@@ -9,8 +9,6 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.AddServiceDefaults();
 
-var port = AuthHelper.KeyCloakPort;
-
 builder.Services.AddAuthentication()
     .AddKeycloakJwtBearer(
         serviceName:  "keycloak",

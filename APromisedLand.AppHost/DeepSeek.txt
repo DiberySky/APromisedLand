@@ -1,0 +1,24 @@
+专家模式:
+
+realm name : apromisedland, display name: A promised land
+
+client id : diberysky, 描述：DiberySky, 
+Audience name：diberysky, Included Custom Audience：diberysky,
+group membership name : group members, Token Claim Name : roles,
+Add to access token: true, Add to token introspection:true
+
+Clients => diberysky Client details => Capability config => Authentication flow => Standard flow => false / Direct access grants => true
+Direct access grants=true, Standard flow=false.
+
+groups : name=admin Description="管理员", name=diberysky Description=成员
+
+admin user : dibery, password Pa$$w0rd, group: admin, fistername: Admin，lastname: Chen，email: admin@diberysky.com, Email verified : true
+user : tian password: Pa$$w0rd, group: diberysky, fistername: 天天，lastname: Chen，email: tian@diberysky.com ,Email verified : true
+
+redirectUris、webOrigins 为空
+
+将clients id : diberysky => Client details =>Dedicated scopes => scope => Full scope allowed=true
+
+将组：diberysky => realm setting => user-registration => default groups
+
+生成Realm 完整配置 JSON 文件，文件名：KeyCloakRealm.json，不含字段 allowUserManagedAccess、directAccessGrantsEnabled
