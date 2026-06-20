@@ -1,0 +1,49 @@
+﻿@page "/weatherclient"
+@attribute [Authorize]
+@inject WeatherApiClient WeatherApi
+
+<h3>天气预报</h3>
+
+@if (forecasts == null)
+{
+    <p>加载中...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>日期</th>
+                <th>温度 (°C)</th>
+                <th>摘要</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var f in forecasts)
+            {
+                <tr>
+                    <td>@f.Date.ToShortDateString()</td>
+                    <td>@f.TemperatureC</td>
+                    <td>@f.Summary</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private WeatherForecast[]? forecasts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            forecasts = await WeatherApi.GetForecastsAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            // 处理错误（JwtAuthorizationMessageHandler 已处理 401/刷新，若最终失败会登出）
+            Console.WriteLine($"请求失败: {ex.Message}");
+        }
+    }
+}

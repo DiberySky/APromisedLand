@@ -1,0 +1,52 @@
+﻿@page "/login"
+@inject NavigationManager Navigation
+@inject AuthService _authService
+
+<EditForm Model="@loginModel" OnValidSubmit="@HandleLogin">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>用户名</label>
+        <InputText @bind-Value="loginModel.Username" />
+    </div>
+    <div>
+        <label>密码</label>
+        <InputText Type="password" @bind-Value="loginModel.Password" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="color:red">@errorMessage</div>
+    }
+
+    <button type="submit">登录</button>
+</EditForm>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+        var success = await _authService.LoginAsync(loginModel.Username, loginModel.Password);
+        if (success)
+        {
+            Navigation.NavigateTo("/", forceLoad: false);
+        }
+        else
+        {
+            errorMessage = "登录失败，请检查用户名或密码。";
+        }
+    }
+
+    private class LoginModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "请输入用户名")]
+        public string Username { get; set; } = "tian";
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "请输入密码")]
+        public string Password { get; set; } = "Pa$$w0rd";
+    }
+}
