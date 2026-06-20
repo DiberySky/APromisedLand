@@ -21,4 +21,4 @@ redirectUris、webOrigins 为空
 
 将组：diberysky => realm setting => user-registration => default groups
 
-生成Realm 完整配置 JSON 文件，文件名：KeyCloakRealm.json，不含字段 allowUserManagedAccess、directAccessGrantsEnabled
+生成Realm 配置 JSON 文件，文件名：KeyCloakRealm.json，不含字段 allowUserManagedAccess、directAccessGrantsEnabled

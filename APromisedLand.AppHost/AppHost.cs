@@ -2,7 +2,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var keycloak = builder.AddKeycloak("Keycloak", 8080)
     .WithDataVolume("keycloak-data")
-    .WithRealmImport("KeycloakRealm.json")
+    // .WithRealmImport("KeycloakRealm.json")
     .WithOtlpExporter();
 
 var weatherapi = builder.AddProject<Projects.WeatherApi>("Weather-Api")
@@ -16,7 +16,7 @@ var gateway = builder.AddYarp("Gateway")
         yarp.AddRoute("/WeatherForecast/{**catch-all}", weatherapi);
     })
     .WithDeveloperCertificateTrust(true)
-    .WithEnvironment("ASPNETCORE_URLS", "https://localhost:8443")
+    .WithEnvironment("ASPNETCORE_URLS", "http://localhost:8443")
     .WithEndpoint(port: 8443, targetPort: 8443, scheme: "https", name: "gateway", isExternal: true);
 
 builder.Build().Run();

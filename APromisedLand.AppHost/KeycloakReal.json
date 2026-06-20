@@ -1,0 +1,109 @@
+{
+  "realm": "apromisedland",
+  "displayName": "A promised land",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "defaultGroups": ["/diberysky"],
+  "clients": [
+    {
+      "clientId": "diberysky",
+      "name": "DiberySky",
+      "description": "DiberySky",
+      "enabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": true,
+      "redirectUris": [],
+      "webOrigins": [],
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "protocolMappers": [
+        {
+          "name": "diberysky",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "audience": "diberysky",
+            "included.custom.audience": "diberysky",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "group members",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "admin",
+      "path": "/admin",
+      "attributes": {},
+      "realmRoles": [],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "diberysky",
+      "path": "/diberysky",
+      "attributes": {},
+      "realmRoles": [],
+      "clientRoles": {},
+      "subGroups": []
+    }
+  ],
+  "users": [
+    {
+      "username": "dibery",
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "Chen",
+      "email": "admin@diberysky.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Pa$$w0rd",
+          "temporary": false
+        }
+      ],
+      "groups": ["/admin"]
+    },
+    {
+      "username": "tian",
+      "enabled": true,
+      "firstName": "天天",
+      "lastName": "Chen",
+      "email": "tian@diberysky.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Pa$$w0rd",
+          "temporary": false
+        }
+      ],
+      "groups": ["/diberysky"]
+    }
+  ]
+}

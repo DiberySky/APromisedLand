@@ -5,7 +5,7 @@
 POST https://{{Keycloak_HostAddress}}/realms/{{realm}}/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
-grant_type=password&client_id=diberysky&username=dibery&password=Pa$$w0rd
+grant_type=password&client_id=diberysky&username=tian&password=Pa$$w0rd
 
 > {%
     // 将 access_token 存入全局变量 token
