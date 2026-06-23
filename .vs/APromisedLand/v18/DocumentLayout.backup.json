@@ -1,7 +1,64 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "E:\\APromisedLand\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{390BCECB-C6E1-4467-AF0F-1BC3D9983C0F}|DiberySky\\DiberySky.csproj|e:\\apromisedland\\diberysky\\components\\projects\\signinapl.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{390BCECB-C6E1-4467-AF0F-1BC3D9983C0F}|DiberySky\\DiberySky.csproj|solutionrelative:diberysky\\components\\projects\\signinapl.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|e:\\apromisedland\\apromisedland.razor\\_imports.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|solutionrelative:apromisedland.razor\\_imports.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{390BCECB-C6E1-4467-AF0F-1BC3D9983C0F}|DiberySky\\DiberySky.csproj|e:\\apromisedland\\diberysky\\components\\_imports.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{390BCECB-C6E1-4467-AF0F-1BC3D9983C0F}|DiberySky\\DiberySky.csproj|solutionrelative:diberysky\\components\\_imports.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{390BCECB-C6E1-4467-AF0F-1BC3D9983C0F}|DiberySky\\DiberySky.csproj|e:\\apromisedland\\diberysky\\components\\projects\\testingapl.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{390BCECB-C6E1-4467-AF0F-1BC3D9983C0F}|DiberySky\\DiberySky.csproj|solutionrelative:diberysky\\components\\projects\\testingapl.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EE6C35E1-89DF-443C-9552-E5EA623E9BF1}|APromisedLand.Shared\\APromisedLand.Shared.csproj|e:\\apromisedland\\apromisedland.shared\\services\\projectservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{EE6C35E1-89DF-443C-9552-E5EA623E9BF1}|APromisedLand.Shared\\APromisedLand.Shared.csproj|solutionrelative:apromisedland.shared\\services\\projectservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|e:\\apromisedland\\apromisedland.razor\\components\\projects\\aboutdialog.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|solutionrelative:apromisedland.razor\\components\\projects\\aboutdialog.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EE6C35E1-89DF-443C-9552-E5EA623E9BF1}|APromisedLand.Shared\\APromisedLand.Shared.csproj|e:\\apromisedland\\apromisedland.shared\\helper\\projecthelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{EE6C35E1-89DF-443C-9552-E5EA623E9BF1}|APromisedLand.Shared\\APromisedLand.Shared.csproj|solutionrelative:apromisedland.shared\\helper\\projecthelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EE6C35E1-89DF-443C-9552-E5EA623E9BF1}|APromisedLand.Shared\\APromisedLand.Shared.csproj|e:\\apromisedland\\apromisedland.shared\\helper\\sharedhelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{EE6C35E1-89DF-443C-9552-E5EA623E9BF1}|APromisedLand.Shared\\APromisedLand.Shared.csproj|solutionrelative:apromisedland.shared\\helper\\sharedhelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|e:\\apromisedland\\apromisedland.razor\\components\\layout\\pagesky.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|solutionrelative:apromisedland.razor\\components\\layout\\pagesky.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|e:\\apromisedland\\apromisedland.razor\\components\\layout\\dialogsky.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|solutionrelative:apromisedland.razor\\components\\layout\\dialogsky.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|e:\\apromisedland\\apromisedland.razor\\helper\\dialoghelper.about.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|solutionrelative:apromisedland.razor\\helper\\dialoghelper.about.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|e:\\apromisedland\\apromisedland.razor\\helper\\dialoghelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|solutionrelative:apromisedland.razor\\helper\\dialoghelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|e:\\apromisedland\\apromisedland.razor\\components\\projects\\testingdialog.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}|APromisedLand.Razor\\APromisedLand.Razor.csproj|solutionrelative:apromisedland.razor\\components\\projects\\testingdialog.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{390BCECB-C6E1-4467-AF0F-1BC3D9983C0F}|DiberySky\\DiberySky.csproj|e:\\apromisedland\\diberysky\\components\\pages\\weatherfactory.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{390BCECB-C6E1-4467-AF0F-1BC3D9983C0F}|DiberySky\\DiberySky.csproj|solutionrelative:diberysky\\components\\pages\\weatherfactory.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -9,7 +66,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": -1,
+          "SelectedChildIndex": 8,
           "Children": [
             {
               "$type": "Bookmark",
@@ -26,6 +83,187 @@
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "TestingApl.razor",
+              "DocumentMoniker": "E:\\APromisedLand\\DiberySky\\Components\\Projects\\TestingApl.razor",
+              "RelativeDocumentMoniker": "DiberySky\\Components\\Projects\\TestingApl.razor",
+              "ToolTip": "E:\\APromisedLand\\DiberySky\\Components\\Projects\\TestingApl.razor",
+              "RelativeToolTip": "DiberySky\\Components\\Projects\\TestingApl.razor",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAASAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-23T11:27:07.702Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ProjectService.cs",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Shared\\Services\\ProjectService.cs",
+              "RelativeDocumentMoniker": "APromisedLand.Shared\\Services\\ProjectService.cs",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Shared\\Services\\ProjectService.cs",
+              "RelativeToolTip": "APromisedLand.Shared\\Services\\ProjectService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-23T11:26:34.726Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "ProjectHelper.cs",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Shared\\Helper\\ProjectHelper.cs",
+              "RelativeDocumentMoniker": "APromisedLand.Shared\\Helper\\ProjectHelper.cs",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Shared\\Helper\\ProjectHelper.cs*",
+              "RelativeToolTip": "APromisedLand.Shared\\Helper\\ProjectHelper.cs*",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAxAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-23T11:24:28.1Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "SharedHelper.cs",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Shared\\Helper\\SharedHelper.cs",
+              "RelativeDocumentMoniker": "APromisedLand.Shared\\Helper\\SharedHelper.cs",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Shared\\Helper\\SharedHelper.cs",
+              "RelativeToolTip": "APromisedLand.Shared\\Helper\\SharedHelper.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-23T11:23:39.5Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "SignInApl.razor",
+              "DocumentMoniker": "E:\\APromisedLand\\DiberySky\\Components\\Projects\\SignInApl.razor",
+              "RelativeDocumentMoniker": "DiberySky\\Components\\Projects\\SignInApl.razor",
+              "ToolTip": "E:\\APromisedLand\\DiberySky\\Components\\Projects\\SignInApl.razor*",
+              "RelativeToolTip": "DiberySky\\Components\\Projects\\SignInApl.razor*",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACsAAAAyAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-23T10:36:03.541Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "PageSky.razor",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Razor\\Components\\Layout\\PageSky.razor",
+              "RelativeDocumentMoniker": "APromisedLand.Razor\\Components\\Layout\\PageSky.razor",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Razor\\Components\\Layout\\PageSky.razor",
+              "RelativeToolTip": "APromisedLand.Razor\\Components\\Layout\\PageSky.razor",
+              "ViewState": "AgIAABsAAAAAAAAAAAAAAFgAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-23T10:29:47.068Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "DialogHelper.About.cs",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Razor\\Helper\\DialogHelper.About.cs",
+              "RelativeDocumentMoniker": "APromisedLand.Razor\\Helper\\DialogHelper.About.cs",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Razor\\Helper\\DialogHelper.About.cs",
+              "RelativeToolTip": "APromisedLand.Razor\\Helper\\DialogHelper.About.cs",
+              "ViewState": "AgIAAAYAAAAAAAAAAAAAABQAAAAfAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-23T10:25:54.924Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "DialogHelper.cs",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Razor\\Helper\\DialogHelper.cs",
+              "RelativeDocumentMoniker": "APromisedLand.Razor\\Helper\\DialogHelper.cs",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Razor\\Helper\\DialogHelper.cs",
+              "RelativeToolTip": "APromisedLand.Razor\\Helper\\DialogHelper.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAuwBoAAAAhAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-23T10:25:10.142Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "AboutDialog.razor",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Razor\\Components\\Projects\\AboutDialog.razor",
+              "RelativeDocumentMoniker": "APromisedLand.Razor\\Components\\Projects\\AboutDialog.razor",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Razor\\Components\\Projects\\AboutDialog.razor*",
+              "RelativeToolTip": "APromisedLand.Razor\\Components\\Projects\\AboutDialog.razor*",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAA9AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-23T10:17:32.013Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "DialogSky.razor",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Razor\\Components\\Layout\\DialogSky.razor",
+              "RelativeDocumentMoniker": "APromisedLand.Razor\\Components\\Layout\\DialogSky.razor",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Razor\\Components\\Layout\\DialogSky.razor",
+              "RelativeToolTip": "APromisedLand.Razor\\Components\\Layout\\DialogSky.razor",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAAACIAAAAvAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-23T10:11:12.072Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "WeatherFactory.razor",
+              "DocumentMoniker": "E:\\APromisedLand\\DiberySky\\Components\\Pages\\WeatherFactory.razor",
+              "RelativeDocumentMoniker": "DiberySky\\Components\\Pages\\WeatherFactory.razor",
+              "ToolTip": "E:\\APromisedLand\\DiberySky\\Components\\Pages\\WeatherFactory.razor",
+              "RelativeToolTip": "DiberySky\\Components\\Pages\\WeatherFactory.razor",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAXAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-23T10:06:29.573Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "_Imports.razor",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Razor\\_Imports.razor",
+              "RelativeDocumentMoniker": "APromisedLand.Razor\\_Imports.razor",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Razor\\_Imports.razor*",
+              "RelativeToolTip": "APromisedLand.Razor\\_Imports.razor*",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-23T10:05:43.107Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "_Imports.razor",
+              "DocumentMoniker": "E:\\APromisedLand\\DiberySky\\Components\\_Imports.razor",
+              "RelativeDocumentMoniker": "DiberySky\\Components\\_Imports.razor",
+              "ToolTip": "E:\\APromisedLand\\DiberySky\\Components\\_Imports.razor*",
+              "RelativeToolTip": "DiberySky\\Components\\_Imports.razor*",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-23T10:05:21.989Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "TestingDialog.razor",
+              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Razor\\Components\\Projects\\TestingDialog.razor",
+              "RelativeDocumentMoniker": "APromisedLand.Razor\\Components\\Projects\\TestingDialog.razor",
+              "ToolTip": "E:\\APromisedLand\\APromisedLand.Razor\\Components\\Projects\\TestingDialog.razor",
+              "RelativeToolTip": "APromisedLand.Razor\\Components\\Projects\\TestingDialog.razor",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACYAAAAVAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-23T10:04:38.586Z",
+              "EditorCaption": ""
             }
           ]
         },

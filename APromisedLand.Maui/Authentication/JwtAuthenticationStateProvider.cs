@@ -37,13 +37,13 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
             return AnonymousState;
         }
 
-        var claims = jwt.Claims.ToList();
+        //var claims = jwt.Claims.ToList();
 
-        // Keycloak → .NET 标准映射
-        MapClaim(claims, "given_name", ClaimTypes.GivenName);
-        MapClaim(claims, "family_name", ClaimTypes.Surname);
-        MapClaim(claims, "preferred_username", ClaimTypes.Name);
-        MapClaim(claims, "email", ClaimTypes.Email);
+        //// Keycloak → .NET 标准映射
+        //MapClaim(claims, "given_name", ClaimTypes.GivenName);
+        //MapClaim(claims, "family_name", ClaimTypes.Surname);
+        //MapClaim(claims, "preferred_username", ClaimTypes.Name);
+        //MapClaim(claims, "email", ClaimTypes.Email);
 
         var identity = new ClaimsIdentity(jwt.Claims, "jwt");
         return new AuthenticationState(new ClaimsPrincipal(identity));

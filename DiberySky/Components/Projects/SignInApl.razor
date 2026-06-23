@@ -1,0 +1,60 @@
+﻿@page "/"
+@page "/signinapl"
+@using global::System.Security.Claims
+
+@inject AuthService AuthService
+@inject AuthenticationStateProvider AuthProvider
+@inject ProjectService ProjectService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigater
+
+<SignInSky Title="武汉供电段"
+           OnSignInClick="e => SignInClick(e)"
+           OnStartClick="e => Navigater.NavigateTo(ProjectHelper.HomePage)"
+           OnBackClick='e => DialogService.ShowTestDialogAsync("Testing Dialog", "testing args")' />
+
+@code {
+
+    [Parameter] public required string HomePage { get; set; }
+
+    private async Task SignInClick(SignInUser user)
+    {
+        try
+        {
+            var success = await AuthService.LoginAsync(user.UserName, user.Password);
+            if (success)
+            {
+
+                var authState = await AuthProvider.GetAuthenticationStateAsync();
+                var userlogin = authState.User;
+
+                if (userlogin != null && userlogin.Identity != null
+                    && userlogin.Identity.IsAuthenticated)
+                {
+                    ProjectService.GetClaimValue(userlogin.Claims);
+
+                    StateHasChanged();
+
+                    var userId = userlogin.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                }
+
+                Snackbar.Success($"登录成功: {ProjectService.UserName}");
+
+                Navigater.NavigateTo(ProjectHelper.HomePage);
+            }
+            else
+            {
+                Snackbar.Error("登录失败，请检查用户名或密码。");
+            }
+        }
+        catch (Exception e)
+        {
+            Snackbar.Details("登录失败。", e.Message, DialogService);
+        }
+        finally
+        {
+            
+        }
+    }
+}

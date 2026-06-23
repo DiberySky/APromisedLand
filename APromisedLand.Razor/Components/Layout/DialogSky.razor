@@ -1,0 +1,93 @@
+﻿@namespace APromisedLand.Razor.Components
+
+<MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense=true
+           Elevation="0">
+    <ChildContent>
+        @if (BackArrowVisibled)
+        {
+            <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                           Edge="Edge.Start" Color="Color.Warning"
+                           OnClick=@(e => Cancel()) />
+        }
+
+        @if (string.IsNullOrEmpty(Title) == false)
+        {
+            <MudText>@Title</MudText>
+        }
+
+        @if (TopBarContent is not null)
+        {
+            @TopBarContent
+        }
+
+        @if (StartIconVisibled)
+        {
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Outlined.Menu"
+                           Color="Color.Success"
+                           OnClick="e => OnStartClick.InvokeAsync()" />
+        }
+
+        @if (CloseIconVisibled)
+        {
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                           OnClick="e => Cancel()" />
+        }
+
+    </ChildContent>
+</MudAppBar>
+
+<MudDialog>
+    <TitleContent>
+        <MudSpacer />
+        <MudText Color="Color.Primary">A promised land</MudText>
+        <MudSpacer />
+    </TitleContent>
+    <DialogContent>
+
+        @if (DialogContent != null)
+        {
+            @DialogContent
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (DialogActionsVisibled)
+        {
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary">关于</MudButton>
+            <MudSpacer />
+        }
+    </DialogActions>
+</MudDialog>
+
+@if (DialogActionsVisibled)
+{
+    <MudAppBar Bottom Class="mud-theme-dark" Dense
+               Elevation="0">
+        @if (DialogActions != null)
+        {
+            @DialogActions
+        }
+    </MudAppBar>
+}
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required string Title { get; set; }
+    [Parameter] public bool BackArrowVisibled { get; set; } = true;
+    [Parameter] public bool StartIconVisibled { get; set; } = true;
+    [Parameter] public bool CloseIconVisibled { get; set; } = false;
+    [Parameter] public bool DialogActionsVisibled { get; set; } = false;
+
+    [Parameter] public RenderFragment? TopBarContent { get; set; }
+    // [Parameter] public RenderFragment? TitleContent { get; set; }
+    [Parameter] public RenderFragment? DialogContent { get; set; }
+    [Parameter] public RenderFragment? DialogActions { get; set; }
+
+    [Parameter] public EventCallback OnStartClick { get; set; }
+
+    private void Cancel() => MudDialog?.Cancel();
+}

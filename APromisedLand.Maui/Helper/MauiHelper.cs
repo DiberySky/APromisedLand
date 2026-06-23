@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.Components.Authorization;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using MudBlazor.Services;
+using MudBlazor;
 
 namespace APromisedLand.Maui.Helper;
 
-public static class ServiceHelper
+public static class MauiHelper
 {
     public static void AuthenticationServices(MauiAppBuilder builder)
     {
@@ -26,4 +28,21 @@ public static class ServiceHelper
         // 注册 HttpClient 并添加自动附加令牌的处理程序
         builder.Services.AddScoped<JwtAuthorizationMessageHandler>();
     }
+
+    public static void MudBlazorServices(MauiAppBuilder builder)
+    {
+        builder.Services.AddMudServices(config =>
+        {
+            config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.TopLeft;
+            config.SnackbarConfiguration.RequireInteraction = false;
+            config.SnackbarConfiguration.PreventDuplicates = false;
+            config.SnackbarConfiguration.NewestOnTop = false;
+            config.SnackbarConfiguration.ShowCloseIcon = true;
+            config.SnackbarConfiguration.VisibleStateDuration = 10000;
+            config.SnackbarConfiguration.HideTransitionDuration = 500;
+            config.SnackbarConfiguration.ShowTransitionDuration = 500;
+            config.SnackbarConfiguration.SnackbarVariant = Variant.Filled;
+        });
+    }
+
 }

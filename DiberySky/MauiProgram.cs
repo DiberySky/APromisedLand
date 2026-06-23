@@ -1,7 +1,9 @@
 ﻿using APromisedLand.Maui.Authentication;
 using APromisedLand.Maui.Helper;
+using APromisedLand.Razor.Services;
 using APromisedLand.Shared.Clients.Weather;
 using APromisedLand.Shared.Helper;
+using APromisedLand.Shared.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
@@ -19,8 +21,11 @@ public static class MauiProgram
 
         builder.Services.AddMauiBlazorWebView();
 
+        builder.Services.AddScoped<BlazorService>();
+        builder.Services.AddScoped<ProjectService>();
+
         //AuthenticationServices(builder);
-        ServiceHelper.AuthenticationServices(builder);
+        MauiHelper.AuthenticationServices(builder);
         HttpClientHelper.AuthHttpClient(builder);
 
         //HttpClientServices(builder);
@@ -31,7 +36,8 @@ public static class MauiProgram
         // 添加级联认证状态（在组件中可通过 CascadingAuthenticationState 获取）
         builder.Services.AddCascadingAuthenticationState();
 
-        builder.Services.AddMudServices();
+        //builder.Services.AddMudServices();
+        MauiHelper.MudBlazorServices(builder);
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

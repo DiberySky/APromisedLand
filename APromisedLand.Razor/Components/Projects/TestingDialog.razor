@@ -1,0 +1,53 @@
+﻿@namespace APromisedLand.Razor.Components
+
+@inject ISnackbar Snackbar
+@inject BlazorService BlazorService
+
+<DialogSky Title="A promised land"
+           DialogActionsVisibled=false>
+    @* <TitleContent>
+        <MudText>TitleContent</MudText>
+    </TitleContent> *@
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Small">
+            <MudStack>
+                <MudTextField T="string" Text="ProjectArgs.User?.Title"
+                              Variant="Variant.Text" Label="用户"
+                              ReadOnly />
+
+                <MudForm @ref="_form">
+                    <MudStack>
+                        @for (int i = 0; i < 10; i++)
+                        {
+                            <h1>@i</h1>
+                            <PasswordSky @ref="_currentPasswordField" Label="当前密码" />
+                            <MudDivider />
+                            <PasswordSky @ref="_newPasswordField" Label="新密码" />
+                            <PasswordSky @ref="_confirmPasswordField" Label="确认密码" />
+                            <PasswordSky @ref="_currentPasswordField" Label="当前密码" />
+                            <MudDivider />
+                        }
+
+                    </MudStack>
+                </MudForm>
+            </MudStack>
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudSpacer/>
+        <MudText Color="Color.Primary">武汉浩瀚科技有限公司</MudText>
+        <MudSpacer />
+    </DialogActions>
+</DialogSky>
+
+@code {
+    MudForm? _form;
+    PasswordSky? _currentPasswordField;
+    PasswordSky? _newPasswordField;
+    PasswordSky? _confirmPasswordField;
+
+    [CascadingParameter] public IMudDialogInstance? DialogInstance { get; set; }
+
+    [Parameter] public required string TestingArgs { get; set; }
+
+}

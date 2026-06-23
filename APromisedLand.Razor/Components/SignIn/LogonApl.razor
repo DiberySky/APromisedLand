@@ -1,0 +1,75 @@
+﻿@namespace APromisedLand.Razor.Components
+@using APromisedLand.Razor.Helper
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudContainer Class="py-4 px-8 mt-8" MaxWidth="MaxWidth.Small">
+    <MudCard Outlined="true">
+        <MudCardHeader Class="mud-theme-success">
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">登录</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudIconButton Icon="@Icons.Material.Filled.Login"
+                               Color="Color.Warning" />
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudForm @ref="_form">
+                <MudStack Spacing="2" Class="px-8">
+                    <MudTextField T="string" Text="@_user" Required
+                                  Variant="Variant.Outlined" Label="用户" />
+
+                    <PasswordSky @ref="_passwordField" Variant="Variant.Outlined" />
+                </MudStack>
+            </MudForm>
+        </MudCardContent>
+        <MudCardActions>
+            <MudSpacer />
+            <ButtonLoadingSky Color="Color.Primary" Size="Size.Small"
+                              Class="mr-8 mb-2"
+                              Variant="Variant.Filled"
+                              FuncClick="OnSubmitClick" />
+        </MudCardActions>
+    </MudCard>
+</MudContainer>
+
+@code {
+    MudForm? _form;
+    PasswordSky? _passwordField;
+    string? _user;
+
+    [Parameter] public EventCallback<SignInUser> OnLogonClick { get; set; }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+#if DEBUG
+        _user = "tian";
+#endif
+    }
+    private async Task OnSubmitClick()
+    {
+        if (_form == null || _passwordField == null
+            || string.IsNullOrEmpty(_user) || string.IsNullOrEmpty(_passwordField.Password)
+        || !_form.IsValid)
+        {
+            return;
+        }
+
+        try
+        {
+            await _form.ValidateAsync();
+
+            if (_form.IsValid == false) return;
+
+            var logonUser = new SignInUser { UserName = _user, Password = _passwordField.Password };
+
+            await OnLogonClick.InvokeAsync(logonUser);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Details("登录失败。", e.Message, DialogService);
+        }
+    }
+}

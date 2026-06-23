@@ -5,12 +5,11 @@
     </Found>
 </Router> *@
 
-<CascadingAuthenticationState>
+@* <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
                 <NotAuthorized>
-                    @* 未登录时显示的内容 *@
                     <p>请先登录以访问此页面。</p>
                 </NotAuthorized>
             </AuthorizeRouteView>
@@ -22,12 +21,23 @@
             </LayoutView>
         </NotFound>
     </Router>
-</CascadingAuthenticationState>
+</CascadingAuthenticationState> *@
 
-@* Required *@
-<MudThemeProvider IsDarkMode=true />
-<MudPopoverProvider />
-@* Needed for dialogs *@
-<MudDialogProvider />
-@* Needed for snackbars *@
-<MudSnackbarProvider />
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(LayoutSky)">
+                <NotAuthorized>
+                    @* 未登录时显示的内容 *@
+                    <p>请先登录以访问此页面。</p>
+                </NotAuthorized>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <PageTitle>未找到</PageTitle>
+            <LayoutView Layout="@typeof(LayoutSky)">
+                <p>抱歉，该页面不存在。</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

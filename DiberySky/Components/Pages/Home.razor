@@ -1,17 +1,16 @@
-﻿@page "/"
+﻿@page "/home"
 
-@inject AuthService _authService
 
 <h1>Hello, world!</h1>
 
 Welcome to your new app.
 
-<button class="btn btn-primary" @onclick="Logout">Logout</button>
-<MudButton Variant="Variant.Filled" Color=Color.Primary OnClick="Logout">Logout</MudButton>
-
 @code {
-    private async Task Logout()
-    {
-        await _authService.LogoutAsync();
-    }
+    
+    // private async void LogoutClick()
+    // {
+    //     await AuthService.LogoutAsync();
+
+    //     StateHasChanged();
+    // }
 }

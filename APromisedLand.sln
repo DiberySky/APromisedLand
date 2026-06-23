@@ -1,5 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.7.11911.148
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APromisedLand.AppHost", "APromisedLand.AppHost\APromisedLand.AppHost.csproj", "{DE33A697-1B8A-4186-9E16-CE21FFF97F36}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APromisedLand.ServiceDefaults", "APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj", "{0BF2CA85-021D-4799-A2FA-80C3B8D9CCD8}"
@@ -55,11 +58,17 @@ Global
 		{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{390BCECB-C6E1-4467-AF0F-1BC3D9983C0F} = {94403BB7-A165-404E-8674-5DC28867E92E}
 		{6B3F21CC-0423-41F0-9FEE-EA0B546F2853} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
 		{96A33913-BFCE-4AF8-A0B8-6969E5B53EFE} = {DC357836-6548-4918-9C56-E876B4E81A44}
 		{EE6C35E1-89DF-443C-9552-E5EA623E9BF1} = {DC357836-6548-4918-9C56-E876B4E81A44}
 		{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9} = {DC357836-6548-4918-9C56-E876B4E81A44}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9647CF65-ABDB-4637-B56C-E0CDAC22FFFB}
 	EndGlobalSection
 EndGlobal

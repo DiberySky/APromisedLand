@@ -1,0 +1,57 @@
+﻿@namespace APromisedLand.Razor.Components
+
+
+<MudIconButton Disabled="@(_processing || Disabled)"
+               Variant=Variant Color=Color
+               Size=Size Class=@Class
+               OnClick="ProcessSomething">
+    @if (_processing)
+    {
+        <MudProgressCircular Size=Size
+                             Indeterminate="true" Color=ProgressColor />
+    }
+    else
+    {
+        <MudIcon Icon="@Icon" />
+    }
+</MudIconButton>
+
+    @code {
+    [Parameter] public string Icon { get; set; } = Icons.Material.Outlined.Check;
+    [Parameter] public string Text { get; set; } = string.Empty;
+    [Parameter] public Color Color { get; set; } = Color.Primary;
+    [Parameter] public Variant Variant { get; set; } = Variant.Text;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public Size Size { get; set; } = Size.Medium;
+    [Parameter] public Color ProgressColor { get; set; } = Color.Warning;
+    [Parameter] public string? Class { get; set; }
+
+
+    [Parameter] public Func<Task>? FuncClick { get; set; }
+
+    private bool _processing = false;
+
+    private async Task ProcessSomething()
+    {
+        try
+        {
+            _processing = true;
+
+            StateHasChanged();
+
+            await Task.Yield();
+            //await Task.Delay(3000);
+
+            if (FuncClick != null)
+            {
+                await FuncClick();
+            }
+        }
+        finally
+        {
+            _processing = false;
+
+            StateHasChanged();
+        }
+    }
+}

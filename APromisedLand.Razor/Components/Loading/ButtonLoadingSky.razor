@@ -1,0 +1,69 @@
+﻿@namespace APromisedLand.Razor.Components
+
+<MudButton Disabled="@(_processing || Disabled)"
+           EndIcon="@EndIcon"
+           IconColor="@IconColor"
+           StartIcon="@StartIcon"
+           Size=@Size Class="@Class"
+           FullWidth="FullWidth"
+           OnClick="ProcessSomething"
+           Variant=Variant Color=Color>
+    @if (_processing)
+    {
+        <MudProgressCircular Size=Size
+                             Indeterminate="true" Color=ProgressColor />
+    }
+    else
+    {
+        <MudText>@Text</MudText>
+    }
+</MudButton>
+
+    @code {
+    [Parameter] public string Text { get; set; } = "提交";
+    [Parameter] public Color Color { get; set; } = Color.Default;
+    [Parameter] public Size Size { get; set; } = Size.Small;
+    [Parameter] public Variant Variant { get; set; } = Variant.Text;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool FullWidth { get; set; }
+    [Parameter] public Color ProgressColor { get; set; } = Color.Warning;
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? EndIcon { get; set; }
+    [Parameter] public string? StartIcon { get; set; }
+    [Parameter] public Color IconColor { get; set; } = Color.Default;
+
+    [Parameter] public Func<Task>? FuncClick { get; set; }
+
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool _processing = false;
+
+    private async Task ProcessSomething()
+    {
+        try
+        {
+            _processing = true;
+
+            StateHasChanged();
+
+            await Task.Yield();
+            // await Task.Delay(300);
+
+            if (FuncClick != null)
+            {
+                await FuncClick();
+            }
+        }
+        catch (Exception)
+        {
+        }
+        finally
+        {
+            _processing = false;
+
+            StateHasChanged();
+        }
+    }
+}

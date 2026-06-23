@@ -1,0 +1,90 @@
+﻿@namespace APromisedLand.Razor.Components
+
+@inject IDialogService DialogService
+
+<MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense=true
+           Elevation="0">
+    <ChildContent>
+        @if (ArrowBackVisibled)
+        {
+            <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                           Edge="Edge.Start" Color="Color.Warning"
+                           OnClick=@(e => OnBackClick.InvokeAsync()) />
+        }
+
+        @if (string.IsNullOrEmpty(Title) == false)
+        {
+            <MudText>@Title</MudText>
+        }
+
+        @if (TopBarContent is not null)
+        {
+            @TopBarContent
+        }
+
+        @if (StartButtonVisibled)
+        {
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Outlined.Menu"
+                           Color="Color.Success"
+                           OnClick="e => OnStartClick.InvokeAsync()" />
+        }
+    </ChildContent>
+</MudAppBar>
+
+<MudContainer MaxWidth="@MaxWidth" Class="mb-16">
+    @if (PageContent != null)
+    {
+        @PageContent
+    }
+</MudContainer>
+
+@if (BottomBarVisibled)
+{
+    <MudAppBar Bottom Color="@BottomBarColor" Dense>
+        <ChildContent>
+            @if (BottomBarContent is not null)
+            {
+                @BottomBarContent
+            }
+            else
+            {
+                if (BottomBarLeftContent != null)
+                {
+                    @BottomBarLeftContent
+                }
+                <MudSpacer/>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                OnClick="e => About()">关于</MudButton>
+                <MudSpacer />
+                if (BottomBarRightContent != null)
+                {
+                    @BottomBarRightContent
+                }
+            }
+        </ChildContent>
+    </MudAppBar>
+}
+
+@code {
+    [Parameter] public required string Title { get; set; }
+    [Parameter] public bool ArrowBackVisibled { get; set; } = true;
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.False;
+    [Parameter] public bool BottomBarVisibled { get; set; } = false;
+    [Parameter] public Color BottomBarColor { get; set; } = Color.Dark;
+    [Parameter] public bool StartButtonVisibled { get; set; } = true;
+
+    [Parameter] public RenderFragment? TopBarContent { get; set; }
+    [Parameter] public RenderFragment? PageContent { get; set; }
+    [Parameter] public RenderFragment? BottomBarContent { get; set; }
+    [Parameter] public RenderFragment? BottomBarLeftContent { get; set; }
+    [Parameter] public RenderFragment? BottomBarRightContent { get; set; }
+
+    [Parameter] public EventCallback OnBackClick { get; set; }
+    [Parameter] public EventCallback OnStartClick { get; set; }
+
+    private async Task About()
+    {
+        await DialogService.ShowAboutDialogAsync();
+    }
+}
