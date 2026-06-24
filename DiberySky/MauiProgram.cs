@@ -1,8 +1,10 @@
 ﻿using APromisedLand.Maui.Authentication;
 using APromisedLand.Maui.Helper;
+using APromisedLand.Maui.Services;
 using APromisedLand.Razor.Services;
 using APromisedLand.Shared.Clients.Weather;
 using APromisedLand.Shared.Helper;
+using APromisedLand.Shared.Intefaces;
 using APromisedLand.Shared.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
@@ -43,6 +45,8 @@ public static class MauiProgram
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
 #endif
+        
+        PlatformServer.PlatformInfo();
 
         return builder.Build();
     }

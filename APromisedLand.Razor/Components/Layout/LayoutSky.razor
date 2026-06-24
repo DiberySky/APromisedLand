@@ -1,6 +1,7 @@
 ﻿@namespace APromisedLand.Razor.Components
 
 @inherits LayoutComponentBase
+@inject ProjectService ProjectService
 
 <MudLayout>
     <MudAppBar Dense Class="mud-theme-primary">
@@ -24,5 +25,12 @@
 <MudSnackbarProvider />
 
 @code {
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
 
+#if DEBUG
+        ProjectService.Debug = true;
+#endif
+    }
 }

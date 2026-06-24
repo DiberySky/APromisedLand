@@ -3,10 +3,10 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageSky Title="@Title" ArrowBackVisibled="true"
+<PageSky Title="@Title" ArrowBackVisibled="false"
          BottomBarVisibled="true" 
-         OnStartClick="e => OnStartClick.InvokeAsync()"
-         OnBackClick="e => OnBackClick.InvokeAsync()">
+         StartButtonVisibled="true"
+         OnStartClick="e => OnStartClick.InvokeAsync()">
     <PageContent>
         <MudContainer Class="py-4 px-8 mt-8" MaxWidth="MaxWidth.Small">
             <MudCard Outlined="true">

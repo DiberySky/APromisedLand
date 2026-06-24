@@ -1,4 +1,5 @@
 ﻿using APromisedLand.Shared.Helper;
+using APromisedLand.Shared.Intefaces;
 using System;
 using System.Collections.Generic;
 using System.Net.Http.Json;
@@ -7,7 +8,7 @@ using System.Text.Json;
 
 namespace APromisedLand.Maui.Authentication;
 
-public class AuthService
+public class AuthService : IAuthService
 {
     private readonly HttpClient _httpClient;       // AuthClient
     private readonly JwtAuthenticationStateProvider _authStateProvider;

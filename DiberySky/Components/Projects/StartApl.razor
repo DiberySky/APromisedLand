@@ -1,0 +1,71 @@
+﻿@page "/StartApl"
+@using APromisedLand.Shared.Models
+
+@inject IAuthService AuthService
+@inject AuthenticationStateProvider AuthProvider
+@* @inject ProjectService ProjectService *@
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigater
+
+<PageSky Title="导航">
+    <PageContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraSmall">
+            <MudStack Class="my-4">
+                @foreach (var key in ProjectService.StartDict.Keys)
+                {
+                    PageInfo pageInfo = ProjectService.StartDict[key];
+                    
+                    <AuthorizeView>
+                        <Authorized>
+                            @if (pageInfo.Authorized)
+                            {
+                                <MudButton Variant="Variant.Filled"
+                                           FullWidth Color="Color.Success"
+                                           OnClick="e => Navigate(key)">@key</MudButton>
+                            }
+                        </Authorized>
+                        <NotAuthorized>
+                            @if (!pageInfo.Authorized)
+                            {
+                                <MudButton Variant="Variant.Filled"
+                                           FullWidth Color="Color.Success"
+                                           OnClick="e => Navigate(key)">@key</MudButton>
+                            }
+                        </NotAuthorized>
+                    </AuthorizeView>
+                }
+            </MudStack>
+        </MudContainer>
+    </PageContent>
+</PageSky>
+
+@code {
+    private async Task Navigate(string key)
+    {
+        //var value = ProjectService.StartDict[key];
+
+        if (ProjectService.StartDict.TryGetValue(key, out PageInfo? page))
+        {
+            if (page.IsDialog)
+            {
+                await DialogAsync(page);
+                return;
+            }
+
+            Navigater.NavigateTo(page.Name);
+        }
+        else
+        {
+            Snackbar.Info($"不存在：{key}");
+        }
+    }
+
+    private async Task DialogAsync(PageInfo pageInfo)
+    {
+        if (pageInfo.Name.ToLower() == "about")
+        {
+            await DialogService.ShowAboutDialogAsync();
+        }
+    }
+}

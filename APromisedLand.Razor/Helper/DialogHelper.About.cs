@@ -22,7 +22,7 @@ public static partial class DialogHelper
             CloseOnEscapeKey = true,
             FullWidth = true,
             Position = DialogPosition.Center,
-            MaxWidth = MaxWidth.ExtraSmall,
+            MaxWidth = MaxWidth.Small,
             BackdropClick = true,
             BackgroundClass = null,
             CloseOnNavigation = true,

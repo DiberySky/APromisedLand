@@ -3,11 +3,7 @@
 @inject NavigationManager Navigater
 
 <PageSky MaxWidth="MaxWidth.Small" Title="Home" BottomBarVisibled
-         OnBackClick='(e) =>
-         {
-             Navigater.NavigateTo("signinapl");
-         }'>
-
+         BackPage="signinapl">
     <PageContent>
         <MudPaper Class="border-3 border-solid mud-border-success pa-4">
             @for (int i = 0; i < 10; i++)

@@ -6,9 +6,11 @@ namespace APromisedLand.Shared.Helper;
 
 public static class ProjectHelper
 {
-    public const string Version = "2026.06.23.01";
+    //public const string Version = "2026.06.23.01";
 
-    public const string HomePage = "Counter";
+    //public const string HomePage = "Counter";
 
-    public const string Copyright = "武汉浩瀚科技有限公司";
+    //public const string StartPage = "StartApl";
+
+    //public const string SignInPage = "SigninApl";
 }

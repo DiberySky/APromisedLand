@@ -6,15 +6,29 @@
            CloseIconVisibled>
     <DialogContent>
         <MudContainer Class="d-flex justify-center py-4" MaxWidth="MaxWidth.Small">
-            <MudStack Row AlignItems="AlignItems.Center">
-                <MudText Typo="Typo.h6" Color="Color.Default">版本：</MudText>
-                <MudText Color="Color.Success">@ProjectHelper.Version</MudText>
+            <MudStack>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6" Color="Color.Default">版本：</MudText>
+                    <MudText Color="Color.Success">@ProjectService.Version</MudText>
+                </MudStack>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6" Color="Color.Default">操作系统：</MudText>
+                    <MudText Color="Color.Success">@ProjectService.PlatformOS</MudText>
+                </MudStack>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6" Color="Color.Default">设备：</MudText>
+                    <MudText Color="Color.Success">@ProjectService.PlatformType</MudText>
+                </MudStack>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6" Color="Color.Default">屏幕尺寸：</MudText>
+                    <MudText Color="Color.Success">@ProjectService.ScreenInfo.Width x @ProjectService.ScreenInfo.Height</MudText>
+                </MudStack>
             </MudStack>
         </MudContainer>
     </DialogContent>
     <DialogActions>
         <MudSpacer />
-        <MudText Color="Color.Primary">@ProjectHelper.Copyright</MudText>
+        <MudText Color="Color.Primary">@ProjectService.Copyright</MudText>
         <MudSpacer />
     </DialogActions>
 </DialogSky>

@@ -1,47 +1,55 @@
 ﻿@page "/"
 @page "/signinapl"
-@using global::System.Security.Claims
+@using APromisedLand.Maui.Services
 
-@inject AuthService AuthService
+@inject IAuthService AuthService
 @inject AuthenticationStateProvider AuthProvider
-@inject ProjectService ProjectService
+@* @inject ProjectService ProjectService *@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigater
 
 <SignInSky Title="武汉供电段"
            OnSignInClick="e => SignInClick(e)"
-           OnStartClick="e => Navigater.NavigateTo(ProjectHelper.HomePage)"
+           OnStartClick="e => Navigater.NavigateTo(ProjectService.StartPage)"
            OnBackClick='e => DialogService.ShowTestDialogAsync("Testing Dialog", "testing args")' />
 
 @code {
 
     [Parameter] public required string HomePage { get; set; }
 
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        PlatformServer.DisplayInfo();
+    }
+
     private async Task SignInClick(SignInUser user)
     {
         try
         {
+            // var size = PlatformServer.CurrentWindow();
+            ProjectService.Authorized = false;
+
             var success = await AuthService.LoginAsync(user.UserName, user.Password);
             if (success)
             {
-
                 var authState = await AuthProvider.GetAuthenticationStateAsync();
                 var userlogin = authState.User;
 
-                if (userlogin != null && userlogin.Identity != null
-                    && userlogin.Identity.IsAuthenticated)
+                if (userlogin != null)
                 {
                     ProjectService.GetClaimValue(userlogin.Claims);
 
                     StateHasChanged();
 
-                    var userId = userlogin.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    ProjectService.Authorized = true;
+
+                    Snackbar.Success($"登录成功: {ProjectService.UserName}");
+
+                    Navigater.NavigateTo(ProjectService.SignInPage);
                 }
-
-                Snackbar.Success($"登录成功: {ProjectService.UserName}");
-
-                Navigater.NavigateTo(ProjectHelper.HomePage);
             }
             else
             {

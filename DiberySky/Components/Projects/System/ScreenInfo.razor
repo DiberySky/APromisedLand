@@ -1,13 +1,17 @@
 ﻿@page "/screen-info"
 @using Microsoft.Maui.Devices
 
-<h3>屏幕信息</h3>
+<PageSky Title="屏幕信息">
+    <PageContent>
+        <h3>屏幕信息</h3>
 
-<p><strong>逻辑尺寸：</strong>@screenWidth x @screenHeight</p>
-<p><strong>屏幕密度：</strong>@density</p>
-<p><strong>物理分辨率：</strong>@physicalWidth x @physicalHeight</p>
-<p><strong>方向：</strong>@orientation</p>
-<p><strong>刷新率：</strong>@refreshRate Hz</p>
+        <p><strong>逻辑尺寸：</strong>@screenWidth x @screenHeight</p>
+        <p><strong>屏幕密度：</strong>@density</p>
+        <p><strong>物理分辨率：</strong>@physicalWidth x @physicalHeight</p>
+        <p><strong>方向：</strong>@orientation</p>
+        <p><strong>刷新率：</strong>@refreshRate Hz</p>
+    </PageContent>
+</PageSky>
 
 @code {
     private double screenWidth;

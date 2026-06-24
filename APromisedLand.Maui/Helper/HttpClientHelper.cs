@@ -1,6 +1,7 @@
 ﻿using APromisedLand.Maui.Authentication;
 using APromisedLand.Shared.Clients.Weather;
 using APromisedLand.Shared.Helper;
+using APromisedLand.Shared.Intefaces;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -32,8 +33,6 @@ public static class HttpClientHelper
 
     public static void AuthHttpClient(MauiAppBuilder builder)
     {
-
-
         // RefreshClient
         builder.Services.AddHttpClient("RefreshClient", client =>
         {
@@ -47,12 +46,12 @@ public static class HttpClientHelper
         });
 
         // AuthService 使用 AuthClient
-        builder.Services.AddScoped<AuthService>(sp =>
-        {
-            var factory = sp.GetRequiredService<IHttpClientFactory>();
-            var client = factory.CreateClient("AuthClient");
-            var authState = sp.GetRequiredService<JwtAuthenticationStateProvider>();
-            return new AuthService(client, authState);
-        });
+        builder.Services.AddScoped<IAuthService, AuthService>(sp =>
+                {
+                    var factory = sp.GetRequiredService<IHttpClientFactory>();
+                    var client = factory.CreateClient("AuthClient");
+                    var authState = sp.GetRequiredService<JwtAuthenticationStateProvider>();
+                    return new AuthService(client, authState);
+                });
     }
 }

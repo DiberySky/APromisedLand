@@ -2,9 +2,13 @@
 @using Microsoft.Maui.Controls
 @implements IDisposable
 
-<h3>当前窗口大小</h3>
-<p><strong>宽度：</strong>@windowWidth.ToString("F0")</p>
-<p><strong>高度：</strong>@windowHeight.ToString("F0")</p>
+<PageSky Title="当前窗口大小">
+    <PageContent>
+        <h3>当前窗口大小</h3>
+        <p><strong>宽度：</strong>@windowWidth.ToString("F0")</p>
+        <p><strong>高度：</strong>@windowHeight.ToString("F0")</p>
+    </PageContent>
+</PageSky>
 
 @code {
     private double windowWidth;

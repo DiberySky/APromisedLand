@@ -1,10 +1,14 @@
 ﻿@page "/os-info"
 @using Microsoft.Maui.Devices
 
-<h3>当前操作系统信息</h3>
+<PageSky Title="当前操作系统信息">
+    <PageContent>
+        <h3>当前操作系统信息</h3>
 
-<p><strong>平台：</strong>@platformName</p>
-<p><strong>设备类型：</strong>@deviceType</p>
+        <p><strong>平台：</strong>@platformName</p>
+        <p><strong>设备类型：</strong>@deviceType</p>
+    </PageContent>
+</PageSky>
 
 @code {
     private string platformName = "未知";
@@ -26,7 +30,7 @@
         else
             platformName = "其他";
 
-        // 判断设备类型（手机、平板、桌面、电视等）
+        // //判断设备类型（手机、平板、桌面、电视等）
         // deviceType = DeviceInfo.Current.Idiom switch
         // {
         //     DeviceIdiom.Phone => "手机",
@@ -36,5 +40,19 @@
         //     DeviceIdiom.Watch => "手表",
         //     _ => "未知"
         // };
+
+        var idiom = DeviceInfo.Current.Idiom;
+        if (idiom == DeviceIdiom.Phone)
+            deviceType = "手机";
+        else if (idiom == DeviceIdiom.Tablet)
+            deviceType = "平板";
+        else if (idiom == DeviceIdiom.Desktop)
+            deviceType = "桌面";
+        else if (idiom == DeviceIdiom.TV)
+            deviceType = "电视";
+        else if (idiom == DeviceIdiom.Watch)
+            deviceType = "手表";
+        else
+            deviceType = "未知";
     }
 }

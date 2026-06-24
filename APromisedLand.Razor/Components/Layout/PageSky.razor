@@ -1,6 +1,8 @@
 ﻿@namespace APromisedLand.Razor.Components
 
 @inject IDialogService DialogService
+@inject NavigationManager Navigater
+@inject IAuthService AuthService
 
 <MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense=true
            Elevation="0">
@@ -9,7 +11,7 @@
         {
             <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
                            Edge="Edge.Start" Color="Color.Warning"
-                           OnClick=@(e => OnBackClick.InvokeAsync()) />
+                           OnClick=@(e => BackClick()) />
         }
 
         @if (string.IsNullOrEmpty(Title) == false)
@@ -29,6 +31,7 @@
                            Color="Color.Success"
                            OnClick="e => OnStartClick.InvokeAsync()" />
         }
+
     </ChildContent>
 </MudAppBar>
 
@@ -53,14 +56,30 @@
                 {
                     @BottomBarLeftContent
                 }
-                <MudSpacer/>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+
+                @* @if (ProjectService.Debug)
+                {
+                    <MudIconButton Icon="@Icons.Material.Outlined.Handyman"
+                                   Color="Color.Warning"
+                                   OnClick="e => OnStartClick.InvokeAsync()" />
+                } *@
+
+                <MudSpacer />
+                <MudButton Variant="Variant.Text" Color="Color.Primary"
                 OnClick="e => About()">关于</MudButton>
                 <MudSpacer />
+
+                @if (ProjectService.Authorized)
+                {
+                    <MudIconButton Icon="@Icons.Material.Outlined.Logout"
+                                   Color="Color.Error"
+                                   OnClick="e => Logout()" />
+                }
+
                 if (BottomBarRightContent != null)
                 {
                     @BottomBarRightContent
-                }
+                                    }
             }
         </ChildContent>
     </MudAppBar>
@@ -83,8 +102,22 @@
     [Parameter] public EventCallback OnBackClick { get; set; }
     [Parameter] public EventCallback OnStartClick { get; set; }
 
+    [Parameter] public required string BackPage { get; set; } = ProjectService.StartPage;
+
+    private async Task BackClick()
+    {
+        Navigater.NavigateTo(BackPage);
+    }
+
     private async Task About()
     {
         await DialogService.ShowAboutDialogAsync();
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+
+        Navigater.NavigateTo(ProjectService.SignInPage);
     }
 }
