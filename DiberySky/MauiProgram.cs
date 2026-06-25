@@ -42,7 +42,7 @@ public static class MauiProgram
 #endif
         
         PlatformServer.PlatformInfo();
-
+        
         return builder.Build();
     }
 

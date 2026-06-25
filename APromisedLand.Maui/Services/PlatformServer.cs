@@ -31,15 +31,17 @@ public class PlatformServer
         var idiom = DeviceInfo.Current.Idiom;
         PlatformTypeEnum deviceType;
         if (idiom == DeviceIdiom.Phone)
-            deviceType = PlatformTypeEnum.手表; //"手机";
+            deviceType = PlatformTypeEnum.手机; //"手机";
         else if (idiom == DeviceIdiom.Tablet)
             deviceType = PlatformTypeEnum.平板; //"平板";
         else if (idiom == DeviceIdiom.Desktop)
             deviceType = PlatformTypeEnum.桌面; //"桌面";
+        else if (idiom == DeviceIdiom.Watch)
+            deviceType = PlatformTypeEnum.手表; //"手表";
         else if (idiom == DeviceIdiom.TV)
             deviceType = PlatformTypeEnum.电视; //"电视";
         else
-            deviceType = PlatformTypeEnum.手表; //"未知";
+            deviceType = PlatformTypeEnum.未知; //"未知";
 
         ProjectService.PlatformType = deviceType;
     }

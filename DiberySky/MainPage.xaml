@@ -3,7 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:DiberySky"
              xmlns:components="clr-namespace:DiberySky.Components"
-             x:Class="DiberySky.MainPage">
+             x:Class="DiberySky.MainPage"
+             SafeAreaEdges="All">
 
     <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
         <BlazorWebView.RootComponents>

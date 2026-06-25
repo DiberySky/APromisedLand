@@ -24,9 +24,9 @@ public partial class ProjectService
             Title = "系统", Expanded = false,
                 PageInfos =
                 [
-                    new PageInfo { Title = "操作系统", Name = "os-info", Authorized = true, Group = GroupEnum.Admin },
+                    new PageInfo { Title = "操作系统", Name = "os-info", Authorized = false, Group = GroupEnum.Admin },
                     new PageInfo { Title = "屏幕分辨率", Name = "screen-info", Authorized = false },
-                    new PageInfo { Title = "窗口尺寸", Name = "window-size", Authorized = false, Group = GroupEnum.Admin },
+                    new PageInfo { Title = "窗口尺寸", Name = "window-size", Authorized = true, Group = GroupEnum.Admin },
                     new PageInfo { Title = "关于", Name = "about", Authorized = false, IsDialog = true }
                 ]
         },
