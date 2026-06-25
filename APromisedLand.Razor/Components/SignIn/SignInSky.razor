@@ -22,7 +22,7 @@
                 <MudCardContent>
                     <MudForm @ref="_form">
                         <MudStack Spacing="2" Class="px-8">
-                            <MudTextField T="string" Text="@_user" Required
+                            <MudTextField T="string" @bind-Value="@_user" Required
                                           Variant="Variant.Outlined" Label="用户" />
 
                             <PasswordSky @ref="_passwordField" Variant="Variant.Outlined" />
@@ -62,8 +62,7 @@
     private async Task OnSubmitClick()
     {
         if (_form == null || _passwordField == null
-            || string.IsNullOrEmpty(_user) || string.IsNullOrEmpty(_passwordField.Password)
-        || !_form.IsValid)
+            || string.IsNullOrEmpty(_user) || string.IsNullOrEmpty(_passwordField.Password))
         {
             return;
         }

@@ -1,43 +1,43 @@
 ﻿@page "/login"
 @inject NavigationManager Navigation
-@inject IAuthService _authService
+@inject IAuthService AuthService
 
-<EditForm Model="@loginModel" OnValidSubmit="@HandleLogin">
+<EditForm Model="@_loginModel" OnValidSubmit="@HandleLogin">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
     <div>
         <label>用户名</label>
-        <InputText @bind-Value="loginModel.Username" />
+        <InputText @bind-Value="_loginModel.Username" />
     </div>
     <div>
         <label>密码</label>
-        <InputText Type="password" @bind-Value="loginModel.Password" />
+        <InputText Type="password" @bind-Value="_loginModel.Password" />
     </div>
 
-    @if (!string.IsNullOrEmpty(errorMessage))
+    @if (!string.IsNullOrEmpty(_errorMessage))
     {
-        <div style="color:red">@errorMessage</div>
+        <div style="color:red">@_errorMessage</div>
     }
 
     <button type="submit">登录</button>
 </EditForm>
 
 @code {
-    private LoginModel loginModel = new();
-    private string? errorMessage;
+    private readonly LoginModel _loginModel = new();
+    private string? _errorMessage;
 
     private async Task HandleLogin()
     {
-        errorMessage = null;
-        var success = await _authService.LoginAsync(loginModel.Username, loginModel.Password);
+        _errorMessage = null;
+        var success = await AuthService.LoginAsync(_loginModel.Username, _loginModel.Password);
         if (success)
         {
             Navigation.NavigateTo("/", forceLoad: false);
         }
         else
         {
-            errorMessage = "登录失败，请检查用户名或密码。";
+            _errorMessage = "登录失败，请检查用户名或密码。";
         }
     }
 

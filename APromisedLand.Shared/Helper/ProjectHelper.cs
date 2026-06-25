@@ -10,7 +10,7 @@ public static class ProjectHelper
 
     //public const string HomePage = "Counter";
 
-    //public const string StartPage = "StartApl";
+    //public const string StartPage = "StartPage";
 
-    //public const string SignInPage = "SigninApl";
+    //public const string SignInPage = "SignInPage";
 }

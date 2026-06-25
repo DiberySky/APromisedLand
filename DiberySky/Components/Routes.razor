@@ -1,4 +1,6 @@
-﻿@* <Router AppAssembly="typeof(MauiProgram).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+﻿@inject NavigationManager Navigater
+
+@* <Router AppAssembly="typeof(MauiProgram).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)"/>
         <FocusOnNavigate RouteData="routeData" Selector="h1"/>
@@ -28,8 +30,15 @@
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(LayoutSky)">
                 <NotAuthorized>
-                    @* 未登录时显示的内容 *@
-                    <p>请先登录以访问此页面。</p>
+                    <MudContainer MaxWidth="MaxWidth.Small" Class="my-8">
+                        <MudStack  AlignItems="AlignItems.Center" Spacing="8">
+                            <MudText Typo="Typo.h3" Color="Color.Warning">请先登录以访问此页面。</MudText>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       Size="Size.Medium"
+                                       OnClick="SignIn">登录</MudButton>
+
+                        </MudStack>
+                    </MudContainer>
                 </NotAuthorized>
             </AuthorizeRouteView>
         </Found>
@@ -41,3 +50,11 @@
         </NotFound>
     </Router>
 </CascadingAuthenticationState>
+
+@code {
+    private void SignIn()
+    {
+        Navigater.NavigateTo(ProjectService.SignInPage);
+    }
+}
+

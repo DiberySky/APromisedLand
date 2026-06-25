@@ -1,5 +1,5 @@
 ﻿using APromisedLand.Maui.Authentication;
-using APromisedLand.Shared.Clients.Weather;
+using APromisedLand.Shared.Clients;
 using APromisedLand.Shared.Helper;
 using APromisedLand.Shared.Intefaces;
 using System;

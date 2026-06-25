@@ -1,12 +1,11 @@
 ﻿@namespace APromisedLand.Razor.Components
 
 @inherits LayoutComponentBase
-@inject ProjectService ProjectService
 
 <MudLayout>
     <MudAppBar Dense Class="mud-theme-primary">
         <MudSpacer />
-        <MudText Color="Color.Success">武汉浩瀚科技有限公司</MudText>
+        <MudText Color="Color.Success">@ProjectService.Copyright</MudText>
         <MudSpacer />
     </MudAppBar>
     <MudMainContent>

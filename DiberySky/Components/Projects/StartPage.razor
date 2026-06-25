@@ -1,0 +1,82 @@
+﻿@page "/StartPage"
+
+@inject IAuthService AuthService
+@inject AuthenticationStateProvider AuthProvider
+@* @inject ProjectService ProjectService *@
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigater
+
+<PageSky Title="导航" BackPage="@ProjectService.SignInPage"
+         ArrowBackVisibled="@(ProjectService.Authorized == false)"
+         BottomBarVisibled>
+    <PageContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraSmall">
+            <MudExpansionPanels Class="my-4">
+                <MudStack Spacing="0">
+                    @foreach (var panel in ProjectService.ExpansionPanels)
+                    {
+                        <MudExpansionPanel Text=@panel.Title Expanded=@panel.Expanded
+                                           HeaderClass="mud-theme-dark" Class="my-0">
+                            <MudStack Spacing="2" Class="my-2">
+                                @foreach (var pageInfo in panel.PageInfos)
+                                {
+                                    @if (pageInfo.Authorized)
+                                    {
+                                        if (ProjectService.GroupMember(pageInfo.Group))
+                                        {
+                                            <MudButton Variant="Variant.Outlined"
+                                                       FullWidth Color="Color.Primary"
+                                                       OnClick="e => Navigate(pageInfo)">@pageInfo.Title</MudButton>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <MudButton Variant="Variant.Outlined"
+                                                   FullWidth Color="Color.Success"
+                                                   OnClick="e => Navigate(pageInfo)">@pageInfo.Title</MudButton>
+                                    }
+                                }
+                            </MudStack>
+                        </MudExpansionPanel>
+                    }
+                </MudStack>
+            </MudExpansionPanels>
+            <MudButton Class="mt-4" Variant="Variant.Filled"
+                       FullWidth Color="Color.Info"
+                       OnClick="e => AboutAsync()">关于</MudButton>
+        </MudContainer>
+    </PageContent>
+</PageSky>
+
+@code {
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        PlatformServer.DisplayInfo();
+    }
+    
+    private async Task Navigate(PageInfo pageInfo)
+    {
+        if (pageInfo.IsDialog)
+        {
+            await DialogAsync(pageInfo);
+        }
+        else
+        {
+            Navigater.NavigateTo(pageInfo.Name);
+        }
+    }
+
+    private async Task DialogAsync(PageInfo pageInfo)
+    {
+        if (pageInfo.Name.ToLower() == "about")
+        {
+            await DialogService.ShowAboutDialogAsync();
+        }
+    }
+
+    private async Task AboutAsync()
+        => await DialogService.ShowAboutDialogAsync();
+}

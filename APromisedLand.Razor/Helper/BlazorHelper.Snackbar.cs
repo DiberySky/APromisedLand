@@ -20,16 +20,19 @@ public static partial class BlazorHelper
         => snackbar.Add(message ?? "没有信息。", Severity.Success,
             config =>
             {
+                config.VisibleStateDuration = 3000;
                 config.ShowCloseIcon = true;
-                config.SnackbarVariant = Variant.Filled;
+                config.SnackbarVariant = Variant.Outlined;
+                
             });
 
     public static void Info(this ISnackbar snackbar, string? message)
         => snackbar.Add(message ?? "没有信息。", Severity.Info,
             config =>
             {
+                config.VisibleStateDuration = 3000;
                 config.ShowCloseIcon = true;
-                config.SnackbarVariant = Variant.Filled;
+                config.SnackbarVariant = Variant.Outlined;
             });
 
     public static void Warning(this ISnackbar snackbar, string? message)
@@ -37,6 +40,7 @@ public static partial class BlazorHelper
         snackbar.Add(message ?? "没有信息。", Severity.Warning,
             config =>
             {
+                config.VisibleStateDuration = 5000;
                 config.ShowCloseIcon = true;
                 config.SnackbarVariant = Variant.Filled;
             });
@@ -44,7 +48,7 @@ public static partial class BlazorHelper
 
     public static void Error(this ISnackbar snackbar, string? message)
     {
-        var duration = 3000;
+        var duration = 5000;
 #if DEBUG
         duration = 10000;
         message = $"错误:{message?.Ellipsis(30)}";
@@ -61,6 +65,7 @@ public static partial class BlazorHelper
     {
         snackbar.Add(message, Severity.Error, config =>
         {
+            config.VisibleStateDuration = 3000;
             config.ShowCloseIcon = true;
             config.Action = "查看";
             config.ActionColor = Color.Info;

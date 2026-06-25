@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace APromisedLand.Shared.Clients.Weather;
+namespace APromisedLand.Shared.Clients;
 
 public class WeatherForecast
 {

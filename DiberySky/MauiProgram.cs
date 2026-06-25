@@ -2,7 +2,7 @@
 using APromisedLand.Maui.Helper;
 using APromisedLand.Maui.Services;
 using APromisedLand.Razor.Services;
-using APromisedLand.Shared.Clients.Weather;
+using APromisedLand.Shared.Clients;
 using APromisedLand.Shared.Helper;
 using APromisedLand.Shared.Intefaces;
 using APromisedLand.Shared.Services;
@@ -32,11 +32,6 @@ public static class MauiProgram
 
         //HttpClientServices(builder);
         HttpClientHelper.WeatherHttpClient(builder);
-
-        // 添加 Blazor 授权核心服务
-        builder.Services.AddAuthorizationCore();
-        // 添加级联认证状态（在组件中可通过 CascadingAuthenticationState 获取）
-        builder.Services.AddCascadingAuthenticationState();
 
         //builder.Services.AddMudServices();
         MauiHelper.MudBlazorServices(builder);

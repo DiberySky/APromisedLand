@@ -33,7 +33,7 @@ public static class MauiHelper
     {
         builder.Services.AddMudServices(config =>
         {
-            config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.TopLeft;
+            config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomLeft;
             config.SnackbarConfiguration.RequireInteraction = false;
             config.SnackbarConfiguration.PreventDuplicates = false;
             config.SnackbarConfiguration.NewestOnTop = false;

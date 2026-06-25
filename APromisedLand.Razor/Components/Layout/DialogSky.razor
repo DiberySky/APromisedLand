@@ -23,7 +23,7 @@
         @if (StartIconVisibled)
         {
             <MudSpacer />
-            <MudIconButton Icon="@Icons.Material.Outlined.Menu"
+            <MudIconButton Class="mr-0" Icon="@Icons.Material.Outlined.Menu"
                            Color="Color.Success"
                            OnClick="e => OnStartClick.InvokeAsync()" />
         }
@@ -31,7 +31,7 @@
         @if (CloseIconVisibled)
         {
             <MudSpacer />
-            <MudIconButton Icon="@Icons.Material.Outlined.Close"
+            <MudIconButton Class="mr-0 pr-0" Icon="@Icons.Material.Outlined.Close"
                            OnClick="e => Cancel()" />
         }
 

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http.Json;
 using System.Text;
 
-namespace APromisedLand.Shared.Clients.Weather;
+namespace APromisedLand.Shared.Clients;
 
 public class WeatherApiClient
 {

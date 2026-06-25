@@ -1,5 +1,4 @@
-﻿using APromisedLand.Shared;
-using APromisedLand.Shared.Helper;
+﻿using APromisedLand.Shared.Helper;
 using APromisedLand.Shared.Models;
 using APromisedLand.Shared.Services;
 using System;
@@ -12,35 +11,35 @@ public class PlatformServer
 {
     public static void PlatformInfo()
     {
-        PlatformOS deviceOS;
+        PlatformOSEnum deviceOS;
         // 判断操作系统
         if (DeviceInfo.Current.Platform == DevicePlatform.Android)
-            deviceOS = PlatformOS.Android; //"Android";
+            deviceOS = PlatformOSEnum.Android; //"Android";
         else if (DeviceInfo.Current.Platform == DevicePlatform.iOS)
-            deviceOS = PlatformOS.iOS; // "iOS";
+            deviceOS = PlatformOSEnum.iOS; // "iOS";
         else if (DeviceInfo.Current.Platform == DevicePlatform.WinUI)
-            deviceOS = PlatformOS.Windows; //"Windows";
+            deviceOS = PlatformOSEnum.Windows; //"Windows";
         else if (DeviceInfo.Current.Platform == DevicePlatform.macOS)
-            deviceOS = PlatformOS.macOS; //"macOS";
+            deviceOS = PlatformOSEnum.macOS; //"macOS";
         else if (DeviceInfo.Current.Platform == DevicePlatform.Tizen)
-            deviceOS = PlatformOS.Tizen; //"Tizen";
+            deviceOS = PlatformOSEnum.Tizen; //"Tizen";
         else
-            deviceOS = PlatformOS.Unknown; //"其他";
+            deviceOS = PlatformOSEnum.Unknown; //"其他";
 
         ProjectService.PlatformOS = deviceOS;
 
         var idiom = DeviceInfo.Current.Idiom;
-        PlatformType deviceType;
+        PlatformTypeEnum deviceType;
         if (idiom == DeviceIdiom.Phone)
-            deviceType = PlatformType.手表; //"手机";
+            deviceType = PlatformTypeEnum.手表; //"手机";
         else if (idiom == DeviceIdiom.Tablet)
-            deviceType = PlatformType.平板; //"平板";
+            deviceType = PlatformTypeEnum.平板; //"平板";
         else if (idiom == DeviceIdiom.Desktop)
-            deviceType = PlatformType.桌面; //"桌面";
+            deviceType = PlatformTypeEnum.桌面; //"桌面";
         else if (idiom == DeviceIdiom.TV)
-            deviceType = PlatformType.电视; //"电视";
+            deviceType = PlatformTypeEnum.电视; //"电视";
         else
-            deviceType = PlatformType.手表; //"未知";
+            deviceType = PlatformTypeEnum.手表; //"未知";
 
         ProjectService.PlatformType = deviceType;
     }
@@ -59,9 +58,9 @@ public class PlatformServer
 
         screenInfo.Orientation = displayInfo.Orientation switch
         {
-            DisplayOrientation.Portrait => ScreenOrientation.纵向,
-            DisplayOrientation.Landscape => ScreenOrientation.横向,
-            _ => ScreenOrientation.未知,
+            DisplayOrientation.Portrait => ScreenOrientationEmnu.纵向,
+            DisplayOrientation.Landscape => ScreenOrientationEmnu.横向,
+            _ => ScreenOrientationEmnu.未知,
         };
 
         ProjectService.ScreenInfo = screenInfo;

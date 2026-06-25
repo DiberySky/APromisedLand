@@ -4,7 +4,7 @@
 
 <h3>天气预报</h3>
 
-@if (forecasts == null)
+@if (_forecasts == null)
 {
     <p>加载中...</p>
 }
@@ -19,7 +19,7 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var f in forecasts)
+            @foreach (var f in _forecasts)
             {
                 <tr>
                     <td>@f.Date.ToShortDateString()</td>
@@ -32,13 +32,13 @@ else
 }
 
 @code {
-    private WeatherForecast[]? forecasts;
+    private WeatherForecast[]? _forecasts;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            forecasts = await WeatherApi.GetForecastsAsync();
+            _forecasts = await WeatherApi.GetForecastsAsync();
         }
         catch (HttpRequestException ex)
         {
