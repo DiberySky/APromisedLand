@@ -15,7 +15,8 @@ builder.Services.AddAuthentication()
         realm:  "apromisedland",
         options =>
         {
-            options.Authority = ProjectService.Authority; //"https://localhost:8088/realms/apromisedland";
+            options.TokenValidationParameters.ValidateIssuer = false;
+            options.Authority = ProjectService.Authority; 
             options.Audience = "diberysky";
             // if (builder.Environment.IsDevelopment())
             {

@@ -4,6 +4,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var keycloak = builder.AddKeycloak("Keycloak",8080)
     .WithDataVolume("keycloak-data")
+    .WithEnvironment("KC_HOSTNAME_URL", "https://www.diberysky.cn")
+    .WithEnvironment("KC_HOSTNAME_ADMIN_URL", "https://www.diberysky.cn")
     .WithOtlpExporter();
 
 var weatherapi = builder.AddProject<Projects.WeatherApi>("Weather-Api")
@@ -21,6 +23,7 @@ var gateway = builder.AddYarp("Yarp")
 
 var publicDevTunnel = builder.AddDevTunnel("devtunnel-public")
     .WithAnonymousAccess()
+    .WithEnvironment("TUNNEL_ACCESS", "anonymous")
     .WithReference(keycloak.GetEndpoint("http"), new DevTunnelPortOptions
     {
          Protocol = "https"

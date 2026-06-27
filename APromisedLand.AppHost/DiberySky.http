@@ -18,7 +18,7 @@ Accept: application/json
 Authorization: bearer {{token}}
 
 ###
-@WeatherApi_HostAddress = https://localhost:7267
+@WeatherApi_HostAddress = http://localhost:5175
 
 GET {{WeatherApi_HostAddress}}/weatherforecast/
 Accept: application/json
