@@ -4,8 +4,6 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var keycloak = builder.AddKeycloak("Keycloak",8080)
     .WithDataVolume("keycloak-data")
-    .WithEnvironment("KC_HOSTNAME_URL", "https://www.diberysky.cn")
-    .WithEnvironment("KC_HOSTNAME_ADMIN_URL", "https://www.diberysky.cn")
     .WithOtlpExporter();
 
 var weatherapi = builder.AddProject<Projects.WeatherApi>("Weather-Api")
@@ -21,7 +19,7 @@ var gateway = builder.AddYarp("Yarp")
     .WithHttpEndpoint(port: 8090, targetPort: 8090, name: "http")
     .WithOtlpExporter();
 
-var publicDevTunnel = builder.AddDevTunnel("devtunnel-public")
+builder.AddDevTunnel("DevTunnel-public")
     .WithAnonymousAccess()
     .WithEnvironment("TUNNEL_ACCESS", "anonymous")
     .WithReference(keycloak.GetEndpoint("http"), new DevTunnelPortOptions
@@ -30,15 +28,15 @@ var publicDevTunnel = builder.AddDevTunnel("devtunnel-public")
     })
     .WithReference(gateway.GetEndpoint("http"));  
 
-var mauiapp = builder.AddMauiProject("mauiapp", "../DiberySky/DiberySky.csproj");
+var diberysky = builder.AddMauiProject("DiberySky", "../DiberySky/DiberySky.csproj");
 
-mauiapp.AddWindowsDevice()
+diberysky.AddWindowsDevice()
     .WithReference(weatherapi)
     .WithReference(keycloak);  
 
-mauiapp.AddAndroidEmulator()
-    .WithOtlpDevTunnel()
-    .WithReference(weatherapi, publicDevTunnel)
-    .WithReference(keycloak, publicDevTunnel);
+// diberysky.AddAndroidEmulator()
+//     .WithOtlpDevTunnel()
+//     .WithReference(weatherapi, publicDevTunnel)
+//     .WithReference(keycloak, publicDevTunnel);
 
 builder.Build().Run();

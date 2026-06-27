@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APromisedLand.AppHost", "AP
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APromisedLand.ServiceDefaults", "APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj", "{0BF2CA85-021D-4799-A2FA-80C3B8D9CCD8}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Projects", "Projects", "{94403BB7-A165-404E-8674-5DC28867E92E}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Clients", "Clients", "{94403BB7-A165-404E-8674-5DC28867E92E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Services", "Services", "{DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}"
 EndProject
