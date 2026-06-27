@@ -16,6 +16,8 @@ public partial class ProjectService
                 PageInfos =
                 [
                     new PageInfo { Title = "天气", Name = "Weather", Authorized = true },
+                    new PageInfo { Title = "天气-Client", Name = "weatherclient", Authorized = true },
+                    new PageInfo { Title = "天气-Factory", Name = "weatherfactory", Authorized = true },
                     new PageInfo { Title = "测试", Name = "TestingApl", Authorized = true , Group = GroupEnum.DiberySky}
                 ]
         },

@@ -5,34 +5,38 @@
 @attribute [Authorize]
 @inject IHttpClientFactory HttpClientFactory
 
-<h3>天气预报</h3>
+<PageSky Title="Weather Factory" BottomBarVisibled>
+    <PageContent>
+        <h3>天气预报</h3>
 
-@if (_forecasts == null)
-{
-    <p>加载中...</p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>日期</th>
-                <th>温度 (°C)</th>
-                <th>摘要</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var f in _forecasts)
-            {
+        @if (_forecasts == null)
+        {
+            <p>加载中...</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
                 <tr>
-                    <td>@f.Date.ToShortDateString()</td>
-                    <td>@f.TemperatureC</td>
-                    <td>@f.Summary</td>
+                    <th>日期</th>
+                    <th>温度 (°C)</th>
+                    <th>摘要</th>
                 </tr>
-            }
-        </tbody>
-    </table>
-}
+                </thead>
+                <tbody>
+                @foreach (var f in _forecasts)
+                {
+                    <tr>
+                        <td>@f.Date.ToShortDateString()</td>
+                        <td>@f.TemperatureC</td>
+                        <td>@f.Summary</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </PageContent>
+</PageSky>
 
 @code {
     private WeatherForecast[]? _forecasts;

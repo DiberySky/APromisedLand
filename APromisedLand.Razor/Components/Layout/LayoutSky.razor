@@ -24,12 +24,4 @@
 <MudSnackbarProvider />
 
 @code {
-    protected override void OnInitialized()
-    {
-        base.OnInitialized();
-
-#if DEBUG
-        ProjectService.Debug = true;
-#endif
-    }
 }

@@ -1,4 +1,4 @@
-using APromisedLand.Shared.Helper;
+using APromisedLand.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +15,7 @@ builder.Services.AddAuthentication()
         realm:  "apromisedland",
         options =>
         {
-            options.Authority = AuthHelper.Authority; //"https://localhost:8088/realms/apromisedland";
+            options.Authority = ProjectService.Authority; //"https://localhost:8088/realms/apromisedland";
             options.Audience = "diberysky";
             // if (builder.Environment.IsDevelopment())
             {

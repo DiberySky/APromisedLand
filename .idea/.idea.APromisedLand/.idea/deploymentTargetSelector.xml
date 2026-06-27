@@ -4,7 +4,7 @@
     <selectionStates>
       <SelectionState runConfigName="DiberySky">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-06-25T04:38:25.623909400Z">
+        <DropdownSelection timestamp="2026-06-26T23:00:45.069052300Z">
           <Target type="DEFAULT_BOOT">
             <handle>
               <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\_Dibery_\.android\avd\pixel_7_-_api_33_0.avd" />

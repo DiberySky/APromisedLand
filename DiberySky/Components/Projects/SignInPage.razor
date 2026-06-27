@@ -37,18 +37,15 @@
                 var authState = await AuthProvider.GetAuthenticationStateAsync();
                 var userlogin = authState.User;
 
-                if (userlogin != null)
-                {
-                    ProjectService.GetClaimValue(userlogin.Claims);
+                ProjectService.GetClaimValue(userlogin.Claims);
 
-                    StateHasChanged();
+                StateHasChanged();
 
-                    ProjectService.Authorized = true;
+                ProjectService.Authorized = true;
 
-                    Snackbar.Success($"登录成功: {ProjectService.UserName}");
+                Snackbar.Success($"登录成功: {ProjectService.UserName}");
 
-                    Navigater.NavigateTo(ProjectService.StartPage);
-                }
+                Navigater.NavigateTo(ProjectService.StartPage);
             }
             else
             {
