@@ -1,0 +1,46 @@
+@Keycloak_HostAddress = localhost:8080
+@realm = apromisedland
+@yarp_HttpHost = http://localhost:8088
+@QuestionService_HostAddress = http://localhost:7001
+@DevTunnel_Yarp = https://6fjddmjf-8090.jpe1.devtunnels.ms
+
+POST https://{{Keycloak_HostAddress}}/realms/{{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=diberysky&username=tian&password=Pa$$w0rd
+
+> {%
+    // 将 access_token 存入全局变量 token
+    client.global.set("token", response.body.access_token);
+%}
+
+###
+
+GET {{QuestionService_HostAddress}}/weatherforecast/
+Accept: application/json
+Authorization: bearer {{token}}
+
+###
+
+POST {{QuestionService_HostAddress}}/Question/
+Content-Type: application/json
+Authorization: bearer {{token}}
+
+{
+  "title": "Title",
+  "content": "content1",
+  "tags": ["aspire","keycloak", "fake"]
+}
+###
+
+GET {{QuestionService_HostAddress}}/tags/
+Accept: application/json
+
+###
+GET {{DevTunnel_Yarp}}/question/
+Accept: application/json
+
+###
+GET {{DevTunnel_Yarp}}/tags/
+Accept: application/json
+
