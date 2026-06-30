@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace QuestionService.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class Initial : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -23,8 +23,8 @@ namespace QuestionService.Data.Migrations
                     Content = table.Column<string>(type: "character varying(5000)", maxLength: 5000, nullable: false),
                     AskerId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AskerDisplayName = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
-                    CreateAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdateAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     ViewCount = table.Column<int>(type: "integer", nullable: false),
                     TagSlugs = table.Column<List<string>>(type: "text[]", nullable: false),
                     HasAcceptedAnswer = table.Column<bool>(type: "boolean", nullable: false),

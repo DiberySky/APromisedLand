@@ -11,13 +11,35 @@ var postgres = builder.AddPostgres("Postgres", port: 8433)
     .WithPgAdmin()
     .WithOtlpExporter();
 
+var typesenseApiKey = builder.AddParameter("typesense-api-key", secret: true);
+
+var typesense = builder.AddContainer("typesense", "typesense/typesense", "30.2")
+    .WithArgs("--data-dir", "/data", "--api-key", typesenseApiKey, "--enable-cors")
+    .WithVolume("typesense-data", "/data")
+    .WithHttpEndpoint(8108, 8108, name: "typesense");
+
+var typeContainer = typesense.GetEndpoint("typesense");
+
+var rabbitmq = builder.AddRabbitMQ("Messaging")
+    .WithDataVolume("rabbitmq-data")
+    .WithManagementPlugin(port: 15672);
+
 var questionDb = postgres.AddDatabase("questionDb");
 
 var questionService = builder.AddProject<Projects.QuestionService>("Question-Service")
     .WithReference(keycloak)
     .WithReference(questionDb)
+    .WithReference(rabbitmq)
     .WaitFor(keycloak)
-    .WaitFor(questionDb);
+    .WaitFor(questionDb)
+    .WaitFor(rabbitmq);
+
+var searchService = builder.AddProject<Projects.SearchService>("Search-Service")
+    .WithEnvironment("typesense-api-key", typesenseApiKey)
+    .WithReference(typeContainer)
+    .WithReference(rabbitmq)
+    .WaitFor(typesense)
+    .WaitFor(rabbitmq);
 
 var weatherapi = builder.AddProject<Projects.WeatherApi>("Weather-Api")
     .WithReference(keycloak)
@@ -29,6 +51,7 @@ var gateway = builder.AddYarp("Yarp")
         yarp.AddRoute("/WeatherForecast/{**catch-all}", weatherapi);
         yarp.AddRoute("/Question/{**catch-all}", questionService);
         yarp.AddRoute("/tags/{**catch-all}", questionService);
+        yarp.AddRoute("/search/{**catch-all}", searchService);
     })
     .WithHttpEndpoint(port: 8090, targetPort: 8090, name: "http")
     .WithOtlpExporter();

@@ -14,11 +14,6 @@ grant_type=password&client_id=diberysky&username=tian&password=Pa$$w0rd
     client.global.set("token", response.body.access_token);
 %}
 
-###
-
-GET {{QuestionService_HostAddress}}/weatherforecast/
-Accept: application/json
-Authorization: bearer {{token}}
 
 ###
 
@@ -27,10 +22,43 @@ Content-Type: application/json
 Authorization: bearer {{token}}
 
 {
-  "title": "Title",
-  "content": "content1",
-  "tags": ["aspire","keycloak", "fake"]
+  "title": "Wolverine 的持久化消息存储与 PostgreSQL 结合性能调优",
+  "content": "Wolverine 内置了消息持久化，我使用 PostgreSQL 作为存储。在高并发场景下，如何优化消息表的索引和清理策略？是否有推荐的配置参数？",
+  "tags": ["wolverine", "postgresql", "microservices"]
 }
+
+> {%
+    // 将 access_token 存入全局变量 token
+    client.global.set("id", response.body.id);
+%}
+###
+@id4=b3d10056-0894-4ec1-9299-3cab86321a95
+
+PUT {{QuestionService_HostAddress}}/Question/{{id4}}
+Content-Type: application/json
+Authorization: bearer {{token}}
+
+{
+  "title": "在Next.js 中使用 TypeScript 如何调用 Keycloak 鉴权 API？",
+  "content": "目前我在 Next.js 项目中使用 next-auth 对接 Keycloak，但登录后无法获取用户角色信息。是否需要自定义 JWT 回调呢？请提供代码示例。",
+  "tags": ["nextjs", "keycloak", "typescript"]
+}
+
+###
+DELETE {{QuestionService_HostAddress}}/Question/{{id4}}
+Content-Type: application/json
+Authorization: bearer {{token}}
+
+###
+GET {{QuestionService_HostAddress}}/question/{{id4}}
+Accept: application/json
+
+###
+
+GET {{QuestionService_HostAddress}}/weatherforecast/
+Accept: application/json
+Authorization: bearer {{token}}
+
 ###
 
 GET {{QuestionService_HostAddress}}/tags/

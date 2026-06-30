@@ -44,7 +44,7 @@ namespace QuestionService.Data.Migrations
                         .HasMaxLength(5000)
                         .HasColumnType("character varying(5000)");
 
-                    b.Property<DateTimeOffset>("CreateAt")
+                    b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("HasAcceptedAnswer")
@@ -59,7 +59,7 @@ namespace QuestionService.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
-                    b.Property<DateTimeOffset>("UpdateAt")
+                    b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("ViewCount")

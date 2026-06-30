@@ -13,8 +13,8 @@ using QuestionService.Data;
 namespace QuestionService.Data.Migrations
 {
     [DbContext(typeof(QuestionDbContext))]
-    [Migration("20260628082735_Initial")]
-    partial class Initial
+    [Migration("20260629211413_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -47,7 +47,7 @@ namespace QuestionService.Data.Migrations
                         .HasMaxLength(5000)
                         .HasColumnType("character varying(5000)");
 
-                    b.Property<DateTimeOffset>("CreateAt")
+                    b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("HasAcceptedAnswer")
@@ -62,7 +62,7 @@ namespace QuestionService.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
-                    b.Property<DateTimeOffset>("UpdateAt")
+                    b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("ViewCount")

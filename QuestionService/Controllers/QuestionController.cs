@@ -1,28 +1,35 @@
 using System.Security.Claims;
+using APromisedLand.Shared.Contracts;
 using APromisedLand.Shared.DTOs.Overflow;
+using FastExpressionCompiler;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuestionService.Data;
 using QuestionService.Models;
+using QuestionService.Services;
+using Wolverine;
 
 namespace QuestionService.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class QuestionController(QuestionDbContext db) : ControllerBase
+public class QuestionController(QuestionDbContext db, IMessageBus bus, TagService tagService) : ControllerBase
 {
     [Authorize]
     [HttpPost]
     public async Task<ActionResult<Question>> CreateQuestion(CreateQuestionDto dto)
     {
-        var validTags = await db.Tags.Where(x => dto.Tags.Contains(x.Slug)).ToListAsync();
-        
-        var missing = dto.Tags.Except(validTags.Select(tag => tag.Slug)).ToList();
-        
-        if (missing.Count != 0)
-            return BadRequest(string.Join(", ", missing));
-        
+        // var validTags = await db.Tags.Where(x => dto.Tags.Contains(x.Slug)).ToListAsync();
+        //
+        // var missing = dto.Tags.Except(validTags.Select(tag => tag.Slug)).ToList();
+        //
+        // if (missing.Count != 0)
+        //     return BadRequest(string.Join(", ", missing));
+
+        if (!await tagService.AreTagsValidAsync(dto.Tags))
+            return BadRequest("标签无效。");
+
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var userName = User.FindFirstValue("name");
 
@@ -43,6 +50,9 @@ public class QuestionController(QuestionDbContext db) : ControllerBase
         db.Questions.Add(question);
         await db.SaveChangesAsync();
 
+        await bus.PublishAsync(new QuestionCreated(question.Id, question.Title, question.Content,
+            question.CreatedAt, question.TagSlugs));
+
         return Ok(question);
     }
 
@@ -55,8 +65,8 @@ public class QuestionController(QuestionDbContext db) : ControllerBase
         {
             query = query.Where(x => x.TagSlugs.Contains(tag));
         }
-        
-        return await query.OrderByDescending(x => x.CreateAt).ToListAsync();
+
+        return await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
     }
 
     [HttpGet("{id}")]
@@ -67,9 +77,9 @@ public class QuestionController(QuestionDbContext db) : ControllerBase
         if (question is null) return NotFound();
 
         await db.Questions.Where(x => x.Id == id)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.ViewCount, 
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.ViewCount,
                 x => x.ViewCount + 1));
-        
+
         return question;
     }
 
@@ -81,20 +91,27 @@ public class QuestionController(QuestionDbContext db) : ControllerBase
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return Forbid();
-        
-        var validTags = await db.Tags.Where(x => dto.Tags.Contains(x.Slug)).ToListAsync();
-        
-        var missing = dto.Tags.Except(validTags.Select(tag => tag.Slug)).ToList();
-        
-        if (missing.Count != 0)
-            return BadRequest(string.Join(", ", missing));
-        
-        question.Title =  dto.Title;
+
+        // var validTags = await db.Tags.Where(x => dto.Tags.Contains(x.Slug)).ToListAsync();
+        //
+        // var missing = dto.Tags.Except(validTags.Select(tag => tag.Slug)).ToList();
+        //
+        // if (missing.Count != 0)
+        //     return BadRequest(string.Join(", ", missing));
+
+        if (!await tagService.AreTagsValidAsync(dto.Tags))
+            return BadRequest("标签无效。");
+
+        question.Title = dto.Title;
         question.Content = dto.Content;
         question.TagSlugs = dto.Tags;
-        question.UpdateAt = DateTimeOffset.UtcNow;
-        
+        question.UpdatedAt = DateTimeOffset.UtcNow;
+
         await db.SaveChangesAsync();
+
+        await bus.PublishAsync(new QuestionUpdated(question.Id, question.Title, question.Content,
+            question.TagSlugs.AsArray()));
+
         return NoContent();
     }
 
@@ -107,9 +124,12 @@ public class QuestionController(QuestionDbContext db) : ControllerBase
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId != question.AskerId) return Forbid();
-        
+
         db.Questions.Remove(question);
         await db.SaveChangesAsync();
+
+        await bus.PublishAsync(new QuestionDeleted(question.Id));
+        
         return NoContent();
     }
 }

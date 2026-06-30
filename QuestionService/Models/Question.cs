@@ -14,8 +14,8 @@ public class Question
     public required string AskerId { get; set; }
     [MaxLength(300)]
     public required string AskerDisplayName { get; set; }
-    public DateTimeOffset CreateAt { get; set; } =  DateTimeOffset.UtcNow;
-    public DateTimeOffset UpdateAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset CreatedAt { get; set; } =  DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public int ViewCount { get; set; }
     public List<string> TagSlugs { get; set; } = [];
     public bool HasAcceptedAnswer { get; set; }

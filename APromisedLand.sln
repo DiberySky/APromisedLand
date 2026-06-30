@@ -29,6 +29,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Overflow", "Overflow", "{8E
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuestionService", "QuestionService\QuestionService.csproj", "{7F1F35A8-B31B-4D30-844E-398AE864B86F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SearchService", "SearchService\SearchService.csproj", "{81B674C6-FB4A-42EE-9CB7-CA18C14BCB67}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -72,6 +74,10 @@ Global
 		{7F1F35A8-B31B-4D30-844E-398AE864B86F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7F1F35A8-B31B-4D30-844E-398AE864B86F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7F1F35A8-B31B-4D30-844E-398AE864B86F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{81B674C6-FB4A-42EE-9CB7-CA18C14BCB67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{81B674C6-FB4A-42EE-9CB7-CA18C14BCB67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{81B674C6-FB4A-42EE-9CB7-CA18C14BCB67}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{81B674C6-FB4A-42EE-9CB7-CA18C14BCB67}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -84,6 +90,7 @@ Global
 		{A5E465C0-4A13-4CDE-A53F-32E5EA807BB9} = {DC357836-6548-4918-9C56-E876B4E81A44}
 		{8E8BB1FF-D5BA-4309-9BF9-DE58139C91F3} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
 		{7F1F35A8-B31B-4D30-844E-398AE864B86F} = {8E8BB1FF-D5BA-4309-9BF9-DE58139C91F3}
+		{81B674C6-FB4A-42EE-9CB7-CA18C14BCB67} = {8E8BB1FF-D5BA-4309-9BF9-DE58139C91F3}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9647CF65-ABDB-4637-B56C-E0CDAC22FFFB}
