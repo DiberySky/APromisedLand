@@ -51,7 +51,8 @@ var gateway = builder.AddYarp("Yarp")
         yarp.AddRoute("/WeatherForecast/{**catch-all}", weatherapi);
         yarp.AddRoute("/Question/{**catch-all}", questionService);
         yarp.AddRoute("/tags/{**catch-all}", questionService);
-        yarp.AddRoute("/search/{**catch-all}", searchService);
+        yarp.AddRoute("/search-mini/{**catch-all}", searchService);
+        yarp.AddRoute("/typesense/{**catch-all}", searchService);
     })
     .WithHttpEndpoint(port: 8090, targetPort: 8090, name: "http")
     .WithOtlpExporter();

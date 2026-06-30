@@ -1,13 +1,21 @@
 @SearchService_HostAddress = http://localhost:7002
 @DevTunnel_Yarp = https://6fjddmjf-8090.jpe1.devtunnels.ms
 
-GET {{SearchService_HostAddress}}/Search/?query="[Aspire]
+GET {{SearchService_HostAddress}}/search-mini/?query="[Aspire]
 Accept: application/json
 
 ###
-GET {{SearchService_HostAddress}}/search/similar-titles?query=Aspire
+GET {{SearchService_HostAddress}}/search-mini/similar-titles?query=Aspire
 Accept: application/json
 
 ###
-GET {{DevTunnel_Yarp}}/search/similar-titles?query=Aspire
+GET {{DevTunnel_Yarp}}/search-mini/similar-titles?query=Aspire
+Accept: application/json
+
+###
+GET {{SearchService_HostAddress}}/Typesense/?query="[Aspire]
+Accept: application/json
+
+###
+GET {{SearchService_HostAddress}}/Typesense/similar-titles?query=Aspire
 Accept: application/json

@@ -10,14 +10,16 @@ using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 添加 MVC 控制器服务
+builder.Services.AddControllers();
+
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 builder.AddServiceDefaults();
 
-// builder.Services.AddScoped<ITypesenseClient, TypesenseClient>();
-
+// ---------- Typesense 配置 ----------
 var typesenseUri = builder.Configuration["services:typesense:typesense:0"];
 if (string.IsNullOrEmpty(typesenseUri))
     throw new InvalidOperationException("配置中未找到 Typesense URI。");
@@ -36,6 +38,7 @@ builder.Services.AddTypesenseClient(config =>
     };
 });
 
+// ---------- OpenTelemetry ----------
 builder.Services.AddOpenTelemetry().WithTracing(traceProviderBuilder =>
 {
     traceProviderBuilder.SetResourceBuilder(ResourceBuilder.CreateDefault()
@@ -43,6 +46,7 @@ builder.Services.AddOpenTelemetry().WithTracing(traceProviderBuilder =>
         .AddSource("Wolverine");
 });
 
+// ---------- Wolverine（消息总线） ----------
 builder.Host.UseWolverine(opts =>
 {
     opts.UseRabbitMqUsingNamedConnection("Messaging").AutoProvision();
@@ -65,7 +69,11 @@ if (app.Environment.IsDevelopment())
 
 app.MapDefaultEndpoints();
 
-app.MapGet("/search", async (string query, ITypesenseClient client) =>
+// 启用控制器路由（路由前缀为 api/...）
+app.MapControllers();
+
+// ---------- 保留原有的最小 API 端点（路径不变） ----------
+app.MapGet("/search-mini", async (string query, ITypesenseClient client) =>
 {
     //[aspire]something
     string? tag = null;
@@ -94,7 +102,7 @@ app.MapGet("/search", async (string query, ITypesenseClient client) =>
     }
 });
 
-app.MapGet("/search/similar-titles", async (string query, ITypesenseClient client) =>
+app.MapGet("/search-mini/similar-titles", async (string query, ITypesenseClient client) =>
 {
     var searchParams = new SearchParameters(query, "title");
 
@@ -108,7 +116,8 @@ app.MapGet("/search/similar-titles", async (string query, ITypesenseClient clien
         return Results.Problem("Typesense 搜索失败", e.Message);
     }
 });
-    
+
+// ---------- 初始化 Typesense 索引（启动时执行） ----------
 using var scope = app.Services.CreateScope();
 var client = scope.ServiceProvider.GetRequiredService<ITypesenseClient>();
 await SearchInitializer.EnsureIndexExists(client);
