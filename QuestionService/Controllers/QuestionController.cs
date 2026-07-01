@@ -14,7 +14,7 @@ namespace QuestionService.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class QuestionController(QuestionDbContext db, IMessageBus bus, TagService tagService) : ControllerBase
+public partial class QuestionsController(QuestionDbContext db, IMessageBus bus, TagService tagService) : ControllerBase
 {
     [Authorize]
     [HttpPost]
@@ -69,17 +69,30 @@ public class QuestionController(QuestionDbContext db, IMessageBus bus, TagServic
         return await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
     }
 
+    // [HttpGet("{id}")]
+    // public async Task<ActionResult<Question>> GetQuestion(string id)
+    // {
+    //     var question = await db.Questions.FindAsync(id);
+    //
+    //     if (question is null) return NotFound();
+    //
+    //     await db.Questions.Where(x => x.Id == id)
+    //         .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.ViewCount,
+    //             x => x.ViewCount + 1));
+    //
+    //     return question;
+    // }
+    
     [HttpGet("{id}")]
     public async Task<ActionResult<Question>> GetQuestion(string id)
     {
-        var question = await db.Questions.FindAsync(id);
-
+        var question = await db.Questions
+            .Include(x => x.Answers)
+            .FirstOrDefaultAsync(x => x.Id == id);
         if (question is null) return NotFound();
-
         await db.Questions.Where(x => x.Id == id)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.ViewCount,
                 x => x.ViewCount + 1));
-
         return question;
     }
 

@@ -1,0 +1,384 @@
+@identityApi = localhost:8080
+@realm = apromisedland
+@yarp_HttpHost = http://localhost:8088
+@QuestionService_HostAddress = http://localhost:7001
+@DevTunnel_Yarp = https://6fjddmjf-8090.jpe1.devtunnels.ms
+
+###
+# group: Section 5 Answer Challenge
+# @name Login as bob
+POST {{identityApi}}/realms/overflow/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+username = bob &
+password = Pa$$w0rd &
+client_id = postman &
+grant_type = password &
+client_secret = zWJYJbQJ2ygrDvDxFSdhs8MSroFlGZcs
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // const user = pm.response.json();
+    //
+    // pm.test("Has properties", function () {
+    //     pm.expect(user).to.have.property('access_token');
+    // });
+    //
+    // if (pm.test("Has properties")) {
+    //     pm.globals.set('bob_token', user.access_token);
+    // }
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Post question
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // const raw = pm.variables.replaceIn("{{$randomLoremParagraphs}}");
+    //
+    // // Split on newlines, wrap each line in <p> tags, then join
+    // const html = raw
+    //   .split('\n')
+    //   .filter(p => p.trim().length > 0)
+    //   .map(p => `<p>${p}</p>`)
+    //   .join('');
+    //
+    // pm.environment.set("escapedContent", JSON.stringify(html).slice(1, -1));
+    //
+    // const allTags = ["aspire", "dotnet", "keycloak", "wolverine", "ef-core", "postgresql", "signalr", "microservices", "nextjs", "typescript"];
+    //
+    // // Pick 1 or 2 tags at random
+    // const shuffled = allTags.sort(() => 0.5 - Math.random());
+    // const selectedTags = shuffled.slice(0, Math.floor(Math.random() * 2) + 1);
+    //
+    // // Set as environment variable for use in body
+    // pm.environment.set('selectedTags', JSON.stringify(selectedTags));
+//%}
+POST {{questionsApi}}/questions
+Authorization: Bearer {{bob_token}}
+Content-Type: application/json
+
+{
+  "title": "{{$guid}}",
+  "content": "{{escapedContent}}",
+  "tags": {{selectedTags}}
+}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // const question = pm.response.json();
+    //
+    // pm.test("Has properties", function () {
+    //     pm.expect(question).to.have.property('id');
+    // });
+    //
+    // if (pm.test("Has properties")) {
+    //     pm.globals.set('questionId', question.id);
+    //     pm.globals.set('questionTitle', question.title);
+    // }
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Post answer
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // const raw = pm.variables.replaceIn("{{$randomLoremParagraphs}}");
+    //
+    // // Split on newlines, wrap each line in <p> tags, then join
+    // const html = raw
+    //   .split('\n')
+    //   .filter(p => p.trim().length > 0)
+    //   .map(p => `<p>${p}</p>`)
+    //   .join('');
+    //
+    // pm.environment.set("escapedContent", JSON.stringify(html).slice(1, -1));
+//%}
+POST {{questionsApi}}/questions/{{questionId}}/answers
+Authorization: Bearer {{bob_token}}
+Content-Type: application/json
+
+{
+  "content": "{{escapedContent}}",
+  "questionId": "{{questionId}}"
+}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // const answer = pm.response.json();
+    //
+    // pm.test("Has properties", function () {
+    //     pm.expect(answer).to.have.property('id');
+    // });
+    //
+    // if (pm.test("Has properties")) {
+    //     pm.globals.set('answerId', answer.id);
+    // }
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Get Question (answerCount=1)
+GET {{questionsApi}}/questions/{{questionId}}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // const question = pm.response.json();
+    //
+    // pm.test("Has answerCount of 1"), function () {
+    //     pm.expect(question.answerCount).to.eql(1);
+    // }
+    //
+    // pm.test("Has answers length of 1"), function () {
+    //     pm.expect(question.answers).to.be.an("array").that.has.lengthOf(1);
+    // }
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Get Question from Search (answerCount=1)
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // setTimeout(function(){}, 1000);
+//%}
+GET {{searchApi}}/search?
+    query={{questionTitle}}
+Content-Type: text/plain
+
+{
+    "title": "{{$randomLoremWords}}",
+    "content": "{{$randomLoremParagraphs}}"
+}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // pm.test("answerCount is 1", function () {
+    //     const json = pm.response.json();
+    //     pm.expect(json[0].answerCount).to.eql(1);
+    // });
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Update answer for question
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // const raw = pm.variables.replaceIn("{{$randomLoremParagraphs}}");
+    //
+    // // Split on newlines, wrap each line in <p> tags, then join
+    // const html = raw
+    //   .split('\n')
+    //   .filter(p => p.trim().length > 0)
+    //   .map(p => `<p>${p}</p>`)
+    //   .join('');
+    //
+    // pm.environment.set("escapedContent", JSON.stringify(html).slice(1, -1));
+//%}
+PUT {{questionsApi}}/questions/{{questionId}}/answers/{{answerId}}
+Authorization: Bearer {{bob_token}}
+Content-Type: application/json
+
+{
+  "content": "{{escapedContent}} updated"
+}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // pm.test("Response returns 204", function () {
+    //     pm.response.to.have.status(204);
+    // });
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Get Question (answer.content contains updated)
+GET {{questionsApi}}/questions/{{questionId}}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // pm.test("Answer contains 'updated'", function () {
+    //     const response = pm.response.json();
+    //     const answerContent = response.answers?.[0]?.content || "";
+    //     pm.expect(answerContent.includes("updated")).to.be.true;
+    // });
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Accept answer for question
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // const raw = pm.variables.replaceIn("{{$randomLoremParagraphs}}");
+    //
+    // // Split on newlines, wrap each line in <p> tags, then join
+    // const html = raw
+    //   .split('\n')
+    //   .filter(p => p.trim().length > 0)
+    //   .map(p => `<p>${p}</p>`)
+    //   .join('');
+    //
+    // pm.environment.set("escapedContent", JSON.stringify(html).slice(1, -1));
+//%}
+POST {{questionsApi}}/questions/{{questionId}}/answers/{{answerId}}/accept
+Authorization: Bearer {{bob_token}}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // pm.test("Response returns 204", function () {
+    //     pm.response.to.have.status(204);
+    // });
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Get Question (hasAcceptedAnswer=true)
+GET {{questionsApi}}/questions/{{questionId}}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // const response = pm.response.json();
+    //
+    // pm.test("Question has accepted answer", function () {
+    //     pm.expect(response.hasAcceptedAnswer).to.eql(true);
+    // });
+    //
+    // pm.test("Answer has accepted property of true", function () {
+    //     pm.expect(response.answers[0].accepted).to.be.true;
+    // })
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Get Question from Search (HasAcceptedAnswer=true)
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // setTimeout(function(){}, 1000);
+//%}
+GET {{searchApi}}/search?
+    query={{questionTitle}}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // pm.test("Has accepted answer is true", function () {
+    //     const json = pm.response.json();
+    //     pm.expect(json[0].hasAcceptedAnswer).to.eql(true);
+    // });
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Post another answer
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // const raw = pm.variables.replaceIn("{{$randomLoremParagraphs}}");
+    //
+    // // Split on newlines, wrap each line in <p> tags, then join
+    // const html = raw
+    //   .split('\n')
+    //   .filter(p => p.trim().length > 0)
+    //   .map(p => `<p>${p}</p>`)
+    //   .join('');
+    //
+    // pm.environment.set("escapedContent", JSON.stringify(html).slice(1, -1));
+//%}
+POST {{questionsApi}}/questions/{{questionId}}/answers
+Authorization: Bearer {{bob_token}}
+Content-Type: application/json
+
+{
+  "content": "{{escapedContent}}",
+  "questionId": "{{questionId}}"
+}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // const answer = pm.response.json();
+    //
+    // pm.test("Has properties", function () {
+    //     pm.expect(answer).to.have.property('id');
+    // });
+    //
+    // if (pm.test("Has properties")) {
+    //     pm.globals.set('answerId', answer.id);
+    // }
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Accept answer (fails returns 400)
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // const raw = pm.variables.replaceIn("{{$randomLoremParagraphs}}");
+    //
+    // // Split on newlines, wrap each line in <p> tags, then join
+    // const html = raw
+    //   .split('\n')
+    //   .filter(p => p.trim().length > 0)
+    //   .map(p => `<p>${p}</p>`)
+    //   .join('');
+    //
+    // pm.environment.set("escapedContent", JSON.stringify(html).slice(1, -1));
+//%}
+POST {{questionsApi}}/questions/{{questionId}}/answers/{{answerId}}/accept
+Authorization: Bearer {{bob_token}}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // pm.test("Response returns 400", function () {
+    //     pm.response.to.have.status(400);
+    // });
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Get Question from Search (AnswerCount = 2)
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // setTimeout(function(){}, 1000);
+//%}
+GET {{searchApi}}/search?
+    query={{questionTitle}}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // pm.test("answerCount is 1", function () {
+    //     const json = pm.response.json();
+    //     pm.expect(json[0].answerCount).to.eql(2);
+    // });
+    //
+    // pm.test("Has accepted answer is true", function () {
+    //     const json = pm.response.json();
+    //     pm.expect(json[0].hasAcceptedAnswer).to.eql(true);
+    // });
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Delete answer for question
+DELETE {{questionsApi}}/questions/{{questionId}}/answers/{{answerId}}
+Authorization: Bearer {{bob_token}}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // pm.test("Response returns 204", function () {
+    //     pm.response.to.have.status(204);
+    // });
+%}
+
+###
+# group: Section 5 Answer Challenge
+# @name Get Question from Search (AnswerCount=1)
+//< {%
+    // TODO: 迁移到 HTTP 客户端Pre-request处理程序 API
+    // setTimeout(function(){}, 1000);
+//%}
+GET {{searchApi}}/search?
+    query={{questionTitle}}
+
+> {%
+    // TODO: 迁移到 HTTP 客户端Response处理程序 API
+    // pm.test("answerCount is 1", function () {
+    //     const json = pm.response.json();
+    //     pm.expect(json[0].answerCount).to.eql(1);
+    // });
+%}

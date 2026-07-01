@@ -49,7 +49,7 @@ var gateway = builder.AddYarp("Yarp")
     .WithConfiguration(yarp =>
     {
         yarp.AddRoute("/WeatherForecast/{**catch-all}", weatherapi);
-        yarp.AddRoute("/Question/{**catch-all}", questionService);
+        yarp.AddRoute("/Questions/{**catch-all}", questionService);
         yarp.AddRoute("/tags/{**catch-all}", questionService);
         yarp.AddRoute("/search-mini/{**catch-all}", searchService);
         yarp.AddRoute("/typesense/{**catch-all}", searchService);
