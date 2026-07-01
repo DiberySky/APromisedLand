@@ -11,6 +11,9 @@ var postgres = builder.AddPostgres("Postgres", port: 8433)
     .WithPgAdmin()
     .WithOtlpExporter();
 
+var redis = builder.AddRedis("Redis")
+    .WithDataVolume("redis-data", isReadOnly: false);
+
 var typesenseApiKey = builder.AddParameter("typesense-api-key", secret: true);
 
 var typesense = builder.AddContainer("typesense", "typesense/typesense", "30.2")
@@ -30,9 +33,11 @@ var questionService = builder.AddProject<Projects.QuestionService>("Question-Ser
     .WithReference(keycloak)
     .WithReference(questionDb)
     .WithReference(rabbitmq)
+    .WithReference(redis)
     .WaitFor(keycloak)
     .WaitFor(questionDb)
-    .WaitFor(rabbitmq);
+    .WaitFor(rabbitmq)
+    .WaitFor(redis);
 
 var searchService = builder.AddProject<Projects.SearchService>("Search-Service")
     .WithEnvironment("typesense-api-key", typesenseApiKey)

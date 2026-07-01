@@ -28,7 +28,7 @@ public partial class QuestionsController(QuestionDbContext db, IMessageBus bus, 
         //     return BadRequest(string.Join(", ", missing));
 
         if (!await tagService.AreTagsValidAsync(dto.Tags))
-            return BadRequest("标签无效。");
+            return BadRequest("含有无效的标签。");
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var userName = User.FindFirstValue("name");
