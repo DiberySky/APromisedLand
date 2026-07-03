@@ -14,10 +14,23 @@ var postgres = builder.AddPostgres("Postgres", port: 8433)
 var redis = builder.AddRedis("Redis")
     .WithDataVolume("redis-data", isReadOnly: false);
 
+var ollama = builder.AddOllama("Ollama", port: 11434)
+    .WithDataVolume("ollama-data")
+    .WithGPUSupport()
+    .WithContainerRuntimeArgs("--gpus=all")
+    .WithLifetime(ContainerLifetime.Persistent)
+    .WithOtlpExporter();
+var embedding = ollama.AddModel("bge-large");
+
+var ollamaService = builder.AddProject<Projects.OllamaService>("Ollama-Service")
+    .WithReference(embedding)
+    .WaitFor(embedding)
+    .WithOtlpExporter();
+
+
 // 1. 修改 Elasticsearch 配置，禁用安全功能以简化本地开发
 var elasticsearch = builder.AddElasticsearch("Elasticsearch")
-    .WithImage("elasticsearch:9.4.3")  //docker pull library/elasticsearch:9.4.2
-    // .WithBindMount("./notes/analysis-ik", "/usr/share/elasticsearch/plugins/analysis-ik")
+    .WithImage("elasticsearch:9.4.3")
     .WithDockerfile("./Notes") 
     .WithDataVolume("elasticsearch-data")
     .WithEnvironment("xpack.security.enabled", "false") 
