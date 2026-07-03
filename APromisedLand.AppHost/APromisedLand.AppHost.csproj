@@ -28,6 +28,9 @@
 
     <ItemGroup>
       <None Remove="KeycloakRealmpart.json" />
+      <None Update="Notes\Dockerfile">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>

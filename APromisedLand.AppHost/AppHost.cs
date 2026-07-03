@@ -16,6 +16,9 @@ var redis = builder.AddRedis("Redis")
 
 // 1. 修改 Elasticsearch 配置，禁用安全功能以简化本地开发
 var elasticsearch = builder.AddElasticsearch("Elasticsearch")
+    .WithImage("elasticsearch:9.4.3")  //docker pull library/elasticsearch:9.4.2
+    // .WithBindMount("./notes/analysis-ik", "/usr/share/elasticsearch/plugins/analysis-ik")
+    .WithDockerfile("./Notes") 
     .WithDataVolume("elasticsearch-data")
     .WithEnvironment("xpack.security.enabled", "false") 
     .WithHttpEndpoint(port: 9200, targetPort: 9200)
@@ -23,6 +26,15 @@ var elasticsearch = builder.AddElasticsearch("Elasticsearch")
     .WithEnvironment("http.cors.allow-origin", "http://localhost:8083")  // 对应你访问 Elasticvue 的地址
     .WithEnvironment("http.cors.allow-headers", "X-Requested-With, Content-Type, Content-Length, Authorization")
     .WithOtlpExporter();
+
+// var elasticsearch = builder.AddElasticsearch("Elasticsearch")
+//     .WithDockerfile(".", "Dockerfile")
+//     .WithEnvironment("xpack.security.enabled", "false")
+//     .WithEnvironment("http.cors.enabled", "true")
+//     .WithEnvironment("http.cors.allow-origin", "http://localhost:8083")
+//     .WithEnvironment("http.cors.allow-headers", "X-Requested-With, Content-Type, Content-Length, Authorization")
+//     .WithHttpEndpoint(port: 9200, targetPort: 9200)
+//     .WithOtlpExporter();
 
 
 // 在 elasticsearch 定义之后添加

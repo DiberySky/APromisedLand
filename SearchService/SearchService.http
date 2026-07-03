@@ -1,7 +1,7 @@
 @SearchService_HostAddress = http://localhost:7002
 @DevTunnel_Yarp = https://6fjddmjf-8090.jpe1.devtunnels.ms
 
-GET {{SearchService_HostAddress}}/search-mini/?query="[Aspire]
+GET {{SearchService_HostAddress}}/search-mini/?query=项目中集成了
 Accept: application/json
 
 ###

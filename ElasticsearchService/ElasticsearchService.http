@@ -1,4 +1,25 @@
 @ElasticsearchService_HostAddress = http://localhost:5171
+@SearchService_HostAddress = http://localhost:7002
+@DevTunnel_Yarp = https://6fjddmjf-8090.jpe1.devtunnels.ms
+
+GET {{ElasticsearchService_HostAddress}}/Elastic?query=如何连接
+Accept: application/json
+
+###
+GET {{ElasticsearchService_HostAddress}}/Elastic/similar-titles?query=如何访问
+Accept: application/json
+
+###
+GET {{DevTunnel_Yarp}}/search-mini/similar-titles?query=Aspire
+Accept: application/json
+
+###
+GET {{SearchService_HostAddress}}/Typesense/?query="[Aspire]
+Accept: application/json
+
+###
+GET {{SearchService_HostAddress}}/Typesense/similar-titles?query=Aspire
+Accept: application/json
 
 GET {{ElasticsearchService_HostAddress}}/weatherforecast/
 Accept: application/json

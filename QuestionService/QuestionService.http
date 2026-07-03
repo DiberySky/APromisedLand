@@ -17,14 +17,14 @@ grant_type=password&client_id=diberysky&username=tian&password=Pa$$w0rd
 
 ###
 
-POST {{QuestionService_HostAddress}}/Question/
+POST {{QuestionService_HostAddress}}/Questions/
 Content-Type: application/json
 Authorization: bearer {{token}}
 
 {
-  "title": "Wolverine 的持久化消息存储与 PostgreSQL 结合性能调优",
-  "content": "Wolverine 内置了消息持久化，我使用 PostgreSQL 作为存储。在高并发场景下，如何优化消息表的索引和清理策略？是否有推荐的配置参数？",
-  "tags": ["wolverine", "postgresql", "microservices"]
+  "title": "Next.js + SignalR 构建实时仪表板时如何管理连接状态？",
+  "content": "我在 Next.js 项目中集成了 SignalR 客户端，但页面切换时连接会中断，且服务端渲染时无法建立连接。有没有推荐的架构模式来处理 SSR 和 WebSocket 的生命周期？",
+  "tags": ["nextjs", "signalr", "typescript"]
 }
 
 > {%
@@ -32,9 +32,9 @@ Authorization: bearer {{token}}
     client.global.set("id", response.body.id);
 %}
 ###
-@id4=b3d10056-0894-4ec1-9299-3cab86321a95
+@id4=3b355463-e090-4ad8-918c-54d6f2fdff7d
 
-PUT {{QuestionService_HostAddress}}/Question/{{id4}}
+PUT {{QuestionService_HostAddress}}/Questions/{{id4}}
 Content-Type: application/json
 Authorization: bearer {{token}}
 
@@ -50,7 +50,7 @@ Content-Type: application/json
 Authorization: bearer {{token}}
 
 ###
-GET {{QuestionService_HostAddress}}/question/{{id4}}
+GET {{QuestionService_HostAddress}}/questions/{{id4}}
 Accept: application/json
 
 ###
@@ -65,7 +65,7 @@ GET {{QuestionService_HostAddress}}/tags/
 Accept: application/json
 
 ###
-GET {{DevTunnel_Yarp}}/question/
+GET {{DevTunnel_Yarp}}/questions/
 Accept: application/json
 
 ###

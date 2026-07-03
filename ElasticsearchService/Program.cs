@@ -1,11 +1,16 @@
 using Aspire.Elastic.Clients.Elasticsearch; 
 using Elastic.Clients.Elasticsearch;
+using ElasticsearchService.Services;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Wolverine;
 using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ElasticsearchService/Program.cs
+// builder.Services.AddHostedService<ElasticIndexInitializer>();
+builder.Services.AddHostedService<ElasticsearchIndexInitializer>();
 
 // Add services to the container.
 

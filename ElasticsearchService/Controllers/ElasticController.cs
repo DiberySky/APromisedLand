@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using APromisedLand.Shared.Models;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using ElasticsearchService.Models;
@@ -25,15 +24,29 @@ public class ElasticController(ElasticsearchClient client) : ControllerBase
         }
 
         // 构建 bool 查询
+        // var boolQuery = new BoolQuery
+        // {
+        //     Must = new List<Query>
+        //     {
+        //         new MultiMatchQuery
+        //         {
+        //             // 使用字符串隐式转换，避免访问 internal 构造函数
+        //             Fields = "title,content",
+        //             Query = query
+        //         }
+        //     }
+        // };
+
         var boolQuery = new BoolQuery
         {
             Must = new List<Query>
             {
                 new MultiMatchQuery
                 {
-                    // 使用字符串隐式转换，避免访问 internal 构造函数
-                    Fields = "title,content",
-                    Query = query
+                    Fields = new[] { "title^3", "content" }, // 标题权重更高
+                    Query = query,
+                    Analyzer = "ik_smart" // 使用 ik_smart 进行搜索
+                    // 或 "ik_max_word"，视需求而定
                 }
             }
         };
@@ -72,7 +85,12 @@ public class ElasticController(ElasticsearchClient client) : ControllerBase
     {
         var searchRequest = new SearchRequest<ElasticQuestion>("questions")
         {
-            Query = new MatchQuery { Field = "title", Query = query }
+            Query = new MatchQuery
+            {
+                Field = "title", 
+                Query = query,
+                Analyzer = "ik_smart"
+            }
         };
 
         try
