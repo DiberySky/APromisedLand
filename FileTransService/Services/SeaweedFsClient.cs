@@ -79,6 +79,27 @@ public class SeaweedFsClient(HttpClient httpClient, IOptions<SeaweedFsOptions> o
         var response = await httpClient.DeleteAsync(url);
         response.EnsureSuccessStatusCode();
     }
+    
+    public async Task<string> GetFidFromTusUploadAsync(string uploadId)
+    {
+        // 1. 从 uploadId 中提取文件 key（去掉路径前缀）
+        var fileKey = uploadId.Split('/').Last();
+        // 2. 向 Filer 发送 HEAD 请求，获取 X-Seaweed-Fid 头
+        var headUrl = $"{_options.BaseUrl}/.tus/.uploads/{fileKey}";
+        var headRequest = new HttpRequestMessage(HttpMethod.Head, headUrl);
+        headRequest.Headers.Add("Tus-Resumable", "1.0.0");
+
+        var headResponse = await httpClient.SendAsync(headRequest);
+        headResponse.EnsureSuccessStatusCode();
+
+        if (headResponse.Headers.TryGetValues("X-Seaweed-Fid", out var values))
+        {
+            var fid = values.FirstOrDefault();
+            if (!string.IsNullOrEmpty(fid))
+                return fid;
+        }
+        throw new Exception($"无法从 TUS 上传 {uploadId} 获取 FID");
+    }
 }
 
 /// <summary>

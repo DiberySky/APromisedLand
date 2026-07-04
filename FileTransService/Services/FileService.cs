@@ -86,4 +86,28 @@ public class FileService : IFileService
         return await _dbContext.Files
             .FirstOrDefaultAsync(f => f.Id == fileId && !f.IsDeleted);
     }
+    
+    public async Task<FileMetadata> CompleteTusUploadAsync(CompleteUploadRequest request)
+    {
+        // 1. 通过 SeaweedFsClient 获取 FID
+        var fid = await _seaweedClient.GetFidFromTusUploadAsync(request.UploadId);
+
+        // 2. 保存元数据到 PostgreSQL
+        var metadata = new FileMetadata
+        {
+            Id = Guid.NewGuid(),
+            Fid = fid,
+            FileName = request.FileName,
+            FileSize = request.FileSize,
+            MimeType = request.MimeType ?? "application/octet-stream",
+            BusinessId = request.BusinessId,
+            UploadTime = DateTime.UtcNow
+        };
+
+        _dbContext.Files.Add(metadata);
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation("TUS upload completed, fileId: {FileId}, fid: {Fid}", metadata.Id, fid);
+        return metadata;
+    }
 }

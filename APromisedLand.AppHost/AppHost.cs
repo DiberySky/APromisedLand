@@ -89,7 +89,7 @@ var seaweedVolume = builder.AddContainer("seaweedfs-volume", "chrislusf/seaweedf
 
 // SeaweedFS Filer
 var seaweedFiler = builder.AddContainer("seaweedfs-filer", "chrislusf/seaweedfs")
-    .WithArgs("filer", "-master=seaweedfs-master:9333")
+    .WithArgs("filer", "-master=seaweedfs-master:9333") //允许所有域名（开发环境）, 生产环境请替换为具体的前端地址，例如：http://localhost:5033
     .WithHttpEndpoint(name: "http", port: 8888, targetPort: 8888)
     .WithOtlpExporter()
     .WaitFor(seaweedMaster)
@@ -102,6 +102,7 @@ var fileTransService = builder.AddProject<Projects.FileTransService>("FileTrans-
     .WithReference(fileTransDb)
     .WithEnvironment("SeaweedFS__BaseUrl", seaweedFiler.GetEndpoint("http"))
     .WithEnvironment("SeaweedFS__MasterUrl", seaweedMaster.GetEndpoint("http"))
+    .WithEnvironment("SeaweedFS__VolumeUrl", seaweedVolume.GetEndpoint("http"))
     .WaitFor(fileTransDb)
     .WithOtlpExporter();
 #endregion

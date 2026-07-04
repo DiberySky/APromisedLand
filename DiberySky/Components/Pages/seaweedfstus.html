@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TUS 断点续传 Demo</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        #progress { width: 100%; height: 20px; background: #eee; }
+        #progress-bar { width: 0%; height: 100%; background: #4caf50; transition: width 0.2s; }
+        #log { margin-top: 20px; background: #f4f4f4; padding: 10px; border-radius: 4px; max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+<h2>上传文件（支持断点续传）</h2>
+<input type="file" id="fileInput" />
+<button id="uploadBtn">开始上传</button>
+<div id="progress"><div id="progress-bar"></div></div>
+<div id="log"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tus-js-client@latest/dist/tus.min.js"></script>
+<script>
+    document.getElementById('uploadBtn').addEventListener('click', function () {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (!file) {
+            alert('请选择一个文件');
+            return;
+        }
+
+        const log = document.getElementById('log');
+        const progressBar = document.getElementById('progress-bar');
+
+        // 创建上传对象
+        const upload = new tus.Upload(file, {
+            // SeaweedFS Filer 的 TUS 端点（请确认端口）
+            endpoint: 'http://localhost:8888/.tus/',
+            // 元数据（可选，但建议至少传文件名）
+            metadata: {
+                filename: file.name,
+                filetype: file.type || 'application/octet-stream',
+                businessId: 'demo2026'  // 可传入业务 ID
+            },
+            // 分片大小（建议 5~10MB）
+            chunkSize: 5 * 1024 * 1024,
+            // 并发上传数
+            parallelUploads: 1,
+            // 进度回调
+            onProgress: function (bytesUploaded, bytesTotal) {
+                const percent = (bytesUploaded / bytesTotal * 100).toFixed(2);
+                progressBar.style.width = percent + '%';
+                log.innerHTML = `上传进度：${percent}% (${bytesUploaded} / ${bytesTotal} 字节)`;
+            },
+            // 上传成功
+            onSuccess: function () {
+                log.innerHTML += '<br>✅ 上传完成！';
+                // 获取上传会话的 URL（即 uploadId）
+                const uploadId = upload.url;  // 如 /.tus/.uploads/xxxxx
+                // 通知后端保存元数据
+                fetch('http://localhost:5033/api/files/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        uploadId: uploadId,
+                        fileName: file.name,
+                        fileSize: file.size,
+                        mimeType: file.type || 'application/octet-stream',
+                        businessId: 'demo2026'
+                    })
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        log.innerHTML += `<br>📦 元数据已保存，文件 ID：${data.fileId}`;
+                    })
+                    .catch(err => {
+                        log.innerHTML += `<br>❌ 保存元数据失败：${err.message}`;
+                    });
+            },
+            // 错误处理
+            onError: function (error) {
+                log.innerHTML += `<br>❌ 上传错误：${error.message}`;
+            }
+        });
+
+        // 开始上传
+        upload.start();
+        log.innerHTML = '⏳ 开始上传...';
+    });
+</script>
+</body>
+</html>
