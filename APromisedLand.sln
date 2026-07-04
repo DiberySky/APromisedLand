@@ -35,6 +35,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElasticsearchService", "Ela
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OllamaService", "OllamaService\OllamaService.csproj", "{963EF1CF-10CA-4473-AE50-56DCB8704AB3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileTransService", "FileTransService\FileTransService.csproj", "{F93FD1A3-5FAD-46C8-B04B-C244B4ADE76F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -90,6 +92,10 @@ Global
 		{963EF1CF-10CA-4473-AE50-56DCB8704AB3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{963EF1CF-10CA-4473-AE50-56DCB8704AB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{963EF1CF-10CA-4473-AE50-56DCB8704AB3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F93FD1A3-5FAD-46C8-B04B-C244B4ADE76F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F93FD1A3-5FAD-46C8-B04B-C244B4ADE76F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F93FD1A3-5FAD-46C8-B04B-C244B4ADE76F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F93FD1A3-5FAD-46C8-B04B-C244B4ADE76F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -105,6 +111,7 @@ Global
 		{81B674C6-FB4A-42EE-9CB7-CA18C14BCB67} = {8E8BB1FF-D5BA-4309-9BF9-DE58139C91F3}
 		{DC020C10-7D30-44D1-A877-8410955BADF5} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
 		{963EF1CF-10CA-4473-AE50-56DCB8704AB3} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
+		{F93FD1A3-5FAD-46C8-B04B-C244B4ADE76F} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9647CF65-ABDB-4637-B56C-E0CDAC22FFFB}

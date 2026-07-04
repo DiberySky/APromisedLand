@@ -1,0 +1,25 @@
+@FileTransService_HostAddress = http://localhost:5033
+
+GET {{FileTransService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+POST {{FileTransService_HostAddress}}/FileTrans/upload?businessId=demo2026"
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="hello.txt"
+
+< hello.txt
+--WebAppBoundary--
+
+###
+# curl -O -J "http://localhost:5033/FileTrans/download/9d11fb95-8bd2-4c00-b249-ee21a41f2b8a"
+GET http://localhost:5033/FileTrans/download/9d11fb95-8bd2-4c00-b249-ee21a41f2b8a
+
+###
+# curl -X DELETE "http://localhost:5033/FileTrans/76ade0f1-fa7e-4326-a602-dc50e31549b2"
+DELETE http://localhost:5033/FileTrans/9d11fb95-8bd2-4c00-b249-ee21a41f2b8a
+
+###
