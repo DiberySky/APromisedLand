@@ -21,3 +21,8 @@ GET http://localhost:5033/FileTrans/download/38f298e4-25a4-42d6-9477-021352eae62
 DELETE http://localhost:5033/FileTrans/38f298e4-25a4-42d6-9477-021352eae622
 
 ###
+# curl -X OPTIONS http://localhost:8888/.tus/ -H "Tus-Resumable: 1.0.0" -i
+OPTIONS http://localhost:8888/.tus/
+Tus-Resumable: 1.0.0
+
+###
