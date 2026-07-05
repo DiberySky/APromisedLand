@@ -5,10 +5,10 @@ namespace APromisedLand.AppHost;
 
 public class AppHostContext
 {
-    // Identity
+    // Keycloak
     public IResourceBuilder<KeycloakResource>? Keycloak { get; set; }
 
-    // Database & Messaging
+    // Database & RabbitMQ
     public IResourceBuilder<PostgresServerResource>? Postgres { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? QuestionDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? FileTransDb { get; set; }
@@ -18,7 +18,7 @@ public class AppHostContext
     // Search (Typesense)
     public IResourceBuilder<ContainerResource>? Typesense { get; set; }
     public EndpointReference? TypesenseEndpoint { get; set; }
-    public ParameterResource? TypesenseApiKey { get; set; }
+    public IResourceBuilder<ParameterResource>? TypesenseApiKey { get; set; }
 
     // Storage (SeaweedFS)
     public IResourceBuilder<ContainerResource>? SeaweedMaster { get; set; }

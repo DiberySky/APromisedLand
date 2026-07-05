@@ -9,6 +9,8 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.AddServiceDefaults();
 
+var keycloakAuthority = builder.Configuration["services:Keycloak:https:0"]; // 提供默认值
+
 builder.Services.AddAuthentication()
     .AddKeycloakJwtBearer(
         serviceName:  "keycloak",
@@ -16,7 +18,7 @@ builder.Services.AddAuthentication()
         options =>
         {
             options.TokenValidationParameters.ValidateIssuer = false;
-            options.Authority = ProjectService.Authority; 
+            options.Authority = keycloakAuthority; 
             options.Audience = "diberysky";
             // if (builder.Environment.IsDevelopment())
             {

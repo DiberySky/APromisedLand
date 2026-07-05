@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.QueryDsl;
+using ElasticsearchService.Embeds;
 using ElasticsearchService.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,7 +9,7 @@ namespace ElasticsearchService.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class ElasticController(ElasticsearchClient client) : ControllerBase
+public class ElasticController(ElasticsearchClient client, IEmbeddingService embeddingService) : ControllerBase
 {
     // GET /elastic?query=xxx  （支持 [tag] 过滤）
     [HttpGet]
@@ -87,7 +88,7 @@ public class ElasticController(ElasticsearchClient client) : ControllerBase
         {
             Query = new MatchQuery
             {
-                Field = "title", 
+                Field = "title",
                 Query = query,
                 Analyzer = "ik_smart"
             }
@@ -104,6 +105,47 @@ public class ElasticController(ElasticsearchClient client) : ControllerBase
         catch (Exception e)
         {
             return Problem("Elasticsearch 搜索失败", e.Message);
+        }
+    }
+
+    [HttpGet("semantic")]
+    public async Task<IActionResult> SemanticSearch([FromQuery] string query, [FromQuery] int size = 10)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return BadRequest("查询词不能为空");
+
+        // 1. 生成查询向量
+        var queryEmbedding = await embeddingService.GenerateEmbeddingAsync(query);
+
+        // 2. 构建 knn 搜索请求（Elastic 8.x 支持 knn 查询）
+        var searchRequest = new SearchRequest<ElasticQuestion>("questions")
+        {
+            Size = size,
+            Knn =
+            [
+                new KnnSearch()
+                {
+                    Field = "embedding",
+                    QueryVector = queryEmbedding,
+                    K = size * 2, // 召回更多候选（用于后续 rerank，若需要）
+                    NumCandidates = size * 10,
+                    Boost = (float?)0.5 // 控制向量得分权重
+                },
+            ]
+        };
+
+        try
+        {
+            var response = await client.SearchAsync<ElasticQuestion>(searchRequest);
+            if (!response.IsValidResponse)
+                return Problem("语义搜索失败", response.DebugInformation);
+
+            // 返回匹配的文档（已包含相关度得分）
+            return Ok(response.Documents);
+        }
+        catch (Exception ex)
+        {
+            return Problem("语义搜索异常", ex.Message);
         }
     }
 }

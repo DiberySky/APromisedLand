@@ -14,11 +14,11 @@ public static class OllamaExtensions
             .WithOtlpExporter();
 
         context.Embedding = context.Ollama.AddModel("bge-large");
-
-        context.OllamaService = builder.AddProject<Projects.OllamaService>("Ollama-Service")
-            .WithReference(context.Embedding)
-            .WaitFor(context.Embedding)
-            .WithOtlpExporter();
+        
+        // context.OllamaService = builder.AddProject<Projects.OllamaService>("Ollama-Service")
+        //     .WithReference(context.Embedding)
+        //     .WaitFor(context.Embedding)
+        //     .WithOtlpExporter();
 
         return builder;
     }

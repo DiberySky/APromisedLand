@@ -1,8 +1,8 @@
 namespace APromisedLand.AppHost.Extensions;
 
-public static class DatabaseExtensions
+public static class PostgresExtensions
 {
-    public static IDistributedApplicationBuilder AddDatabases(
+    public static IDistributedApplicationBuilder AddPostgres(
         this IDistributedApplicationBuilder builder,
         AppHostContext context)
     {
@@ -15,16 +15,7 @@ public static class DatabaseExtensions
         // 创建具体数据库
         context.QuestionDb = context.Postgres.AddDatabase("questionDb");
         context.FileTransDb = context.Postgres.AddDatabase("fileTransDb");
-
-        // Redis
-        context.Redis = builder.AddRedis("Redis")
-            .WithDataVolume("redis-data", isReadOnly: false);
-
-        // RabbitMQ
-        context.RabbitMq = builder.AddRabbitMQ("Messaging")
-            .WithDataVolume("rabbitmq-data")
-            .WithManagementPlugin(port: 15672);
-
+        
         return builder;
     }
 }

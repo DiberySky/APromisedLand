@@ -49,7 +49,7 @@ builder.Services.AddOpenTelemetry().WithTracing(traceProviderBuilder =>
 // ---------- Wolverine（消息总线） ----------
 builder.Host.UseWolverine(opts =>
 {
-    opts.UseRabbitMqUsingNamedConnection("Messaging").AutoProvision();
+    opts.UseRabbitMqUsingNamedConnection("RabbitMQ").AutoProvision();
     opts.ListenToRabbitQueue("questions.search", cfg =>
     {
         cfg.BindExchange("questions");

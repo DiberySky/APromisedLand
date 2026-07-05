@@ -31,7 +31,7 @@ public static class SeaweedFsExtensions
             .WaitFor(context.SeaweedVolume);
 
         // FileTrans Service
-        context.FileTransService = builder.AddProject<Projects.FileTransService>("FileTrans-Service")
+        context.FileTransService = builder.AddProject<Projects.FileTransService>("SeaweedFS-Service")
             .WithReference(context.FileTransDb)
             .WithEnvironment("SeaweedFS__BaseUrl", context.SeaweedFiler.GetEndpoint("http"))
             .WithEnvironment("SeaweedFS__MasterUrl", context.SeaweedMaster.GetEndpoint("http"))

@@ -1,4 +1,4 @@
-@Keycloak_HostAddress = localhost:8080
+@Keycloak_HostAddress = localhost:8323
 @realm = apromisedland
 @yarp_HttpHost = http://localhost:8088
 @QuestionService_HostAddress = http://localhost:7001
@@ -22,15 +22,18 @@ Content-Type: application/json
 Authorization: bearer {{token}}
 
 {
-  "title": "Next.js + SignalR 构建实时仪表板时如何管理连接状态？",
-  "content": "我在 Next.js 项目中集成了 SignalR 客户端，但页面切换时连接会中断，且服务端渲染时无法建立连接。有没有推荐的架构模式来处理 SSR 和 WebSocket 的生命周期？",
-  "tags": ["nextjs", "signalr", "typescript"]
+  "title": "EF Core 如何高效处理多对多关系？面食",
+  "content": "在 EF Core 中，我需要建立用户和角色之间的多对多关系，并希望使用自动生成的联接表。但查询时总是出现 N+1 问题，该如何优化？",
+  "tags": ["ef-core", "dotnet"]
 }
 
 > {%
     // 将 access_token 存入全局变量 token
     client.global.set("id", response.body.id);
 %}
+###
+GET http://localhost:5171/Elastic/semantic?query=电脑&size=3
+
 ###
 @id4=3b355463-e090-4ad8-918c-54d6f2fdff7d
 

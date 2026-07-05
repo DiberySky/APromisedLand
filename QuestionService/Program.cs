@@ -19,6 +19,13 @@ builder.Services.AddMemoryCache();
 builder.AddRedisClient(connectionName: "redis");
 builder.Services.AddScoped<TagService>();
 
+var keycloakUrl = builder.Configuration["services:Keycloak:https:0"];
+if (string.IsNullOrEmpty(keycloakUrl))
+    throw new InvalidOperationException("配置中未找到 Keycloak URI。");
+//string? Authority = Environment.GetEnvironmentVariable("Keycloak__Authority");
+
+var authority = $"{keycloakUrl}/realms/{ProjectService.Realm}";
+
 builder.Services.AddAuthentication()
     .AddKeycloakJwtBearer(
         serviceName:  "keycloak",
@@ -26,7 +33,7 @@ builder.Services.AddAuthentication()
         options =>
         {
             options.TokenValidationParameters.ValidateIssuer = true;
-            options.Authority = ProjectService.Authority; 
+            options.Authority = authority; 
             options.Audience = "diberysky";
             if (builder.Environment.IsDevelopment())
             {
@@ -45,7 +52,7 @@ builder.Services.AddOpenTelemetry().WithTracing(traceProviderBuilder =>
 
 builder.Host.UseWolverine(opts =>
 {
-    opts.UseRabbitMqUsingNamedConnection("Messaging").AutoProvision();
+    opts.UseRabbitMqUsingNamedConnection("RabbitMQ").AutoProvision();
     opts.PublishAllMessages().ToRabbitExchange("questions");
 });
 
