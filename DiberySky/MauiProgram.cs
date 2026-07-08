@@ -4,7 +4,6 @@ using APromisedLand.Maui.Services;
 using APromisedLand.Razor.Services;
 using APromisedLand.Shared.Clients;
 using APromisedLand.Shared.Helper;
-using APromisedLand.Shared.Intefaces;
 using APromisedLand.Shared.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;

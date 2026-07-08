@@ -1,20 +1,30 @@
+using System.Net.Security;
 using System.Security.Claims;
 using APromisedLand.Shared.Contracts;
 using APromisedLand.Shared.DTOs.Overflow;
+using APromisedLand.Shared.Interfaces;
+using APromisedLand.Shared.MessageContracts;
+using Elastic.Clients.Elasticsearch;
 using FastExpressionCompiler;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using QuestionService.Data;
 using QuestionService.Models;
 using QuestionService.Services;
+using QuestionService.Services.Nats;
 using Wolverine;
 
 namespace QuestionService.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public partial class QuestionsController(QuestionDbContext db, IMessageBus bus, TagService tagService) : ControllerBase
+// public partial class QuestionsController(QuestionDbContext db, IMessageBus bus, 
+public partial class QuestionsController(QuestionDbContext db,
+    TagService tagService, IQuestionPublisher publisher, 
+    IEmbeddingGenerator embedder, ElasticsearchClient elasticClient,
+    ILogger<QuestionsController> logger) : ControllerBase
 {
     [Authorize]
     [HttpPost]
@@ -50,8 +60,11 @@ public partial class QuestionsController(QuestionDbContext db, IMessageBus bus, 
         db.Questions.Add(question);
         await db.SaveChangesAsync();
 
-        await bus.PublishAsync(new QuestionCreated(question.Id, question.Title, question.Content,
-            question.CreatedAt, question.TagSlugs));
+        // await bus.PublishAsync(new QuestionCreated(question.Id, question.Title, question.Content,
+        //     question.CreatedAt, question.TagSlugs));
+        
+        var data = MapToQuestionData(question);
+        await publisher.PublishQuestionAsync(data, "create");
 
         return Ok(question);
     }
@@ -82,7 +95,7 @@ public partial class QuestionsController(QuestionDbContext db, IMessageBus bus, 
     //
     //     return question;
     // }
-    
+
     [HttpGet("{id}")]
     public async Task<ActionResult<Question>> GetQuestion(string id)
     {
@@ -122,9 +135,12 @@ public partial class QuestionsController(QuestionDbContext db, IMessageBus bus, 
 
         await db.SaveChangesAsync();
 
-        await bus.PublishAsync(new QuestionUpdated(question.Id, question.Title, question.Content,
-            question.TagSlugs.AsArray()));
+        // await bus.PublishAsync(new QuestionUpdated(question.Id, question.Title, question.Content,
+        //     question.TagSlugs.AsArray()));
 
+        var data = MapToQuestionData(question);
+        await publisher.PublishQuestionAsync(data, "update");
+        
         return NoContent();
     }
 
@@ -141,8 +157,40 @@ public partial class QuestionsController(QuestionDbContext db, IMessageBus bus, 
         db.Questions.Remove(question);
         await db.SaveChangesAsync();
 
-        await bus.PublishAsync(new QuestionDeleted(question.Id));
+        // await bus.PublishAsync(new QuestionDeleted(question.Id));
         
+        var data = MapToQuestionData(question);
+        await publisher.PublishQuestionAsync(data, "delete");
+
         return NoContent();
+    }
+
+    [HttpGet("errors")]
+    public ActionResult GetErrorsResponsed(int code)
+    {
+        ModelState.AddModelError("问题一", "验证问题一");
+        ModelState.AddModelError("问题二", "验证问题二");
+
+        return code switch
+        {
+            400 => BadRequest("与正当请求完全相反。"),
+            401 => Unauthorized(),
+            403 => Forbid(),
+            404 => NotFound(),
+            500 => throw new Exception("这是一个服务器错误。"),
+            _ => ValidationProblem(ModelState)
+        };
+    }
+
+    private static QuestionData MapToQuestionData(Question question)
+    {
+        return new QuestionData
+        {
+            Id = question.Id,
+            Title = question.Title,
+            Content = question.Content,
+            CreatedAt = question.CreatedAt,
+            Tags = question.TagSlugs,
+        };
     }
 }

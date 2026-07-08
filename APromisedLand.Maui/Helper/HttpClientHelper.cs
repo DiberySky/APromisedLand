@@ -1,11 +1,11 @@
 ﻿using APromisedLand.Maui.Authentication;
 using APromisedLand.Shared.Clients;
 using APromisedLand.Shared.Helper;
-using APromisedLand.Shared.Intefaces;
 using APromisedLand.Shared.Services;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using APromisedLand.Shared.Interfaces;
 
 namespace APromisedLand.Maui.Helper;
 

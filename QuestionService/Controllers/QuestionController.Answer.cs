@@ -105,8 +105,11 @@ public partial class QuestionsController
         
         await db.SaveChangesAsync();
         
-        await bus.PublishAsync(new AnswerCountUpdated(questionId, question.AnswerCount));
+        // await bus.PublishAsync(new AnswerCountUpdated(questionId, question.AnswerCount));
         
+        var data = MapToQuestionData(question);
+        await publisher.PublishQuestionAsync(data, "update");
+
         return Created($"/questions/{questionId}", answer);
     }
     
@@ -124,8 +127,11 @@ public partial class QuestionsController
         
         await db.SaveChangesAsync();
         
-        await bus.PublishAsync(new AnswerCountUpdated(questionId, question.AnswerCount));
+        // await bus.PublishAsync(new AnswerCountUpdated(questionId, question.AnswerCount));
         
+        var data = MapToQuestionData(question);
+        await publisher.PublishQuestionAsync(data, "update");
+
         return NoContent();
     }
     
@@ -144,7 +150,10 @@ public partial class QuestionsController
         
         await db.SaveChangesAsync();
         
-        await bus.PublishAsync(new AnswerAccepted(questionId));
+        // await bus.PublishAsync(new AnswerAccepted(questionId));
+        
+        var data = MapToQuestionData(question);
+        await publisher.PublishQuestionAsync(data, "update");
         
         return NoContent();
     }

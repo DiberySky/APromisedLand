@@ -3,18 +3,11 @@ using OllamaSharp.Models;
 
 namespace ElasticsearchService.Embeds;
 
-public class EmbeddingService : IEmbeddingService
+public class EmbeddingService(IOllamaApiClient ollama) : IEmbeddingService
 {
-    private readonly IOllamaApiClient _ollama;
-
-    public EmbeddingService(IOllamaApiClient ollama)
-    {
-        _ollama = ollama;
-    }
-
     public async Task<float[]> GenerateEmbeddingAsync(string text)
     {
-        var response = await _ollama.EmbedAsync(new EmbedRequest
+        var response = await ollama.EmbedAsync(new EmbedRequest
         {
             Model = "bge-large",
             Input = [ text ]
@@ -24,7 +17,7 @@ public class EmbeddingService : IEmbeddingService
 
     public async Task<List<float[]>> GenerateEmbeddingsAsync(List<string> texts)
     {
-        var response = await _ollama.EmbedAsync(new EmbedRequest
+        var response = await ollama.EmbedAsync(new EmbedRequest
         {
             Model = "bge-large",
             Input = texts

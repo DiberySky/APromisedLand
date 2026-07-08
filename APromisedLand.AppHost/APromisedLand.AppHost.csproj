@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.4.5">
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -9,10 +9,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+      <PackageReference Include="Aspire.Hosting.Docker" Version="13.4.6" />
       <PackageReference Include="Aspire.Hosting.Elasticsearch" Version="13.3.0" />
       <PackageReference Include="Aspire.Hosting.Keycloak" Version="13.4.6-preview.1.26319.6" />
       <PackageReference Include="Aspire.Hosting.Maui" Version="13.4.6-preview.1.26319.6" />
+      <PackageReference Include="Aspire.Hosting.Nats" Version="13.4.6" />
       <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
       <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.4.6" />
       <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
@@ -25,7 +26,9 @@
       <ProjectReference Include="..\FileTransService\FileTransService.csproj" />
       <ProjectReference Include="..\OllamaService\OllamaService.csproj" />
       <ProjectReference Include="..\QuestionService\QuestionService.csproj" />
+      <ProjectReference Include="..\QuestionTypesenseService\QuestionTypesenseService.csproj" />
       <ProjectReference Include="..\SearchService\SearchService.csproj" />
+      <ProjectReference Include="..\SemanticSearch.Api\SemanticSearch.Api.csproj" />
       <ProjectReference Include="..\WeatherApi\WeatherApi.csproj" />
     </ItemGroup>
 

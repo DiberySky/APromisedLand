@@ -1,10 +1,10 @@
 ﻿using APromisedLand.Shared.Helper;
-using APromisedLand.Shared.Intefaces;
 using System;
 using System.Collections.Generic;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using APromisedLand.Shared.Interfaces;
 using APromisedLand.Shared.Services;
 
 namespace APromisedLand.Maui.Authentication;

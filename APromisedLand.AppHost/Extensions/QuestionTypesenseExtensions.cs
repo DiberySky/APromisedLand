@@ -17,6 +17,16 @@ public static class QuestionTypesenseExtensions
             .WaitFor(context.Typesense)
             .WaitFor(context.RabbitMq);
 
+        // if (context.TypesenseEndpoint is null || context.Typesense is null || 
+        //     context.TypesenseApiKey is null || context.Nats is null) return builder;
+        //
+        // context.TypesenseService = builder.AddProject<Projects.QuestionTypesenseService>("Typesense-question")
+        //     .WithEnvironment("typesense-api-key", context.TypesenseApiKey)
+        //     .WithReference(context.TypesenseEndpoint)
+        //     .WithReference(context.Nats)
+        //     .WaitFor(context.Typesense)
+        //     .WaitFor(context.Nats);
+        
         return builder;
     }
 }

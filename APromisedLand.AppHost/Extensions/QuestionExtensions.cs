@@ -7,17 +7,27 @@ public static class QuestionExtensions
         AppHostContext context)
     {
         if (context.QuestionDb is null || context.Keycloak is null ||
-            context.RabbitMq is null || context.Redis is null) return builder;
+            context.Redis is null || context.Ollama is null ||
+            context.Nats is null || context.Elasticsearch is null ||
+            context.TypesenseEndpoint is null) return builder;
         
         // QuestionService
         context.QuestionService = builder.AddProject<Projects.QuestionService>("Question-Service")
+            .WithEnvironment("typesense-api-key", context.TypesenseApiKey)
+            .WithReference(context.TypesenseEndpoint)
             .WithReference(context.Keycloak)
             .WithReference(context.QuestionDb)
-            .WithReference(context.RabbitMq)
+            // .WithReference(context.RabbitMq)
             .WithReference(context.Redis)
+            .WithReference(context.Elasticsearch)
+            .WithReference(context.Ollama)
+            .WithReference(context.Nats)
             .WaitFor(context.Keycloak)
             .WaitFor(context.QuestionDb)
-            .WaitFor(context.RabbitMq)
+            // .WaitFor(context.RabbitMq)
+            .WaitFor(context.Elasticsearch)
+            .WaitFor(context.Ollama)
+            .WaitFor(context.Nats)
             .WaitFor(context.Redis);
 
         // WeatherApi

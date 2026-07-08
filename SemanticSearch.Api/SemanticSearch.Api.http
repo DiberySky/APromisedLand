@@ -1,0 +1,15 @@
+@SemanticSearch.Api_HostAddress = http://localhost:5269
+
+GET {{SemanticSearch.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+###
+GET http://localhost:5269/Search/semantic?q=abcdeftyrytrytry
+
+###
+GET http://localhost:5269/Search/text?q=深度学习与神经网络
+
+###
+GET http://localhost:5269/Search/hybrid?q=语言&size=3

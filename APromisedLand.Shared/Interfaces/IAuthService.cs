@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace APromisedLand.Shared.Intefaces;
+﻿namespace APromisedLand.Shared.Interfaces;
 
 public interface IAuthService
 {

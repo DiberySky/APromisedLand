@@ -1,18 +1,12 @@
-using Aspire.Elastic.Clients.Elasticsearch; 
 using Elastic.Clients.Elasticsearch;
 using ElasticsearchService.Embeds;
 using ElasticsearchService.Services;
-using OllamaSharp;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Wolverine;
 using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// ElasticsearchService/Program.cs
-// builder.Services.AddHostedService<ElasticIndexInitializer>();
-builder.Services.AddHostedService<ElasticsearchIndexInitializer>();
 
 // Add services to the container.
 
@@ -23,6 +17,10 @@ builder.AddServiceDefaults();
 
 // 注册 Elasticsearch 客户端（使用单例）
 builder.AddElasticsearchClient("Elasticsearch");
+
+// ElasticsearchService/Program.cs
+// builder.Services.AddHostedService<ElasticIndexInitializer>();
+builder.Services.AddHostedService<ElasticsearchIndexInitializer>();
 
 // 注册 Ollama 客户端（指向 Ollama 容器地址，假设容器内名称为 "Ollama"，端口 11434）
 // builder.Services.AddSingleton<IOllamaApiClient>(sp => 

@@ -12,5 +12,7 @@ public partial class ProjectService
 
     public static bool Debug { get; set; } = false;
 
+    public static float MinScore { get; set; } = 0.80f; //只返回相似度 ≥ 0.80 的文档
+
     public static string Copyright { get; set; } = $"\u00A9 {DateTime.Now.Year} 武汉浩瀚科技有限公司";
 }

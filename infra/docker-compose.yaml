@@ -1,0 +1,244 @@
+services:
+  production-dashboard:
+    image: "mcr.microsoft.com/dotnet/nightly/aspire-dashboard:latest"
+    ports:
+      - "8090:18888"
+    expose:
+      - "18889"
+      - "18890"
+    networks:
+      - "aspire"
+    restart: "always"
+  keycloak:
+    image: "quay.io/keycloak/keycloak:26.6"
+    command:
+      - "start"
+      - "--import-realm"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: "admin"
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "${KEYCLOAK_PASSWORD}"
+      KC_HEALTH_ENABLED: "true"
+      KC_FEATURES: "opentelemetry"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Keycloak"
+    expose:
+      - "8080"
+      - "9000"
+    volumes:
+      - type: "volume"
+        target: "/opt/keycloak/data"
+        source: "keycloak-data"
+        read_only: false
+    networks:
+      - "aspire"
+  postgres:
+    image: "docker.io/library/postgres:18.3"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Postgres"
+    expose:
+      - "5432"
+    volumes:
+      - type: "volume"
+        target: "/var/lib/postgresql"
+        source: "postgres-data"
+        read_only: false
+    networks:
+      - "aspire"
+  redis:
+    image: "docker.io/library/redis:8.6"
+    command:
+      - "-c"
+      - "redis-server --requirepass $$REDIS_PASSWORD --save 60 1"
+    entrypoint:
+      - "/bin/sh"
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+    expose:
+      - "6379"
+    volumes:
+      - type: "volume"
+        target: "/data"
+        source: "redis-data"
+        read_only: false
+    networks:
+      - "aspire"
+  rabbitmq:
+    image: "docker.io/library/rabbitmq:4.3-management"
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD}"
+    expose:
+      - "5672"
+      - "15672"
+    volumes:
+      - type: "volume"
+        target: "/var/lib/rabbitmq"
+        source: "rabbitmq-data"
+        read_only: false
+    networks:
+      - "aspire"
+  typesense:
+    image: "typesense/typesense:30.2"
+    command:
+      - "--data-dir"
+      - "/data"
+      - "--api-key"
+      - "${TYPESENSE_API_KEY}"
+      - "--enable-cors"
+    environment:
+      TYPESENSE_API_KEY: "${TYPESENSE_API_KEY}"
+    expose:
+      - "8108"
+    volumes:
+      - type: "volume"
+        target: "/data"
+        source: "typesense-data"
+        read_only: false
+    networks:
+      - "aspire"
+  question-service:
+    image: "${QUESTION_SERVICE_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${QUESTION_SERVICE_PORT}"
+      KEYCLOAK_HTTP: "http://Keycloak:8080"
+      services__Keycloak__http__0: "http://Keycloak:8080"
+      ConnectionStrings__questionDb: "Host=Postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=questionDb"
+      QUESTIONDB_HOST: "Postgres"
+      QUESTIONDB_PORT: "5432"
+      QUESTIONDB_USERNAME: "postgres"
+      QUESTIONDB_PASSWORD: "${POSTGRES_PASSWORD}"
+      QUESTIONDB_URI: "postgresql://postgres:${POSTGRES_PASSWORD}@Postgres:5432/questionDb"
+      QUESTIONDB_JDBCCONNECTIONSTRING: "jdbc:postgresql://Postgres:5432/questionDb"
+      QUESTIONDB_DATABASENAME: "questionDb"
+      ConnectionStrings__RabbitMQ: "amqp://guest:${RABBITMQ_PASSWORD}@RabbitMQ:5672"
+      RABBITMQ_HOST: "RabbitMQ"
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: "guest"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+      RABBITMQ_URI: "amqp://guest:${RABBITMQ_PASSWORD}@RabbitMQ:5672"
+      ConnectionStrings__Redis: "Redis:6379,password=${REDIS_PASSWORD}"
+      REDIS_HOST: "Redis"
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+      REDIS_URI: "redis://:${REDIS_PASSWORD}@Redis:6379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Question-Service"
+    expose:
+      - "${QUESTION_SERVICE_PORT}"
+    depends_on:
+      keycloak:
+        condition: "service_started"
+      postgres:
+        condition: "service_started"
+      rabbitmq:
+        condition: "service_started"
+      redis:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  weather-api:
+    image: "${WEATHER_API_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${WEATHER_API_PORT}"
+      KEYCLOAK_HTTP: "http://Keycloak:8080"
+      services__Keycloak__http__0: "http://Keycloak:8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Weather-Api"
+    expose:
+      - "${WEATHER_API_PORT}"
+    depends_on:
+      keycloak:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  typesense-question:
+    image: "${TYPESENSE_QUESTION_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${TYPESENSE_QUESTION_PORT}"
+      typesense-api-key: "${TYPESENSE_API_KEY}"
+      TYPESENSE_TYPESENSE: "http://Typesense:8108"
+      services__Typesense__typesense__0: "http://Typesense:8108"
+      ConnectionStrings__RabbitMQ: "amqp://guest:${RABBITMQ_PASSWORD}@RabbitMQ:5672"
+      RABBITMQ_HOST: "RabbitMQ"
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: "guest"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+      RABBITMQ_URI: "amqp://guest:${RABBITMQ_PASSWORD}@RabbitMQ:5672"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Typesense-question"
+    expose:
+      - "${TYPESENSE_QUESTION_PORT}"
+    depends_on:
+      typesense:
+        condition: "service_started"
+      rabbitmq:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  yarp:
+    image: "mcr.microsoft.com/dotnet/nightly/yarp:2.3-preview"
+    command:
+      - "/app/yarp.dll"
+    entrypoint:
+      - "dotnet"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      WEATHER_API_HTTP: "http://Weather-Api:${WEATHER_API_PORT}"
+      REVERSEPROXY__ROUTES__route0__MATCH__PATH: "/WeatherForecast/{**catch-all}"
+      REVERSEPROXY__ROUTES__route0__CLUSTERID: "cluster_Weather-Api"
+      REVERSEPROXY__ROUTES__route1__MATCH__PATH: "/Questions/{**catch-all}"
+      REVERSEPROXY__ROUTES__route1__CLUSTERID: "cluster_Question-Service"
+      REVERSEPROXY__ROUTES__route2__MATCH__PATH: "/tags/{**catch-all}"
+      REVERSEPROXY__ROUTES__route2__CLUSTERID: "cluster_Question-Service"
+      REVERSEPROXY__ROUTES__route3__MATCH__PATH: "/search-mini/{**catch-all}"
+      REVERSEPROXY__ROUTES__route3__CLUSTERID: "cluster_Typesense-question"
+      REVERSEPROXY__ROUTES__route4__MATCH__PATH: "/typesense/{**catch-all}"
+      REVERSEPROXY__ROUTES__route4__CLUSTERID: "cluster_Typesense-question"
+      REVERSEPROXY__CLUSTERS__cluster_Weather-Api__DESTINATIONS__destination1__ADDRESS: "https+http://Weather-Api"
+      REVERSEPROXY__CLUSTERS__cluster_Question-Service__DESTINATIONS__destination1__ADDRESS: "https+http://Question-Service"
+      REVERSEPROXY__CLUSTERS__cluster_Typesense-question__DESTINATIONS__destination1__ADDRESS: "https+http://Typesense-question"
+      services__Weather-Api__http__0: "http://Weather-Api:${WEATHER_API_PORT}"
+      WEATHER_API_HTTPS: "https://Weather-Api:${WEATHER_API_PORT}"
+      QUESTION_SERVICE_HTTP: "http://Question-Service:${QUESTION_SERVICE_PORT}"
+      services__Question-Service__http__0: "http://Question-Service:${QUESTION_SERVICE_PORT}"
+      QUESTION_SERVICE_HTTPS: "https://Question-Service:${QUESTION_SERVICE_PORT}"
+      TYPESENSE_QUESTION_HTTP: "http://Typesense-question:${TYPESENSE_QUESTION_PORT}"
+      services__Typesense-question__http__0: "http://Typesense-question:${TYPESENSE_QUESTION_PORT}"
+      TYPESENSE_QUESTION_HTTPS: "https://Typesense-question:${TYPESENSE_QUESTION_PORT}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Yarp"
+    expose:
+      - "8919"
+    networks:
+      - "aspire"
+networks:
+  aspire:
+    driver: "bridge"
+volumes:
+  keycloak-data:
+    driver: "local"
+  postgres-data:
+    driver: "local"
+  redis-data:
+    driver: "local"
+  rabbitmq-data:
+    driver: "local"
+  typesense-data:
+    driver: "local"

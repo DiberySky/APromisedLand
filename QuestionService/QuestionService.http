@@ -1,6 +1,6 @@
 @Keycloak_HostAddress = localhost:8323
 @realm = apromisedland
-@yarp_HttpHost = http://localhost:8088
+@yarp_HttpHost = http://localhost:8919
 @QuestionService_HostAddress = http://localhost:7001
 @DevTunnel_Yarp = https://6fjddmjf-8090.jpe1.devtunnels.ms
 
@@ -22,9 +22,9 @@ Content-Type: application/json
 Authorization: bearer {{token}}
 
 {
-  "title": "EF Core 如何高效处理多对多关系？面食",
-  "content": "在 EF Core 中，我需要建立用户和角色之间的多对多关系，并希望使用自动生成的联接表。但查询时总是出现 N+1 问题，该如何优化？",
-  "tags": ["ef-core", "dotnet"]
+  "title": "Aspire 仪表板中如何自定义日志和追踪数据？",
+  "content": "我使用了 .NET Aspire 的仪表板来监控服务，但默认的日志和追踪信息不够详细。能否自定义接入 OpenTelemetry 或增加业务字段？",
+  "tags": ["aspire", "dotnet", "microservices"]
 }
 
 > {%
@@ -75,3 +75,19 @@ Accept: application/json
 GET {{DevTunnel_Yarp}}/tags/
 Accept: application/json
 
+###
+GET {{QuestionService_HostAddress}}/Questions/errors?code=0
+Accept: application/json
+
+###
+GET {{yarp_HttpHost}}/Questions/errors?code=400
+Accept: application/json
+
+###
+GET {{QuestionService_HostAddress}}/Questions/semantic-search?q="SignalR 在 Kubernetes 集群中的横向扩展问题
+
+###
+GET http://localhost:7001/Questions/doc/dd8f8202-36b8-48f6-809f-7fd5754ffcca
+
+###
+GET /questions/_mapping

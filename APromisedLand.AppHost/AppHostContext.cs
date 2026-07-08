@@ -14,11 +14,13 @@ public class AppHostContext
     public IResourceBuilder<PostgresDatabaseResource>? FileTransDb { get; set; }
     public IResourceBuilder<RedisResource>? Redis { get; set; }
     public IResourceBuilder<RabbitMQServerResource>? RabbitMq { get; set; }
+    public IResourceBuilder<NatsServerResource>? Nats { get; set; }
 
     // Search (Typesense)
     public IResourceBuilder<ContainerResource>? Typesense { get; set; }
     public EndpointReference? TypesenseEndpoint { get; set; }
-    public IResourceBuilder<ParameterResource>? TypesenseApiKey { get; set; }
+    // public IResourceBuilder<ParameterResource>? TypesenseApiKey { get; set; }
+    public string? TypesenseApiKey { get; set; }
 
     // Storage (SeaweedFS)
     public IResourceBuilder<ContainerResource>? SeaweedMaster { get; set; }
