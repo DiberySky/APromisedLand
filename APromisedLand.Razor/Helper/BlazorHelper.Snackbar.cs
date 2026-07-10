@@ -1,8 +1,5 @@
 ﻿using APromisedLand.Shared.Helper;
 using MudBlazor;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace APromisedLand.Razor.Helper;
 

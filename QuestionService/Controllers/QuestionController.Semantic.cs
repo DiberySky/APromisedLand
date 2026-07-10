@@ -1,5 +1,5 @@
 using System.Text.Json;
-using APromisedLand.Shared.MessageContracts;
+using APromisedLand.Api.MessageContracts;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Aggregations;
 using Elastic.Clients.Elasticsearch.MachineLearning;

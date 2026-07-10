@@ -1,0 +1,13 @@
+@DiberyTreeService_HostAddress = http://localhost:5085
+
+GET {{DiberyTreeService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+GET {{DiberyTreeService_HostAddress}}/diberytree/roots
+Accept: application/json
+
+###
+GET {{DiberyTreeService_HostAddress}}/diberytree/1/children
+Accept: application/json
+

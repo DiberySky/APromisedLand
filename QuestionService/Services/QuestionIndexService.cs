@@ -1,9 +1,5 @@
-using System.Linq;
+using APromisedLand.Api.MessageContracts;
 using Elastic.Clients.Elasticsearch;
-using Elastic.Clients.Elasticsearch.Mapping;
-using Elastic.Clients.Elasticsearch.IndexManagement;
-using APromisedLand.Shared.Interfaces;
-using APromisedLand.Shared.MessageContracts;
 
 namespace QuestionService.Services;
 

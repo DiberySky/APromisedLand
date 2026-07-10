@@ -1,9 +1,6 @@
 ﻿using APromisedLand.Shared.Helper;
 using APromisedLand.Shared.Models;
 using APromisedLand.Shared.Services;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace APromisedLand.Maui.Services;
 

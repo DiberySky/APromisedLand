@@ -3,7 +3,6 @@ using APromisedLand.Shared.DTOs.Overflow;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QuestionService.Models;
-using APromisedLand.Shared.Contracts;
 
 namespace QuestionService.Controllers;
 

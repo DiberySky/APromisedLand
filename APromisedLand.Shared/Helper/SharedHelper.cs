@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace APromisedLand.Shared.Helper;
+﻿namespace APromisedLand.Shared.Helper;
 
 public static partial class SharedHelper
 {

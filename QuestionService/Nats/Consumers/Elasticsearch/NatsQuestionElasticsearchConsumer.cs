@@ -1,9 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using APromisedLand.Shared.Interfaces;
-using APromisedLand.Shared.MessageContracts;
-using APromisedLand.Shared.Projects.Elasticsearch;
-using APromisedLand.Shared.Projects.Elasticsearch.Embedding;
+using APromisedLand.Api.MessageContracts;
 using Elastic.Clients.Elasticsearch;
 using NATS.Client.Core;
 using QuestionService.Services;

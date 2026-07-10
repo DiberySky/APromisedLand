@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace APromisedLand.Shared.Models;
+﻿namespace APromisedLand.Shared.Models;
 
 public class WindowSize
 {

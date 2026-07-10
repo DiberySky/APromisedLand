@@ -1,6 +1,5 @@
+using APromisedLand.Api.Projects.Elasticsearch.Services;
 using Elastic.Clients.Elasticsearch;
-using ElasticsearchService.Embeds;
-using ElasticsearchService.Services;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Wolverine;

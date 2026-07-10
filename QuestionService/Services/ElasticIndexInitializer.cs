@@ -1,4 +1,4 @@
-using APromisedLand.Shared.MessageContracts;
+using APromisedLand.Api.MessageContracts;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.Analysis; 

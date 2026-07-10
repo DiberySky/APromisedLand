@@ -14,8 +14,8 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\APromisedLand.Api\APromisedLand.Api.csproj" />
       <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
-      <ProjectReference Include="..\APromisedLand.Shared\APromisedLand.Shared.csproj" />
     </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-using APromisedLand.Shared.Contracts;
+using APromisedLand.Api.Contracts;
 using SearchService.Models;
 using Typesense;
 

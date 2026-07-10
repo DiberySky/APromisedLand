@@ -1,6 +1,5 @@
 using System.Text.RegularExpressions;
-using APromisedLand.Shared.Contracts;
-using SearchService.Models;
+using APromisedLand.Api.Contracts;
 using Typesense;
 
 namespace SearchService.MessageHandlers;

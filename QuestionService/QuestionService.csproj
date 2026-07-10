@@ -19,15 +19,16 @@
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="OllamaSharp" Version="5.4.12" />
+        <PackageReference Include="OllamaSharp" Version="5.4.25" />
         <PackageReference Include="Typesense" Version="8.5.0" />
-        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.16.0" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.16.0" />
+        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.17.0" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.17.0" />
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\APromisedLand.Shared\APromisedLand.Shared.csproj" />
+      <ProjectReference Include="..\APromisedLand.Api\APromisedLand.Api.csproj" />
       <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
-      <ProjectReference Include="..\APromisedLand.Shared\APromisedLand.Shared.csproj" />
     </ItemGroup>
 
 </Project>

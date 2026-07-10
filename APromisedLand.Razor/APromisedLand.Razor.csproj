@@ -20,5 +20,5 @@
   <ItemGroup>
     <ProjectReference Include="..\APromisedLand.Shared\APromisedLand.Shared.csproj" />
   </ItemGroup>
-
+  
 </Project>

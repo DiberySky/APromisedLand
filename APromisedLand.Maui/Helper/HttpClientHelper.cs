@@ -1,11 +1,8 @@
 ﻿using APromisedLand.Maui.Authentication;
-using APromisedLand.Shared.Clients;
-using APromisedLand.Shared.Helper;
-using APromisedLand.Shared.Services;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using APromisedLand.Shared.Interfaces;
+using APromisedLand.Shared.Interfaces;
+using APromisedLand.Shared.Services;
+using APromisedLand.Shared.Services.Weather;
 
 namespace APromisedLand.Maui.Helper;
 

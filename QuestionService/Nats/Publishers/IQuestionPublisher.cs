@@ -1,4 +1,4 @@
-using APromisedLand.Shared.MessageContracts;
+using APromisedLand.Api.MessageContracts;
 
 namespace QuestionService.Nats.Publishers;
 

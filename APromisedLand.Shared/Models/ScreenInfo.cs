@@ -1,7 +1,4 @@
 ﻿using APromisedLand.Shared.Helper;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace APromisedLand.Shared.Models;
 

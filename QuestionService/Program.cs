@@ -1,4 +1,3 @@
-using APromisedLand.Shared.Services;
 using Elastic.Clients.Elasticsearch;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Resources;

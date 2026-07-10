@@ -1,8 +1,5 @@
-﻿using APromisedLand.Shared.Helper;
-using System;
-using System.Collections.Generic;
-using System.Security.Claims;
-using System.Text;
+﻿using System.Security.Claims;
+using APromisedLand.Shared.Helper;
 
 namespace APromisedLand.Shared.Services;
 

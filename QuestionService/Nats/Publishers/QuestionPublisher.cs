@@ -1,5 +1,5 @@
 using System.Text.Json;
-using APromisedLand.Shared.MessageContracts;
+using APromisedLand.Api.MessageContracts;
 using NATS.Client.Core;
 
 namespace QuestionService.Nats.Publishers;

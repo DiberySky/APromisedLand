@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
-using APromisedLand.Shared.Contracts;
+using APromisedLand.Api.Contracts;
+using APromisedLand.Api.Projects.Elasticsearch.Services;
 using Elastic.Clients.Elasticsearch;
-using ElasticsearchService.Embeds;
 
 namespace ElasticsearchService.MessageHandlers;
 

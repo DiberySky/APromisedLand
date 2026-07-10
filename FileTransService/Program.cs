@@ -1,6 +1,5 @@
-using FileTransService.Data;
-using FileTransService.Models;
-using FileTransService.Services;
+using APromisedLand.Api.Projects.SeaweedFS.Data;
+using APromisedLand.Api.Projects.SeaweedFS.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,11 +11,11 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.AddServiceDefaults();
 
-builder.AddNpgsqlDbContext<FileTransDbContext>("fileTransDb");
+builder.AddNpgsqlDbContext<SeaweedFsDbContext>("fileTransDb");
 
 builder.Services.AddHttpClient<ISeaweedFsClient, SeaweedFsClient>();
 builder.Services.Configure<SeaweedFsOptions>(builder.Configuration.GetSection("SeaweedFS"));
-builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<ISeaweedFsService, SeaweedFsService>();
 
 var app = builder.Build();
 
@@ -36,7 +35,7 @@ using var scope = app.Services.CreateScope();
 var services = scope.ServiceProvider;
 try
 {
-    var context = services.GetRequiredService<FileTransDbContext>();
+    var context = services.GetRequiredService<SeaweedFsDbContext>();
     await context.Database.MigrateAsync();
 }
 catch (Exception e)

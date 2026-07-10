@@ -1,10 +1,4 @@
-﻿using APromisedLand.Shared.Models;
-using System;
-using System.Collections.Generic;
-using System.Security.Claims;
-using System.Text;
-
-namespace APromisedLand.Shared.Services;
+﻿namespace APromisedLand.Shared.Services;
 
 public partial class SolutionService
 {

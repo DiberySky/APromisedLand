@@ -1,23 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Aspire.Elastic.Clients.Elasticsearch" Version="13.3.0" />
-    <PackageReference Include="Aspire.NATS.Net" Version="13.4.6" />
-    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.4.2" />
-    <PackageReference Include="OllamaSharp" Version="5.4.25" />
-    <PackageReference Include="Typesense" Version="8.5.0" />
-    <PackageReference Include="Zafiro.FileSystem.SeaweedFS" Version="47.1.1" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Projects\DiberyTree\Models\" />
-    <Folder Include="Projects\DiberyTree\Services\" />
-  </ItemGroup>
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
 
 </Project>

@@ -9,7 +9,7 @@ var compose = builder.AddDockerComposeEnvironment("production")
 
 var context = new AppHostContext();
 
-builder.AddKeycloak(context); // Keycloak
+// builder.AddKeycloak(context); // Keycloak
 // builder.AddPostgres(context); // Postgres
 // builder.AddRedis(context); // Redis
 //     // builder.AddRabbitMq(context); // RabbitMQ
@@ -26,5 +26,6 @@ builder.AddKeycloak(context); // Keycloak
 //     // builder.AddMauiApp(context); // Maui Blazor
 //     // builder.AddElasticKibana(context); // Kibana
 // builder.AddSemanticSearch(context);
+builder.AddDiberyTreeService(context);
 
 builder.Build().Run();
