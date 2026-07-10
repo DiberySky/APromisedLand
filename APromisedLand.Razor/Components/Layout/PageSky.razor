@@ -54,7 +54,7 @@
 
             }
 
-            @if (ProjectService.Authorized)
+            @if (SolutionService.Authorized)
             {
                 <MudSpacer />
                 <MudIconButton Icon="@Icons.Material.Outlined.Logout"
@@ -80,7 +80,7 @@
     [Parameter] public EventCallback OnBackClick { get; set; }
     [Parameter] public EventCallback OnStartClick { get; set; }
 
-    [Parameter] public required string BackPage { get; set; } = ProjectService.StartPage;
+    [Parameter] public required string BackPage { get; set; } = SolutionService.StartPage;
 
     private async Task BackClick()
     {
@@ -96,8 +96,8 @@
     {
         await AuthService.LogoutAsync();
 
-        ProjectService.Reset();
+        SolutionService.Reset();
 
-        Navigater.NavigateTo(ProjectService.SignInPage);
+        Navigater.NavigateTo(SolutionService.SignInPage);
     }
 }

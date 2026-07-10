@@ -27,10 +27,10 @@ public static class MauiProgram
         builder.Services.AddMauiBlazorWebView();
 
         builder.Services.AddScoped<BlazorService>();
-        builder.Services.AddScoped<ProjectService>();
+        builder.Services.AddScoped<SolutionService>();
 
 #if DEBUG
-        ProjectService.Debug = true;
+        SolutionService.Debug = true;
 #endif
         PlatformServer.PlatformInfo();
 

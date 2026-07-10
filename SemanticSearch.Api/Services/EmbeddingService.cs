@@ -5,20 +5,20 @@ namespace SemanticSearch.Api.Services;
 
 public class EmbeddingService
 {
-    private IOllamaApiClient _ollama;
-    private readonly string _modelName = "bge-large";
+    private readonly IOllamaApiClient _ollama;
+    private const string ModelName = "bge-large";
 
     public EmbeddingService(IOllamaApiClient ollama)
     {
         _ollama = ollama;
-        ollama.SelectedModel = _modelName;
+        ollama.SelectedModel = ModelName;
     }
 
     public async Task<float[]> GetEmbeddingAsync(string text)
     {
         var response = await _ollama.EmbedAsync(new EmbedRequest
         {
-            Model = "bge-large",
+            Model = ModelName, //"bge-large",
             Input = [ text ]
         });
 

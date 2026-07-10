@@ -1,6 +1,6 @@
 using APromisedLand.Shared.MessageContracts;
 
-namespace QuestionService.Services.Nats;
+namespace QuestionService.Nats.Publishers;
 
 public interface IQuestionPublisher
 {

@@ -13,7 +13,7 @@ public class ElasticsearchService(ElasticsearchClient client,
     private const string IndexName = "documents";
 
     // 创建索引映射（含 dense_vector）
-    public async Task CreateIndexAsync()
+    private async Task CreateIndexAsync()
     {
         var existsResponse = await client.Indices.ExistsAsync(IndexName);
         if (existsResponse.Exists)
@@ -27,7 +27,7 @@ public class ElasticsearchService(ElasticsearchClient client,
                     .Text(t => t.Content, txt => txt.Analyzer("ik_max_word"))
                     .DenseVector(d => d.Embedding, dv => dv
                         .Dims(1024)
-                        .Index(true)
+                        .Index()
                         .Similarity(DenseVectorSimilarity.Cosine)
                         .IndexOptions(opt => opt
                             .Type(DenseVectorIndexOptionsType.Hnsw)   // 必须显式设置
@@ -44,13 +44,13 @@ public class ElasticsearchService(ElasticsearchClient client,
     }
 
     // 批量索引示例数据
-    public async Task IndexSampleDataAsync(IEnumerable<Document> documents)
+    private async Task IndexSampleDataAsync(IEnumerable<Document> documents)
     {
         // 生成向量（若未提供）
         var docsWithEmbedding = new List<Document>();
         foreach (var doc in documents)
         {
-            if (doc.Embedding == null || doc.Embedding.Length == 0)
+            if (doc.Embedding.Length == 0)
             {
                 doc.Embedding = await embeddingService.GetEmbeddingAsync(doc.Content);
             }
@@ -73,7 +73,7 @@ public class ElasticsearchService(ElasticsearchClient client,
         await CreateIndexAsync();
 
         // 检查是否有数据，若无则插入示例数据
-        var countResponse = await client.CountAsync(c => c.Index(IndexName));
+        var countResponse = await client.CountAsync(c => c.Indices(IndexName));
         if (countResponse.Count == 0)
         {
             var samples = SampleData.GetDocuments();
@@ -87,9 +87,9 @@ public class ElasticsearchService(ElasticsearchClient client,
         var queryVector = await embeddingService.GetEmbeddingAsync(query);
 
         var searchResponse = await client.SearchAsync<Document>(s => s
-            .Index(IndexName)
+            .Indices(IndexName)
             .Size(size)
-            .MinScore(ProjectService.MinScore)  // 只返回相似度 ≥ 0.80 的文档
+            .MinScore(SolutionService.MinScore)  // 只返回相似度 ≥ 0.80 的文档
             .Query(q => q
                 .Knn(k => k
                     .Field(f => f.Embedding)
@@ -105,9 +105,10 @@ public class ElasticsearchService(ElasticsearchClient client,
         );
         
         return searchResponse.Hits
+            .Where(x => x.Source != null)
             .Select(hit => new SearchResult
             {
-                Id = hit.Source.Id,
+                Id = hit.Source!.Id,
                 Title = hit.Source.Title,
                 Content = hit.Source.Content,
                 Score = (float)(hit.Score ?? 0)
@@ -115,13 +116,11 @@ public class ElasticsearchService(ElasticsearchClient client,
             .ToList();
     }
     
-    // 在 ElasticsearchService.cs 中添加以下方法
-
-// 分词搜索（全文检索）
+    // 分词搜索（全文检索）
     public async Task<List<SearchResult>> TextSearchAsync(string query, int size = 5)
     {
         var searchResponse = await client.SearchAsync<Document>(s => s
-            .Index(IndexName)
+            .Indices(IndexName)
             .Size(size)
             .Query(q => q
                 .MultiMatch(mm => mm
@@ -138,9 +137,10 @@ public class ElasticsearchService(ElasticsearchClient client,
         );
 
         return searchResponse.Hits
+            .Where(x => x.Source != null)
             .Select(hit => new SearchResult
             {
-                Id = hit.Source.Id,
+                Id = hit.Source!.Id,
                 Title = hit.Source.Title,
                 Content = hit.Source.Content,
                 Score = (float)(hit.Score ?? 0)
@@ -155,7 +155,7 @@ public class ElasticsearchService(ElasticsearchClient client,
         var queryVector = await embeddingService.GetEmbeddingAsync(query);
 
         var searchResponse = await client.SearchAsync<Document>(s => s
-            .Index(IndexName)
+            .Indices(IndexName)
             .Size(size)
             .Query(q => q
                 .MultiMatch(mm => mm
@@ -173,7 +173,7 @@ public class ElasticsearchService(ElasticsearchClient client,
                     .NumCandidates(100)
                     .Boost(knnBoost)               // 向量部分权重
             )
-            .MinScore(ProjectService.MinScore) // 可选：保留与语义搜索一致的最低分数
+            .MinScore(SolutionService.MinScore) // 可选：保留与语义搜索一致的最低分数
             .Source(new SourceFilter
             {
                 Includes = new[] { "id", "title", "content" }
@@ -181,9 +181,277 @@ public class ElasticsearchService(ElasticsearchClient client,
         );
 
         return searchResponse.Hits
+            .Where(x => x.Source != null)
             .Select(hit => new SearchResult
             {
-                Id = hit.Source.Id,
+                Id = hit.Source!.Id,
+                Title = hit.Source.Title,
+                Content = hit.Source.Content,
+                Score = (float)(hit.Score ?? 0)
+            })
+            .ToList();
+    }
+
+    // 带过滤条件的 KNN 搜索
+    public async Task<List<SearchResult>> KnnWithFilterAsync(string query, int size = 5,
+        string? titleFilter = null, float? minScore = null)
+    {
+        var queryVector = await embeddingService.GetEmbeddingAsync(query);
+
+        // 构建过滤条件列表
+        var filterQueries = new List<Query>();
+        
+        // 标题过滤（前缀匹配）
+        if (!string.IsNullOrEmpty(titleFilter))
+        {
+            filterQueries.Add(new PrefixQuery 
+            { 
+                Field = "title", 
+                Value = titleFilter 
+            });
+        }
+
+        var searchResponse = await client.SearchAsync<Document>(s => s
+            .Indices(IndexName)
+            .Size(size)
+            .MinScore(minScore ?? SolutionService.MinScore)
+            .Query(q => q
+                .Bool(b => b
+                    .Filter(filterQueries)
+                    .Must(m => m
+                        .Knn(k => k
+                            .Field(f => f.Embedding)
+                            .QueryVector(queryVector)
+                            .K(size)
+                            .NumCandidates(100)
+                        )
+                    )
+                )
+            )
+            .Source(new SourceFilter
+            {
+                Includes = new[] { "id", "title", "content" }
+            })
+        );
+
+        return searchResponse.Hits
+            .Where(x => x.Source != null)
+            .Select(hit => new SearchResult
+            {
+                Id = hit.Source!.Id,
+                Title = hit.Source.Title,
+                Content = hit.Source.Content,
+                Score = (float)(hit.Score ?? 0)
+            })
+            .ToList();
+    }
+
+    // 自定义参数的 KNN 搜索
+    public async Task<List<SearchResult>> KnnWithCustomParamsAsync(string query, int size = 5,
+        int numCandidates = 100, float boost = 1.0f, float? minScore = null)
+    {
+        var queryVector = await embeddingService.GetEmbeddingAsync(query);
+
+        var searchResponse = await client.SearchAsync<Document>(s => s
+            .Indices(IndexName)
+            .Size(size)
+            .MinScore(minScore ?? SolutionService.MinScore)
+            .Query(q => q
+                .Knn(k => k
+                    .Field(f => f.Embedding)
+                    .QueryVector(queryVector)
+                    .K(size)
+                    .NumCandidates(numCandidates)
+                    .Boost(boost)
+                )
+            )
+            .Source(new SourceFilter
+            {
+                Includes = new[] { "id", "title", "content" }
+            })
+        );
+
+        return searchResponse.Hits
+            .Where(x => x.Source != null)
+            .Select(hit => new SearchResult
+            {
+                Id = hit.Source!.Id,
+                Title = hit.Source.Title,
+                Content = hit.Source.Content,
+                Score = (float)(hit.Score ?? 0)
+            })
+            .ToList();
+    }
+
+    // 向量相似度范围查询
+    public async Task<List<SearchResult>> KnnRangeSearchAsync(string query, float minSimilarity,
+        float maxSimilarity = 1.0f, int size = 5)
+    {
+        var queryVector = await embeddingService.GetEmbeddingAsync(query);
+
+        // 使用 MinScore 过滤最低相似度，在内存中过滤最高相似度
+        var searchResponse = await client.SearchAsync<Document>(s => s
+            .Indices(IndexName)
+            .Size(size * 10)
+            .MinScore(minSimilarity)
+            .Query(q => q
+                .Knn(k => k
+                    .Field(f => f.Embedding)
+                    .QueryVector(queryVector)
+                    .K(size * 10)
+                    .NumCandidates(200)
+                )
+            )
+            .Source(new SourceFilter
+            {
+                Includes = new[] { "id", "title", "content" }
+            })
+        );
+
+        // 在内存中过滤分数范围并排序
+        return searchResponse.Hits
+            .Where(x => x.Source != null && (x.Score ?? 0) <= maxSimilarity)
+            .Select(hit => new SearchResult
+            {
+                Id = hit.Source!.Id,
+                Title = hit.Source.Title,
+                Content = hit.Source.Content,
+                Score = (float)(hit.Score ?? 0)
+            })
+            .OrderByDescending(r => r.Score)
+            .Take(size)
+            .ToList();
+    }
+
+    // 多查询向量的 KNN 搜索
+    public async Task<List<SearchResult>> MultiVectorKnnSearchAsync(List<string> queries, int size = 5)
+    {
+        var queryVectors = new List<float[]>();
+        foreach (var query in queries)
+        {
+            var vector = await embeddingService.GetEmbeddingAsync(query);
+            queryVectors.Add(vector);
+        }
+
+        var allResults = new Dictionary<int, SearchResult>();
+        
+        foreach (var vector in queryVectors)
+        {
+            var searchResponse = await client.SearchAsync<Document>(s => s
+                .Indices(IndexName)
+                .Size(size * 2)
+                .Query(q => q
+                    .Knn(k => k
+                        .Field(f => f.Embedding)
+                        .QueryVector(vector)
+                        .K(size * 2)
+                        .NumCandidates(100)
+                    )
+                )
+                .Source(new SourceFilter
+                {
+                    Includes = new[] { "id", "title", "content" }
+                })
+            );
+
+            foreach (var hit in searchResponse.Hits.Where(h => h.Source != null))
+            {
+                var existing = allResults.TryGetValue(hit.Source!.Id, out var result);
+                if (existing && result != null)
+                {
+                    result.Score = (result.Score + (float)(hit.Score ?? 0)) / 2;
+                }
+                else
+                {
+                    allResults[hit.Source.Id] = new SearchResult
+                    {
+                        Id = hit.Source.Id,
+                        Title = hit.Source.Title,
+                        Content = hit.Source.Content,
+                        Score = (float)(hit.Score ?? 0)
+                    };
+                }
+            }
+        }
+
+        return allResults.Values
+            .OrderByDescending(r => r.Score)
+            .Take(size)
+            .ToList();
+    }
+
+    // 分页 KNN 搜索
+    public async Task<List<SearchResult>> KnnSearchWithPaginationAsync(string query, 
+        int page = 1, int pageSize = 10)
+    {
+        var queryVector = await embeddingService.GetEmbeddingAsync(query);
+
+        var searchResponse = await client.SearchAsync<Document>(s => s
+            .Indices(IndexName)
+            .Size(pageSize)
+            .From((page - 1) * pageSize)
+            .MinScore(SolutionService.MinScore)
+            .Query(q => q
+                .Knn(k => k
+                    .Field(f => f.Embedding)
+                    .QueryVector(queryVector)
+                    .K(pageSize)
+                    .NumCandidates(100)
+                )
+            )
+            .Source(new SourceFilter
+            {
+                Includes = new[] { "id", "title", "content" }
+            })
+        );
+
+        return searchResponse.Hits
+            .Where(x => x.Source != null)
+            .Select(hit => new SearchResult
+            {
+                Id = hit.Source!.Id,
+                Title = hit.Source.Title,
+                Content = hit.Source.Content,
+                Score = (float)(hit.Score ?? 0)
+            })
+            .ToList();
+    }
+    
+    // 混合搜索+分页（BM25 + kNN + 分页）
+    public async Task<List<SearchResult>> HybridSearchWithPaginationAsync(string query,
+        int page = 1, int pageSize = 10, float knnBoost = 1.0f, float bm25Boost = 1.0f)
+    {
+        var queryVector = await embeddingService.GetEmbeddingAsync(query);
+
+        var searchResponse = await client.SearchAsync<Document>(s => s
+            .Indices(IndexName)
+            .Size(pageSize)
+            .From((page - 1) * pageSize)
+            .Query(q => q
+                .MultiMatch(mm => mm
+                    .Fields(new[] { "title^2", "content" })
+                    .Query(query)
+                    .Analyzer("ik_max_word")
+                    .Operator(Operator.Or)
+                    .Boost(bm25Boost)
+                )
+            )
+            .Knn(k => k
+                .Field(f => f.Embedding)
+                .QueryVector(queryVector)
+                .K(pageSize * 2)
+                .NumCandidates(100)
+                .Boost(knnBoost)
+            )
+            .MinScore(SolutionService.MinScore)
+            .Source(new SourceFilter { Includes = new[] { "id", "title", "content" } })
+        );
+
+        return searchResponse.Hits
+            .Where(x => x.Source != null)
+            .Select(hit => new SearchResult
+            {
+                Id = hit.Source!.Id,
                 Title = hit.Source.Title,
                 Content = hit.Source.Content,
                 Score = (float)(hit.Score ?? 0)

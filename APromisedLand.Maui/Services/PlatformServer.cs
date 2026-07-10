@@ -26,7 +26,7 @@ public class PlatformServer
         else
             deviceOS = PlatformOSEnum.Unknown; //"其他";
 
-        ProjectService.PlatformOS = deviceOS;
+        SolutionService.PlatformOS = deviceOS;
 
         var idiom = DeviceInfo.Current.Idiom;
         PlatformTypeEnum deviceType;
@@ -43,7 +43,7 @@ public class PlatformServer
         else
             deviceType = PlatformTypeEnum.未知; //"未知";
 
-        ProjectService.PlatformType = deviceType;
+        SolutionService.PlatformType = deviceType;
     }
 
     public static void DisplayInfo()
@@ -65,7 +65,7 @@ public class PlatformServer
             _ => ScreenOrientationEmnu.未知,
         };
 
-        ProjectService.ScreenInfo = screenInfo;
+        SolutionService.ScreenInfo = screenInfo;
     }
 
     public static WindowSize CurrentWindow()

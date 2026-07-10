@@ -11,7 +11,7 @@
 
 <SignInSky Title="武汉供电段"
            OnSignInClick="e => SignInClick(e)"
-           OnStartClick="e => Navigater.NavigateTo(ProjectService.StartPage)"
+           OnStartClick="e => Navigater.NavigateTo(SolutionService.StartPage)"
            OnBackClick='e => DialogService.ShowTestDialogAsync("Testing Dialog", "testing args")' />
 
 @code {
@@ -30,7 +30,7 @@
         try
         {
             // var size = PlatformServer.CurrentWindow();
-            ProjectService.Authorized = false;
+            SolutionService.Authorized = false;
 
             var success = await AuthService.LoginAsync(user.UserName, user.Password);
             if (success)
@@ -38,15 +38,15 @@
                 var authState = await AuthProvider.GetAuthenticationStateAsync();
                 var userlogin = authState.User;
 
-                ProjectService.GetClaimValue(userlogin.Claims);
+                SolutionService.GetClaimValue(userlogin.Claims);
 
                 StateHasChanged();
 
-                ProjectService.Authorized = true;
+                SolutionService.Authorized = true;
 
-                Snackbar.Success($"登录成功: {ProjectService.UserName}");
+                Snackbar.Success($"登录成功: {SolutionService.UserName}");
 
-                Navigater.NavigateTo(ProjectService.StartPage);
+                Navigater.NavigateTo(SolutionService.StartPage);
             }
             else
             {

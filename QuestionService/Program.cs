@@ -6,7 +6,6 @@ using OpenTelemetry.Trace;
 using QuestionService.Configs;
 using QuestionService.Data;
 using QuestionService.Services;
-using QuestionService.Services.Nats;
 using Typesense.Setup;
 using Wolverine;
 using Wolverine.RabbitMQ;

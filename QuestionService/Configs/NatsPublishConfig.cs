@@ -1,9 +1,8 @@
 using OllamaSharp;
 using QuestionService.Nats.Consumers.Elasticsearch;
 using QuestionService.Nats.Consumers.Typesense;
+using QuestionService.Nats.Publishers;
 using QuestionService.Services;
-using QuestionService.Services.Nats;
-using QuestionService.Services.Nats.Publishers;
 
 namespace QuestionService.Configs;
 

@@ -22,11 +22,11 @@ public class AuthService : IAuthService
 
     public async Task<bool> LoginAsync(string username, string password)
     {
-        var requestUri = $"/realms/{ProjectService.Realm}/protocol/openid-connect/token";
+        var requestUri = $"/realms/{SolutionService.Realm}/protocol/openid-connect/token";
         var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
-            ["client_id"] = ProjectService.ClientId,
+            ["client_id"] = SolutionService.ClientId,
             ["username"] = username,
             ["password"] = password
         });

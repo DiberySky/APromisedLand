@@ -2,9 +2,12 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using APromisedLand.Shared.Interfaces;
 using APromisedLand.Shared.MessageContracts;
+using APromisedLand.Shared.Projects.Elasticsearch;
+using APromisedLand.Shared.Projects.Elasticsearch.Embedding;
 using Elastic.Clients.Elasticsearch;
 using NATS.Client.Core;
 using QuestionService.Services;
+using IEmbeddingGenerator = QuestionService.Services.IEmbeddingGenerator;
 
 namespace QuestionService.Nats.Consumers.Elasticsearch;
 

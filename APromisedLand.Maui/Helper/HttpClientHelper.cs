@@ -21,7 +21,7 @@ public static class HttpClientHelper
         builder.Services
             .AddHttpClient("WebApi", client =>
             {
-                client.BaseAddress = new Uri(ProjectService.YarpHostBaseUrl); 
+                client.BaseAddress = new Uri(SolutionService.YarpHostBaseUrl); 
                 
             })
             .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
@@ -30,7 +30,7 @@ public static class HttpClientHelper
         // 注册类型化 HttpClient（自动应用 JwtAuthorizationMessageHandler）
         builder.Services.AddHttpClient<WeatherApiClient>(client =>
             {
-                client.BaseAddress = new Uri(ProjectService.YarpHostBaseUrl);
+                client.BaseAddress = new Uri(SolutionService.YarpHostBaseUrl);
             })
             .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
     }
@@ -40,14 +40,14 @@ public static class HttpClientHelper
         // RefreshClient
         builder.Services.AddHttpClient("RefreshClient", client =>
             {
-                client.BaseAddress = new Uri(ProjectService.KeyCloakHttpsBaseUrl); // Keycloak 地址
+                client.BaseAddress = new Uri(SolutionService.KeyCloakHttpsBaseUrl); // Keycloak 地址
             })
             .ConfigurePrimaryHttpMessageHandler(CreateHttpClientHandler);
 
         // 用于调用 Keycloak 登录/注册等无需 JWT 的请求
         builder.Services.AddHttpClient("AuthClient", client =>
             {
-                client.BaseAddress = new Uri(ProjectService.KeyCloakHttpsBaseUrl); // Keycloak 地址
+                client.BaseAddress = new Uri(SolutionService.KeyCloakHttpsBaseUrl); // Keycloak 地址
             })
             .ConfigurePrimaryHttpMessageHandler(CreateHttpClientHandler);
 

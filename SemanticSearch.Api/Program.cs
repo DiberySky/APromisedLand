@@ -45,27 +45,29 @@ using (var scope = app.Services.CreateScope())
     // 重试初始化，应对容器启动延迟
     const int maxRetries = 10;
     int retryCount = 0;
-    while (retryCount < maxRetries)
+    bool initialized = false;
+
+    do
     {
         try
         {
             logger.LogInformation("正在初始化 Elasticsearch 索引和数据...");
             await esService.EnsureIndexAndDataAsync();
             logger.LogInformation("初始化成功！");
-            break;
+            initialized = true;
         }
         catch (Exception ex)
         {
             retryCount++;
-            logger.LogWarning(ex, "初始化失败 (尝试 {RetryCount}/{MaxRetries})，等待 5 秒后重试...", retryCount, maxRetries);
             if (retryCount >= maxRetries)
             {
                 logger.LogError(ex, "初始化失败，已达最大重试次数。");
-                throw; // 可决定是否抛出异常让应用退出
+                throw;
             }
+            logger.LogWarning(ex, "初始化失败 (尝试 {RetryCount}/{MaxRetries})，等待 5 秒后重试...", retryCount, maxRetries);
             await Task.Delay(5000);
         }
-    }
+    } while (!initialized);
 }
 
 app.Run();

@@ -1,4 +1,5 @@
 using APromisedLand.Shared.Interfaces;
+using APromisedLand.Shared.Projects.Elasticsearch;
 using Elastic.Clients.Elasticsearch;
 using QuestionService.Services;
 

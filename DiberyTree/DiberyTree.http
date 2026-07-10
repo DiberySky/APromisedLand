@@ -1,0 +1,6 @@
+@DiberyTree_HostAddress = http://localhost:5161
+
+GET {{DiberyTree_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

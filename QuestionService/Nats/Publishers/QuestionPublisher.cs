@@ -2,7 +2,7 @@ using System.Text.Json;
 using APromisedLand.Shared.MessageContracts;
 using NATS.Client.Core;
 
-namespace QuestionService.Services.Nats.Publishers;
+namespace QuestionService.Nats.Publishers;
 
 public class QuestionPublisher(NatsConnection nats) : IQuestionPublisher
 {

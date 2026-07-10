@@ -35,7 +35,7 @@
                             <MudText Typo="Typo.h3" Color="Color.Warning">请先登录以访问此页面。</MudText>
                             <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                                        Size="Size.Medium"
-                                       OnClick="SignIn">登录</MudButton>
+                                       OnClick="SignInHandler">登录</MudButton>
 
                         </MudStack>
                     </MudContainer>
@@ -52,9 +52,9 @@
 </CascadingAuthenticationState>
 
 @code {
-    private void SignIn()
+    private void SignInHandler()
     {
-        Navigater.NavigateTo(ProjectService.SignInPage);
+        Navigater.NavigateTo(SolutionService.SignInPage);
     }
 }
 

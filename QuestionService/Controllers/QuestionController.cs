@@ -4,6 +4,8 @@ using APromisedLand.Shared.Contracts;
 using APromisedLand.Shared.DTOs.Overflow;
 using APromisedLand.Shared.Interfaces;
 using APromisedLand.Shared.MessageContracts;
+using APromisedLand.Shared.Projects.Elasticsearch;
+using APromisedLand.Shared.Projects.Elasticsearch.Embedding;
 using Elastic.Clients.Elasticsearch;
 using FastExpressionCompiler;
 using Microsoft.AspNetCore.Authorization;
@@ -12,9 +14,10 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using QuestionService.Data;
 using QuestionService.Models;
+using QuestionService.Nats.Publishers;
 using QuestionService.Services;
-using QuestionService.Services.Nats;
 using Wolverine;
+using IEmbeddingGenerator = QuestionService.Services.IEmbeddingGenerator;
 
 namespace QuestionService.Controllers;
 

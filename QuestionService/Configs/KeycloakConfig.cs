@@ -12,7 +12,7 @@ public static class KeycloakConfig
         if (string.IsNullOrEmpty(keycloakUrl))
             throw new InvalidOperationException("配置中未找到 Keycloak URI。");
 
-        var authority = $"{keycloakUrl}/realms/{ProjectService.Realm}";
+        var authority = $"{keycloakUrl}/realms/{SolutionService.Realm}";
 
         builder.Services.AddAuthentication()
             .AddKeycloakJwtBearer(

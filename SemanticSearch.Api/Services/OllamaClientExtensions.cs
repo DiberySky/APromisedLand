@@ -13,7 +13,7 @@ public static class OllamaClientExtensions
 
         try
         {
-            builder.Services.AddSingleton<IOllamaApiClient>(sp =>
+            builder.Services.AddSingleton<IOllamaApiClient>(_ =>
                 new OllamaApiClient(new Uri(endpoint)));
         }
         catch (Exception e)

@@ -1,4 +1,6 @@
 using APromisedLand.Shared.Interfaces;
+using APromisedLand.Shared.Projects.Elasticsearch;
+using APromisedLand.Shared.Projects.Elasticsearch.Embedding;
 using OllamaSharp;
 using OllamaSharp.Models;
 

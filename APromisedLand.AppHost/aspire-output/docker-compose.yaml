@@ -1,0 +1,285 @@
+services:
+  production-dashboard:
+    image: "mcr.microsoft.com/dotnet/nightly/aspire-dashboard:latest"
+    ports:
+      - "8090:18888"
+    expose:
+      - "18889"
+      - "18890"
+    networks:
+      - "aspire"
+    restart: "always"
+  keycloak:
+    image: "quay.io/keycloak/keycloak:26.6"
+    command:
+      - "start"
+      - "--import-realm"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: "admin"
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "${KEYCLOAK_PASSWORD}"
+      KC_HEALTH_ENABLED: "true"
+      KC_FEATURES: "opentelemetry"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Keycloak"
+    expose:
+      - "8080"
+      - "9000"
+    volumes:
+      - type: "volume"
+        target: "/opt/keycloak/data"
+        source: "keycloak-data"
+        read_only: false
+    networks:
+      - "aspire"
+  postgres:
+    image: "docker.io/library/postgres:18.3"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Postgres"
+    expose:
+      - "5432"
+    volumes:
+      - type: "volume"
+        target: "/var/lib/postgresql"
+        source: "postgres-data"
+        read_only: false
+    networks:
+      - "aspire"
+  redis:
+    image: "docker.io/library/redis:8.6"
+    command:
+      - "-c"
+      - "redis-server --requirepass $$REDIS_PASSWORD --save 60 1"
+    entrypoint:
+      - "/bin/sh"
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+    expose:
+      - "6379"
+    volumes:
+      - type: "volume"
+        target: "/data"
+        source: "redis-data"
+        read_only: false
+    networks:
+      - "aspire"
+  nats:
+    image: "docker.io/library/nats:2.14"
+    command:
+      - "--user"
+      - "nats"
+      - "--pass"
+      - "${NATS_PASSWORD}"
+      - "-js"
+      - "-sd"
+      - "/var/lib/nats"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Nats"
+    expose:
+      - "4222"
+      - "8222"
+    volumes:
+      - type: "volume"
+        target: "/var/lib/nats"
+        source: "nats-data"
+        read_only: false
+    networks:
+      - "aspire"
+  typesense:
+    image: "typesense/typesense:30.2"
+    command:
+      - "--data-dir"
+      - "/data"
+      - "--api-key"
+      - "${TYPESENSE_API_KEY}"
+      - "--enable-cors"
+    environment:
+      TYPESENSE_API_KEY: "${TYPESENSE_API_KEY}"
+    expose:
+      - "8108"
+    volumes:
+      - type: "volume"
+        target: "/data"
+        source: "typesense-data"
+        read_only: false
+    networks:
+      - "aspire"
+  ollama:
+    image: "docker.io/ollama/ollama:0.13.0"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Ollama"
+    expose:
+      - "11434"
+    volumes:
+      - type: "volume"
+        target: "/root/.ollama"
+        source: "ollama-data"
+        read_only: false
+    networks:
+      - "aspire"
+  elasticsearch:
+    image: "${ELASTICSEARCH_IMAGE}"
+    environment:
+      discovery.type: "single-node"
+      xpack.security.enabled: "false"
+      ELASTIC_PASSWORD: "${ELASTICSEARCH_PASSWORD}"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      http.cors.enabled: "true"
+      http.cors.allow-origin: "http://localhost:8083"
+      http.cors.allow-headers: "X-Requested-With, Content-Type, Content-Length, Authorization"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Elasticsearch"
+    expose:
+      - "9200"
+      - "9300"
+    volumes:
+      - type: "volume"
+        target: "/usr/share/elasticsearch/data"
+        source: "elasticsearch-data"
+        read_only: false
+    networks:
+      - "aspire"
+  question-service:
+    image: "${QUESTION_SERVICE_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${QUESTION_SERVICE_PORT}"
+      typesense-api-key: "${TYPESENSE_API_KEY}"
+      TYPESENSE_TYPESENSE: "http://Typesense:8108"
+      services__Typesense__typesense__0: "http://Typesense:8108"
+      KEYCLOAK_HTTP: "http://Keycloak:8080"
+      services__Keycloak__http__0: "http://Keycloak:8080"
+      ConnectionStrings__questionDb: "Host=Postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=questionDb"
+      QUESTIONDB_HOST: "Postgres"
+      QUESTIONDB_PORT: "5432"
+      QUESTIONDB_USERNAME: "postgres"
+      QUESTIONDB_PASSWORD: "${POSTGRES_PASSWORD}"
+      QUESTIONDB_URI: "postgresql://postgres:${POSTGRES_PASSWORD}@Postgres:5432/questionDb"
+      QUESTIONDB_JDBCCONNECTIONSTRING: "jdbc:postgresql://Postgres:5432/questionDb"
+      QUESTIONDB_DATABASENAME: "questionDb"
+      ConnectionStrings__Redis: "Redis:6379,password=${REDIS_PASSWORD}"
+      REDIS_HOST: "Redis"
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+      REDIS_URI: "redis://:${REDIS_PASSWORD}@Redis:6379"
+      ConnectionStrings__Elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@Elasticsearch:9200"
+      ConnectionStrings__Ollama: "Endpoint=http://Ollama:11434"
+      OLLAMA_HOST: "Ollama"
+      OLLAMA_PORT: "11434"
+      OLLAMA_URI: "http://Ollama:11434"
+      ConnectionStrings__Nats: "nats://nats:${NATS_PASSWORD}@Nats:4222"
+      NATS_HOST: "Nats"
+      NATS_PORT: "4222"
+      NATS_USERNAME: "nats"
+      NATS_PASSWORD: "${NATS_PASSWORD}"
+      NATS_URI: "nats://nats:${NATS_PASSWORD}@Nats:4222"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Question-Service"
+    expose:
+      - "${QUESTION_SERVICE_PORT}"
+    depends_on:
+      keycloak:
+        condition: "service_started"
+      postgres:
+        condition: "service_started"
+      elasticsearch:
+        condition: "service_started"
+      ollama:
+        condition: "service_started"
+      nats:
+        condition: "service_started"
+      redis:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  weather-api:
+    image: "${WEATHER_API_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${WEATHER_API_PORT}"
+      KEYCLOAK_HTTP: "http://Keycloak:8080"
+      services__Keycloak__http__0: "http://Keycloak:8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Weather-Api"
+    expose:
+      - "${WEATHER_API_PORT}"
+    depends_on:
+      keycloak:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  elasticvue:
+    image: "cars10/elasticvue:1.15.0"
+    environment:
+      ELASTICSEARCH_HOSTS: "[\"http://Elasticsearch:9200\"]"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "Elasticvue"
+    expose:
+      - "8080"
+    networks:
+      - "aspire"
+  semanticsearch-service:
+    image: "${SEMANTICSEARCH_SERVICE_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${SEMANTICSEARCH_SERVICE_PORT}"
+      ConnectionStrings__Elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@Elasticsearch:9200"
+      ConnectionStrings__Ollama: "Endpoint=http://Ollama:11434"
+      OLLAMA_HOST: "Ollama"
+      OLLAMA_PORT: "11434"
+      OLLAMA_URI: "http://Ollama:11434"
+      ConnectionStrings__Nats: "nats://nats:${NATS_PASSWORD}@Nats:4222"
+      NATS_HOST: "Nats"
+      NATS_PORT: "4222"
+      NATS_USERNAME: "nats"
+      NATS_PASSWORD: "${NATS_PASSWORD}"
+      NATS_URI: "nats://nats:${NATS_PASSWORD}@Nats:4222"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://production-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "SemanticSearch-Service"
+    expose:
+      - "${SEMANTICSEARCH_SERVICE_PORT}"
+    depends_on:
+      elasticsearch:
+        condition: "service_started"
+      ollama:
+        condition: "service_started"
+      nats:
+        condition: "service_started"
+    networks:
+      - "aspire"
+networks:
+  aspire:
+    driver: "bridge"
+volumes:
+  keycloak-data:
+    driver: "local"
+  postgres-data:
+    driver: "local"
+  redis-data:
+    driver: "local"
+  nats-data:
+    driver: "local"
+  typesense-data:
+    driver: "local"
+  ollama-data:
+    driver: "local"
+  elasticsearch-data:
+    driver: "local"

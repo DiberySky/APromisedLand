@@ -9,30 +9,30 @@
             <MudStack>
                 <MudStack Row AlignItems="AlignItems.Center">
                     <MudText Typo="Typo.h6" Color="Color.Default">版本：</MudText>
-                    <MudText Color="Color.Success">@ProjectService.Version</MudText>
+                    <MudText Color="Color.Success">@SolutionService.Version</MudText>
                 </MudStack>
                 <MudStack Row AlignItems="AlignItems.Center">
                     <MudText Typo="Typo.h6" Color="Color.Default">操作系统：</MudText>
-                    <MudText Color="Color.Success">@ProjectService.PlatformOS</MudText>
+                    <MudText Color="Color.Success">@SolutionService.PlatformOS</MudText>
                 </MudStack>
                 <MudStack Row AlignItems="AlignItems.Center">
                     <MudText Typo="Typo.h6" Color="Color.Default">设备：</MudText>
-                    <MudText Color="Color.Success">@ProjectService.PlatformType</MudText>
+                    <MudText Color="Color.Success">@SolutionService.PlatformType</MudText>
                 </MudStack>
                 <MudStack Row AlignItems="AlignItems.Center">
                     <MudText Typo="Typo.h6" Color="Color.Default">方向：</MudText>
-                    <MudText Color="Color.Success">@ProjectService.ScreenInfo.Orientation</MudText>
+                    <MudText Color="Color.Success">@SolutionService.ScreenInfo.Orientation</MudText>
                 </MudStack>
                 <MudStack Row AlignItems="AlignItems.Center">
                     <MudText Typo="Typo.h6" Color="Color.Default">屏幕尺寸：</MudText>
-                    <MudText Color="Color.Success">@ProjectService.ScreenInfo.Width x @ProjectService.ScreenInfo.Height</MudText>
+                    <MudText Color="Color.Success">@SolutionService.ScreenInfo.Width x @SolutionService.ScreenInfo.Height</MudText>
                 </MudStack>
             </MudStack>
         </MudContainer>
     </DialogContent>
     <DialogActions>
         <MudSpacer />
-        <MudText Color="Color.Primary">@ProjectService.Copyright</MudText>
+        <MudText Color="Color.Primary">@SolutionService.Copyright</MudText>
         <MudSpacer />
     </DialogActions>
 </DialogSky>

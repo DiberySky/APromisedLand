@@ -8,14 +8,14 @@
 @inject IDialogService DialogService
 @inject NavigationManager Navigater
 
-<PageSky Title="导航" BackPage="@ProjectService.SignInPage"
-         ArrowBackVisibled="@(ProjectService.Authorized == false)"
+<PageSky Title="导航" BackPage="@SolutionService.SignInPage"
+         ArrowBackVisibled="@(SolutionService.Authorized == false)"
          BottomBarVisibled>
     <PageContent>
         <MudContainer MaxWidth="MaxWidth.ExtraSmall">
             <MudExpansionPanels Class="my-4">
                 <MudStack Spacing="0">
-                    @foreach (var panel in ProjectService.ExpansionPanels)
+                    @foreach (var panel in SolutionService.ExpansionPanels)
                     {
                         <MudExpansionPanel Text=@panel.Title Expanded=@panel.Expanded
                                            HeaderClass="mud-theme-dark" Class="my-0">
@@ -24,7 +24,7 @@
                                 {
                                     @if (pageInfo.Authorized)
                                     {
-                                        if (ProjectService.GroupMember(pageInfo.Group))
+                                        if (SolutionService.GroupMember(pageInfo.Group))
                                         {
                                             <MudButton Variant="Variant.Outlined"
                                                        FullWidth Color="Color.Primary"
