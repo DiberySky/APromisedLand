@@ -4,6 +4,7 @@ using Elastic.Clients.Elasticsearch.Mapping;
 using SemanticSearch.Api.Models;
 using Elastic.Clients.Elasticsearch.Core.Search;
 using Elastic.Clients.Elasticsearch.QueryDsl;
+using SolutionService = APromisedLand.Shared.Services.Solution.SolutionService;
 
 namespace SemanticSearch.Api.Services;
 

@@ -1,10 +1,10 @@
 ﻿@using APromisedLand.Shared.Interfaces
-@using SolutionService = APromisedLand.Shared.Services.SolutionService
+@using SolutionService = APromisedLand.Shared.Services.Solution.SolutionService
 @namespace APromisedLand.Razor.Components
 
 @inject IDialogService DialogService
 @inject NavigationManager Navigater
-@inject IAuthService AuthService
+@inject IAuthenticationService AuthenticationService
 
 <MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense=true
            Elevation="0">
@@ -81,9 +81,9 @@
     [Parameter] public EventCallback OnBackClick { get; set; }
     [Parameter] public EventCallback OnStartClick { get; set; }
 
-    [Parameter] public required string BackPage { get; set; } = SolutionService.StartPage;
+    [Parameter] public required string BackPage { get; set; } = "/";
 
-    private async Task BackClick()
+    private void BackClick()
     {
         Navigater.NavigateTo(BackPage);
     }
@@ -95,10 +95,10 @@
 
     private async Task Logout()
     {
-        await AuthService.LogoutAsync();
+        await AuthenticationService.LogoutAsync();
 
         SolutionService.Reset();
 
-        Navigater.NavigateTo(SolutionService.SignInPage);
+        Navigater.NavigateTo("/");
     }
 }

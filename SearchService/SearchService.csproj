@@ -9,8 +9,8 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9"/>
         <PackageReference Include="Typesense" Version="8.5.0" />
-        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.15.0" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.15.0" />
+        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.17.3" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.17.3" />
     </ItemGroup>
 
     <ItemGroup>

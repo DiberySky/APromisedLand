@@ -1,66 +1,66 @@
 ﻿@page "/"
 @page "/SignInPage"
+@using APromisedLand.Maui.Configs
 @using APromisedLand.Shared.Interfaces
-@using SolutionService = APromisedLand.Shared.Services.SolutionService
+@using APromisedLand.Shared.Services.Solution
 
-@inject IAuthService AuthService
+@inject IAuthenticationService AuthenticationService
 @inject AuthenticationStateProvider AuthProvider
-@* @inject ProjectService ProjectService *@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@inject NavigationManager Navigater
+@inject NavigationManager Navigator
 
 <SignInSky Title="武汉供电段"
-           OnSignInClick="e => SignInClick(e)"
-           OnStartClick="e => Navigater.NavigateTo(SolutionService.StartPage)"
+           @* OnSignInClick="SignInClick" *@
+           @* OnStartClick="e => Navigator.NavigateTo(SolutionService.StartPage)" *@
            OnBackClick='e => DialogService.ShowTestDialogAsync("Testing Dialog", "testing args")' />
 
 @code {
 
-    [Parameter] public required string HomePage { get; set; }
+    // [Parameter] public required string HomePage { get; set; }
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
 
-        PlatformServer.DisplayInfo();
+        PlatformInfo.DisplayInfo();
     }
 
-    private async Task SignInClick(SignInUser user)
-    {
-        try
-        {
-            // var size = PlatformServer.CurrentWindow();
-            SolutionService.Authorized = false;
-
-            var success = await AuthService.LoginAsync(user.UserName, user.Password);
-            if (success)
-            {
-                var authState = await AuthProvider.GetAuthenticationStateAsync();
-                var userlogin = authState.User;
-
-                SolutionService.GetClaimValue(userlogin.Claims);
-
-                StateHasChanged();
-
-                SolutionService.Authorized = true;
-
-                Snackbar.Success($"登录成功: {SolutionService.UserName}");
-
-                Navigater.NavigateTo(SolutionService.StartPage);
-            }
-            else
-            {
-                Snackbar.Error("登录失败，请检查用户名或密码。");
-            }
-        }
-        catch (Exception e)
-        {
-            Snackbar.Details("登录失败。", e.Message, DialogService);
-        }
-        finally
-        {
-            
-        }
-    }
+    // private async Task SignInClick(SignInUser user)
+    // {
+    //     try
+    //     {
+    //         // var size = PlatformServer.CurrentWindow();
+    //         SolutionService.Authorized = false;
+    //
+    //         var success = await AuthenticationService.LoginAsync(user.UserName, user.Password);
+    //         if (success)
+    //         {
+    //             var authState = await AuthProvider.GetAuthenticationStateAsync();
+    //             var userlogin = authState.User;
+    //
+    //             SolutionService.GetClaimValue(userlogin.Claims);
+    //
+    //             StateHasChanged();
+    //
+    //             SolutionService.Authorized = true;
+    //
+    //             Snackbar.Success($"登录成功: {SolutionService.UserName}");
+    //
+    //             Navigator.NavigateTo(SolutionService.StartPage);
+    //         }
+    //         else
+    //         {
+    //             Snackbar.Error("登录失败，请检查用户名或密码。");
+    //         }
+    //     }
+    //     catch (Exception e)
+    //     {
+    //         Snackbar.Details("登录失败。", e.Message, DialogService);
+    //     }
+    //     finally
+    //     {
+    //         
+    //     }
+    // }
 }

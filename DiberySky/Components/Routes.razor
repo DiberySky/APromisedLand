@@ -1,4 +1,5 @@
-﻿@using SolutionService = APromisedLand.Shared.Services.SolutionService
+﻿@using System.Reflection
+@using SolutionService = APromisedLand.Shared.Services.Solution.SolutionService
 @inject NavigationManager Navigater
 
 @* <Router AppAssembly="typeof(MauiProgram).Assembly" NotFoundPage="typeof(Pages.NotFound)">
@@ -27,7 +28,8 @@
 </CascadingAuthenticationState> *@
 
 <CascadingAuthenticationState>
-    <Router AppAssembly="@typeof(App).Assembly">
+    <Router AppAssembly="@typeof(App).Assembly"
+            AdditionalAssemblies="@BlazorHelper.Pages">
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(LayoutSky)">
                 <NotAuthorized>
@@ -53,6 +55,11 @@
 </CascadingAuthenticationState>
 
 @code {
+    IEnumerable<Assembly> PageAssemblies { get; set; } = [
+        typeof(APromisedLand.Razor.Pages.TestingPage).Assembly,
+        typeof(TreePage).Assembly,
+    ];
+    
     private void SignInHandler()
     {
         Navigater.NavigateTo(SolutionService.SignInPage);

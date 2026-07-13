@@ -1,12 +1,7 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "E:\\APromisedLand\\",
-  "Documents": [
-    {
-      "AbsoluteMoniker": "D:0:0:{EE6C35E1-89DF-443C-9552-E5EA623E9BF1}|APromisedLand.Shared\\APromisedLand.Shared.csproj|e:\\apromisedland\\apromisedland.shared\\projects\\seaweedfs\\data\\seaweedfsdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{EE6C35E1-89DF-443C-9552-E5EA623E9BF1}|APromisedLand.Shared\\APromisedLand.Shared.csproj|solutionrelative:apromisedland.shared\\projects\\seaweedfs\\data\\seaweedfsdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    }
-  ],
+  "Documents": [],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -14,7 +9,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 428,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": -1,
           "Children": [
             {
               "$type": "Bookmark",
@@ -31,19 +26,6 @@
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "SeaweedFsDbContext.cs",
-              "DocumentMoniker": "E:\\APromisedLand\\APromisedLand.Shared\\Projects\\SeaweedFS\\Data\\SeaweedFsDbContext.cs",
-              "RelativeDocumentMoniker": "APromisedLand.Shared\\Projects\\SeaweedFS\\Data\\SeaweedFsDbContext.cs",
-              "ToolTip": "E:\\APromisedLand\\APromisedLand.Shared\\Projects\\SeaweedFS\\Data\\SeaweedFsDbContext.cs",
-              "RelativeToolTip": "APromisedLand.Shared\\Projects\\SeaweedFS\\Data\\SeaweedFsDbContext.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAArAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T11:05:03.385Z",
-              "EditorCaption": ""
             }
           ]
         },

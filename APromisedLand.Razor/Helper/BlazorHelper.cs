@@ -7,16 +7,11 @@ namespace APromisedLand.Razor.Helper;
 
 public static partial class BlazorHelper
 {
-    public static DialogOptions DialogOptions
-    {
-        get
+    public static DialogOptions DialogOptions =>
+        new()
         {
-            return new()
-            {
-                FullScreen = true,
-                CloseButton = true,
-                BackdropClick = true,
-            };
-        }
-    }
+            FullScreen = true,
+            CloseButton = true,
+            BackdropClick = true,
+        };
 }

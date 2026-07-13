@@ -18,7 +18,9 @@ public class AppHostContext
 
     // Search (Typesense)
     public IResourceBuilder<ContainerResource>? Typesense { get; set; }
+
     public EndpointReference? TypesenseEndpoint { get; set; }
+
     // public IResourceBuilder<ParameterResource>? TypesenseApiKey { get; set; }
     public string? TypesenseApiKey { get; set; }
 
@@ -37,6 +39,7 @@ public class AppHostContext
     public IResourceBuilder<ContainerResource>? Kibana { get; set; }
 
     // Business Services
+    public IResourceBuilder<ProjectResource>? DiberyTreeService { get; set; }
     public IResourceBuilder<ProjectResource>? QuestionService { get; set; }
     public IResourceBuilder<ProjectResource>? WeatherApi { get; set; }
     public IResourceBuilder<ProjectResource>? TypesenseService { get; set; }
@@ -52,4 +55,6 @@ public class AppHostContext
 
     // Maui
     public IResourceBuilder<MauiProjectResource>? DiberySky { get; set; }
+    public IResourceBuilder<MauiProjectResource>? DiberyMauiSky { get; set; }
+
 }

@@ -26,4 +26,8 @@
       <ProjectReference Include="..\APromisedLand.Shared\APromisedLand.Shared.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Projects\DiberyTree\Models\" />
+    </ItemGroup>
+
 </Project>

@@ -9,11 +9,17 @@ public static class TypesenseConfig
         // ---------- Typesense 配置 ----------
         var typesenseUri = builder.Configuration["services:typesense:typesense:0"];
         if (string.IsNullOrEmpty(typesenseUri))
-            throw new InvalidOperationException("配置中未找到 Typesense URI。");
+        {
+            Console.WriteLine("配置中未找到 Typesense URI。");
+            return;
+        }
 
         var typesenseApiKey = builder.Configuration["typesense-api-key"];
         if (string.IsNullOrEmpty(typesenseApiKey))
-            throw new InvalidOperationException("配置中未找到 Typesense API 密钥");
+        {
+            Console.WriteLine("配置中未找到 Typesense API 密钥");
+            return;
+        }
 
         var uri = new Uri(typesenseUri);
         builder.Services.AddTypesenseClient(config =>

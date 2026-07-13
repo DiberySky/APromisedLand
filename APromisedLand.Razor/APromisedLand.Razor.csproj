@@ -14,11 +14,16 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.9" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.9" />
-    <PackageReference Include="MudBlazor" Version="9.6.0" />
+    <PackageReference Include="MudBlazor" Version="9.7.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\APromisedLand.MauiBlazor\APromisedLand.MauiBlazor.csproj" />
     <ProjectReference Include="..\APromisedLand.Shared\APromisedLand.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="DiberyTree\TreePage.razor.cs" />
   </ItemGroup>
   
 </Project>

@@ -13,13 +13,32 @@ public static class YarpExtension
         context.YarpGateway = builder.AddYarp("Yarp")
             .WithConfiguration(yarp =>
             {
-                yarp.AddRoute("/WeatherForecast/{**catch-all}", context.WeatherApi);
-                yarp.AddRoute("/Questions/{**catch-all}", context.QuestionService);
-                yarp.AddRoute("/tags/{**catch-all}", context.QuestionService);
-                // yarp.AddRoute("/search-mini/{**catch-all}", context.TypesenseService);
-                yarp.AddRoute("/typesense/{**catch-all}", context.TypesenseService);
-                // yarp.AddRoute("/elastic/{**catch-all}", context.ElasticService); 
-                // yarp.AddRoute("/filetrans/{**catch-all}", context.FileTransService);
+                if (context.WeatherApi is not null) 
+                {
+                    yarp.AddRoute("/WeatherForecast/{**catch-all}", context.WeatherApi);
+                }
+                if (context.QuestionService is not null) 
+                {
+                    yarp.AddRoute("/Questions/{**catch-all}", context.QuestionService);
+                    yarp.AddRoute("/tags/{**catch-all}", context.QuestionService);
+                }
+                if (context.TypesenseService is not null) 
+                {
+                    yarp.AddRoute("/search-mini/{**catch-all}", context.TypesenseService);
+                    yarp.AddRoute("/typesense/{**catch-all}", context.TypesenseService);
+                }
+                if (context.ElasticService is not null) 
+                {
+                    yarp.AddRoute("/elastic/{**catch-all}", context.ElasticService); 
+                }
+                if (context.FileTransService is not null) 
+                {
+                    yarp.AddRoute("/filetrans/{**catch-all}", context.FileTransService);
+                }
+                if (context.DiberyTreeService is not null) 
+                {
+                    yarp.AddRoute("/DiberyTree/{**catch-all}", context.DiberyTreeService);
+                }
             })
             .WithHttpEndpoint(port: 8919, targetPort: 8919, name: "http")
             .WithOtlpExporter();

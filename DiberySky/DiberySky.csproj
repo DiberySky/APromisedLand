@@ -76,6 +76,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\APromisedLand.MauiBlazor\APromisedLand.MauiBlazor.csproj" />
       <ProjectReference Include="..\APromisedLand.MauiServiceDefaults\APromisedLand.MauiServiceDefaults.csproj" />
       <ProjectReference Include="..\APromisedLand.Maui\APromisedLand.Maui.csproj" />
       <ProjectReference Include="..\APromisedLand.Razor\APromisedLand.Razor.csproj" />

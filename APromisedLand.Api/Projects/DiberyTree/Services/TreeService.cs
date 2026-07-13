@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
-using APromisedLand.Api.Projects.DiberyTree.Models;
+using APromisedLand.Shared.DiberyTree.Interfaces;
+using APromisedLand.Shared.DiberyTree.Models;
 
 namespace APromisedLand.Api.Projects.DiberyTree.Services;
 

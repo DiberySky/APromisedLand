@@ -6,13 +6,21 @@ public static class MauiExtension
         this IDistributedApplicationBuilder builder,
         AppHostContext context)
     {
-        if (context.Keycloak is null || context.WeatherApi is null) return builder;
-
         context.DiberySky = builder.AddMauiProject("DiberySky", "../DiberySky/DiberySky.csproj");
 
-        context.DiberySky.AddWindowsDevice()
-            .WithReference(context.WeatherApi)
-            .WithReference(context.Keycloak);
+        var winDevice = context.DiberySky.AddWindowsDevice();
+
+        if (context.Keycloak is not null && context.PublicDevTunnel is not null)
+        {
+            winDevice.WithReference(context.Keycloak, context.PublicDevTunnel);
+        }
+
+        if (context.DiberyTreeService is not null)
+        {
+            winDevice.WithReference(context.DiberyTreeService);
+        }
+
+        winDevice.WithOtlpExporter();
 
         // 可选 Android 模拟器（注释部分）
         // context.DiberySky.AddAndroidEmulator()

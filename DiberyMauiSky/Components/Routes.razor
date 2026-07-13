@@ -1,0 +1,42 @@
+﻿@using APromisedLand.Razor.Components
+@using APromisedLand.Razor.Helper
+@using APromisedLand.Shared.Services.Solution
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject NavigationManager Navigator
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly"
+            AdditionalAssemblies="@BlazorHelper.Pages">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(LayoutSky)">
+                <NotAuthorized>
+                    <MudContainer MaxWidth="MaxWidth.Small" Class="my-8">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="8">
+                            <MudText Typo="Typo.h3" Color="Color.Warning">请先登录以访问此页面。</MudText>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       Size="Size.Medium"
+                                       OnClick=@(() =>Navigator.NavigateTo("/"))>登录
+                            </MudButton>
+
+                        </MudStack>
+                    </MudContainer>
+                </NotAuthorized>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <PageTitle>未找到</PageTitle>
+            <LayoutView Layout="@typeof(LayoutSky)">
+                <p>抱歉，该页面不存在。</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+
+@* <Router AppAssembly="typeof(MauiProgram).Assembly" NotFoundPage="typeof(Pages.NotFound)"> *@
+@*     <Found Context="routeData"> *@
+@*         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" /> *@
+@*         <FocusOnNavigate RouteData="routeData" Selector="h1" /> *@
+@*     </Found> *@
+@* </Router> *@

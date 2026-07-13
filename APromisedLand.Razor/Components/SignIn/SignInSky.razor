@@ -1,12 +1,17 @@
 ﻿@namespace APromisedLand.Razor.Components
-@using APromisedLand.Razor.Helper
+@using APromisedLand.Shared.Interfaces
+@using APromisedLand.Shared.Services.Solution
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+
+@inject IAuthenticationService AuthenticationService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigator
 
 <PageSky Title="@Title" ArrowBackVisibled="false"
          BottomBarVisibled="true"
          StartButtonVisibled="true"
-         OnStartClick="e => OnStartClick.InvokeAsync()">
+         OnStartClick=@(() => Navigator.NavigateTo("StartPage"))>
     <PageContent>
         <MudMainContent>
             <MudContainer Class="align-content-center" MaxWidth="MaxWidth.Small">
@@ -49,9 +54,9 @@
     string? _user;
 
     [Parameter] public required string Title { get; set; }
-    [Parameter] public EventCallback<SignInUser> OnSignInClick { get; set; }
+    // [Parameter] public EventCallback<SignInUser> OnSignInClick { get; set; }
 
-    [Parameter] public EventCallback OnStartClick { get; set; }
+    // [Parameter] public EventCallback OnStartClick { get; set; }
     [Parameter] public EventCallback OnBackClick { get; set; }
 
     protected override void OnInitialized()
@@ -61,7 +66,7 @@
         _user = "tian";
 #endif
     }
-
+    
     private async Task OnSubmitClick()
     {
         if (_form == null || _passwordField == null
@@ -78,7 +83,9 @@
 
             var logonUser = new SignInUser { UserName = _user, Password = _passwordField.Password };
 
-            await OnSignInClick.InvokeAsync(logonUser);
+            // await OnSignInClick.InvokeAsync(logonUser);
+            
+            await SignInClick(logonUser);
         }
         catch (Exception e)
         {
@@ -86,4 +93,41 @@
         }
     }
 
+    private async Task SignInClick(SignInUser user)
+    {
+        try
+        {
+            // var size = PlatformServer.CurrentWindow();
+            SolutionService.Authorized = false;
+
+            var success = await AuthenticationService.LoginAsync(user.UserName, user.Password);
+            if (success)
+            {
+                var authState = await AuthProvider.GetAuthenticationStateAsync();
+                var userlogin = authState.User;
+
+                SolutionService.GetClaimValue(userlogin.Claims);
+
+                StateHasChanged();
+
+                SolutionService.Authorized = true;
+
+                Snackbar.Success($"登录成功: {SolutionService.UserName}");
+
+                Navigator.NavigateTo(SolutionService.StartPage);
+            }
+            else
+            {
+                Snackbar.Error("登录失败，请检查用户名或密码。");
+            }
+        }
+        catch (Exception e)
+        {
+            Snackbar.Details("登录失败。", e.Message, DialogService);
+        }
+        finally
+        {
+            
+        }
+    }
 }

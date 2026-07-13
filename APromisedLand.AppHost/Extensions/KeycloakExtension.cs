@@ -10,10 +10,6 @@ public static class KeycloakExtension
             .WithDataVolume("keycloak-data")
             .WithOtlpExporter();
 
-        // builder.AddKeycloak("Keycloak8323", 8111)
-        //     .WithDataVolume("keycloak323-data")
-        //     .WithOtlpExporter();
-
         return builder;
     }
 }

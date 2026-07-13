@@ -1,14 +1,14 @@
 ﻿@page "/StartPage"
+@using APromisedLand.Maui.Configs
 @using APromisedLand.Shared.Interfaces
 @using APromisedLand.Shared.Models
-@using SolutionService = APromisedLand.Shared.Services.SolutionService
+@using APromisedLand.Shared.Services.Solution
 
-@inject IAuthService AuthService
+@inject IAuthenticationService AuthenticationService
 @inject AuthenticationStateProvider AuthProvider
-@* @inject ProjectService ProjectService *@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@inject NavigationManager Navigater
+@inject NavigationManager Navigator
 
 <PageSky Title="导航" BackPage="@SolutionService.SignInPage"
          ArrowBackVisibled="@(SolutionService.Authorized == false)"
@@ -57,7 +57,7 @@
     {
         base.OnInitialized();
 
-        PlatformServer.DisplayInfo();
+        PlatformInfo.DisplayInfo();
     }
     
     private async Task Navigate(PageInfo pageInfo)
@@ -68,7 +68,7 @@
         }
         else
         {
-            Navigater.NavigateTo(pageInfo.Name);
+            Navigator.NavigateTo(pageInfo.Name);
         }
     }
 

@@ -1,0 +1,11 @@
+﻿@page "/"
+@using APromisedLand.Razor.Components
+
+@inject NavigationManager Navigator
+
+@* <h1>Hello, world!</h1> *@
+@* *@
+@* Welcome to your new app. *@
+
+<SignInSky Title="武汉供电段"
+           OnBackClick=@(e => Navigator.NavigateTo("/")) />

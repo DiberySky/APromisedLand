@@ -1,7 +1,7 @@
 ﻿@page "/login"
 @using APromisedLand.Shared.Interfaces
 @inject NavigationManager Navigation
-@inject IAuthService AuthService
+@inject IAuthenticationService AuthenticationService
 
 <EditForm Model="@_loginModel" OnValidSubmit="@HandleLogin">
     <DataAnnotationsValidator />
@@ -31,7 +31,7 @@
     private async Task HandleLogin()
     {
         _errorMessage = null;
-        var success = await AuthService.LoginAsync(_loginModel.Username, _loginModel.Password);
+        var success = await AuthenticationService.LoginAsync(_loginModel.Username, _loginModel.Password);
         if (success)
         {
             Navigation.NavigateTo("/", forceLoad: false);

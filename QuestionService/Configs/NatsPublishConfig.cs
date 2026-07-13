@@ -31,7 +31,10 @@ public static class NatsPublishConfig
     {
         var endpoint = builder.Configuration["OLLAMA_URI"];
         if (endpoint is null)
-            throw new Exception($"OLLAMA_URI 对应的配置缺失。");
+        {
+            Console.WriteLine($"OLLAMA_URI 对应的配置缺失。");
+            return;
+        }
 
         try
         {
@@ -40,7 +43,8 @@ public static class NatsPublishConfig
         }
         catch (Exception e)
         {
-            throw new InvalidOperationException(e.Message, e);
+            // throw new InvalidOperationException(e.Message, e);
+            Console.WriteLine(e.Message);
         }
     }
 }

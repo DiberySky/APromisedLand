@@ -12,7 +12,7 @@ public static class DiberyTreeExtension
         //     context.TypesenseEndpoint is null) return builder;
         
         // QuestionService
-        context.QuestionService = builder.AddProject<Projects.DiberyTreeService>("DiberyTree-Service")
+        context.DiberyTreeService = builder.AddProject<Projects.DiberyTreeService>("DiberyTree-Service")
             .WithOtlpExporter();
         
         return builder;

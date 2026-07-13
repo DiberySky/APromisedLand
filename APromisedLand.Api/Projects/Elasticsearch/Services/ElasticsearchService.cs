@@ -6,6 +6,7 @@ using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Core.Search;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
+using SolutionService = APromisedLand.Shared.Services.Solution.SolutionService;
 
 namespace APromisedLand.Api.Projects.Elasticsearch.Services;
 

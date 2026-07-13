@@ -1,12 +1,8 @@
-﻿using APromisedLand.Maui.Authentication;
-using APromisedLand.Maui.Helper;
-using APromisedLand.Maui.Services;
+﻿using APromisedLand.Maui.Configs;
+using APromisedLand.Maui.DiberyTree;
 using APromisedLand.Razor.Services;
-using APromisedLand.Shared.Services;
-using Microsoft.AspNetCore.Components.Authorization;
+using APromisedLand.Shared.Services.Solution;
 using Microsoft.Extensions.Logging;
-using MudBlazor.Services;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 namespace DiberySky;
@@ -19,9 +15,9 @@ public static class MauiProgram
         builder
             .UseMauiApp<App>()
             .ConfigureFonts(fonts => { fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"); });
-        
+
         builder.AddServiceDefaults();
-        
+
         builder.Services.AddMauiBlazorWebView();
 
         builder.Services.AddScoped<BlazorService>();
@@ -30,23 +26,26 @@ public static class MauiProgram
 #if DEBUG
         SolutionService.Debug = true;
 #endif
-        PlatformServer.PlatformInfo();
+        builder.AddPlatformInfo();
 
         //AuthenticationServices(builder);
-        MauiHelper.AuthenticationServices(builder);
-        HttpClientHelper.AuthHttpClient(builder);
+        builder.AddAuthenticationServices();
+        builder.AddKeycloakClient();
+
+        //DiberySkyServices(builder);
+        builder.AddDiberyTreeClient<string>();
 
         //HttpClientServices(builder);
-        HttpClientHelper.WeatherHttpClient(builder);
+        builder.AddWeatherHttpClient();
 
         //builder.Services.AddMudServices();
-        MauiHelper.MudBlazorServices(builder);
+        builder.AddMudBlazorServices();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
 #endif
-        
+
         return builder.Build();
     }
 
