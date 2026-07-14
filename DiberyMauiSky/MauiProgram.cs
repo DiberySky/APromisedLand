@@ -1,4 +1,7 @@
 ﻿using APromisedLand.Maui.Configs;
+using APromisedLand.Maui.DiberyTree;
+using APromisedLand.Shared.DiberyTree.Models;
+using APromisedLand.Shared.DTOs;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +23,8 @@ namespace DiberyMauiSky
             builder.AddServiceDefaults();
             
             builder.AddDiberyConfig();
+            
+            builder.AddDiberyTreeClient<Category>();
             
             builder.AddWeatherHttpClient();
 #if DEBUG

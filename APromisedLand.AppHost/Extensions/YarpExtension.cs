@@ -38,6 +38,7 @@ public static class YarpExtension
                 if (context.DiberyTreeService is not null) 
                 {
                     yarp.AddRoute("/DiberyTree/{**catch-all}", context.DiberyTreeService);
+                    yarp.AddRoute("/CategoryTree/{**catch-all}", context.DiberyTreeService);
                 }
             })
             .WithHttpEndpoint(port: 8919, targetPort: 8919, name: "http")

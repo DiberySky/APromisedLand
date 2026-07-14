@@ -16,7 +16,7 @@
         <MudContainer MaxWidth="MaxWidth.ExtraSmall">
             <MudExpansionPanels Class="my-4">
                 <MudStack Spacing="0">
-                    @foreach (var panel in SolutionService.ExpansionPanels)
+                    @foreach (var panel in ExpansionPanels)
                     {
                         <MudExpansionPanel Text=@panel.Title Expanded=@panel.Expanded
                                            HeaderClass="mud-theme-dark" Class="my-0">
@@ -52,6 +52,9 @@
 </PageSky>
 
 @code {
+    
+    [Parameter] public List<ExpansionPanel> ExpansionPanels { get; set; } = BlazorHelper.ExpansionPanels;
+    
     protected override void OnInitialized()
     {
         base.OnInitialized();

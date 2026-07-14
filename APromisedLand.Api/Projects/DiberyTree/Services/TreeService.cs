@@ -25,7 +25,7 @@ public class TreeService<T> : ITreeService<T>
         // 创建根节点
         var root1 = CreateNodeInternal(null, "根节点 1", default(T), "folder", true);
         var root2 = CreateNodeInternal(null, "根节点 2", default(T), "folder", true);
-
+        
         // 创建子节点
         var child1 = CreateNodeInternal(root1.Id, "子节点 1-1", default(T), "description", false);
         var child2 = CreateNodeInternal(root1.Id, "子节点 1-2", default(T), "description", true);

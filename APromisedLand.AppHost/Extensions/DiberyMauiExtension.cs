@@ -6,7 +6,8 @@ public static class DiberyMauiExtension
         this IDistributedApplicationBuilder builder,
         AppHostContext context)
     {
-        context.DiberyMauiSky = builder.AddMauiProject("DiberyMauiSky", "../DiberyMauiSky/DiberyMauiSky.csproj");
+        context.DiberyMauiSky = builder.AddMauiProject("DiberyMauiSky", 
+            "../DiberyMauiSky/DiberyMauiSky.csproj");
 
         var winDevice = context.DiberyMauiSky.AddWindowsDevice();
 

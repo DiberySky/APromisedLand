@@ -10,5 +10,5 @@ public partial class SolutionService
 
     public static string KeyCloakHttpsBaseUrl => "https://6fjddmjf-8323.jpe1.devtunnels.ms";
     
-    public static string YarpHostBaseUrl { get; set; } = "https://6fjddmjf-8090.jpe1.devtunnels.ms";
+    public static string YarpHostBaseUrl { get; set; } = "https://6fjddmjf-8919.jpe1.devtunnels.ms";
 }

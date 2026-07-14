@@ -1,9 +1,9 @@
 ﻿using APromisedLand.Shared.Helper;
 using APromisedLand.Shared.Models;
 
-namespace APromisedLand.Shared.Services.Solution;
+namespace APromisedLand.Razor.Helper;
 
-public partial class SolutionService
+public static partial class BlazorHelper
 {
     public static List<ExpansionPanel> ExpansionPanels { get; set; } =
     [

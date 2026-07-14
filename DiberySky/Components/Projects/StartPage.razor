@@ -17,7 +17,7 @@
         <MudContainer MaxWidth="MaxWidth.ExtraSmall">
             <MudExpansionPanels Class="my-4">
                 <MudStack Spacing="0">
-                    @foreach (var panel in SolutionService.ExpansionPanels)
+                    @foreach (var panel in BlazorHelper.ExpansionPanels)
                     {
                         <MudExpansionPanel Text=@panel.Title Expanded=@panel.Expanded
                                            HeaderClass="mud-theme-dark" Class="my-0">

@@ -11,3 +11,10 @@ Accept: application/json
 GET {{DiberyTreeService_HostAddress}}/diberytree/1/children
 Accept: application/json
 
+###
+GET https://6fjddmjf-8919.jpe1.devtunnels.ms/CategoryDtoTree/roots
+Accept: application/json
+
+###
+GET http://localhost:5085/CategoryDtoTree/roots
+Accept: application/json

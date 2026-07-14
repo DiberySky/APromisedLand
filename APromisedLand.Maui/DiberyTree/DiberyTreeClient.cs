@@ -16,14 +16,24 @@ public static class DiberyTreeClient
     /// <typeparam name="T">节点值的类型（通常为自定义 DTO）</typeparam>
     public static void AddDiberyTreeClient<T>(this MauiAppBuilder builder)
     {
+        // // 注册一个便利的 HttpClient 工厂或直接注入 IHttpClientFactory
+        // builder.Services.AddTransient(sp => sp.GetRequiredService<IHttpClientFactory>()
+        //     .CreateClient("TreeApi"));
+        //
+        // // 用于调用受保护的后端 API（自动携带 JWT）
+        // builder.Services
+        //     .AddHttpClient("TreeApi", client =>
+        //     {
+        //         client.BaseAddress = new Uri(SolutionService.YarpHostBaseUrl); 
+        //         
+        //     })
+        //     .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
+        
         // 注册类型化 HTTP 客户端，自动添加 JWT 处理程序
         builder.Services.AddHttpClient<DiberyTreeApiClient<T>>(client =>
             {
                 client.BaseAddress = new Uri(SolutionService.YarpHostBaseUrl);
             })
             .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
-
-        // 注册 TreeServiceClient（实现 ITreeService<T>）
-        builder.Services.AddScoped<ITreeService<T>, TreeServiceClient<T>>();
     }
 }
