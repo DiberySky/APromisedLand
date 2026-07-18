@@ -5,7 +5,7 @@
 
 @namespace APromisedLand.Razor.DiberyTree
 
-@inject DiberyTreeApiClient<Category> DiberyTreeApiClient;
+@inject DiberyTreeApiClient<CategoryTree> DiberyTreeApiClient;
 
 <PageSky Title="Weather" BottomBarVisibled>
     <PageContent>
@@ -13,10 +13,10 @@
             <ChildContent>
                 <MudContainer MaxWidth="MaxWidth.Small">
                     <MudButton Variant="Variant.Filled" Color="Color.Success"
-                               OnClick="async () => await GetCategoryTree()">Category</MudButton>
+                               OnClick="async () => await GetCategoryTree()">CategoryTree</MudButton>
                    
-                    <TreeSky TItem="Category" InitialTreeItems="@InitialTreeItems" 
-                             LoadServerData="@LoadDataAsync"/>
+                    @* <TreeSky TItem="CategoryTree" InitialTreeItems="@InitialTreeItems"  *@
+                    @*          LoadServerData="@LoadDataAsync"/> *@
                 </MudContainer>
             </ChildContent>
         </MudMainContent>
@@ -25,27 +25,17 @@
 
 @code {
 
-    private List<TreeItemData<Category>> InitialTreeItems { get; set; } = new();
+    private List<TreeItemData<CategoryTree>> InitialTreeItems { get; set; } = new();
     private int _idCounter = 1; // <- the counter makes sure the generated items are unique
 
     protected override async Task OnInitializedAsync()
     {
         var items = await DiberyTreeApiClient.GetRootNodesAsync();
         
-        InitialTreeItems = items.Select(i => i.ToTreeItemData<Category>()).ToList();
-        // InitialTreeItems.Add(new TreeItemData<Category> {
-        //     Value = new Category { Name = "All Mail" }, Icon = Icons.Material.Filled.Label,
-        //     Expanded = true,
-        //     Children = [
-        //         new TreeItemData<Category> { Value = new Category { Name = "Promotions" }, Icon = Icons.Material.Filled.Group, },
-        //         new TreeItemData<Category> { Value = new Category { Name = "Updates" }, Icon = Icons.Material.Filled.Info, },
-        //         new TreeItemData<Category> { Value = new Category { Name = "Forums" }, Icon = Icons.Material.Filled.QuestionAnswer, Expandable = false },
-        //         new TreeItemData<Category> { Value = new Category { Name = "Social" }, Icon = Icons.Material.Filled.LocalOffer, Expandable = false }
-        //     ] });
-        // InitialTreeItems.Add(new TreeItemData<Category> { Value = new Category { Name = "Trash" }, Icon = Icons.Material.Filled.Delete });
+         InitialTreeItems = items.Select(i => i.ToTreeItemData<CategoryTree>()).ToList();
     }
 
-    private async Task<IReadOnlyCollection<TreeItemData<Category>>> LoadDataAsync(Category? parentValue)
+    private async Task<IReadOnlyCollection<TreeItemData<CategoryTree>>> LoadDataAsync(CategoryTree? parentValue)
     {
         // return await DiberyTreeApiClient.LoadServerData(parentValue);
         
@@ -55,11 +45,11 @@
         // but for the sake of this example we will just return some hardcoded children
         return
         [
-            new TreeItemData<Category> { Value = new Category { Name = $"More Spam ({_idCounter++})" }, Icon = Icons.Material.Filled.Group, },
-            new TreeItemData<Category> { Value = new Category { Name = $"L.E.D Door Mats ({_idCounter++})" }, Icon = Icons.Material.Outlined.Lightbulb, Expandable = false },
-            new TreeItemData<Category> { Value = new Category { Name = $"Car Beauty Salon ({_idCounter++})" }, Icon = Icons.Material.Filled.CarRepair, Expandable = false },
-            new TreeItemData<Category> { Value = new Category { Name = $"Fakedoors.com ({_idCounter++})" }, Icon = Icons.Material.Outlined.DoorFront, Expandable = false },
-            new TreeItemData<Category> { Value =  new Category { Name = $"Bluetooth Toilet ({_idCounter++})" }, Icon = Icons.Material.Filled.Wc, Expandable = false }
+            new TreeItemData<CategoryTree> { Value = new CategoryTree { Name = $"More Spam ({_idCounter++})" }, Icon = Icons.Material.Filled.Group, },
+            new TreeItemData<CategoryTree> { Value = new CategoryTree { Name = $"L.E.D Door Mats ({_idCounter++})" }, Icon = Icons.Material.Outlined.Lightbulb, Expandable = false },
+            new TreeItemData<CategoryTree> { Value = new CategoryTree { Name = $"Car Beauty Salon ({_idCounter++})" }, Icon = Icons.Material.Filled.CarRepair, Expandable = false },
+            new TreeItemData<CategoryTree> { Value = new CategoryTree { Name = $"Fakedoors.com ({_idCounter++})" }, Icon = Icons.Material.Outlined.DoorFront, Expandable = false },
+            new TreeItemData<CategoryTree> { Value =  new CategoryTree { Name = $"Bluetooth Toilet ({_idCounter++})" }, Icon = Icons.Material.Filled.Wc, Expandable = false }
         ];
     }
 
@@ -67,6 +57,6 @@
     {
         var items = await DiberyTreeApiClient.GetRootNodesAsync();
         
-        InitialTreeItems = items.Select(i => i.ToTreeItemData<Category>()).ToList();
+        InitialTreeItems = items.Select(i => i.ToTreeItemData<CategoryTree>()).ToList();
     }
 }

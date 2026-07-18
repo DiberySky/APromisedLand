@@ -16,7 +16,7 @@ public static class SearchInitializer
         }
         catch (Exception e)
         {
-            Console.WriteLine($"集合模式{schemaName}尚未创建。");
+            Console.WriteLine($"集合模式{schemaName}尚未创建。{e.Message}");
         }
 
         var schema = new Schema(schemaName, new List<Field>

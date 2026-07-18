@@ -12,9 +12,16 @@ public static class DiberyTreeExtension
         //     context.TypesenseEndpoint is null) return builder;
         
         // QuestionService
-        context.DiberyTreeService = builder.AddProject<Projects.DiberyTreeService>("DiberyTree-Service")
-            .WithOtlpExporter();
+        context.DiberyTreeService = builder.AddProject<Projects.DiberyTreeService>("DiberyTree-Service");
         
+        if (context.TreeDb != null )
+        {
+            context.DiberyTreeService.WithReference(context.TreeDb);
+            context.DiberyTreeService.WaitFor(context.TreeDb);
+        }
+        
+        context.DiberyTreeService.WithOtlpExporter();
+
         return builder;
     }
 }

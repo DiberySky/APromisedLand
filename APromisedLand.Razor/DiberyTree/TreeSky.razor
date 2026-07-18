@@ -1,55 +1,43 @@
 @typeparam TItem where TItem : class, ITreeNode
 
-<MudTreeView T="TItem" ServerData="@LoadServerData" Items="@InitialTreeItems">
+<MudTreeView ServerData="@LoadChildrenAsync" Items="@_items">
     <ItemTemplate>
-        <MudTreeViewItem T="TItem" 
-            Text="@context.Value?.Text()"
+        <MudTreeViewItem
+            Text="@context.Text"
             Value="@context.Value"
             @bind-Items="context.Children"
             @bind-Expanded="@context.Expanded"
             CanExpand="@context.Expandable"
             Icon="@context.Icon"
-            LoadingIconColor="Color.Info"/>
+            LoadingIconColor="Color.Info">
+            <BodyContent Context="node">
+                <MudContainer class="d-flex justify-space-between mx-0 px-0" >
+                    <MudText>
+                        <MudHighlighter Text="@(context.Text)"
+                                        HighlightedText="@HighlightedText"
+                                        Class="mud-theme-primary"/>
+                    </MudText>
+
+                    <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => OnMoreClick(node))"/>
+                </MudContainer>
+            </BodyContent>
+        </MudTreeViewItem>
     </ItemTemplate>
 </MudTreeView>
 
 @code {
-    [Parameter] public Func<TItem?, Task<IReadOnlyCollection<TreeItemData<TItem>>>>? 
-        LoadServerData { get; set; } 
-    [Parameter] public List<TreeItemData<TItem>> InitialTreeItems { get; set; } = [];
+    [Parameter] public string? RootId { get; set; }
+
+    [Parameter] public Func<Task<IReadOnlyList<TreeNodeDto<TItem>>>>? 
+        FunLoadInitialData { get; set; }
     
-    // private List<TreeItemData<T>> InitialTreeItems { get; set; } = new();
-    // private int _idCounter = 1; // <- the counter makes sure the generated items are unique
-    //
-    // protected override void OnInitialized()
-    // {
-    //     InitialTreeItems.Add(new TreeItemData<string> {
-    //         Value = "All Mail", Icon = Icons.Material.Filled.Label,
-    //         Expanded = true,
-    //         Children = [
-    //             new TreeItemData<string> { Value = "Promotions", Icon = Icons.Material.Filled.Group, },
-    //             new TreeItemData<string> { Value = "Updates", Icon = Icons.Material.Filled.Info, },
-    //             new TreeItemData<string> { Value = "Forums", Icon = Icons.Material.Filled.QuestionAnswer, Expandable = false },
-    //             new TreeItemData<string> { Value = "Social", Icon = Icons.Material.Filled.LocalOffer, Expandable = false }
-    //         ] });
-    //     InitialTreeItems.Add(new TreeItemData<string> { Value = "Trash", Icon = Icons.Material.Filled.Delete });
-    // }
-    //
-    // private async Task<IReadOnlyCollection<TreeItemData<T>>> LoadDataAsync(string? parentValue)
-    // {
-    //     // return await DiberyTreeApiClient.LoadServerData(parentValue);
-    //     
-    //     // wait 500ms to simulate a server load
-    //     await Task.Delay(500);
-    //     // normally you would use the parentValue to query your server for the children of the given parent
-    //     // but for the sake of this example we will just return some hardcoded children
-    //     return
-    //     [
-    //         new TreeItemData<string> { Value = $"More Spam ({_idCounter++})", Icon = Icons.Material.Filled.Group, },
-    //         new TreeItemData<string> { Value = $"L.E.D Door Mats ({_idCounter++})", Icon = Icons.Material.Outlined.Lightbulb, Expandable = false },
-    //         new TreeItemData<string> { Value = $"Car Beauty Salon ({_idCounter++})", Icon = Icons.Material.Filled.CarRepair, Expandable = false },
-    //         new TreeItemData<string> { Value = $"Fakedoors.com ({_idCounter++})", Icon = Icons.Material.Outlined.DoorFront, Expandable = false },
-    //         new TreeItemData<string> { Value = $"Bluetooth Toilet ({_idCounter++})", Icon = Icons.Material.Filled.Wc, Expandable = false }
-    //     ];
-    // }
+    [Parameter] public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>? 
+        FunLoadServerData { get; set; }
+    
+    [Parameter] public TItem? SelectedValue { get; set; }
+    [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
+
 }

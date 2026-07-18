@@ -24,7 +24,7 @@ namespace DiberyMauiSky
             
             builder.AddDiberyConfig();
             
-            builder.AddDiberyTreeClient<Category>();
+            builder.AddDiberyTreeClient<CategoryTree>();
             
             builder.AddWeatherHttpClient();
 #if DEBUG

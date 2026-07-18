@@ -9,12 +9,13 @@ public static partial class BlazorHelper
     {
         return new TreeItemData<T>
         {
-            Icon = dto.Icon,
+            Icon = Icons.Material.Filled.Label,
             Text = dto.Text,
             Value = dto.Value,
             Expanded = dto.Expanded,
             Selected = dto.Selected,
-            Expandable = dto.Expanded,
+            Expandable = dto.HasChildren,
+            Children = dto.Children?.Select(i => i.ToTreeItemData<T>()).ToList(),
         };
     }
 }

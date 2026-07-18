@@ -11,10 +11,10 @@ public static class DiberyMauiExtension
 
         var winDevice = context.DiberyMauiSky.AddWindowsDevice();
 
-        if (context.Keycloak is not null && context.PublicDevTunnel is not null)
-        {
-            winDevice.WithReference(context.Keycloak, context.PublicDevTunnel);
-        }
+        // if (context.Keycloak is not null && context.PublicDevTunnel is not null)
+        // {
+        //     winDevice.WithReference(context.Keycloak, context.PublicDevTunnel);
+        // }
 
         if (context.DiberyTreeService is not null)
         {

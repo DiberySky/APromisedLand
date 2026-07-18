@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using APromisedLand.Shared.DiberyTree;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
 
@@ -8,11 +9,11 @@ namespace APromisedLand.Api.Projects.DiberyTree.Services;
 /// 泛型树服务实现（内存存储示例）
 /// </summary>
 /// <typeparam name="T">节点值的类型</typeparam>
-public class TreeService<T> : ITreeService<T>
+public class TreeService<T> where T : class, ITreeNode //ITreeService<T> 
 {
     private readonly ConcurrentDictionary<string, TreeNodeDto<T>> _nodes = new();
     private readonly ConcurrentDictionary<string, List<string>> _parentChildren = new();
-    private int _idCounter;
+    //private int _idCounter;
 
     public TreeService()
     {
@@ -30,31 +31,37 @@ public class TreeService<T> : ITreeService<T>
         var child1 = CreateNodeInternal(root1.Id, "子节点 1-1", default(T), "description", false);
         var child2 = CreateNodeInternal(root1.Id, "子节点 1-2", default(T), "description", true);
         var child3 = CreateNodeInternal(root2.Id, "子节点 2-1", default(T), "description", false);
-
+    
         // 创建孙节点
         var grandChild = CreateNodeInternal(child2.Id, "孙节点 1-2-1", default(T), "insert_drive_file", false);
     }
 
     private TreeNodeDto<T> CreateNodeInternal(string? parentId, string text, T? value, string? icon, bool hasChildren)
     {
-        var id = (++_idCounter).ToString();
-        var node = new TreeNodeDto<T>
-        {
-            Id = id,
-            ParentId = parentId,
-            Value = value,
-            Text = text,
-            Icon = icon,
-            HasChildren = hasChildren,
-            Children = new List<TreeNodeDto<T>>()
-        };
+        if (value == null)
+            throw new ArgumentNullException(nameof(value));
 
+        var id = value.Id;
+        
+        // var node = new TreeNodeDto<T>
+        // {
+        //     Id = value?.Id ?? id,
+        //     ParentId = parentId,
+        //     Value = value,
+        //     Text = value?.Text(),
+        //     Icon = icon,
+        //     HasChildren = hasChildren,
+        //     Children = new List<TreeNodeDto<T>>()
+        // };
+        
+        var node = value.ToNodeDto();
+        
         _nodes.TryAdd(id, node);
 
         if (!string.IsNullOrEmpty(parentId))
         {
             _parentChildren.AddOrUpdate(parentId,
-                _ => new List<string> { id },
+                _ => [id],
                 (_, list) =>
                 {
                     list.Add(id);
@@ -178,7 +185,7 @@ public class TreeService<T> : ITreeService<T>
 
     public Task<TreeNodeDto<T>> CreateNodeAsync(TreeNodeDto<T> node, CancellationToken cancellationToken = default)
     {
-        var id = (++_idCounter).ToString();
+        var id = Guid.NewGuid().ToString();
         node.Id = id;
 
         _nodes.TryAdd(id, node);

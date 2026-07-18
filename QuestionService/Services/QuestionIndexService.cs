@@ -38,8 +38,8 @@ public static class QuestionIndexService
                         .Date(d => d.CreatedAt)
                         .Boolean(b => b.HasAcceptedAnswer)
                         .IntegerNumber(i => i.AnswerCount)
-                        .DenseVector(dv => dv.TitleVector.Index())
-                        .DenseVector(dv => dv.ContentVector.Index())
+                        .DenseVector(dv => dv.TitleVector!.Index())
+                        .DenseVector(dv => dv.ContentVector!.Index())
                     )
                 )
             );

@@ -16,18 +16,18 @@ var compose = builder.AddDockerComposeEnvironment("production")
 
 var context = new AppHostContext();
 
-builder.AddKeycloak(context); // Keycloak
+// builder.AddKeycloak(context); // Keycloak
 builder.AddPostgres(context); // Postgres
 builder.AddRedis(context); // Redis
 
-builder.AddWeatherService(context); // WeatherApi
+// builder.AddWeatherService(context); // WeatherApi
 
 builder.AddDiberyTreeService(context);
 
-builder.AddYarp(context); // Yarp
-builder.AddDevTunnel(context); // DevTunnel
+// builder.AddYarp(context); // Yarp
+// builder.AddDevTunnel(context); // DevTunnel
 
-builder.AddMauiApp(context); // Maui Blazor
+// builder.AddMauiApp(context); // Maui Blazor
 builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
 
 // builder.AddSemanticSearch(context);

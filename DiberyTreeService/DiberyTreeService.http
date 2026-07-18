@@ -16,5 +16,12 @@ GET https://6fjddmjf-8919.jpe1.devtunnels.ms/CategoryDtoTree/roots
 Accept: application/json
 
 ###
-GET http://localhost:5085/CategoryDtoTree/roots
+GET http://localhost:5085/CategoryTree/roots
 Accept: application/json
+
+###
+GET http://localhost:5085/CategoryTree/full?rootId=55705350-7071-43A4-AFAF-2F30B3CE2718
+Accept: application/json
+
+###
+GET http://localhost:5085/CategoryTree/full

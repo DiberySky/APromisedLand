@@ -30,10 +30,16 @@ public static class DiberyTreeClient
         //     .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
         
         // 注册类型化 HTTP 客户端，自动添加 JWT 处理程序
+        // builder.Services.AddHttpClient<DiberyTreeApiClient<T>>(client =>
+        //     {
+        //         client.BaseAddress = new Uri(SolutionService.YarpHostBaseUrl);
+        //     })
+        //     .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
+        
+        //http://localhost:5085
         builder.Services.AddHttpClient<DiberyTreeApiClient<T>>(client =>
             {
-                client.BaseAddress = new Uri(SolutionService.YarpHostBaseUrl);
+                client.BaseAddress = new Uri("http://localhost:5085");
             })
-            .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
-    }
+            .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    }
 }

@@ -1,7 +1,9 @@
+using APromisedLand.Api.Data;
 using APromisedLand.Api.Projects.DiberyTree.Services;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,11 +14,13 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.AddServiceDefaults();
 
+builder.AddNpgsqlDbContext<TreeDbContext>("TreeDb");
+
 // 注册泛型树服务（以 string 类型为例）
 // builder.Services.AddSingleton<ITreeService<string>, TreeService<string>>();
 
 // 如果需要多种类型的树，可以分别注册
-builder.Services.AddSingleton<ITreeService<Category>, TreeService<Category>>();
+builder.Services.AddScoped<ITreeService<CategoryTree>, CategoryTreeService>();
 
 var app = builder.Build();
 
@@ -29,5 +33,20 @@ if (app.Environment.IsDevelopment())
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapDefaultControllerRoute();
+
+using var scope = app.Services.CreateScope();
+var services = scope.ServiceProvider;
+try
+{
+    var context = services.GetRequiredService<TreeDbContext>();
+    await context.Database.MigrateAsync();
+}
+catch (Exception e)
+{
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(e, "在迁移或初始化数据库时出现了错误。");
+}
 
 app.Run();

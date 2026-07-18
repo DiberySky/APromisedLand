@@ -15,6 +15,7 @@ public static class PostgresExtension
         // 创建具体数据库
         context.QuestionDb = context.Postgres.AddDatabase("questionDb");
         context.FileTransDb = context.Postgres.AddDatabase("fileTransDb");
+        context.TreeDb = context.Postgres.AddDatabase("TreeDb");
         
         return builder;
     }

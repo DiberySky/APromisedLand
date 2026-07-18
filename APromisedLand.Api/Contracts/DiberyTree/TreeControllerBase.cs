@@ -16,13 +16,15 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
     ILogger logger) : ControllerBase
 {
     protected readonly ITreeService<T> TreeService = treeService;
-    protected readonly ILogger Logger = logger;
+    private readonly ILogger _logger = logger;
 
     [HttpGet("roots")]
+    [HttpGet("roots/{rootId}")]
     [ProducesResponseType(StatusCodes.Status200OK)] // 移除 typeof，只保留状态码
-    public virtual async Task<IActionResult> GetRoots(CancellationToken cancellationToken = default)
+    public virtual async Task<IActionResult> GetRoots(string? rootId = null, CancellationToken cancellationToken = default)
     {
-        var roots = await TreeService.GetRootNodesAsync(cancellationToken);
+        var roots = await TreeService.GetRootNodesAsync(rootId, cancellationToken);
+        
         return Ok(roots);
     }
 
@@ -68,7 +70,7 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "创建节点失败");
+            _logger.LogError(ex, "创建节点失败");
             return StatusCode(500, "创建节点时发生错误");
         }
     }
@@ -96,7 +98,7 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "更新节点失败");
+            _logger.LogError(ex, "更新节点失败");
             return StatusCode(500, "更新节点时发生错误");
         }
     }

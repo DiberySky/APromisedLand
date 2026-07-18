@@ -18,12 +18,12 @@ public class TreeController<T>(ITreeService<T> treeService, ILogger<TreeControll
     /// <summary>
     /// 获取根节点列表
     /// </summary>
-    [HttpGet("roots")]
-    public async Task<IActionResult> GetRoots(CancellationToken cancellationToken)
+    [HttpGet("roots/{rootId}")]
+    public async Task<IActionResult> GetRoots(string? rootId = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            var roots = await treeService.GetRootNodesAsync(cancellationToken);
+            var roots = await treeService.GetRootNodesAsync(rootId, cancellationToken);
             return Ok(new { success = true, data = roots });
         }
         catch (Exception ex)
@@ -39,7 +39,7 @@ public class TreeController<T>(ITreeService<T> treeService, ILogger<TreeControll
     [HttpGet("{parentId}/children")]
     public async Task<IActionResult> GetChildren(
         string parentId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -59,7 +59,7 @@ public class TreeController<T>(ITreeService<T> treeService, ILogger<TreeControll
     [HttpGet("query")]
     public async Task<IActionResult> Query(
         [FromQuery] TreeQueryParams queryParams,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -99,7 +99,7 @@ public class TreeController<T>(ITreeService<T> treeService, ILogger<TreeControll
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] TreeNodeDto<T> node,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -120,7 +120,7 @@ public class TreeController<T>(ITreeService<T> treeService, ILogger<TreeControll
     public async Task<IActionResult> Update(
         string id,
         [FromBody] TreeNodeDto<T> node,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -147,7 +147,7 @@ public class TreeController<T>(ITreeService<T> treeService, ILogger<TreeControll
     /// 删除节点
     /// </summary>
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -172,7 +172,7 @@ public class TreeController<T>(ITreeService<T> treeService, ILogger<TreeControll
     public async Task<IActionResult> Move(
         string id,
         [FromBody] MoveNodeRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         try
         {

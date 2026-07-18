@@ -15,7 +15,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiberySky", "DiberySky\Dibe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WeatherApi", "WeatherApi\WeatherApi.csproj", "{6B3F21CC-0423-41F0-9FEE-EA0B546F2853}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Shared", "Shared", "{DC357836-6548-4918-9C56-E876B4E81A44}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{DC357836-6548-4918-9C56-E876B4E81A44}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APromisedLand.Maui", "APromisedLand.Maui\APromisedLand.Maui.csproj", "{96A33913-BFCE-4AF8-A0B8-6969E5B53EFE}"
 EndProject

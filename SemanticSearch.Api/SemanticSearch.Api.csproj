@@ -9,8 +9,12 @@
     <ItemGroup>
         <PackageReference Include="Aspire.Elastic.Clients.Elasticsearch" Version="13.3.0" />
         <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.4.2" />
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9"/>
-        <PackageReference Include="OllamaSharp" Version="5.4.25" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="OllamaSharp" Version="5.4.27" />
     </ItemGroup>
 
     <ItemGroup>

@@ -44,7 +44,7 @@ public partial class QuestionsController
             return response.Hits
                 .Select(hit => new QuestionSearchResult
                 {
-                    Id = hit.Source.Id,
+                    Id = hit.Source!.Id,
                     Title = hit.Source.Title,
                     Content = hit.Source.Content,
                     Score = (float)(hit.Score ?? 0)

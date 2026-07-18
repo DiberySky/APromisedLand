@@ -52,6 +52,11 @@ public class TreeNodeDto<T>
     public List<TreeNodeDto<T>>? Children { get; set; }
 
     /// <summary>
+    /// 子节点列表（完整加载时使用）
+    /// </summary>
+    public TreeNodeDto<T>? Parent { get; set; }
+
+    /// <summary>
     /// 额外数据（扩展字段）
     /// </summary>
     public Dictionary<string, object>? ExtraData { get; set; }
