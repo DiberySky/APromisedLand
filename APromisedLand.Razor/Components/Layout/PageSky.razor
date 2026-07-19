@@ -81,11 +81,18 @@
     [Parameter] public EventCallback OnBackClick { get; set; }
     [Parameter] public EventCallback OnStartClick { get; set; }
 
-    [Parameter] public required string BackPage { get; set; } = "/";
+    [Parameter] public string? BackPage { get; set; }
 
     private void BackClick()
     {
-        Navigater.NavigateTo(BackPage);
+        if (string.IsNullOrEmpty(BackPage))
+        {
+            OnBackClick.InvokeAsync();
+        }
+        else
+        {
+            Navigater.NavigateTo(BackPage);
+        }
     }
 
     private async Task About()

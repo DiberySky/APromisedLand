@@ -1,6 +1,6 @@
 using APromisedLand.Razor.Helper;
 using APromisedLand.Shared.DiberyTree.Models;
-using Microsoft.AspNetCore.Components;
+using APromisedLand.Shared.Services.Solution;
 using MudBlazor;
 
 namespace APromisedLand.Razor.DiberyTree;
@@ -8,19 +8,73 @@ namespace APromisedLand.Razor.DiberyTree;
 public partial class TreeSky<TItem>
 {
     private List<TreeItemData<TItem>> _items = new();
+    private bool _isLoading = true;
 
     private string HighlightedText { get; set; } = string.Empty;
     
-    private void OnMoreClick(MudTreeViewItem<TItem> clickNode)
-    {
-        
-    }
-    
     protected override async Task OnInitializedAsync()
     {
-        _items = await LoadInitialDataAsync();
+        _isLoading = true;
+        StateHasChanged();
 
-        await base.OnInitializedAsync();
+        _items = await LoadInitialDataAsync();
+        
+        _isLoading = false;
+        StateHasChanged();
+        
+        SetSelected();
+    }
+
+    // protected override void OnParametersSet()
+    // {
+    //     // 2. 参数变化时（如从 /tree 到 /tree/rootId/xxx）
+    //     if (_items.Count > 0 )
+    //     {
+    //         SetSelected();
+    //     }
+    // }
+    
+    // protected override void OnAfterRender(bool firstRender)
+    // {
+    //     if (!firstRender)
+    //     {
+    //         // SetSelected();
+    //     }
+    // }
+
+    private void ClickItem(ITreeItemData<TItem> node)
+    {
+        // var rootValue = FindNodeById(_items.ToHashSet(), RootId);
+        // 保存当前位置（包含当前节点ID的URL）
+        History.Push(NavigationManager.Uri, RootId, node.Value?.Id);
+
+        // 导航到详情页
+        var targetUrl = $"{Page}/rootId/{node.Value!.Id}/ClickNodeId/{node.Value!.Id}";
+        NavigationManager.NavigateTo(targetUrl, forceLoad: true);
+    }
+
+    private void ClickBack()
+    {
+        var entry = History.Pop();
+        if (entry == null) return;
+
+        var returnUrl = entry.Url;
+
+        var targetUrl = $"{Page}/";
+        if (entry.RootId != null) targetUrl += $"rootId/{entry.RootId}/";
+        if (entry.ClickNodeId != null) targetUrl += $"ClickNodeId/{entry.ClickNodeId}";
+        
+        NavigationManager.NavigateTo(targetUrl, forceLoad: true);
+    }
+
+    public void SetSelected()
+    {
+        var rootValue = FindNodeById(_items.ToHashSet(), ClickNodeId);
+        SelectedValue = rootValue;
+    }
+    
+    private void OnMoreClick(MudTreeViewItem<TItem> clickNode)
+    {
         
     }
     
@@ -85,5 +139,31 @@ public partial class TreeSky<TItem>
             // 但 TreeItemData 没有 CanExpand 属性，MudTreeView 根据 Children 是否有内容判断
             // 因此我们在加载子节点时才填充 Children
         };
+    }
+
+    private void StartClick()
+    {
+        History.Clear();
+        NavigationManager.NavigateTo(SolutionService.StartPage);
+    }
+    
+    private TItem? FindNodeById(IEnumerable<ITreeItemData<TItem>> items, string? id)
+    {
+        if (id == null) return null;
+        
+        foreach (var item in items)
+        {
+            if (item.Value?.Id == id)
+                return item.Value;
+
+            if (item.Children?.Count > 0)
+            {
+                var children = item.Children.ToList();
+                var found = FindNodeById(item.Children.ToList(),  id);
+                if (found != null)
+                    return found;
+            }
+        }
+        return null;
     }
 }

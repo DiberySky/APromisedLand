@@ -1,73 +1,56 @@
 @page "/category-tree"
-@page "/category-tree/{RootId}"
+@page "/category-tree/root"
+@page "/category-tree/rootId/{RootId}"
+@page "/category-tree/ClickNodeId/{ClickNodeId}"
+@page "/category-tree/rootId/{RootId}/ClickNodeId/{ClickNodeId}"
+
 @using APromisedLand.MauiBlazor.DiberyTree.Services
 @inject DiberyTreeApiClient<CategoryTree> TreeClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
 
-<PageSky Title="Weather" BottomBarVisibled>
-    <PageContent>
-        <MudMainContent>
-            <ChildContent>
-                <MudContainer MaxWidth="MaxWidth.Small">
+<MudMainContent>
+    <ChildContent>
+        <MudContainer MaxWidth="MaxWidth.Small">
 
-                    <MudText Typo="Typo.h4" Class="mb-4">📂 分类树管理</MudText>
+            <MudPaper Class="pa-4" Elevation="2">
+                <TreeSky TItem="CategoryTree"
+                         @ref="@TreeSky"
+                         RootId="@RootId"
+                         ClickNodeId="@ClickNodeId"
+                         Page="category-tree"
+                         FunLoadInitialData="@LoadInitialDataAsync"
+                         FunLoadServerData="@LoadChildrenAsync"
+                         @bind-SelectedValue="_selectedCategory"
+                         OnClickItem="@ClickItem"/>
+            </MudPaper>
 
-                    <MudStack Row="true" Spacing="2" Class="mb-4">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
-                                   OnClick="@AddRootNode">
-                            添加根分类
-                        </MudButton>
-                        <MudButton Variant="Variant.Filled" Color="Color.Secondary"
-                                   StartIcon="@Icons.Material.Filled.Refresh"
-                                   OnClick="@RefreshTree">
-                            刷新
-                        </MudButton>
-                    </MudStack>
-
-                    <MudPaper Class="pa-4" Elevation="2">
-                        <TreeSky TItem="CategoryTree"
-                                 @ref="_treeSky"
-                                 FunLoadInitialData="@LoadInitialDataAsync"
-                                 FunLoadServerData="@LoadChildrenAsync"
-                                 @bind-SelectedValue="_selectedCategory"/>
-                    </MudPaper>
-
-                </MudContainer>
-            </ChildContent>
-        </MudMainContent>
-    </PageContent>
-</PageSky>
+        </MudContainer>
+    </ChildContent>
+</MudMainContent>
 
 @code {
     [Parameter] public string? RootId { get; set; }
-    
-    private TreeSky<CategoryTree>? _treeSky;
-    private CategoryTree? _selectedCategory;
-    private List<TreeItemData<CategoryTree>> InitialTreeItems { get; set; } = new();
+    [Parameter] public string? ClickNodeId { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    // private TreeSky<CategoryTree>? _treeSky;
+    public TreeSky<CategoryTree>? TreeSky { get; set; }
+    private CategoryTree? _selectedCategory;
+
+   
+    private void ClickItem(ITreeItemData<CategoryTree>? node)
     {
-        await base.OnInitializedAsync();
+        Snackbar.Info($"点击“{node!.Text}”");
+        NavigationManager.NavigateTo($"category-tree/rootid/{node.Value!.Id}", forceLoad: true, replace: true);
     }
 
     private async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> LoadInitialDataAsync()
     {
         var items = await TreeClient.GetRootNodesAsync(RootId);
 
-        // var InitialTreeItems = items.Select(i => i.ToTreeItemData<CategoryTree>()).ToList();
-        
         return items;
     }
-
-    // private async Task<IReadOnlyCollection<TreeItemData<CategoryTree>>> LoadInitialDataAsync(CategoryTree? parent)
-    // {
-    //     var items = await TreeClient.GetRootNodesAsync();
-    //
-    //     InitialTreeItems = items.Select(i => i.ToTreeItemData<CategoryTree>()).ToList();
-    //     
-    //     return InitialTreeItems;
-    // }
 
     /// <summary>
     /// 懒加载子节点
@@ -79,35 +62,14 @@
             // 加载根节点
             var roots = await TreeClient.GetRootNodesAsync();
             return roots;
-            //return roots.Select(dto => ConvertToTreeItem(dto)).ToList();
         }
         else
         {
             // 加载指定节点的子节点
             var children = await TreeClient.GetChildrenAsync(parent.Id);
             return children;
-            // return children.Select(dto => ConvertToTreeItem(dto)).ToList();
         }
     }
-    
-    // /// <summary>
-    // /// 懒加载子节点
-    // /// </summary>
-    // private async Task<IReadOnlyCollection<TreeItemData<CategoryTree>>> LoadChildrenAsync(CategoryTree? parent)
-    // {
-    //     if (parent == null)
-    //     {
-    //         // 加载根节点
-    //         var roots = await TreeClient.GetRootNodesAsync();
-    //         return roots.Select(dto => ConvertToTreeItem(dto)).ToList();
-    //     }
-    //     else
-    //     {
-    //         // 加载指定节点的子节点
-    //         var children = await TreeClient.GetChildrenAsync(parent.Id);
-    //         return children.Select(dto => ConvertToTreeItem(dto)).ToList();
-    //     }
-    // }
 
     /// <summary>
     /// 将 TreeNodeDto 转换为 TreeItemData
@@ -134,8 +96,8 @@
     /// </summary>
     private async Task RefreshTree()
     {
-        if (_treeSky != null)
-            await _treeSky.RefreshAsync();
+        if (TreeSky != null)
+            await TreeSky.RefreshAsync();
         _selectedCategory = null;
     }
 
@@ -206,32 +168,5 @@
             Snackbar.Add($"分类“{node.Text()}”已删除", Severity.Success);
         }
     }
-
-    // /// <summary>
-    // /// 自定义节点模板（每个节点显示图标、文本和操作按钮）
-    // /// </summary>
-    @* private RenderFragment<ITreeItemData<CategoryTree>> ItemTemplate => (item) => @<div *@
-    @* style="display: flex; align-items: center; width: 100%; gap: 8px;"> *@
-    @*     <span style="flex: 1;"> *@
-    @*         @if (!string.IsNullOrEmpty(item.Icon)) *@
-    @*         { *@
-    @*             <MudIcon Icon="@item.Icon" Size="Size.Small" Class="mr-2"/> *@
-    @*         } *@
-    @*         @item.Text *@
-    @*     </span> *@
-    @*       <div *@
-    @*           style="display: flex; gap: 4px;"> *@
-    @*           <MudIconButton *@
-    @*               Icon="@Icons.Material.Filled.Add" *@
-    @*               Size="Size.Small" *@
-    @*               Color="Color.Success" *@
-    @*               OnClick="@(() => AddChildNode(item.Value))"/> *@
-    @*           <MudIconButton *@
-    @*               Icon="@Icons.Material.Filled.Delete" *@
-    @*               Size="Size.Small" *@
-    @*               Color="Color.Error" *@
-    @*               OnClick="@(() => DeleteNode(item.Value))"/> *@
-    @*       </div> *@
-    @*   </div>; *@
 
 }
