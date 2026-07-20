@@ -1,0 +1,79 @@
+@typeparam TItem where TItem : class, ITreeNode
+@implements IDisposable
+
+@* Title="确认删除" *@
+<MudDialog> 
+    <DialogContent>
+        <MudContainer Class="py-4">
+            <MudText>确定要删除节点 <strong>"@Node.Text()"</strong> 吗？</MudText>
+
+            @if (HasChildren)
+            {
+                <MudAlert Severity="Severity.Warning"
+                          Class="mt-4"
+                          Variant="Variant.Outlined">
+                    <MudText>该节点包含子节点，删除将同时移除所有子节点！</MudText>
+                </MudAlert>
+            }
+
+            <MudTextField T="string"
+                          @bind-Value="_confirmText"
+                          Label="请输入节点名称以确认删除"
+                          Variant="Variant.Outlined"
+                          Class="mt-4"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@_confirmIcon"
+                          AdornmentColor="@_confirmColor" />
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close"
+                   Variant="Variant.Text"
+                   Color="Color.Default">
+            取消
+        </MudButton>
+        <MudButton OnClick="ConfirmDelete"
+                   Variant="Variant.Filled"
+                   Color="Color.Error"
+                   Disabled="!CanDelete">
+            @if (_isDeleting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">删除中...</MudText>
+            }
+            else
+            {
+                <MudText>确认删除</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required TItem Node { get; set; }
+    [Parameter] public bool HasChildren { get; set; }
+
+    private string _confirmText = string.Empty;
+    private bool _isDeleting = false;
+
+    private bool CanDelete => _confirmText.Trim() == Node.Text().Trim();
+    private string _confirmIcon => CanDelete ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error;
+    private Color _confirmColor => CanDelete ? Color.Success : Color.Error;
+
+    private void ConfirmDelete()
+    {
+        if (!CanDelete) return;
+        MudDialog?.Close(DialogResult.Ok(true));
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    public void Dispose()
+    {
+    }
+}

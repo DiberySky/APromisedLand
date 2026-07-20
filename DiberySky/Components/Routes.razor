@@ -55,11 +55,6 @@
 </CascadingAuthenticationState>
 
 @code {
-    IEnumerable<Assembly> PageAssemblies { get; set; } = [
-        typeof(APromisedLand.Razor.Pages.TestingPage).Assembly,
-        typeof(TreePage).Assembly,
-    ];
-    
     private void SignInHandler()
     {
         Navigater.NavigateTo(SolutionService.SignInPage);

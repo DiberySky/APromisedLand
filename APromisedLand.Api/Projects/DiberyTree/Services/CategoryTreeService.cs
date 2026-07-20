@@ -27,6 +27,7 @@ public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<Categor
         {
             roots = await dbContext.CategoryTrees
                 .Where(c => c.ParentId == null)
+                .OrderBy(c => c.SortOrder)
                 .Select(c => c.ToNodeDto())
                 .ToListAsync(cancellationToken);
         }
@@ -58,6 +59,7 @@ public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<Categor
     {
         var children = await dbContext.CategoryTrees
             .Where(c => c.ParentId == parentId)
+            .OrderBy(c => c.SortOrder)
             .Select(c => c.ToNodeDto())
             .ToListAsync(cancellationToken);
 
@@ -70,6 +72,7 @@ public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<Categor
 
             var grandson = await dbContext.CategoryTrees
                 .Where(c => c.ParentId == child.Id)
+                .OrderBy(c => c.SortOrder)
                 .Select(c => c.ToNodeDto())
                 .ToListAsync(cancellationToken);
 
@@ -97,18 +100,21 @@ public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<Categor
             query = query.Where(c => c.HasChildren);
 
         var result = await query
+            .OrderBy(c => c.SortOrder)
             .Skip((queryParams.Page - 1) * queryParams.PageSize)
             .Take(queryParams.PageSize)
             .Select(c => c.ToNodeDto())
             .ToListAsync(cancellationToken);
         return result;
     }
-    
+
     public async Task<TreeNodeDto<CategoryTree>?> GetFullTreeAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
     {
         // 1. 加载所有节点到内存
-        var allNodes = await dbContext.CategoryTrees.ToListAsync(cancellationToken);
+        var allNodes = await dbContext.CategoryTrees
+            .OrderBy(c => c.SortOrder)
+            .ToListAsync(cancellationToken);
         if (allNodes.Count == 0)
             return null;
 
@@ -138,18 +144,21 @@ public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<Categor
             }
         }
 
-        // 4. 递归构建 DTO 树
+        // 4. 递归构建 DTO 树，并对子节点排序
         TreeNodeDto<CategoryTree> BuildDto(CategoryTree entity)
         {
             var dto = entity.ToNodeDto();
             if (entity.Children != null && entity.Children.Any())
             {
-                dto.Children = entity.Children.Select(child => BuildDto(child)).ToList();
+                dto.Children = entity.Children
+                    .OrderBy(c => c.SortOrder)
+                    .Select(child => BuildDto(child))
+                    .ToList();
                 dto.HasChildren = true;
             }
             else
             {
-                dto.HasChildren = false; // 也可直接使用 entity.HasChildren，但实体中 HasChildren 标记了 NotMapped，我们以实际子节点为准
+                dto.HasChildren = false;
             }
 
             return dto;
@@ -167,6 +176,7 @@ public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<Categor
             Id = nodeDto.Id ?? Guid.NewGuid().ToString(),
             Name = nodeDto.Text ?? string.Empty,
             ParentId = nodeDto.ParentId,
+            SortOrder = nodeDto.SortOrder,
             HasChildren = false
         };
 
@@ -193,6 +203,7 @@ public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<Categor
             throw new KeyNotFoundException($"节点 {nodeDto.Id} 不存在");
 
         entity.Name = nodeDto.Text ?? entity.Name;
+        entity.SortOrder = nodeDto.SortOrder;
         // 不在此修改 ParentId，请使用 MoveNodeAsync
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -201,33 +212,37 @@ public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<Categor
 
     public async Task<bool> DeleteNodeAsync(string nodeId, CancellationToken cancellationToken = default)
     {
-        // 使用 CTE 递归删除整个子树
-        var sql = @"
-            WITH RECURSIVE to_delete AS (
-                SELECT id FROM ""CategoryTrees"" WHERE id = @nodeId
-                UNION ALL
-                SELECT c.id FROM ""CategoryTrees"" c
-                INNER JOIN to_delete td ON c.""ParentId"" = td.id
-            )
-            DELETE FROM ""CategoryTrees"" WHERE id IN (SELECT id FROM to_delete);";
+        // 1. 查找节点
+        var node = await dbContext.CategoryTrees
+            .FirstOrDefaultAsync(c => c.Id == nodeId, cancellationToken);
 
-        var param = new NpgsqlParameter("@nodeId", nodeId);
-        var affected = await dbContext.Database.ExecuteSqlRawAsync(sql, param, cancellationToken);
-        if (affected == 0)
+        if (node == null)
             return false;
 
-        // 更新父节点的 HasChildren（如果存在）
-        var parentId = await dbContext.CategoryTrees
-            .Where(c => c.Id == nodeId)
-            .Select(c => c.ParentId)
-            .FirstOrDefaultAsync(cancellationToken);
+        // 2. 检查是否为叶子节点（没有子节点）
+        var hasChildren = await dbContext.CategoryTrees
+            .AnyAsync(c => c.ParentId == nodeId, cancellationToken);
+
+        if (hasChildren)
+            throw new InvalidOperationException("只能删除叶子节点，请先删除子节点");
+
+        // 3. 获取父节点ID
+        var parentId = node.ParentId;
+
+        // 4. 删除节点
+        dbContext.CategoryTrees.Remove(node);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        // 5. 更新父节点的 HasChildren
         if (!string.IsNullOrEmpty(parentId))
         {
-            var hasChildren = await dbContext.CategoryTrees
+            var parentStillHasChildren = await dbContext.CategoryTrees
                 .AnyAsync(c => c.ParentId == parentId, cancellationToken);
-            if (!hasChildren)
+
+            if (!parentStillHasChildren)
             {
-                var parent = await dbContext.CategoryTrees.FindAsync(new object[] { parentId }, cancellationToken);
+                var parent = await dbContext.CategoryTrees
+                    .FindAsync(new object[] { parentId }, cancellationToken);
                 if (parent != null)
                 {
                     parent.HasChildren = false;
@@ -307,5 +322,66 @@ public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<Categor
             .SqlQueryRaw<bool>(sql, param1, param2)
             .FirstOrDefaultAsync(cancellationToken);
         return exists;
+    }
+
+    /// <summary>
+    /// 优化版：减少内存占用（逐层查询）
+    /// 如果树很深，不需要加载全部节点：
+    /// 
+    /// 方案	   查询次数	        内存占用	适用场景
+    /// 逐层查询	N 次（路径深度）	1 个节点	节点数很大、树很深
+    /// </summary>
+    /// <param name="nodeId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task<IReadOnlyList<string>> GetAncestorPathAsync(string nodeId, CancellationToken cancellationToken = default)
+    {
+        var path = new List<string>();
+        var currentId = nodeId;
+
+        while (!string.IsNullOrEmpty(currentId))
+        {
+            // 只查当前节点
+            var node = await dbContext.CategoryTrees
+                .Where(c => c.Id == currentId)
+                .Select(c => new { c.Id, c.ParentId })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (node == null) break;
+
+            path.Insert(0, node.Id);
+            currentId = node.ParentId;
+        }
+
+        return path.AsReadOnly();
+    }
+
+    /// <summary>
+    /// 方案	        查询次数	内存占用	适用场景
+    /// 一次加载全部	1 次	全部节点	节点数 < 1万
+    /// </summary>
+    /// <param name="nodeId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task<IReadOnlyList<string>> GetAncestorPathAsyncAll(string nodeId, CancellationToken cancellationToken = default)
+    {
+        var path = new List<string>();
+        var currentId = nodeId;
+
+        while (!string.IsNullOrEmpty(currentId))
+        {
+            // 只查当前节点
+            var node = await dbContext.CategoryTrees
+                .Where(c => c.Id == currentId)
+                .Select(c => new { c.Id, c.ParentId })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (node == null) break;
+
+            path.Insert(0, node.Id);
+            currentId = node.ParentId;
+        }
+
+        return path.AsReadOnly();
     }
 }

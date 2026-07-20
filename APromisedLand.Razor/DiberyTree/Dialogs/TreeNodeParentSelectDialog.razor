@@ -1,0 +1,242 @@
+@typeparam TItem where TItem : class, ITreeNode
+@using APromisedLand.Razor.DiberyTree.Models
+@implements IDisposable
+
+ @* Title="选择父节点" *@
+<MudDialog> 
+    <DialogContent>
+        <MudContainer Class="py-2" Style="min-height: 300px; max-height: 500px; overflow-y: auto;">
+            <MudAlert Severity="Severity.Info"
+                      Dense="true"
+                      Class="mb-2"
+                      ShowCloseIcon="false">
+                当前选中: <strong>@SelectedName</strong>
+                @if (SelectedParent == null)
+                {
+                    <MudText Inline="true" Color="Color.Secondary">(根节点)</MudText>
+                }
+            </MudAlert>
+
+            <MudTextField T="string"
+                          @bind-Value="_searchText"
+                          Label="搜索节点"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Class="mb-2"
+                          Clearable="true"
+                          DebounceInterval="300"
+                          OnDebounceIntervalElapsed="OnSearchAsync" />
+
+            @if (_isLoading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_filteredItems?.Any() != true && !string.IsNullOrEmpty(_searchText))
+            {
+                <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
+                    未找到匹配的节点
+                </MudText>
+            }
+            else
+            {
+                <MudTreeView T="TItem"
+                             @bind-SelectedValue="_selectedValue"
+                             SelectionMode="SelectionMode.SingleSelection"
+                             ExpandOnClick="true">
+                    @RenderTreeItems(_filteredItems ?? _treeItems)
+                </MudTreeView>
+            }
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close"
+                   Variant="Variant.Text"
+                   Color="Color.Default">
+            取消
+        </MudButton>
+        <MudButton OnClick="ConfirmSelection"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="!CanConfirm">
+            确认选择
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required List<TItem> TreeItems { get; set; }
+    [Parameter] public TItem? CurrentNode { get; set; }
+    [Parameter] public TItem? CurrentParent { get; set; }
+    [Parameter] public bool AllowRootSelection { get; set; } = true;
+    [Parameter] public Func<TItem, bool>? CanSelectNode { get; set; }
+
+    private string _searchText = string.Empty;
+    private bool _isLoading = false;
+
+    private List<TItem> _treeItems = new();
+    private List<TItem>? _filteredItems;
+    private TItem? _selectedValue;
+    private TItem? SelectedParent => _selectedValue;
+
+    private string SelectedName => SelectedParent?.Text() ?? CurrentParent?.Text() ?? "根节点";
+    private bool CanConfirm => _selectedValue != null || AllowRootSelection;
+
+    protected override void OnInitialized()
+    {
+        _treeItems = TreeItems.ToList();
+        _selectedValue = CurrentParent;
+        base.OnInitialized();
+    }
+
+    private RenderFragment RenderTreeItems(List<TItem> items)
+    {
+        return builder =>
+        {
+            foreach (var item in items)
+            {
+                var isDisabled = IsNodeDisabled(item);
+                var isSelected = item.Id == _selectedValue?.Id;
+
+                builder.OpenComponent<MudTreeViewItem<TItem>>(0);
+                builder.AddAttribute(1, "Value", item);
+                builder.AddAttribute(2, "Text", item.Text());
+                builder.AddAttribute(3, "Icon", GetNodeIcon(item, isSelected));
+                builder.AddAttribute(4, "IconColor", GetNodeColor(item, isSelected));
+                builder.AddAttribute(5, "Disabled", isDisabled);
+                builder.AddAttribute(6, "OnClick", EventCallback.Factory.Create<TItem>(this, OnNodeClick));
+
+                // 递归渲染子节点
+                var children = GetChildren(item);
+                if (children.Any())
+                {
+                    builder.AddAttribute(7, "ChildContent", RenderTreeItems(children));
+                }
+
+                builder.CloseComponent();
+            }
+        };
+    }
+
+    private void OnNodeClick(TItem node)
+    {
+        if (IsNodeDisabled(node)) return;
+        _selectedValue = node;
+        StateHasChanged();
+    }
+
+    private bool IsNodeDisabled(TItem node)
+    {
+        if (CurrentNode != null && IsDescendantOrSelf(node, CurrentNode))
+            return true;
+
+        if (CanSelectNode != null && !CanSelectNode(node))
+            return true;
+
+        return false;
+    }
+
+    private bool IsDescendantOrSelf(TItem node, TItem target)
+    {
+        if (node.Id == target.Id) return true;
+
+        var children = GetChildren(node);
+        if (!children.Any()) return false;
+
+        foreach (var child in children)
+        {
+            if (IsDescendantOrSelf(child, target))
+                return true;
+        }
+
+        return false;
+    }
+
+    private List<TItem> GetChildren(TItem node)
+    {
+        // 通过反射获取 Children 属性
+        var childrenProperty = node.GetType().GetProperty("Children");
+        if (childrenProperty == null) return new List<TItem>();
+
+        var children = childrenProperty.GetValue(node) as IEnumerable<object>;
+        if (children == null) return new List<TItem>();
+
+        return children.OfType<TItem>().ToList();
+    }
+
+    private string GetNodeIcon(TItem node, bool isSelected)
+    {
+        if (isSelected) return Icons.Material.Filled.CheckCircle;
+        if (GetChildren(node).Any() || node.HasChildren) return Icons.Material.Filled.Folder;
+        return Icons.Material.Filled.InsertDriveFile;
+    }
+
+    private Color GetNodeColor(TItem node, bool isSelected)
+    {
+        if (isSelected) return Color.Primary;
+        if (IsNodeDisabled(node)) return Color.Default;
+        return Color.Inherit;
+    }
+
+    private async Task OnSearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            _filteredItems = null;
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+
+        await Task.Delay(100);
+
+        var keyword = _searchText.ToLowerInvariant();
+        var matchedIds = _treeItems
+            .Where(n => n.Text().ToLowerInvariant().Contains(keyword))
+            .Select(n => n.Id)
+            .ToHashSet();
+
+        var result = new HashSet<string>();
+        foreach (var id in matchedIds)
+        {
+            AddWithAncestors(id, result);
+        }
+
+        _filteredItems = _treeItems.Where(n => result.Contains(n.Id)).ToList();
+
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private void AddWithAncestors(string nodeId, HashSet<string> result)
+    {
+        result.Add(nodeId);
+        var node = _treeItems.FirstOrDefault(n => n.Id == nodeId);
+        if (node?.ParentId != null)
+        {
+            AddWithAncestors(node.ParentId, result);
+        }
+    }
+
+    private void ConfirmSelection()
+    {
+        var result = new ParentSelectResult<TItem>
+        {
+            IsConfirmed = true,
+            SelectedParent = SelectedParent
+        };
+        MudDialog?.Close(DialogResult.Ok(result));
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    public void Dispose()
+    {
+    }
+}

@@ -11,8 +11,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(TreeDbContext))]
-    [Migration("20260716220814_SampleSeeds")]
-    partial class SampleSeeds
+    [Migration("20260720220557_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -30,7 +30,14 @@ namespace APromisedLand.Api.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
 
-                    b.Property<bool>("HasChildren")
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
@@ -42,6 +49,9 @@ namespace APromisedLand.Api.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
 
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ParentId");
@@ -52,78 +62,111 @@ namespace APromisedLand.Api.Data.Migrations
                         new
                         {
                             Id = "55705350-7071-43A4-AFAF-2F30B3CE2718",
-                            HasChildren = false,
-                            Name = "Sample Root"
+                            Description = "根分类示例",
+                            IsActive = true,
+                            IsArchived = false,
+                            Name = "Sample Root",
+                            SortOrder = 0
                         },
                         new
                         {
                             Id = "39EA6315-0A74-40F6-A096-8E15CCC98579",
-                            HasChildren = false,
+                            Description = "子分类 1",
+                            IsActive = true,
+                            IsArchived = false,
                             Name = "Sample 1",
-                            ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718"
+                            ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718",
+                            SortOrder = 1
                         },
                         new
                         {
                             Id = "C1EBEE10-97F6-44C8-9852-2F574515BF51",
-                            HasChildren = false,
+                            Description = "子分类 1.1",
+                            IsActive = true,
+                            IsArchived = false,
                             Name = "Sample 1.1",
-                            ParentId = "39EA6315-0A74-40F6-A096-8E15CCC98579"
+                            ParentId = "39EA6315-0A74-40F6-A096-8E15CCC98579",
+                            SortOrder = 0
                         },
                         new
                         {
                             Id = "C8969ED0-C018-4FDC-AE55-C363BD95C853",
-                            HasChildren = false,
+                            Description = "子分类 2",
+                            IsActive = true,
+                            IsArchived = false,
                             Name = "Sample 2",
-                            ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718"
+                            ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718",
+                            SortOrder = 2
                         },
                         new
                         {
                             Id = "ED0990CF-5BB7-4C36-A3BB-3AF606AD1974",
-                            HasChildren = false,
+                            Description = "子分类 2.1",
+                            IsActive = true,
+                            IsArchived = false,
                             Name = "Sample 2.1",
-                            ParentId = "C8969ED0-C018-4FDC-AE55-C363BD95C853"
+                            ParentId = "C8969ED0-C018-4FDC-AE55-C363BD95C853",
+                            SortOrder = 0
                         },
                         new
                         {
                             Id = "975599CC-B967-4AD2-B4B8-9E00D889FB4D",
-                            HasChildren = false,
+                            Description = "子分类 2.2 [Archived]",
+                            IsActive = false,
+                            IsArchived = true,
                             Name = "Sample 2.2",
-                            ParentId = "C8969ED0-C018-4FDC-AE55-C363BD95C853"
+                            ParentId = "C8969ED0-C018-4FDC-AE55-C363BD95C853",
+                            SortOrder = 1
                         },
                         new
                         {
                             Id = "27EE32B0-0F30-4331-AA85-61457B7A0912",
-                            HasChildren = false,
+                            Description = "子分类 3",
+                            IsActive = true,
+                            IsArchived = false,
                             Name = "Sample 3",
-                            ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718"
+                            ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718",
+                            SortOrder = 3
                         },
                         new
                         {
                             Id = "8E971C0E-B99A-4931-AFD6-46E44D6ECE5A",
-                            HasChildren = false,
+                            Description = "子分类 3.1",
+                            IsActive = true,
+                            IsArchived = false,
                             Name = "Sample 3.1",
-                            ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912"
+                            ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912",
+                            SortOrder = 0
                         },
                         new
                         {
                             Id = "5C30BACA-3C11-4677-8123-8EC2BE729667",
-                            HasChildren = false,
+                            Description = "子分类 3.2",
+                            IsActive = true,
+                            IsArchived = false,
                             Name = "Sample 3.2",
-                            ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912"
+                            ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912",
+                            SortOrder = 1
                         },
                         new
                         {
                             Id = "1B16336D-FB7F-42AA-AFD2-F78388883336",
-                            HasChildren = false,
+                            Description = "子分类 3.3",
+                            IsActive = true,
+                            IsArchived = false,
                             Name = "Sample 3.3",
-                            ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912"
+                            ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912",
+                            SortOrder = 2
                         },
                         new
                         {
                             Id = "35F02829-6490-467E-9D3E-C2EBF0EAA2B4",
-                            HasChildren = false,
+                            Description = "子分类 3.3.1",
+                            IsActive = true,
+                            IsArchived = false,
                             Name = "Sample 3.3.1",
-                            ParentId = "1B16336D-FB7F-42AA-AFD2-F78388883336"
+                            ParentId = "1B16336D-FB7F-42AA-AFD2-F78388883336",
+                            SortOrder = 0
                         });
                 });
 

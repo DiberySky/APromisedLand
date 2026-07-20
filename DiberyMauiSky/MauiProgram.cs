@@ -2,6 +2,7 @@
 using APromisedLand.Maui.DiberyTree;
 using APromisedLand.Razor.DiberyTree;
 using APromisedLand.Razor.DiberyTree.Navigation;
+using APromisedLand.Razor.DiberyTree.Services;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs;
 using Microsoft.Extensions.Hosting;
@@ -31,6 +32,8 @@ namespace DiberyMauiSky
             builder.AddWeatherHttpClient();
             
             builder.Services.AddSingleton<ITreeNavigationHistoryService, TreeNavigationHistoryService>();
+            
+            builder.Services.AddScoped<TreeNodeDialogService<CategoryTree>>();
             
 #if DEBUG
     		builder.Services.AddBlazorWebViewDeveloperTools();

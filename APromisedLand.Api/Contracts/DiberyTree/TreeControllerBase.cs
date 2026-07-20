@@ -135,4 +135,20 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
             return BadRequest("移动失败，可能节点不存在或试图移动到自身子节点下");
         return Ok(true);
     }
+    
+    [HttpGet("{nodeId}/ancestors")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public virtual async Task<IActionResult> GetAncestorPath(string nodeId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(nodeId))
+            return BadRequest("节点 ID 不能为空");
+
+        var path = await TreeService.GetAncestorPathAsync(nodeId, cancellationToken);
+    
+        if (path.Count == 0)
+            return NotFound($"节点 '{nodeId}' 不存在");
+
+        return Ok(path);
+    }
 }

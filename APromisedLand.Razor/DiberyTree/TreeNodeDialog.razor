@@ -1,0 +1,126 @@
+@typeparam TItem where TItem : class, ITreeNode
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@GetModeIcon()" Class="mr-2" />
+            @Title
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudContainer Class="pa-0">
+            @if (Mode == NodeDialogMode.Delete)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    确定要删除 <strong>@ResolveNodeName()</strong> 吗？
+                    @if (HasChildren)
+                    {
+                        <div class="mt-1">该节点包含子节点，删除后将一并移除。</div>
+                    }
+                </MudAlert>
+            }
+            else if (Mode == NodeDialogMode.View)
+            {
+                @ViewContent
+            }
+            else
+            {
+                @FormContent
+            }
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">@CancelText</MudButton>
+
+        @if (Mode != NodeDialogMode.View && Mode != NodeDialogMode.Delete)
+        {
+            <MudButton Color="Color.Primary" 
+                       Variant="Variant.Filled"
+                       OnClick="SubmitAsync"
+                       Disabled="!IsValid()">
+                @ConfirmText
+            </MudButton>
+        }
+        else if (Mode == NodeDialogMode.Delete)
+        {
+            <MudButton Color="Color.Error" 
+                       Variant="Variant.Filled"
+                       OnClick="SubmitAsync">
+                @ConfirmText
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>对话框模式</summary>
+    [Parameter] public NodeDialogMode Mode { get; set; } = NodeDialogMode.View;
+
+    /// <summary>当前节点（编辑/查看/删除时用）</summary>
+    [Parameter] public TItem? Node { get; set; }
+
+    /// <summary>父节点（创建子节点时用）</summary>
+    [Parameter] public TItem? ParentNode { get; set; }
+
+    /// <summary>对话框标题</summary>
+    [Parameter] public string Title { get; set; } = "节点操作";
+
+    /// <summary>是否有子节点（删除确认用）</summary>
+    [Parameter] public bool HasChildren { get; set; }
+
+    /// <summary>获取节点显示名称的委托</summary>
+    [Parameter] public Func<TItem?, string> ResolveName { get; set; } = n => n?.ToString() ?? "";
+
+    /// <summary>表单验证委托</summary>
+    [Parameter] public Func<bool> IsValid { get; set; } = () => true;
+
+    /// <summary>提交处理委托，返回结果对象</summary>
+    [Parameter] public Func<Task<TreeNodeDialogResult<TItem>?>>? OnSubmit { get; set; }
+
+    /// <summary>表单内容（创建/编辑模式）</summary>
+    [Parameter] public RenderFragment? FormContent { get; set; }
+
+    /// <summary>查看内容（浏览模式）</summary>
+    [Parameter] public RenderFragment? ViewContent { get; set; }
+
+    /// <summary>取消按钮文本</summary>
+    [Parameter] public string CancelText { get; set; } = "取消";
+
+    /// <summary>确认按钮文本</summary>
+    [Parameter] public string ConfirmText { get; set; } = "确认";
+
+    private string ResolveNodeName() => ResolveName(Node);
+
+    private string GetModeIcon() => Mode switch
+    {
+        NodeDialogMode.Create => Icons.Material.Filled.AddCircle,
+        NodeDialogMode.Edit => Icons.Material.Filled.Edit,
+        NodeDialogMode.View => Icons.Material.Filled.Visibility,
+        NodeDialogMode.Delete => Icons.Material.Filled.Delete,
+        _ => Icons.Material.Filled.Help
+    };
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        if (OnSubmit != null)
+        {
+            var result = await OnSubmit();
+            if (result != null)
+            {
+                MudDialog.Close(DialogResult.Ok(result));
+                return;
+            }
+        }
+
+        MudDialog.Close(DialogResult.Ok(new TreeNodeDialogResult<TItem>
+        {
+            Mode = Mode,
+            Node = Node,
+            ParentNode = ParentNode
+        }));
+    }
+}

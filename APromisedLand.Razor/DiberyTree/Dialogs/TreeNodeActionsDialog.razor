@@ -1,0 +1,122 @@
+@typeparam TItem where TItem : class, ITreeNode
+@using APromisedLand.Razor.DiberyTree.Enums
+@using APromisedLand.Razor.DiberyTree.Models
+@implements IDisposable
+
+@* Title="@TitleText" *@
+<MudDialog> 
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Small">
+            <MudStack Spacing="2">
+                <MudTextField T="string"
+                              Value="Node.Id"
+                              Label="ID"
+                              Variant="Variant.Text"
+                              ReadOnly="true" />
+
+                <MudTextField T="string"
+                              Value="Node.Text()"
+                              Label="名称"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true" />
+
+                <MudTextField T="string"
+                              Value="Node.Description"
+                              Label="描述"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true"
+                              Lines="2" />
+
+                <MudTextField T="string"
+                              Value="ParentName"
+                              Label="父分类"
+                              Variant="Variant.Text"
+                              ReadOnly="true" />
+
+                <MudSwitch T="bool"
+                           Value="Node.IsActive"
+                           Label="状态"
+                           Color="Color.Primary"
+                           ReadOnly="true" />
+            </MudStack>
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudSpacer />
+
+        <MudButton OnClick="OnAddChild"
+                   Variant="Variant.Filled"
+                   Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.Add">
+            创建子项
+        </MudButton>
+
+        <MudButton OnClick="OnEdit"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Edit">
+            修改
+        </MudButton>
+
+        @if (IsLeaf)
+        {
+            <MudButton OnClick="OnDelete"
+                       Variant="Variant.Filled"
+                       Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.Delete">
+                删除
+            </MudButton>
+        }
+
+        <MudButton OnClick="Close"
+                   Variant="Variant.Text"
+                   Color="Color.Default">
+            关闭
+        </MudButton>
+        <MudSpacer />
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required TItem Node { get; set; }
+    [Parameter] public TItem? ParentNode { get; set; }
+    [Parameter] public bool IsLeaf { get; set; }
+
+    private string TitleText => $"节点: {Node.Text()}";
+    private string ParentName => ParentNode?.Text() ?? "根分类";
+
+    private void OnAddChild()
+    {
+        CloseWithAction(NodeAction.AddChild);
+    }
+
+    private void OnEdit()
+    {
+        CloseWithAction(NodeAction.Edit);
+    }
+
+    private void OnDelete()
+    {
+        CloseWithAction(NodeAction.Delete);
+    }
+
+    private void CloseWithAction(NodeAction action)
+    {
+        MudDialog?.Close(DialogResult.Ok(new NodeActionResult<TItem>
+        {
+            Action = action,
+            Node = Node
+        }));
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    public void Dispose()
+    {
+    }
+}

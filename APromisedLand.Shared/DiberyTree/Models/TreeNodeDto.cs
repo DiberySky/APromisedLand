@@ -25,6 +25,9 @@ public class TreeNodeDto<T>
     /// 显示文本
     /// </summary>
     public string? Text { get; set; }
+    
+    /// <summary>排序序号，数值越小排序越靠前</summary>
+    public int SortOrder { get; set; } = 0;
 
     /// <summary>
     /// 图标

@@ -1,0 +1,39 @@
+@page "/category-tree"
+@page "/category-tree/root"
+@page "/category-tree/rootId/{RootId}"
+@page "/category-tree/ClickNodeId/{ClickNodeId}"
+@page "/category-tree/rootId/{RootId}/ClickNodeId/{ClickNodeId}"
+
+@* @inject DiberyTreeApiClient<CategoryTree> TreeClient *@
+@* @inject IDialogService DialogService *@
+@* @inject NavigationManager NavigationManager *@
+
+<MudMainContent>
+    <ChildContent>
+        <MudContainer MaxWidth="MaxWidth.Small">
+            <MudPaper Class="pa-4" Elevation="2">
+                <!-- 工具栏 -->
+                <MudToolBar Dense="true" Class="mb-2">
+                    <MudText Typo="Typo.h6">分类树</MudText>
+                    <MudSpacer />
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                   OnClick="AddRootNodeAsync">添加根分类</MudIconButton>        
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                                   OnClick="RefreshTreeAsync">刷新</MudIconButton>
+                </MudToolBar>
+
+                <TreeSky TItem="CategoryTree"
+                         @ref="@_treeSky"
+                         RootId="@RootId"
+                         @bind-SelectedValue="_selectedCategory"
+                         ClickNodeId="@ClickNodeId"
+                         Page="category-tree"
+                         FunLoadInitialData="@LoadInitialDataAsync"
+                         FunLoadServerData="@LoadChildrenAsync"
+                         FunGetAncestorPath="@GetAncestorPathFromApiAsync"
+                         OnClickItem="@ClickItem"
+                         OnNodeAction="@HandleNodeActionAsync" />
+            </MudPaper>
+        </MudContainer>
+    </ChildContent>
+</MudMainContent>

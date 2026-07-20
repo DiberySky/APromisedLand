@@ -20,8 +20,8 @@ public class TreeDbContext(DbContextOptions<TreeDbContext> options) : DbContext(
                 .OnDelete(DeleteBehavior.Restrict); // 防止意外级联删除
         });
 
-        // 添加种子数据（调用 SampleData()）
-        modelBuilder.Entity<CategoryTree>().HasData(CategoryTree.SampleData());
+        // 使用 SeedData() 添加种子数据（纯扁平数据，不包含导航属性）
+        modelBuilder.Entity<CategoryTree>().HasData(CategoryTree.SeedData());
 
         base.OnModelCreating(modelBuilder);
     }

@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.3.0" />
@@ -26,6 +27,21 @@
 
   <ItemGroup>
     <Compile Remove="DiberyTree\TreePage.razor.cs" />
+    <Compile Remove="DiberyTree\Dialogs\CategoryTreeDialog.razor.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="DiberyTree\Dialogs\CategoryTreeDialog.razor" />
+    <Content Remove="DiberyTree\Dialogs\CategoryTreeDeleteDialog.razor" />
+    <Content Remove="DiberyTree\Dialogs\CategoryTreeSelectDialog.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="DiberyTree\Enums\" />
+    <Folder Include="DiberyTree\Helpers\" />
+    <Folder Include="DiberyTree\Interfaces\" />
+    <Folder Include="DiberyTree\Models\" />
+    <Folder Include="DiberyTree\Services\" />
   </ItemGroup>
   
 </Project>

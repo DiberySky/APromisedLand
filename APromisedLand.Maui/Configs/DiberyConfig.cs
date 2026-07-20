@@ -1,5 +1,6 @@
 using APromisedLand.Maui.Authentication;
 using APromisedLand.Razor.Services;
+using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Interfaces;
 using APromisedLand.Shared.Services.Solution;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -19,9 +20,9 @@ public static class DiberyConfig
 
             builder.Services.AddScoped<BlazorService>();
             builder.Services.AddScoped<SolutionService>();
-        
+
             builder.AddPlatformInfo();
-        
+
             builder.AddAuthenticationServices();
             builder.AddKeycloakClient();
         }
@@ -43,6 +44,11 @@ public static class DiberyConfig
 
             // 注册 HttpClient 并添加自动附加令牌的处理程序
             builder.Services.AddScoped<JwtAuthorizationMessageHandler>();
+            
+            // 新增：树节点权限处理器
+            // builder.Services.AddScoped<
+            //     ITreeNodeAuthorizationHandler<CategoryTree>,
+            //     KeycloakTreeNodeAuthorizationHandler<CategoryTree>>();
         }
 
         public void AddMudBlazorServices()
@@ -65,7 +71,7 @@ public static class DiberyConfig
         {
             var keyCloakHttpsBaseUrl = builder.Configuration["services:Keycloak:https:0"];
             if (keyCloakHttpsBaseUrl is null) keyCloakHttpsBaseUrl = SolutionService.KeyCloakHttpsBaseUrl;
-        
+
             // RefreshClient
             builder.Services.AddHttpClient("RefreshClient", client =>
                 {

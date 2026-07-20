@@ -53,6 +53,22 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     }
 
     /// <summary>
+    /// 获取从根节点到指定节点的祖先路径
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetAncestorPathAsync(string nodeId,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            $"{_basePath}/{Uri.EscapeDataString(nodeId)}/ancestors", 
+            cancellationToken);
+        
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<string>>(
+                   cancellationToken: cancellationToken)
+               ?? new List<string>();
+    }
+    
+    /// <summary>
     /// 条件查询节点（分页、搜索、过滤）
     /// </summary>
     public async Task<IReadOnlyList<TreeNodeDto<T>>> QueryNodesAsync(TreeQueryParams queryParams,

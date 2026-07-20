@@ -1,0 +1,265 @@
+using APromisedLand.Razor.DiberyTree.Dialogs;
+using APromisedLand.Razor.DiberyTree.Enums;
+using APromisedLand.Razor.DiberyTree.Models;
+using APromisedLand.Shared.DiberyTree.Interfaces;
+using MudBlazor;
+
+namespace APromisedLand.Razor.DiberyTree.Services;
+
+/// <summary>
+/// 树节点对话框服务
+/// </summary>
+/// <typeparam name="TItem">节点类型，必须实现 ITreeNode</typeparam>
+public class TreeNodeDialogService<TItem>(
+    IDialogService dialogService)
+    where TItem : class, ITreeNode, new()
+{
+    #region 操作选择对话框
+
+    public async Task<NodeActionResult<TItem>?> ShowActionsDialogAsync(
+        TItem node,
+        TItem? parentNode = null,
+        bool isLeaf = false,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Node", node },
+            { "ParentNode", parentNode },
+            { "IsLeaf", isLeaf }
+        };
+
+        var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
+        var dialog = await dialogService.ShowAsync<TreeNodeActionsDialog<TItem>>("节点操作", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
+            return null;
+
+        return actionResult;
+    }
+
+    #endregion
+
+    #region 查看详情对话框
+
+    public async Task<bool> ShowViewDialogAsync(
+        TItem node,
+        TItem? parentNode = null,
+        string? createdAt = null,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Node", node },
+            { "ParentNode", parentNode },
+            { "CreatedAt", createdAt }
+        };
+
+        var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
+        var dialog = await dialogService.ShowAsync<TreeNodeViewDialog<TItem>>("节点详情", parameters, options);
+
+        var result = await dialog.Result;
+        return result is { Canceled: false };
+    }
+
+    #endregion
+
+    #region 编辑/创建对话框
+
+    public async Task<TreeNodeFormModel?> ShowCreateDialogAsync(
+        TItem? parentNode = null,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Node", (TItem?)null },
+            { "ParentNode", parentNode },
+            { "IsCreate", true }
+        };
+
+        var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
+        var dialog = await dialogService.ShowAsync<TreeNodeEditDialog<TItem>>("创建节点", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not TreeNodeFormModel formModel)
+            return null;
+
+        return formModel;
+    }
+
+    public async Task<TreeNodeFormModel?> ShowEditDialogAsync(
+        TItem node,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Node", node },
+            { "IsCreate", false }
+        };
+
+        var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
+        var dialog = await dialogService.ShowAsync<TreeNodeEditDialog<TItem>>("编辑节点", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not TreeNodeFormModel formModel)
+            return null;
+
+        return formModel;
+    }
+
+    #endregion
+
+    #region 删除确认对话框
+
+    public async Task<bool> ShowDeleteDialogAsync(
+        TItem node,
+        bool hasChildren = false,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Node", node },
+            { "HasChildren", hasChildren }
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+            MaxWidth = MaxWidth.ExtraSmall,
+            CloseButton = false,
+            BackdropClick = false
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<TreeNodeDeleteDialog<TItem>>("确认删除", parameters, options);
+
+        var result = await dialog.Result;
+        return result is { Canceled: false };
+    }
+
+    #endregion
+
+    #region 父节点选择对话框
+
+    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(
+        List<TItem> treeItems,
+        TItem? currentNode = null,
+        TItem? currentParent = null,
+        bool allowRoot = true,
+        Func<TItem, bool>? canSelectNode = null,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { "TreeItems", treeItems },
+            { "CurrentNode", currentNode },
+            { "CurrentParent", currentParent },
+            { "AllowRootSelection", allowRoot },
+            { "CanSelectNode", canSelectNode }
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+            MaxWidth = MaxWidth.Medium,
+            CloseButton = true
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<TreeNodeParentSelectDialog<TItem>>(
+            "选择父节点", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not ParentSelectResult<TItem> selectResult)
+            return null;
+
+        return selectResult;
+    }
+
+    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(
+        TreeSky<TItem> treeSky,
+        TItem? currentNode = null,
+        TItem? currentParent = null,
+        bool allowRoot = true,
+        DialogConfig? config = null)
+    {
+        var allItems = await treeSky.GetAllNodesAsync();
+        return await ShowParentSelectDialogAsync(
+            allItems, currentNode, currentParent, allowRoot, null, config);
+    }
+
+    #endregion
+
+    #region 拖拽排序对话框
+
+    public async Task<SortResult<TItem>?> ShowSortDialogAsync(
+        List<TItem> treeItems,
+        bool allowHierarchyChange = true,
+        int maxDepth = 10,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { "TreeItems", treeItems },
+            { "AllowHierarchyChange", allowHierarchyChange },
+            { "MaxDepth", maxDepth }
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+            MaxWidth = MaxWidth.Large,
+            CloseButton = true,
+            BackdropClick = false
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<TreeNodeSortDialog<TItem>>(
+            "拖拽排序", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not SortResult<TItem> sortResult)
+            return null;
+
+        return sortResult;
+    }
+
+    public async Task<SortResult<TItem>?> ShowSortDialogAsync(
+        TreeSky<TItem> treeSky,
+        bool allowHierarchyChange = true,
+        int maxDepth = 10,
+        DialogConfig? config = null)
+    {
+        var allItems = await treeSky.GetAllNodesAsync();
+        return await ShowSortDialogAsync(allItems, allowHierarchyChange, maxDepth, config);
+    }
+
+    #endregion
+
+    #region 便捷方法
+
+    public async Task<NodeOperationOutcome<TItem>?> ExecuteNodeOperationAsync(
+        TItem node,
+        TItem? parentNode = null,
+        bool isLeaf = false)
+    {
+        var actionResult = await ShowActionsDialogAsync(node, parentNode, isLeaf);
+        if (actionResult == null)
+            return null;
+
+        return new NodeOperationOutcome<TItem>
+        {
+            Action = actionResult.Action,
+            Node = actionResult.Node
+        };
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// 节点操作执行结果
+/// </summary>
+public class NodeOperationOutcome<TItem> where TItem : class, ITreeNode
+{
+    /// <summary>用户选择的操作</summary>
+    public required NodeAction Action { get; set; }
+
+    /// <summary>目标节点</summary>
+    public required TItem Node { get; set; }
+}

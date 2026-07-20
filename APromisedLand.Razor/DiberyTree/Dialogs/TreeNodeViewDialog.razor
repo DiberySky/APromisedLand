@@ -1,0 +1,67 @@
+@typeparam TItem where TItem : class, ITreeNode
+@implements IDisposable
+
+ @* Title="节点详情" *@
+<MudDialog> 
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Small">
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudField Label="ID" Variant="Variant.Text">@Node.Id</MudField>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudField Label="名称" Variant="Variant.Outlined">@Node.Text()</MudField>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudField Label="描述" Variant="Variant.Outlined">
+                        @(Node.Description ?? "-")
+                    </MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="父分类" Variant="Variant.Text">@ParentName</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="状态" Variant="Variant.Text">
+                        <MudChip T="string"
+                                 Color="Node.IsActive ? Color.Success : Color.Default"
+                                 Size="Size.Small">
+                            @(Node.IsActive ? "启用" : "禁用")
+                        </MudChip>
+                    </MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="排序" Variant="Variant.Text">@Node.SortOrder</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="创建时间" Variant="Variant.Text">@(CreatedAt ?? "未知")</MudField>
+                </MudItem>
+            </MudGrid>
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary">
+            确定
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required TItem Node { get; set; }
+    [Parameter] public TItem? ParentNode { get; set; }
+    [Parameter] public string? CreatedAt { get; set; }
+
+    private string ParentName => ParentNode?.Text() ?? "根分类";
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Ok(true));
+    }
+
+    public void Dispose()
+    {
+    }
+}

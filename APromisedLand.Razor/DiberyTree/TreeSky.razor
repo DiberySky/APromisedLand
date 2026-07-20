@@ -2,8 +2,9 @@
 
 @typeparam TItem where TItem : class, ITreeNode
 
-@inject NavigationManager NavigationManager
 @inject ITreeNavigationHistoryService History
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageSky Title="Category Tree" BottomBarVisibled
          ArrowBackVisibled=@(History.Peek() != null)
@@ -42,7 +43,7 @@
                                 <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
                                                Size="Size.Small"
                                                Color="Color.Primary"
-                                               OnClick="@(() => OnMoreClick(node))"/>
+                                               OnClick="@(() => ShowNodeActionsAsync(context))"/>
                             </MudContainer>
                         </BodyContent>
                     </MudTreeViewItem>
@@ -53,19 +54,5 @@
 </PageSky>
 
 @code {
-    [Parameter] public required string? Page { get; set; }
-    [Parameter] public string? RootId { get; set; }
-    [Parameter] public string? ClickNodeId { get; set; }
-
-    [Parameter]
-    public Func<Task<IReadOnlyList<TreeNodeDto<TItem>>>>?
-        FunLoadInitialData { get; set; }
-
-    [Parameter]
-    public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>?
-        FunLoadServerData { get; set; }
-
-    [Parameter] public TItem? SelectedValue { get; set; }
-    [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
-    [Parameter] public EventCallback<ITreeItemData<TItem>> OnClickItem { get; set; }
+    
 }

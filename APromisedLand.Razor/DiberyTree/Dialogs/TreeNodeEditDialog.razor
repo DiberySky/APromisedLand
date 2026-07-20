@@ -1,0 +1,130 @@
+@typeparam TItem where TItem : class, ITreeNode, new()
+@using APromisedLand.Razor.DiberyTree.Models
+@implements IDisposable
+
+@* Title="@TitleText" *@
+<MudDialog> 
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Small">
+            <MudForm @ref="_form" Model="_model">
+                <MudStack Spacing="3">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Name"
+                                  Label="名称"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="名称不能为空"
+                                  MaxLength="100"
+                                  Counter="100"
+                                  Immediate="true" />
+
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Description"
+                                  Label="描述"
+                                  Variant="Variant.Outlined"
+                                  Lines="3"
+                                  MaxLength="500"
+                                  Counter="500"
+                                  Immediate="true" />
+
+                    <MudNumericField T="int"
+                                     @bind-Value="_model.SortOrder"
+                                     Label="排序"
+                                     Variant="Variant.Outlined"
+                                     Min="0"
+                                     Max="9999" />
+
+                    <MudSwitch T="bool"
+                               @bind-Value="_model.IsActive"
+                               Label="启用状态"
+                               Color="Color.Primary" />
+
+                    @if (ParentNode != null)
+                    {
+                        <MudTextField T="string"
+                                      Value="ParentNode.Text()"
+                                      Label="父分类"
+                                      Variant="Variant.Text"
+                                      ReadOnly="true"
+                                      Disabled="true" />
+                    }
+                </MudStack>
+            </MudForm>
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close"
+                   Variant="Variant.Text"
+                   Color="Color.Default">
+            取消
+        </MudButton>
+        <MudButton OnClick="SubmitAsync"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="_isSubmitting">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">保存中...</MudText>
+            }
+            else
+            {
+                <MudText>保存</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public TItem? Node { get; set; }
+    [Parameter] public TItem? ParentNode { get; set; }
+    [Parameter] public bool IsCreate { get; set; }
+
+    private MudForm _form = null!;
+    private TreeNodeFormModel _model = new();
+    private bool _isSubmitting = false;
+
+    private string TitleText => IsCreate ? "创建节点" : "编辑节点";
+
+    protected override void OnInitialized()
+    {
+        if (Node != null && !IsCreate)
+        {
+            _model = new TreeNodeFormModel
+            {
+                Name = Node.Text(),
+                Description = Node.Description,
+                SortOrder = Node.SortOrder,
+                IsActive = Node.IsActive
+            };
+        }
+        base.OnInitialized();
+    }
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _isSubmitting = true;
+        try
+        {
+            MudDialog?.Close(DialogResult.Ok(_model));
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    public void Dispose()
+    {
+    }
+}
