@@ -4,10 +4,77 @@
 @page "/category-tree/ClickNodeId/{ClickNodeId}"
 @page "/category-tree/rootId/{RootId}/ClickNodeId/{ClickNodeId}"
 
-@* @inject DiberyTreeApiClient<CategoryTree> TreeClient *@
-@* @inject IDialogService DialogService *@
-@* @inject NavigationManager NavigationManager *@
+@{
+    RenderFragment<CategoryTree> actionTemplate = (context) =>
+        @<div class="node-detail">
+            <MudTextField T="string"
+                          Value="@context.Text()"
+                          Label="名称"
+                          Variant="Variant.Outlined"
+                          ReadOnly="true" />
 
+            <MudTextField T="string"
+                          Value="@context.Description"
+                          Label="描述"
+                          Variant="Variant.Outlined"
+                          ReadOnly="true"
+                          Lines="3" />
+
+            <MudChip T="string"
+                     Color="@((context.IsActive ? Color.Success : Color.Error))"
+                     Size="Size.Small">
+                @(context.IsActive ? "已启用" : "已禁用")
+            </MudChip>
+        </div>;
+}
+
+@{
+    RenderFragment<CategoryTree> editTemplate = (context) =>
+        @<div class="node-detail">
+            <MudStack Spacing="3">
+                <MudTextField T="string"
+                              @bind-Value="context.Name"
+                              Label="名称"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="名称不能为空"
+                              MaxLength="100"
+                              Counter="100"
+                              Immediate="true" />
+
+                <MudTextField T="string"
+                              @bind-Value="context.Description"
+                              Label="描述"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              MaxLength="500"
+                              Counter="500"
+                              Immediate="true" />
+
+                @* <MudNumericField T="int" *@
+                @*                  @bind-Value="context.SortOrder" *@
+                @*                  Label="排序" *@
+                @*                  Variant="Variant.Outlined" *@
+                @*                  Min="0" *@
+                @*                  Max="9999" /> *@
+
+                <MudSwitch T="bool"
+                           @bind-Value="context.IsActive"
+                           Label="启用状态"
+                           Color="Color.Primary" />
+
+                @* @if (ParentNode != null) *@
+                @* { *@
+                @*     <MudTextField T="string" *@
+                @*                   Value="ParentNode.Text()" *@
+                @*                   Label="父分类" *@
+                @*                   Variant="Variant.Text" *@
+                @*                   ReadOnly="true" *@
+                @*                   Disabled="true" /> *@
+                @* } *@
+            </MudStack>
+        </div>;
+}
 <MudMainContent>
     <ChildContent>
         <MudContainer MaxWidth="MaxWidth.Small">
@@ -31,9 +98,12 @@
                          FunLoadInitialData="@LoadInitialDataAsync"
                          FunLoadServerData="@LoadChildrenAsync"
                          FunGetAncestorPath="@GetAncestorPathFromApiAsync"
-                         OnClickItem="@ClickItem"
-                         OnNodeAction="@HandleNodeActionAsync" />
+                         ActionTemplate="@actionTemplate"
+                         EditTemplate="@editTemplate"
+                         OnNodeAction="@HandleNodeActionAsync" 
+                         OnClickItem="@ClickItem"/>
             </MudPaper>
         </MudContainer>
     </ChildContent>
 </MudMainContent>
+

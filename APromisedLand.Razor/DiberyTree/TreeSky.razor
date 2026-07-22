@@ -1,6 +1,7 @@
+@using APromisedLand.Razor.DiberyTree.Models
 @using APromisedLand.Razor.DiberyTree.Navigation
 
-@typeparam TItem where TItem : class, ITreeNode
+@typeparam TItem where TItem : class, ITreeNode, new()
 
 @inject ITreeNavigationHistoryService History
 @inject IDialogService DialogService
@@ -54,5 +55,7 @@
 </PageSky>
 
 @code {
-    
+    [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
+
+    [Parameter] public RenderFragment<TItem>? EditTemplate { get; set; }
 }

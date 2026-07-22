@@ -1,5 +1,6 @@
 using APromisedLand.MauiBlazor.DiberyTree.Services;
 using APromisedLand.Razor.DiberyTree.Enums;
+using APromisedLand.Razor.DiberyTree.Models;
 using APromisedLand.Razor.DiberyTree.Services;
 using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.AspNetCore.Components;
@@ -26,7 +27,7 @@ public partial class CategoryTreePage : ComponentBase
     private TreeNodeDialogService<CategoryTree>? _nodeDialogService;
     private TreeNodeDialogService<CategoryTree> NodeDialogSvc =>
         _nodeDialogService ??= new TreeNodeDialogService<CategoryTree>(DialogService);
-
+    
     #region 事件处理
 
     private void ClickItem(ITreeItemData<CategoryTree>? node)
@@ -36,17 +37,17 @@ public partial class CategoryTreePage : ComponentBase
         NavigationManager.NavigateTo($"category-tree/rootId/{node.Value.Id}", forceLoad: true, replace: true);
     }
 
-    private async Task HandleNodeActionAsync(ITreeItemData<CategoryTree> node)
+    private async Task HandleNodeActionAsync(NodeTemplate<CategoryTree> nodeTemplate)
     {
-        if (node.Value == null) return;
+        if (nodeTemplate.Node.Value == null) return;
 
-        var parent = _treeSky?.GetParentNode(node.Value.Id);
-        var isLeaf = !(node.Children?.Count > 0 || node.Value.HasChildren);
+        var parent = _treeSky?.GetParentNode(nodeTemplate.Node.Value.Id);
+        var isLeaf = !(nodeTemplate.Node.Children?.Count > 0 || nodeTemplate.Node.Value.HasChildren);
 
-        var result = await NodeDialogSvc.ShowActionsDialogAsync(node.Value, parent, isLeaf);
+        var result = await NodeDialogSvc.ShowActionsDialogAsync(nodeTemplate, parent, isLeaf);
         if (result == null) return;
 
-        await ExecuteNodeActionAsync(result.Action, node, parent);
+        await ExecuteNodeActionAsync(result.Action, nodeTemplate.Node, parent);
     }
 
     private async Task ExecuteNodeActionAsync(NodeAction action, ITreeItemData<CategoryTree> node, CategoryTree? parent)
@@ -91,10 +92,11 @@ public partial class CategoryTreePage : ComponentBase
 
     private async Task HandleEditAsync(ITreeItemData<CategoryTree> node)
     {
-        var formModel = await NodeDialogSvc.ShowEditDialogAsync(node.Value!);
-        if (formModel == null) return;
-
-        node.Text = formModel.Name;
+        
+        // var formModel = await NodeDialogSvc.ShowEditDialogAsync(node.Value!);
+        // if (formModel == null) return;
+        //
+        // node.Text = formModel.Name;
         ShowSuccess("更新成功");
     }
 
@@ -156,7 +158,7 @@ public partial class CategoryTreePage : ComponentBase
 
         if (sortResult?.IsConfirmed != true) return;
 
-        if (!sortResult.HasOrderChanges && !sortResult.HasHierarchyChanges)
+        if (sortResult is { HasOrderChanges: false, HasHierarchyChanges: false })
         {
             Snackbar.Add("未做任何变更", Severity.Info);
             return;
@@ -220,4 +222,5 @@ public partial class CategoryTreePage : ComponentBase
     }
 
     #endregion
+    
 }

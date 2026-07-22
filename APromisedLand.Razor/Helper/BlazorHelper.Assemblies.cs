@@ -3,6 +3,7 @@ using APromisedLand.Razor.Components;
 using APromisedLand.Razor.Components.Layout;
 using APromisedLand.Razor.DiberyTree;
 using APromisedLand.Razor.DiberyTree.Category;
+using APromisedLand.Razor.DiberyTree.Pages;
 using APromisedLand.Razor.Pages;
 using APromisedLand.Razor.Weather;
 
@@ -12,6 +13,10 @@ public static partial class BlazorHelper
 {
     public static IEnumerable<Assembly> Pages { get; set; }=
     [
+        typeof(TreeImagePage).Assembly,
+        typeof(TreeVideoPage).Assembly,
+        typeof(TreeFilePage).Assembly,
+        typeof(TreeLocationPage).Assembly,
         typeof(NotFound).Assembly,
         typeof(StartPage).Assembly,
         typeof(StartPage).Assembly,

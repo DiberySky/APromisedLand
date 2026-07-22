@@ -11,7 +11,7 @@ public class DialogConfig
     public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
 
     /// <summary>是否显示关闭按钮</summary>
-    public bool CloseButton { get; set; } = true;
+    public bool CloseButton { get; set; } = false;
 
     /// <summary>点击背景是否关闭</summary>
     public bool BackdropClick { get; set; } = false;
@@ -19,6 +19,9 @@ public class DialogConfig
     /// <summary>是否全屏</summary>
     public bool FullScreen { get; set; } = false;
 
+    /// <summary>是否全屏</summary>
+    public bool FullWidth { get; set; } = true;
+    
     /// <summary>位置</summary>
     public DialogPosition Position { get; set; } = DialogPosition.Center;
 
@@ -29,6 +32,7 @@ public class DialogConfig
         CloseButton = CloseButton,
         BackdropClick = BackdropClick,
         FullScreen = FullScreen,
+        FullWidth = FullWidth,
         Position = Position
     };
 }

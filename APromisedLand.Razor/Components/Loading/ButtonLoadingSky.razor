@@ -6,12 +6,12 @@
            StartIcon="@StartIcon"
            Size=@Size Class="@Class"
            FullWidth="FullWidth"
-           OnClick="ProcessSomething"
+           OnClick="@ProcessSomething"
            Variant=Variant Color=Color>
     @if (_processing)
     {
         <MudProgressCircular Size=Size
-                             Indeterminate="true" Color=ProgressColor />
+                             Indeterminate="true" Color=ProgressColor/>
     }
     else
     {
@@ -19,7 +19,7 @@
     }
 </MudButton>
 
-    @code {
+@code {
     [Parameter] public string Text { get; set; } = "提交";
     [Parameter] public Color Color { get; set; } = Color.Default;
     [Parameter] public Size Size { get; set; } = Size.Small;
@@ -30,7 +30,7 @@
     [Parameter] public string? Class { get; set; }
     [Parameter] public string? EndIcon { get; set; }
     [Parameter] public string? StartIcon { get; set; }
-    [Parameter] public Color IconColor { get; set; } = Color.Default;
+    [Parameter] public Color IconColor { get; set; } = Color.Inherit;
 
     [Parameter] public Func<Task>? FuncClick { get; set; }
 
@@ -66,4 +66,5 @@
             StateHasChanged();
         }
     }
+
 }

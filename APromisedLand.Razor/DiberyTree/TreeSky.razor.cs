@@ -1,3 +1,7 @@
+using APromisedLand.MauiBlazor.DiberyTree.Services;
+using APromisedLand.Razor.DiberyTree.Enums;
+using APromisedLand.Razor.DiberyTree.Models;
+using APromisedLand.Razor.DiberyTree.Services;
 using APromisedLand.Razor.Helper;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
@@ -7,12 +11,17 @@ using MudBlazor;
 
 namespace APromisedLand.Razor.DiberyTree;
 
-public partial class TreeSky<TItem> where TItem : class, ITreeNode
+public partial class TreeSky<TItem> where TItem : class, ITreeNode, new()
 {
     private List<TreeItemData<TItem>>? _items;
     private bool _isLoading = true;
     private string? _lastClickNodeId;
     private string HighlightedText { get; set; } = string.Empty;
+
+    private TreeNodeDialogService<TItem>? _nodeDialogService;
+    private TreeNodeDialogService<TItem> NodeDialogSvc =>
+        _nodeDialogService ??= new TreeNodeDialogService<TItem>(DialogService);
+
 
     // ========== 参数 ==========
     [Parameter] public string? RootId { get; set; }
@@ -24,9 +33,10 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNode
     [Parameter] public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>? FunLoadServerData { get; set; }
     [Parameter] public Func<string, Task<List<string>?>>? FunGetAncestorPath { get; set; }
     [Parameter] public EventCallback<ITreeItemData<TItem>?> OnClickItem { get; set; }
-    [Parameter] public EventCallback<ITreeItemData<TItem>> OnNodeAction { get; set; }
+    [Parameter] public EventCallback<NodeTemplate<TItem>> OnNodeAction { get; set; }
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] private DiberyTreeApiClient<TItem> TreeClient { get; set; } = null!;
 
     // ========== 生命周期 ==========
     protected override async Task OnInitializedAsync()
@@ -115,12 +125,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNode
         SelectedValue = rootValue;
     }
 
-    // ========== 节点操作回调（由外部页面处理具体业务） ==========
-    private async Task ShowNodeActionsAsync(ITreeItemData<TItem> node)
-    {
-        if (node.Value == null) return;
-        await OnNodeAction.InvokeAsync(node);
-    }
+    
 
     // ========== 数据加载 ==========
     private async Task<List<TreeItemData<TItem>>> LoadInitialDataAsync()

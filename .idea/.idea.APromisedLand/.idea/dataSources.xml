@@ -51,5 +51,25 @@
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="Redis" uuid="4fb63cc8-276d-468c-9ae7-43059ff16a98">
+      <driver-ref>redis</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>jdbc.RedisDriver</jdbc-driver>
+      <jdbc-url>jdbc:redis://afZGb0DhJpbn1AEy9FH3yF@localhost:50681?ssl=true&amp;verifyServerCertificate=false</jdbc-url>
+      <jdbc-additional-properties>
+        <property name="aspireResourceId" value="Redis-wekcenss" />
+      </jdbc-additional-properties>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
+    <data-source source="LOCAL" name="Postgres" uuid="935cae94-d474-4540-a985-0b64913fc77d">
+      <driver-ref>postgresql</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
+      <jdbc-url>jdbc:postgresql://localhost:56422/?password=yTs%29%7B%7DDT*6V8c*YbSg7Qrb&amp;user=postgres</jdbc-url>
+      <jdbc-additional-properties>
+        <property name="aspireResourceId" value="Postgres-ydkxqmwc" />
+      </jdbc-additional-properties>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>

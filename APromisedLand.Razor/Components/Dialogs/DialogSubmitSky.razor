@@ -1,0 +1,37 @@
+<DialogSky TitleClass="@TitleClass"
+                  ContentClass="@ContentClass"
+                  ActionsClass="@ActionsClass">
+    <DialogContent>
+        @if (DialogContent != null)
+        {
+            @DialogContent
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (DialogActions != null)
+        {
+            @DialogActions
+        }
+        else
+        {
+            <ButtonLoadingSky Text="提交"
+                              Variant="Variant.Filled"
+                              Color="Color.Primary"
+                              StartIcon="@Icons.Material.Filled.SaveAs"
+                              OnClick=@(e => OnSubmitedClick.InvokeAsync(e)) />
+
+        }
+    </DialogActions>
+</DialogSky>
+
+@code {
+    [Parameter] public string TitleClass { get; set; } = "mud-theme-success";
+    [Parameter] public string ContentClass { get; set; } = "mud-theme-dark";
+    [Parameter] public string ActionsClass { get; set; } = "mud-theme-default";
+
+    [Parameter] public RenderFragment? DialogContent { get; set; }
+    [Parameter] public RenderFragment? DialogActions { get; set; }
+    
+    [Parameter] public EventCallback OnSubmitedClick { get; set; }
+
+}

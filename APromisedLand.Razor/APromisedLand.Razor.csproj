@@ -28,20 +28,31 @@
   <ItemGroup>
     <Compile Remove="DiberyTree\TreePage.razor.cs" />
     <Compile Remove="DiberyTree\Dialogs\CategoryTreeDialog.razor.cs" />
+    <Compile Update="DiberyTree\TreeSky.razor.Action.cs">
+      <DependentUpon>TreeSky.razor</DependentUpon>
+    </Compile>
+    <Compile Remove="Components\Dialogs\**" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Remove="DiberyTree\Dialogs\CategoryTreeDialog.razor" />
     <Content Remove="DiberyTree\Dialogs\CategoryTreeDeleteDialog.razor" />
     <Content Remove="DiberyTree\Dialogs\CategoryTreeSelectDialog.razor" />
+    <Content Remove="Components\Dialogs\**" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="DiberyTree\Enums\" />
     <Folder Include="DiberyTree\Helpers\" />
-    <Folder Include="DiberyTree\Interfaces\" />
-    <Folder Include="DiberyTree\Models\" />
     <Folder Include="DiberyTree\Services\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="Components\Dialogs\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Components\Dialogs\**" />
   </ItemGroup>
   
 </Project>

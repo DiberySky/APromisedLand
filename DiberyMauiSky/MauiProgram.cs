@@ -31,8 +31,6 @@ namespace DiberyMauiSky
             
             builder.AddWeatherHttpClient();
             
-            builder.Services.AddSingleton<ITreeNavigationHistoryService, TreeNavigationHistoryService>();
-            
             builder.Services.AddScoped<TreeNodeDialogService<CategoryTree>>();
             
 #if DEBUG

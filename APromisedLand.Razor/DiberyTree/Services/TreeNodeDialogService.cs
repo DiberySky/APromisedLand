@@ -1,5 +1,4 @@
 using APromisedLand.Razor.DiberyTree.Dialogs;
-using APromisedLand.Razor.DiberyTree.Enums;
 using APromisedLand.Razor.DiberyTree.Models;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using MudBlazor;
@@ -17,19 +16,23 @@ public class TreeNodeDialogService<TItem>(
     #region 操作选择对话框
 
     public async Task<NodeActionResult<TItem>?> ShowActionsDialogAsync(
-        TItem node,
+        NodeTemplate<TItem> nodeTemplate,
         TItem? parentNode = null,
         bool isLeaf = false,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters
         {
-            { "Node", node },
+            { "NodeTemplate", nodeTemplate },
             { "ParentNode", parentNode },
             { "IsLeaf", isLeaf }
         };
-
-        var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
+        
+        var options = (config ?? new DialogConfig
+        {
+            MaxWidth = MaxWidth.Small,
+        }).ToDialogOptions();
+        
         var dialog = await dialogService.ShowAsync<TreeNodeActionsDialog<TItem>>("节点操作", parameters, options);
 
         var result = await dialog.Result;
@@ -89,11 +92,13 @@ public class TreeNodeDialogService<TItem>(
     }
 
     public async Task<TreeNodeFormModel?> ShowEditDialogAsync(
+        NodeTemplate<TItem> nodeTemplate,
         TItem node,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters
         {
+            { "NodeTemplate", nodeTemplate },
             { "Node", node },
             { "IsCreate", false }
         };
@@ -234,11 +239,11 @@ public class TreeNodeDialogService<TItem>(
     #region 便捷方法
 
     public async Task<NodeOperationOutcome<TItem>?> ExecuteNodeOperationAsync(
-        TItem node,
+        NodeTemplate<TItem>  nodeTemplate,
         TItem? parentNode = null,
         bool isLeaf = false)
     {
-        var actionResult = await ShowActionsDialogAsync(node, parentNode, isLeaf);
+        var actionResult = await ShowActionsDialogAsync(nodeTemplate, parentNode, isLeaf);
         if (actionResult == null)
             return null;
 
@@ -252,14 +257,14 @@ public class TreeNodeDialogService<TItem>(
     #endregion
 }
 
-/// <summary>
-/// 节点操作执行结果
-/// </summary>
-public class NodeOperationOutcome<TItem> where TItem : class, ITreeNode
-{
-    /// <summary>用户选择的操作</summary>
-    public required NodeAction Action { get; set; }
-
-    /// <summary>目标节点</summary>
-    public required TItem Node { get; set; }
-}
+// /// <summary>
+// /// 节点操作执行结果
+// /// </summary>
+// public class NodeOperationOutcome<TItem> where TItem : class, ITreeNode
+// {
+//     /// <summary>用户选择的操作</summary>
+//     public required NodeAction Action { get; set; }
+//
+//     /// <summary>目标节点</summary>
+//     public required TItem Node { get; set; }
+// }

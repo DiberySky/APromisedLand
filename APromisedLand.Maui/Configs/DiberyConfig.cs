@@ -1,4 +1,5 @@
 using APromisedLand.Maui.Authentication;
+using APromisedLand.Razor.DiberyTree.Navigation;
 using APromisedLand.Razor.Services;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Interfaces;
@@ -25,6 +26,9 @@ public static class DiberyConfig
 
             builder.AddAuthenticationServices();
             builder.AddKeycloakClient();
+            
+            builder.Services.AddSingleton<ITreeNavigationHistoryService, TreeNavigationHistoryService>();
+
         }
 
         public void AddAuthenticationServices()
