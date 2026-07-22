@@ -1,48 +1,19 @@
-﻿@namespace APromisedLand.Razor.Components
-
-<MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense=true
-           Elevation="0">
-    <ChildContent>
-        @if (BackArrowVisibled)
-        {
-            <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
-                           Edge="Edge.Start" Color="Color.Warning"
-                           OnClick=@(e => Cancel()) />
-        }
-
-        @if (string.IsNullOrEmpty(Title) == false)
-        {
-            <MudText>@Title</MudText>
-        }
-
-        @if (TopBarContent is not null)
-        {
-            @TopBarContent
-        }
-
-        @if (StartIconVisibled)
-        {
-            <MudSpacer />
-            <MudIconButton Class="mr-0" Icon="@Icons.Material.Outlined.Menu"
-                           Color="Color.Success"
-                           OnClick="e => OnStartClick.InvokeAsync()" />
-        }
-
-        @if (CloseIconVisibled)
-        {
-            <MudSpacer />
-            <MudIconButton Class="mr-0 pr-0" Icon="@Icons.Material.Outlined.Close"
-                           OnClick="e => Cancel()" />
-        }
-
-    </ChildContent>
-</MudAppBar>
-
-<MudDialog>
+<MudDialog TitleClass="@TitleClass"
+           ContentClass="@ContentClass"
+           ActionsClass="@ActionsClass">
     <TitleContent>
-        <MudSpacer />
-        <MudText Color="Color.Primary">A promised land</MudText>
-        <MudSpacer />
+        @if (!string.IsNullOrEmpty(Title))
+        {
+            <MudText Color="Color.Inherit" Typo="Typo.h6" class="pa-4">@Title</MudText>
+        }
+        @if (ToolBarContent != null)
+        {
+            <MudPaper>
+                <MudToolBar Dense>
+                    @ToolBarContent
+                </MudToolBar>
+            </MudPaper>
+        }
     </TitleContent>
     <DialogContent>
 
@@ -52,42 +23,59 @@
         }
     </DialogContent>
     <DialogActions>
-        @if (DialogActionsVisibled)
-        {
-            <MudSpacer />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary">关于</MudButton>
-            <MudSpacer />
-        }
+        <MudStack Row Class="@ActionsContentClass">
+            @if (CancelButtonVisible)
+            {
+                <MudButton Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.Close"
+                           Color="Color.Default"
+                           OnClick="@CancelAsync">
+                    取消
+                </MudButton>
+            }
+            
+            @if (SubmitButtonVisible)
+            {
+                <ButtonLoadingSky Text="提交"
+                                  Variant="Variant.Filled"
+                                  Color="Color.Primary"
+                                  StartIcon="@Icons.Material.Filled.SaveAs"
+                                  OnClick=@(e => OnSubmitClick.InvokeAsync(e))/>
+            }
+
+            @if (DialogActions != null)
+            {
+                @DialogActions
+            }
+        </MudStack>
     </DialogActions>
 </MudDialog>
 
-@if (DialogActionsVisibled)
-{
-    <MudAppBar Bottom Class="mud-theme-dark" Dense
-               Elevation="0">
-        @if (DialogActions != null)
-        {
-            @DialogActions
-        }
-    </MudAppBar>
-}
-
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance? MudDialog { get; set; }
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required string Title { get; set; }
-    [Parameter] public bool BackArrowVisibled { get; set; } = true;
-    [Parameter] public bool StartIconVisibled { get; set; } = true;
-    [Parameter] public bool CloseIconVisibled { get; set; } = false;
-    [Parameter] public bool DialogActionsVisibled { get; set; } = false;
 
-    [Parameter] public RenderFragment? TopBarContent { get; set; }
-    // [Parameter] public RenderFragment? TitleContent { get; set; }
+    [Parameter] public bool CancelButtonVisible { get; set; } = true;
+    [Parameter] public bool SubmitButtonVisible { get; set; } = false;
+
+    [Parameter] public string TitleClass { get; set; } = "mud-theme-success px-0 pa-0";
+    [Parameter] public string ContentClass { get; set; } = "mud-theme-dark";
+    [Parameter] public string ActionsClass { get; set; } = "mud-theme-default";
+    [Parameter] public string ActionsContentClass { get; set; } = "mr-8 py-3";
+
+    [Parameter] public RenderFragment? TitleContent { get; set; }
+    [Parameter] public RenderFragment? ToolBarContent { get; set; }
     [Parameter] public RenderFragment? DialogContent { get; set; }
     [Parameter] public RenderFragment? DialogActions { get; set; }
 
-    [Parameter] public EventCallback OnStartClick { get; set; }
+    [Parameter] public EventCallback OnCanceledClick { get; set; }
+    [Parameter] public EventCallback OnSubmitClick { get; set; }
 
-    private void Cancel() => MudDialog?.Cancel();
+    private async Task CancelAsync()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+
+        await OnCanceledClick.InvokeAsync();
+    }
 }
