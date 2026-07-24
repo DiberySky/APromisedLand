@@ -20,11 +20,11 @@
         }
         else
         {
-            <MudTreeView ServerData="@LoadChildrenAsync" Items="@_items"
+            <MudTreeView T="TItem" ServerData="@LoadChildrenAsync" Items="@_items"
                          @bind-SelectedValue="SelectedValue"
                          SelectionMode="@SelectionMode.ToggleSelection">
                 <ItemTemplate>
-                    <MudTreeViewItem
+                    <MudTreeViewItem T="TItem"
                         Text="@context.Text"
                         Value="@context.Value"
                         @bind-Items="context.Children"
