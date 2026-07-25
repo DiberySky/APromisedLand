@@ -1,11 +1,9 @@
 using APromisedLand.Api.Projects.DiberyTree.Interface;
-using APromisedLand.Api.Projects.DiberyTree.Services;
-using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace APromisedLand.Api.Projects.DiberyTree;
+namespace APromisedLand.Api.Controllers;
 
 /// <summary>
 /// 泛型树 API 控制器
