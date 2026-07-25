@@ -8,7 +8,7 @@ namespace APromisedLand.Shared.DiberyTree.Models;
 /// <summary>
 /// 分类树节点 - 实现完整的树节点接口
 /// </summary>
-public sealed class CategoryTree : ITreeNode, IArchivableTreeNode, IHierarchyTreeNode, IEquatable<CategoryTree>
+public sealed class CategoryTree : ITreeNodeBase, IArchivableTreeNodeBase, IHierarchyTreeNodeBase, IEquatable<CategoryTree>
 {
     [Key]
     [MaxLength(36)]

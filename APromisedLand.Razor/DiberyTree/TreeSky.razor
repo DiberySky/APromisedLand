@@ -1,14 +1,14 @@
 @using APromisedLand.Razor.DiberyTree.Models
 @using APromisedLand.Razor.DiberyTree.Navigation
 
-@typeparam TItem where TItem : class, ITreeNode, new()
+@typeparam TItem where TItem : class, ITreeNodeBase, new()
 
 @inject ITreeNavigationHistoryService History
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-<PageSky Title="Category Tree" BottomBarVisibled
-         ArrowBackVisibled=@(History.Peek() != null)
+<PageSky Title="Category Tree" BottomBarVisible
+         ArrowBackVisible=@(History.Peek() != null)
          OnStartClick="e => StartClick()"
          OnBackClick="e => ClickBack()">
     <PageContent>

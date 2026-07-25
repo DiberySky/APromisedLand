@@ -6,10 +6,10 @@
 @inject NavigationManager Navigater
 @inject IAuthenticationService AuthenticationService
 
-<MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense=true
+<MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense="true"
            Elevation="0">
     <ChildContent>
-        @if (ArrowBackVisibled)
+        @if (ArrowBackVisible)
         {
             <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
                            Edge="Edge.Start" Color="Color.Warning"
@@ -27,7 +27,7 @@
             @TopBarContent
         }
 
-        @if (StartButtonVisibled)
+        @if (StartButtonVisible)
         {
             <MudSpacer />
             <MudIconButton Icon="@Icons.Material.Outlined.Menu"
@@ -45,7 +45,7 @@
     }
 </MudContainer>
 
-@if (BottomBarVisibled)
+@if (BottomBarVisible)
 {
     <MudAppBar Bottom Color="@BottomBarColor" Dense>
         <ChildContent>
@@ -68,11 +68,11 @@
 
 @code {
     [Parameter] public required string Title { get; set; }
-    [Parameter] public bool ArrowBackVisibled { get; set; } = true;
+    [Parameter] public bool ArrowBackVisible { get; set; } = true;
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.False;
-    [Parameter] public bool BottomBarVisibled { get; set; } = false;
+    [Parameter] public bool BottomBarVisible { get; set; } = false;
     [Parameter] public Color BottomBarColor { get; set; } = Color.Dark;
-    [Parameter] public bool StartButtonVisibled { get; set; } = true;
+    [Parameter] public bool StartButtonVisible { get; set; } = true;
 
     [Parameter] public RenderFragment? TopBarContent { get; set; }
     [Parameter] public RenderFragment? PageContent { get; set; }

@@ -11,7 +11,7 @@ using MudBlazor;
 
 namespace APromisedLand.Razor.DiberyTree;
 
-public partial class TreeSky<TItem> where TItem : class, ITreeNode, new()
+public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
 {
     private List<TreeItemData<TItem>>? _items;
     private bool _isLoading = true;

@@ -1,17 +1,26 @@
+@using APromisedLand.Razor.DiberyTree.Services
+@typeparam TItem where TItem : class, ITreeNodeBase, new()
+
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+
 <DialogSky title="@Title"
            CancelButtonVisible="@CancelButtonVisible"
            SubmitButtonVisible="@SubmitButtonVisible"
            OnCanceledClick="e => OnCanceledClick.InvokeAsync()"
            OnSubmitClick="e => OnSubmitClick.InvokeAsync()">
     <ToolBarContent>
-        <MudIconButton Icon="@Icons.Material.Outlined.PhotoCamera" 
-                       Color="Color.Primary"/>
-        <MudIconButton Icon="@Icons.Material.Outlined.Videocam"  
-                       Color="Color.Primary"/>
-        <MudIconButton Icon="@Icons.Material.Outlined.FilePresent"  
-                       Color="Color.Primary"/>
-        <MudIconButton Icon="@Icons.Material.Outlined.LocationOn"  
-                       Color="Color.Primary"/>
+        <MudIconButton Icon="@Icons.Material.Outlined.PhotoCamera"
+                       Color="Color.Primary"
+                       OnClick="@(e => ImageClick(Item))"/>
+        <MudIconButton Icon="@Icons.Material.Outlined.Videocam"
+                       Color="Color.Primary"
+                       OnClick="@(e => VideoClick(Item))"/>
+        <MudIconButton Icon="@Icons.Material.Outlined.FilePresent"
+                       Color="Color.Primary"
+                       OnClick="@(e => FileClick(Item))"/>
+        <MudIconButton Icon="@Icons.Material.Outlined.LocationOn"
+                       Color="Color.Primary"
+                       OnClick="@(e => LocationClick(Item))"/>
     </ToolBarContent>
     <DialogContent>
 
@@ -32,14 +41,10 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required string Title { get; set; }
+    [Parameter] public required TItem Item { get; set; }
 
     [Parameter] public bool CancelButtonVisible { get; set; } = true;
-    [Parameter] public bool SubmitButtonVisible { get; set; } = false;
-
-    // [Parameter] public string TitleClass { get; set; } = "mud-theme-success px-0 pa-0";
-    // [Parameter] public string ContentClass { get; set; } = "mud-theme-dark";
-    // [Parameter] public string ActionsClass { get; set; } = "mud-theme-default";
-    // [Parameter] public string ActionsContentClass { get; set; } = "mr-8 py-3";
+    [Parameter] public bool SubmitButtonVisible { get; set; }
 
     [Parameter] public RenderFragment? TitleContent { get; set; }
     [Parameter] public RenderFragment? ToolBarContent { get; set; }
@@ -49,11 +54,28 @@
     [Parameter] public EventCallback OnCanceledClick { get; set; }
     [Parameter] public EventCallback OnSubmitClick { get; set; }
 
-    private async Task CancelAsync()
+    // [Parameter] public EventCallback OnImageClick { get; set; }
+    // [Parameter] public EventCallback OnFileClick { get; set; }
+    // [Parameter] public EventCallback OnVideoClick { get; set; }
+    // [Parameter] public EventCallback OnLocationClick { get; set; }
+    
+    private async Task ImageClick(TItem? item)
     {
-        MudDialog?.Close(DialogResult.Cancel());
-
-        await OnCanceledClick.InvokeAsync();
+        await TreeNodeDialogService.ShowTreeImageDialogAsync();
+    }
+    
+    private async Task VideoClick(TItem? item)
+    {
+        await TreeNodeDialogService.ShowTreeVideoDialogAsync();
     }
 
+    private async Task FileClick(TItem? item)
+    {
+        await TreeNodeDialogService.ShowTreeFileDialogAsync();
+    }
+
+    private async Task LocationClick(TItem? item)
+    {
+        await TreeNodeDialogService.ShowTreeLocationDialogAsync();
+    }
 }

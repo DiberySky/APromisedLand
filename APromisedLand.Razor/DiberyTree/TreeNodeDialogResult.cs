@@ -1,4 +1,3 @@
-
 using APromisedLand.Shared.DiberyTree.Interfaces;
 
 namespace APromisedLand.Razor.DiberyTree;
@@ -22,7 +21,7 @@ public enum NodeDialogMode
 /// 节点对话框操作结果
 /// </summary>
 /// <typeparam name="TItem">节点类型</typeparam>
-public class TreeNodeDialogResult<TItem> where TItem : class, ITreeNode
+public class TreeNodeDialogResult<TItem> where TItem : class, ITreeNodeBase
 {
     /// <summary>操作模式</summary>
     public NodeDialogMode Mode { get; set; }

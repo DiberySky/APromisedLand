@@ -13,10 +13,6 @@ public static partial class BlazorHelper
 {
     public static IEnumerable<Assembly> Pages { get; set; }=
     [
-        typeof(TreeImagePage).Assembly,
-        typeof(TreeVideoPage).Assembly,
-        typeof(TreeFilePage).Assembly,
-        typeof(TreeLocationPage).Assembly,
         typeof(NotFound).Assembly,
         typeof(StartPage).Assembly,
         typeof(StartPage).Assembly,

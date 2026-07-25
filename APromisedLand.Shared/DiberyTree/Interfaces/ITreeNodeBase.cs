@@ -1,6 +1,6 @@
 namespace APromisedLand.Shared.DiberyTree.Interfaces;
 
-public interface ITreeNode
+public interface ITreeNodeBase
 {
     string Id { get; }
     string? ParentId { get; }

@@ -1,7 +1,13 @@
-@typeparam TItem where TItem : class, ITreeNode, new()
+@typeparam TItem where TItem : class, ITreeNodeBase, new()
+
+@using APromisedLand.Razor.DiberyTree.Services
 @implements IDisposable
 
-<TreeDialogSky Title="编辑节点"
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+
+<TreeDialogSky TItem="@TItem"
+               Item="@Node"
+               Title="编辑节点"
                SubmitButtonVisible="true"
                OnSubmitClick="@SubmitAsync"
                OnCanceledClick="@Close">
@@ -60,97 +66,8 @@
             </MudForm>
         </MudContainer>
     </DialogContent>
-    @* <DialogActions> *@
-    @*     <MudStack Row Class="mr-8 py-3"> *@
-    @*         <MudButton Variant="Variant.Outlined" *@
-    @*                    StartIcon="@Icons.Material.Filled.Close" *@
-    @*                    Color="Color.Default" *@
-    @*                    OnClick="@Close"> *@
-    @*             取消 *@
-    @*         </MudButton> *@
-    @*         <ButtonLoadingSky Text="提交" *@
-    @*                           Variant="Variant.Filled" *@
-    @*                           Color="Color.Primary" *@
-    @*                           StartIcon="@Icons.Material.Filled.SaveAs" *@
-    @*                           OnClick="@SubmitAsync"/> *@
-    @*     </MudStack> *@
-    @* </DialogActions> *@
-</TreeDialogSky>
 
-@* <MudDialog TitleClass="mud-theme-success" *@
-@*            ContentClass="mud-theme-dark" *@
-@*            ActionsClass="mud-theme-default"> *@
-@*     <DialogContent> *@
-@*         <MudContainer Class="py-8"> *@
-@*             <MudForm @ref="_form" Model="_model"> *@
-@*                 @if (NodeTemplate.EditTemplate is null) *@
-@*                 { *@
-@*                     <MudStack Spacing="3"> *@
-@*                         <MudTextField T="string" *@
-@*                                       @bind-Value="_model.Name" *@
-@*                                       Label="名称" *@
-@*                                       Variant="Variant.Outlined" *@
-@*                                       Required="true" *@
-@*                                       RequiredError="名称不能为空" *@
-@*                                       MaxLength="100" *@
-@*                                       Counter="100" *@
-@*                                       Immediate="true"/> *@
-@* *@
-@*                         <MudTextField T="string" *@
-@*                                       @bind-Value="_model.Description" *@
-@*                                       Label="描述" *@
-@*                                       Variant="Variant.Outlined" *@
-@*                                       Lines="3" *@
-@*                                       MaxLength="500" *@
-@*                                       Counter="500" *@
-@*                                       Immediate="true"/> *@
-@* *@
-@*                         <MudNumericField T="int" *@
-@*                                          @bind-Value="_model.SortOrder" *@
-@*                                          Label="排序" *@
-@*                                          Variant="Variant.Outlined" *@
-@*                                          Min="0" *@
-@*                                          Max="9999"/> *@
-@* *@
-@*                         <MudSwitch T="bool" *@
-@*                                    @bind-Value="_model.IsActive" *@
-@*                                    Label="启用状态" *@
-@*                                    Color="Color.Primary"/> *@
-@* *@
-@*                         @if (ParentNode != null) *@
-@*                         { *@
-@*                             <MudTextField T="string" *@
-@*                                           Value="ParentNode.Text()" *@
-@*                                           Label="父分类" *@
-@*                                           Variant="Variant.Text" *@
-@*                                           ReadOnly="true" *@
-@*                                           Disabled="true"/> *@
-@*                         } *@
-@*                     </MudStack> *@
-@*                 } *@
-@*                 else *@
-@*                 { *@
-@*                     @NodeTemplate.EditTemplate(NodeTemplate.Node.Value!) *@
-@*                 } *@
-@*             </MudForm> *@
-@*         </MudContainer> *@
-@*     </DialogContent> *@
-@*     <DialogActions> *@
-@*         <MudStack Row Class="mr-8 py-3"> *@
-@*             <MudButton Variant="Variant.Outlined" *@
-@*                        StartIcon="@Icons.Material.Filled.Close" *@
-@*                        Color="Color.Default" *@
-@*                        OnClick="@Close"> *@
-@*                 取消 *@
-@*             </MudButton> *@
-@*             <ButtonLoadingSky Text="提交" *@
-@*                               Variant="Variant.Filled" *@
-@*                               Color="Color.Primary" *@
-@*                               StartIcon="@Icons.Material.Filled.SaveAs" *@
-@*                               OnClick="@SubmitAsync"/> *@
-@*         </MudStack> *@
-@*     </DialogActions> *@
-@* </MudDialog> *@
+</TreeDialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

@@ -1,5 +1,6 @@
 using APromisedLand.Razor.DiberyTree.Dialogs;
 using APromisedLand.Razor.DiberyTree.Models;
+using APromisedLand.Razor.DiberyTree.Pages;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using MudBlazor;
 
@@ -11,7 +12,7 @@ namespace APromisedLand.Razor.DiberyTree.Services;
 /// <typeparam name="TItem">节点类型，必须实现 ITreeNode</typeparam>
 public class TreeNodeDialogService<TItem>(
     IDialogService dialogService)
-    where TItem : class, ITreeNode, new()
+    where TItem : class, ITreeNodeBase, new()
 {
     #region 操作选择对话框
 
@@ -255,16 +256,108 @@ public class TreeNodeDialogService<TItem>(
     }
 
     #endregion
-}
+    
+    #region 文件附件
 
-// /// <summary>
-// /// 节点操作执行结果
-// /// </summary>
-// public class NodeOperationOutcome<TItem> where TItem : class, ITreeNode
-// {
-//     /// <summary>用户选择的操作</summary>
-//     public required NodeAction Action { get; set; }
-//
-//     /// <summary>目标节点</summary>
-//     public required TItem Node { get; set; }
-// }
+    public async Task<NodeActionResult<TItem>?> ShowTreeFileDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            
+        };
+        
+        var options = (config ?? new DialogConfig
+        {
+            FullScreen = true,
+        }).ToDialogOptions();
+        
+        var dialog = await dialogService.ShowAsync<TreeFileDialogPage<TItem>>("文件附件", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
+            return null;
+
+        return actionResult;
+    }
+
+    #endregion
+
+    #region 图片附件
+
+    public async Task<NodeActionResult<TItem>?> ShowTreeImageDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            
+        };
+        
+        var options = (config ?? new DialogConfig
+        {
+            FullScreen = true,
+        }).ToDialogOptions();
+        
+        var dialog = await dialogService.ShowAsync<TreeImageDialogPage<TItem>>("图片附件", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
+            return null;
+
+        return actionResult;
+    }
+
+    #endregion
+    
+    #region 视频附件
+
+    public async Task<NodeActionResult<TItem>?> ShowTreeVideoDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            
+        };
+        
+        var options = (config ?? new DialogConfig
+        {
+            FullScreen = true,
+        }).ToDialogOptions();
+        
+        var dialog = await dialogService.ShowAsync<TreeVideoDialogPage<TItem>>("视频附件", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
+            return null;
+
+        return actionResult;
+    }
+
+    #endregion
+    
+    #region 视频附件
+
+    public async Task<NodeActionResult<TItem>?> ShowTreeLocationDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            
+        };
+        
+        var options = (config ?? new DialogConfig
+        {
+            FullScreen = true,
+        }).ToDialogOptions();
+        
+        var dialog = await dialogService.ShowAsync<TreeLocationDialogPage<TItem>>("视频附件", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
+            return null;
+
+        return actionResult;
+    }
+
+    #endregion
+}

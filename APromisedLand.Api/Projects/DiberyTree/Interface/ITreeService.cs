@@ -1,6 +1,6 @@
 using APromisedLand.Shared.DiberyTree.Models;
 
-namespace APromisedLand.Shared.DiberyTree.Interfaces;
+namespace APromisedLand.Api.Projects.DiberyTree.Interface;
 
 /// <summary>
 /// 泛型树服务接口
