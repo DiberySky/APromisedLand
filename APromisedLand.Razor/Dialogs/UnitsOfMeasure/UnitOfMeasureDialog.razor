@@ -1,0 +1,127 @@
+@using APromisedLand.Shared.DTOs.Units
+@using APromisedLand.MauiBlazor.DiberyTree.Services
+@inject UnitsOfMeasureApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@(IsEdit ? "编辑计量单位" : "新增计量单位")"
+           SubmitButtonVisible="true"
+           CancelButtonVisible="true"
+           OnSubmitClick="SubmitAsync"
+           OnCanceledClick="CancelAsync">
+    <DialogContent>
+        <MudForm @ref="_form" Model="_model" @bind-IsValid="_isValid" ValidationDelay="0">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Name"
+                                  Label="名称"
+                                  Required
+                                  RequiredError="名称不能为空"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Symbol"
+                                  Label="符号"
+                                  Required
+                                  RequiredError="符号不能为空"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Description"
+                                  Label="描述"
+                                  Lines="3"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch @bind-Value="_model.IsActive"
+                               Label="是否启用"
+                               Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+    [Parameter] public UnitOfMeasureDto? EditDto { get; set; }
+
+    private MudForm? _form;
+    private bool _isValid;
+    private UnitOfMeasureFormModel _model = new();
+
+    private bool IsEdit => EditDto != null;
+
+    protected override void OnInitialized()
+    {
+        if (EditDto != null)
+        {
+            _model = new UnitOfMeasureFormModel
+            {
+                Id = EditDto.Id,
+                Name = EditDto.Name,
+                Symbol = EditDto.Symbol,
+                Description = EditDto.Description,
+                IsActive = EditDto.IsActive
+            };
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_form != null)
+            await _form.Validate();
+
+        if (!_isValid) return;
+
+        try
+        {
+            if (IsEdit)
+            {
+                var command = new UpdateUnitOfMeasureCommand
+                {
+                    Id = _model.Id!,
+                    Name = _model.Name,
+                    Symbol = _model.Symbol,
+                    Description = _model.Description,
+                    IsActive = _model.IsActive
+                };
+                await ApiClient.UpdateAsync(command.Id, command);
+                Snackbar.Add("更新成功", Severity.Success);
+            }
+            else
+            {
+                var command = new CreateUnitOfMeasureCommand
+                {
+                    Name = _model.Name,
+                    Symbol = _model.Symbol,
+                    Description = _model.Description
+                };
+                await ApiClient.CreateAsync(command);
+                Snackbar.Add("新增成功", Severity.Success);
+            }
+
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"操作失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void CancelAsync()
+    {
+        // DiberySky 内部已调用 MudDialog.Close，此处无需重复关闭
+    }
+
+    private class UnitOfMeasureFormModel
+    {
+        public string? Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Symbol { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+}

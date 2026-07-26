@@ -1,0 +1,142 @@
+@inject UnitsOfMeasureApiClient ApiClient
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<DialogPageSky Title="计量单位">
+    <ToolBarContent>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => OpenDialog(null))">
+            新增单位
+        </MudButton>
+    </ToolBarContent>
+    <DialogContent>
+        <MudTable ServerData="LoadDataAsync" Dense Hover @ref="_table" RowsPerPage="10"
+                  Loading="_loading" Breakpoint="Breakpoint.Sm"
+                  Class="mud-theme-dark">
+            <HeaderContent>
+                <MudTh>名称</MudTh>
+                <MudTh>符号</MudTh>
+                <MudTh>描述</MudTh>
+                <MudTh>状态</MudTh>
+                <MudTh Style="text-align:center">操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="名称">@context.Name</MudTd>
+                <MudTd DataLabel="符号">@context.Symbol</MudTd>
+                <MudTd DataLabel="描述">@context.Description</MudTd>
+                <MudTd DataLabel="状态">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "启用" : "禁用")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="操作" Style="text-align:center">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"
+                                   OnClick="() => OpenDialog(context)" Size="Size.Small"/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                   OnClick="() => DeleteAsync(context)" Size="Size.Small"/>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new[] { 10, 20, 50 }"/>
+            </PagerContent>
+            <LoadingContent>
+                <MudText Class="pa-4">加载中...</MudText>
+            </LoadingContent>
+            <NoRecordsContent>
+                <MudText Class="pa-4">暂无数据</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </DialogContent>
+</DialogPageSky>
+
+@code {
+    private MudTable<UnitOfMeasureDto> _table = default!;
+    private bool _loading;
+    private List<UnitOfMeasureDto> _units = new();
+
+private async Task<TableData<UnitOfMeasureDto>> LoadDataAsync(TableState state, CancellationToken cancellationToken)
+    {
+        _loading = true;
+        try
+        {
+            var pageNumber = state.Page + 1;
+            var pageSize = state.PageSize;
+            var result = await ApiClient.GetPagedAsync(pageNumber, pageSize);
+            return new TableData<UnitOfMeasureDto>
+            {
+                TotalItems = result.TotalCount,
+                Items = result.Items
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载数据失败: {ex.Message}", Severity.Error);
+            return new TableData<UnitOfMeasureDto>
+            {
+                Items = new List<UnitOfMeasureDto>(),
+                TotalItems = 0
+            };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenDialog(UnitOfMeasureDto? dto = null)
+    {
+        var parameters = new DialogParameters<UnitOfMeasureDialog>
+        {
+            { x => x.EditDto, dto }
+        };
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = false,
+            NoHeader = true
+        };
+
+        var dialog = await DialogService.ShowAsync<UnitOfMeasureDialog>("计量单位详情", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await _table.ReloadServerData();
+        }
+    }
+
+    private async Task DeleteAsync(UnitOfMeasureDto dto)
+    {
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定要删除计量单位 [{dto.Name}] 吗？此操作不可撤销。",
+            yesText: "删除",
+            cancelText: "取消");
+
+        if (confirm != true) return;
+
+        try
+        {
+            var success = await ApiClient.DeleteAsync(dto.Id);
+            if (success)
+            {
+                Snackbar.Add("删除成功", Severity.Success);
+                await _table.ReloadServerData();
+            }
+            else
+            {
+                Snackbar.Add("删除失败", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败: {ex.Message}", Severity.Error);
+        }
+    }
+}

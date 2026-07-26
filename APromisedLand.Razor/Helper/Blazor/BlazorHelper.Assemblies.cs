@@ -1,6 +1,7 @@
 using System.Reflection;
 using APromisedLand.Razor.Components;
 using APromisedLand.Razor.Components.Layout;
+using APromisedLand.Razor.Dialogs;
 using APromisedLand.Razor.DiberyTree;
 using APromisedLand.Razor.DiberyTree.Category;
 using APromisedLand.Razor.DiberyTree.Pages;
@@ -13,6 +14,7 @@ public static partial class BlazorHelper
 {
     public static IEnumerable<Assembly> Pages { get; set; }=
     [
+        typeof(UnitOfMeasurePage).Assembly,
         typeof(NotFound).Assembly,
         typeof(StartPage).Assembly,
         typeof(StartPage).Assembly,

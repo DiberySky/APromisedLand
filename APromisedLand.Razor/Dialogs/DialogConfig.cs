@@ -1,6 +1,6 @@
 using MudBlazor;
 
-namespace APromisedLand.Razor.DiberyTree.Models;
+namespace APromisedLand.Razor.Helper;
 
 /// <summary>
 /// 对话框配置选项
