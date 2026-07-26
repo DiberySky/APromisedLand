@@ -1,0 +1,141 @@
+@inject UnitsOfMeasureApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<DialogSky Title="选择计量单位"
+           SubmitButtonVisible="@(_selectedItem != null)"
+           CancelButtonVisible="true"
+           OnSubmitClick="Submit"
+           OnCanceledClick="CancelAsync">
+    <ToolBarContent>
+        <MudTextField @bind-Value="_searchText"
+                      TextChanged="FilterData"
+                      Placeholder="搜索名称、符号或描述..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      Clearable="true"
+                      Variant="Variant.Text"
+                      Margin="Margin.Dense"
+                      Class="flex-grow-1" />
+    </ToolBarContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="my-2" />
+        }
+        <MudTable Items="_filteredItems"
+                  Class="mud-theme-dark"
+                  Dense="true"
+                  Hover="true"
+                  FixedHeader="true"
+                  Height="350px"
+                  SelectedItem="_selectedItem"
+                  SelectedItemChanged="OnItemSelected"
+                  RowClassFunc="@SelectedRowClassFunc"
+                  Breakpoint="Breakpoint.Sm"
+                  T="UnitOfMeasureDto">
+            <HeaderContent>
+                <MudTh>名称</MudTh>
+                <MudTh>符号</MudTh>
+                <MudTh>描述</MudTh>
+                <MudTh>状态</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Symbol</MudTd>
+                <MudTd>@context.Description</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "启用" : "禁用")
+                    </MudChip>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Align="Align.Center" Class="pa-4">未找到计量单位</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+    [Parameter] public string? SelectedId { get; set; }
+
+    private List<UnitOfMeasureDto> _items = new();
+    private List<UnitOfMeasureDto> _filteredItems = new();
+    private UnitOfMeasureDto? _selectedItem;
+    private string _searchText = string.Empty;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            _items = await ApiClient.GetAllAsync();
+            _filteredItems = _items.ToList();
+
+            if (!string.IsNullOrEmpty(SelectedId))
+            {
+                _selectedItem = _items.FirstOrDefault(x => x.Id == SelectedId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载数据失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void FilterData()
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            _filteredItems = _items.ToList();
+        }
+        else
+        {
+            var text = _searchText.Trim().ToLowerInvariant();
+            _filteredItems = _items.Where(x =>
+                x.Name.Contains(text, StringComparison.InvariantCultureIgnoreCase) ||
+                x.Symbol.Contains(text, StringComparison.InvariantCultureIgnoreCase) ||
+                (x.Description != null && x.Description.Contains(text, StringComparison.InvariantCultureIgnoreCase))
+            ).ToList();
+        }
+    }
+
+    private void OnItemSelected(UnitOfMeasureDto item)
+    {
+        // 防止点击已选项时取消选择（保持单选行为稳定）
+        if (_selectedItem?.Id == item.Id) return;
+        _selectedItem = item;
+    }
+
+    private string SelectedRowClassFunc(UnitOfMeasureDto item, int index)
+    {
+        if (_selectedItem != null && item.Id == _selectedItem.Id)
+            return "mud-theme-primary font-weight-bold";
+        return string.Empty;
+    }
+
+    private void Submit()
+    {
+        if (_selectedItem != null)
+        {
+            MudDialog?.Close(DialogResult.Ok(_selectedItem));
+        }
+    }
+
+    private void CancelAsync()
+    {
+        // DiberySky 内部已调用 MudDialog.Close
+    }
+}

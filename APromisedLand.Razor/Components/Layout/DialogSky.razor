@@ -1,3 +1,6 @@
+
+@inject ISnackbar Snackbar
+
 <MudDialog TitleClass="@TitleClass"
            ContentClass="@ContentClass"
            ActionsClass="@ActionsClass">
@@ -44,7 +47,7 @@
                                       Variant="Variant.Filled"
                                       Color="Color.Primary"
                                       StartIcon="@Icons.Material.Filled.SaveAs"
-                                      OnClick=@(e => OnSubmitClick.InvokeAsync(e))/>
+                                      OnClickFunc=@(() => OnSubmitClick.InvokeAsync())/>
                 }
 
                 @if (DialogActions != null)

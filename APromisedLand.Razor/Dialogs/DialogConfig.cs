@@ -1,6 +1,6 @@
 using MudBlazor;
 
-namespace APromisedLand.Razor.Helper;
+namespace APromisedLand.Razor.Dialogs;
 
 /// <summary>
 /// 对话框配置选项

@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace APromisedLand.Api.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class UnitsOfMeasureController(IUnitOfMeasureService service) : ControllerBase
+// [ApiController]
+// [Route("[controller]")]
+public class UnitsOfMeasureControllerBase(IUnitOfMeasureService service) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<UnitOfMeasureDto>>> GetAll()

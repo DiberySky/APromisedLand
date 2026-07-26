@@ -1,9 +1,6 @@
 ﻿using MudBlazor;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace APromisedLand.Razor.Helper;
+namespace APromisedLand.Razor.Helper.Blazor;
 
 public static partial class BlazorHelper
 {

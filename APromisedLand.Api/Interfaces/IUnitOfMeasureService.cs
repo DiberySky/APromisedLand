@@ -1,7 +1,7 @@
 using APromisedLand.Shared.DTOs.Shared;
 using APromisedLand.Shared.DTOs.Units;
 
-namespace APromisedLand.Shared.DiberyTree.Interfaces;
+namespace APromisedLand.Api.Interfaces;
 
 public interface IUnitOfMeasureService
 {

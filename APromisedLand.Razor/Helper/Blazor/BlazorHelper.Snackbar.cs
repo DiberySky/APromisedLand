@@ -1,7 +1,7 @@
 ﻿using APromisedLand.Shared.Helper;
 using MudBlazor;
 
-namespace APromisedLand.Razor.Helper;
+namespace APromisedLand.Razor.Helper.Blazor;
 
 public static partial class BlazorHelper
 {

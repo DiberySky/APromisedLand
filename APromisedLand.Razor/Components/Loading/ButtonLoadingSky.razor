@@ -1,5 +1,7 @@
 ﻿@namespace APromisedLand.Razor.Components
 
+@inject ISnackbar Snackbar
+
 <MudButton Disabled="@(_processing || Disabled)"
            EndIcon="@EndIcon"
            IconColor="@IconColor"
@@ -32,9 +34,7 @@
     [Parameter] public string? StartIcon { get; set; }
     [Parameter] public Color IconColor { get; set; } = Color.Inherit;
 
-    [Parameter] public Func<Task>? FuncClick { get; set; }
-
-    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public Func<Task>? OnClickFunc { get; set; }
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
@@ -51,13 +51,14 @@
             await Task.Yield();
             // await Task.Delay(300);
 
-            if (FuncClick != null)
+            if (OnClickFunc != null)
             {
-                await FuncClick();
+                await OnClickFunc();
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Snackbar.Add($"操作失败: {ex.Message}", Severity.Error);
         }
         finally
         {

@@ -1,6 +1,8 @@
 using APromisedLand.Api.Data;
+using APromisedLand.Api.Interfaces;
 using APromisedLand.Api.Projects.DiberyTree.Interface;
 using APromisedLand.Api.Projects.DiberyTree.Services;
+using APromisedLand.Api.Services;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs;
@@ -15,13 +17,14 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.AddServiceDefaults();
 
-builder.AddNpgsqlDbContext<TreeDbContext>("TreeDb");
+builder.AddNpgsqlDbContext<DiberyDbContext>("TreeDb");
 
 // 注册泛型树服务（以 string 类型为例）
 // builder.Services.AddSingleton<ITreeService<string>, TreeService<string>>();
 
 // 如果需要多种类型的树，可以分别注册
 builder.Services.AddScoped<ITreeService<CategoryTree>, CategoryTreeService>();
+builder.Services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
 
 var app = builder.Build();
 
@@ -41,7 +44,7 @@ using var scope = app.Services.CreateScope();
 var services = scope.ServiceProvider;
 try
 {
-    var context = services.GetRequiredService<TreeDbContext>();
+    var context = services.GetRequiredService<DiberyDbContext>();
     await context.Database.MigrateAsync();
 }
 catch (Exception e)

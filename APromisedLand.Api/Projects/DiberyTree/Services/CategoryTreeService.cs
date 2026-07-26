@@ -10,7 +10,7 @@ using APromisedLand.Shared.DiberyTree;
 
 namespace APromisedLand.Api.Projects.DiberyTree.Services;
 
-public class CategoryTreeService(TreeDbContext dbContext) : ITreeService<CategoryTree>
+public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<CategoryTree>
 {
     public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)

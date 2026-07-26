@@ -3,6 +3,8 @@
 @page "/category-tree/rootId/{RootId}"
 @page "/category-tree/ClickNodeId/{ClickNodeId}"
 @page "/category-tree/rootId/{RootId}/ClickNodeId/{ClickNodeId}"
+@using APromisedLand.Razor.Dialogs
+
 
 @{
     RenderFragment<CategoryTree> actionTemplate = (context) =>
@@ -11,14 +13,14 @@
                           Value="@context.Text()"
                           Label="名称"
                           Variant="Variant.Outlined"
-                          ReadOnly="true" />
+                          ReadOnly="true"/>
 
             <MudTextField T="string"
                           Value="@context.Description"
                           Label="描述"
                           Variant="Variant.Outlined"
                           ReadOnly="true"
-                          Lines="3" />
+                          Lines="3"/>
 
             <MudChip T="string"
                      Color="@((context.IsActive ? Color.Success : Color.Error))"
@@ -40,7 +42,7 @@
                               RequiredError="名称不能为空"
                               MaxLength="100"
                               Counter="100"
-                              Immediate="true" />
+                              Immediate="true"/>
 
                 <MudTextField T="string"
                               @bind-Value="context.Description"
@@ -49,32 +51,20 @@
                               Lines="3"
                               MaxLength="500"
                               Counter="500"
-                              Immediate="true" />
-
-                @* <MudNumericField T="int" *@
-                @*                  @bind-Value="context.SortOrder" *@
-                @*                  Label="排序" *@
-                @*                  Variant="Variant.Outlined" *@
-                @*                  Min="0" *@
-                @*                  Max="9999" /> *@
+                              Immediate="true"/>
 
                 <MudSwitch T="bool"
                            @bind-Value="context.IsActive"
                            Label="启用状态"
-                           Color="Color.Primary" />
+                           Color="Color.Primary"/>
 
-                @* @if (ParentNode != null) *@
-                @* { *@
-                @*     <MudTextField T="string" *@
-                @*                   Value="ParentNode.Text()" *@
-                @*                   Label="父分类" *@
-                @*                   Variant="Variant.Text" *@
-                @*                   ReadOnly="true" *@
-                @*                   Disabled="true" /> *@
-                @* } *@
             </MudStack>
         </div>;
 }
+
+<TreePageSky>
+    
+</TreePageSky>
 <MudMainContent>
     <ChildContent>
         <MudContainer MaxWidth="MaxWidth.Small">
@@ -82,11 +72,13 @@
                 <!-- 工具栏 -->
                 <MudToolBar Dense="true" Class="mb-2">
                     <MudText Typo="Typo.h6">分类树</MudText>
-                    <MudSpacer />
-                    <MudIconButton Icon="@Icons.Material.Filled.Add" 
-                                   OnClick="AddRootNodeAsync">添加根分类</MudIconButton>        
-                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
-                                   OnClick="RefreshTreeAsync">刷新</MudIconButton>
+                    <MudSpacer/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                   OnClick="AddRootNodeAsync">添加根分类
+                    </MudIconButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                   OnClick="RefreshTreeAsync">刷新
+                    </MudIconButton>
                 </MudToolBar>
 
                 <TreeSky TItem="CategoryTree"
@@ -100,10 +92,24 @@
                          FunGetAncestorPath="@GetAncestorPathFromApiAsync"
                          ActionTemplate="@actionTemplate"
                          EditTemplate="@editTemplate"
-                         OnNodeAction="@HandleNodeActionAsync" 
+                         OnNodeAction="@HandleNodeActionAsync"
                          OnClickItem="@ClickItem"/>
             </MudPaper>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Warning"
+                       OnClick="TestingAsync">Testing
+            </MudButton>
+
         </MudContainer>
     </ChildContent>
 </MudMainContent>
+
+@code
+{
+    private async Task TestingAsync()
+    {
+        var result = await DialogService.ShowUnitOfMeasureSelectDialogAsync();
+    }
+}
 

@@ -1,4 +1,3 @@
-@using APromisedLand.Razor.DiberyTree.Models
 @using APromisedLand.Razor.DiberyTree.Navigation
 
 @typeparam TItem where TItem : class, ITreeNodeBase, new()
@@ -7,19 +6,19 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-<PageSky Title="Category Tree" BottomBarVisible
-         ArrowBackVisible=@(History.Peek() != null)
-         OnStartClick="e => StartClick()"
-         OnBackClick="e => ClickBack()">
-    <PageContent>
-        @if (_isLoading)
-        {
-            <div style="display: flex; justify-content: center; align-items: center; height: 300px;">
-                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large"/>
-            </div>
-        }
-        else
-        {
+@* <PageSky Title="Category Tree" BottomBarVisible *@
+@*          ArrowBackVisible=@(History.Peek() != null) *@
+@*          OnStartClick="e => StartClick()" *@
+@*          OnBackClick="e => ClickBack()"> *@
+@*     <PageContent> *@
+@*         @if (_isLoading) *@
+@*         { *@
+@*             <div style="display: flex; justify-content: center; align-items: center; height: 300px;"> *@
+@*                 <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large"/> *@
+@*             </div> *@
+@*         } *@
+@*         else *@
+@*         { *@
             <MudTreeView T="TItem" ServerData="@LoadChildrenAsync" Items="@_items"
                          @bind-SelectedValue="SelectedValue"
                          SelectionMode="@SelectionMode.ToggleSelection">
@@ -50,9 +49,9 @@
                     </MudTreeViewItem>
                 </ItemTemplate>
             </MudTreeView>
-        }
-    </PageContent>
-</PageSky>
+@*         } *@
+@*     </PageContent> *@
+@* </PageSky> *@
 
 @code {
     [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }

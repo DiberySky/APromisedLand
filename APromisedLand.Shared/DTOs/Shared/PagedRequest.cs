@@ -1,4 +1,4 @@
-namespace APromisedLand.Shared.DTOs.Units;
+namespace APromisedLand.Shared.DTOs.Shared;
 
 public class PagedRequest
 {

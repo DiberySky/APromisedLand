@@ -1,10 +1,7 @@
 ﻿using APromisedLand.Razor.Components;
 using MudBlazor;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace APromisedLand.Razor.Helper;
+namespace APromisedLand.Razor.Helper.Dialog;
 
 public static partial class DialogHelper
 {

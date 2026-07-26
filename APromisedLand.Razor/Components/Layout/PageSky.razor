@@ -1,4 +1,5 @@
-﻿@using APromisedLand.Shared.Interfaces
+﻿@using APromisedLand.Razor.Helper.Dialog
+@using APromisedLand.Shared.Interfaces
 @using SolutionService = APromisedLand.Shared.Services.Solution.SolutionService
 @namespace APromisedLand.Razor.Components
 
@@ -32,7 +33,7 @@
             <MudSpacer />
             <MudIconButton Icon="@Icons.Material.Outlined.Menu"
                            Color="Color.Success"
-                           OnClick="e => OnStartClick.InvokeAsync()" />
+                           OnClick="@(e => OnStartClick.InvokeAsync())" />
         }
 
     </ChildContent>
@@ -72,7 +73,7 @@
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.False;
     [Parameter] public bool BottomBarVisible { get; set; } = false;
     [Parameter] public Color BottomBarColor { get; set; } = Color.Dark;
-    [Parameter] public bool StartButtonVisible { get; set; } = true;
+    [Parameter] public bool StartButtonVisible { get; set; } = false;
 
     [Parameter] public RenderFragment? TopBarContent { get; set; }
     [Parameter] public RenderFragment? PageContent { get; set; }
@@ -81,7 +82,7 @@
     [Parameter] public EventCallback OnBackClick { get; set; }
     [Parameter] public EventCallback OnStartClick { get; set; }
 
-    [Parameter] public string? BackPage { get; set; }
+    [Parameter] public string? BackPage { get; set; } 
 
     private void BackClick()
     {

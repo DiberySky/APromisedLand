@@ -10,7 +10,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace APromisedLand.Api.Data.Migrations
 {
-    [DbContext(typeof(TreeDbContext))]
+    [DbContext(typeof(DiberyDbContext))]
     [Migration("20260720220557_Initial")]
     partial class Initial
     {

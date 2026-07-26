@@ -1,7 +1,10 @@
 ﻿@page "/StartPage"
+@using APromisedLand.Razor.Dialogs
+@using APromisedLand.Razor.Helper.Dialog
 @using APromisedLand.Shared.Interfaces
 @using APromisedLand.Shared.Models
 @using APromisedLand.Shared.Services.Solution
+@using BlazorHelper = APromisedLand.Razor.Helper.Blazor.BlazorHelper
 
 @inject IAuthenticationService AuthenticationService
 @inject AuthenticationStateProvider AuthProvider
@@ -11,7 +14,9 @@
 
 <PageSky Title="导航" 
          ArrowBackVisible="@(SolutionService.Authorized == false)"
-         BottomBarVisible>
+         StartButtonVisible="true"
+         BottomBarVisible
+         BackPage="/">
     <PageContent>
         <MudContainer MaxWidth="MaxWidth.ExtraSmall">
             <MudExpansionPanels Class="my-4">
@@ -79,6 +84,10 @@
         if (pageInfo.Name.ToLower() == "about")
         {
             await DialogService.ShowAboutDialogAsync();
+        }
+        else if (pageInfo.Name.ToLower() == "unitofmeasure")
+        {
+            await DialogService.ShowUnitOfMeasureDialogAsync();
         }
     }
 

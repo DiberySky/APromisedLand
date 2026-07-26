@@ -16,6 +16,19 @@ public static class DiberyTreeClient
     /// <typeparam name="T">节点值的类型（通常为自定义 DTO）</typeparam>
     public static void AddDiberyTreeClient<T>(this MauiAppBuilder builder)
     {
+        builder.Services.AddHttpClient<UnitsOfMeasureApiClient>(client =>
+            {
+                client.BaseAddress = new Uri("http://localhost:5085");
+            })
+            .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
+
+        //http://localhost:5085
+        builder.Services.AddHttpClient<DiberyTreeApiClient<T>>(client =>
+            {
+                client.BaseAddress = new Uri("http://localhost:5085");
+            })
+            .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
+        
         // // 注册一个便利的 HttpClient 工厂或直接注入 IHttpClientFactory
         // builder.Services.AddTransient(sp => sp.GetRequiredService<IHttpClientFactory>()
         //     .CreateClient("TreeApi"));
@@ -35,11 +48,5 @@ public static class DiberyTreeClient
         //         client.BaseAddress = new Uri(SolutionService.YarpHostBaseUrl);
         //     })
         //     .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
-        
-        //http://localhost:5085
-        builder.Services.AddHttpClient<DiberyTreeApiClient<T>>(client =>
-            {
-                client.BaseAddress = new Uri("http://localhost:5085");
-            })
-            .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    }
+    }
 }

@@ -1,0 +1,43 @@
+@using APromisedLand.Razor.DiberyTree.Navigation
+
+@typeparam TItem where TItem : class, ITreeNodeBase, new()
+
+@inject NavigationManager NavigationManager
+@inject ITreeNavigationHistoryService History
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageSky Title="Category Tree" BottomBarVisible
+         ArrowBackVisible=@(History.Peek() != null)
+         OnStartClick="e => StartClick()"
+         OnBackClick="e => ClickBack()">
+    <PageContent>
+        <TreeSky TItem="@TItem" />
+    </PageContent>
+</PageSky>
+
+@code {
+    [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
+
+    [Parameter] public RenderFragment<TItem>? EditTemplate { get; set; }
+    
+    [Parameter] public string? Page { get; set; }
+
+    private void StartClick()
+    {
+        History.Clear();
+        NavigationManager.NavigateTo(SolutionService.StartPage);
+    }
+    
+    private void ClickBack()
+    {
+        var entry = History.Pop();
+        if (entry == null) return;
+
+        var targetUrl = $"{Page}/";
+        if (entry.RootId != null) targetUrl += $"rootId/{entry.RootId}/";
+        if (entry.ClickNodeId != null) targetUrl += $"ClickNodeId/{entry.ClickNodeId}";
+
+        NavigationManager.NavigateTo(targetUrl, forceLoad: true);
+    }
+}
