@@ -3,8 +3,6 @@
 @page "/category-tree/rootId/{RootId}"
 @page "/category-tree/ClickNodeId/{ClickNodeId}"
 @page "/category-tree/rootId/{RootId}/ClickNodeId/{ClickNodeId}"
-@using APromisedLand.Razor.Dialogs
-
 
 @{
     RenderFragment<CategoryTree> actionTemplate = (context) =>
@@ -62,51 +60,34 @@
         </div>;
 }
 
-<TreePageSky>
-    
+<TreePageSky TItem="CategoryTree"
+             TitleToolBar="分类树"
+             Page="category-tree"
+             RootId="@RootId"
+             @bind-SelectedValue="@_selectedCategory"
+             NewPageOpenVisible="true"
+             @bind-NewPageOpen="@NewPageOpen"
+             ClickNodeId="@ClickNodeId"
+             LoadInitialDataFunc="@LoadInitialDataAsync"
+             LoadServerDataFunc="@LoadChildrenAsync"
+             GetAncestorPathFunc="@GetAncestorPathFromApiAsync"
+             ActionTemplate="@actionTemplate"
+             EditTemplate="@editTemplate"
+             BackPage="@SolutionService.StartPage">
+    <ToolBarRightContent>
+        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                       OnClick="AddRootNodeAsync">添加根分类
+        </MudIconButton>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                       OnClick="RefreshTreeAsync">刷新
+        </MudIconButton>
+    </ToolBarRightContent>
 </TreePageSky>
-<MudMainContent>
-    <ChildContent>
-        <MudContainer MaxWidth="MaxWidth.Small">
-            <MudPaper Class="pa-4" Elevation="2">
-                <!-- 工具栏 -->
-                <MudToolBar Dense="true" Class="mb-2">
-                    <MudText Typo="Typo.h6">分类树</MudText>
-                    <MudSpacer/>
-                    <MudIconButton Icon="@Icons.Material.Filled.Add"
-                                   OnClick="AddRootNodeAsync">添加根分类
-                    </MudIconButton>
-                    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
-                                   OnClick="RefreshTreeAsync">刷新
-                    </MudIconButton>
-                </MudToolBar>
-
-                <TreeSky TItem="CategoryTree"
-                         @ref="@_treeSky"
-                         RootId="@RootId"
-                         @bind-SelectedValue="_selectedCategory"
-                         ClickNodeId="@ClickNodeId"
-                         Page="category-tree"
-                         FunLoadInitialData="@LoadInitialDataAsync"
-                         FunLoadServerData="@LoadChildrenAsync"
-                         FunGetAncestorPath="@GetAncestorPathFromApiAsync"
-                         ActionTemplate="@actionTemplate"
-                         EditTemplate="@editTemplate"
-                         OnNodeAction="@HandleNodeActionAsync"
-                         OnClickItem="@ClickItem"/>
-            </MudPaper>
-
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Warning"
-                       OnClick="TestingAsync">Testing
-            </MudButton>
-
-        </MudContainer>
-    </ChildContent>
-</MudMainContent>
 
 @code
 {
+    public bool NewPageOpen { get; set; }
+
     private async Task TestingAsync()
     {
         var result = await DialogService.ShowUnitOfMeasureSelectDialogAsync();

@@ -1,10 +1,7 @@
-﻿@using APromisedLand.Razor.Helper.Dialog
-@using APromisedLand.Shared.Interfaces
-@using SolutionService = APromisedLand.Shared.Services.Solution.SolutionService
-@namespace APromisedLand.Razor.Components
+﻿@namespace APromisedLand.Razor.Components
 
 @inject IDialogService DialogService
-@inject NavigationManager Navigater
+@inject NavigationManager NavigationManager
 @inject IAuthenticationService AuthenticationService
 
 <MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense="true"
@@ -14,26 +11,26 @@
         {
             <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
                            Edge="Edge.Start" Color="Color.Warning"
-                           OnClick=@(e => BackClick()) />
+                           OnClick=@(e => BackClick())/>
         }
 
         @if (string.IsNullOrEmpty(Title) == false)
         {
-            <MudSpacer />
+            <MudSpacer/>
             <MudText>@Title</MudText>
+            <MudSpacer/>
         }
 
-        @if (TopBarContent is not null)
+        @if (TopBarRightContent is not null)
         {
-            @TopBarContent
+            @TopBarRightContent
         }
 
         @if (StartButtonVisible)
         {
-            <MudSpacer />
             <MudIconButton Icon="@Icons.Material.Outlined.Menu"
                            Color="Color.Success"
-                           OnClick="@(e => OnStartClick.InvokeAsync())" />
+                           OnClick="@(e => OnStartClick.InvokeAsync())"/>
         }
 
     </ChildContent>
@@ -53,15 +50,14 @@
             @if (BottomBarContent is not null)
             {
                 @BottomBarContent
-
             }
 
             @if (SolutionService.Authorized)
             {
-                <MudSpacer />
+                <MudSpacer/>
                 <MudIconButton Icon="@Icons.Material.Outlined.Logout"
                                Color="Color.Error"
-                               OnClick="e => Logout()" />
+                               OnClick="e => Logout()"/>
             }
         </ChildContent>
     </MudAppBar>
@@ -75,14 +71,14 @@
     [Parameter] public Color BottomBarColor { get; set; } = Color.Dark;
     [Parameter] public bool StartButtonVisible { get; set; } = false;
 
-    [Parameter] public RenderFragment? TopBarContent { get; set; }
+    [Parameter] public RenderFragment? TopBarRightContent { get; set; }
     [Parameter] public RenderFragment? PageContent { get; set; }
     [Parameter] public RenderFragment? BottomBarContent { get; set; }
 
-    [Parameter] public EventCallback OnBackClick { get; set; }
     [Parameter] public EventCallback OnStartClick { get; set; }
 
-    [Parameter] public string? BackPage { get; set; } 
+    [Parameter] public EventCallback OnBackClick { get; set; }
+    [Parameter] public string? BackPage { get; set; }
 
     private void BackClick()
     {
@@ -92,7 +88,7 @@
         }
         else
         {
-            Navigater.NavigateTo(BackPage);
+            NavigationManager.NavigateTo(BackPage);
         }
     }
 
@@ -107,6 +103,7 @@
 
         SolutionService.Reset();
 
-        Navigater.NavigateTo("/");
+        NavigationManager.NavigateTo("/");
     }
+
 }

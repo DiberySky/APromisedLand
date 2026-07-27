@@ -7,37 +7,125 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-<PageSky Title="Category Tree" BottomBarVisible
-         ArrowBackVisible=@(History.Peek() != null)
+<PageSky Title="@Title"
+         BottomBarVisible
+         ArrowBackVisible
          OnStartClick="e => StartClick()"
-         OnBackClick="e => ClickBack()">
+         OnBackClick="e => BackClick()">
+    <TopBarRightContent>
+        @if (TopBarRightContent != null)
+        {
+            @TopBarRightContent
+        }
+    </TopBarRightContent>
     <PageContent>
-        <TreeSky TItem="@TItem" />
+        <MudContainer MaxWidth="@MaxWidth">
+            <MudToolBar Class="mud-theme-dark">
+                @if (!string.IsNullOrEmpty(TitleToolBar))
+                {
+                    <MudText Typo="Typo.h6" Class="text-info">@TitleToolBar</MudText>
+                }
+                
+                @if (ToolBarLeftContent != null)
+                {
+                    @ToolBarLeftContent
+                }
+
+                <MudSpacer/>
+
+                @if (ToolBarRightContent != null)
+                {
+                    @ToolBarRightContent
+                }
+
+                @if (NewPageOpenVisible)
+                {
+                    <MudCheckBox @bind-Value="NewPageOpen"
+                             Label="新页面打开"
+                             Color="Color.Primary"
+                             Size="Size.Small"
+                             UncheckedColor="Color.Default"/>
+                }
+            </MudToolBar>
+
+            <TreeSky TItem="@TItem"
+                     @ref="@_treeSky"
+                     Page="@Page"
+                     RootId="@RootId"
+                     @bind-NewPageOpen="@NewPageOpen"
+                     @bind-SelectedValue="@SelectedValue"
+                     ClickNodeId="@ClickNodeId"
+                     LoadInitialDataFunc="@LoadInitialDataFunc"
+                     LoadServerDataFunc="@LoadServerDataFunc"
+                     GetAncestorPathFunc="@GetAncestorPathFunc"
+                     ActionTemplate="@ActionTemplate"
+                     EditTemplate="@EditTemplate"
+                     OnClickItemText="@(e => OnClickItemText.InvokeAsync(e))"/>
+        </MudContainer>
     </PageContent>
 </PageSky>
 
 @code {
-    [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
+    private TreeSky<TItem>? _treeSky;
 
-    [Parameter] public RenderFragment<TItem>? EditTemplate { get; set; }
-    
+    [Parameter] public string Title { get; set; } = typeof(TItem).Name;
+    [Parameter] public string? TitleToolBar { get; set; }
+    [Parameter] public string? RootId { get; set; }
     [Parameter] public string? Page { get; set; }
+    [Parameter] public string? ClickNodeId { get; set; }
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
+    [Parameter] public string? BackPage { get; set; } 
+
+    [Parameter] public TItem? SelectedValue { get; set; }
+    [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
+    
+    [Parameter] public bool NewPageOpen { get; set; } = false;
+    [Parameter] public EventCallback<bool> NewPageOpenChanged { get; set; } 
+    [Parameter] public bool NewPageOpenVisible { get; set; }
+
+    [Parameter] public RenderFragment? TopBarRightContent { get; set; }
+    [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }
+    [Parameter] public RenderFragment? ToolBarRightContent { get; set; }
+    
+    [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
+    [Parameter] public RenderFragment<TItem>? EditTemplate { get; set; }
+
+    [Parameter] public Func<Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadInitialDataFunc { get; set; }
+    [Parameter] public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadServerDataFunc { get; set; }
+    [Parameter] public Func<string, Task<List<string>?>>? GetAncestorPathFunc { get; set; }
+
+    [Parameter] public EventCallback OnBackClick { get; set; }
+    [Parameter] public EventCallback<ITreeItemData<TItem>?> OnClickItemText { get; set; }
 
     private void StartClick()
     {
         History.Clear();
         NavigationManager.NavigateTo(SolutionService.StartPage);
     }
-    
-    private void ClickBack()
+
+    private void BackClick()
     {
-        var entry = History.Pop();
-        if (entry == null) return;
+        if (History.Peek() != null)
+        {
+            var entry = History.Pop();
+            if (entry == null) return;
 
-        var targetUrl = $"{Page}/";
-        if (entry.RootId != null) targetUrl += $"rootId/{entry.RootId}/";
-        if (entry.ClickNodeId != null) targetUrl += $"ClickNodeId/{entry.ClickNodeId}";
+            var targetUrl = $"{Page}/";
+            if (entry.RootId != null) targetUrl += $"rootId/{entry.RootId}/";
+            if (entry.ClickNodeId != null) targetUrl += $"ClickNodeId/{entry.ClickNodeId}";
 
-        NavigationManager.NavigateTo(targetUrl, forceLoad: true);
+            NavigationManager.NavigateTo(targetUrl, forceLoad: true);
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(BackPage))
+            {
+                OnBackClick.InvokeAsync();
+            }
+            else
+            {
+                NavigationManager.NavigateTo(BackPage);
+            }
+        }
     }
 }

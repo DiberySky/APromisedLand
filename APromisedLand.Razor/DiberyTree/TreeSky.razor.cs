@@ -22,20 +22,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
     private TreeNodeDialogService<TItem>? _nodeDialogService;
     private TreeNodeDialogService<TItem> NodeDialogSvc =>
         _nodeDialogService ??= new TreeNodeDialogService<TItem>(DialogService);
-
-
-    // ========== 参数 ==========
-    [Parameter] public string? RootId { get; set; }
-    [Parameter] public string? ClickNodeId { get; set; }
-    [Parameter] public string? Page { get; set; }
-    [Parameter] public TItem? SelectedValue { get; set; }
-    [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
-    [Parameter] public Func<Task<IReadOnlyList<TreeNodeDto<TItem>>>>? FunLoadInitialData { get; set; }
-    [Parameter] public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>? FunLoadServerData { get; set; }
-    [Parameter] public Func<string, Task<List<string>?>>? FunGetAncestorPath { get; set; }
-    [Parameter] public EventCallback<ITreeItemData<TItem>?> OnClickItem { get; set; }
-    [Parameter] public EventCallback<NodeTemplate<TItem>> OnNodeAction { get; set; }
-
+    
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private DiberyTreeApiClient<TItem> TreeClient { get; set; } = null!;
 
@@ -60,6 +47,8 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
             _lastClickNodeId = ClickNodeId;
             await ExpandToNodeAsync(ClickNodeId);
         }
+        
+        if (RootId == null && _items != null) RootId = _items!.FirstOrDefault()?.Value?.Id;
     }
 
     // ========== 节点展开 ==========
@@ -74,7 +63,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
 
         if (path != null)
         {
-            await _items.ExpandToNodeAsync(
+            await _items!.ExpandToNodeAsync(
                 path: path,
                 loadChildren: LoadChildrenAsync,
                 onSelected: value =>
@@ -89,17 +78,32 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
 
     private async Task<List<string>?> GetAncestorPathFromApiAsync(string nodeId)
     {
-        if (FunGetAncestorPath == null) return null;
-        return await FunGetAncestorPath(nodeId);
+        if (GetAncestorPathFunc == null) return null;
+        return await GetAncestorPathFunc(nodeId);
     }
 
     // ========== 节点点击与导航 ==========
-    private async Task ClickItem(ITreeItemData<TItem> node)
+    private async Task ClickItemText(ITreeItemData<TItem> node)
     {
-        // 记录浏览历史
-        History.Push(NavigationManager.Uri, RootId, node.Value?.Id);
+        SelectedValue = node.Value;
+        _ = SelectedValueChanged.InvokeAsync(node.Value);
+
+        if (node.Value!.Id == RootId) return;
+        
+        if (NewPageOpen && node.HasChildren)
+        {
+            // 记录浏览历史
+            History.Push(NavigationManager.Uri, RootId, node.Value?.Id);
+            
+            if (node?.Value == null) return;
+            Snackbar.Add($"点击{node.Text}", Severity.Info);
+            NavigationManager.NavigateTo($"{Page}/rootId/{node.Value.Id}", forceLoad: true, replace: true);
+            
+        }
+        
         // 触发外部回调，由调用方决定导航行为
-        await OnClickItem.InvokeAsync(node);
+        await OnClickItemText.InvokeAsync(node);
+
     }
 
     private void ClickBack()
@@ -131,23 +135,23 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
     // ========== 数据加载 ==========
     private async Task<List<TreeItemData<TItem>>> LoadInitialDataAsync()
     {
-        if (FunLoadInitialData == null) return [];
-        var items = await FunLoadInitialData();
+        if (LoadInitialDataFunc == null) return [];
+        var items = await LoadInitialDataFunc();
         return items.Select(i => i.ToTreeItemData<TItem>()).ToList();
     }
 
     private async Task<IReadOnlyCollection<TreeItemData<TItem>>> LoadChildrenAsync(TItem? parent)
     {
-        if (FunLoadServerData == null) return [];
+        if (LoadServerDataFunc == null) return [];
 
         if (parent == null)
         {
-            var roots = await FunLoadServerData(null);
+            var roots = await LoadServerDataFunc(null);
             return roots.Select(ConvertToTreeItem).ToList();
         }
         else
         {
-            var children = await FunLoadServerData(parent);
+            var children = await LoadServerDataFunc(parent);
             return children.Select(ConvertToTreeItem).ToList();
         }
     }
@@ -155,9 +159,9 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
     // ========== 刷新 ==========
     public async Task RefreshAsync()
     {
-        if (FunLoadServerData != null)
+        if (LoadServerDataFunc != null)
         {
-            var rootItems = await FunLoadServerData(null);
+            var rootItems = await LoadServerDataFunc(null);
             _items = rootItems?.Select(dto => ConvertToTreeItem(dto)).ToList() ?? [];
             StateHasChanged();
         }
@@ -165,9 +169,9 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
 
     public async Task RefreshNodeChildrenAsync(ITreeItemData<TItem> node)
     {
-        if (node.Value == null || FunLoadServerData == null) return;
+        if (node.Value == null || LoadServerDataFunc == null) return;
 
-        var children = await FunLoadServerData(node.Value);
+        var children = await LoadServerDataFunc(node.Value);
         node.Children = children.Select(c => new TreeItemData<TItem>
         {
             Value = c.Value,

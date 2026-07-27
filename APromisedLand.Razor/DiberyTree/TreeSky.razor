@@ -6,55 +6,74 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-@* <PageSky Title="Category Tree" BottomBarVisible *@
-@*          ArrowBackVisible=@(History.Peek() != null) *@
-@*          OnStartClick="e => StartClick()" *@
-@*          OnBackClick="e => ClickBack()"> *@
-@*     <PageContent> *@
-@*         @if (_isLoading) *@
-@*         { *@
-@*             <div style="display: flex; justify-content: center; align-items: center; height: 300px;"> *@
-@*                 <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large"/> *@
-@*             </div> *@
-@*         } *@
-@*         else *@
-@*         { *@
-            <MudTreeView T="TItem" ServerData="@LoadChildrenAsync" Items="@_items"
-                         @bind-SelectedValue="SelectedValue"
-                         SelectionMode="@SelectionMode.ToggleSelection">
-                <ItemTemplate>
-                    <MudTreeViewItem T="TItem"
-                        Text="@context.Text"
-                        Value="@context.Value"
-                        @bind-Items="context.Children"
-                        @bind-Expanded="@context.Expanded"
-                        CanExpand="@context.Expandable"
-                        Icon="@context.Icon"
-                        LoadingIconColor="Color.Info"
-                        OnClick="@(() => ClickItem(context))">
-                        <BodyContent Context="node">
-                            <MudContainer class="d-flex justify-space-between mx-0 px-0">
-                                <MudText>
-                                    <MudHighlighter Text="@(context.Text)"
-                                                    HighlightedText="@HighlightedText"
-                                                    Class="mud-theme-primary"/>
-                                </MudText>
+@if (_items == null || _items.Count == 0)
+{
+    <div style="display: flex; justify-content: center; align-items: center; height: 300px;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large"/>
+    </div>
+}
+else
+{
+    <MudTreeView T="TItem" ServerData="@LoadChildrenAsync" Items="@_items"
+                 @bind-SelectedValue="SelectedValue"
+                 SelectionMode="@SelectionMode.ToggleSelection">
+        <ItemTemplate>
+            <MudTreeViewItem T="TItem"
+                             Text="@context.Text"
+                             Value="@context.Value"
+                             @bind-Items="context.Children"
+                             @bind-Expanded="@context.Expanded"
+                             CanExpand="@context.Expandable"
+                             Icon="@context.Icon"
+                             LoadingIconColor="Color.Info"
+                             OnClick="@(() => ClickItemText(context))">
+                <BodyContent Context="node">
+                    <MudContainer class="d-flex justify-space-between mx-0 px-0">
+                        <MudText>
+                            <MudHighlighter Text="@(context.Text)"
+                                            HighlightedText="@HighlightedText"
+                                            Class="mud-theme-primary"/>
+                        </MudText>
 
-                                <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
-                                               Size="Size.Small"
-                                               Color="Color.Primary"
-                                               OnClick="@(() => ShowNodeActionsAsync(context))"/>
-                            </MudContainer>
-                        </BodyContent>
-                    </MudTreeViewItem>
-                </ItemTemplate>
-            </MudTreeView>
-@*         } *@
-@*     </PageContent> *@
-@* </PageSky> *@
+                        @if (context.Value!.Id == RootId)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => ShowRootActionsAsync(context))"/>
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => ShowNodeActionsAsync(context))"/>
+                        }
+                    </MudContainer>
+                </BodyContent>
+            </MudTreeViewItem>
+        </ItemTemplate>
+    </MudTreeView>
+}
 
 @code {
-    [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
 
+    // ========== 参数 ==========
+    [Parameter] public string? RootId { get; set; }
+    [Parameter] public string? ClickNodeId { get; set; }
+    [Parameter] public string? Page { get; set; }
+
+    [Parameter] public TItem? SelectedValue { get; set; }
+    [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
+
+    [Parameter] public Func<Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadInitialDataFunc { get; set; }
+    [Parameter] public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadServerDataFunc { get; set; }
+    [Parameter] public Func<string, Task<List<string>?>>? GetAncestorPathFunc { get; set; }
+    [Parameter] public EventCallback<ITreeItemData<TItem>?> OnClickItemText { get; set; }
+
+    [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
     [Parameter] public RenderFragment<TItem>? EditTemplate { get; set; }
+
+    [Parameter] public bool NewPageOpen { get; set; }
+    [Parameter] public EventCallback<bool> NewPageOpenChanged { get; set; }
 }

@@ -5,23 +5,15 @@
 @inject IDialogService DialogService
 
 <PageSky BackPage="/startPage">
-    <TopBarContent>
+    <TopBarRightContent>
         <MudText Typo="Typo.h6">计量单位管理</MudText>
         <MudSpacer/>
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.Add" OnClick="() => OpenDialog()">
             新增
         </MudButton>
-    </TopBarContent>
+    </TopBarRightContent>
     <PageContent>
-        @* <MudToolBar Dense> *@
-        @*     <MudText Typo="Typo.h6">计量单位管理</MudText> *@
-        @*     <MudSpacer/> *@
-        @*     <MudButton Variant="Variant.Filled" Color="Color.Primary" *@
-        @*                StartIcon="@Icons.Material.Filled.Add" OnClick="() => OpenDialog()"> *@
-        @*         新增 *@
-        @*     </MudButton> *@
-        @* </MudToolBar> *@
 
         <MudTable ServerData="LoadDataAsync" Dense Hover @ref="_table" RowsPerPage="20"
                   Loading="_loading" Breakpoint="Breakpoint.Sm">
