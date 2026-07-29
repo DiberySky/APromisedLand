@@ -9,7 +9,7 @@ namespace APromisedLand.Api.Projects.DiberyTree.Services;
 /// 泛型树服务实现（内存存储示例）
 /// </summary>
 /// <typeparam name="T">节点值的类型</typeparam>
-public class TreeService<T> where T : class, ITreeNodeBase //ITreeService<T> 
+public class TreeService<T> where T : class, ITreeNodeBase<T> //ITreeService<T> 
 {
     private readonly ConcurrentDictionary<string, TreeNodeDto<T>> _nodes = new();
     private readonly ConcurrentDictionary<string, List<string>> _parentChildren = new();

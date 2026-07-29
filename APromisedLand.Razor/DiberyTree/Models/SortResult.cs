@@ -6,7 +6,7 @@ namespace APromisedLand.Razor.DiberyTree.Models;
 /// 节点排序结果
 /// </summary>
 /// <typeparam name="TItem">节点类型</typeparam>
-public class SortResult<TItem> where TItem : class, ITreeNodeBase
+public class SortResult<TItem> where TItem : class, ITreeNodeBase<TItem>
 {
     /// <summary>是否确认保存</summary>
     public bool IsConfirmed { get; set; }
@@ -24,7 +24,7 @@ public class SortResult<TItem> where TItem : class, ITreeNodeBase
 /// <summary>
 /// 排序项详情
 /// </summary>
-public class SortItem<TItem> where TItem : class, ITreeNodeBase
+public class SortItem<TItem> where TItem : class, ITreeNodeBase<TItem>
 {
     /// <summary>节点</summary>
     public required TItem Node { get; set; }

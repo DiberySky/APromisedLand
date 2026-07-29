@@ -21,7 +21,7 @@ public enum NodeDialogMode
 /// 节点对话框操作结果
 /// </summary>
 /// <typeparam name="TItem">节点类型</typeparam>
-public class TreeNodeDialogResult<TItem> where TItem : class, ITreeNodeBase
+public class TreeNodeDialogResult<TItem> where TItem : class, ITreeNodeBase<TItem>
 {
     /// <summary>操作模式</summary>
     public NodeDialogMode Mode { get; set; }

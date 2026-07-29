@@ -12,9 +12,9 @@ public static partial class BlazorHelper
             Title = "功能", Expanded = true,
                 PageInfos =
                 [
+                    new PageInfo { Title = "CategoryTreePage", Name = "category-tree", Authorized = false },
                     new PageInfo { Title = "单位", Name = "UnitOfMeasure", IsDialog = true, Authorized = false },
                     new PageInfo { Title = "计量单位", Name = "UnitOfMeasurePage", Authorized = false },
-                    new PageInfo { Title = "CategoryTreePage", Name = "category-tree", Authorized = false },
                     new PageInfo { Title = "DiberyTree", Name = "TreePage", Authorized = false },
                     new PageInfo { Title = "天气-api", Name = "Weather", Authorized = true },
                     new PageInfo { Title = "天气-Client", Name = "weatherclient", Authorized = true },

@@ -1,16 +1,15 @@
-@using APromisedLand.Razor.DiberyTree.Navigation
 
-@typeparam TItem where TItem : class, ITreeNodeBase, new()
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
+@inject DiberyTreeApiClient<TItem> ApiClient
 @inject ITreeNavigationHistoryService History
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject BlazorService BlazorService
 
 @if (_items == null || _items.Count == 0)
 {
-    <div style="display: flex; justify-content: center; align-items: center; height: 300px;">
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large"/>
-    </div>
+    <ProgressCircularSky /> 
 }
 else
 {
@@ -40,7 +39,7 @@ else
                             <MudIconButton Icon="@Icons.Material.Filled.Add"
                                            Size="Size.Small"
                                            Color="Color.Primary"
-                                           OnClick="@(() => ShowRootActionsAsync(context))"/>
+                                           OnClick="@(() => HandleAddChildAsync(context))"/>
                         }
                         else
                         {

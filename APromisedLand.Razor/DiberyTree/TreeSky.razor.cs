@@ -12,7 +12,7 @@ using MudBlazor;
 
 namespace APromisedLand.Razor.DiberyTree;
 
-public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
+public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, new()
 {
     private List<TreeItemData<TItem>>? _items;
     private bool _isLoading = true;
@@ -20,9 +20,10 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
     private string HighlightedText { get; set; } = string.Empty;
 
     private TreeNodeDialogService<TItem>? _nodeDialogService;
+
     private TreeNodeDialogService<TItem> NodeDialogSvc =>
         _nodeDialogService ??= new TreeNodeDialogService<TItem>(DialogService);
-    
+
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private DiberyTreeApiClient<TItem> TreeClient { get; set; } = null!;
 
@@ -47,7 +48,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
             _lastClickNodeId = ClickNodeId;
             await ExpandToNodeAsync(ClickNodeId);
         }
-        
+
         if (RootId == null && _items != null) RootId = _items!.FirstOrDefault()?.Value?.Id;
     }
 
@@ -89,21 +90,19 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
         _ = SelectedValueChanged.InvokeAsync(node.Value);
 
         if (node.Value!.Id == RootId) return;
-        
+
         if (NewPageOpen && node.HasChildren)
         {
             // 记录浏览历史
             History.Push(NavigationManager.Uri, RootId, node.Value?.Id);
-            
+
             if (node?.Value == null) return;
             Snackbar.Add($"点击{node.Text}", Severity.Info);
             NavigationManager.NavigateTo($"{Page}/rootId/{node.Value.Id}", forceLoad: true, replace: true);
-            
         }
-        
+
         // 触发外部回调，由调用方决定导航行为
         await OnClickItemText.InvokeAsync(node);
-
     }
 
     private void ClickBack()
@@ -130,14 +129,21 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
         SelectedValue = rootValue;
     }
 
-    
 
     // ========== 数据加载 ==========
     private async Task<List<TreeItemData<TItem>>> LoadInitialDataAsync()
     {
-        if (LoadInitialDataFunc == null) return [];
-        var items = await LoadInitialDataFunc();
-        return items.Select(i => i.ToTreeItemData<TItem>()).ToList();
+        try
+        {
+            if (LoadInitialDataFunc == null) return [];
+            var items = await LoadInitialDataFunc();
+            return items.Select(i => i.ToTreeItemData<TItem>()).ToList();
+        }
+        catch (Exception e)
+        {
+            Snackbar.Details("加载初始数据失败。", e.Message, DialogService);
+            return [];
+        }
     }
 
     private async Task<IReadOnlyCollection<TreeItemData<TItem>>> LoadChildrenAsync(TItem? parent)
@@ -147,12 +153,12 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
         if (parent == null)
         {
             var roots = await LoadServerDataFunc(null);
-            return roots.Select(ConvertToTreeItem).ToList();
+            return roots.Select(i => i.ToTreeItemData<TItem>()).ToList();
         }
         else
         {
             var children = await LoadServerDataFunc(parent);
-            return children.Select(ConvertToTreeItem).ToList();
+            return children.Select(i => i.ToTreeItemData<TItem>()).ToList();
         }
     }
 
@@ -162,40 +168,47 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
         if (LoadServerDataFunc != null)
         {
             var rootItems = await LoadServerDataFunc(null);
-            _items = rootItems?.Select(dto => ConvertToTreeItem(dto)).ToList() ?? [];
+            _items = rootItems?.Select(x => x.ToTreeItemData<TItem>()).ToList() ?? [];
             StateHasChanged();
         }
     }
 
-    public async Task RefreshNodeChildrenAsync(ITreeItemData<TItem> node)
+    private async Task RefreshNodeChildrenAsync(ITreeItemData<TItem> node)
     {
         if (node.Value == null || LoadServerDataFunc == null) return;
 
         var children = await LoadServerDataFunc(node.Value);
+        
         node.Children = children.Select(c => new TreeItemData<TItem>
         {
             Value = c.Value,
             Text = c.Text,
-            Icon = c.Icon,
+            Icon = BlazorHelper.TreeItemIcons,
+            Expandable = c.HasChildren,
             Expanded = false,
-            Children = new HashSet<ITreeItemData<TItem>>()
+            Children = c.Children?.Select(x => x.ToTreeItemData<TItem>()).ToList()
         }).ToHashSet<ITreeItemData<TItem>>();
 
         StateHasChanged();
     }
 
     // ========== 数据转换 ==========
-    public TreeItemData<TItem> ConvertToTreeItem(TreeNodeDto<TItem> dto)
-    {
-        return new TreeItemData<TItem>
-        {
-            Value = dto.Value,
-            Text = dto.Text,
-            Icon = dto.Icon,
-            Expanded = dto.Expanded,
-            Children = [],
-        };
-    }
+    // public TreeItemData<TItem> ConvertToTreeItem(TreeNodeDto<TItem> dto)
+    // {
+    //     
+    //     var node = new TreeItemData<TItem>
+    //     {
+    //         Value = dto.Value,
+    //         Text = dto.Text,
+    //         Icon = dto.Icon,
+    //         Expanded = dto.Expanded,
+    //         Children = [],
+    //     };
+    //     
+    //     node.Value!.Parent = dto.Parent;
+    //     
+    //     return node;
+    // }
 
     // ========== 节点查找 ==========
     private TItem? FindNodeById(IEnumerable<ITreeItemData<TItem>> items, string? id)
@@ -221,7 +234,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
     /// <summary>
     /// 从树中查找指定节点的父节点（泛型）
     /// </summary>
-    public TItem? GetParentNode(string nodeId)
+    private TItem? GetParentNode(string nodeId)
     {
         foreach (var item in _items!)
         {
@@ -279,7 +292,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase, new()
 
         return false;
     }
-    
+
     #region 获取所有节点
 
     /// <summary>

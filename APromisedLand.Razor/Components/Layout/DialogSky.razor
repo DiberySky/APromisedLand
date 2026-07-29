@@ -28,34 +28,45 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudToolBar Dense>
-            <MudSpacer/>
-            <MudStack Row Spacing="2" Class="mr-4">
-                @if (CancelButtonVisible)
-                {
-                    <MudButton Variant="Variant.Text"
-                               StartIcon="@Icons.Material.Filled.Close"
-                               Color="Color.Default"
-                               OnClick="@CancelAsync">
-                        取消
-                    </MudButton>
-                }
+        @* <MudToolBar Dense> *@
+            <MudContainer>
+                <MudStack Row Spacing="2">
+                    
+                    @if (DialogLeftActions != null)
+                    {
+                        @DialogLeftActions
+                    }
 
-                @if (SubmitButtonVisible)
-                {
-                    <ButtonLoadingSky Text="提交"
-                                      Variant="Variant.Filled"
-                                      Color="Color.Primary"
-                                      StartIcon="@Icons.Material.Filled.SaveAs"
-                                      OnClickFunc=@(() => OnSubmitClick.InvokeAsync())/>
-                }
+                    <MudSpacer/>
 
-                @if (DialogActions != null)
-                {
-                    @DialogActions
-                }
-            </MudStack>
-        </MudToolBar>
+                    @if (DialogRightActions != null)
+                    {
+                        @DialogRightActions
+                    }
+
+                    @if (SubmitButtonVisible)
+                    {
+                        <ButtonLoadingSky Text="提交"
+                                          Variant="Variant.Text"
+                                          Color="Color.Primary"
+                                          StartIcon="@Icons.Material.Filled.SaveAs"
+                                          OnClickFunc=@(() => OnSubmitClick.InvokeAsync())/>
+                    }
+                    
+                    @if (CancelButtonVisible)
+                    {
+                        <MudButton Variant="Variant.Text"
+                                   StartIcon="@Icons.Material.Filled.Close"
+                                   Color="Color.Default"
+                                   OnClick="@CancelAsync">
+                            取消
+                        </MudButton>
+                    }
+                    
+                </MudStack>
+
+            </MudContainer>
+        @* </MudToolBar> *@
     </DialogActions>
 </MudDialog>
 
@@ -65,7 +76,7 @@
     [Parameter] public required string Title { get; set; }
 
     [Parameter] public bool CancelButtonVisible { get; set; } = true;
-    [Parameter] public bool SubmitButtonVisible { get; set; } = false;
+    [Parameter] public bool SubmitButtonVisible { get; set; }
 
     [Parameter] public string TitleClass { get; set; } = "mud-theme-success px-0 pa-0";
     [Parameter] public string ContentClass { get; set; } = "mud-theme-dark";
@@ -75,7 +86,8 @@
     [Parameter] public RenderFragment? TitleContent { get; set; }
     [Parameter] public RenderFragment? ToolBarContent { get; set; }
     [Parameter] public RenderFragment? DialogContent { get; set; }
-    [Parameter] public RenderFragment? DialogActions { get; set; }
+    [Parameter] public RenderFragment? DialogLeftActions { get; set; }
+    [Parameter] public RenderFragment? DialogRightActions { get; set; }
 
     [Parameter] public EventCallback OnCanceledClick { get; set; }
     [Parameter] public EventCallback OnSubmitClick { get; set; }

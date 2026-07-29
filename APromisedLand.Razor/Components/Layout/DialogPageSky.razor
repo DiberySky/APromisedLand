@@ -9,19 +9,19 @@
                 {
                     <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
                                    Edge="Edge.Start" Color="Color.Warning"
-                                   OnClick=@(e => CancelAsync()) />
+                                   OnClick=@(e => CancelAsync())/>
                 }
 
-                <MudSpacer />
-                <MudText >@Title</MudText>
-                <MudSpacer />
-                
+                <MudSpacer/>
+                <MudText>@Title</MudText>
+                <MudSpacer/>
+
                 @if (StartButtonVisible)
                 {
-                    <MudSpacer />
+                    <MudSpacer/>
                     <MudIconButton Icon="@Icons.Material.Outlined.Menu"
                                    Color="Color.Success"
-                                   OnClick="@(e => OnStartClick.InvokeAsync())" />
+                                   OnClick="@(e => OnStartClick.InvokeAsync())"/>
                 }
             </MudToolBar>
         }
@@ -52,7 +52,7 @@
                     取消
                 </MudButton>
             }
-            
+
             @if (SubmitButtonVisible)
             {
                 <ButtonLoadingSky Text="提交"
@@ -100,4 +100,5 @@
 
         await OnCanceledClick.InvokeAsync();
     }
+
 }

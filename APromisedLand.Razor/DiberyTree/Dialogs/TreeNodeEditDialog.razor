@@ -1,101 +1,96 @@
-@typeparam TItem where TItem : class, ITreeNodeBase, new()
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-@using APromisedLand.Razor.DiberyTree.Services
 @implements IDisposable
 
 @inject TreeNodeDialogService<TItem> TreeNodeDialogService
 
-<TreeDialogSky TItem="@TItem"
-               Item="@Node"
-               Title="编辑节点"
+<DialogTreeSky TItem="@TItem"
+               Item="@_node"
+               Title="@_title"
                SubmitButtonVisible="true"
                OnSubmitClick="@SubmitAsync"
                OnCanceledClick="@Close">
     <DialogContent>
         <MudContainer Class="py-8">
-            <MudForm @ref="_form" Model="_model">
+            <MudForm @ref="_form" Model="@_node">
                 @if (NodeTemplate.EditTemplate is null)
                 {
                     <MudStack Spacing="3">
-                        <MudTextField T="string"
-                                      @bind-Value="_model.Name"
-                                      Label="名称"
-                                      Variant="Variant.Outlined"
-                                      Required="true"
-                                      RequiredError="名称不能为空"
-                                      MaxLength="100"
-                                      Counter="100"
-                                      Immediate="true"/>
-
-                        <MudTextField T="string"
-                                      @bind-Value="_model.Description"
-                                      Label="描述"
-                                      Variant="Variant.Outlined"
-                                      Lines="3"
-                                      MaxLength="500"
-                                      Counter="500"
-                                      Immediate="true"/>
-
-                        <MudNumericField T="int"
-                                         @bind-Value="_model.SortOrder"
-                                         Label="排序"
-                                         Variant="Variant.Outlined"
-                                         Min="0"
-                                         Max="9999"/>
-
-                        <MudSwitch T="bool"
-                                   @bind-Value="_model.IsActive"
-                                   Label="启用状态"
-                                   Color="Color.Primary"/>
-
-                        @if (ParentNode != null)
-                        {
-                            <MudTextField T="string"
-                                          Value="ParentNode.Text()"
-                                          Label="父分类"
-                                          Variant="Variant.Text"
-                                          ReadOnly="true"
-                                          Disabled="true"/>
-                        }
+                        @* <MudTextField T="string" *@
+                        @*               @bind-Value="_model.Name" *@
+                        @*               Label="名称" *@
+                        @*               Variant="Variant.Outlined" *@
+                        @*               Required="true" *@
+                        @*               RequiredError="名称不能为空" *@
+                        @*               MaxLength="100" *@
+                        @*               Counter="100" *@
+                        @*               Immediate="true"/> *@
+                        @* *@
+                        @* <MudTextField T="string" *@
+                        @*               @bind-Value="_model.Description" *@
+                        @*               Label="描述" *@
+                        @*               Variant="Variant.Outlined" *@
+                        @*               Lines="3" *@
+                        @*               MaxLength="500" *@
+                        @*               Counter="500" *@
+                        @*               Immediate="true"/> *@
+                        @* *@
+                        @* <MudNumericField T="int" *@
+                        @*                  @bind-Value="_model.SortOrder" *@
+                        @*                  Label="排序" *@
+                        @*                  Variant="Variant.Outlined" *@
+                        @*                  Min="0" *@
+                        @*                  Max="9999"/> *@
+                        @* *@
+                        @* <MudSwitch T="bool" *@
+                        @*            @bind-Value="_model.IsActive" *@
+                        @*            Label="启用状态" *@
+                        @*            Color="Color.Primary"/> *@
                     </MudStack>
                 }
                 else
                 {
-                    @NodeTemplate.EditTemplate(NodeTemplate.Node.Value!)
+                    @NodeTemplate.EditTemplate(_node)
                 }
             </MudForm>
         </MudContainer>
     </DialogContent>
 
-</TreeDialogSky>
+</DialogTreeSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
-    [Parameter] public TItem? Node { get; set; }
-    [Parameter] public TItem? ParentNode { get; set; }
+    // [Parameter] public TItem? Node { get; set; }
+    // [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsCreate { get; set; }
 
-    private MudForm _form = null!;
-    private TreeNodeFormModel _model = new();
-    private bool _isSubmitting = false;
+    [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
 
-    private string TitleText => IsCreate ? "创建节点" : "编辑节点";
+    private MudForm _form = null!;
+    // private TreeNodeFormModel _model = new();
+    // private bool _isSubmitting = false;
+    private TItem _node = null!;
+
+    private string _title = null!; //=> IsCreate ? "创建节点" : "编辑节点";
 
     protected override void OnInitialized()
     {
-        if (Node != null && !IsCreate)
-        {
-            _model = new TreeNodeFormModel
-            {
-                Name = Node.Text(),
-                Description = Node.Description,
-                SortOrder = Node.SortOrder,
-                IsActive = Node.IsActive
-            };
-        }
+        _node = NodeTemplate.Node.Value!;
+        
+        // if (!IsCreate)
+        // {
+        //     _model = new TreeNodeFormModel
+        //     {
+        //         Name = _node.Text(),
+        //         Description = _node.Description,
+        //         SortOrder = _node.SortOrder,
+        //         IsActive = _node.IsActive
+        //     };
+        // }
 
+        _title = IsCreate ? $"创建【{_node.Parent!.Text()}】子节点" : _node.Text();
+        
         base.OnInitialized();
     }
 
@@ -104,14 +99,14 @@
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
 
-        _isSubmitting = true;
+        // _isSubmitting = true;
         try
         {
-            MudDialog?.Close(DialogResult.Ok(_model));
+            MudDialog?.Close(DialogResult.Ok(_node));
         }
         finally
         {
-            _isSubmitting = false;
+            // _isSubmitting = false;
         }
     }
 

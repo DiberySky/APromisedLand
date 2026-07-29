@@ -11,7 +11,7 @@ public static class TreeDragDropHelper
     /// 检查是否可以将源节点拖放到目标节点
     /// </summary>
     public static bool CanDrop<TItem>(TItem source, TItem target, DropPosition position)
-        where TItem : class, ITreeNodeBase
+        where TItem : class, ITreeNodeBase<TItem>
     {
         if (source.Id == target.Id) return false;
         if (IsDescendant(source, target)) return false;
@@ -22,7 +22,7 @@ public static class TreeDragDropHelper
     /// 检查 target 是否是 source 的后代
     /// </summary>
     private static bool IsDescendant<TItem>(TItem source, TItem target)
-        where TItem : class, ITreeNodeBase
+        where TItem : class, ITreeNodeBase<TItem>
     {
         // 通过反射获取 Children 属性（因为 ITreeNode 接口没有定义 Children）
         var childrenProperty = source.GetType().GetProperty("Children");
@@ -51,7 +51,7 @@ public static class TreeDragDropHelper
         TItem draggedItem,
         TItem? targetItem,
         DropPosition position)
-        where TItem : class, ITreeNodeBase
+        where TItem : class, ITreeNodeBase<TItem>
     {
         if (targetItem == null) return siblings.Count;
 
@@ -71,7 +71,7 @@ public static class TreeDragDropHelper
     /// 重新计算同级节点的排序序号
     /// </summary>
     public static void ReorderSiblings<TItem>(List<TItem> siblings)
-        where TItem : class, ITreeNodeBase
+        where TItem : class, ITreeNodeBase<TItem>
     {
         for (int i = 0; i < siblings.Count; i++)
         {

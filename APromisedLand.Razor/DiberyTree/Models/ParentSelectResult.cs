@@ -6,7 +6,7 @@ namespace APromisedLand.Razor.DiberyTree.Models;
 /// 父节点选择结果
 /// </summary>
 /// <typeparam name="TItem">节点类型</typeparam>
-public class ParentSelectResult<TItem> where TItem : class, ITreeNodeBase
+public class ParentSelectResult<TItem> where TItem : class, ITreeNodeBase<TItem>
 {
     /// <summary>是否确认选择</summary>
     public bool IsConfirmed { get; set; }

@@ -24,9 +24,17 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
     [ProducesResponseType(StatusCodes.Status200OK)] // 移除 typeof，只保留状态码
     public virtual async Task<IActionResult> GetRoots(string? rootId = null, CancellationToken cancellationToken = default)
     {
-        var roots = await TreeService.GetRootNodesAsync(rootId, cancellationToken);
+        try
+        {
+            var roots = await TreeService.GetRootNodesAsync(rootId, cancellationToken);
         
-        return Ok(roots);
+            return Ok(roots);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "获取根节点失败");
+            return BadRequest($"获取根节点失败:{e.Message}");
+        }
     }
 
     [HttpGet("children/{parentId}")]

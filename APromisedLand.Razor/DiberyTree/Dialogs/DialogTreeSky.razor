@@ -1,5 +1,5 @@
 @using APromisedLand.Razor.DiberyTree.Services
-@typeparam TItem where TItem : class, ITreeNodeBase, new()
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject TreeNodeDialogService<TItem> TreeNodeDialogService
 
@@ -29,12 +29,12 @@
             @DialogContent
         }
     </DialogContent>
-    <DialogActions>
+    <DialogRightActions>
         @if (DialogActions != null)
         {
             @DialogActions
         }
-    </DialogActions>
+    </DialogRightActions>
 </DialogSky>
 
 @code {

@@ -20,7 +20,7 @@ public static class DiberyTreeHelper
     public static TreeNodeDto<T> ToNodeDto<T>(
         this T nodeValue,
         string? icon = null,
-        bool hasChildren = false) where T : class, ITreeNodeBase
+        bool hasChildren = false) where T : class, ITreeNodeBase<T>
     {
         return new TreeNodeDto<T>
         {

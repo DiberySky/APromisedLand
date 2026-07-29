@@ -7,6 +7,7 @@ using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Api.Data;
 using APromisedLand.Api.Projects.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree;
+using Zafiro.Trees;
 
 namespace APromisedLand.Api.Projects.DiberyTree.Services;
 
@@ -45,7 +46,8 @@ public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<Categ
 
             foreach (var child in rootNode.Children)
             {
-                child.Value?.Parent = rootNode.Value;
+                child.Parent = rootNode.Value;
+                child.Value!.Parent = rootNode.Value;
                 var grandson = await GetChildrenAsync(child.Id, cancellationToken);
                 child.Children = grandson.ToList();
                 child.HasChildren = grandson.Count > 0;
@@ -69,7 +71,8 @@ public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<Categ
             var parent = await dbContext.CategoryTrees
                 .FirstAsync(c => c.Id == parentId, cancellationToken);
 
-            child.Value?.Parent = parent;
+            child.Parent = parent;
+            child.Value!.Parent = parent;
 
             var grandson = await dbContext.CategoryTrees
                 .Where(c => c.ParentId == child.Id)
@@ -140,8 +143,8 @@ public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<Categ
         {
             if (node.ParentId != null && dict.TryGetValue(node.ParentId, out var parent))
             {
-                parent.Children ??= new List<CategoryTree>();
-                parent.Children.Add(node);
+                // parent.Children ??= new List<CategoryTree>();
+                // parent.Children.Add(node);
             }
         }
 
@@ -149,18 +152,18 @@ public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<Categ
         TreeNodeDto<CategoryTree> BuildDto(CategoryTree entity)
         {
             var dto = entity.ToNodeDto();
-            if (entity.Children != null && entity.Children.Any())
-            {
-                dto.Children = entity.Children
-                    .OrderBy(c => c.SortOrder)
-                    .Select(child => BuildDto(child))
-                    .ToList();
-                dto.HasChildren = true;
-            }
-            else
-            {
-                dto.HasChildren = false;
-            }
+            // if (entity.Children != null && entity.Children.Any())
+            // {
+            //     dto.Children = entity.Children
+            //         .OrderBy(c => c.SortOrder)
+            //         .Select(child => BuildDto(child))
+            //         .ToList();
+            //     dto.HasChildren = true;
+            // }
+            // else
+            // {
+            //     dto.HasChildren = false;
+            // }
 
             return dto;
         }
@@ -221,36 +224,37 @@ public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<Categ
             return false;
 
         // 2. 检查是否为叶子节点（没有子节点）
-        var hasChildren = await dbContext.CategoryTrees
-            .AnyAsync(c => c.ParentId == nodeId, cancellationToken);
-
-        if (hasChildren)
-            throw new InvalidOperationException("只能删除叶子节点，请先删除子节点");
+        // var hasChildren = await dbContext.CategoryTrees
+        //     .AnyAsync(c => c.ParentId == nodeId, cancellationToken);
+        //
+        // if (hasChildren)
+        //     throw new InvalidOperationException("只能删除叶子节点，请先删除子节点");
 
         // 3. 获取父节点ID
-        var parentId = node.ParentId;
+        // var parentId = node.ParentId;
 
         // 4. 删除节点
         dbContext.CategoryTrees.Remove(node);
+        
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // 5. 更新父节点的 HasChildren
-        if (!string.IsNullOrEmpty(parentId))
-        {
-            var parentStillHasChildren = await dbContext.CategoryTrees
-                .AnyAsync(c => c.ParentId == parentId, cancellationToken);
-
-            if (!parentStillHasChildren)
-            {
-                var parent = await dbContext.CategoryTrees
-                    .FindAsync(new object[] { parentId }, cancellationToken);
-                if (parent != null)
-                {
-                    parent.HasChildren = false;
-                    await dbContext.SaveChangesAsync(cancellationToken);
-                }
-            }
-        }
+        // if (!string.IsNullOrEmpty(parentId))
+        // {
+        //     var parentStillHasChildren = await dbContext.CategoryTrees
+        //         .AnyAsync(c => c.ParentId == parentId, cancellationToken);
+        //
+        //     if (!parentStillHasChildren)
+        //     {
+        //         var parent = await dbContext.CategoryTrees
+        //             .FindAsync(new object[] { parentId }, cancellationToken);
+        //         if (parent != null)
+        //         {
+        //             parent.HasChildren = false;
+        //             await dbContext.SaveChangesAsync(cancellationToken);
+        //         }
+        //     }
+        // }
 
         return true;
     }

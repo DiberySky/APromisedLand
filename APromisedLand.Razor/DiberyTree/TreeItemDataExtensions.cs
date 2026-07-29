@@ -11,7 +11,7 @@ public static class TreeItemDataExtensions
     public static TreeItemData<T>? FindTreeItem<T>(
         this IEnumerable<TreeItemData<T>> items, 
         string id) 
-        where T : class, ITreeNodeBase
+        where T : class, ITreeNodeBase<T>
     {
         foreach (var item in items)
         {
@@ -30,14 +30,14 @@ public static class TreeItemDataExtensions
         }
         return null;
     }
-
+    
     /// <summary>
     /// 获取从根到目标节点的 ID 路径
     /// </summary>
     public static List<string>? GetPathToNode<T>(
         this IEnumerable<TreeItemData<T>> items, 
         string targetId) 
-        where T : class, ITreeNodeBase
+        where T : class, ITreeNodeBase<T>
     {
         foreach (var item in items)
         {
@@ -67,7 +67,7 @@ public static class TreeItemDataExtensions
     public static async Task ExpandAsync<T>(
         this TreeItemData<T> item,
         Func<T?, Task<IReadOnlyCollection<TreeItemData<T>>>> loadChildren) 
-        where T : class, ITreeNodeBase
+        where T : class, ITreeNodeBase<T>
     {
         item.Expanded = true;
 
@@ -86,7 +86,7 @@ public static class TreeItemDataExtensions
         List<string> path,
         Func<T?, Task<IReadOnlyCollection<TreeItemData<T>>>> loadChildren,
         Action<T?>? onSelected = null) 
-        where T : class, ITreeNodeBase
+        where T : class, ITreeNodeBase<T>
     {
         var currentItems = items;
 

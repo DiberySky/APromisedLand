@@ -3,7 +3,7 @@ namespace APromisedLand.Shared.DiberyTree.Interfaces;
 /// <summary>
 /// 有层级信息的树节点接口
 /// </summary>
-public interface IHierarchyTreeNodeBase : ITreeNodeBase
+public interface IHierarchyTreeNodeBase<TItem> : ITreeNodeBase<TItem>
 {
     /// <summary>父节点ID</summary>
     string? ParentId { get; set; }

@@ -8,7 +8,8 @@ namespace APromisedLand.Shared.DiberyTree.Models;
 /// <summary>
 /// 分类树节点 - 实现完整的树节点接口
 /// </summary>
-public sealed class CategoryTree : ITreeNodeBase, IArchivableTreeNodeBase, IHierarchyTreeNodeBase, IEquatable<CategoryTree>
+public sealed class CategoryTree : ITreeNodeBase<CategoryTree>,
+    IEquatable<CategoryTree>
 {
     [Key]
     [MaxLength(36)]
@@ -34,40 +35,40 @@ public sealed class CategoryTree : ITreeNodeBase, IArchivableTreeNodeBase, IHier
     [MaxLength(36)]
     public string? ParentId { get; set; }
 
-    /// <summary>节点深度（从0开始，根节点为0）</summary>
-    [NotMapped]
-    public int Depth { get; private set; }
+    // /// <summary>节点深度（从0开始，根节点为0）</summary>
+    // [NotMapped]
+    // public int Depth { get; private set; }
 
     [JsonIgnore]
     [NotMapped]
     public bool HasChildren { get; set; }
 
     // 导航属性
-    [ForeignKey(nameof(ParentId))]
+    [ForeignKey(nameof(Parent))]
     [JsonIgnore]
     [NotMapped]
     public CategoryTree? Parent { get; set; }
-
-    [JsonIgnore]
-    [NotMapped]
-    public ICollection<CategoryTree>? Children { get; set; }
+    
+    // [JsonIgnore]
+    // [NotMapped]
+    // public ICollection<CategoryTree>? Children { get; set; }
 
     public string Text() => Name;
 
     /// <summary>
     /// 计算节点深度
     /// </summary>
-    public void CalculateDepth(int parentDepth = -1)
-    {
-        Depth = parentDepth + 1;
-        if (Children?.Any() == true)
-        {
-            foreach (var child in Children)
-            {
-                child.CalculateDepth(Depth);
-            }
-        }
-    }
+    // public void CalculateDepth(int parentDepth = -1)
+    // {
+    //     Depth = parentDepth + 1;
+    //     if (Children?.Any() == true)
+    //     {
+    //         foreach (var child in Children)
+    //         {
+    //             child.CalculateDepth(Depth);
+    //         }
+    //     }
+    // }
 
     public override bool Equals(object? obj)
     {
@@ -86,22 +87,22 @@ public sealed class CategoryTree : ITreeNodeBase, IArchivableTreeNodeBase, IHier
         return string.IsNullOrEmpty(Id) ? 0 : Id.GetHashCode();
     }
 
-    /// <summary>
-    /// 运行时使用的示例数据（包含树结构构建）
-    /// </summary>
-    public static List<CategoryTree> SampleData()
-    {
-        var items = SeedData();
-
-        // 构建树结构并计算深度
-        var lookup = items.ToLookup(i => i.ParentId);
-        foreach (var root in lookup[null])
-        {
-            BuildTree(root, lookup);
-        }
-
-        return items;
-    }
+    // /// <summary>
+    // /// 运行时使用的示例数据（包含树结构构建）
+    // /// </summary>
+    // public static List<CategoryTree> SampleData()
+    // {
+    //     var items = SeedData();
+    //
+    //     // 构建树结构并计算深度
+    //     var lookup = items.ToLookup(i => i.ParentId);
+    //     foreach (var root in lookup[null])
+    //     {
+    //         BuildTree(root, lookup);
+    //     }
+    //
+    //     return items;
+    // }
 
     /// <summary>
     /// EF Core 种子数据使用的纯扁平数据（不包含导航属性）
@@ -234,15 +235,15 @@ public sealed class CategoryTree : ITreeNodeBase, IArchivableTreeNodeBase, IHier
         };
     }
 
-    private static void BuildTree(CategoryTree node, ILookup<string?, CategoryTree> lookup)
-    {
-        node.Children = lookup[node.Id].ToList();
-        node.HasChildren = node.Children.Any();
-        foreach (var child in node.Children)
-        {
-            child.Parent = node;
-            BuildTree(child, lookup);
-        }
-        node.CalculateDepth();
-    }
+    // private static void BuildTree(CategoryTree node, ILookup<string?, CategoryTree> lookup)
+    // {
+    //     node.Children = lookup[node.Id].ToList();
+    //     node.HasChildren = node.Children.Any();
+    //     foreach (var child in node.Children)
+    //     {
+    //         child.Parent = node;
+    //         BuildTree(child, lookup);
+    //     }
+    //     node.CalculateDepth();
+    // }
 }

@@ -22,6 +22,11 @@ public class TreeNodeDto<T>
     public T? Value { get; set; }
 
     /// <summary>
+    /// 节点值（泛型）
+    /// </summary>
+    public T? Parent { get; set; }
+
+    /// <summary>
     /// 显示文本
     /// </summary>
     public string? Text { get; set; }
@@ -54,10 +59,10 @@ public class TreeNodeDto<T>
     /// </summary>
     public List<TreeNodeDto<T>>? Children { get; set; }
 
-    /// <summary>
-    /// 子节点列表（完整加载时使用）
-    /// </summary>
-    public TreeNodeDto<T>? Parent { get; set; }
+    // /// <summary>
+    // /// 子节点列表（完整加载时使用）
+    // /// </summary>
+    // public T? Parent { get; set; }
 
     /// <summary>
     /// 额外数据（扩展字段）

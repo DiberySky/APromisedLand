@@ -5,7 +5,7 @@ using MudBlazor;
 namespace APromisedLand.Razor.DiberyTree.Models;
 
 public class NodeTemplate<TItem> 
-    where TItem : class, ITreeNodeBase
+    where TItem : class, ITreeNodeBase<TItem>
 {
     /// <summary>目标节点</summary>
     public required  ITreeItemData<TItem> Node { get; set; }

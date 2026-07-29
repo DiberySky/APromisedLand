@@ -69,27 +69,28 @@ public static partial class BlazorHelper
             config.ActionVariant = Variant.Filled;
             config.OnClick = snackbar =>
             {
-                Help(dialogService, message, detail);
+                HelpAsync(dialogService, message, detail);
                 return Task.CompletedTask;
             };
         });
     }
 
-    private static async void Help(IDialogService dialogService, string message, string details)
+    private static async void HelpAsync(IDialogService dialogService, string message, string details)
     {
         //snackbar.Add(message);
         var options = new MessageBoxOptions
         {
             Title = message,
             Message = details,
+            YesText = "关闭",
         };
 
         var dialogOptions = new DialogOptions
         {
-            BackdropClick = false,
+            BackdropClick = true,
             MaxWidth = MaxWidth.ExtraSmall,
             FullWidth = true,
-            CloseButton = true,
+            CloseButton = false,
         };
 
         await dialogService.ShowMessageBoxAsync(options, dialogOptions);

@@ -75,9 +75,6 @@
              EditTemplate="@editTemplate"
              BackPage="@SolutionService.StartPage">
     <ToolBarRightContent>
-        <MudIconButton Icon="@Icons.Material.Filled.Add"
-                       OnClick="AddRootNodeAsync">添加根分类
-        </MudIconButton>
         <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                        OnClick="RefreshTreeAsync">刷新
         </MudIconButton>
@@ -87,10 +84,5 @@
 @code
 {
     public bool NewPageOpen { get; set; }
-
-    private async Task TestingAsync()
-    {
-        var result = await DialogService.ShowUnitOfMeasureSelectDialogAsync();
-    }
 }
 

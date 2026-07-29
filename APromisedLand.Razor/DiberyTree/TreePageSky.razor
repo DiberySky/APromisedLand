@@ -1,9 +1,10 @@
 @using APromisedLand.Razor.DiberyTree.Navigation
 
-@typeparam TItem where TItem : class, ITreeNodeBase, new()
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject NavigationManager NavigationManager
 @inject ITreeNavigationHistoryService History
+@inject BlazorService BlazorService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 

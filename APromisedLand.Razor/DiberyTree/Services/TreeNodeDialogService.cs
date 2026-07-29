@@ -14,7 +14,7 @@ namespace APromisedLand.Razor.DiberyTree.Services;
 /// <typeparam name="TItem">节点类型，必须实现 ITreeNode</typeparam>
 public class TreeNodeDialogService<TItem>(
     IDialogService dialogService)
-    where TItem : class, ITreeNodeBase, new()
+    where TItem : class, ITreeNodeBase<TItem>, new()
 {
     #region 操作选择对话框
 
@@ -73,14 +73,13 @@ public class TreeNodeDialogService<TItem>(
 
     #region 编辑/创建对话框
 
-    public async Task<TreeNodeFormModel?> ShowCreateDialogAsync(
-        TItem? parentNode = null,
+    public async Task<TItem?> ShowCreateDialogAsync(
+        NodeTemplate<TItem> nodeTemplate,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters
         {
-            { "Node", (TItem?)null },
-            { "ParentNode", parentNode },
+            { "NodeTemplate", nodeTemplate },
             { "IsCreate", true }
         };
 
@@ -88,21 +87,20 @@ public class TreeNodeDialogService<TItem>(
         var dialog = await dialogService.ShowAsync<TreeNodeEditDialog<TItem>>("创建节点", parameters, options);
 
         var result = await dialog.Result;
-        if (result?.Canceled != false || result.Data is not TreeNodeFormModel formModel)
+        if (result?.Canceled != false || result.Data is not TItem formModel)
             return null;
 
         return formModel;
     }
 
-    public async Task<TreeNodeFormModel?> ShowEditDialogAsync(
+    public async Task<TItem?> ShowEditDialogAsync(
         NodeTemplate<TItem> nodeTemplate,
-        TItem node,
+        // TItem node,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters
         {
             { "NodeTemplate", nodeTemplate },
-            { "Node", node },
             { "IsCreate", false }
         };
 
@@ -110,7 +108,7 @@ public class TreeNodeDialogService<TItem>(
         var dialog = await dialogService.ShowAsync<TreeNodeEditDialog<TItem>>("编辑节点", parameters, options);
 
         var result = await dialog.Result;
-        if (result?.Canceled != false || result.Data is not TreeNodeFormModel formModel)
+        if (result?.Canceled != false || result.Data is not TItem formModel)
             return null;
 
         return formModel;

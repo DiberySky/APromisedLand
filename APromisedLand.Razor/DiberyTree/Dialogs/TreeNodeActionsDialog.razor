@@ -1,4 +1,4 @@
-@typeparam TItem where TItem : class, ITreeNodeBase, new()
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @implements IDisposable
 
@@ -7,73 +7,67 @@
     <DialogContent>
         <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
             <MudStack Spacing="2">
-                @if (NodeTemplate.ActionTemplate is null)
-                {
-                    <MudTextField T="string"
-                                  Value="NodeTemplate.Node.Value!.Id"
-                                  Label="ID"
-                                  Variant="Variant.Text"
-                                  ReadOnly="true"/>
+                <MudTextField T="string"
+                              Value="NodeTemplate.Node.Value!.Id"
+                              Label="ID"
+                              Variant="Variant.Text"
+                              ReadOnly="true"/>
 
-                    <MudTextField T="string"
-                                  Value="NodeTemplate.Node.Value!.Text()"
-                                  Label="名称"
-                                  Variant="Variant.Outlined"
-                                  ReadOnly="true"/>
+                <MudTextField T="string"
+                              Value="NodeTemplate.Node.Value!.Text()"
+                              Label="名称"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true"/>
 
-                    <MudTextField T="string"
-                                  Value="NodeTemplate.Node.Value!.Description"
-                                  Label="描述"
-                                  Variant="Variant.Outlined"
-                                  ReadOnly="true"
-                                  Lines="2"/>
+                <MudTextField T="string"
+                              Value="NodeTemplate.Node.Value!.Description"
+                              Label="描述"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true"
+                              Lines="2"/>
 
-                    <MudTextField T="string"
-                                  Value="ParentName"
-                                  Label="父分类"
-                                  Variant="Variant.Text"
-                                  ReadOnly="true"/>
+                <MudTextField T="string"
+                              Value="ParentName"
+                              Label="父分类"
+                              Variant="Variant.Text"
+                              ReadOnly="true"/>
 
-                    <MudSwitch T="bool"
-                               Value="NodeTemplate.Node.Value!.IsActive"
-                               Label="状态"
-                               Color="Color.Primary"
-                               ReadOnly="true"/>
-                }
-                else
-                {
-                    @NodeTemplate.ActionTemplate(NodeTemplate.Node.Value!)
-                }
+                <MudSwitch T="bool"
+                           Value="NodeTemplate.Node.Value!.IsActive"
+                           Label="状态"
+                           Color="Color.Primary"
+                           ReadOnly="true"/>
+
             </MudStack>
         </MudContainer>
     </DialogContent>
-    <DialogActions>
-            <MudButton OnClick="@OnAddChild"
-                       Variant="Variant.Filled"
-                       Color="Color.Success"
-                       StartIcon="@Icons.Material.Filled.Add">
-                创建子项
+    <DialogLeftActions>
+        @if (!NodeTemplate.Node.HasChildren)
+        {
+            <MudButton OnClick="OnDelete"
+                       Variant="Variant.Text"
+                       Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.Delete">
+                删除
             </MudButton>
+        }
+    </DialogLeftActions>
+    <DialogRightActions>
+        <MudButton OnClick="OnEdit"
+                   Variant="Variant.Text"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Edit">
+            修改
+        </MudButton>
 
-            <MudButton OnClick="OnEdit"
-                       Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Edit">
-                修改
-            </MudButton>
+        <MudButton OnClick="@OnAddChild"
+                   Variant="Variant.Text"
+                   Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.Add">
+            创建子项
+        </MudButton>
 
-            @if (IsLeaf)
-            {
-                <MudButton OnClick="OnDelete"
-                           Variant="Variant.Filled"
-                           Color="Color.Error"
-                           StartIcon="@Icons.Material.Filled.Delete">
-                    删除
-                </MudButton>
-            }
-
-        @* </MudStack> *@
-    </DialogActions>
+    </DialogRightActions>
 </DialogSky>
 
 @code {
