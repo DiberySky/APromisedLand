@@ -9,7 +9,7 @@
 
 @if (_items == null || _items.Count == 0)
 {
-    <ProgressCircularSky /> 
+    <ProgressCircularSky/>
 }
 else
 {
@@ -34,19 +34,22 @@ else
                                             Class="mud-theme-primary"/>
                         </MudText>
 
-                        @if (context.Value!.Id == RootId)
+                        @if (!SelectDialog)
                         {
-                            <MudIconButton Icon="@Icons.Material.Filled.Add"
-                                           Size="Size.Small"
-                                           Color="Color.Primary"
-                                           OnClick="@(() => HandleAddChildAsync(context))"/>
-                        }
-                        else
-                        {
-                            <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
-                                           Size="Size.Small"
-                                           Color="Color.Primary"
-                                           OnClick="@(() => ShowNodeActionsAsync(context))"/>
+                            @if (context.Value!.Id == RootId)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                               Size="Size.Small"
+                                               Color="Color.Primary"
+                                               OnClick="@(() => HandleAddChildAsync(context))"/>
+                            }
+                            else
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
+                                               Size="Size.Small"
+                                               Color="Color.Primary"
+                                               OnClick="@(() => ShowNodeActionsAsync(context))"/>
+                            }
                         }
                     </MudContainer>
                 </BodyContent>
@@ -56,11 +59,14 @@ else
 }
 
 @code {
+    [Parameter] public bool SelectDialog { get; set; }
 
     // ========== 参数 ==========
     [Parameter] public string? RootId { get; set; }
     [Parameter] public string? ClickNodeId { get; set; }
-    [Parameter] public string? Page { get; set; }
+
+    [Parameter] public string? CurrentPage { get; set; }
+    [Parameter] public EventCallback<string?> CurrentPageChanged { get; set; }
 
     [Parameter] public TItem? SelectedValue { get; set; }
     [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }

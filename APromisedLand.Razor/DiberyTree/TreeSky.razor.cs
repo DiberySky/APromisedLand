@@ -14,6 +14,7 @@ namespace APromisedLand.Razor.DiberyTree;
 
 public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, new()
 {
+    // private string? CurrentPage;
     private List<TreeItemData<TItem>>? _items;
     private bool _isLoading = true;
     private string? _lastClickNodeId;
@@ -30,15 +31,30 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
     // ========== 生命周期 ==========
     protected override async Task OnInitializedAsync()
     {
-        _isLoading = true;
-        StateHasChanged();
+        try
+        {
+            _isLoading = true;
+            StateHasChanged();
 
-        _items = await LoadInitialDataAsync();
+            _items = await LoadInitialDataAsync();
 
-        _isLoading = false;
-        StateHasChanged();
+            _isLoading = false;
+            StateHasChanged();
 
-        SetSelected();
+            SetSelected();
+
+            if (!SelectDialog)
+            {
+                // 获取当前路径的第一个段作为页面标识
+                var relative = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+                CurrentPage = relative.Split('/').FirstOrDefault();
+                _ = CurrentPageChanged.InvokeAsync(CurrentPage);
+            }
+        }
+        catch (Exception e)
+        {
+            BlazorService.ShowError("数据加载失败。", e.Message);
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -64,6 +80,11 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
 
         if (path != null)
         {
+            SelectedValue = null;
+            _ = SelectedValueChanged.InvokeAsync(null);
+            
+            StateHasChanged();
+            
             await _items!.ExpandToNodeAsync(
                 path: path,
                 loadChildren: LoadChildrenAsync,
@@ -89,16 +110,19 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         SelectedValue = node.Value;
         _ = SelectedValueChanged.InvokeAsync(node.Value);
 
-        if (node.Value!.Id == RootId) return;
-
-        if (NewPageOpen && node.HasChildren)
+        if (!SelectDialog)
         {
-            // 记录浏览历史
-            History.Push(NavigationManager.Uri, RootId, node.Value?.Id);
+            if (node.Value!.Id == RootId) return;
 
-            if (node?.Value == null) return;
-            Snackbar.Add($"点击{node.Text}", Severity.Info);
-            NavigationManager.NavigateTo($"{Page}/rootId/{node.Value.Id}", forceLoad: true, replace: true);
+            if (NewPageOpen && node.HasChildren)
+            {
+                // 记录浏览历史
+                History.Push(NavigationManager.Uri, RootId, node.Value?.Id);
+
+                if (node?.Value == null) return;
+                Snackbar.Add($"点击{node.Text}", Severity.Info);
+                NavigationManager.NavigateTo($"{CurrentPage}/rootId/{node.Value.Id}", forceLoad: true, replace: true);
+            }
         }
 
         // 触发外部回调，由调用方决定导航行为
@@ -110,7 +134,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         var entry = History.Pop();
         if (entry == null) return;
 
-        var targetUrl = $"{Page}/";
+        var targetUrl = $"{CurrentPage}/";
         if (entry.RootId != null) targetUrl += $"rootId/{entry.RootId}/";
         if (entry.ClickNodeId != null) targetUrl += $"ClickNodeId/{entry.ClickNodeId}";
 
@@ -178,7 +202,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         if (node.Value == null || LoadServerDataFunc == null) return;
 
         var children = await LoadServerDataFunc(node.Value);
-        
+
         node.Children = children.Select(c => new TreeItemData<TItem>
         {
             Value = c.Value,
@@ -190,6 +214,19 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         }).ToHashSet<ITreeItemData<TItem>>();
 
         StateHasChanged();
+    }
+    
+    private async Task ReLoadingAsync(ITreeItemData<TItem> node)
+    {
+        _items = await LoadInitialDataAsync();
+
+        await ExpandToNodeAsync(node.Value!.Id);
+        
+        StateHasChanged();
+
+        // SelectedValue = node.Value;
+        // _ = SelectedValueChanged.InvokeAsync(SelectedValue);
+        
     }
 
     // ========== 数据转换 ==========

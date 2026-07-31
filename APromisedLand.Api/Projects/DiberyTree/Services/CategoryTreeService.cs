@@ -208,7 +208,10 @@ public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<Categ
 
         entity.Name = nodeDto.Text ?? entity.Name;
         entity.SortOrder = nodeDto.SortOrder;
+        
         // 不在此修改 ParentId，请使用 MoveNodeAsync
+        entity.ParentId = nodeDto.ParentId;
+        
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
         return entity.ToNodeDto();

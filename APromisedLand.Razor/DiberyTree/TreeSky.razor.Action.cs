@@ -187,18 +187,48 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
     {
         if (node.Value == null) return;
 
-        var allNodes = await GetAllNodesAsync();
-        var currentParent = GetParentNode(node.Value.Id);
+        var selectResult = await NodeDialogSvc.ShowParentSelectDialogAsync();
 
-        var selectResult = await NodeDialogSvc.ShowParentSelectDialogAsync(
-            allNodes, node.Value, currentParent, allowRoot: true);
+        if (selectResult == null) return;
 
-        if (selectResult?.IsConfirmed != true) return;
+        try
+        {
+            node.Value.ParentId = selectResult.Id;
+            
+            var dto = new TreeNodeDto<TItem>
+            {
+                Id = node.Value.Id,
+                Text = node.Value.Text(),
+                Icon = BlazorHelper.TreeItemIcons,
+                ParentId = selectResult.Id,
+                Value = node.Value,
+            };
 
-        var newParentId = selectResult.SelectedParent?.Id;
-        await ExecuteTreeOperationAsync(
-            () => TreeClient.MoveNodeAsync(node.Value.Id, newParentId),
-            $"已移动到: {selectResult.SelectedParent?.Text() ?? "根节点"}");
+            await ApiClient.UpdateNodeAsync(dto.Id, dto);
+            
+            node.Value.Parent = selectResult;
+            
+            await ReLoadingAsync(node);
+            
+            BlazorService.ShowSuccess("转移成功");
+        }
+        catch (Exception e)
+        {
+            BlazorService.ShowError("转移失败", e.Message);
+        }
+        
+        // var allNodes = await GetAllNodesAsync();
+        // var currentParent = GetParentNode(node.Value.Id);
+        //
+        // var selectResult = await NodeDialogSvc.ShowParentSelectDialogAsync(
+        //     allNodes, node.Value, currentParent, allowRoot: true);
+        //
+        // if (selectResult?.IsConfirmed != true) return;
+        //
+        // var newParentId = selectResult.SelectedParent?.Id;
+        // await ExecuteTreeOperationAsync(
+        //     () => TreeClient.MoveNodeAsync(node.Value.Id, newParentId),
+        //     $"已移动到: {selectResult.SelectedParent?.Text() ?? "根节点"}");
     }
 
     private async Task HandleSortAsync()

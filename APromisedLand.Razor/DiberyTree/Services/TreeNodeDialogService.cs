@@ -1,4 +1,5 @@
 using APromisedLand.Razor.Dialogs;
+using APromisedLand.Razor.DiberyTree.Category;
 using APromisedLand.Razor.DiberyTree.Dialogs;
 using APromisedLand.Razor.DiberyTree.Models;
 using APromisedLand.Razor.DiberyTree.Pages;
@@ -146,6 +147,28 @@ public class TreeNodeDialogService<TItem>(
 
     #region 父节点选择对话框
 
+    public async Task<TItem?> ShowParentSelectDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            
+        };
+        
+        var options = (config ?? new DialogConfig
+        {
+            FullScreen = true,
+        }).ToDialogOptions();
+        
+        var dialog = await dialogService.ShowAsync<CategoryTreeSelectDialog>("选择上级节点", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not TItem actionResult)
+            return null;
+
+        return actionResult;
+    }
+    
     public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(
         List<TItem> treeItems,
         TItem? currentNode = null,

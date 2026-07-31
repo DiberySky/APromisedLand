@@ -42,31 +42,35 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudStack Row Class="@ActionsContentClass">
-            @if (CancelButtonVisible)
-            {
-                <MudButton Variant="Variant.Text"
-                           StartIcon="@Icons.Material.Filled.Close"
-                           Color="Color.Default"
-                           OnClick="@CancelAsync">
-                    取消
-                </MudButton>
-            }
+        <MudContainer MaxWidth="@MaxWidth">
 
-            @if (SubmitButtonVisible)
-            {
-                <ButtonLoadingSky Text="提交"
-                                  Variant="Variant.Filled"
-                                  Color="Color.Primary"
-                                  StartIcon="@Icons.Material.Filled.SaveAs"
-                                  OnClickFunc=@(() => OnSubmitClick.InvokeAsync())/>
-            }
+            <MudStack Row Class="@ActionsContentClass">
+                @if (CancelButtonVisible)
+                {
+                    <MudButton Variant="Variant.Text"
+                               StartIcon="@Icons.Material.Filled.Close"
+                               Color="Color.Default"
+                               OnClick="@CancelAsync">
+                        取消
+                    </MudButton>
+                }
 
-            @if (DialogActions != null)
-            {
-                @DialogActions
-            }
-        </MudStack>
+                @if (SubmitButtonVisible)
+                {
+                    <ButtonLoadingSky Text="提交"
+                                      Variant="Variant.Filled"
+                                      Color="Color.Primary"
+                                      StartIcon="@Icons.Material.Filled.SaveAs"
+                                      OnClickFunc=@(() => OnSubmitClick.InvokeAsync())/>
+                }
+
+                @if (DialogActions != null)
+                {
+                    @DialogActions
+                }
+            </MudStack>
+            
+        </MudContainer>
     </DialogActions>
 </MudDialog>
 
@@ -74,6 +78,7 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required string Title { get; set; }
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
 
     [Parameter] public bool ArrowBackVisible { get; set; } = true;
     [Parameter] public bool CancelButtonVisible { get; set; }
