@@ -5,14 +5,24 @@
 @* Title="@TitleText" *@
 <DialogSky Title="节点操作">
     <ToolBarContent>
-        <MudText Color="Color.Info">@NodeTemplate.Node.Value!.Parent?.Text()</MudText>
-        <MudSpacer />
-        <MudButton Variant="Variant.Text"
-                   StartIcon="@Icons.Material.Filled.MoveUp"
-                   Color="Color.Inherit"
-                   OnClick="@OnMove">
-            移动
-        </MudButton>
+        @if (IsBoot)
+        {
+            <MudText Color="Color.Info">根结点</MudText>
+        }
+        else
+        {
+            <MudText Color="Color.Info">@NodeTemplate.Node.Value!.Parent?.Text()</MudText>
+        }
+        <MudSpacer/>
+        @if (!IsBoot)
+        {
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Filled.MoveUp"
+                       Color="Color.Inherit"
+                       OnClick="@OnMove">
+                移动
+            </MudButton>
+        }
     </ToolBarContent>
     <DialogContent>
         <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
@@ -63,12 +73,23 @@
         }
     </DialogLeftActions>
     <DialogRightActions>
-        <MudButton OnClick="OnEdit"
+        <MudButton OnClick="@OnSort"
                    Variant="Variant.Text"
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Edit">
-            修改
+                   Color="Color.Info"
+                   StartIcon="@Icons.Material.Filled.ImportExport">
+            子项排序
         </MudButton>
+        
+        @if (!IsBoot)
+        {
+            <MudButton OnClick="OnEdit"
+                       Variant="Variant.Text"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit">
+                修改
+            </MudButton>
+
+        }
 
         <MudButton OnClick="@OnAddChild"
                    Variant="Variant.Text"
@@ -85,9 +106,8 @@
 
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
     [Parameter] public TItem? ParentNode { get; set; }
-    [Parameter] public bool IsLeaf { get; set; }
+    [Parameter] public bool IsBoot { get; set; }
     
-    private string TitleText => $"节点: {NodeTemplate.Node.Value!.Text()}";
     private string ParentName => ParentNode?.Text() ?? "根分类";
 
     private void OnAddChild()
@@ -108,6 +128,11 @@
     private void OnMove()
     {
         CloseWithAction(NodeAction.Move);
+    }
+
+    private void OnSort()
+    {
+        CloseWithAction(NodeAction.Sort);
     }
 
     private void CloseWithAction(NodeAction action)

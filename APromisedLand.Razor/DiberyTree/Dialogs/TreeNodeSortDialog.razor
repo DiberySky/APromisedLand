@@ -1,459 +1,64 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>
-@using APromisedLand.Razor.DiberyTree.Models
-@implements IDisposable
+@* TreeNodeSortDialog.razor *@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
- @* Title="拖拽排序" *@
-<MudDialog> 
+<DialogSky Title="拖拽排序" SubmitButtonVisible
+           OnSubmitClick="@Submit">
     <DialogContent>
-        <MudContainer Class="py-2" Style="min-height: 400px; max-height: 600px;">
-            <MudAlert Severity="Severity.Info"
-                      Dense="true"
-                      Class="mb-3"
-                      ShowCloseIcon="false">
-                <MudText Typo="Typo.body2">
-                    <MudIcon Icon="@Icons.Material.Filled.DragHandle" Size="Size.Small" />
-                    拖拽节点调整顺序，拖放到节点上可成为子节点
-                </MudText>
-            </MudAlert>
-
-            @if (HasChanges)
+        <MudList T="string" SelectionMode="SelectionMode.SingleSelection">
+            @for (int i = 0; i < _children.Count; i++)
             {
-                <MudChip T="string"
-                         Color="Color.Warning"
-                         Size="Size.Small"
-                         Class="mb-2">
-                    有未保存的变更
-                </MudChip>
+                int index = i;
+                <MudListItem T="string">
+                    <MudContainer class="@("d-flex align-items-center")">
+                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward"
+                                       Class="mr-2"
+                                       Size="Size.Small"
+                                       Color="Color.Info"
+                                       Disabled="@(index == 0)"
+                                       OnClick="@(() => Move(index, -1))" />
+
+                        <MudText Typo="Typo.body1">@_children[index].Text()</MudText>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward"
+                                       Size="Size.Small"
+                                       Color="Color.Info"
+                                       Disabled="@(index == _children.Count - 1)"
+                                       OnClick="@(() => Move(index, 1))"/>
+                    </MudContainer>
+                </MudListItem>
             }
-
-            <MudTextField T="string"
-                          @bind-Value="_searchText"
-                          Label="搜索节点"
-                          Variant="Variant.Outlined"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          Class="mb-2"
-                          Clearable="true"
-                          DebounceInterval="300"
-                          OnDebounceIntervalElapsed="OnSearchAsync" />
-
-            <MudPaper Elevation="1"
-                      Class="sort-tree-container"
-                      Style="border: 1px solid #e0e0e0; border-radius: 4px;">
-                @if (_isLoading)
-                {
-                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-                }
-                else
-                {
-                    <MudDropContainer T="SortableNode"
-                                      Items="_filteredNodes"
-                                      ItemsSelector="@((item, dropzone) => item.ParentId == dropzone)"
-                                      ItemDropped="ItemDropped"
-                                      Class="d-flex flex-column flex-grow-1"
-                                      Style="min-height: 200px;">
-                        <ChildContent>
-                            @RenderDropZone(null, 0)
-                        </ChildContent>
-                        <ItemRenderer>
-                            <div class="sort-node-wrapper">
-                                <MudPaper Elevation="0"
-                                          Class="sort-node"
-                                          Style="padding: 8px 12px; margin: 2px 0; cursor: grab; border-left: 3px solid transparent;"
-                                          id=@($"node-{context.Id}")>
-                                    <div class="d-flex align-center">
-                                        <MudIcon Icon="@Icons.Material.Filled.DragHandle"
-                                                 Size="Size.Small"
-                                                 Color="Color.Default"
-                                                 Class="mr-2" />
-                                        <MudIcon Icon="@GetNodeIcon(context)"
-                                                 Size="Size.Small"
-                                                 Color="@GetNodeColor(context)"
-                                                 Class="mr-2" />
-                                        <MudText Typo="Typo.body1" Class="flex-grow-1">@context.Name</MudText>
-                                        <MudChip T="string"
-                                                 Size="Size.Small"
-                                                 Color="Color.Info"
-                                                 Variant="Variant.Text">
-                                            排序: @context.SortOrder
-                                        </MudChip>
-                                        @if (context.IsChanged)
-                                        {
-                                            <MudIcon Icon="@Icons.Material.Filled.Edit"
-                                                     Size="Size.Small"
-                                                     Color="Color.Warning"
-                                                     Class="ml-2" />
-                                        }
-                                    </div>
-                                </MudPaper>
-                                @RenderDropZone(context.Id, context.Depth + 1)
-                            </div>
-                        </ItemRenderer>
-                    </MudDropContainer>
-                }
-            </MudPaper>
-
-            <div class="d-flex justify-end mt-2">
-                <MudButton OnClick="ExpandAll"
-                           Variant="Variant.Text"
-                           Size="Size.Small"
-                           StartIcon="@Icons.Material.Filled.ExpandMore">
-                    全部展开
-                </MudButton>
-                <MudButton OnClick="CollapseAll"
-                           Variant="Variant.Text"
-                           Size="Size.Small"
-                           StartIcon="@Icons.Material.Filled.ChevronRight">
-                    全部折叠
-                </MudButton>
-            </div>
-        </MudContainer>
+        </MudList>
     </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="ResetChanges"
-                   Variant="Variant.Text"
-                   Color="Color.Default"
-                   Disabled="!HasChanges">
-            重置
-        </MudButton>
-        <MudSpacer />
-        <MudButton OnClick="Close"
-                   Variant="Variant.Text"
-                   Color="Color.Default">
-            取消
-        </MudButton>
-        <MudButton OnClick="ConfirmSort"
-                   Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   Disabled="!HasChanges">
-            保存排序
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-<style>
-    .sort-tree-container {
-        overflow-y: auto;
-        max-height: 450px;
-    }
-    .sort-node {
-        transition: all 0.2s ease;
-    }
-    .sort-node:hover {
-        background-color: rgba(0, 0, 0, 0.04);
-    }
-    .sort-node-wrapper {
-        margin-left: 16px;
-    }
-    .drop-zone {
-        min-height: 8px;
-        transition: background-color 0.2s;
-    }
-</style>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    [Parameter] public required List<TItem> TreeItems { get; set; }
-    [Parameter] public bool AllowHierarchyChange { get; set; } = true;
-    [Parameter] public int MaxDepth { get; set; } = 10;
-
-    private string _searchText = string.Empty;
-    private bool _isLoading = false;
-    private bool HasChanges => _allNodes.Any(n => n.IsChanged);
-
-    private List<SortableNode> _allNodes = new();
-    private List<SortableNode> _filteredNodes = new();
+    [Parameter] public required ITreeItemData<TItem> Node { get; set; }
+    private List<TItem> _children = [];
 
     protected override void OnInitialized()
     {
-        _allNodes = FlattenTree(TreeItems);
-        _filteredNodes = _allNodes.ToList();
         base.OnInitialized();
+        _children = [.. Node.Children!.Select(x => x.Value)!];
     }
 
-    private class SortableNode
+    private void Move(int currentIndex, int offset)
     {
-        public string Id { get; private set; } = string.Empty;
-        public string Name { get; private set; } = string.Empty;
-        public string? ParentId { get; set; }
-        public int SortOrder { get; set; }
-        public int Depth { get; set; }
-        public bool HasChildren { get; private set; }
-        public string? OriginalParentId { get; private set; }
-        public int OriginalSortOrder { get; private set; }
-        public bool IsChanged => ParentId != OriginalParentId || SortOrder != OriginalSortOrder;
-
-        public static SortableNode FromTreeItem(TItem item, string? parentId, int depth)
-        {
-            return new SortableNode
-            {
-                Id = item.Id,
-                Name = item.Text(),
-                ParentId = parentId,
-                OriginalParentId = parentId,
-                SortOrder = item.SortOrder,
-                OriginalSortOrder = item.SortOrder,
-                Depth = depth,
-                HasChildren = HasAnyChildren(item)
-            };
-        }
-
-        private static bool HasAnyChildren(TItem item)
-        {
-            var childrenProperty = item.GetType().GetProperty("Children");
-            if (childrenProperty == null) return item.HasChildren;
-
-            var children = childrenProperty.GetValue(item) as IEnumerable<object>;
-            return children?.Any() == true || item.HasChildren;
-        }
-    }
-
-    private List<SortableNode> FlattenTree(List<TItem> items, string? parentId = null, int depth = 0)
-    {
-        var result = new List<SortableNode>();
-
-        foreach (var item in items.OrderBy(i => i.SortOrder))
-        {
-            var node = SortableNode.FromTreeItem(item, parentId, depth);
-            result.Add(node);
-
-            var children = GetChildren(item);
-            if (children.Any())
-            {
-                result.AddRange(FlattenTree(children, item.Id, depth + 1));
-            }
-        }
-
-        return result;
-    }
-
-    private List<TItem> GetChildren(TItem item)
-    {
-        var childrenProperty = item.GetType().GetProperty("Children");
-        if (childrenProperty == null) return new List<TItem>();
-
-        var children = childrenProperty.GetValue(item) as IEnumerable<object>;
-        return children?.OfType<TItem>().ToList() ?? new List<TItem>();
-    }
-
-    private RenderFragment RenderDropZone(string? parentId, int depth)
-    {
-        return builder =>
-        {
-            var zoneId = parentId ?? "root";
-            var indent = depth * 16;
-
-            builder.OpenElement(0, "div");
-            builder.AddAttribute(1, "class", "drop-zone");
-            builder.AddAttribute(2, "style", $"margin-left: {indent}px; min-height: 4px;");
-            builder.AddAttribute(3, "id", $"dropzone-{zoneId}");
-
-            builder.OpenComponent<MudDropZone<SortableNode>>(4);
-            builder.AddAttribute(5, "Identifier", zoneId);
-            builder.AddAttribute(6, "AllowReorder", true);
-            builder.AddAttribute(7, "Class", "flex-grow-1");
-            builder.CloseComponent();
-
-            builder.CloseElement();
-        };
-    }
-
-    private string GetNodeClass(SortableNode node)
-    {
-        return node.IsChanged ? "changed" : "";
-    }
-
-    private string GetNodeIcon(SortableNode node)
-    {
-        if (node.HasChildren) return Icons.Material.Filled.Folder;
-        return Icons.Material.Filled.InsertDriveFile;
-    }
-
-    private Color GetNodeColor(SortableNode node)
-    {
-        if (node.IsChanged) return Color.Warning;
-        if (node.HasChildren) return Color.Primary;
-        return Color.Default;
-    }
-
-    private void ItemDropped(MudItemDropInfo<SortableNode> dropInfo)
-    {
-        var draggedItem = dropInfo.Item;
-        if (draggedItem == null) return;
-
-        var newParentId = dropInfo.DropzoneIdentifier == "root"
-            ? null
-            : dropInfo.DropzoneIdentifier;
-
-        if (!AllowHierarchyChange && newParentId != draggedItem.OriginalParentId)
-        {
-            Snackbar?.Add("不允许更改节点层级", Severity.Warning);
+        int newIndex = currentIndex + offset;
+        if (newIndex < 0 || newIndex >= _children.Count)
             return;
-        }
 
-        if (newParentId != null && IsDescendant(draggedItem.Id, newParentId))
-        {
-            Snackbar?.Add("不能将节点放入自己的子节点中", Severity.Error);
-            return;
-        }
-
-        if (newParentId != null)
-        {
-            var newDepth = CalculateDepth(newParentId);
-            if (newDepth >= MaxDepth)
-            {
-                Snackbar?.Add($"超过最大嵌套深度 ({MaxDepth})", Severity.Warning);
-                return;
-            }
-        }
-
-        draggedItem.ParentId = newParentId;
-        ReorderSiblings(newParentId);
-        UpdateDepths();
-
-        StateHasChanged();
+        (_children[currentIndex], _children[newIndex]) = (_children[newIndex], _children[currentIndex]);
     }
-
-    private bool IsDescendant(string ancestorId, string descendantId)
+    
+    private void Submit()
     {
-        var children = _allNodes.Where(n => n.ParentId == ancestorId).ToList();
-        foreach (var child in children)
+        for (int i = 0; i < _children.Count; i++)
         {
-            if (child.Id == descendantId) return true;
-            if (IsDescendant(child.Id, descendantId)) return true;
+            _children[i].SortOrder = i;
         }
-        return false;
-    }
-
-    private int CalculateDepth(string nodeId)
-    {
-        var node = _allNodes.FirstOrDefault(n => n.Id == nodeId);
-        if (node == null) return 0;
-        if (node.ParentId == null) return 1;
-        return CalculateDepth(node.ParentId) + 1;
-    }
-
-    private void ReorderSiblings(string? parentId)
-    {
-        var siblings = _allNodes
-            .Where(n => n.ParentId == parentId)
-            .OrderBy(n => n.SortOrder)
-            .ToList();
-
-        for (int i = 0; i < siblings.Count; i++)
-        {
-            siblings[i].SortOrder = i;
-        }
-    }
-
-    private void UpdateDepths()
-    {
-        foreach (var node in _allNodes)
-        {
-            node.Depth = CalculateDepth(node.Id) - 1;
-        }
-    }
-
-    private async Task OnSearchAsync()
-    {
-        if (string.IsNullOrWhiteSpace(_searchText))
-        {
-            _filteredNodes = _allNodes.ToList();
-            return;
-        }
-
-        _isLoading = true;
-        StateHasChanged();
-
-        await Task.Delay(100);
-
-        var keyword = _searchText.ToLowerInvariant();
-        var matchedIds = _allNodes
-            .Where(n => n.Name.ToLowerInvariant().Contains(keyword))
-            .Select(n => n.Id)
-            .ToHashSet();
-
-        var result = new HashSet<string>();
-        foreach (var id in matchedIds)
-        {
-            AddWithAncestors(id, result);
-        }
-
-        _filteredNodes = _allNodes.Where(n => result.Contains(n.Id)).ToList();
-
-        _isLoading = false;
-        StateHasChanged();
-    }
-
-    private void AddWithAncestors(string nodeId, HashSet<string> result)
-    {
-        result.Add(nodeId);
-        var node = _allNodes.FirstOrDefault(n => n.Id == nodeId);
-        if (node?.ParentId != null)
-        {
-            AddWithAncestors(node.ParentId, result);
-        }
-    }
-
-    private void ExpandAll()
-    {
-        foreach (var node in _allNodes)
-        {
-            // IsExpanded 已移除，不需要操作
-        }
-        StateHasChanged();
-    }
-
-    private void CollapseAll()
-    {
-        foreach (var node in _allNodes)
-        {
-            // IsExpanded 已移除，不需要操作
-        }
-        StateHasChanged();
-    }
-
-    private void ResetChanges()
-    {
-        foreach (var node in _allNodes)
-        {
-            node.ParentId = node.OriginalParentId;
-            node.SortOrder = node.OriginalSortOrder;
-        }
-        UpdateDepths();
-        StateHasChanged();
-    }
-
-    private void ConfirmSort()
-    {
-        var result = new SortResult<TItem>
-        {
-            IsConfirmed = true,
-            SortedItems = _allNodes
-                .Where(n => n.IsChanged)
-                .Select(n => new SortItem<TItem>
-                {
-                    Node = TreeItems.First(t => t.Id == n.Id),
-                    NewSortOrder = n.SortOrder,
-                    NewParentId = n.ParentId,
-                    OriginalSortOrder = n.OriginalSortOrder,
-                    OriginalParentId = n.OriginalParentId
-                })
-                .ToList()
-        };
-
-        MudDialog?.Close(DialogResult.Ok(result));
-    }
-
-    private void Close()
-    {
-        MudDialog?.Close(DialogResult.Cancel());
-    }
-
-    [Inject] private ISnackbar? Snackbar { get; set; }
-
-    public void Dispose()
-    {
+        
+        MudDialog?.Close(DialogResult.Ok(_children));
     }
 }

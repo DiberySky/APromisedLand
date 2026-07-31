@@ -110,6 +110,20 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     /// <summary>
     /// 更新节点信息（不包括 ParentId，请使用 Move 方法移动）
     /// </summary>
+    public async Task<TreeNodeDto<T>> UpdateChildrenAsync(TreeNodeDto<T>  nodeDto,
+        CancellationToken cancellationToken = default)
+    {
+        // var url = $"{_basePath}/move?nodeId={Uri.EscapeDataString(nodeId)}";
+
+        var response =
+            await httpClient.PostAsJsonAsync($"{_basePath}/children", nodeDto, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<TreeNodeDto<T>>(cancellationToken: cancellationToken))!;
+    }
+
+    /// <summary>
+    /// 更新节点信息（不包括 ParentId，请使用 Move 方法移动）
+    /// </summary>
     public async Task<TreeNodeDto<T>> UpdateNodeAsync(string id, TreeNodeDto<T> node,
         CancellationToken cancellationToken = default)
     {

@@ -36,20 +36,25 @@ else
 
                         @if (!SelectDialog)
                         {
-                            @if (context.Value!.Id == RootId)
-                            {
-                                <MudIconButton Icon="@Icons.Material.Filled.Add"
-                                               Size="Size.Small"
-                                               Color="Color.Primary"
-                                               OnClick="@(() => HandleAddChildAsync(context))"/>
-                            }
-                            else
-                            {
-                                <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
-                                               Size="Size.Small"
-                                               Color="Color.Primary"
-                                               OnClick="@(() => ShowNodeActionsAsync(context))"/>
-                            }
+                            @* @if (context.Value!.Id == RootId) *@
+                            @* { *@
+                            @*     <MudIconButton Icon="@Icons.Material.Filled.Add" *@
+                            @*                    Size="Size.Small" *@
+                            @*                    Color="Color.Primary" *@
+                            @*                    OnClick="@(() => HandleAddChildAsync(context))"/> *@
+                            @* } *@
+                            @* else *@
+                            @* { *@
+                            @*     <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz" *@
+                            @*                    Size="Size.Small" *@
+                            @*                    Color="Color.Primary" *@
+                            @*                    OnClick="@(() => ShowNodeActionsAsync(context))"/> *@
+                            @* } *@
+                            
+                            <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => ShowNodeActionsAsync(context))"/>
                         }
                     </MudContainer>
                 </BodyContent>

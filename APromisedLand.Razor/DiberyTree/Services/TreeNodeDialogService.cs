@@ -22,14 +22,14 @@ public class TreeNodeDialogService<TItem>(
     public async Task<NodeActionResult<TItem>?> ShowActionsDialogAsync(
         NodeTemplate<TItem> nodeTemplate,
         TItem? parentNode = null,
-        bool isLeaf = false,
+        bool isBoot = false,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters
         {
             { "NodeTemplate", nodeTemplate },
             { "ParentNode", parentNode },
-            { "IsLeaf", isLeaf }
+            { "IsBoot", isBoot }
         };
         
         var options = (config ?? new DialogConfig
@@ -218,6 +218,33 @@ public class TreeNodeDialogService<TItem>(
 
     #region 拖拽排序对话框
 
+    public async Task<List<TItem>?> ShowSortDialogAsync(
+        ITreeItemData<TItem> node,
+        DialogConfig? config = null)
+    {
+        var children = node.Children?.Select(x => x.Value).ToList();
+        var parameters = new DialogParameters
+        {
+            { "Node", node },
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+            MaxWidth = MaxWidth.Small,
+            CloseButton = false,
+            BackdropClick = false
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<TreeNodeSortDialog<TItem>>(
+            "拖拽排序", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not  List<TItem> sortResult)
+            return null;
+        
+        return sortResult;
+    }
+    
     public async Task<SortResult<TItem>?> ShowSortDialogAsync(
         List<TItem> treeItems,
         bool allowHierarchyChange = true,

@@ -83,6 +83,24 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
             return StatusCode(500, "创建节点时发生错误");
         }
     }
+    
+    [HttpPost("children")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public virtual async Task<IActionResult> UpdateChildren([FromBody] TreeNodeDto<T> nodeDto, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await TreeService.UpdateChildrenAsync(nodeDto, cancellationToken);
+            return Ok(updated);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "更新节点子项失败");
+            return StatusCode(500, "更新节点子项时发生错误");
+        }
+    }
 
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]

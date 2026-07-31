@@ -201,6 +201,11 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
     {
         if (node.Value == null || LoadServerDataFunc == null) return;
 
+        SelectedValue = null;
+        _ = SelectedValueChanged.InvokeAsync(null);
+        
+        StateHasChanged();
+        
         var children = await LoadServerDataFunc(node.Value);
 
         node.Children = children.Select(c => new TreeItemData<TItem>
@@ -212,6 +217,10 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
             Expanded = false,
             Children = c.Children?.Select(x => x.ToTreeItemData<TItem>()).ToList()
         }).ToHashSet<ITreeItemData<TItem>>();
+
+        node.Expanded = true;
+        SelectedValue = node.Value;
+        _ = SelectedValueChanged.InvokeAsync(node.Value);
 
         StateHasChanged();
     }

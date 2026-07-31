@@ -34,9 +34,9 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         if (nodeTemplate.Node.Value == null) return;
 
         var parent = GetParentNode(nodeTemplate.Node.Value.ParentId!);
-        var isLeaf = !(nodeTemplate.Node.Children?.Count > 0 || nodeTemplate.Node.Value.HasChildren);
+        var isBoot = nodeTemplate.Node.Value!.Id == RootId;
 
-        var result = await NodeDialogSvc.ShowActionsDialogAsync(nodeTemplate, parent, isLeaf);
+        var result = await NodeDialogSvc.ShowActionsDialogAsync(nodeTemplate, parent, isBoot);
         if (result == null) return;
 
         await ExecuteNodeActionAsync(result.Action, nodeTemplate.Node);
@@ -62,7 +62,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
                 await HandleMoveNodeAsync(node);
                 break;
             case NodeAction.Sort:
-                await HandleSortAsync();
+                await HandleSortAsync(node);
                 break;
         }
     }
@@ -231,34 +231,35 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         //     $"已移动到: {selectResult.SelectedParent?.Text() ?? "根节点"}");
     }
 
-    private async Task HandleSortAsync()
+    private async Task HandleSortAsync(ITreeItemData<TItem> node)
     {
-        var allNodes = await GetAllNodesAsync();
-        if (allNodes.Count < 2)
+        var sortResult = await NodeDialogSvc.ShowSortDialogAsync(node);
+
+        if (sortResult == null) return;
+
+        var nodeDto = new TreeNodeDto<TItem>
         {
-            Snackbar.Add("节点数量不足，无需排序", Severity.Info);
-            return;
-        }
+            Id = node.Value!.Id,
+            Text = node.Value.Text(),
+            Icon = BlazorHelper.TreeItemIcons,
+            ParentId = node.Value.ParentId!,
+            Value = node.Value,
+            Children = sortResult.Select(i => new TreeNodeDto<TItem>
+            {
+                Id = i.Id,
+                Text = i.Text(),
+                Icon = BlazorHelper.TreeItemIcons,
+                ParentId = node.Value.Id,
+                Value = i,
+                SortOrder = i.SortOrder,
+            }).ToList()
+        };
+            
+        await ApiClient.UpdateChildrenAsync(nodeDto);
+        
+        await RefreshNodeChildrenAsync(node);
 
-        var sortResult = await NodeDialogSvc.ShowSortDialogAsync(
-            allNodes, allowHierarchyChange: true, maxDepth: 5);
-
-        if (sortResult?.IsConfirmed != true) return;
-
-        if (!sortResult.HasOrderChanges && !sortResult.HasHierarchyChanges)
-        {
-            Snackbar.Add("未做任何变更", Severity.Info);
-            return;
-        }
-
-        var updateTasks = sortResult.SortedItems.Select(item =>
-            TreeClient.MoveNodeAsync(item.Node.Id, item.NewParentId));
-
-        await Task.WhenAll(updateTasks);
-        await RefreshTreeAsync();
-
-        var changeDesc = sortResult.HasHierarchyChanges ? "层级和顺序" : "顺序";
-        BlazorService.ShowSuccess($"{changeDesc}更新成功");
+        BlazorService.ShowSuccess($"排序成功");
     }
 
     #endregion

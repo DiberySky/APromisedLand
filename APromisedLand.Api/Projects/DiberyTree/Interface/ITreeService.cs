@@ -39,6 +39,11 @@ public interface ITreeService<T>
     Task<TreeNodeDto<T>> UpdateNodeAsync(TreeNodeDto<T> node, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 更新指定父节点的子节点顺序
+    /// </summary>
+    Task<TreeNodeDto<T>> UpdateChildrenAsync(TreeNodeDto<T> nodeDto, CancellationToken cancellationToken = default);
+    
+    /// <summary>
     /// 删除节点（及其所有子节点）
     /// </summary>
     Task<bool> DeleteNodeAsync(string nodeId, CancellationToken cancellationToken = default);

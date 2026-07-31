@@ -217,6 +217,22 @@ public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<Categ
         return entity.ToNodeDto();
     }
 
+    public async Task<TreeNodeDto<CategoryTree>> UpdateChildrenAsync(TreeNodeDto<CategoryTree> nodeDto, CancellationToken cancellationToken = default)
+    {
+        var entityChildren = await dbContext.CategoryTrees.Where(x => x.ParentId == nodeDto.Id).ToListAsync(cancellationToken);
+
+        foreach (var entity in entityChildren)
+        {
+            entity.SortOrder = nodeDto.Children?.FirstOrDefault(x => x.Id == entity.Id)?.SortOrder ?? 0;
+        }
+        
+        dbContext.UpdateRange(entityChildren);
+        
+        await dbContext.SaveChangesAsync(cancellationToken);
+        
+        return nodeDto;
+    }
+
     public async Task<bool> DeleteNodeAsync(string nodeId, CancellationToken cancellationToken = default)
     {
         // 1. 查找节点
