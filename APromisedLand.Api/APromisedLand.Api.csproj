@@ -27,7 +27,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Projects\DiberyTree\Models\" />
+      <Folder Include="Contracts\DiberyTree\" />
+      <Folder Include="Models\" />
     </ItemGroup>
 
 </Project>

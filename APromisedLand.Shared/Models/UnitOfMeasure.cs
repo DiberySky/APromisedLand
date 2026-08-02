@@ -1,4 +1,4 @@
-namespace APromisedLand.Api.Models;
+namespace APromisedLand.Shared.Models;
 
 public class UnitOfMeasure
 {

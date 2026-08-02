@@ -1,4 +1,7 @@
+using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DiberyTree.Models;
+using Microsoft.AspNetCore.Mvc;
 
 namespace APromisedLand.Api.Projects.DiberyTree.Interface;
 
@@ -52,11 +55,12 @@ public interface ITreeService<T>
     /// 移动节点（更改父节点）
     /// </summary>
     Task<bool> MoveNodeAsync(string nodeId, string? newParentId, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 获取从根节点到指定节点的祖先路径（ID列表）
     /// </summary>
     /// <param name="nodeId">目标节点ID</param>
+    /// <param name="cancellationToken"></param>
     /// <returns>从根到目标的ID路径，如 ["root-id", "parent-id", "target-id"]</returns>
     Task<IReadOnlyList<string>> GetAncestorPathAsync(string nodeId, CancellationToken cancellationToken = default);
 }

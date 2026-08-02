@@ -1,6 +1,5 @@
-using APromisedLand.Api.Contracts.DiberyTree;
+using APromisedLand.Api.Projects.DiberyTree;
 using APromisedLand.Api.Projects.DiberyTree.Interface;
-using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,8 +11,10 @@ namespace DiberyTreeService.Controllers;
 [ApiController]
 [Route("[controller]")]  // 路由: /api/CategoryTree
 public class CategoryTreeController(ITreeService<CategoryTree> treeService, 
+    // DiberyDbContext dbContext,
+    ITreeAttributeService attributeService,
     ILogger<CategoryTreeController> logger)
-    : TreeControllerBase<CategoryTree>(treeService, logger)
+    : TreeControllerBase<CategoryTree>(treeService, attributeService, logger)
 {
     // 基类已实现所有 CRUD，无需额外初始化
 

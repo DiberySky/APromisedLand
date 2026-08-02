@@ -1,0 +1,96 @@
+@using APromisedLand.Shared.DiberyTree.Attributes.DTOs
+@using APromisedLand.Shared.DiberyTree.Attributes.Models
+@typeparam T
+@inject DiberyTreeApiClient<T> ApiClient
+@inject ISnackbar Snackbar
+
+<DialogSky Title="添加属性"
+           CancelButtonVisible="true"
+           SubmitButtonVisible="true"
+           OnSubmitClick="@SubmitAsync"
+           OnCanceledClick="@(() => MudDialog?.Close(DialogResult.Cancel()))">
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudSelect T="AttributeDefinition" Label="选择属性定义" 
+                           @bind-Value="_selectedDefinition" 
+                           For="@(() => _selectedDefinition)" 
+                           AnchorOrigin="Origin.BottomCenter"
+                           Variant="Variant.Outlined" 
+                           Margin="Margin.Dense">
+                    @foreach (var def in _definitions)
+                    {
+                        <MudSelectItem Value="@def">@def.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField Label="属性值" @bind-Value="_value" 
+                              Variant="Variant.Outlined" 
+                              Margin="Margin.Dense" />
+                @if (!string.IsNullOrEmpty(_selectedDefinition?.AttributeType?.Name))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                        类型：@_selectedDefinition.AttributeType.Name
+                        @if (!string.IsNullOrEmpty(_selectedDefinition.UnitOfMeasure?.Symbol))
+                        {
+                            <span>，单位：@_selectedDefinition.UnitOfMeasure.Symbol</span>
+                        }
+                    </MudText>
+                }
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+    [Parameter] public required string NodeId { get; set; }
+
+    private List<AttributeDefinition> _definitions = new();
+    private AttributeDefinition? _selectedDefinition;
+    private string _value = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var defs = await ApiClient.GetAllDefinitionsAsync();
+            _definitions = defs.ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载属性定义失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_selectedDefinition == null)
+        {
+            Snackbar.Add("请选择属性定义", Severity.Warning);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_value))
+        {
+            Snackbar.Add("请输入属性值", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            // 注意：AddValueDto 的 AttributeDefinitionId 为 string，但后端期望 int，需统一
+            var dto = new AddValueDto(
+                AttributeDefinitionId: _selectedDefinition.Id.ToString(),
+                Value: _value
+            );
+            await ApiClient.AddValueAsync(NodeId, dto);
+            Snackbar.Add("属性添加成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"添加失败: {ex.Message}", Severity.Error);
+        }
+    }
+}

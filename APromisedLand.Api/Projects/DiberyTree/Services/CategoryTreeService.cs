@@ -2,12 +2,10 @@
 
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Api.Data;
 using APromisedLand.Api.Projects.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree;
-using Zafiro.Trees;
 
 namespace APromisedLand.Api.Projects.DiberyTree.Services;
 
@@ -382,7 +380,7 @@ public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<Categ
 
     /// <summary>
     /// 方案	        查询次数	内存占用	适用场景
-    /// 一次加载全部	1 次	全部节点	节点数 < 1万
+    /// 一次加载全部	1 次	全部节点	节点数 小于 一万
     /// </summary>
     /// <param name="nodeId"></param>
     /// <param name="cancellationToken"></param>
@@ -408,4 +406,6 @@ public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<Categ
 
         return path.AsReadOnly();
     }
+    
+    
 }

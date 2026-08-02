@@ -1,39 +1,50 @@
+using System.Globalization;
+using APromisedLand.Api.Data;
 using APromisedLand.Api.Projects.DiberyTree.Interface;
-using APromisedLand.Shared.DiberyTree.Interfaces;
+using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using APromisedLand.Shared.DiberyTree.Attributes.Models;
+using APromisedLand.Shared.DiberyTree.Attributes.Validation;
 using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace APromisedLand.Api.Contracts.DiberyTree;
+namespace APromisedLand.Api.Projects.DiberyTree;
 
 /// <summary>
-/// 泛型树控制器基类，支持任意节点值类型 T
+/// 泛型树控制器基类，支持任意节点值类型 T，并包含属性定义与值的操作。
 /// </summary>
 /// <typeparam name="T">节点值的类型</typeparam>
 [ApiController]
 [Route("[controller]")]
-public abstract class TreeControllerBase<T>(ITreeService<T> treeService, 
-    ILogger logger) : ControllerBase
+public partial class TreeControllerBase<T>(
+    ITreeService<T> treeService,
+    ITreeAttributeService attributeService,
+    // DiberyDbContext db,
+    ILogger<TreeControllerBase<T>> logger)
+    : ControllerBase
 {
     protected readonly ITreeService<T> TreeService = treeService;
-    private readonly ILogger _logger = logger;
+    // protected readonly DiberyDbContext Db = db;
+    protected readonly ILogger Logger = logger;
+
+    // ==================== 树节点操作 ====================
 
     [HttpGet("roots")]
     [HttpGet("roots/{rootId}")]
-    [ProducesResponseType(StatusCodes.Status200OK)] // 移除 typeof，只保留状态码
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public virtual async Task<IActionResult> GetRoots(string? rootId = null, CancellationToken cancellationToken = default)
     {
         try
         {
             var roots = await TreeService.GetRootNodesAsync(rootId, cancellationToken);
-        
             return Ok(roots);
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
-            _logger.LogError(e, "获取根节点失败");
-            return BadRequest($"获取根节点失败:{e.Message}");
+            Logger.LogError(ex, "获取根节点失败");
+            return BadRequest($"获取根节点失败: {ex.Message}");
         }
     }
 
@@ -79,11 +90,11 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "创建节点失败");
+            Logger.LogError(ex, "创建节点失败");
             return StatusCode(500, "创建节点时发生错误");
         }
     }
-    
+
     [HttpPost("children")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -97,7 +108,7 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "更新节点子项失败");
+            Logger.LogError(ex, "更新节点子项失败");
             return StatusCode(500, "更新节点子项时发生错误");
         }
     }
@@ -125,7 +136,7 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "更新节点失败");
+            Logger.LogError(ex, "更新节点失败");
             return StatusCode(500, "更新节点时发生错误");
         }
     }
@@ -162,7 +173,7 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
             return BadRequest("移动失败，可能节点不存在或试图移动到自身子节点下");
         return Ok(true);
     }
-    
+
     [HttpGet("{nodeId}/ancestors")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -172,10 +183,11 @@ public abstract class TreeControllerBase<T>(ITreeService<T> treeService,
             return BadRequest("节点 ID 不能为空");
 
         var path = await TreeService.GetAncestorPathAsync(nodeId, cancellationToken);
-    
         if (path.Count == 0)
             return NotFound($"节点 '{nodeId}' 不存在");
 
         return Ok(path);
     }
+
+    
 }

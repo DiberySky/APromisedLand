@@ -1,0 +1,16 @@
+@typeparam TItem
+@inject DiberyTreeApiClient<TItem> ApiClient
+
+<DialogSky Title="节点属性"
+           CancelButtonVisible="true"
+           SubmitButtonVisible="false"
+           OnCanceledClick="@(() => MudDialog?.Close(DialogResult.Ok(true)))">
+    <DialogContent>
+        <NodeAttributesPanel T="TItem" NodeId="@NodeId" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+    [Parameter] public required string NodeId { get; set; }
+}

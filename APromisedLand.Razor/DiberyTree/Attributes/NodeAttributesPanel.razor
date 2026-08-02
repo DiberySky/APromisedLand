@@ -1,0 +1,118 @@
+@using APromisedLand.Shared.DiberyTree.Attributes.DTOs
+@typeparam T
+@inject DiberyTreeApiClient<T> ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">属性列表</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@OpenAddDialog">
+                添加属性
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (_loading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (_attributes == null || !_attributes.Any())
+        {
+            <MudText>此节点暂无属性</MudText>
+        }
+        else
+        {
+            <MudTable Items="@_attributes" Hover="true" Striped="true">
+                <HeaderContent>
+                    <MudTh>属性名称</MudTh>
+                    <MudTh>类型</MudTh>
+                    <MudTh>单位</MudTh>
+                    <MudTh>值</MudTh>
+                    <MudTh>操作</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.DefinitionName</MudTd>
+                    <MudTd>@context.Type</MudTd>
+                    <MudTd>@context.Unit</MudTd>
+                    <MudTd>@context.Value</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                       OnClick="@(() => DeleteValue(context))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter] public required string NodeId { get; set; }
+
+    private List<AttributeDto>? _attributes;
+    private bool _loading;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAttributes();
+    }
+
+    private async Task LoadAttributes()
+    {
+        if (string.IsNullOrEmpty(NodeId)) return;
+        _loading = true;
+        try
+        {
+            var result = await ApiClient.GetAllValuesAsync(NodeId);
+            _attributes = result?.Attributes ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载属性失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialogParams = new DialogParameters
+        {
+            { nameof(AddAttributeValueDialog<T>.NodeId), NodeId }
+        };
+        var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<T>>("添加属性", dialogParams);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadAttributes(); // 刷新列表
+        }
+    }
+
+    private async Task DeleteValue(AttributeDto attr)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定要删除属性“{attr.DefinitionName}”吗？",
+            "删除", "取消");
+        if (confirm == true)
+        {
+            try
+            {
+                // 注意：需要 AttributeDto 包含 Id 字段，请自行添加
+                // 假设已有 Id 属性，调用删除
+                // await ApiClient.DeleteValueAsync(NodeId, attr.Id);
+                Snackbar.Add("删除功能需要 AttributeDto 包含 Id 字段", Severity.Warning);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"删除失败: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

@@ -17,8 +17,8 @@
         @if (!IsBoot)
         {
             <MudButton Variant="Variant.Text"
-                       StartIcon="@Icons.Material.Filled.MoveUp"
-                       Color="Color.Inherit"
+                       StartIcon="@Icons.Material.Outlined.MoveUp"
+                       Color="Color.Warning"
                        OnClick="@OnMove">
                 移动
             </MudButton>
@@ -27,11 +27,6 @@
     <DialogContent>
         <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
             <MudStack Spacing="2">
-                @* <MudTextField T="string" *@
-                @*               Value="NodeTemplate.Node.Value!.Id" *@
-                @*               Label="ID" *@
-                @*               Variant="Variant.Text" *@
-                @*               ReadOnly="true"/> *@
 
                 <MudTextField T="string"
                               Value="NodeTemplate.Node.Value!.Text()"
@@ -67,7 +62,7 @@
             <MudButton OnClick="OnDelete"
                        Variant="Variant.Text"
                        Color="Color.Error"
-                       StartIcon="@Icons.Material.Filled.Delete">
+                       StartIcon="@Icons.Material.Outlined.Delete">
                 删除
             </MudButton>
         }
@@ -75,8 +70,8 @@
     <DialogRightActions>
         <MudButton OnClick="@OnSort"
                    Variant="Variant.Text"
-                   Color="Color.Info"
-                   StartIcon="@Icons.Material.Filled.ImportExport">
+                   Color="Color.Default"
+                   StartIcon="@Icons.Material.Outlined.ImportExport">
             子项排序
         </MudButton>
         
@@ -85,7 +80,7 @@
             <MudButton OnClick="OnEdit"
                        Variant="Variant.Text"
                        Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Edit">
+                       StartIcon="@Icons.Material.Outlined.Edit">
                 修改
             </MudButton>
 
@@ -94,8 +89,15 @@
         <MudButton OnClick="@OnAddChild"
                    Variant="Variant.Text"
                    Color="Color.Success"
-                   StartIcon="@Icons.Material.Filled.Add">
+                   StartIcon="@Icons.Material.Outlined.Add">
             创建子项
+        </MudButton>
+
+        <MudButton OnClick="@OnAttribute"
+                   Variant="Variant.Text"
+                   Color="Color.Info"
+                   StartIcon="@Icons.Material.Outlined.EditAttributes">
+            属性
         </MudButton>
 
     </DialogRightActions>
@@ -110,6 +112,11 @@
     
     private string ParentName => ParentNode?.Text() ?? "根分类";
 
+    private void OnAttribute()
+    {
+        CloseWithAction(NodeAction.Attribute);
+    }
+    
     private void OnAddChild()
     {
         CloseWithAction(NodeAction.AddChild);

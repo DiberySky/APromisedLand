@@ -6,6 +6,9 @@ using APromisedLand.Razor.DiberyTree.Pages;
 using APromisedLand.Razor.Helper;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using MudBlazor;
+using APromisedLand.MauiBlazor.DiberyTree.Services;
+using APromisedLand.Razor.DiberyTree.Attributes;
+using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 
 namespace APromisedLand.Razor.DiberyTree.Services;
 
@@ -96,7 +99,6 @@ public class TreeNodeDialogService<TItem>(
 
     public async Task<TItem?> ShowEditDialogAsync(
         NodeTemplate<TItem> nodeTemplate,
-        // TItem node,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters
@@ -150,10 +152,7 @@ public class TreeNodeDialogService<TItem>(
     public async Task<TItem?> ShowParentSelectDialogAsync(
         DialogConfig? config = null)
     {
-        var parameters = new DialogParameters
-        {
-            
-        };
+        var parameters = new DialogParameters();
         
         var options = (config ?? new DialogConfig
         {
@@ -222,7 +221,6 @@ public class TreeNodeDialogService<TItem>(
         ITreeItemData<TItem> node,
         DialogConfig? config = null)
     {
-        var children = node.Children?.Select(x => x.Value).ToList();
         var parameters = new DialogParameters
         {
             { "Node", node },
@@ -239,7 +237,7 @@ public class TreeNodeDialogService<TItem>(
             "拖拽排序", parameters, options);
 
         var result = await dialog.Result;
-        if (result?.Canceled != false || result.Data is not  List<TItem> sortResult)
+        if (result?.Canceled != false || result.Data is not List<TItem> sortResult)
             return null;
         
         return sortResult;
@@ -290,7 +288,7 @@ public class TreeNodeDialogService<TItem>(
     #region 便捷方法
 
     public async Task<NodeOperationOutcome<TItem>?> ExecuteNodeOperationAsync(
-        NodeTemplate<TItem>  nodeTemplate,
+        NodeTemplate<TItem> nodeTemplate,
         TItem? parentNode = null,
         bool isLeaf = false)
     {
@@ -312,10 +310,7 @@ public class TreeNodeDialogService<TItem>(
     public async Task<NodeActionResult<TItem>?> ShowTreeFileDialogAsync(
         DialogConfig? config = null)
     {
-        var parameters = new DialogParameters
-        {
-            
-        };
+        var parameters = new DialogParameters();
         
         var options = (config ?? new DialogConfig
         {
@@ -338,10 +333,7 @@ public class TreeNodeDialogService<TItem>(
     public async Task<NodeActionResult<TItem>?> ShowTreeImageDialogAsync(
         DialogConfig? config = null)
     {
-        var parameters = new DialogParameters
-        {
-            
-        };
+        var parameters = new DialogParameters();
         
         var options = (config ?? new DialogConfig
         {
@@ -364,10 +356,7 @@ public class TreeNodeDialogService<TItem>(
     public async Task<NodeActionResult<TItem>?> ShowTreeVideoDialogAsync(
         DialogConfig? config = null)
     {
-        var parameters = new DialogParameters
-        {
-            
-        };
+        var parameters = new DialogParameters();
         
         var options = (config ?? new DialogConfig
         {
@@ -385,28 +374,61 @@ public class TreeNodeDialogService<TItem>(
 
     #endregion
     
-    #region 视频附件
+    #region 位置附件
 
     public async Task<NodeActionResult<TItem>?> ShowTreeLocationDialogAsync(
         DialogConfig? config = null)
     {
-        var parameters = new DialogParameters
-        {
-            
-        };
+        var parameters = new DialogParameters();
         
         var options = (config ?? new DialogConfig
         {
             FullScreen = true,
         }).ToDialogOptions();
         
-        var dialog = await dialogService.ShowAsync<TreeLocationDialogPage<TItem>>("视频附件", parameters, options);
+        var dialog = await dialogService.ShowAsync<TreeLocationDialogPage<TItem>>("位置附件", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
             return null;
 
         return actionResult;
+    }
+
+    #endregion
+
+    // ==================== 新增：节点属性管理 ====================
+
+    #region 节点属性管理
+
+    /// <summary>
+    /// 显示节点属性管理对话框（查看/添加/删除属性）
+    /// </summary>
+    /// <param name="nodeId">节点 ID</param>
+    /// <param name="config">对话框配置</param>
+    /// <returns>是否进行了修改（关闭时返回 true，取消返回 false）</returns>
+    public async Task<bool> ShowNodeAttributesDialogAsync(
+        string nodeId,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(NodeAttributesDialog<TItem>.NodeId), nodeId }
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<NodeAttributesDialog<TItem>>(
+            "节点属性", parameters, options);
+
+        var result = await dialog.Result;
+        // 只要不是取消就返回 true（表示可能已修改）
+        return result is not { Canceled: true };
     }
 
     #endregion

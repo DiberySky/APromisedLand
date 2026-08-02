@@ -61,6 +61,9 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
             case NodeAction.Move:
                 await HandleMoveNodeAsync(node);
                 break;
+            case NodeAction.Attribute:
+                await HandleAttributeAsync(node);
+                break;
             case NodeAction.Sort:
                 await HandleSortAsync(node);
                 break;
@@ -158,11 +161,11 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         try
         {
             await ApiClient.DeleteNodeAsync(node.Value!.Id);
-            
+
             var parent = _items?.FindTreeItem(node.Value!.ParentId!);
             await RefreshNodeChildrenAsync(parent!);
-            
-            BlazorService.ShowSuccess("删除成功");   
+
+            BlazorService.ShowSuccess("删除成功");
         }
         catch (Exception e)
         {
@@ -194,7 +197,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         try
         {
             node.Value.ParentId = selectResult.Id;
-            
+
             var dto = new TreeNodeDto<TItem>
             {
                 Id = node.Value.Id,
@@ -205,18 +208,18 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
             };
 
             await ApiClient.UpdateNodeAsync(dto.Id, dto);
-            
+
             node.Value.Parent = selectResult;
-            
+
             await ReLoadingAsync(node);
-            
+
             BlazorService.ShowSuccess("转移成功");
         }
         catch (Exception e)
         {
             BlazorService.ShowError("转移失败", e.Message);
         }
-        
+
         // var allNodes = await GetAllNodesAsync();
         // var currentParent = GetParentNode(node.Value.Id);
         //
@@ -231,7 +234,12 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         //     $"已移动到: {selectResult.SelectedParent?.Text() ?? "根节点"}");
     }
 
-    private async Task HandleSortAsync(ITreeItemData<TItem> node)
+    private async Task HandleAttributeAsync(ITreeItemData<TItem> node)
+    {
+        var formModel = await NodeDialogSvc.ShowNodeAttributesDialogAsync(node.Value!.Id);
+    }
+
+private async Task HandleSortAsync(ITreeItemData<TItem> node)
     {
         var sortResult = await NodeDialogSvc.ShowSortDialogAsync(node);
 

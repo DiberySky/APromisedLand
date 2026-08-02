@@ -1,8 +1,9 @@
 using APromisedLand.Api.Data;
 using APromisedLand.Api.Interfaces;
-using APromisedLand.Api.Models;
+using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs.Shared;
 using APromisedLand.Shared.DTOs.Units;
+using APromisedLand.Shared.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace APromisedLand.Api.Services;
