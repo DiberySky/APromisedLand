@@ -9,6 +9,7 @@ namespace APromisedLand.Api.Data;
 public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbContext(options)
 {
     public DbSet<CategoryTree> CategoryTrees { get; set; }
+    public DbSet<UnitTree> UnitTrees { get; set; }
     public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
     public DbSet<AttributeType> AttributeTypes => Set<AttributeType>();
     public DbSet<AttributeDefinition> AttributeDefinitions => Set<AttributeDefinition>();

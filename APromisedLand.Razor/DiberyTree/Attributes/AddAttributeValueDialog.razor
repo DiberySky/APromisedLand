@@ -1,7 +1,7 @@
 @using APromisedLand.Shared.DiberyTree.Attributes.DTOs
 @using APromisedLand.Shared.DiberyTree.Attributes.Models
 @typeparam T
-@inject DiberyTreeApiClient<T> ApiClient
+@* @inject DiberyTreeApiClient<T> ApiClient *@
 @inject ISnackbar Snackbar
 
 <DialogSky Title="添加属性"
@@ -55,8 +55,8 @@
     {
         try
         {
-            var defs = await ApiClient.GetAllDefinitionsAsync();
-            _definitions = defs.ToList();
+            // var defs = await ApiClient.GetAllDefinitionsAsync();
+            // _definitions = defs.ToList();
         }
         catch (Exception ex)
         {
@@ -84,7 +84,7 @@
                 AttributeDefinitionId: _selectedDefinition.Id.ToString(),
                 Value: _value
             );
-            await ApiClient.AddValueAsync(NodeId, dto);
+            // await ApiClient.AddValueAsync(NodeId, dto);
             Snackbar.Add("属性添加成功", Severity.Success);
             MudDialog?.Close(DialogResult.Ok(true));
         }

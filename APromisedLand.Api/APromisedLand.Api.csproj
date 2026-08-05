@@ -9,7 +9,7 @@
     <ItemGroup>
         <PackageReference Include="Aspire.Elastic.Clients.Elasticsearch" Version="13.3.0" />
         <PackageReference Include="Aspire.NATS.Net" Version="13.4.6" />
-        <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.4.2" />
+        <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.5.0" />
         <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.3.11" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
@@ -17,7 +17,7 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-        <PackageReference Include="OllamaSharp" Version="5.4.27" />
+        <PackageReference Include="OllamaSharp" Version="5.4.30" />
         <PackageReference Include="Typesense" Version="8.5.0" />
         <PackageReference Include="Zafiro.FileSystem.SeaweedFS" Version="47.1.1" />
     </ItemGroup>

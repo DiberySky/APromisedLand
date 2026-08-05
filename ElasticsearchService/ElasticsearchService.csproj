@@ -8,11 +8,11 @@
 
     <ItemGroup>
         <PackageReference Include="Aspire.Elastic.Clients.Elasticsearch" Version="13.3.0" />
-        <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.4.2" />
+        <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.5.0" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
-        <PackageReference Include="OllamaSharp" Version="5.4.27" />
-        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.22.0" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.22.0" />
+        <PackageReference Include="OllamaSharp" Version="5.4.30" />
+        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.24.5" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.24.5" />
     </ItemGroup>
 
     <ItemGroup>

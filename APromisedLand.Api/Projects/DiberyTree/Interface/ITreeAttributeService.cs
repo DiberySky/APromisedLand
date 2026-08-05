@@ -10,7 +10,9 @@ public interface ITreeAttributeService
     Task<AttributeDefinitionDto> CreateAsync(AttributeDefinitionCreateDto dto, CancellationToken cancellationToken = default);
     Task<AttributeDefinitionDto> UpdateAsync(string id, AttributeDefinitionUpdateDto dto, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default);
-    
+
+    Task<IReadOnlyList<AttributeType>> GetAttributeTypesAsync(CancellationToken cancellationToken = default);
+
     /// <summary>添加属性值，返回生成的值实体（含 Id）</summary>
     Task<AttributeValueBase> AddValueAsync(string nodeId, AddValueDto dto);
     /// <summary>获取单个属性值的 DTO</summary>

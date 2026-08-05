@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
+using APromisedLand.Shared.DTOs;
 
 namespace APromisedLand.MauiBlazor.DiberyTree.Services;
 
@@ -169,14 +170,37 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     /// <summary>
     /// 获取所有属性定义
     /// </summary>
-    public async Task<IReadOnlyList<AttributeDefinition>> GetAllDefinitionsAsync(
+    public async Task<List<AttributeDefinitionDto>> GetAllDefinitionsAsync(
         CancellationToken cancellationToken = default)
     {
         var response = await httpClient.GetAsync($"{_basePath}/attributes/definitions", cancellationToken);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<IReadOnlyList<AttributeDefinition>>(
-                   cancellationToken: cancellationToken)
-               ?? new List<AttributeDefinition>();
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<AttributeDefinitionDto>>>(cancellationToken: cancellationToken);
+
+        if (apiResponse?.Success == true)
+            return apiResponse.Data?.ToList() ?? [];
+        else
+        {
+            throw new Exception(apiResponse?.Message ?? "获取属性定义失败");
+        }
+    }
+
+    /// <summary>
+    /// 获取所有属性类型
+    /// </summary>
+    public async Task<List<AttributeType>> GetAttributeTypesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"{_basePath}/attributes/types", cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<AttributeType>>>(cancellationToken: cancellationToken);
+
+        if (apiResponse?.Success == true)
+            return apiResponse.Data?.ToList() ?? [];
+        else
+        {
+            throw new Exception(apiResponse?.Message ?? "获取属性类型失败");
+        }
     }
 
     /// <summary>

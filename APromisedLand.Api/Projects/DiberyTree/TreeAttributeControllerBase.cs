@@ -10,31 +10,27 @@ namespace APromisedLand.Api.Projects.DiberyTree;
 
 [ApiController]
 [Route("TreeAttribute")]
-public partial class TreeAttributeControllerBase : ControllerBase
+public class TreeAttributeControllerBase(DiberyDbContext db) : ControllerBase
 {
-    private readonly DiberyDbContext _db;
-
-    public TreeAttributeControllerBase(DiberyDbContext db) => _db = db;
-
     // ---------- 属性定义 ----------
     [HttpPost("definitions")]
     public async Task<IActionResult> Create(AttributeDefinition definition)
     {
-        _db.AttributeDefinitions.Add(definition);
-        await _db.SaveChangesAsync();
+        db.AttributeDefinitions.Add(definition);
+        await db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetById), new { id = definition.Id }, definition);
     }
 
     [HttpGet("definitions/{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
-        var def = await _db.AttributeDefinitions.FindAsync(id);
+        var def = await db.AttributeDefinitions.FindAsync(id);
         return def is null ? NotFound() : Ok(def);
     }
 
     [HttpGet("definitions")]
     public async Task<IActionResult> GetAll()
-        => Ok(await _db.AttributeDefinitions.ToListAsync());
+        => Ok(await db.AttributeDefinitions.ToListAsync());
 
     // ---------- 属性值 ----------
     [HttpPost("values/{nodeId}")]
@@ -43,7 +39,7 @@ public partial class TreeAttributeControllerBase : ControllerBase
         // 可选：校验节点是否存在
         // if (!await _db.Nodes.AnyAsync(n => n.Id == nodeId)) return NotFound("节点不存在");
 
-        var def = await _db.AttributeDefinitions
+        var def = await db.AttributeDefinitions
             .Include(d => d.AttributeType)
             .FirstOrDefaultAsync(d => d.Id == dto.AttributeDefinitionId);
         if (def is null) return NotFound("属性定义不存在");
@@ -55,17 +51,17 @@ public partial class TreeAttributeControllerBase : ControllerBase
         var entity = validation.ValueEntity!;
         switch (entity)
         {
-            case TextAttributeValue tv: _db.TextAttributeValues.Add(tv); break;
-            case DecimalAttributeValue dv: _db.DecimalAttributeValues.Add(dv); break;
-            case IntegerAttributeValue iv: _db.IntegerAttributeValues.Add(iv); break;
-            case DateAttributeValue dav: _db.DateAttributeValues.Add(dav); break;
-            case TimeAttributeValue tav: _db.TimeAttributeValues.Add(tav); break;
-            case DateTimeAttributeValue dtav: _db.DateTimeAttributeValues.Add(dtav); break;
-            case FileAttributeValue fav: _db.FileAttributeValues.Add(fav); break;
-            case LocationAttributeValue lav: _db.LocationAttributeValues.Add(lav); break;
+            case TextAttributeValue tv: db.TextAttributeValues.Add(tv); break;
+            case DecimalAttributeValue dv: db.DecimalAttributeValues.Add(dv); break;
+            case IntegerAttributeValue iv: db.IntegerAttributeValues.Add(iv); break;
+            case DateAttributeValue dav: db.DateAttributeValues.Add(dav); break;
+            case TimeAttributeValue tav: db.TimeAttributeValues.Add(tav); break;
+            case DateTimeAttributeValue dtav: db.DateTimeAttributeValues.Add(dtav); break;
+            case FileAttributeValue fav: db.FileAttributeValues.Add(fav); break;
+            case LocationAttributeValue lav: db.LocationAttributeValues.Add(lav); break;
         }
 
-        await _db.SaveChangesAsync();
+        await db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetSingleValue), new { nodeId, id = entity.Id }, null);
     }
 
@@ -98,44 +94,44 @@ public partial class TreeAttributeControllerBase : ControllerBase
         var value = await FindValueAsync(nodeId, id);
         if (value is null) return NotFound();
 
-        _db.Remove(value);
-        await _db.SaveChangesAsync();
+        db.Remove(value);
+        await db.SaveChangesAsync();
         return NoContent();
     }
 
     // ---------- 私有辅助方法 ----------
     private async Task<AttributeValueBase?> FindValueAsync(string nodeId, int id)
     {
-        if (await _db.TextAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await _db.TextAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
+        if (await db.TextAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
+            return await db.TextAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
 
-        if (await _db.DecimalAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await _db.DecimalAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
+        if (await db.DecimalAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
+            return await db.DecimalAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
 
-        if (await _db.IntegerAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await _db.IntegerAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
+        if (await db.IntegerAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
+            return await db.IntegerAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
 
-        if (await _db.DateAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await _db.DateAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
+        if (await db.DateAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
+            return await db.DateAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
 
-        if (await _db.TimeAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await _db.TimeAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
+        if (await db.TimeAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
+            return await db.TimeAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
 
-        if (await _db.DateTimeAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await _db.DateTimeAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
+        if (await db.DateTimeAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
+            return await db.DateTimeAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
 
-        if (await _db.FileAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await _db.FileAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
+        if (await db.FileAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
+            return await db.FileAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
 
-        if (await _db.LocationAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await _db.LocationAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
+        if (await db.LocationAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
+            return await db.LocationAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
 
         return null;
     }
 
     private async Task<List<AttributeDto>> QueryValues<T>(string nodeId) where T : AttributeValueBase
     {
-        var set = _db.Set<T>();
+        var set = db.Set<T>();
         var items = await set
             .Include(v => v.Definition)
                 .ThenInclude(d => d.AttributeType)

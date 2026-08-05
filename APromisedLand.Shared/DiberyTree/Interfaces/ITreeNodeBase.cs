@@ -2,7 +2,7 @@ namespace APromisedLand.Shared.DiberyTree.Interfaces;
 
 public interface ITreeNodeBase<TItem>
 {
-    string Id { get; }
+    string Id { get; set; }
     string? ParentId { get; set; }
     /// <summary>节点描述</summary>
     public string? Description { get; set; }

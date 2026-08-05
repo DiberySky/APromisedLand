@@ -3,6 +3,7 @@ using APromisedLand.Razor.Components;
 using APromisedLand.Razor.Components.Layout;
 using APromisedLand.Razor.Dialogs;
 using APromisedLand.Razor.Dialogs.UnitsOfMeasure;
+using APromisedLand.Razor.DiberyTree.Attributes;
 using APromisedLand.Razor.DiberyTree.Category;
 using APromisedLand.Razor.Pages;
 using APromisedLand.Razor.Weather;
@@ -14,6 +15,7 @@ public static partial class BlazorHelper
     public static IEnumerable<Assembly> Pages { get; set; }=
     [
         typeof(UnitOfMeasurePage).Assembly,
+        typeof(AttributeDefinitionList).Assembly,
         typeof(NotFound).Assembly,
         typeof(StartPage).Assembly,
         typeof(StartPage).Assembly,

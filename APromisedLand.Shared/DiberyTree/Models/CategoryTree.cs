@@ -13,7 +13,7 @@ public sealed class CategoryTree : ITreeNodeBase<CategoryTree>,
 {
     [Key]
     [MaxLength(36)]
-    public string Id { get; init; } = Guid.NewGuid().ToString();
+    public string Id { get; set; } = Guid.NewGuid().ToString();
 
     [MaxLength(300)]
     [Required]

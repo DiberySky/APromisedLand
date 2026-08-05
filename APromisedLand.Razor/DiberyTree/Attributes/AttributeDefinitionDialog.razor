@@ -1,0 +1,200 @@
+@using APromisedLand.Shared.DiberyTree.Attributes.Enums
+
+@inject ISnackbar Snackbar
+@* @inject DiberyTreeApiClient<CategoryTree> ApiClient *@
+
+<DialogSky Title="@(IsEdit ? "编辑属性定义" : "新建属性定义")"
+           SubmitButtonVisible="true"
+           CancelButtonVisible="true"
+           OnSubmitClick="HandleSubmitAsync"
+           OnCanceledClick="HandleCancel">
+    <DialogContent>
+        <MudForm @ref="_form" Model="_model" ValidationDelay="0">
+            <MudContainer class="my-4">
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudSelect T="AttributeType"
+                                   @bind-Value="_model.AttributeType"
+                                   Label="属性类型"
+                                   Variant="Variant.Outlined"
+                                   Required="true"
+                                   RequiredError="请选择属性类型"
+                                   Disabled="IsEdit"
+                                   AnchorOrigin="Origin.BottomLeft">
+                            @foreach (var type in AttributeTypes)
+                            {
+                                <MudSelectItem Value="@type">@type.Name 【@type.Description】</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.Name"
+                                      Label="属性名称"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      RequiredError="属性名称不能为空"
+                                      MaxLength="256"
+                                      Counter="256"/>
+                    </MudItem>
+
+                    @if (_model.AttributeType?.SystemType == AttributeTypeEnum.文本)
+                    {
+                        <MudItem xs="12">
+                            <MudNumericField @bind-Value="_model.Lines"
+                                             Label="文本显示行数"
+                                             Variant="Variant.Outlined"
+                                             Min="1"
+                                             Max="20"/>
+                        </MudItem>
+                    }
+
+                    @if (_model.AttributeType?.SystemType == AttributeTypeEnum.小数)
+                    {
+                        <MudItem xs="6">
+                            <MudNumericField @bind-Value="_model.Precision"
+                                             Label="精度 (总位数)"
+                                             Variant="Variant.Outlined"
+                                             Min="1"
+                                             Max="38"/>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudNumericField @bind-Value="_model.Scale"
+                                             Label="小数位"
+                                             Variant="Variant.Outlined"
+                                             Min="0"
+                                             Max="10"/>
+                        </MudItem>
+                    }
+
+                    @if (_model.AttributeType?.SystemType is AttributeTypeEnum.整数 or AttributeTypeEnum.小数)
+                    {
+                        <MudItem xs="12">
+                            <MudSelect T="string?"
+                                       @bind-Value="_model.UnitOfMeasureId"
+                                       Label="计量单位"
+                                       Variant="Variant.Outlined"
+                                       Clearable="true"
+                                       AnchorOrigin="Origin.BottomCenter">
+                                <MudSelectItem T="string?" Value="@((string?)null)">无</MudSelectItem>
+                                @foreach (var uom in UnitsOfMeasure)
+                                {
+                                    <MudSelectItem T="string?" Value="@uom.Id">@uom.Name (@uom.Symbol)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+                    
+                </MudGrid>
+            </MudContainer>
+        </MudForm>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public AttributeDefinitionDto? EditItem { get; set; }
+    [Parameter] public List<AttributeType> AttributeTypes { get; set; } = new();
+    [Parameter] public List<UnitOfMeasure> UnitsOfMeasure { get; set; } = new();
+
+    private MudForm? _form;
+    private FormModel _model = new();
+
+    private bool IsEdit => EditItem != null;
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit && EditItem != null)
+        {
+            _model = new FormModel
+            {
+                Name = EditItem.Name,
+                AttributeType = EditItem.AttributeType,
+                Lines = EditItem.Lines,
+                Precision = EditItem.Precision,
+                Scale = EditItem.Scale,
+                UnitOfMeasureId = EditItem.UnitOfMeasureId
+            };
+        }
+        else
+        {
+            _model = new FormModel
+            {
+                Name = string.Empty,
+                AttributeType = AttributeTypes.FirstOrDefault(),
+                Lines = 1,
+                Precision = 0,
+                Scale = 0,
+                UnitOfMeasureId = null
+            };
+        }
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        if (_form == null) return;
+        await _form.Validate();
+
+        if (!_form.IsValid) return;
+
+        try
+        {
+            if (IsEdit)
+            {
+                var updateDto = new AttributeDefinitionUpdateDto
+                {
+                    Name = _model.Name,
+                    Lines = _model.Lines,
+                    Precision = _model.Precision,
+                    Scale = _model.Scale,
+                    UnitOfMeasureId = _model.UnitOfMeasureId
+                };
+
+                // await ApiClient.UpdateDefinitionAsync(EditItem!.Id, updateDto);
+
+                Snackbar.Add("属性定义更新成功", Severity.Success);
+            }
+            else
+            {
+                if (_model.AttributeType == null) return;
+
+                var createDto = new AttributeDefinitionCreateDto
+                {
+                    Name = _model.Name,
+                    AttributeType = _model.AttributeType,
+                    Lines = _model.Lines,
+                    Precision = _model.Precision,
+                    Scale = _model.Scale,
+                    UnitOfMeasureId = _model.UnitOfMeasureId
+                };
+
+                // await ApiClient.CreateDefinitionAsync(createDto);
+
+                Snackbar.Add("属性定义创建成功", Severity.Success);
+            }
+
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"操作失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void HandleCancel()
+    {
+        // DialogSky 内部已处理 MudDialog.Close，此处仅做额外清理
+    }
+
+    private class FormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public AttributeType? AttributeType { get; set; }
+        public int? Lines { get; set; }
+        public int? Precision { get; set; }
+        public int? Scale { get; set; }
+        public string? UnitOfMeasureId { get; set; }
+    }
+
+}

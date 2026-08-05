@@ -24,6 +24,11 @@ builder.AddNpgsqlDbContext<DiberyDbContext>("TreeDb");
 
 // 如果需要多种类型的树，可以分别注册
 builder.Services.AddScoped<ITreeService<CategoryTree>, CategoryTreeService>();
+builder.Services.AddScoped<ITreeService<UnitTree>, UnitTreeService>();
+
+//ITreeAttributeService 
+builder.Services.AddScoped<ITreeAttributeService, TreeAttributeService>();
+
 builder.Services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
 
 var app = builder.Build();

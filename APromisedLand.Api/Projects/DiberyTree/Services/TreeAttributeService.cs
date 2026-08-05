@@ -19,7 +19,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
             {
                 Id = d.Id,
                 Name = d.Name,
-                AttributeTypeId = d.AttributeTypeId,
+                AttributeType = d.AttributeType,
                 AttributeTypeName = d.AttributeType.Name,
                 Lines = d.Lines,
                 Precision = d.Precision,
@@ -30,6 +30,12 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<AttributeType>> GetAttributeTypesAsync(CancellationToken cancellationToken = default)
+    {
+        return await dbContext.AttributeTypes
+            .ToListAsync(cancellationToken);
+    }
+    
     public async Task<AttributeDefinitionDto?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
     {
         var entity = await dbContext.AttributeDefinitions
@@ -43,7 +49,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
         {
             Id = entity.Id,
             Name = entity.Name,
-            AttributeTypeId = entity.AttributeTypeId,
+            AttributeType = entity.AttributeType,
             AttributeTypeName = entity.AttributeType.Name,
             Lines = entity.Lines,
             Precision = entity.Precision,
@@ -56,9 +62,9 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
     public async Task<AttributeDefinitionDto> CreateAsync(AttributeDefinitionCreateDto dto, CancellationToken cancellationToken = default)
     {
         // 检查属性类型是否存在
-        var attrType = await dbContext.AttributeTypes.FindAsync(new object[] { dto.AttributeTypeId }, cancellationToken);
+        var attrType = await dbContext.AttributeTypes.FindAsync(new object[] { dto.AttributeType }, cancellationToken);
         if (attrType == null)
-            throw new ArgumentException($"AttributeType with id {dto.AttributeTypeId} does not exist.");
+            throw new ArgumentException($"AttributeType with id {dto.AttributeType} does not exist.");
 
         // 检查单位（如果提供）
         if (!string.IsNullOrEmpty(dto.UnitOfMeasureId))
@@ -72,7 +78,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
         {
             Id = Guid.NewGuid().ToString(),
             Name = dto.Name,
-            AttributeTypeId = dto.AttributeTypeId,
+            AttributeType = dto.AttributeType,
             Lines = dto.Lines,
             Precision = dto.Precision,
             Scale = dto.Scale,
@@ -133,8 +139,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
-    
-    
+
     public async Task<AttributeValueBase> AddValueAsync(string nodeId, AddValueDto dto)
     {
         // 1. 获取属性定义（含类型和单位）

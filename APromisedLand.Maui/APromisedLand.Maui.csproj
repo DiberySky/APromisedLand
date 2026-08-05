@@ -31,7 +31,7 @@
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90" />
 		<PackageReference Include="Microsoft.Maui.Essentials" Version="10.0.90" />
 		<PackageReference Include="MudBlazor" Version="9.7.0" />
-		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.21.0" />
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
 	</ItemGroup>
 
 	<ItemGroup>

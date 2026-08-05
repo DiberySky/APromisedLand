@@ -13,6 +13,7 @@ public static partial class BlazorHelper
                 PageInfos =
                 [
                     new PageInfo { Title = "CategoryTreePage", Name = "category-tree", Authorized = false },
+                    new PageInfo { Title = "附加属性", Name = "attribute-definitions", IsDialog = false, Authorized = false },
                     new PageInfo { Title = "单位", Name = "UnitOfMeasure", IsDialog = true, Authorized = false },
                     new PageInfo { Title = "计量单位", Name = "UnitOfMeasurePage", Authorized = false },
                     new PageInfo { Title = "DiberyTree", Name = "TreePage", Authorized = false },
