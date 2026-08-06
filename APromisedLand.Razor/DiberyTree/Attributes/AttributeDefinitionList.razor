@@ -109,14 +109,15 @@
         try
         {
             // 并行加载数据
-            _definitions = await ApiClient.GetAllDefinitionsAsync();
+            var defsTask = await ApiClient.GetAllDefinitionsAsync();
             
             // 注意：如果 API Client 没有提供获取 AttributeTypes 和 UnitsOfMeasure 的方法，
             // 需要额外注入对应的服务或从其他接口获取
-            // _definitions = defsTask.ToList();
+            _definitions = [.. defsTask];
 
             // 这里假设你有获取类型和单位的方法，如果没有可以从 DbContext 或其他服务获取
-            _attributeTypes = await ApiClient.GetAttributeTypesAsync();
+            var types = await ApiClient.GetAttributeTypesAsync();
+            _attributeTypes = [.. types];
             // _unitsOfMeasure = ...
         }
         catch (Exception ex)

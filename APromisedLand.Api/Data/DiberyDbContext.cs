@@ -33,6 +33,14 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
         });
         modelBuilder.Entity<CategoryTree>().HasData(CategoryTree.SeedData());
 
+        // ------ UnitTrees ------
+        modelBuilder.Entity<UnitTree>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.ParentId);
+        });
+        modelBuilder.Entity<UnitTree>().HasData(UnitTree.SeedData());
+
         // ------ UnitOfMeasure ------
         modelBuilder.Entity<UnitOfMeasure>(entity =>
         {
