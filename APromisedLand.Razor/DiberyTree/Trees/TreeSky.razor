@@ -1,4 +1,7 @@
 
+@namespace APromisedLand.Razor.DiberyTree.Trees
+
+@using APromisedLand.MauiBlazor.DiberyTree.Interfaces
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject DiberyTreeApiClient<TItem> ApiClient
@@ -6,6 +9,7 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject BlazorService BlazorService
+@inject ITreeClientService<TItem> ClientService
 
 @if (_items == null || _items.Count == 0)
 {
@@ -34,23 +38,8 @@ else
                                             Class="mud-theme-primary"/>
                         </MudText>
 
-                        @if (!SelectDialog)
+                        @if (!IsSelectDialog)
                         {
-                            @* @if (context.Value!.Id == RootId) *@
-                            @* { *@
-                            @*     <MudIconButton Icon="@Icons.Material.Filled.Add" *@
-                            @*                    Size="Size.Small" *@
-                            @*                    Color="Color.Primary" *@
-                            @*                    OnClick="@(() => HandleAddChildAsync(context))"/> *@
-                            @* } *@
-                            @* else *@
-                            @* { *@
-                            @*     <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz" *@
-                            @*                    Size="Size.Small" *@
-                            @*                    Color="Color.Primary" *@
-                            @*                    OnClick="@(() => ShowNodeActionsAsync(context))"/> *@
-                            @* } *@
-                            
                             <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
                                            Size="Size.Small"
                                            Color="Color.Primary"
@@ -64,8 +53,7 @@ else
 }
 
 @code {
-    [Parameter] public bool SelectDialog { get; set; }
-
+    [Parameter] public bool IsSelectDialog { get; set; }
     // ========== 参数 ==========
     [Parameter] public string? RootId { get; set; }
     [Parameter] public string? ClickNodeId { get; set; }
@@ -76,14 +64,15 @@ else
     [Parameter] public TItem? SelectedValue { get; set; }
     [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
 
-    [Parameter] public Func<Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadInitialDataFunc { get; set; }
-    [Parameter] public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadServerDataFunc { get; set; }
-    [Parameter] public Func<string, Task<List<string>?>>? GetAncestorPathFunc { get; set; }
+    // [Parameter] public Func<Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadInitialDataFunc { get; set; }
+    // [Parameter] public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadServerDataFunc { get; set; }
+    // [Parameter] public Func<string, Task<List<string>?>>? GetAncestorPathFunc { get; set; }
     [Parameter] public EventCallback<ITreeItemData<TItem>?> OnClickItemText { get; set; }
 
     [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
     [Parameter] public RenderFragment<TItem>? EditTemplate { get; set; }
 
-    [Parameter] public bool NewPageOpen { get; set; }
+    // [Parameter] public bool NewPageOpen { get; set; }
+    [Parameter] public Func<ITreeItemData<TItem>, Task>? ShowDialogFunc { get; set; }
     [Parameter] public EventCallback<bool> NewPageOpenChanged { get; set; }
 }

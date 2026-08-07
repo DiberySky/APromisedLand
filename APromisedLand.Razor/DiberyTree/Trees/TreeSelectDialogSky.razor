@@ -23,17 +23,15 @@
     <DialogContent>
         <MudContainer MaxWidth="@MaxWidth">
             <TreeSky TItem="@TItem"
-                     SelectDialog="true"
+                     IsSelectDialog="true"
                      RootId="@RootId"
-                     @bind-SelectedValue="@SelectedValue"
                      ClickNodeId="@ClickNodeId"
-                     LoadInitialDataFunc="@LoadInitialDataFunc"
-                     LoadServerDataFunc="@LoadServerDataFunc"
-                     GetAncestorPathFunc="@GetAncestorPathFunc"
                      OnClickItemText="@HandleClickItemText"/>
         </MudContainer>
     </DialogContent>
 </DialogPageSky>
+
+@* @bind-SelectedValue="@SelectedValue" *@
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
@@ -43,21 +41,13 @@
     [Parameter] public string? RootId { get; set; }
     [Parameter] public string? ClickNodeId { get; set; }
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
-    [Parameter] public string? BackPage { get; set; }
 
-    [Parameter] public TItem? SelectedValue { get; set; }
-    [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
+    // [Parameter] public TItem? SelectedValue { get; set; }
+    // [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
     
     [Parameter] public RenderFragment? TopBarRightContent { get; set; }
     [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }
     [Parameter] public RenderFragment? ToolBarRightContent { get; set; }
-    
-    [Parameter] public Func<Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadInitialDataFunc { get; set; }
-    [Parameter] public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadServerDataFunc { get; set; }
-    [Parameter] public Func<string, Task<List<string>?>>? GetAncestorPathFunc { get; set; }
-
-    [Parameter] public EventCallback OnBackClick { get; set; }
-    [Parameter] public EventCallback<ITreeItemData<TItem>?> OnClickItemText { get; set; }
     
     private void HandleClickItemText(ITreeItemData<TItem>? node)
     {

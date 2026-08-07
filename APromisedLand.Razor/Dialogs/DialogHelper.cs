@@ -1,4 +1,6 @@
 using APromisedLand.Razor.Dialogs.UnitsOfMeasure;
+using APromisedLand.Razor.DiberyTree.Category;
+using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs.Units;
 using MudBlazor;
 
@@ -6,6 +8,29 @@ namespace APromisedLand.Razor.Dialogs;
 
 public static class DialogHelper
 {
+    public static async Task ShowCategoryTreeDialogAsync(this IDialogService dialogService, 
+        ITreeItemData<CategoryTree>? node = null)
+    {
+        var parameters = new DialogParameters<CategoryTreeDialogPage>
+        {
+            { x => x.ClickNode, node },
+        };
+
+        var options = new DialogConfig
+        {
+            FullScreen = true,
+            FullWidth = true,
+            MaxWidth = MaxWidth.False,
+        }.ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<CategoryTreeDialogPage>("分类",
+            parameters, options);
+
+        var result = await dialog.Result;
+
+        //return result.Canceled == false;
+    }
+    
     public static async Task<UnitOfMeasureDto?> ShowUnitOfMeasureSelectDialogAsync(this IDialogService dialogService)
     {
         var parameters = new DialogParameters<UnitOfMeasureSelectDialog>

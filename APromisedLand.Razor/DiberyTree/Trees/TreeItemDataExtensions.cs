@@ -1,7 +1,7 @@
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using MudBlazor;
 
-namespace APromisedLand.Razor.DiberyTree;
+namespace APromisedLand.Razor.DiberyTree.Trees;
 
 public static class TreeItemDataExtensions
 {

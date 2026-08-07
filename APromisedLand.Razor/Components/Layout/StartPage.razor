@@ -11,7 +11,7 @@
 @inject BlazorService BlazorService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@inject NavigationManager Navigater
+@inject NavigationManager NavigationManager
 
 <PageSky Title="导航" 
          ArrowBackVisible="@(SolutionService.Authorized == false)"
@@ -65,13 +65,6 @@
     
     [Parameter] public List<ExpansionPanel> ExpansionPanels { get; set; } = BlazorHelper.ExpansionPanels;
     
-    protected override void OnInitialized()
-    {
-        base.OnInitialized();
-
-        // PlatformInfo.DisplayInfo();
-    }
-    
     private async Task Navigate(PageInfo pageInfo)
     {
         if (pageInfo.IsDialog)
@@ -80,7 +73,7 @@
         }
         else
         {
-            Navigater.NavigateTo(pageInfo.Name);
+            NavigationManager.NavigateTo(pageInfo.Name);
         }
     }
 
@@ -93,6 +86,10 @@
         else if (pageInfo.Name.ToLower() == "unitofmeasure")
         {
             await DialogService.ShowUnitOfMeasureDialogAsync();
+        }
+        else if (pageInfo.Name.ToLower() == "categorytree")
+        {
+            await DialogService.ShowCategoryTreeDialogAsync();
         }
     }
 

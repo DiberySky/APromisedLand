@@ -1,9 +1,12 @@
+
 @using APromisedLand.Razor.DiberyTree.Navigation
 
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject NavigationManager NavigationManager
 @inject ITreeNavigationHistoryService History
+@inject ITreeClientService<TItem> ClientService
+
 @inject BlazorService BlazorService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -41,7 +44,7 @@
 
                 @if (NewPageOpenVisible)
                 {
-                    <MudCheckBox @bind-Value="NewPageOpen"
+                    <MudCheckBox @bind-Value="@ClientService.NewPageOpen"
                              Label="新页面打开"
                              Color="Color.Primary"
                              Size="Size.Small"
@@ -50,15 +53,9 @@
             </MudToolBar>
 
             <TreeSky TItem="@TItem"
-                     @ref="@_treeSky"
                      RootId="@RootId"
                      @bind-CurrentPage="@CurrentPage"
-                     @bind-NewPageOpen="@NewPageOpen"
-                     @bind-SelectedValue="@SelectedValue"
                      ClickNodeId="@ClickNodeId"
-                     LoadInitialDataFunc="@LoadInitialDataFunc"
-                     LoadServerDataFunc="@LoadServerDataFunc"
-                     GetAncestorPathFunc="@GetAncestorPathFunc"
                      ActionTemplate="@ActionTemplate"
                      EditTemplate="@EditTemplate"
                      OnClickItemText="@(e => OnClickItemText.InvokeAsync(e))"/>
@@ -66,9 +63,10 @@
     </PageContent>
 </PageSky>
 
-@code {
-    private TreeSky<TItem>? _treeSky;
+@* @bind-SelectedValue="@SelectedValue" *@
+@* @bind-NewPageOpen="@NewPageOpen" *@
 
+@code {
     [Parameter] public string Title { get; set; } = typeof(TItem).Name;
     [Parameter] public string? TitleToolBar { get; set; }
     [Parameter] public string? RootId { get; set; }
@@ -77,12 +75,8 @@
     [Parameter] public string? BackPage { get; set; } 
     [Parameter] public string? CurrentPage { get; set; }
     
-    [Parameter] public TItem? SelectedValue { get; set; }
-    [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
-    
-    [Parameter] public bool NewPageOpen { get; set; } = false;
     [Parameter] public EventCallback<bool> NewPageOpenChanged { get; set; } 
-    [Parameter] public bool NewPageOpenVisible { get; set; }
+    [Parameter] public bool NewPageOpenVisible { get; set; } = true;
 
     [Parameter] public RenderFragment? TopBarRightContent { get; set; }
     [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }
@@ -90,10 +84,6 @@
     
     [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
     [Parameter] public RenderFragment<TItem>? EditTemplate { get; set; }
-
-    [Parameter] public Func<Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadInitialDataFunc { get; set; }
-    [Parameter] public Func<TItem?, Task<IReadOnlyList<TreeNodeDto<TItem>>>>? LoadServerDataFunc { get; set; }
-    [Parameter] public Func<string, Task<List<string>?>>? GetAncestorPathFunc { get; set; }
 
     [Parameter] public EventCallback OnBackClick { get; set; }
     [Parameter] public EventCallback<ITreeItemData<TItem>?> OnClickItemText { get; set; }

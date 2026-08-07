@@ -1,6 +1,6 @@
 using APromisedLand.Shared.DiberyTree.Interfaces;
 
-namespace APromisedLand.Razor.DiberyTree;
+namespace APromisedLand.Razor.DiberyTree.Trees;
 
 /// <summary>
 /// 节点对话框操作模式

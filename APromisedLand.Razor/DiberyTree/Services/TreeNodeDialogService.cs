@@ -201,8 +201,7 @@ public class TreeNodeDialogService<TItem>(
         return selectResult;
     }
 
-    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(
-        TreeSky<TItem> treeSky,
+    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(Trees.TreeSky<TItem> treeSky,
         TItem? currentNode = null,
         TItem? currentParent = null,
         bool allowRoot = true,
@@ -273,8 +272,7 @@ public class TreeNodeDialogService<TItem>(
         return sortResult;
     }
 
-    public async Task<SortResult<TItem>?> ShowSortDialogAsync(
-        TreeSky<TItem> treeSky,
+    public async Task<SortResult<TItem>?> ShowSortDialogAsync(Trees.TreeSky<TItem> treeSky,
         bool allowHierarchyChange = true,
         int maxDepth = 10,
         DialogConfig? config = null)

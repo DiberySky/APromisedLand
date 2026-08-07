@@ -1,14 +1,10 @@
 <TreeSelectDialogSky TItem="CategoryTree"
-                     Title="分类树"
-                     TitleToolBar="请选择"
+                     Title="请选择分类"
+                     TitleToolBar="分类"
                      RootId="@RootId"
-                     @bind-SelectedValue="@_selectedCategory"
-                     ClickNodeId="@ClickNodeId"
-                     LoadInitialDataFunc="@LoadInitialDataAsync"
-                     LoadServerDataFunc="@LoadChildrenAsync"
-                     GetAncestorPathFunc="@GetAncestorPathFromApiAsync"
-                     BackPage="@SolutionService.StartPage" />
+                     ClickNodeId="@ClickNodeId"/>
 
 @code {
-
+    [Parameter] public string? RootId { get; set; }
+    [Parameter] public string? ClickNodeId { get; set; }
 }

@@ -1,14 +1,15 @@
-using System.Collections.Immutable;
 using APromisedLand.Razor.DiberyTree.Enums;
 using APromisedLand.Razor.DiberyTree.Models;
 using APromisedLand.Razor.Helper.Blazor;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
+using Microsoft.AspNetCore.Components;
 using MudBlazor;
 
-namespace APromisedLand.Razor.DiberyTree;
+namespace APromisedLand.Razor.DiberyTree.Trees;
 
-public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, new()
+public partial class TreeSky<TItem> : ComponentBase
+    where TItem : class, ITreeNodeBase<TItem>, new()
 {
     // ========== 节点操作回调（由外部页面处理具体业务） ==========
     private async Task ShowAddChildActionsAsync(ITreeItemData<TItem> node)
@@ -287,19 +288,6 @@ private async Task HandleSortAsync(ITreeItemData<TItem> node)
 
     #region 数据加载
 
-    // private async Task<IReadOnlyList<TreeNodeDto<TItem>>> LoadInitialDataAsync()
-    // {
-    //     var items = await TreeClient.GetRootNodesAsync(RootId);
-    //     return OrderNodes(items);
-    // }
-    //
-    // private async Task<IReadOnlyList<TreeNodeDto<TItem>>> LoadChildrenAsync(TItem? parent)
-    // {
-    //     var items = parent == null
-    //         ? await TreeClient.GetRootNodesAsync()
-    //         : await TreeClient.GetChildrenAsync(parent.Id);
-    //     return OrderNodes(items);
-    // }
 
     private static IReadOnlyList<TreeNodeDto<TItem>> OrderNodes(IEnumerable<TreeNodeDto<TItem>> items)
         => items.OrderBy(i => i.Value?.SortOrder).ThenBy(i => i.Text).ToList();

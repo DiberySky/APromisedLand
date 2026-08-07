@@ -1,0 +1,94 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject ITreeClientService<TItem> ClientService
+
+<DialogPageSky Title="@Title" MaxWidth="@MaxWidth">
+    <ToolBarContent>
+        @if (!string.IsNullOrEmpty(TitleToolBar))
+        {
+            <MudText Typo="Typo.h6" Class="text-info">@TitleToolBar</MudText>
+        }
+
+        @if (ToolBarLeftContent != null)
+        {
+            @ToolBarLeftContent
+        }
+
+        <MudSpacer/>
+
+        @if (ToolBarRightContent != null)
+        {
+            @ToolBarRightContent
+        }
+        
+        @if (ShowDialogFunc != null)
+        {
+            <MudCheckBox @bind-Value="@ClientService.NewPageOpen"
+                         Label="新页面打开"
+                         Color="Color.Primary"
+                         Size="Size.Small"
+                         UncheckedColor="Color.Default"/>
+        }
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer MaxWidth="@MaxWidth">
+            <TreeSky TItem="@TItem"
+                     RootId="@RootId"
+                     ActionTemplate="@ActionTemplate"
+                     EditTemplate="@EditTemplate"
+                     OnClickItemText="@HandleClickItemText"
+                     ShowDialogFunc="@ShowDialogFunc"/>
+        </MudContainer>
+    </DialogContent>
+</DialogPageSky>
+
+@* ClickNodeId="@ClickNodeId" *@
+@* @bind-SelectedValue="@SelectedValue" *@
+
+@code {
+    [Parameter] public string Title { get; set; } = typeof(TItem).Name;
+    [Parameter] public string? TitleToolBar { get; set; }
+    [Parameter] public string? RootId { get; set; }
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
+    [Parameter] public Func<ITreeItemData<TItem>, Task>? ShowDialogFunc { get; set; }
+    
+    [Parameter] public RenderFragment? TopBarRightContent { get; set; }
+    [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }
+    [Parameter] public RenderFragment? ToolBarRightContent { get; set; }
+    
+    [Parameter] public RenderFragment<TItem>? ActionTemplate { get; set; }
+    [Parameter] public RenderFragment<TItem>? EditTemplate { get; set; }
+
+   private void HandleClickItemText(ITreeItemData<TItem>? node)
+    {
+        if (ShowDialogFunc == null || node == null) return;
+        
+        ShowDialogFunc(node);
+    }
+    
+    private void BackClick()
+    {
+        // if (History.Peek() != null)
+        // {
+        //     var entry = History.Pop();
+        //     if (entry == null) return;
+        //
+        //     var targetUrl = $"{CurrentPage}/";
+        //     if (entry.RootId != null) targetUrl += $"rootId/{entry.RootId}/";
+        //     if (entry.ClickNodeId != null) targetUrl += $"ClickNodeId/{entry.ClickNodeId}";
+        //
+        //     NavigationManager.NavigateTo(targetUrl, forceLoad: true);
+        // }
+        // else
+        // {
+        //     if (string.IsNullOrEmpty(BackPage))
+        //     {
+        //         OnBackClick.InvokeAsync();
+        //     }
+        //     else
+        //     {
+        //         NavigationManager.NavigateTo(BackPage);
+        //     }
+        // }
+    }
+}

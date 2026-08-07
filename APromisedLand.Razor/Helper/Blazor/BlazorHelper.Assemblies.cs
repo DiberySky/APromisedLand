@@ -19,6 +19,7 @@ public static partial class BlazorHelper
         typeof(NotFound).Assembly,
         typeof(StartPage).Assembly,
         typeof(StartPage).Assembly,
+        typeof(CategoryTreeDialogPage).Assembly,
         typeof(CategoryTreePage).Assembly,
         typeof(WeatherClient).Assembly,
         typeof(WeatherFactory).Assembly,

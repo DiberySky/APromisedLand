@@ -1,18 +1,17 @@
 using APromisedLand.MauiBlazor.DiberyTree.Services;
+using APromisedLand.Razor.Dialogs;
 using APromisedLand.Razor.DiberyTree.Enums;
-using APromisedLand.Razor.DiberyTree.Models;
 using APromisedLand.Razor.DiberyTree.Services;
-using APromisedLand.Razor.Helper;
 using APromisedLand.Razor.Helper.Blazor;
 using APromisedLand.Shared.DiberyTree.Interfaces;
-using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Services.Solution;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 
-namespace APromisedLand.Razor.DiberyTree;
+namespace APromisedLand.Razor.DiberyTree.Trees;
 
-public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, new()
+public partial class TreeSky<TItem> : ComponentBase
+    where TItem : class, ITreeNodeBase<TItem>, new()
 {
     // private string? CurrentPage;
     private List<TreeItemData<TItem>>? _items;
@@ -43,7 +42,7 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
 
             SetSelected();
 
-            if (!SelectDialog)
+            if (ShowDialogFunc == null)
             {
                 // 获取当前路径的第一个段作为页面标识
                 var relative = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
@@ -82,9 +81,9 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         {
             SelectedValue = null;
             _ = SelectedValueChanged.InvokeAsync(null);
-            
+
             StateHasChanged();
-            
+
             await _items!.ExpandToNodeAsync(
                 path: path,
                 loadChildren: LoadChildrenAsync,
@@ -100,8 +99,8 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
 
     private async Task<List<string>?> GetAncestorPathFromApiAsync(string nodeId)
     {
-        if (GetAncestorPathFunc == null) return null;
-        return await GetAncestorPathFunc(nodeId);
+        // if (GetAncestorPathFunc == null) return null;
+        return await ClientService.GetAncestorPathFromApiAsync(nodeId);
     }
 
     // ========== 节点点击与导航 ==========
@@ -110,19 +109,27 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
         SelectedValue = node.Value;
         _ = SelectedValueChanged.InvokeAsync(node.Value);
 
-        if (!SelectDialog)
+        if (IsSelectDialog)
         {
-            if (node.Value!.Id == RootId) return;
+            // 触发外部回调，由调用方决定导航行为
+            await OnClickItemText.InvokeAsync(node);
 
-            if (NewPageOpen && node.HasChildren)
-            {
-                // 记录浏览历史
-                History.Push(NavigationManager.Uri, RootId, node.Value?.Id);
+            return;
+        }
 
-                if (node?.Value == null) return;
-                Snackbar.Add($"点击{node.Text}", Severity.Info);
-                NavigationManager.NavigateTo($"{CurrentPage}/rootId/{node.Value.Id}", forceLoad: true, replace: true);
-            }
+        if (node.Value!.Id == RootId) return;
+        if (!ClientService.NewPageOpen || !node.HasChildren) return;
+
+        if (ShowDialogFunc == null)
+        {
+            // 记录浏览历史
+            History.Push(NavigationManager.Uri, RootId, node.Value?.Id);
+
+            if (node?.Value == null) return;
+            Snackbar.Add($"点击{node.Text}", Severity.Info);
+            NavigationManager.NavigateTo($"{CurrentPage}/rootId/{node.Value.Id}", forceLoad: true, replace: true);
+            
+            return;
         }
 
         // 触发外部回调，由调用方决定导航行为
@@ -159,8 +166,10 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
     {
         try
         {
-            if (LoadInitialDataFunc == null) return [];
-            var items = await LoadInitialDataFunc();
+            // if (LoadInitialDataFunc == null) return [];
+            
+            var items = await ClientService.LoadInitialDataAsync(RootId);
+            
             return items.Select(i => i.ToTreeItemData<TItem>()).ToList();
         }
         catch (Exception e)
@@ -172,16 +181,16 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
 
     private async Task<IReadOnlyCollection<TreeItemData<TItem>>> LoadChildrenAsync(TItem? parent)
     {
-        if (LoadServerDataFunc == null) return [];
+        // if (LoadServerDataFunc == null) return [];
 
         if (parent == null)
         {
-            var roots = await LoadServerDataFunc(null);
+            var roots = await ClientService.LoadChildrenAsync();
             return roots.Select(i => i.ToTreeItemData<TItem>()).ToList();
         }
         else
         {
-            var children = await LoadServerDataFunc(parent);
+            var children = await ClientService.LoadChildrenAsync(parent);
             return children.Select(i => i.ToTreeItemData<TItem>()).ToList();
         }
     }
@@ -189,24 +198,24 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
     // ========== 刷新 ==========
     public async Task RefreshAsync()
     {
-        if (LoadServerDataFunc != null)
-        {
-            var rootItems = await LoadServerDataFunc(null);
+        // if (LoadServerDataFunc != null)
+        // {
+            var rootItems = await ClientService.LoadChildrenAsync();
             _items = rootItems?.Select(x => x.ToTreeItemData<TItem>()).ToList() ?? [];
             StateHasChanged();
-        }
+        // }
     }
 
     private async Task RefreshNodeChildrenAsync(ITreeItemData<TItem> node)
     {
-        if (node.Value == null || LoadServerDataFunc == null) return;
+        // if (node.Value == null || LoadServerDataFunc == null) return;
 
         SelectedValue = null;
         _ = SelectedValueChanged.InvokeAsync(null);
-        
+
         StateHasChanged();
-        
-        var children = await LoadServerDataFunc(node.Value);
+
+        var children = await ClientService.LoadChildrenAsync(node.Value);
 
         node.Children = children.Select(c => new TreeItemData<TItem>
         {
@@ -224,37 +233,18 @@ public partial class TreeSky<TItem> where TItem : class, ITreeNodeBase<TItem>, n
 
         StateHasChanged();
     }
-    
+
     private async Task ReLoadingAsync(ITreeItemData<TItem> node)
     {
         _items = await LoadInitialDataAsync();
 
         await ExpandToNodeAsync(node.Value!.Id);
-        
+
         StateHasChanged();
 
         // SelectedValue = node.Value;
         // _ = SelectedValueChanged.InvokeAsync(SelectedValue);
-        
     }
-
-    // ========== 数据转换 ==========
-    // public TreeItemData<TItem> ConvertToTreeItem(TreeNodeDto<TItem> dto)
-    // {
-    //     
-    //     var node = new TreeItemData<TItem>
-    //     {
-    //         Value = dto.Value,
-    //         Text = dto.Text,
-    //         Icon = dto.Icon,
-    //         Expanded = dto.Expanded,
-    //         Children = [],
-    //     };
-    //     
-    //     node.Value!.Parent = dto.Parent;
-    //     
-    //     return node;
-    // }
 
     // ========== 节点查找 ==========
     private TItem? FindNodeById(IEnumerable<ITreeItemData<TItem>> items, string? id)

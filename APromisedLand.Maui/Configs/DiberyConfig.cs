@@ -1,5 +1,7 @@
 using APromisedLand.Maui.Authentication;
+using APromisedLand.MauiBlazor.DiberyTree.Interfaces;
 using APromisedLand.Razor.DiberyTree.Navigation;
+using APromisedLand.Razor.DiberyTree.Services;
 using APromisedLand.Razor.Services;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Interfaces;
@@ -28,6 +30,7 @@ public static class DiberyConfig
             builder.AddKeycloakClient();
             
             builder.Services.AddSingleton<ITreeNavigationHistoryService, TreeNavigationHistoryService>();
+            builder.Services.AddSingleton<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
 
         }
 
