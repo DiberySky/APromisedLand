@@ -1,18 +1,16 @@
 using APromisedLand.Razor.Dialogs;
-using APromisedLand.Razor.DiberyTree.Trees.Category;
-using APromisedLand.Shared.DiberyTree.Models;
+using APromisedLand.Razor.Dialogs.UnitsOfMeasure;
 using MudBlazor;
 
 namespace APromisedLand.Razor.Services;
 
 public partial class BlazorService
 {
-    public async Task ShowCategoryTreeDialogPageAsync( 
-        ITreeItemData<CategoryTree>? node = null)
+    public async Task ShowUnitOfMeasureDialogAsync()
     {
-        var parameters = new DialogParameters<CategoryTreeDialogPage>
+        var parameters = new DialogParameters<UnitsOfMeasureDialogPage>
         {
-            { x => x.ClickNode, node },
+            //{ x => x.TestingArgs, testingArgs }
         };
 
         var options = new DialogConfig
@@ -22,7 +20,7 @@ public partial class BlazorService
             MaxWidth = MaxWidth.False,
         }.ToDialogOptions();
 
-        var dialog = await dialogService.ShowAsync<CategoryTreeDialogPage>("分类",
+        var dialog = await dialogService.ShowAsync<UnitsOfMeasureDialogPage>("计量单位",
             parameters, options);
 
         var result = await dialog.Result;

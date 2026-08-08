@@ -27,11 +27,11 @@ namespace DiberyMauiSky
             
             builder.AddDiberyConfig();
             
-            builder.AddDiberyTreeClient<CategoryTree>();
+            // builder.AddDiberyTreeClient<CategoryTree>();
             
             builder.AddWeatherHttpClient();
             
-            builder.Services.AddScoped<TreeNodeDialogService<CategoryTree>>();
+            // builder.Services.AddScoped<TreeNodeDialogService<CategoryTree>>();
             
 #if DEBUG
     		builder.Services.AddBlazorWebViewDeveloperTools();

@@ -23,9 +23,9 @@
                 <MudItem xs="12" sm="6">
                     <MudField Label="状态" Variant="Variant.Text">
                         <MudChip T="string"
-                                 Color="Node.IsActive ? Color.Success : Color.Default"
+                                 Color="Node.CanHaveChildren ? Color.Success : Color.Default"
                                  Size="Size.Small">
-                            @(Node.IsActive ? "启用" : "禁用")
+                            @(Node.CanHaveChildren ? "启用" : "禁用")
                         </MudChip>
                     </MudField>
                 </MudItem>

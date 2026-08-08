@@ -1,10 +1,9 @@
 using System.Reflection;
 using APromisedLand.Razor.Components;
 using APromisedLand.Razor.Components.Layout;
-using APromisedLand.Razor.Dialogs;
 using APromisedLand.Razor.Dialogs.UnitsOfMeasure;
 using APromisedLand.Razor.DiberyTree.Attributes;
-using APromisedLand.Razor.DiberyTree.Category;
+using APromisedLand.Razor.DiberyTree.Trees.Category;
 using APromisedLand.Razor.Pages;
 using APromisedLand.Razor.Weather;
 

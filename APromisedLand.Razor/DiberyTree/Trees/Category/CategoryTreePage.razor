@@ -21,9 +21,9 @@
                           Lines="3"/>
 
             <MudChip T="string"
-                     Color="@((context.IsActive ? Color.Success : Color.Error))"
+                     Color="@((context.CanHaveChildren ? Color.Success : Color.Error))"
                      Size="Size.Small">
-                @(context.IsActive ? "已启用" : "已禁用")
+                @(context.CanHaveChildren ? "已启用" : "已禁用")
             </MudChip>
         </div>;
 }
@@ -52,7 +52,7 @@
                               Immediate="true"/>
 
                 <MudSwitch T="bool"
-                           @bind-Value="context.IsActive"
+                           @bind-Value="context.CanHaveChildren"
                            Label="启用状态"
                            Color="Color.Primary"/>
 

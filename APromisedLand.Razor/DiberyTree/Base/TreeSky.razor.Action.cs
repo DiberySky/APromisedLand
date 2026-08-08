@@ -176,7 +176,7 @@ public partial class TreeSky<TItem> : ComponentBase
 
     private async Task AddRootNodeAsync()
     {
-        var formModel = await NodeDialogSvc.ShowCreateDialogAsync(null);
+        var formModel = await NodeDialogSvc.ShowCreateDialogAsync();
         if (formModel == null) return;
 
         await RefreshTreeAsync();
@@ -191,9 +191,14 @@ public partial class TreeSky<TItem> : ComponentBase
     {
         if (node.Value == null) return;
 
-        var selectResult = await NodeDialogSvc.ShowParentSelectDialogAsync();
+        var selectResult = await NodeDialogSvc.ShowParentSelectDialogAsync(node);
 
         if (selectResult == null) return;
+
+        var message = $"节点【{node.Text}】的上级节点：【{node.Value.Parent?.Text()}】 => 【{selectResult.Text()}】!";
+        var result = await BlazorService.BoolBox(message);
+
+        if (!result) return;
 
         try
         {
@@ -240,7 +245,7 @@ public partial class TreeSky<TItem> : ComponentBase
         var formModel = await NodeDialogSvc.ShowNodeAttributesDialogAsync(node.Value!.Id);
     }
 
-private async Task HandleSortAsync(ITreeItemData<TItem> node)
+    private async Task HandleSortAsync(ITreeItemData<TItem> node)
     {
         var sortResult = await NodeDialogSvc.ShowSortDialogAsync(node);
 
@@ -263,9 +268,9 @@ private async Task HandleSortAsync(ITreeItemData<TItem> node)
                 SortOrder = i.SortOrder,
             }).ToList()
         };
-            
+
         await ApiClient.UpdateChildrenAsync(nodeDto);
-        
+
         await RefreshNodeChildrenAsync(node);
 
         BlazorService.ShowSuccess($"排序成功");
@@ -288,7 +293,6 @@ private async Task HandleSortAsync(ITreeItemData<TItem> node)
 
     #region 数据加载
 
-
     private static IReadOnlyList<TreeNodeDto<TItem>> OrderNodes(IEnumerable<TreeNodeDto<TItem>> items)
         => items.OrderBy(i => i.Value?.SortOrder).ThenBy(i => i.Text).ToList();
 
@@ -305,13 +309,13 @@ private async Task HandleSortAsync(ITreeItemData<TItem> node)
     }
 
     #endregion
-    
+
     #region 数据删除
-    
+
     /// <summary>
     /// 根据 Id 递归删除树节点
     /// </summary>
-    public bool RemoveById(IEnumerable<ITreeItemData<TItem>> treeItems, string id) 
+    public bool RemoveById(IEnumerable<ITreeItemData<TItem>> treeItems, string id)
     {
         foreach (var item in treeItems)
         {
@@ -322,6 +326,7 @@ private async Task HandleSortAsync(ITreeItemData<TItem> node)
                 {
                     _items!.Remove(concreteItem);
                 }
+
                 return true;
             }
 
@@ -335,6 +340,7 @@ private async Task HandleSortAsync(ITreeItemData<TItem> node)
                     {
                         item.Value.HasChildren = item.Children.Count > 0;
                     }
+
                     return true;
                 }
             }

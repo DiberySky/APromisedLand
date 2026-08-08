@@ -1,4 +1,5 @@
 using APromisedLand.Maui.Authentication;
+using APromisedLand.Maui.DiberyTree;
 using APromisedLand.MauiBlazor.DiberyTree.Interfaces;
 using APromisedLand.Razor.DiberyTree.Navigation;
 using APromisedLand.Razor.DiberyTree.Services;
@@ -8,6 +9,7 @@ using APromisedLand.Shared.Interfaces;
 using APromisedLand.Shared.Services.Solution;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
+using MudBlazor.Extensions;
 using MudBlazor.Services;
 
 namespace APromisedLand.Maui.Configs;
@@ -29,9 +31,16 @@ public static class DiberyConfig
             builder.AddAuthenticationServices();
             builder.AddKeycloakClient();
             
-            builder.Services.AddSingleton<ITreeNavigationHistoryService, TreeNavigationHistoryService>();
-            builder.Services.AddSingleton<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
+            builder.AddDiberyTreeClient<CategoryTree>();
+            builder.AddDiberyTreeClient<UnitTree>();
+            
+            builder.Services.AddScoped<TreeNodeDialogService<CategoryTree>>();
+            builder.Services.AddScoped<TreeNodeDialogService<UnitTree>>();
 
+            builder.Services.AddSingleton<ITreeNavigationHistoryService, TreeNavigationHistoryService>();
+            
+            builder.Services.AddSingleton<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
+            builder.Services.AddSingleton<ITreeClientService<UnitTree>, UnitTreeClientService>();
         }
 
         public void AddAuthenticationServices()
@@ -72,6 +81,8 @@ public static class DiberyConfig
                 config.SnackbarConfiguration.ShowTransitionDuration = 500;
                 config.SnackbarConfiguration.SnackbarVariant = Variant.Filled;
             });
+            
+            builder.Services.AddMudServicesWithExtensions();
         }
 
         public void AddKeycloakClient()

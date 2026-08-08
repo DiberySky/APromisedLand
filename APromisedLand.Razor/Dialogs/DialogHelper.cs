@@ -1,5 +1,5 @@
 using APromisedLand.Razor.Dialogs.UnitsOfMeasure;
-using APromisedLand.Razor.DiberyTree.Category;
+using APromisedLand.Razor.DiberyTree.Trees.Category;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs.Units;
 using MudBlazor;

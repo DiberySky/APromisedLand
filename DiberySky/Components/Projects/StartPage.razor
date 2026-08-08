@@ -78,10 +78,12 @@
     {
         if (pageInfo.Name.ToLower() == "about")
         {
-            await DialogService.ShowAboutDialogAsync();
+            // await DialogService.ShowAboutDialogAsync();
         }
     }
 
     private async Task AboutAsync()
-        => await DialogService.ShowAboutDialogAsync();
+    {
+        // await BlazorService.ShowAboutDialogAsync();
+    }
 }

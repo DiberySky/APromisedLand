@@ -12,7 +12,8 @@ public static partial class BlazorHelper
             Title = "功能", Expanded = true,
                 PageInfos =
                 [
-                    new PageInfo { Title = "CategoryTreeDialogPage", Name = "categorytree", IsDialog = true, Authorized = false },
+                    new PageInfo { Title = "单位注册", Name = "UnitTree", IsDialog = true, Authorized = false },
+                    new PageInfo { Title = "CategoryTreeDialogPage", Name = "CategoryTree", IsDialog = true, Authorized = false },
                     new PageInfo { Title = "CategoryTreePage", Name = "category-tree", Authorized = false },
                     new PageInfo { Title = "附加属性", Name = "attribute-definitions", IsDialog = false, Authorized = false },
                     new PageInfo { Title = "单位", Name = "UnitOfMeasure", IsDialog = true, Authorized = false },

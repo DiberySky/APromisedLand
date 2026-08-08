@@ -79,22 +79,11 @@
 
     private async Task DialogAsync(PageInfo pageInfo)
     {
-        if (pageInfo.Name.ToLower() == "about")
-        {
-            await DialogService.ShowAboutDialogAsync();
-        }
-        else if (pageInfo.Name.ToLower() == "unitofmeasure")
-        {
-            await DialogService.ShowUnitOfMeasureDialogAsync();
-        }
-        else if (pageInfo.Name.ToLower() == "categorytree")
-        {
-            await DialogService.ShowCategoryTreeDialogAsync();
-        }
+        await BlazorService.ShowDialogAsync(pageInfo);
     }
 
     private async Task AboutAsync()
-        => await DialogService.ShowAboutDialogAsync();
+        => await BlazorService.ShowAboutDialogAsync();
     
     private void TestClick()
     {

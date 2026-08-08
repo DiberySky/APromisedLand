@@ -6,7 +6,7 @@ namespace APromisedLand.Razor.Helper.Blazor;
 
 public static partial class BlazorHelper
 {
-    public const string TreeItemIcons = Icons.Material.Filled.Label;
+    public const string TreeItemIcons = Icons.Material.Outlined.Label;
     
     public static TreeItemData<T> ToTreeItemData<T>(this TreeNodeDto<T> dto)
         where T : class, ITreeNodeBase<T>, new()

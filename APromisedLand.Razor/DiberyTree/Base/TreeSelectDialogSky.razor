@@ -1,6 +1,7 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-<DialogPageSky Title="@Title" MaxWidth="@MaxWidth">
+<DialogPageSky Title="@Title" MaxWidth="@MaxWidth"
+               TitleClass="mud-theme-success">
     <ToolBarContent>
         @if (!string.IsNullOrEmpty(TitleToolBar))
         {
@@ -36,14 +37,13 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    [Parameter] public string Title { get; set; } = typeof(TItem).Name;
-    [Parameter] public string? TitleToolBar { get; set; }
+    [Parameter] public ITreeItemData<TItem>? OriginalNode { get; set; }
+
+    [Parameter] public string Title { get; set; } = "请选择上级节点";
+    [Parameter] public string? TitleToolBar { get; set; } = "请选择";
     [Parameter] public string? RootId { get; set; }
     [Parameter] public string? ClickNodeId { get; set; }
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
-
-    // [Parameter] public TItem? SelectedValue { get; set; }
-    // [Parameter] public EventCallback<TItem?> SelectedValueChanged { get; set; }
     
     [Parameter] public RenderFragment? TopBarRightContent { get; set; }
     [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }

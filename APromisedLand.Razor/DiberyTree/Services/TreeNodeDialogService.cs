@@ -1,5 +1,4 @@
 using APromisedLand.Razor.Dialogs;
-using APromisedLand.Razor.DiberyTree.Category;
 using APromisedLand.Razor.DiberyTree.Dialogs;
 using APromisedLand.Razor.DiberyTree.Models;
 using APromisedLand.Razor.DiberyTree.Pages;
@@ -8,7 +7,11 @@ using APromisedLand.Shared.DiberyTree.Interfaces;
 using MudBlazor;
 using APromisedLand.MauiBlazor.DiberyTree.Services;
 using APromisedLand.Razor.DiberyTree.Attributes;
+using APromisedLand.Razor.DiberyTree.Base;
+using APromisedLand.Razor.DiberyTree.Trees.Category;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using MudBlazor.Extensions;
+using MudBlazor.Extensions.Options;
 
 namespace APromisedLand.Razor.DiberyTree.Services;
 
@@ -78,7 +81,7 @@ public class TreeNodeDialogService<TItem>(
     #region 编辑/创建对话框
 
     public async Task<TItem?> ShowCreateDialogAsync(
-        NodeTemplate<TItem> nodeTemplate,
+        NodeTemplate<TItem>? nodeTemplate = null,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters
@@ -150,20 +153,33 @@ public class TreeNodeDialogService<TItem>(
     #region 父节点选择对话框
 
     public async Task<TItem?> ShowParentSelectDialogAsync(
-        DialogConfig? config = null)
+        ITreeItemData<TItem>? node = null)
     {
-        var parameters = new DialogParameters();
-        
-        var options = (config ?? new DialogConfig
+        var parameters = new DialogParameters<TreeSelectDialogSky<TItem>>
         {
-            FullScreen = true,
-        }).ToDialogOptions();
+            { x => x.OriginalNode, node },
+            { x => x.TitleToolBar, node?.Value?.Parent?.Text() + " =>" },
+            { x => x.Title, node?.Value?.Text() },
+        };
         
-        var dialog = await dialogService.ShowAsync<CategoryTreeSelectDialog>("选择上级节点", parameters, options);
+        var options = new DialogOptionsEx
+        {
+            MaximizeButton = true, // 启用最大化/还原按钮
+            CloseButton = false,    // 同时显示关闭按钮
+            FullWidth = true,
+            MaxWidth = MaxWidth.Small,
+            BackdropClick = false,
+            Position = DialogPosition.TopCenter,
+            Resizeable = true
+        };
+        
+        var dialog = await dialogService.ShowExAsync<TreeSelectDialogSky<TItem>>("选择上级节点", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not TItem actionResult)
             return null;
+
+        if (actionResult.Id == node?.Value?.ParentId) return null;
 
         return actionResult;
     }

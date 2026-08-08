@@ -23,7 +23,7 @@
         
         @if (ShowDialogFunc != null)
         {
-            <MudCheckBox @bind-Value="@ClientService.NewPageOpen"
+            <MudCheckBox @bind-Value="@ClientService.NewPageShow"
                          Label="新页面打开"
                          Color="Color.Primary"
                          Size="Size.Small"
@@ -41,9 +41,6 @@
         </MudContainer>
     </DialogContent>
 </DialogPageSky>
-
-@* ClickNodeId="@ClickNodeId" *@
-@* @bind-SelectedValue="@SelectedValue" *@
 
 @code {
     [Parameter] public string Title { get; set; } = typeof(TItem).Name;

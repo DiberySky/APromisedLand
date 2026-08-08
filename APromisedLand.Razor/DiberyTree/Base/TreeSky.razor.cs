@@ -118,7 +118,7 @@ public partial class TreeSky<TItem> : ComponentBase
         }
 
         if (node.Value!.Id == RootId) return;
-        if (!ClientService.NewPageOpen || !node.HasChildren) return;
+        if (!ClientService.NewPageShow || !node.HasChildren) return;
 
         if (ShowDialogFunc == null)
         {

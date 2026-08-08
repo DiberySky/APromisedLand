@@ -4,18 +4,18 @@ using APromisedLand.Shared.DiberyTree.Models;
 
 namespace APromisedLand.Razor.DiberyTree.Services;
 
-public class CategoryTreeClientService(
-    DiberyTreeApiClient<CategoryTree> treeClient) : ITreeClientService<CategoryTree>
+public class UnitTreeClientService(
+    DiberyTreeApiClient<UnitTree> treeClient) : ITreeClientService<UnitTree>
 {
     public bool NewPageShow { get; set; } 
 
-    public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> LoadInitialDataAsync(string? rootId)
+    public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> LoadInitialDataAsync(string? rootId)
     {
         var items = await treeClient.GetRootNodesAsync(rootId);
         return OrderNodes(items);
     }
 
-    public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> LoadChildrenAsync(CategoryTree? parent)
+    public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> LoadChildrenAsync(UnitTree? parent)
     {
         var items = parent == null
             ? await treeClient.GetRootNodesAsync()
@@ -23,7 +23,7 @@ public class CategoryTreeClientService(
         return OrderNodes(items);
     }
 
-    private static IReadOnlyList<TreeNodeDto<CategoryTree>> OrderNodes(IEnumerable<TreeNodeDto<CategoryTree>> items)
+    private static IReadOnlyList<TreeNodeDto<UnitTree>> OrderNodes(IEnumerable<TreeNodeDto<UnitTree>> items)
         => [.. items.OrderBy(i => i.Value?.SortOrder).ThenBy(i => i.Text)];
 
     public async Task<List<string>?> GetAncestorPathFromApiAsync(string nodeId)

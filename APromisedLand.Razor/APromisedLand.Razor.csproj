@@ -18,6 +18,7 @@
     <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.10" />
     <PackageReference Include="MudBlazor" Version="9.7.0" />
+    <PackageReference Include="MudBlazor.Extensions" Version="9.7.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,10 +30,10 @@
     <Compile Remove="DiberyTree\TreePage.razor.cs" />
     <Compile Remove="DiberyTree\Dialogs\CategoryTreeDialog.razor.cs" />
     <Compile Remove="Components\Dialogs\**" />
-    <Compile Update="DiberyTree\Trees\TreeSky.razor.Action.cs">
+    <Compile Remove="DiberyTree\Category\CategoryTreeDialogPage.razor.cs" />
+    <Compile Update="DiberyTree\Base\TreeSky.razor.Action.cs">
       <DependentUpon>TreeSky.razor</DependentUpon>
     </Compile>
-    <Compile Remove="DiberyTree\Category\CategoryTreeDialogPage.razor.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -52,6 +53,18 @@
 
   <ItemGroup>
     <None Remove="Components\Dialogs\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <UpToDateCheckInput Remove="DiberyTree\Category\CategoryTreeDialogPage.razor" />
+    <UpToDateCheckInput Remove="DiberyTree\Category\CategoryTreePage.razor" />
+    <UpToDateCheckInput Remove="DiberyTree\Category\CategoryTreeSelectDialog.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="DiberyTree\Trees\Category\CategoryTreeDialogPage.razor" />
+    <AdditionalFiles Include="DiberyTree\Trees\Category\CategoryTreePage.razor" />
+    <AdditionalFiles Include="DiberyTree\Trees\Category\CategoryTreeSelectDialog.razor" />
   </ItemGroup>
   
 </Project>

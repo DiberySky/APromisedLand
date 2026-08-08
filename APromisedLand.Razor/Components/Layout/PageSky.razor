@@ -1,8 +1,8 @@
 ﻿@namespace APromisedLand.Razor.Components
 
-@inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 @inject IAuthenticationService AuthenticationService
+@inject BlazorService BlazorService
 
 <MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense="true"
            Elevation="0">
@@ -94,7 +94,7 @@
 
     private async Task About()
     {
-        await DialogService.ShowAboutDialogAsync();
+        await BlazorService.ShowAboutDialogAsync();
     }
 
     private async Task Logout()

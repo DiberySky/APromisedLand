@@ -26,7 +26,7 @@
     </ToolBarContent>
     <DialogContent>
         <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
-            <MudStack Spacing="2">
+            <MudStack Spacing="4">
 
                 <MudTextField T="string"
                               Value="NodeTemplate.Node.Value!.Text()"
@@ -39,19 +39,16 @@
                               Label="描述"
                               Variant="Variant.Outlined"
                               ReadOnly="true"
-                              Lines="2"/>
-
-                <MudTextField T="string"
-                              Value="ParentName"
-                              Label="父分类"
-                              Variant="Variant.Text"
-                              ReadOnly="true"/>
-
-                <MudSwitch T="bool"
-                           Value="NodeTemplate.Node.Value!.IsActive"
-                           Label="状态"
-                           Color="Color.Primary"
-                           ReadOnly="true"/>
+                              Lines="3"/>
+                
+                <MudStack Row>
+                    <MudSpacer/>
+                    <MudSwitch T="bool"
+                               Value="NodeTemplate.Node.Value!.CanHaveChildren"
+                               Label="是否允许添加子节点"
+                               Color="Color.Success"
+                               ReadOnly="true"    />
+                </MudStack>
 
             </MudStack>
         </MudContainer>
@@ -68,12 +65,16 @@
         }
     </DialogLeftActions>
     <DialogRightActions>
-        <MudButton OnClick="@OnSort"
-                   Variant="Variant.Text"
-                   Color="Color.Default"
-                   StartIcon="@Icons.Material.Outlined.ImportExport">
-            子项排序
-        </MudButton>
+        @if (NodeTemplate.Node.Value!.CanHaveChildren 
+             || NodeTemplate.Node.Children?.Count > 1)
+        {
+            <MudButton OnClick="@OnSort"
+                       Variant="Variant.Text"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Outlined.ImportExport">
+                子项排序
+            </MudButton>
+        }
         
         @if (!IsBoot)
         {
@@ -86,13 +87,16 @@
 
         }
 
-        <MudButton OnClick="@OnAddChild"
-                   Variant="Variant.Text"
-                   Color="Color.Success"
-                   StartIcon="@Icons.Material.Outlined.Add">
-            创建子项
-        </MudButton>
-
+        @if (NodeTemplate.Node.Value!.CanHaveChildren)
+        {
+            <MudButton OnClick="@OnAddChild"
+                       Variant="Variant.Text"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Outlined.Add">
+                创建子项
+            </MudButton>
+        }
+        
         <MudButton OnClick="@OnAttribute"
                    Variant="Variant.Text"
                    Color="Color.Info"

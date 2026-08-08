@@ -7,7 +7,7 @@ public interface ITreeNodeBase<TItem>
     /// <summary>节点描述</summary>
     public string? Description { get; set; }
     /// <summary>是否启用</summary>
-    bool IsActive { get; set; }
+    bool CanHaveChildren { get; set; }
     int SortOrder { get; set; }
     
     bool HasChildren { get; set; }
