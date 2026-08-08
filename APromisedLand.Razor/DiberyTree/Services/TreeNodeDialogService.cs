@@ -9,6 +9,7 @@ using APromisedLand.MauiBlazor.DiberyTree.Services;
 using APromisedLand.Razor.DiberyTree.Attributes;
 using APromisedLand.Razor.DiberyTree.Base;
 using APromisedLand.Razor.DiberyTree.Trees.Category;
+using APromisedLand.Razor.Services;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using MudBlazor.Extensions;
 using MudBlazor.Extensions.Options;
@@ -20,9 +21,62 @@ namespace APromisedLand.Razor.DiberyTree.Services;
 /// </summary>
 /// <typeparam name="TItem">节点类型，必须实现 ITreeNode</typeparam>
 public class TreeNodeDialogService<TItem>(
-    IDialogService dialogService)
+    IDialogService dialogService,
+    BlazorService blazorService)
     where TItem : class, ITreeNodeBase<TItem>, new()
 {
+    public async Task<TItem?> ShowDialogPageAsync()
+    {
+        var parameters = new DialogParameters<TreeDialogPageSky<TItem>>
+        {
+            { x => x.TitleToolBar, "" },
+            { x => x.Title, "注册" },
+        };
+        
+        var options = blazorService.DialogOptions;
+
+        var dialog = await dialogService.ShowExAsync<TreeDialogPageSky<TItem>>("注册", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not TItem actionResult)
+            return null;
+        
+        return actionResult;
+    }
+    
+    public async Task<TItem?> ShowSelectDialogAsync()
+    {
+        var parameters = new DialogParameters<TreeSelectDialogSky<TItem>>
+        {
+            { x => x.OriginalNode, null },
+            { x => x.TitleToolBar, "请选择 =>" },
+            { x => x.Title, "" },
+            { x => x.EditFunc, blazorService.ShowUnitTreeDialogPageAsync}
+        };
+        
+        // var options = new DialogOptionsEx
+        // {
+        //     MaximizeButton = true, // 启用最大化/还原按钮
+        //     CloseButton = false,    // 同时显示关闭按钮
+        //     FullWidth = true,
+        //     MaxWidth = MaxWidth.Small,
+        //     BackdropClick = false,
+        //     Position = DialogPosition.TopCenter,
+        //     Resizeable = true,
+        //     DragMode = MudDialogDragMode.Simple
+        // };
+
+        var options = blazorService.DialogOptions;
+        
+        var dialog = await dialogService.ShowExAsync<TreeSelectDialogSky<TItem>>("选择节点", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not TItem actionResult)
+            return null;
+        
+        return actionResult;
+    }
+    
     #region 操作选择对话框
 
     public async Task<NodeActionResult<TItem>?> ShowActionsDialogAsync(
@@ -162,17 +216,7 @@ public class TreeNodeDialogService<TItem>(
             { x => x.Title, node?.Value?.Text() },
         };
         
-        var options = new DialogOptionsEx
-        {
-            MaximizeButton = true, // 启用最大化/还原按钮
-            CloseButton = false,    // 同时显示关闭按钮
-            FullWidth = true,
-            MaxWidth = MaxWidth.Small,
-            BackdropClick = false,
-            Position = DialogPosition.TopCenter,
-            Resizeable = true
-        };
-        
+        var options = blazorService.DialogOptions;
         var dialog = await dialogService.ShowExAsync<TreeSelectDialogSky<TItem>>("选择上级节点", parameters, options);
 
         var result = await dialog.Result;

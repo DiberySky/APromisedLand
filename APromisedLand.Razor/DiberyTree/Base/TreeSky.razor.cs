@@ -19,10 +19,9 @@ public partial class TreeSky<TItem> : ComponentBase
     private string? _lastClickNodeId;
     private string HighlightedText { get; set; } = string.Empty;
 
-    private TreeNodeDialogService<TItem>? _nodeDialogService;
-
-    private TreeNodeDialogService<TItem> NodeDialogSvc =>
-        _nodeDialogService ??= new TreeNodeDialogService<TItem>(DialogService);
+    // private TreeNodeDialogService<TItem>? _nodeDialogService;
+    // private TreeNodeDialogService<TItem> NodeDialogSvc =>
+    //     _nodeDialogService ??= new TreeNodeDialogService<TItem>(DialogService);
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private DiberyTreeApiClient<TItem> TreeClient { get; set; } = null!;

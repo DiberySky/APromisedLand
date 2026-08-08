@@ -1,9 +1,7 @@
 ﻿@page "/StartPage"
-@using APromisedLand.Razor.Dialogs
-@using APromisedLand.Razor.Helper.Dialog
-@using APromisedLand.Shared.Interfaces
-@using APromisedLand.Shared.Models
-@using APromisedLand.Shared.Services.Solution
+
+@using MudBlazor.Extensions
+@using MudBlazor.Extensions.Options
 @using BlazorHelper = APromisedLand.Razor.Helper.Blazor.BlazorHelper
 
 @inject IAuthenticationService AuthenticationService
@@ -12,6 +10,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
+@inject TreeNodeDialogService<UnitTree> TreeNodeDialogService
 
 <PageSky Title="导航" 
          ArrowBackVisible="@(SolutionService.Authorized == false)"
@@ -54,7 +53,7 @@
                        FullWidth Color="Color.Info"
                        OnClick="e => AboutAsync()">关于</MudButton>
 
-            <MudButton Color="Color.Warning" Variant="Variant.Filled"
+            <MudButton Color="Color.Dark" Variant="Variant.Filled"
                        FullWidth Size="Size.Small"
                        OnClick="@TestClick"> 测试</MudButton>
             </MudContainer>
@@ -85,8 +84,20 @@
     private async Task AboutAsync()
         => await BlazorService.ShowAboutDialogAsync();
     
-    private void TestClick()
+    private async Task TestClick()
     {
+        var selectResult = await TreeNodeDialogService.ShowSelectDialogAsync();
+        
+        var unit = new UnitOfMeasure();
+        var dialog = await DialogService.EditObjectAsync<UnitOfMeasure>(unit, new DialogOptionsEx
+        {
+            MaximizeButton = true, // 启用最大化/还原按钮
+            CloseButton = true,    // 同时显示关闭按钮
+            FullWidth = true,
+            MaxWidth = MaxWidth.Medium
+        });
+        var result = dialog.Result;
+        
         BlazorService.ShowError("测试", "测试参数");
         BlazorService.ShowSuccess("测试成功");
     }

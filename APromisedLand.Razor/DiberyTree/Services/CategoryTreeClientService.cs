@@ -7,7 +7,9 @@ namespace APromisedLand.Razor.DiberyTree.Services;
 public class CategoryTreeClientService(
     DiberyTreeApiClient<CategoryTree> treeClient) : ITreeClientService<CategoryTree>
 {
-    public bool NewPageShow { get; set; } 
+    public string Title { get; set; } = "分类树";
+    public bool NewPageShow { get; set; }
+    public bool SelectLeaf { get; set; } = false;
 
     public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> LoadInitialDataAsync(string? rootId)
     {

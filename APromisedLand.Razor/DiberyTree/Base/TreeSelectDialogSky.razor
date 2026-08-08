@@ -1,7 +1,10 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
+@inject ITreeClientService<TItem> ClientService
+@inject TreeNodeDialogService<UnitTree> TreeNodeDialogService
+
 <DialogPageSky Title="@Title" MaxWidth="@MaxWidth"
-               TitleClass="mud-theme-success">
+               TitleClass="mud-theme-success px-0 pa-0">
     <ToolBarContent>
         @if (!string.IsNullOrEmpty(TitleToolBar))
         {
@@ -20,6 +23,11 @@
             @ToolBarRightContent
         }
         
+        @if (OriginalNode == null)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.EditNote" Color="Color.Primary"
+                           OnClick="@EditClick"/>
+        }
     </ToolBarContent>
     <DialogContent>
         <MudContainer MaxWidth="@MaxWidth">
@@ -32,8 +40,6 @@
     </DialogContent>
 </DialogPageSky>
 
-@* @bind-SelectedValue="@SelectedValue" *@
-
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
@@ -45,13 +51,35 @@
     [Parameter] public string? ClickNodeId { get; set; }
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
     
+    [Parameter] public Func<TreeItemData<UnitTree>?, Task>? EditFunc { get; set; }
+
     [Parameter] public RenderFragment? TopBarRightContent { get; set; }
     [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }
     [Parameter] public RenderFragment? ToolBarRightContent { get; set; }
     
+    bool _selectLeaf;
+    
+    protected override void OnInitialized()
+    {
+        Title = string.IsNullOrEmpty(Title) ? ClientService.Title : Title;
+
+        _selectLeaf = OriginalNode == null && ClientService.SelectLeaf;
+        
+        base.OnInitialized();
+    }
+    
     private void HandleClickItemText(ITreeItemData<TItem>? node)
     {
         if (node == null) return;
-        MudDialog?.Close(DialogResult.Ok(node.Value));
+        
+        if (_selectLeaf && !node.Value!.CanHaveChildren) 
+            MudDialog?.Close(DialogResult.Ok(node.Value));
+    }
+
+    private async Task EditClick()
+    {
+        if (EditFunc  == null) return;
+        
+        await EditFunc(null);
     }
 }

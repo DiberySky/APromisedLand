@@ -7,7 +7,9 @@ namespace APromisedLand.Razor.DiberyTree.Services;
 public class UnitTreeClientService(
     DiberyTreeApiClient<UnitTree> treeClient) : ITreeClientService<UnitTree>
 {
-    public bool NewPageShow { get; set; } 
+    public string Title { get; set; } = "计量单位";
+    public bool NewPageShow { get; set; }
+    public bool SelectLeaf { get; set; } = true;
 
     public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> LoadInitialDataAsync(string? rootId)
     {
