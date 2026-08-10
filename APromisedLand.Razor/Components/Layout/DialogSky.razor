@@ -8,9 +8,12 @@
         @if (!string.IsNullOrEmpty(Title))
         {
             <MudToolBar Dense>
+                <MudSpacer/>
                 <MudText Color="Color.Inherit">@Title</MudText>
+                <MudSpacer/>
             </MudToolBar>
         }
+        
         @if (ToolBarContent != null)
         {
             <MudPaper>
@@ -29,43 +32,43 @@
     </DialogContent>
     <DialogActions>
         @* <MudToolBar Dense> *@
-            <MudContainer>
-                <MudStack Row Spacing="2">
-                    
-                    @if (DialogLeftActions != null)
-                    {
-                        @DialogLeftActions
-                    }
+        <MudContainer MaxWidth="@MaxWidth">
 
-                    <MudSpacer/>
+            <MudStack Row Class="@ActionsContentClass">
+                @if (DialogLeftActions != null)
+                {
+                    @DialogLeftActions
+                }
 
-                    @if (DialogRightActions != null)
-                    {
-                        @DialogRightActions
-                    }
+                <MudSpacer/>
 
-                    @if (SubmitButtonVisible)
-                    {
-                        <ButtonLoadingSky Text="提交"
-                                          Variant="Variant.Text"
-                                          Color="Color.Primary"
-                                          StartIcon="@Icons.Material.Filled.SaveAs"
-                                          OnClickFunc=@(() => OnSubmitClick.InvokeAsync())/>
-                    }
-                    
-                    @if (CancelButtonVisible)
-                    {
-                        <MudButton Variant="Variant.Text"
-                                   StartIcon="@Icons.Material.Filled.Close"
-                                   Color="Color.Default"
-                                   OnClick="@CancelAsync">
-                            取消
-                        </MudButton>
-                    }
-                    
-                </MudStack>
+                @if (DialogRightActions != null)
+                {
+                    @DialogRightActions
+                }
 
-            </MudContainer>
+                @if (SubmitButtonVisible)
+                {
+                    <ButtonLoadingSky Text="提交"
+                                      Variant="Variant.Text"
+                                      Color="Color.Primary"
+                                      StartIcon="@Icons.Material.Filled.SaveAs"
+                                      OnClickFunc=@(() => OnSubmitClick.InvokeAsync())/>
+                }
+
+                @if (CancelButtonVisible)
+                {
+                    <MudButton Variant="Variant.Text"
+                               StartIcon="@Icons.Material.Filled.Close"
+                               Color="Color.Default"
+                               OnClick="@CancelAsync">
+                        取消
+                    </MudButton>
+                }
+
+            </MudStack>
+
+        </MudContainer>
         @* </MudToolBar> *@
     </DialogActions>
 </MudDialog>
@@ -74,6 +77,7 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required string Title { get; set; }
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
 
     [Parameter] public bool CancelButtonVisible { get; set; } = true;
     [Parameter] public bool SubmitButtonVisible { get; set; }
@@ -81,7 +85,7 @@
     [Parameter] public string TitleClass { get; set; } = "mud-theme-success px-0 pa-0";
     [Parameter] public string ContentClass { get; set; } = "mud-theme-dark";
     [Parameter] public string ActionsClass { get; set; } = "mud-theme-default";
-    [Parameter] public string ActionsContentClass { get; set; } = "mud-theme-inherit";
+    [Parameter] public string ActionsContentClass { get; set; } = "";
 
     [Parameter] public RenderFragment? TitleContent { get; set; }
     [Parameter] public RenderFragment? ToolBarContent { get; set; }

@@ -1,4 +1,5 @@
-@typeparam TItem
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
 @* @inject DiberyTreeApiClient<TItem> ApiClient *@
 
 <DialogSky Title="节点属性"
@@ -6,7 +7,7 @@
            SubmitButtonVisible="false"
            OnCanceledClick="@(() => MudDialog?.Close(DialogResult.Ok(true)))">
     <DialogContent>
-        <NodeAttributesPanel T="TItem" NodeId="@NodeId" />
+        <NodeAttributesPanel TItem="TItem" NodeId="@NodeId" />
     </DialogContent>
 </DialogSky>
 

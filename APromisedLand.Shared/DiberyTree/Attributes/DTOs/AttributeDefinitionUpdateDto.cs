@@ -6,5 +6,5 @@ public class AttributeDefinitionUpdateDto
     public int? Lines { get; set; }
     public int? Precision { get; set; }
     public int? Scale { get; set; }
-    public string? UnitOfMeasureId { get; set; }
+    public string? UnitId { get; set; }
 }

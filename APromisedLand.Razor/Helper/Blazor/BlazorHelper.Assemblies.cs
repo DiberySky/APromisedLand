@@ -14,7 +14,6 @@ public static partial class BlazorHelper
     public static IEnumerable<Assembly> Pages { get; set; }=
     [
         typeof(UnitOfMeasurePage).Assembly,
-        typeof(AttributeDefinitionList).Assembly,
         typeof(NotFound).Assembly,
         typeof(StartPage).Assembly,
         typeof(StartPage).Assembly,

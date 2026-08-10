@@ -1,0 +1,31 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+
+<MudTextField @bind-Value="@AttributeDefinitionDto?.Name"
+              Label="属性默认名称"
+              Variant="Variant.Outlined" ReadOnly="true"
+              InputType="@InputType.Text" Adornment="Adornment.End"
+              AdornmentIcon="@Icons.Material.Outlined.EditNote"
+              AdornmentColor="Color.Info"
+              OnAdornmentClick="@EditClick"
+              AdornmentAriaLabel=""/>
+
+@code {
+    [Parameter] public AttributeDefinitionDto? AttributeDefinitionDto { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto> AttributeDefinitionChanged { get; set; }
+
+    private async Task EditClick()
+    {
+        var result = await TreeNodeDialogService.ShowAttributeDefinitionListDialogAsync();
+     
+        if (result == null) return;
+        
+        AttributeDefinitionDto = result;
+        
+        StateHasChanged();
+        
+        await AttributeDefinitionChanged.InvokeAsync(result);
+    }
+
+}

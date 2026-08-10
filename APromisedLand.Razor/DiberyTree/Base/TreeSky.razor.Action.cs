@@ -1,12 +1,13 @@
 using APromisedLand.Razor.DiberyTree.Enums;
 using APromisedLand.Razor.DiberyTree.Models;
+using APromisedLand.Razor.DiberyTree.Trees;
 using APromisedLand.Razor.Helper.Blazor;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 
-namespace APromisedLand.Razor.DiberyTree.Trees;
+namespace APromisedLand.Razor.DiberyTree.Base;
 
 public partial class TreeSky<TItem> : ComponentBase
     where TItem : class, ITreeNodeBase<TItem>, new()

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(DiberyDbContext))]
-    [Migration("20260807135125_Initial")]
+    [Migration("20260810000701_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -30,12 +30,12 @@ namespace APromisedLand.Api.Data.Migrations
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeDefinition", b =>
                 {
                     b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
 
-                    b.Property<int>("AttributeTypeId")
-                        .HasColumnType("integer");
+                    b.Property<string>("AttributeTypeId")
+                        .IsRequired()
+                        .HasColumnType("character varying(36)");
 
                     b.Property<int?>("Lines")
                         .HasColumnType("integer");
@@ -51,25 +51,145 @@ namespace APromisedLand.Api.Data.Migrations
                     b.Property<int?>("Scale")
                         .HasColumnType("integer");
 
-                    b.Property<string>("UnitOfMeasureId")
-                        .HasColumnType("character varying(36)");
+                    b.Property<string>("UnitId")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AttributeTypeId");
 
-                    b.HasIndex("UnitOfMeasureId");
+                    b.HasIndex("UnitId");
 
                     b.ToTable("AttributeDefinitions");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
+                            AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            Lines = 1,
+                            Name = "名称"
+                        },
+                        new
+                        {
+                            Id = "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f",
+                            AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            Lines = 5,
+                            Name = "描述"
+                        },
+                        new
+                        {
+                            Id = "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a",
+                            AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            Lines = 10,
+                            Name = "备注"
+                        },
+                        new
+                        {
+                            Id = "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b",
+                            AttributeTypeId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            Name = "数量",
+                            UnitId = "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c"
+                        },
+                        new
+                        {
+                            Id = "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c",
+                            AttributeTypeId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            Name = "等级"
+                        },
+                        new
+                        {
+                            Id = "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d",
+                            AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            Name = "价格",
+                            Precision = 18,
+                            Scale = 2
+                        },
+                        new
+                        {
+                            Id = "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e",
+                            AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            Name = "重量",
+                            Precision = 10,
+                            Scale = 3,
+                            UnitId = "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e"
+                        },
+                        new
+                        {
+                            Id = "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f",
+                            AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            Name = "长度",
+                            Precision = 8,
+                            Scale = 2,
+                            UnitId = "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
+                        },
+                        new
+                        {
+                            Id = "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a",
+                            AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            Name = "生产日期"
+                        },
+                        new
+                        {
+                            Id = "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b",
+                            AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            Name = "试验日期"
+                        },
+                        new
+                        {
+                            Id = "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
+                            AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            Name = "出厂日期"
+                        },
+                        new
+                        {
+                            Id = "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+                            AttributeTypeId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            Name = "开始时间"
+                        },
+                        new
+                        {
+                            Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
+                            AttributeTypeId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            Name = "结束时间"
+                        },
+                        new
+                        {
+                            Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
+                            AttributeTypeId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            Name = "创建时间"
+                        },
+                        new
+                        {
+                            Id = "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a",
+                            AttributeTypeId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            Name = "更新时间"
+                        },
+                        new
+                        {
+                            Id = "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b",
+                            AttributeTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            Name = "附件"
+                        },
+                        new
+                        {
+                            Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+                            AttributeTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            Name = "图片"
+                        },
+                        new
+                        {
+                            Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d",
+                            AttributeTypeId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+                            Name = "位置坐标"
+                        });
                 });
 
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeType", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
 
                     b.Property<string>("Description")
                         .HasMaxLength(512)
@@ -92,56 +212,56 @@ namespace APromisedLand.Api.Data.Migrations
                     b.HasData(
                         new
                         {
-                            Id = 1,
+                            Id = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
                             Description = "用于存储短文本、备注、名称等单行或多行文字信息",
                             Name = "文本",
                             SystemType = "文本"
                         },
                         new
                         {
-                            Id = 2,
+                            Id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             Description = "用于存储整数值，如数量、计数、等级等",
                             Name = "整数",
                             SystemType = "整数"
                         },
                         new
                         {
-                            Id = 3,
+                            Id = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
                             Description = "用于存储带小数的数值，如价格、重量等",
                             Name = "小数",
                             SystemType = "小数"
                         },
                         new
                         {
-                            Id = 4,
+                            Id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
                             Description = "用于存储日期（不含时间）",
                             Name = "日期",
                             SystemType = "日期"
                         },
                         new
                         {
-                            Id = 5,
+                            Id = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
                             Description = "用于存储时间（不含日期）",
                             Name = "时间",
                             SystemType = "时间"
                         },
                         new
                         {
-                            Id = 6,
+                            Id = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
                             Description = "用于存储精确的日期和时间",
                             Name = "日期时间",
                             SystemType = "日期时间"
                         },
                         new
                         {
-                            Id = 7,
+                            Id = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
                             Description = "用于上传和存储文件，记录文件路径、名称等",
                             Name = "文件",
                             SystemType = "文件"
                         },
                         new
                         {
-                            Id = 8,
+                            Id = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
                             Description = "用于存储地理位置信息（经度、纬度）",
                             Name = "定位",
                             SystemType = "定位"
@@ -367,6 +487,17 @@ namespace APromisedLand.Api.Data.Migrations
                         },
                         new
                         {
+                            Id = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            Abbreviation = "",
+                            CanHaveChildren = true,
+                            Description = "货币计量单位",
+                            HasChildren = true,
+                            Name = "货币",
+                            ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
+                            SortOrder = 0
+                        },
+                        new
+                        {
                             Id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             Abbreviation = "",
                             CanHaveChildren = true,
@@ -374,7 +505,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "长度",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 0
+                            SortOrder = 1
                         },
                         new
                         {
@@ -385,7 +516,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "质量",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 1
+                            SortOrder = 2
                         },
                         new
                         {
@@ -396,7 +527,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "时间",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 2
+                            SortOrder = 3
                         },
                         new
                         {
@@ -407,7 +538,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "温度",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 3
+                            SortOrder = 4
                         },
                         new
                         {
@@ -418,7 +549,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "电流",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 4
+                            SortOrder = 5
                         },
                         new
                         {
@@ -429,7 +560,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "电压",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 5
+                            SortOrder = 6
                         },
                         new
                         {
@@ -440,7 +571,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "功率",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 6
+                            SortOrder = 7
                         },
                         new
                         {
@@ -451,7 +582,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "面积",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 7
+                            SortOrder = 8
                         },
                         new
                         {
@@ -462,7 +593,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "体积",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 8
+                            SortOrder = 9
                         },
                         new
                         {
@@ -473,7 +604,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "速度",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 9
+                            SortOrder = 10
                         },
                         new
                         {
@@ -484,7 +615,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "压力",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 10
+                            SortOrder = 11
                         },
                         new
                         {
@@ -495,7 +626,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "能量",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 11
+                            SortOrder = 12
                         },
                         new
                         {
@@ -506,7 +637,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "频率",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 12
+                            SortOrder = 13
                         },
                         new
                         {
@@ -517,7 +648,84 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = true,
                             Name = "角度",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
-                            SortOrder = 13
+                            SortOrder = 14
+                        },
+                        new
+                        {
+                            Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+                            Abbreviation = "CNY",
+                            CanHaveChildren = false,
+                            Description = "人民币",
+                            HasChildren = false,
+                            Name = "元",
+                            ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            SortOrder = 15
+                        },
+                        new
+                        {
+                            Id = "e6b7c8d9-f0a1-4b2c-3d4e-5f6a7b8c9d0e",
+                            Abbreviation = "USD",
+                            CanHaveChildren = false,
+                            Description = "美元",
+                            HasChildren = false,
+                            Name = "美元",
+                            ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            SortOrder = 16
+                        },
+                        new
+                        {
+                            Id = "d5c6d7e8-f9a0-4b1c-2d3e-4f5a6b7c8d9e",
+                            Abbreviation = "EUR",
+                            CanHaveChildren = false,
+                            Description = "欧元",
+                            HasChildren = false,
+                            Name = "欧元",
+                            ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            SortOrder = 17
+                        },
+                        new
+                        {
+                            Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
+                            Abbreviation = "GBP",
+                            CanHaveChildren = false,
+                            Description = "英镑",
+                            HasChildren = false,
+                            Name = "英镑",
+                            ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            SortOrder = 18
+                        },
+                        new
+                        {
+                            Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
+                            Abbreviation = "JPY",
+                            CanHaveChildren = false,
+                            Description = "日元",
+                            HasChildren = false,
+                            Name = "日元",
+                            ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            SortOrder = 19
+                        },
+                        new
+                        {
+                            Id = "a5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d",
+                            Abbreviation = "HKD",
+                            CanHaveChildren = false,
+                            Description = "港元",
+                            HasChildren = false,
+                            Name = "港元",
+                            ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            SortOrder = 20
+                        },
+                        new
+                        {
+                            Id = "b6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e",
+                            Abbreviation = "AUD",
+                            CanHaveChildren = false,
+                            Description = "澳元",
+                            HasChildren = false,
+                            Name = "澳元",
+                            ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            SortOrder = 21
                         },
                         new
                         {
@@ -528,7 +736,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "米",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-                            SortOrder = 14
+                            SortOrder = 22
                         },
                         new
                         {
@@ -539,7 +747,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "千米",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-                            SortOrder = 15
+                            SortOrder = 23
                         },
                         new
                         {
@@ -550,7 +758,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "厘米",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-                            SortOrder = 16
+                            SortOrder = 24
                         },
                         new
                         {
@@ -561,7 +769,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "毫米",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-                            SortOrder = 17
+                            SortOrder = 25
                         },
                         new
                         {
@@ -572,7 +780,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "英里",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-                            SortOrder = 18
+                            SortOrder = 26
                         },
                         new
                         {
@@ -583,7 +791,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "码",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-                            SortOrder = 19
+                            SortOrder = 27
                         },
                         new
                         {
@@ -594,7 +802,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "英尺",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-                            SortOrder = 20
+                            SortOrder = 28
                         },
                         new
                         {
@@ -605,7 +813,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "英寸",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-                            SortOrder = 21
+                            SortOrder = 29
                         },
                         new
                         {
@@ -616,7 +824,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "千克",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-                            SortOrder = 22
+                            SortOrder = 30
                         },
                         new
                         {
@@ -627,7 +835,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "克",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-                            SortOrder = 23
+                            SortOrder = 31
                         },
                         new
                         {
@@ -638,7 +846,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "毫克",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-                            SortOrder = 24
+                            SortOrder = 32
                         },
                         new
                         {
@@ -649,7 +857,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "吨",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-                            SortOrder = 25
+                            SortOrder = 33
                         },
                         new
                         {
@@ -660,7 +868,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "磅",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-                            SortOrder = 26
+                            SortOrder = 34
                         },
                         new
                         {
@@ -671,7 +879,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "盎司",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-                            SortOrder = 27
+                            SortOrder = 35
                         },
                         new
                         {
@@ -682,7 +890,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "秒",
                             ParentId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
-                            SortOrder = 28
+                            SortOrder = 36
                         },
                         new
                         {
@@ -693,7 +901,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "分钟",
                             ParentId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
-                            SortOrder = 29
+                            SortOrder = 37
                         },
                         new
                         {
@@ -704,7 +912,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "小时",
                             ParentId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
-                            SortOrder = 30
+                            SortOrder = 38
                         },
                         new
                         {
@@ -715,7 +923,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "天",
                             ParentId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
-                            SortOrder = 31
+                            SortOrder = 39
                         },
                         new
                         {
@@ -726,7 +934,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "摄氏度",
                             ParentId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
-                            SortOrder = 32
+                            SortOrder = 40
                         },
                         new
                         {
@@ -737,7 +945,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "华氏度",
                             ParentId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
-                            SortOrder = 33
+                            SortOrder = 41
                         },
                         new
                         {
@@ -748,7 +956,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "开尔文",
                             ParentId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
-                            SortOrder = 34
+                            SortOrder = 42
                         },
                         new
                         {
@@ -759,7 +967,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "安培",
                             ParentId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
-                            SortOrder = 35
+                            SortOrder = 43
                         },
                         new
                         {
@@ -770,7 +978,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "毫安",
                             ParentId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
-                            SortOrder = 36
+                            SortOrder = 44
                         },
                         new
                         {
@@ -781,7 +989,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "微安",
                             ParentId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
-                            SortOrder = 37
+                            SortOrder = 45
                         },
                         new
                         {
@@ -792,7 +1000,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "伏特",
                             ParentId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
-                            SortOrder = 38
+                            SortOrder = 46
                         },
                         new
                         {
@@ -803,7 +1011,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "千伏",
                             ParentId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
-                            SortOrder = 39
+                            SortOrder = 47
                         },
                         new
                         {
@@ -814,7 +1022,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "毫伏",
                             ParentId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
-                            SortOrder = 40
+                            SortOrder = 48
                         },
                         new
                         {
@@ -825,7 +1033,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "瓦特",
                             ParentId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
-                            SortOrder = 41
+                            SortOrder = 49
                         },
                         new
                         {
@@ -836,7 +1044,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "千瓦",
                             ParentId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
-                            SortOrder = 42
+                            SortOrder = 50
                         },
                         new
                         {
@@ -847,7 +1055,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "兆瓦",
                             ParentId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
-                            SortOrder = 43
+                            SortOrder = 51
                         },
                         new
                         {
@@ -858,7 +1066,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "马力",
                             ParentId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
-                            SortOrder = 44
+                            SortOrder = 52
                         },
                         new
                         {
@@ -869,7 +1077,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "平方米",
                             ParentId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
-                            SortOrder = 45
+                            SortOrder = 53
                         },
                         new
                         {
@@ -880,7 +1088,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "平方公里",
                             ParentId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
-                            SortOrder = 46
+                            SortOrder = 54
                         },
                         new
                         {
@@ -891,7 +1099,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "公顷",
                             ParentId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
-                            SortOrder = 47
+                            SortOrder = 55
                         },
                         new
                         {
@@ -902,7 +1110,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "亩",
                             ParentId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
-                            SortOrder = 48
+                            SortOrder = 56
                         },
                         new
                         {
@@ -913,7 +1121,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "立方米",
                             ParentId = "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
-                            SortOrder = 49
+                            SortOrder = 57
                         },
                         new
                         {
@@ -924,7 +1132,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "升",
                             ParentId = "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
-                            SortOrder = 50
+                            SortOrder = 58
                         },
                         new
                         {
@@ -935,7 +1143,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "毫升",
                             ParentId = "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
-                            SortOrder = 51
+                            SortOrder = 59
                         },
                         new
                         {
@@ -946,7 +1154,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "米/秒",
                             ParentId = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
-                            SortOrder = 52
+                            SortOrder = 60
                         },
                         new
                         {
@@ -957,7 +1165,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "千米/小时",
                             ParentId = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
-                            SortOrder = 53
+                            SortOrder = 61
                         },
                         new
                         {
@@ -968,7 +1176,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "英里/小时",
                             ParentId = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
-                            SortOrder = 54
+                            SortOrder = 62
                         },
                         new
                         {
@@ -979,7 +1187,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "帕斯卡",
                             ParentId = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
-                            SortOrder = 55
+                            SortOrder = 63
                         },
                         new
                         {
@@ -990,7 +1198,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "千帕",
                             ParentId = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
-                            SortOrder = 56
+                            SortOrder = 64
                         },
                         new
                         {
@@ -1001,7 +1209,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "兆帕",
                             ParentId = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
-                            SortOrder = 57
+                            SortOrder = 65
                         },
                         new
                         {
@@ -1012,7 +1220,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "巴",
                             ParentId = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
-                            SortOrder = 58
+                            SortOrder = 66
                         },
                         new
                         {
@@ -1023,7 +1231,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "焦耳",
                             ParentId = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
-                            SortOrder = 59
+                            SortOrder = 67
                         },
                         new
                         {
@@ -1034,7 +1242,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "千焦",
                             ParentId = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
-                            SortOrder = 60
+                            SortOrder = 68
                         },
                         new
                         {
@@ -1045,7 +1253,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "千瓦时",
                             ParentId = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
-                            SortOrder = 61
+                            SortOrder = 69
                         },
                         new
                         {
@@ -1056,7 +1264,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "赫兹",
                             ParentId = "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
-                            SortOrder = 62
+                            SortOrder = 70
                         },
                         new
                         {
@@ -1067,7 +1275,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "千赫",
                             ParentId = "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
-                            SortOrder = 63
+                            SortOrder = 71
                         },
                         new
                         {
@@ -1078,7 +1286,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "兆赫",
                             ParentId = "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
-                            SortOrder = 64
+                            SortOrder = 72
                         },
                         new
                         {
@@ -1089,7 +1297,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "度",
                             ParentId = "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
-                            SortOrder = 65
+                            SortOrder = 73
                         },
                         new
                         {
@@ -1100,7 +1308,7 @@ namespace APromisedLand.Api.Data.Migrations
                             HasChildren = false,
                             Name = "弧度",
                             ParentId = "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
-                            SortOrder = 66
+                            SortOrder = 74
                         });
                 });
 
@@ -1552,14 +1760,14 @@ namespace APromisedLand.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("APromisedLand.Shared.Models.UnitOfMeasure", "UnitOfMeasure")
+                    b.HasOne("APromisedLand.Shared.DiberyTree.Models.UnitTree", "Unit")
                         .WithMany()
-                        .HasForeignKey("UnitOfMeasureId")
+                        .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("AttributeType");
 
-                    b.Navigation("UnitOfMeasure");
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Models.UnitTree", b =>

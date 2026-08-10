@@ -58,28 +58,21 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
         modelBuilder.Entity<AttributeType>(entity =>
         {
             entity.HasKey(t => t.Id);
+            entity.Property(t => t.Id).HasMaxLength(36).ValueGeneratedNever();
             entity.Property(t => t.Name).HasMaxLength(50).IsRequired();
             entity.Property(t => t.Description).HasMaxLength(512);
             entity.Property(t => t.SystemType)
                   .HasConversion<string>()
                   .HasMaxLength(32);
         });
-        modelBuilder.Entity<AttributeType>().HasData(
-            new AttributeType { Id = 1, Name = "文本", Description = "用于存储短文本、备注、名称等单行或多行文字信息", SystemType = AttributeTypeEnum.文本 },
-            new AttributeType { Id = 2, Name = "整数", Description = "用于存储整数值，如数量、计数、等级等", SystemType = AttributeTypeEnum.整数 },
-            new AttributeType { Id = 3, Name = "小数", Description = "用于存储带小数的数值，如价格、重量等", SystemType = AttributeTypeEnum.小数 },
-            new AttributeType { Id = 4, Name = "日期", Description = "用于存储日期（不含时间）", SystemType = AttributeTypeEnum.日期 },
-            new AttributeType { Id = 5, Name = "时间", Description = "用于存储时间（不含日期）", SystemType = AttributeTypeEnum.时间 },
-            new AttributeType { Id = 6, Name = "日期时间", Description = "用于存储精确的日期和时间", SystemType = AttributeTypeEnum.日期时间 },
-            new AttributeType { Id = 7, Name = "文件", Description = "用于上传和存储文件，记录文件路径、名称等", SystemType = AttributeTypeEnum.文件 },
-            new AttributeType { Id = 8, Name = "定位", Description = "用于存储地理位置信息（经度、纬度）", SystemType = AttributeTypeEnum.定位 }
-        );
+        modelBuilder.Entity<AttributeType>().HasData(AttributeType.SeedData());
+       
 
         // ------ AttributeDefinition (Id 改为 string) ------
         modelBuilder.Entity<AttributeDefinition>(entity =>
         {
             entity.HasKey(d => d.Id);
-            entity.Property(d => d.Id).HasMaxLength(36).ValueGeneratedOnAdd();
+            entity.Property(d => d.Id).HasMaxLength(36).ValueGeneratedNever();
             entity.Property(d => d.Name).HasMaxLength(256).IsRequired();
             entity.Property(d => d.Lines);
             entity.Property(d => d.Precision);
@@ -90,11 +83,12 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
                   .HasForeignKey(d => d.AttributeTypeId)
                   .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasOne(d => d.UnitOfMeasure)
+            entity.HasOne(d => d.Unit)
                   .WithMany()
-                  .HasForeignKey(d => d.UnitOfMeasureId)
+                  .HasForeignKey(d => d.UnitId)
                   .OnDelete(DeleteBehavior.Restrict);
         });
+        modelBuilder.Entity<AttributeDefinition>().HasData(AttributeDefinition.SeedData());
 
         // ------ TPC 继承映射 (根类型 AttributeValueBase) ------
         modelBuilder.Entity<AttributeValueBase>(entity =>

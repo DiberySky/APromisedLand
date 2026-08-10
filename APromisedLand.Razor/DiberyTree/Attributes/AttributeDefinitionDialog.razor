@@ -1,7 +1,8 @@
-@using APromisedLand.Shared.DiberyTree.Attributes.Enums
+
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject ISnackbar Snackbar
-@* @inject DiberyTreeApiClient<CategoryTree> ApiClient *@
+@inject DiberyTreeApiClient<CategoryTree> ApiClient
 
 <DialogSky Title="@(IsEdit ? "编辑属性定义" : "新建属性定义")"
            SubmitButtonVisible="true"
@@ -13,20 +14,24 @@
             <MudContainer class="my-4">
                 <MudGrid>
                     <MudItem xs="12">
-                        <MudSelect T="AttributeType"
-                                   @bind-Value="_model.AttributeType"
-                                   Label="属性类型"
-                                   Variant="Variant.Outlined"
-                                   Required="true"
-                                   RequiredError="请选择属性类型"
-                                   Disabled="IsEdit"
-                                   AnchorOrigin="Origin.BottomLeft">
-                            @foreach (var type in AttributeTypes)
-                            {
-                                <MudSelectItem Value="@type">@type.Name 【@type.Description】</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <AttributeTypeField TItem="TItem" AttributeDefinitionDto="@EditItem"
+                                          AttributeDefinitionChanged="@AttributeDefinitionChanged"/>
                     </MudItem>
+                    @* <MudItem xs="12"> *@
+                    @*     <MudSelect T="AttributeType" *@
+                    @*                @bind-Value="_model.AttributeType" *@
+                    @*                Label="属性类型" *@
+                    @*                Variant="Variant.Outlined" *@
+                    @*                Required="true" *@
+                    @*                RequiredError="请选择属性类型" *@
+                    @*                Disabled="IsEdit" *@
+                    @*                AnchorOrigin="Origin.BottomLeft"> *@
+                    @*         @foreach (var type in AttributeTypes) *@
+                    @*         { *@
+                    @*             <MudSelectItem Value="@type">@type.Name 【@type.Description】</MudSelectItem> *@
+                    @*         } *@
+                    @*     </MudSelect> *@
+                    @* </MudItem> *@
 
                     <MudItem xs="12">
                         <MudTextField @bind-Value="_model.Name"
@@ -70,21 +75,23 @@
                     @if (_model.AttributeType?.SystemType is AttributeTypeEnum.整数 or AttributeTypeEnum.小数)
                     {
                         <MudItem xs="12">
-                            <MudSelect T="string?"
-                                       @bind-Value="_model.UnitOfMeasureId"
-                                       Label="计量单位"
-                                       Variant="Variant.Outlined"
-                                       Clearable="true"
-                                       AnchorOrigin="Origin.BottomCenter">
-                                <MudSelectItem T="string?" Value="@((string?)null)">无</MudSelectItem>
-                                @foreach (var uom in UnitsOfMeasure)
-                                {
-                                    <MudSelectItem T="string?" Value="@uom.Id">@uom.Name (@uom.Symbol)</MudSelectItem>
-                                }
-                            </MudSelect>
+                            <UintTreeField Unit="@Unit" />
+                            
+                            @* <MudSelect T="string?" *@
+                            @*            @bind-Value="_model.UnitId" *@
+                            @*            Label="计量单位" *@
+                            @*            Variant="Variant.Outlined" *@
+                            @*            Clearable="true" *@
+                            @*            AnchorOrigin="Origin.BottomCenter"> *@
+                            @*     <MudSelectItem T="string?" Value="@((string?)null)">无</MudSelectItem> *@
+                            @*     @foreach (var uom in Units) *@
+                            @*     { *@
+                            @*         <MudSelectItem T="string?" Value="@uom.Id">@uom.Name (@uom.Abbreviation)</MudSelectItem> *@
+                            @*     } *@
+                            @* </MudSelect> *@
                         </MudItem>
                     }
-                    
+
                 </MudGrid>
             </MudContainer>
         </MudForm>
@@ -96,7 +103,7 @@
 
     [Parameter] public AttributeDefinitionDto? EditItem { get; set; }
     [Parameter] public List<AttributeType> AttributeTypes { get; set; } = new();
-    [Parameter] public List<UnitOfMeasure> UnitsOfMeasure { get; set; } = new();
+    [Parameter] public UnitTree? Unit { get; set; }
 
     private MudForm? _form;
     private FormModel _model = new();
@@ -114,7 +121,7 @@
                 Lines = EditItem.Lines,
                 Precision = EditItem.Precision,
                 Scale = EditItem.Scale,
-                UnitOfMeasureId = EditItem.UnitOfMeasureId
+                UnitId = EditItem.Unit?.Id
             };
         }
         else
@@ -126,7 +133,7 @@
                 Lines = 1,
                 Precision = 0,
                 Scale = 0,
-                UnitOfMeasureId = null
+                UnitId = null
             };
         }
     }
@@ -134,7 +141,7 @@
     private async Task HandleSubmitAsync()
     {
         if (_form == null) return;
-        await _form.Validate();
+        await _form.ValidateAsync();
 
         if (!_form.IsValid) return;
 
@@ -148,10 +155,10 @@
                     Lines = _model.Lines,
                     Precision = _model.Precision,
                     Scale = _model.Scale,
-                    UnitOfMeasureId = _model.UnitOfMeasureId
+                    UnitId = _model.UnitId
                 };
 
-                // await ApiClient.UpdateDefinitionAsync(EditItem!.Id, updateDto);
+                await ApiClient.UpdateDefinitionAsync(EditItem!.Id, updateDto);
 
                 Snackbar.Add("属性定义更新成功", Severity.Success);
             }
@@ -166,10 +173,10 @@
                     Lines = _model.Lines,
                     Precision = _model.Precision,
                     Scale = _model.Scale,
-                    UnitOfMeasureId = _model.UnitOfMeasureId
+                    UnitId = _model.UnitId
                 };
 
-                // await ApiClient.CreateDefinitionAsync(createDto);
+                await ApiClient.CreateDefinitionAsync(createDto);
 
                 Snackbar.Add("属性定义创建成功", Severity.Success);
             }
@@ -187,6 +194,20 @@
         // DialogSky 内部已处理 MudDialog.Close，此处仅做额外清理
     }
 
+    private void AttributeDefinitionChanged(AttributeDefinitionDto dto)
+    {
+        EditItem = dto;
+
+        _model.Name = dto.Name;
+        _model.AttributeType = dto.AttributeType;
+        _model.Lines = dto.Lines;
+        _model.Precision = dto.Precision;
+        _model.Scale = dto.Scale;
+        // _model.UnitId = dto.UnitId;
+            
+        StateHasChanged();
+    }
+    
     private class FormModel
     {
         public string Name { get; set; } = string.Empty;
@@ -194,7 +215,6 @@
         public int? Lines { get; set; }
         public int? Precision { get; set; }
         public int? Scale { get; set; }
-        public string? UnitOfMeasureId { get; set; }
+        public string? UnitId { get; set; }
     }
-
 }

@@ -136,7 +136,7 @@ public class TreeAttributeControllerBase(DiberyDbContext db) : ControllerBase
             .Include(v => v.Definition)
                 .ThenInclude(d => d.AttributeType)
             .Include(v => v.Definition)
-                .ThenInclude(d => d.UnitOfMeasure)
+                .ThenInclude(d => d.Unit)
             .Where(v => v.NodeId == nodeId)
             .ToListAsync();
         return items.Select(MapToDto).ToList();
@@ -146,7 +146,7 @@ public class TreeAttributeControllerBase(DiberyDbContext db) : ControllerBase
     {
         var def = v.Definition;
         var attrType = def?.AttributeType;
-        var unit = def?.UnitOfMeasure;
+        var unit = def?.Unit;
 
         return new AttributeDto
         {
@@ -154,7 +154,7 @@ public class TreeAttributeControllerBase(DiberyDbContext db) : ControllerBase
             DefinitionName = def?.Name ?? "未知定义",
             Type = attrType?.Name ?? "未知类型",
             TypeDescription = attrType?.Description,
-            Unit = unit?.Symbol ?? unit?.Name,
+            Unit = unit?.Abbreviation ?? unit?.Name,
             Lines = def?.Lines,
             Value = v switch
             {

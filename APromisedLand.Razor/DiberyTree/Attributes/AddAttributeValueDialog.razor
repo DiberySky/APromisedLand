@@ -1,8 +1,9 @@
-@using APromisedLand.Shared.DiberyTree.Attributes.DTOs
-@using APromisedLand.Shared.DiberyTree.Attributes.Models
-@typeparam T
-@* @inject DiberyTreeApiClient<T> ApiClient *@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject IDialogService DialogService
+@inject DiberyTreeApiClient<TItem> ApiClient
 @inject ISnackbar Snackbar
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
 
 <DialogSky Title="添加属性"
            CancelButtonVisible="true"
@@ -10,31 +11,48 @@
            OnSubmitClick="@SubmitAsync"
            OnCanceledClick="@(() => MudDialog?.Close(DialogResult.Cancel()))">
     <DialogContent>
-        <MudGrid>
+        <MudGrid Class="pa-4">
             <MudItem xs="12">
-                <MudSelect T="AttributeDefinition" Label="选择属性定义" 
-                           @bind-Value="_selectedDefinition" 
-                           For="@(() => _selectedDefinition)" 
-                           AnchorOrigin="Origin.BottomCenter"
-                           Variant="Variant.Outlined" 
-                           Margin="Margin.Dense">
-                    @foreach (var def in _definitions)
-                    {
-                        <MudSelectItem Value="@def">@def.Name</MudSelectItem>
-                    }
-                </MudSelect>
+                <AttributeTypeField TItem="TItem" AttributeDefinitionDto="@_attributeDefinition"
+                                  AttributeDefinitionChanged="@(e => _attributeDefinition = e)"/>
             </MudItem>
+            @* <MudItem xs="12"> *@
+            @*     <MudTextField @bind-Value="@_attributeDefinition?.Name" Label="@_attributeDefinition?.Name" *@
+            @*                   Variant="Variant.Outlined" ReadOnly="true" *@
+            @*                   InputType="@InputType.Text" Adornment="Adornment.End" *@
+            @*                   AdornmentIcon="@Icons.Material.Outlined.EditNote" *@
+            @*                   AdornmentColor="Color.Info" *@
+            @*                   OnAdornmentClick="@EditClick" *@
+            @*                   AdornmentAriaLabel=""/> *@
+            @* </MudItem> *@
+            @* <MudItem xs="10"> *@
+            @*     <MudSelect T="AttributeDefinitionDto" Label="选择属性定义" *@
+            @*                @bind-Value="_attributeDefinition" *@
+            @*                For="@(() => _attributeDefinition)" *@
+            @*                AnchorOrigin="Origin.BottomLeft" *@
+            @*                Variant="Variant.Outlined" *@
+            @*                Margin="Margin.Dense"> *@
+            @*         @foreach (var def in _definitions) *@
+            @*         { *@
+            @*             <MudSelectItem Value="@def">@def.Name</MudSelectItem> *@
+            @*         } *@
+            @*     </MudSelect> *@
+            @* </MudItem> *@
+            @* <MudItem xs="2"> *@
+            @*     <MudIconButton Icon="@Icons.Material.Outlined.EditNote" *@
+            @*                    Color="Color.Info"/> *@
+            @* </MudItem> *@
             <MudItem xs="12">
-                <MudTextField Label="属性值" @bind-Value="_value" 
-                              Variant="Variant.Outlined" 
-                              Margin="Margin.Dense" />
-                @if (!string.IsNullOrEmpty(_selectedDefinition?.AttributeType?.Name))
+                <MudTextField Label="属性值" @bind-Value="_value"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"/>
+                @if (!string.IsNullOrEmpty(_attributeDefinition?.AttributeType?.Name))
                 {
                     <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                        类型：@_selectedDefinition.AttributeType.Name
-                        @if (!string.IsNullOrEmpty(_selectedDefinition.UnitOfMeasure?.Symbol))
+                        类型：@_attributeDefinition.AttributeType.Name
+                        @if (!string.IsNullOrEmpty(_attributeDefinition.Unit?.Abbreviation))
                         {
-                            <span>，单位：@_selectedDefinition.UnitOfMeasure.Symbol</span>
+                            <span>，单位：@_attributeDefinition.Unit?.Abbreviation</span>
                         }
                     </MudText>
                 }
@@ -47,16 +65,16 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
     [Parameter] public required string NodeId { get; set; }
 
-    private List<AttributeDefinition> _definitions = new();
-    private AttributeDefinition? _selectedDefinition;
+    private List<AttributeDefinitionDto> _definitions = new();
+    private AttributeDefinitionDto? _attributeDefinition;
     private string _value = "";
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // var defs = await ApiClient.GetAllDefinitionsAsync();
-            // _definitions = defs.ToList();
+            var defs = await ApiClient.GetAllDefinitionsAsync();
+            _definitions = defs.ToList();
         }
         catch (Exception ex)
         {
@@ -66,11 +84,12 @@
 
     private async Task SubmitAsync()
     {
-        if (_selectedDefinition == null)
+        if (_attributeDefinition == null)
         {
             Snackbar.Add("请选择属性定义", Severity.Warning);
             return;
         }
+
         if (string.IsNullOrWhiteSpace(_value))
         {
             Snackbar.Add("请输入属性值", Severity.Warning);
@@ -81,7 +100,7 @@
         {
             // 注意：AddValueDto 的 AttributeDefinitionId 为 string，但后端期望 int，需统一
             var dto = new AddValueDto(
-                AttributeDefinitionId: _selectedDefinition.Id.ToString(),
+                AttributeDefinitionId: _attributeDefinition.Id.ToString(),
                 Value: _value
             );
             // await ApiClient.AddValueAsync(NodeId, dto);
@@ -93,4 +112,26 @@
             Snackbar.Add($"添加失败: {ex.Message}", Severity.Error);
         }
     }
+
+    private async Task EditClick()
+    {
+        var dialogParams = new DialogParameters<AttributeDefinitionListDialog<TItem>>
+        {
+            // { x => x.NodeId, NodeId }
+        };
+        var result = await TreeNodeDialogService.ShowAttributeDefinitionListDialogAsync();
+        // var result = await dialog;
+        // if (!result.Canceled)
+        // {
+        //     // await LoadAttributes(); // 刷新列表
+        // }
+    }
+
+    private void AttributeDefinitionChanged(AttributeDefinitionDto dto)
+    {
+        _attributeDefinition = dto;
+        
+        StateHasChanged();
+    }
+
 }

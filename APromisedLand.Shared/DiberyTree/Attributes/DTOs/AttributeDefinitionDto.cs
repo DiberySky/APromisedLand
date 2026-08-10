@@ -1,4 +1,5 @@
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
+using APromisedLand.Shared.DiberyTree.Models;
 
 namespace APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 
@@ -11,6 +12,7 @@ public class AttributeDefinitionDto
     public int? Lines { get; set; }
     public int? Precision { get; set; }
     public int? Scale { get; set; }
-    public string? UnitOfMeasureId { get; set; }
-    public string? UnitOfMeasureName { get; set; } 
+    public UnitTree? Unit { get; set; }
+    // public string? UnitId { get; set; }
+    // public string? UnitName { get; set; } 
 }

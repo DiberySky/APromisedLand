@@ -1,6 +1,5 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -21,8 +20,7 @@ namespace APromisedLand.Api.Data.Migrations
                 name: "AttributeTypes",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Description = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     SystemType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false)
@@ -93,11 +91,11 @@ namespace APromisedLand.Api.Data.Migrations
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    AttributeTypeId = table.Column<int>(type: "integer", nullable: false),
+                    AttributeTypeId = table.Column<string>(type: "character varying(36)", nullable: false),
                     Lines = table.Column<int>(type: "integer", nullable: true),
                     Precision = table.Column<int>(type: "integer", nullable: true),
                     Scale = table.Column<int>(type: "integer", nullable: true),
-                    UnitOfMeasureId = table.Column<string>(type: "character varying(36)", nullable: true)
+                    UnitId = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -109,9 +107,9 @@ namespace APromisedLand.Api.Data.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_AttributeDefinitions_UnitsOfMeasure_UnitOfMeasureId",
-                        column: x => x.UnitOfMeasureId,
-                        principalTable: "UnitsOfMeasure",
+                        name: "FK_AttributeDefinitions_UnitTrees_UnitId",
+                        column: x => x.UnitId,
+                        principalTable: "UnitTrees",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -285,14 +283,14 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: new[] { "Id", "Description", "Name", "SystemType" },
                 values: new object[,]
                 {
-                    { 1, "用于存储短文本、备注、名称等单行或多行文字信息", "文本", "文本" },
-                    { 2, "用于存储整数值，如数量、计数、等级等", "整数", "整数" },
-                    { 3, "用于存储带小数的数值，如价格、重量等", "小数", "小数" },
-                    { 4, "用于存储日期（不含时间）", "日期", "日期" },
-                    { 5, "用于存储时间（不含日期）", "时间", "时间" },
-                    { 6, "用于存储精确的日期和时间", "日期时间", "日期时间" },
-                    { 7, "用于上传和存储文件，记录文件路径、名称等", "文件", "文件" },
-                    { 8, "用于存储地理位置信息（经度、纬度）", "定位", "定位" }
+                    { "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", "用于存储短文本、备注、名称等单行或多行文字信息", "文本", "文本" },
+                    { "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", "用于存储整数值，如数量、计数、等级等", "整数", "整数" },
+                    { "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", "用于存储地理位置信息（经度、纬度）", "定位", "定位" },
+                    { "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", "用于存储带小数的数值，如价格、重量等", "小数", "小数" },
+                    { "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", "用于存储日期（不含时间）", "日期", "日期" },
+                    { "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", "用于存储时间（不含日期）", "时间", "时间" },
+                    { "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", "用于存储精确的日期和时间", "日期时间", "日期时间" },
+                    { "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", "用于上传和存储文件，记录文件路径、名称等", "文件", "文件" }
                 });
 
             migrationBuilder.InsertData(
@@ -364,77 +362,117 @@ namespace APromisedLand.Api.Data.Migrations
                 });
 
             migrationBuilder.InsertData(
+                table: "AttributeDefinitions",
+                columns: new[] { "Id", "AttributeTypeId", "Lines", "Name", "Precision", "Scale", "UnitId" },
+                values: new object[,]
+                {
+                    { "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, "开始时间", null, null, null },
+                    { "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, "价格", 18, 2, null },
+                    { "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", null, "位置坐标", null, null, null },
+                    { "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", 1, "名称", null, null, null },
+                    { "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, "结束时间", null, null, null },
+                    { "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", 5, "描述", null, null, null },
+                    { "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, "创建时间", null, null, null },
+                    { "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", 10, "备注", null, null, null },
+                    { "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, "更新时间", null, null, null },
+                    { "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, "生产日期", null, null, null },
+                    { "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, "试验日期", null, null, null },
+                    { "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, "附件", null, null, null },
+                    { "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, "出厂日期", null, null, null },
+                    { "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, "等级", null, null, null },
+                    { "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, "图片", null, null, null }
+                });
+
+            migrationBuilder.InsertData(
                 table: "UnitTrees",
                 columns: new[] { "Id", "Abbreviation", "CanHaveChildren", "Description", "HasChildren", "Name", "ParentId", "SortOrder" },
                 values: new object[,]
                 {
-                    { "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", "", true, "长度计量单位", true, "长度", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 0 },
-                    { "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", "", true, "频率计量单位", true, "频率", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 12 },
-                    { "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", "", true, "功率计量单位", true, "功率", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 6 },
-                    { "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", "", true, "质量计量单位", true, "质量", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 1 },
-                    { "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", "", true, "角度计量单位", true, "角度", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 13 },
-                    { "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", "", true, "面积计量单位", true, "面积", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 7 },
-                    { "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", "", true, "时间计量单位", true, "时间", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 2 },
-                    { "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", "", true, "体积计量单位", true, "体积", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 8 },
-                    { "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", "", true, "速度计量单位", true, "速度", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 9 },
-                    { "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", "", true, "温度计量单位", true, "温度", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 3 },
-                    { "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", "", true, "压力计量单位", true, "压力", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 10 },
-                    { "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", "", true, "电流计量单位", true, "电流", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 4 },
-                    { "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", "", true, "能量计量单位", true, "能量", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 11 },
-                    { "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", "", true, "电压计量单位", true, "电压", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 5 },
-                    { "0d7ebe17-93ae-4e4c-92f4-063a124cd181", "km²", false, "", false, "平方公里", "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", 46 },
-                    { "1a80ed3b-1b36-4d8b-b80b-3070dbc7979d", "kHz", false, "", false, "千赫", "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", 63 },
-                    { "221d3c45-911f-4e94-9c3e-c13e6f2bcc76", "Pa", false, "", false, "帕斯卡", "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", 55 },
-                    { "279a6b18-6d01-4437-b95b-0480ca7adc98", "kJ", false, "", false, "千焦", "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", 60 },
-                    { "2d21c35a-4251-479e-b814-060b2fc84445", "m³", false, "", false, "立方米", "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", 49 },
-                    { "3d9088a3-7283-4f8f-b995-b193a57a6c2a", "rad", false, "", false, "弧度", "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", 66 },
-                    { "405ae7a3-8a13-479d-bc1a-6f9d3c15e521", "mph", false, "", false, "英里/小时", "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", 54 },
-                    { "41572712-95dd-4caf-b316-e1b924bc57c3", "MHz", false, "", false, "兆赫", "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", 64 },
-                    { "4cbec89d-3f52-4db3-9ab0-faeeb841ffbf", "m/s", false, "", false, "米/秒", "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", 52 },
-                    { "5db494d7-2a9c-4ae0-86e0-d4bb0dfc7b81", "J", false, "", false, "焦耳", "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", 59 },
-                    { "5e880060-9410-40d7-bcb4-545ccd0c1bb6", "Hz", false, "", false, "赫兹", "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", 62 },
-                    { "64e918fb-ee9d-45c7-b35a-2a55f5a5fe62", "km/h", false, "", false, "千米/小时", "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", 53 },
-                    { "780e7a01-350d-45ec-b963-b36a996de614", "mL", false, "", false, "毫升", "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", 51 },
-                    { "7f0af6a9-ba1a-469c-b967-e32afe43cad2", "L", false, "", false, "升", "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", 50 },
-                    { "883a9940-84ec-4daa-8448-609461b984ea", "kPa", false, "", false, "千帕", "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", 56 },
-                    { "8981bd9a-bd99-4f4c-b8af-038975b799be", "bar", false, "", false, "巴", "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", 58 },
-                    { "a00be966-be2e-484e-92b6-9706494ac775", "hp", false, "", false, "马力", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", 44 },
-                    { "a0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", "mg", false, "", false, "毫克", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 24 },
-                    { "a2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a", "mA", false, "", false, "毫安", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", 36 },
-                    { "a4c312d3-023e-4d4e-b5a7-fb7fcbd55c56", "ha", false, "", false, "公顷", "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", 47 },
-                    { "a4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", "mi", false, "", false, "英里", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 18 },
-                    { "a6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a", "h", false, "", false, "小时", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", 30 },
-                    { "a8e9f0a1-b2c3-4d4e-5f6a-7b8c9d0e1f2a", "kW", false, "", false, "千瓦", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", 42 },
-                    { "b1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", "t", false, "", false, "吨", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 25 },
-                    { "b3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b", "µA", false, "", false, "微安", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", 37 },
-                    { "b5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", "yd", false, "", false, "码", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 19 },
-                    { "b7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b", "d", false, "", false, "天", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", 31 },
-                    { "b9f0a1b2-c3d4-4e5f-6a7b-8c9d0e1f2a3b", "MW", false, "", false, "兆瓦", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", 43 },
-                    { "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c", "m", false, "", false, "米", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 14 },
-                    { "c2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", "lb", false, "", false, "磅", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 26 },
-                    { "c4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c", "V", false, "", false, "伏特", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", 38 },
-                    { "c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", "ft", false, "", false, "英尺", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 20 },
-                    { "c8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c", "°C", false, "", false, "摄氏度", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", 32 },
-                    { "d1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", "km", false, "", false, "千米", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 15 },
-                    { "d3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", "oz", false, "", false, "盎司", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 27 },
-                    { "d5306eb8-324f-4088-a867-6fbc7141fd59", "MPa", false, "", false, "兆帕", "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", 57 },
-                    { "d5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", "kV", false, "", false, "千伏", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", 39 },
-                    { "d7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", "in", false, "", false, "英寸", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 21 },
-                    { "d9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d", "°F", false, "", false, "华氏度", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", 33 },
-                    { "e0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e", "K", false, "", false, "开尔文", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", 34 },
-                    { "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", "cm", false, "", false, "厘米", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 16 },
-                    { "e3c1f025-3b2b-461a-a5a1-015cb4e3fe38", "kWh", false, "", false, "千瓦时", "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", 61 },
-                    { "e4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", "s", false, "", false, "秒", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", 28 },
-                    { "e6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", "mV", false, "", false, "毫伏", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", 40 },
-                    { "e88b04db-40ac-4bb7-b420-1f3b37180673", "m²", false, "", false, "平方米", "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", 45 },
-                    { "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", "kg", false, "", false, "千克", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 22 },
-                    { "ed1b66d2-454b-453b-9d43-12605dffa456", "°", false, "", false, "度", "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", 65 },
-                    { "f1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f", "A", false, "", false, "安培", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", 35 },
-                    { "f3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", "mm", false, "", false, "毫米", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 17 },
-                    { "f5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", "min", false, "", false, "分钟", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", 29 },
-                    { "f7d8e9f0-a1b2-4c3d-4e5f-6a7b8c9d0e1f", "W", false, "", false, "瓦特", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", 41 },
-                    { "f9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", "g", false, "", false, "克", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 23 },
-                    { "fefa26a5-d608-411c-b637-469a886e558c", "亩", false, "", false, "亩", "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", 48 }
+                    { "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", "", true, "长度计量单位", true, "长度", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 1 },
+                    { "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", "", true, "频率计量单位", true, "频率", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 13 },
+                    { "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", "", true, "功率计量单位", true, "功率", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 7 },
+                    { "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", "", true, "质量计量单位", true, "质量", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 2 },
+                    { "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", "", true, "角度计量单位", true, "角度", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 14 },
+                    { "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", "", true, "面积计量单位", true, "面积", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 8 },
+                    { "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", "", true, "时间计量单位", true, "时间", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 3 },
+                    { "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", "", true, "货币计量单位", true, "货币", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 0 },
+                    { "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", "", true, "体积计量单位", true, "体积", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 9 },
+                    { "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", "", true, "速度计量单位", true, "速度", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 10 },
+                    { "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", "", true, "温度计量单位", true, "温度", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 4 },
+                    { "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", "", true, "压力计量单位", true, "压力", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 11 },
+                    { "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", "", true, "电流计量单位", true, "电流", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 5 },
+                    { "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", "", true, "能量计量单位", true, "能量", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 12 },
+                    { "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", "", true, "电压计量单位", true, "电压", "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", 6 },
+                    { "0d7ebe17-93ae-4e4c-92f4-063a124cd181", "km²", false, "", false, "平方公里", "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", 54 },
+                    { "1a80ed3b-1b36-4d8b-b80b-3070dbc7979d", "kHz", false, "", false, "千赫", "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", 71 },
+                    { "221d3c45-911f-4e94-9c3e-c13e6f2bcc76", "Pa", false, "", false, "帕斯卡", "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", 63 },
+                    { "279a6b18-6d01-4437-b95b-0480ca7adc98", "kJ", false, "", false, "千焦", "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", 68 },
+                    { "2d21c35a-4251-479e-b814-060b2fc84445", "m³", false, "", false, "立方米", "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", 57 },
+                    { "3d9088a3-7283-4f8f-b995-b193a57a6c2a", "rad", false, "", false, "弧度", "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", 74 },
+                    { "405ae7a3-8a13-479d-bc1a-6f9d3c15e521", "mph", false, "", false, "英里/小时", "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", 62 },
+                    { "41572712-95dd-4caf-b316-e1b924bc57c3", "MHz", false, "", false, "兆赫", "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", 72 },
+                    { "4cbec89d-3f52-4db3-9ab0-faeeb841ffbf", "m/s", false, "", false, "米/秒", "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", 60 },
+                    { "5db494d7-2a9c-4ae0-86e0-d4bb0dfc7b81", "J", false, "", false, "焦耳", "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", 67 },
+                    { "5e880060-9410-40d7-bcb4-545ccd0c1bb6", "Hz", false, "", false, "赫兹", "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", 70 },
+                    { "64e918fb-ee9d-45c7-b35a-2a55f5a5fe62", "km/h", false, "", false, "千米/小时", "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", 61 },
+                    { "780e7a01-350d-45ec-b963-b36a996de614", "mL", false, "", false, "毫升", "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", 59 },
+                    { "7f0af6a9-ba1a-469c-b967-e32afe43cad2", "L", false, "", false, "升", "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", 58 },
+                    { "883a9940-84ec-4daa-8448-609461b984ea", "kPa", false, "", false, "千帕", "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", 64 },
+                    { "8981bd9a-bd99-4f4c-b8af-038975b799be", "bar", false, "", false, "巴", "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", 66 },
+                    { "a00be966-be2e-484e-92b6-9706494ac775", "hp", false, "", false, "马力", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", 52 },
+                    { "a0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", "mg", false, "", false, "毫克", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 32 },
+                    { "a2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a", "mA", false, "", false, "毫安", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", 44 },
+                    { "a4c312d3-023e-4d4e-b5a7-fb7fcbd55c56", "ha", false, "", false, "公顷", "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", 55 },
+                    { "a4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", "mi", false, "", false, "英里", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 26 },
+                    { "a5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", "HKD", false, "港元", false, "港元", "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", 20 },
+                    { "a6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a", "h", false, "", false, "小时", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", 38 },
+                    { "a8e9f0a1-b2c3-4d4e-5f6a-7b8c9d0e1f2a", "kW", false, "", false, "千瓦", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", 50 },
+                    { "b1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", "t", false, "", false, "吨", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 33 },
+                    { "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", "JPY", false, "日元", false, "日元", "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", 19 },
+                    { "b3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b", "µA", false, "", false, "微安", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", 45 },
+                    { "b5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", "yd", false, "", false, "码", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 27 },
+                    { "b6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", "AUD", false, "澳元", false, "澳元", "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", 21 },
+                    { "b7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b", "d", false, "", false, "天", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", 39 },
+                    { "b9f0a1b2-c3d4-4e5f-6a7b-8c9d0e1f2a3b", "MW", false, "", false, "兆瓦", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", 51 },
+                    { "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c", "m", false, "", false, "米", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 22 },
+                    { "c2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", "lb", false, "", false, "磅", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 34 },
+                    { "c4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c", "V", false, "", false, "伏特", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", 46 },
+                    { "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", "GBP", false, "英镑", false, "英镑", "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", 18 },
+                    { "c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", "ft", false, "", false, "英尺", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 28 },
+                    { "c8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c", "°C", false, "", false, "摄氏度", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", 40 },
+                    { "d1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", "km", false, "", false, "千米", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 23 },
+                    { "d3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", "oz", false, "", false, "盎司", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 35 },
+                    { "d5306eb8-324f-4088-a867-6fbc7141fd59", "MPa", false, "", false, "兆帕", "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", 65 },
+                    { "d5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", "kV", false, "", false, "千伏", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", 47 },
+                    { "d5c6d7e8-f9a0-4b1c-2d3e-4f5a6b7c8d9e", "EUR", false, "欧元", false, "欧元", "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", 17 },
+                    { "d7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", "in", false, "", false, "英寸", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 29 },
+                    { "d9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d", "°F", false, "", false, "华氏度", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", 41 },
+                    { "e0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e", "K", false, "", false, "开尔文", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", 42 },
+                    { "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", "cm", false, "", false, "厘米", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 24 },
+                    { "e3c1f025-3b2b-461a-a5a1-015cb4e3fe38", "kWh", false, "", false, "千瓦时", "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", 69 },
+                    { "e4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", "s", false, "", false, "秒", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", 36 },
+                    { "e6b7c8d9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", "USD", false, "美元", false, "美元", "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", 16 },
+                    { "e6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", "mV", false, "", false, "毫伏", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", 48 },
+                    { "e88b04db-40ac-4bb7-b420-1f3b37180673", "m²", false, "", false, "平方米", "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", 53 },
+                    { "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", "kg", false, "", false, "千克", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 30 },
+                    { "ed1b66d2-454b-453b-9d43-12605dffa456", "°", false, "", false, "度", "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", 73 },
+                    { "f1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f", "A", false, "", false, "安培", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", 43 },
+                    { "f3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", "mm", false, "", false, "毫米", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", 25 },
+                    { "f5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", "min", false, "", false, "分钟", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", 37 },
+                    { "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", "CNY", false, "人民币", false, "元", "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", 15 },
+                    { "f7d8e9f0-a1b2-4c3d-4e5f-6a7b8c9d0e1f", "W", false, "", false, "瓦特", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", 49 },
+                    { "f9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", "g", false, "", false, "克", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", 31 },
+                    { "fefa26a5-d608-411c-b637-469a886e558c", "亩", false, "", false, "亩", "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", 56 }
+                });
+
+            migrationBuilder.InsertData(
+                table: "AttributeDefinitions",
+                columns: new[] { "Id", "AttributeTypeId", "Lines", "Name", "Precision", "Scale", "UnitId" },
+                values: new object[,]
+                {
+                    { "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, "重量", 10, 3, "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e" },
+                    { "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, "长度", 8, 2, "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e" },
+                    { "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, "数量", null, null, "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c" }
                 });
 
             migrationBuilder.CreateIndex(
@@ -443,9 +481,9 @@ namespace APromisedLand.Api.Data.Migrations
                 column: "AttributeTypeId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AttributeDefinitions_UnitOfMeasureId",
+                name: "IX_AttributeDefinitions_UnitId",
                 table: "AttributeDefinitions",
-                column: "UnitOfMeasureId");
+                column: "UnitId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_CategoryTrees_ParentId",
@@ -535,7 +573,7 @@ namespace APromisedLand.Api.Data.Migrations
                 name: "TimeAttributeValues");
 
             migrationBuilder.DropTable(
-                name: "UnitTrees");
+                name: "UnitsOfMeasure");
 
             migrationBuilder.DropTable(
                 name: "AttributeDefinitions");
@@ -544,7 +582,7 @@ namespace APromisedLand.Api.Data.Migrations
                 name: "AttributeTypes");
 
             migrationBuilder.DropTable(
-                name: "UnitsOfMeasure");
+                name: "UnitTrees");
 
             migrationBuilder.DropSequence(
                 name: "AttributeValueBaseSequence");

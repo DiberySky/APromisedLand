@@ -11,6 +11,8 @@ using APromisedLand.Razor.DiberyTree.Base;
 using APromisedLand.Razor.DiberyTree.Trees.Category;
 using APromisedLand.Razor.Services;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using APromisedLand.Shared.DiberyTree.Attributes.Models;
+using APromisedLand.Shared.DiberyTree.Models;
 using MudBlazor.Extensions;
 using MudBlazor.Extensions.Options;
 
@@ -44,7 +46,7 @@ public class TreeNodeDialogService<TItem>(
         return actionResult;
     }
     
-    public async Task<TItem?> ShowSelectDialogAsync()
+    public async Task<TItem?> ShowTreeSelectDialogAsync()
     {
         var parameters = new DialogParameters<TreeSelectDialogSky<TItem>>
         {
@@ -261,7 +263,7 @@ public class TreeNodeDialogService<TItem>(
         return selectResult;
     }
 
-    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(Trees.TreeSky<TItem> treeSky,
+    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(TreeSky<TItem> treeSky,
         TItem? currentNode = null,
         TItem? currentParent = null,
         bool allowRoot = true,
@@ -332,7 +334,7 @@ public class TreeNodeDialogService<TItem>(
         return sortResult;
     }
 
-    public async Task<SortResult<TItem>?> ShowSortDialogAsync(Trees.TreeSky<TItem> treeSky,
+    public async Task<SortResult<TItem>?> ShowSortDialogAsync(TreeSky<TItem> treeSky,
         bool allowHierarchyChange = true,
         int maxDepth = 10,
         DialogConfig? config = null)
@@ -469,16 +471,14 @@ public class TreeNodeDialogService<TItem>(
         string nodeId,
         DialogConfig? config = null)
     {
-        var parameters = new DialogParameters
+        var parameters = new DialogParameters<NodeAttributesDialog<TItem>>
         {
-            { nameof(NodeAttributesDialog<TItem>.NodeId), nodeId }
+            { x => x.NodeId, nodeId }
         };
 
         var options = (config ?? new DialogConfig
         {
-            MaxWidth = MaxWidth.Medium,
             FullWidth = true,
-            CloseButton = true
         }).ToDialogOptions();
 
         var dialog = await dialogService.ShowAsync<NodeAttributesDialog<TItem>>(
@@ -488,6 +488,56 @@ public class TreeNodeDialogService<TItem>(
         // 只要不是取消就返回 true（表示可能已修改）
         return result is not { Canceled: true };
     }
+    
+    public async Task<AttributeDefinitionDto?> ShowAttributeDefinitionListDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeDefinitionListDialog<TItem>>
+        {
+            // { x => x.NodeId, nodeId }
+        };
 
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<AttributeDefinitionListDialog<TItem>>(
+            "节点属性", parameters, options);
+
+
+        var result = await dialog.Result;
+
+        // 如果用户取消或关闭对话框，返回 null
+        if (result == null || result.Canceled)
+            return null;
+
+        // 从 Data 中提取并转换返回值
+        return result.Data as AttributeDefinitionDto;
+    }
+
+    public async Task<bool?> ShowAttributeDefinitionDialogAsync(
+        AttributeDefinitionDto? item,
+        List<AttributeType> attributeTypes,
+        UnitTree? unit = null,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeDefinitionDialog<TItem>>
+        {
+            { x => x.EditItem, item },
+            { x => x.AttributeTypes, attributeTypes },
+            { x => x.Unit, unit }
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<AttributeDefinitionDialog<TItem>>(
+            "节点属性", parameters, options);
+
+        var result = await dialog.Result;
+        // 只要不是取消就返回 true（表示可能已修改）
+        return result is not { Canceled: true };
+    }
     #endregion
 }

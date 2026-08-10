@@ -86,7 +86,7 @@
     
     private async Task TestClick()
     {
-        var selectResult = await TreeNodeDialogService.ShowSelectDialogAsync();
+        var selectResult = await TreeNodeDialogService.ShowTreeSelectDialogAsync();
         
         var unit = new UnitOfMeasure();
         var dialog = await DialogService.EditObjectAsync<UnitOfMeasure>(unit, new DialogOptionsEx

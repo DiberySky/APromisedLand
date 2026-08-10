@@ -14,7 +14,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
     {
         return await dbContext.AttributeDefinitions
             .Include(d => d.AttributeType)
-            .Include(d => d.UnitOfMeasure)
+            .Include(d => d.Unit)
             .Select(d => new AttributeDefinitionDto
             {
                 Id = d.Id,
@@ -24,8 +24,9 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
                 Lines = d.Lines,
                 Precision = d.Precision,
                 Scale = d.Scale,
-                UnitOfMeasureId = d.UnitOfMeasureId,
-                UnitOfMeasureName = d.UnitOfMeasure != null ? d.UnitOfMeasure.Name : null
+                Unit = d.Unit
+                // UnitId = d.UnitId,
+                // UnitName = d.Unit != null ? d.Unit.Name : null
             })
             .ToListAsync(cancellationToken);
     }
@@ -40,7 +41,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
     {
         var entity = await dbContext.AttributeDefinitions
             .Include(d => d.AttributeType)
-            .Include(d => d.UnitOfMeasure)
+            .Include(d => d.Unit)
             .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
         if (entity == null) return null;
@@ -54,8 +55,9 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
             Lines = entity.Lines,
             Precision = entity.Precision,
             Scale = entity.Scale,
-            UnitOfMeasureId = entity.UnitOfMeasureId,
-            UnitOfMeasureName = entity.UnitOfMeasure?.Name
+            Unit = entity.Unit
+            // UnitId = entity.UnitId,
+            // UnitName = entity.Unit?.Name
         };
     }
 
@@ -67,11 +69,11 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
             throw new ArgumentException($"AttributeType with id {dto.AttributeType} does not exist.");
 
         // 检查单位（如果提供）
-        if (!string.IsNullOrEmpty(dto.UnitOfMeasureId))
+        if (!string.IsNullOrEmpty(dto.UnitId))
         {
-            var unit = await dbContext.UnitsOfMeasure.FindAsync(new object[] { dto.UnitOfMeasureId }, cancellationToken);
+            var unit = await dbContext.UnitsOfMeasure.FindAsync(new object[] { dto.UnitId }, cancellationToken);
             if (unit == null)
-                throw new ArgumentException($"UnitOfMeasure with id {dto.UnitOfMeasureId} does not exist.");
+                throw new ArgumentException($"Unit with id {dto.UnitId} does not exist.");
         }
 
         var entity = new AttributeDefinition
@@ -82,7 +84,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
             Lines = dto.Lines,
             Precision = dto.Precision,
             Scale = dto.Scale,
-            UnitOfMeasureId = dto.UnitOfMeasureId
+            UnitId = dto.UnitId
         };
 
         // 简单校验：只有文本类型可以有 Lines，只有数字类型可以有 Precision/Scale
@@ -107,7 +109,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
         entity.Lines = dto.Lines;
         entity.Precision = dto.Precision;
         entity.Scale = dto.Scale;
-        entity.UnitOfMeasureId = dto.UnitOfMeasureId;
+        entity.UnitId = dto.UnitId;
 
         // 注意：不允许更改 AttributeTypeId，因为类型改变会导致值表不兼容，如有需要可设计迁移方案，此处忽略
 
@@ -145,7 +147,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
         // 1. 获取属性定义（含类型和单位）
         var def = await dbContext.AttributeDefinitions
             .Include(d => d.AttributeType)
-            .Include(d => d.UnitOfMeasure)
+            .Include(d => d.Unit)
             .FirstOrDefaultAsync(d => d.Id == dto.AttributeDefinitionId);
 
         if (def == null)
@@ -278,7 +280,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
             .Include(v => v.Definition)
                 .ThenInclude(d => d.AttributeType)
             .Include(v => v.Definition)
-                .ThenInclude(d => d.UnitOfMeasure)
+                .ThenInclude(d => d.Unit)
             .Where(v => v.NodeId == nodeId)
             .ToListAsync();
 
@@ -292,7 +294,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
     {
         var def = v.Definition;
         var attrType = def?.AttributeType;
-        var unit = def?.UnitOfMeasure;
+        var unit = def?.Unit;
 
         return new AttributeDto
         {
@@ -300,7 +302,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
             DefinitionName = def?.Name ?? "未知定义",
             Type = attrType?.Name ?? "未知类型",
             TypeDescription = attrType?.Description,
-            Unit = unit?.Symbol ?? unit?.Name,
+            Unit = unit?.Abbreviation ?? unit?.Name,
             Lines = def?.Lines,
             Value = v switch
             {

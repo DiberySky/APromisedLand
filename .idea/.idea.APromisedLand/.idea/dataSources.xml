@@ -91,13 +91,13 @@
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="Redis" uuid="daec92fd-ece8-4999-bb2b-d51c7f1ca089">
+    <data-source source="LOCAL" name="Redis" uuid="3a9830b9-73c1-4e61-ad33-74512196c626">
       <driver-ref>redis</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>jdbc.RedisDriver</jdbc-driver>
-      <jdbc-url>jdbc:redis://afZGb0DhJpbn1AEy9FH3yF@localhost:53022?ssl=true&amp;verifyServerCertificate=false</jdbc-url>
+      <jdbc-url>jdbc:redis://afZGb0DhJpbn1AEy9FH3yF@localhost:53990?ssl=true&amp;verifyServerCertificate=false</jdbc-url>
       <jdbc-additional-properties>
-        <property name="aspireResourceId" value="Redis-eczdvhgz" />
+        <property name="aspireResourceId" value="Redis-hzzamvaf" />
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>

@@ -1,14 +1,12 @@
 using APromisedLand.MauiBlazor.DiberyTree.Services;
-using APromisedLand.Razor.Dialogs;
-using APromisedLand.Razor.DiberyTree.Enums;
-using APromisedLand.Razor.DiberyTree.Services;
+using APromisedLand.Razor.DiberyTree.Trees;
 using APromisedLand.Razor.Helper.Blazor;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.Services.Solution;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 
-namespace APromisedLand.Razor.DiberyTree.Trees;
+namespace APromisedLand.Razor.DiberyTree.Base;
 
 public partial class TreeSky<TItem> : ComponentBase
     where TItem : class, ITreeNodeBase<TItem>, new()

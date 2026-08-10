@@ -1,0 +1,189 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject DiberyTreeApiClient<TItem> ApiClient
+@inject ISnackbar Snackbar
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+
+<DialogSky Title="添加修改属性"
+           CancelButtonVisible="true"
+           SubmitButtonVisible="false"
+           OnCanceledClick="@(() => MudDialog?.Close(DialogResult.Cancel()))">
+    <ToolBarContent>
+        <MudText Color="Color.Inherit">附加属性</MudText>
+        <MudSpacer/>
+        @if (_modifiable)
+        {
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Warning"
+                       StartIcon="@Icons.Material.Outlined.Refresh"
+                       OnClick="LoadDataAsync"
+                       Class="ml-2">
+                刷新
+            </MudButton>
+        }
+        <MudSwitch T="bool" Label="修改" Color="Color.Success"
+                   ValueChanged="@Modifiable"/>
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer>
+            <MudTable T="AttributeDefinitionDto"
+                      Items="_definitions"
+                      Dense="true"
+                      Hover="true"
+                      Striped="false"
+                      Loading="_loading"
+                      LoadingProgressColor="Color.Primary"
+                      Breakpoint="Breakpoint.Sm"
+                      SelectedItemChanged="@(SelectedItemChanged)">
+                <HeaderContent>
+                    <MudTh>属性名称</MudTh>
+                    <MudTh>类型</MudTh>
+                    @if (_modifiable)
+                    {
+                        <MudTh Style="text-align:right">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                                           Color="Color.Info"
+                                           Size="Size.Small"
+                                           OnClick="() => OpenDialogAsync(null)"/>
+                        </MudTh>
+                    }
+                    else
+                    {
+                        <MudTh Style="text-align:right">查看详情</MudTh>
+                    }
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="属性名称">
+                        <MudText Typo="Typo.body1" Color="Color.Success">@context.Name</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="类型">
+                        <MudText Typo="Typo.body1" Color="Color.Info">@context.AttributeTypeName</MudText>
+                    </MudTd>
+                    @if (_modifiable)
+                    {
+                        <MudTd Style="text-align:right">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                           Color="Color.Warning"
+                                           Size="Size.Small"
+                                           OnClick="() => DeleteAsync(context)"/>
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           OnClick="() => OpenDialogAsync(context)"/>
+                        </MudTd>
+                    }
+                    else
+                    {
+                        <MudTd Style="text-align:right">
+                            <MudIconButton Icon="@Icons.Material.Outlined.MoreHoriz"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           OnClick="() => OpenDialogAsync(context)"/>
+                        </MudTd>
+                    }
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Align="Align.Center" Class="py-8">暂无属性定义数据</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudContainer>
+    </DialogContent>
+    <DialogLeftActions>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Warning">
+            双击选择属性！
+        </MudButton>
+    </DialogLeftActions>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private List<AttributeDefinitionDto> _definitions = new();
+    private List<AttributeType> _attributeTypes = new();
+    private List<UnitTree> _units = new();
+    private bool _loading;
+    private bool _modifiable;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            // 并行加载数据
+            var defsTask = await ApiClient.GetAllDefinitionsAsync();
+
+            // 注意：如果 API Client 没有提供获取 AttributeTypes 和 UnitsOfMeasure 的方法，
+            // 需要额外注入对应的服务或从其他接口获取
+            _definitions = [.. defsTask];
+
+            // 这里假设你有获取类型和单位的方法，如果没有可以从 DbContext 或其他服务获取
+            var types = await ApiClient.GetAttributeTypesAsync();
+            _attributeTypes = [.. types];
+            // _unitsOfMeasure = ...
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载数据失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenDialogAsync(AttributeDefinitionDto? item)
+    {
+        var result = await TreeNodeDialogService.ShowAttributeDefinitionDialogAsync(item, _attributeTypes);
+    }
+
+    private async Task DeleteAsync(AttributeDefinitionDto item)
+    {
+        // var confirmed = await DialogService.ShowMessageBoxAsync(
+        //     "确认删除",
+        //     $"确定要删除属性定义 \"{item.Name}\" 吗？如果已被节点引用将无法删除。",
+        //     yesText: "删除",
+        //     cancelText: "取消");
+        //
+        // if (confirmed != true) return;
+
+        try
+        {
+            // var success = await ApiClient.DeleteDefinitionAsync(item.Id);
+            // if (success)
+            // {
+            //     Snackbar.Add("删除成功", Severity.Success);
+            //     await LoadDataAsync();
+            // }
+            // else
+            // {
+            //     Snackbar.Add("删除失败，属性定义不存在", Severity.Warning);
+            // }
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Modifiable(bool modify)
+    {
+        _modifiable = modify;
+        StateHasChanged();
+    }
+
+    private void SelectedItemChanged(AttributeDefinitionDto selectedItem)
+    {
+        MudDialog?.Close(DialogResult.Ok(selectedItem));
+    }
+
+}

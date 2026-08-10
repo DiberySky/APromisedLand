@@ -27,6 +27,7 @@ public class UnitTree : ITreeNodeBase<UnitTree>
         int sortOrder = 0;
 
         // ========== 分类节点（固定 GUID） ==========
+        const string CURRENCY_ID = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f";
         const string LENGTH_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
         const string MASS_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
         const string TIME_ID = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f";
@@ -56,6 +57,17 @@ public class UnitTree : ITreeNodeBase<UnitTree>
         });
 
         // 分类节点（允许有子项，且有子项）
+        nodes.Add(new UnitTree
+        {
+            Id = CURRENCY_ID,
+            Name = "货币",
+            Abbreviation = "",
+            Description = "货币计量单位",
+            ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
+            CanHaveChildren = true,
+            SortOrder = sortOrder++,
+            HasChildren = true
+        });
         nodes.Add(new UnitTree
         {
             Id = LENGTH_ID,
@@ -212,6 +224,85 @@ public class UnitTree : ITreeNodeBase<UnitTree>
         });
 
         // ========== 单位节点（不允许有子项，且当前无子项） ==========
+        // 货币单位
+        nodes.Add(new UnitTree
+        {
+            Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", // 人民币
+            Name = "元",
+            Abbreviation = "CNY",
+            Description = "人民币",
+            ParentId = CURRENCY_ID,
+            CanHaveChildren = false,
+            SortOrder = sortOrder++,
+            HasChildren = false
+        });
+        nodes.Add(new UnitTree
+        {
+            Id = "e6b7c8d9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", // 美元
+            Name = "美元",
+            Abbreviation = "USD",
+            Description = "美元",
+            ParentId = CURRENCY_ID,
+            CanHaveChildren = false,
+            SortOrder = sortOrder++,
+            HasChildren = false
+        });
+        nodes.Add(new UnitTree
+        {
+            Id = "d5c6d7e8-f9a0-4b1c-2d3e-4f5a6b7c8d9e", // 欧元
+            Name = "欧元",
+            Abbreviation = "EUR",
+            Description = "欧元",
+            ParentId = CURRENCY_ID,
+            CanHaveChildren = false,
+            SortOrder = sortOrder++,
+            HasChildren = false
+        });
+        nodes.Add(new UnitTree
+        {
+            Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", // 英镑
+            Name = "英镑",
+            Abbreviation = "GBP",
+            Description = "英镑",
+            ParentId = CURRENCY_ID,
+            CanHaveChildren = false,
+            SortOrder = sortOrder++,
+            HasChildren = false
+        });
+        nodes.Add(new UnitTree
+        {
+            Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", // 日元
+            Name = "日元",
+            Abbreviation = "JPY",
+            Description = "日元",
+            ParentId = CURRENCY_ID,
+            CanHaveChildren = false,
+            SortOrder = sortOrder++,
+            HasChildren = false
+        });
+// 新增港元和澳元
+        nodes.Add(new UnitTree
+        {
+            Id = "a5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", // 港元
+            Name = "港元",
+            Abbreviation = "HKD",
+            Description = "港元",
+            ParentId = CURRENCY_ID,
+            CanHaveChildren = false,
+            SortOrder = sortOrder++,
+            HasChildren = false
+        });
+        nodes.Add(new UnitTree
+        {
+            Id = "b6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", // 澳元
+            Name = "澳元",
+            Abbreviation = "AUD",
+            Description = "澳元",
+            ParentId = CURRENCY_ID,
+            CanHaveChildren = false,
+            SortOrder = sortOrder++,
+            HasChildren = false
+        });
         // 长度单位
         nodes.Add(new UnitTree
         {

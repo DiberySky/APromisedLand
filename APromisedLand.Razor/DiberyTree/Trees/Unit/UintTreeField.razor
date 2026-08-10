@@ -1,0 +1,38 @@
+@inject TreeNodeDialogService<UnitTree> TreeNodeDialogService
+
+<MudTextField @bind-Value="@_fullName"
+              Label="计量单位"
+              Variant="Variant.Outlined" ReadOnly="true"
+              InputType="@InputType.Text" Adornment="Adornment.End"
+              AdornmentIcon="@Icons.Material.Outlined.EditNote"
+              AdornmentColor="Color.Info"
+              OnAdornmentClick="@EditClick"
+              AdornmentAriaLabel=""/>
+
+@code {
+    [Parameter] public UnitTree? Unit { get; set; }
+    [Parameter] public EventCallback<UnitTree> UnitChanged { get; set; }
+
+    string? _fullName;
+
+    protected override  void OnInitialized()
+    {
+        _fullName = Unit?.Text();
+    }
+    
+    private async Task EditClick()
+    {
+        var result = await TreeNodeDialogService.ShowTreeSelectDialogAsync();
+     
+        if (result == null) return;
+        
+        Unit = result;
+        
+        _fullName = Unit?.Text();
+        
+        StateHasChanged();
+        
+        await UnitChanged.InvokeAsync(result);
+    }
+
+}
