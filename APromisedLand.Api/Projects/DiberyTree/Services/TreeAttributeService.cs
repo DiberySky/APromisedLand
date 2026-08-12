@@ -4,31 +4,47 @@ using APromisedLand.Api.Projects.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DiberyTree.Attributes.Validation;
+using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace APromisedLand.Api.Projects.DiberyTree.Services;
 
-public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeService
+public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttributeService> logger) : ITreeAttributeService
 {
     public async Task<IReadOnlyList<AttributeDefinitionDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await dbContext.AttributeDefinitions
-            .Include(d => d.AttributeType)
-            .Include(d => d.Unit)
-            .Select(d => new AttributeDefinitionDto
-            {
-                Id = d.Id,
-                Name = d.Name,
-                AttributeType = d.AttributeType,
-                AttributeTypeName = d.AttributeType.Name,
-                Lines = d.Lines,
-                Precision = d.Precision,
-                Scale = d.Scale,
-                Unit = d.Unit
-                // UnitId = d.UnitId,
-                // UnitName = d.Unit != null ? d.Unit.Name : null
-            })
-            .ToListAsync(cancellationToken);
+        // 使用 Lambda 表达式进行 Join 和 GroupJoin
+        var query = dbContext.AttributeDefinitions
+            .Join(
+                dbContext.AttributeTypes,
+                d => d.AttributeTypeId,
+                t => t.Id,
+                (d, t) => new { d, t }
+            )
+            .GroupJoin(
+                dbContext.UnitTrees,
+                x => x.d.UnitId,
+                u => u.Id,
+                (x, units) => new { x.d, x.t, units }
+            )
+            .SelectMany(
+                x => x.units.DefaultIfEmpty(),
+                (x, u) => new AttributeDefinitionDto
+                {
+                    Id = x.d.Id,
+                    Name = x.d.Name,
+                    AttributeType = x.t,
+                    AttributeTypeName = x.t.Name,
+                    MaxLength = x.d.MaxLength,
+                    Lines = x.d.Lines,
+                    Precision = x.d.Precision,
+                    Scale = x.d.Scale,
+                    Unit = u
+                }
+            );
+
+        return await query.ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<AttributeType>> GetAttributeTypesAsync(CancellationToken cancellationToken = default)
@@ -36,43 +52,62 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
         return await dbContext.AttributeTypes
             .ToListAsync(cancellationToken);
     }
-    
+
     public async Task<AttributeDefinitionDto?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.AttributeDefinitions
-            .Include(d => d.AttributeType)
-            .Include(d => d.Unit)
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        var query = dbContext.AttributeDefinitions
+            .Where(d => d.Id == id)
+            .Join(
+                dbContext.AttributeTypes,
+                d => d.AttributeTypeId,
+                t => t.Id,
+                (d, t) => new { d, t }
+            )
+            .GroupJoin(
+                dbContext.UnitTrees,
+                x => x.d.UnitId,
+                u => u.Id,
+                (x, units) => new { x.d, x.t, units }
+            )
+            .SelectMany(
+                x => x.units.DefaultIfEmpty(),
+                (x, u) => new AttributeDefinitionDto
+                {
+                    Id = x.d.Id,
+                    Name = x.d.Name,
+                    AttributeType = x.t,
+                    AttributeTypeName = x.t.Name,
+                    MaxLength = x.d.MaxLength,
+                    Lines = x.d.Lines,
+                    Precision = x.d.Precision,
+                    Scale = x.d.Scale,
+                    Unit = u
+                }
+            );
 
-        if (entity == null) return null;
-
-        return new AttributeDefinitionDto
-        {
-            Id = entity.Id,
-            Name = entity.Name,
-            AttributeType = entity.AttributeType,
-            AttributeTypeName = entity.AttributeType.Name,
-            Lines = entity.Lines,
-            Precision = entity.Precision,
-            Scale = entity.Scale,
-            Unit = entity.Unit
-            // UnitId = entity.UnitId,
-            // UnitName = entity.Unit?.Name
-        };
+        return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<AttributeDefinitionDto> CreateAsync(AttributeDefinitionCreateDto dto, CancellationToken cancellationToken = default)
     {
-        // 检查属性类型是否存在
-        var attrType = await dbContext.AttributeTypes.FindAsync(new object[] { dto.AttributeType }, cancellationToken);
-        if (attrType == null)
-            throw new ArgumentException($"AttributeType with id {dto.AttributeType} does not exist.");
+        logger.LogInformation(">>> CreateAsync 被调用，时间：{Time}, 参数 Name={Name}, AttributeTypeId={TypeId}",
+            DateTime.Now, dto.Name, dto.AttributeType?.Id);
 
-        // 检查单位（如果提供）
+        if (dto.AttributeType == null || string.IsNullOrEmpty(dto.AttributeType.Id))
+            throw new ArgumentException("AttributeType is required.");
+
+        // 验证 AttributeType 是否存在
+        var attrTypeExists = await dbContext.AttributeTypes
+            .AnyAsync(t => t.Id == dto.AttributeType.Id, cancellationToken);
+        if (!attrTypeExists)
+            throw new ArgumentException($"AttributeType with id {dto.AttributeType.Id} does not exist.");
+
+        // 验证 Unit 是否存在（如果提供）
         if (!string.IsNullOrEmpty(dto.UnitId))
         {
-            var unit = await dbContext.UnitsOfMeasure.FindAsync(new object[] { dto.UnitId }, cancellationToken);
-            if (unit == null)
+            var unitExists = await dbContext.UnitTrees
+                .AnyAsync(u => u.Id == dto.UnitId, cancellationToken);
+            if (!unitExists)
                 throw new ArgumentException($"Unit with id {dto.UnitId} does not exist.");
         }
 
@@ -80,51 +115,46 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
         {
             Id = Guid.NewGuid().ToString(),
             Name = dto.Name,
-            AttributeType = dto.AttributeType,
+            AttributeTypeId = dto.AttributeType.Id,
+            MaxLength = dto.MaxLength,
             Lines = dto.Lines,
             Precision = dto.Precision,
             Scale = dto.Scale,
             UnitId = dto.UnitId
         };
 
-        // 简单校验：只有文本类型可以有 Lines，只有数字类型可以有 Precision/Scale
-        // 可以根据业务需求增强，此处不做强制，留给业务层或数据库约束
-
-        dbContext.AttributeDefinitions.Add(entity);
+        await dbContext.AttributeDefinitions.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // 返回完整 DTO（重新加载关联）
-        return await GetByIdAsync(entity.Id, cancellationToken) 
+        return await GetByIdAsync(entity.Id, cancellationToken)
                ?? throw new Exception("Failed to retrieve created entity.");
     }
 
     public async Task<AttributeDefinitionDto> UpdateAsync(string id, AttributeDefinitionUpdateDto dto, CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.AttributeDefinitions.FindAsync(new object[] { id }, cancellationToken);
+        var entity = await dbContext.AttributeDefinitions
+            .FindAsync(new object[] { id }, cancellationToken);
         if (entity == null)
             throw new KeyNotFoundException($"AttributeDefinition with id {id} not found.");
 
-        // 只更新允许修改的字段
         entity.Name = dto.Name;
         entity.Lines = dto.Lines;
         entity.Precision = dto.Precision;
         entity.Scale = dto.Scale;
         entity.UnitId = dto.UnitId;
 
-        // 注意：不允许更改 AttributeTypeId，因为类型改变会导致值表不兼容，如有需要可设计迁移方案，此处忽略
-
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return await GetByIdAsync(id, cancellationToken) 
+        return await GetByIdAsync(id, cancellationToken)
                ?? throw new Exception("Failed to retrieve updated entity.");
     }
 
     public async Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.AttributeDefinitions.FindAsync(new object[] { id }, cancellationToken);
+        var entity = await dbContext.AttributeDefinitions
+            .FindAsync([id], cancellationToken);
         if (entity == null) return false;
 
-        // 检查是否被节点值引用（任一种值表）
         var hasReferences = await dbContext.TextAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
                             || await dbContext.IntegerAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
                             || await dbContext.DecimalAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
@@ -135,7 +165,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
                             || await dbContext.LocationAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken);
 
         if (hasReferences)
-            throw new InvalidOperationException("Cannot delete definition because it is being used by one or more node attribute values.");
+            throw new InvalidOperationException("无法删除定义，因为它正被一个或多个节点属性值使用。");
 
         dbContext.AttributeDefinitions.Remove(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -144,70 +174,90 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
 
     public async Task<AttributeValueBase> AddValueAsync(string nodeId, AddValueDto dto)
     {
-        // 1. 获取属性定义（含类型和单位）
-        var def = await dbContext.AttributeDefinitions
-            .Include(d => d.AttributeType)
-            .Include(d => d.Unit)
-            .FirstOrDefaultAsync(d => d.Id == dto.AttributeDefinitionId);
+        // 1. 用 Lambda 表达式获取定义、类型、单位
+        var defQuery = dbContext.AttributeDefinitions
+            .Where(d => d.Id == dto.AttributeDefinitionId)
+            .Join(
+                dbContext.AttributeTypes,
+                d => d.AttributeTypeId,
+                t => t.Id,
+                (d, t) => new { d, t }
+            )
+            .GroupJoin(
+                dbContext.UnitTrees,
+                x => x.d.UnitId,
+                u => u.Id,
+                (x, units) => new { x.d, x.t, units }
+            )
+            .SelectMany(
+                x => x.units.DefaultIfEmpty(),
+                (x, u) => new { x.d, x.t, u }
+            );
 
-        if (def == null)
+        var result = await defQuery.FirstOrDefaultAsync();
+        if (result == null)
             throw new KeyNotFoundException($"属性定义 '{dto.AttributeDefinitionId}' 不存在。");
 
-        // 2. 验证并构建具体值实体
+        var def = result.d;
+        var attrType = result.t;
+        var unit = result.u;
+
         var validation = ValueValidator.ValidateAndBuild(def, dto.Value, nodeId);
         if (!validation.IsValid)
             throw new ArgumentException(validation.ErrorMessage);
 
         var entity = validation.ValueEntity!;
+        entity.Id = Guid.NewGuid().ToString();
 
-        // 3. 添加到对应的 DbSet
         switch (entity)
         {
             case TextAttributeValue tv:
-                dbContext.TextAttributeValues.Add(tv);
+                await dbContext.TextAttributeValues.AddAsync(tv);
                 break;
             case DecimalAttributeValue dv:
-                dbContext.DecimalAttributeValues.Add(dv);
+                await dbContext.DecimalAttributeValues.AddAsync(dv);
                 break;
             case IntegerAttributeValue iv:
-                dbContext.IntegerAttributeValues.Add(iv);
+                await dbContext.IntegerAttributeValues.AddAsync(iv);
                 break;
             case DateAttributeValue dav:
-                dbContext.DateAttributeValues.Add(dav);
+                await dbContext.DateAttributeValues.AddAsync(dav);
                 break;
             case TimeAttributeValue tav:
-                dbContext.TimeAttributeValues.Add(tav);
+                await dbContext.TimeAttributeValues.AddAsync(tav);
                 break;
             case DateTimeAttributeValue dtav:
-                dbContext.DateTimeAttributeValues.Add(dtav);
+                await dbContext.DateTimeAttributeValues.AddAsync(dtav);
                 break;
             case FileAttributeValue fav:
-                dbContext.FileAttributeValues.Add(fav);
+                await dbContext.FileAttributeValues.AddAsync(fav);
                 break;
             case LocationAttributeValue lav:
-                dbContext.LocationAttributeValues.Add(lav);
+                await dbContext.LocationAttributeValues.AddAsync(lav);
                 break;
             default:
                 throw new NotSupportedException($"不支持的值类型 '{entity.GetType().Name}'。");
         }
 
         await dbContext.SaveChangesAsync();
-
-        // 返回完整实体（含自动生成的 Id）
         return entity;
     }
 
-    public async Task<AttributeDto?> GetValueAsync(string nodeId, int id)
+    public async Task<AttributeDto?> GetValueAsync(string nodeId, string id)
     {
         var value = await FindValueAsync(nodeId, id);
-        return value == null ? null : MapToDto(value);
+        if (value == null) return null;
+
+        var defInfo = await GetDefinitionWithTypeAndUnitAsync(value.AttributeDefinitionId);
+        if (defInfo == null) return null;
+
+        return MapToDto(value, defInfo.Definition, defInfo.AttributeType, defInfo.Unit);
     }
 
     public async Task<NodeDto> GetAllValuesAsync(string nodeId)
     {
         var list = new List<AttributeDto>();
 
-        // 分别查询每种值表
         list.AddRange(await QueryValues<TextAttributeValue>(nodeId));
         list.AddRange(await QueryValues<DecimalAttributeValue>(nodeId));
         list.AddRange(await QueryValues<IntegerAttributeValue>(nodeId));
@@ -220,7 +270,7 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
         return new NodeDto { Id = nodeId, Attributes = list };
     }
 
-    public async Task<bool> DeleteValueAsync(string nodeId, int id)
+    public async Task<bool> DeleteValueAsync(string nodeId, string id)
     {
         var value = await FindValueAsync(nodeId, id);
         if (value == null)
@@ -233,13 +283,9 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
 
     // ==================== 私有辅助方法 ====================
 
-    /// <summary>
-    /// 根据 nodeId 和 id 在8张值表中查找实体
-    /// </summary>
-    private async Task<AttributeValueBase?> FindValueAsync(string nodeId, int id)
+    private async Task<AttributeValueBase?> FindValueAsync(string nodeId, string id)
     {
-        // 依次检查各表，使用 Any + First 组合（可优化为直接 FirstOrDefault）
-        var tables = new Func<Task<AttributeValueBase?>>[]
+        var tasks = new Func<Task<AttributeValueBase?>>[]
         {
             async () => await dbContext.TextAttributeValues
                 .FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
@@ -259,9 +305,9 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
                 .FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id)
         };
 
-        foreach (var query in tables)
+        foreach (var task in tasks)
         {
-            var result = await query();
+            var result = await task();
             if (result != null)
                 return result;
         }
@@ -269,33 +315,73 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
         return null;
     }
 
-    /// <summary>
-    /// 查询指定类型的所有值，并映射为 AttributeDto
-    /// </summary>
+    private async Task<DefinitionWithTypeAndUnit?> GetDefinitionWithTypeAndUnitAsync(string definitionId)
+    {
+        var query = dbContext.AttributeDefinitions
+            .Where(d => d.Id == definitionId)
+            .Join(
+                dbContext.AttributeTypes,
+                d => d.AttributeTypeId,
+                t => t.Id,
+                (d, t) => new { d, t }
+            )
+            .GroupJoin(
+                dbContext.UnitTrees,
+                x => x.d.UnitId,
+                u => u.Id,
+                (x, units) => new { x.d, x.t, units }
+            )
+            .SelectMany(
+                x => x.units.DefaultIfEmpty(),
+                (x, u) => new DefinitionWithTypeAndUnit
+                {
+                    Definition = x.d,
+                    AttributeType = x.t,
+                    Unit = u
+                }
+            );
+
+        return await query.FirstOrDefaultAsync();
+    }
+
     private async Task<List<AttributeDto>> QueryValues<TValue>(string nodeId)
         where TValue : AttributeValueBase
     {
-        var set = dbContext.Set<TValue>();
-        var items = await set
-            .Include(v => v.Definition)
-                .ThenInclude(d => d.AttributeType)
-            .Include(v => v.Definition)
-                .ThenInclude(d => d.Unit)
+        var items = await dbContext.Set<TValue>()
             .Where(v => v.NodeId == nodeId)
             .ToListAsync();
 
-        return items.Select(MapToDto).ToList();
+        if (items.Count == 0) return new List<AttributeDto>();
+
+        var result = new List<AttributeDto>();
+
+        var definitionIds = items
+            .Select(v => v.AttributeDefinitionId)
+            .Distinct()
+            .ToList();
+
+        var defInfos = new Dictionary<string, DefinitionWithTypeAndUnit>();
+
+        foreach (var defId in definitionIds)
+        {
+            var info = await GetDefinitionWithTypeAndUnitAsync(defId);
+            if (info != null)
+                defInfos[defId] = info;
+        }
+
+        foreach (var v in items)
+        {
+            if (defInfos.TryGetValue(v.AttributeDefinitionId, out var info))
+            {
+                result.Add(MapToDto(v, info.Definition, info.AttributeType, info.Unit));
+            }
+        }
+
+        return result;
     }
 
-    /// <summary>
-    /// 将值实体映射为 DTO（与原控制器逻辑一致）
-    /// </summary>
-    private static AttributeDto MapToDto(AttributeValueBase v)
+    private static AttributeDto MapToDto(AttributeValueBase v, AttributeDefinition? def, AttributeType? attrType, UnitTree? unit)
     {
-        var def = v.Definition;
-        var attrType = def?.AttributeType;
-        var unit = def?.Unit;
-
         return new AttributeDto
         {
             DefinitionId = v.AttributeDefinitionId,
@@ -317,5 +403,12 @@ public class TreeAttributeService(DiberyDbContext dbContext) : ITreeAttributeSer
                 _ => null
             }
         };
+    }
+
+    private sealed class DefinitionWithTypeAndUnit
+    {
+        public AttributeDefinition Definition { get; set; } = null!;
+        public AttributeType AttributeType { get; set; } = null!;
+        public UnitTree? Unit { get; set; }
     }
 }

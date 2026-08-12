@@ -3,6 +3,7 @@ using APromisedLand.Api.Data;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DiberyTree.Attributes.Validation;
+using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,8 +22,8 @@ public class TreeAttributeControllerBase(DiberyDbContext db) : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = definition.Id }, definition);
     }
 
-    [HttpGet("definitions/{id:int}")]
-    public async Task<IActionResult> GetById(int id)
+    [HttpGet("definitions/{id}")]
+    public async Task<IActionResult> GetById(string id)
     {
         var def = await db.AttributeDefinitions.FindAsync(id);
         return def is null ? NotFound() : Ok(def);
@@ -36,19 +37,19 @@ public class TreeAttributeControllerBase(DiberyDbContext db) : ControllerBase
     [HttpPost("values/{nodeId}")]
     public async Task<IActionResult> AddValue(string nodeId, AddValueDto dto)
     {
-        // 可选：校验节点是否存在
-        // if (!await _db.Nodes.AnyAsync(n => n.Id == nodeId)) return NotFound("节点不存在");
-
+        // 1. 仅查询定义（无需 Include）
         var def = await db.AttributeDefinitions
-            .Include(d => d.AttributeType)
             .FirstOrDefaultAsync(d => d.Id == dto.AttributeDefinitionId);
         if (def is null) return NotFound("属性定义不存在");
 
+        // 2. 验证并构建值实体
         var validation = ValueValidator.ValidateAndBuild(def, dto.Value, nodeId);
         if (!validation.IsValid)
             return BadRequest(validation.ErrorMessage);
 
         var entity = validation.ValueEntity!;
+
+        // 3. 添加到对应 DbSet
         switch (entity)
         {
             case TextAttributeValue tv: db.TextAttributeValues.Add(tv); break;
@@ -59,23 +60,30 @@ public class TreeAttributeControllerBase(DiberyDbContext db) : ControllerBase
             case DateTimeAttributeValue dtav: db.DateTimeAttributeValues.Add(dtav); break;
             case FileAttributeValue fav: db.FileAttributeValues.Add(fav); break;
             case LocationAttributeValue lav: db.LocationAttributeValues.Add(lav); break;
+            default: return BadRequest("不支持的值类型");
         }
 
         await db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetSingleValue), new { nodeId, id = entity.Id }, null);
     }
 
-    [HttpGet("values/{nodeId}/{id:int}")]
-    public async Task<IActionResult> GetSingleValue(string nodeId, int id)
+    [HttpGet("values/{nodeId}/{id}")]
+    public async Task<IActionResult> GetSingleValue(string nodeId, string id)
     {
         var value = await FindValueAsync(nodeId, id);
-        return value is null ? NotFound() : Ok(MapToDto(value));
+        if (value is null) return NotFound();
+
+        // 单独获取定义及关联信息
+        var (def, attrType, unit) = await GetDefinitionWithTypeAndUnitAsync(value.AttributeDefinitionId);
+        var dto = MapToDto(value, def, attrType, unit);
+        return Ok(dto);
     }
 
     [HttpGet("values/{nodeId}")]
     public async Task<IActionResult> GetAllValues(string nodeId)
     {
         var list = new List<AttributeDto>();
+
         list.AddRange(await QueryValues<TextAttributeValue>(nodeId));
         list.AddRange(await QueryValues<DecimalAttributeValue>(nodeId));
         list.AddRange(await QueryValues<IntegerAttributeValue>(nodeId));
@@ -88,8 +96,8 @@ public class TreeAttributeControllerBase(DiberyDbContext db) : ControllerBase
         return Ok(new NodeDto { Id = nodeId, Attributes = list });
     }
 
-    [HttpDelete("values/{nodeId}/{id:int}")]
-    public async Task<IActionResult> DeleteValue(string nodeId, int id)
+    [HttpDelete("values/{nodeId}/{id}")]
+    public async Task<IActionResult> DeleteValue(string nodeId, string id)
     {
         var value = await FindValueAsync(nodeId, id);
         if (value is null) return NotFound();
@@ -100,56 +108,88 @@ public class TreeAttributeControllerBase(DiberyDbContext db) : ControllerBase
     }
 
     // ---------- 私有辅助方法 ----------
-    private async Task<AttributeValueBase?> FindValueAsync(string nodeId, int id)
+
+    /// <summary>在多个表中查找值实体（按节点 + ID）</summary>
+    private async Task<AttributeValueBase?> FindValueAsync(string nodeId, string id)
     {
-        if (await db.TextAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await db.TextAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
+        // 使用 FirstOrDefault 替代 Any+First，减少往返
+        var tasks = new Func<Task<AttributeValueBase?>>[]
+        {
+            async () => await db.TextAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await db.DecimalAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await db.IntegerAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await db.DateAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await db.TimeAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await db.DateTimeAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await db.FileAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await db.LocationAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id)
+        };
 
-        if (await db.DecimalAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await db.DecimalAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
-
-        if (await db.IntegerAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await db.IntegerAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
-
-        if (await db.DateAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await db.DateAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
-
-        if (await db.TimeAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await db.TimeAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
-
-        if (await db.DateTimeAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await db.DateTimeAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
-
-        if (await db.FileAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await db.FileAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
-
-        if (await db.LocationAttributeValues.AnyAsync(v => v.NodeId == nodeId && v.Id == id))
-            return await db.LocationAttributeValues.FirstAsync(v => v.NodeId == nodeId && v.Id == id);
-
+        foreach (var task in tasks)
+        {
+            var result = await task();
+            if (result != null) return result;
+        }
         return null;
     }
 
-    private async Task<List<AttributeDto>> QueryValues<T>(string nodeId) where T : AttributeValueBase
+    /// <summary>查询定义 + 类型 + 单位（无导航）</summary>
+    private async Task<(AttributeDefinition Definition, AttributeType? Type, UnitTree? Unit)> GetDefinitionWithTypeAndUnitAsync(string definitionId)
     {
-        var set = db.Set<T>();
-        var items = await set
-            .Include(v => v.Definition)
-                .ThenInclude(d => d.AttributeType)
-            .Include(v => v.Definition)
-                .ThenInclude(d => d.Unit)
-            .Where(v => v.NodeId == nodeId)
-            .ToListAsync();
-        return items.Select(MapToDto).ToList();
+        var query = db.AttributeDefinitions
+            .Where(d => d.Id == definitionId)
+            .Join(db.AttributeTypes, d => d.AttributeTypeId, t => t.Id, (d, t) => new { d, t })
+            .GroupJoin(db.UnitTrees, x => x.d.UnitId, u => u.Id, (x, units) => new { x.d, x.t, units })
+            .SelectMany(x => x.units.DefaultIfEmpty(), (x, u) => new { x.d, x.t, u })
+            .FirstOrDefaultAsync();
+
+        var result = await query;
+        if (result == null) return (null!, null, null);
+        return (result.d, result.t, result.u);
     }
 
-    private static AttributeDto MapToDto(AttributeValueBase v)
+    /// <summary>查询指定节点下某类型的所有值，并组装为 DTO</summary>
+    private async Task<List<AttributeDto>> QueryValues<T>(string nodeId) where T : AttributeValueBase
     {
-        var def = v.Definition;
-        var attrType = def?.AttributeType;
-        var unit = def?.Unit;
+        var values = await db.Set<T>()
+            .Where(v => v.NodeId == nodeId)
+            .ToListAsync();
 
+        if (values.Count == 0) return new List<AttributeDto>();
+
+        // 收集所有定义ID
+        var defIds = values.Select(v => v.AttributeDefinitionId).Distinct().ToList();
+
+        // 一次性查询所有定义、类型、单位
+        var defInfos = await db.AttributeDefinitions
+            .Where(d => defIds.Contains(d.Id))
+            .Join(db.AttributeTypes, d => d.AttributeTypeId, t => t.Id, (d, t) => new { d, t })
+            .GroupJoin(db.UnitTrees, x => x.d.UnitId, u => u.Id, (x, units) => new { x.d, x.t, units })
+            .SelectMany(x => x.units.DefaultIfEmpty(), (x, u) => new { x.d, x.t, u })
+            .ToDictionaryAsync(
+                x => x.d.Id,
+                x => (Definition: x.d, AttributeType: x.t, Unit: x.u)
+            );
+
+        return values
+            .Select(v =>
+            {
+                defInfos.TryGetValue(v.AttributeDefinitionId, out var info);
+                return MapToDto(v, info.Definition, info.AttributeType, info.Unit);
+            })
+            .ToList();
+    }
+
+    /// <summary>将值实体映射为 DTO（传入定义及相关信息）</summary>
+    private static AttributeDto MapToDto(
+        AttributeValueBase v,
+        AttributeDefinition? def,
+        AttributeType? attrType,
+        UnitTree? unit)
+    {
         return new AttributeDto
         {
+            Id = v.Id,                               // 新增，便于前端操作
             DefinitionId = v.AttributeDefinitionId,
             DefinitionName = def?.Name ?? "未知定义",
             Type = attrType?.Name ?? "未知类型",

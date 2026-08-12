@@ -16,9 +16,9 @@ public interface ITreeAttributeService
     /// <summary>添加属性值，返回生成的值实体（含 Id）</summary>
     Task<AttributeValueBase> AddValueAsync(string nodeId, AddValueDto dto);
     /// <summary>获取单个属性值的 DTO</summary>
-    Task<AttributeDto?> GetValueAsync(string nodeId, int id);
+    Task<AttributeDto?> GetValueAsync(string nodeId, string id);
     /// <summary>获取节点所有属性值的聚合 DTO</summary>
     Task<NodeDto> GetAllValuesAsync(string nodeId);
     /// <summary>删除属性值，返回是否成功</summary>
-    Task<bool> DeleteValueAsync(string nodeId, int id);
+    Task<bool> DeleteValueAsync(string nodeId, string id);
 }

@@ -9,8 +9,6 @@ public class AttributeType
     public string? Description { get; set; }
     public AttributeTypeEnum SystemType { get; set; } = AttributeTypeEnum.文本;
 
-    public ICollection<AttributeDefinition> Definitions { get; set; } = new List<AttributeDefinition>();
-    
     public static List<AttributeType> SeedData()
     {
         return

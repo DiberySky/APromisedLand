@@ -278,70 +278,70 @@ public class TreeNodeDialogService<TItem>(
 
     #region 拖拽排序对话框
 
-    public async Task<List<TItem>?> ShowSortDialogAsync(
-        ITreeItemData<TItem> node,
-        DialogConfig? config = null)
-    {
-        var parameters = new DialogParameters
-        {
-            { "Node", node },
-        };
+    // public async Task<List<TItem>?> ShowSortDialogAsync(
+    //     ITreeItemData<TItem> node,
+    //     DialogConfig? config = null)
+    // {
+    //     var parameters = new DialogParameters
+    //     {
+    //         { "Node", node },
+    //     };
+    //
+    //     var options = (config ?? new DialogConfig
+    //     {
+    //         MaxWidth = MaxWidth.Small,
+    //         CloseButton = false,
+    //         BackdropClick = false
+    //     }).ToDialogOptions();
+    //
+    //     var dialog = await dialogService.ShowAsync<TreeNodeSortDialog<TItem>>(
+    //         "拖拽排序", parameters, options);
+    //
+    //     var result = await dialog.Result;
+    //     if (result?.Canceled != false || result.Data is not List<TItem> sortResult)
+    //         return null;
+    //     
+    //     return sortResult;
+    // }
+    //
+    // public async Task<SortResult<TItem>?> ShowSortDialogAsync(
+    //     List<TItem> treeItems,
+    //     bool allowHierarchyChange = true,
+    //     int maxDepth = 10,
+    //     DialogConfig? config = null)
+    // {
+    //     var parameters = new DialogParameters
+    //     {
+    //         { "TreeItems", treeItems },
+    //         { "AllowHierarchyChange", allowHierarchyChange },
+    //         { "MaxDepth", maxDepth }
+    //     };
+    //
+    //     var options = (config ?? new DialogConfig
+    //     {
+    //         MaxWidth = MaxWidth.Large,
+    //         CloseButton = true,
+    //         BackdropClick = false
+    //     }).ToDialogOptions();
+    //
+    //     var dialog = await dialogService.ShowAsync<TreeNodeSortDialog<TItem>>(
+    //         "拖拽排序", parameters, options);
+    //
+    //     var result = await dialog.Result;
+    //     if (result?.Canceled != false || result.Data is not SortResult<TItem> sortResult)
+    //         return null;
+    //
+    //     return sortResult;
+    // }
 
-        var options = (config ?? new DialogConfig
-        {
-            MaxWidth = MaxWidth.Small,
-            CloseButton = false,
-            BackdropClick = false
-        }).ToDialogOptions();
-
-        var dialog = await dialogService.ShowAsync<TreeNodeSortDialog<TItem>>(
-            "拖拽排序", parameters, options);
-
-        var result = await dialog.Result;
-        if (result?.Canceled != false || result.Data is not List<TItem> sortResult)
-            return null;
-        
-        return sortResult;
-    }
-    
-    public async Task<SortResult<TItem>?> ShowSortDialogAsync(
-        List<TItem> treeItems,
-        bool allowHierarchyChange = true,
-        int maxDepth = 10,
-        DialogConfig? config = null)
-    {
-        var parameters = new DialogParameters
-        {
-            { "TreeItems", treeItems },
-            { "AllowHierarchyChange", allowHierarchyChange },
-            { "MaxDepth", maxDepth }
-        };
-
-        var options = (config ?? new DialogConfig
-        {
-            MaxWidth = MaxWidth.Large,
-            CloseButton = true,
-            BackdropClick = false
-        }).ToDialogOptions();
-
-        var dialog = await dialogService.ShowAsync<TreeNodeSortDialog<TItem>>(
-            "拖拽排序", parameters, options);
-
-        var result = await dialog.Result;
-        if (result?.Canceled != false || result.Data is not SortResult<TItem> sortResult)
-            return null;
-
-        return sortResult;
-    }
-
-    public async Task<SortResult<TItem>?> ShowSortDialogAsync(TreeSky<TItem> treeSky,
-        bool allowHierarchyChange = true,
-        int maxDepth = 10,
-        DialogConfig? config = null)
-    {
-        var allItems = await treeSky.GetAllNodesAsync();
-        return await ShowSortDialogAsync(allItems, allowHierarchyChange, maxDepth, config);
-    }
+    // public async Task<SortResult<TItem>?> ShowSortDialogAsync(TreeSky<TItem> treeSky,
+    //     bool allowHierarchyChange = true,
+    //     int maxDepth = 10,
+    //     DialogConfig? config = null)
+    // {
+    //     var allItems = await treeSky.GetAllNodesAsync();
+    //     return await ShowSortDialogAsync(allItems, allowHierarchyChange, maxDepth, config);
+    // }
 
     #endregion
 

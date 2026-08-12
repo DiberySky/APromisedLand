@@ -1,0 +1,267 @@
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
+@* @using MudBlazor *@
+@* @using Microsoft.AspNetCore.Components.Forms *@
+@* *@
+@* @if (Definition == null) *@
+@* { *@
+@*     <MudText Color="Color.Warning">请先选择属性定义</MudText> *@
+@* } *@
+@* else *@
+@* { *@
+@*     switch (Definition.AttributeType?.SystemType) *@
+@*     { *@
+@*         case AttributeTypeEnum.文本: *@
+@*             <MudTextField @bind-Value="_value" *@
+@*                           Label="@Definition.Name" *@
+@*                           Variant="Variant.Outlined" *@
+@*                           Lines="@(Definition.Lines ?? 1)" *@
+@*                           MaxLength="500" *@
+@*                           FullWidth="true" *@
+@*                           $1$ @oninput="OnValueChanged" #1# *@
+@*                           Margin="Margin.Dense" *@
+@*                           Immediate="true"/> *@
+@*             break; *@
+@* *@
+@*         case AttributeTypeEnum.整数: *@
+@*             <MudNumericField T="long?" *@
+@*                              @bind-Value="_numericValue" *@
+@*                              Label="@Definition.Name" *@
+@*                              Variant="Variant.Outlined" *@
+@*                              Format="N0" *@
+@*                              Min="0" *@
+@*                              @onvaluechanged="OnNumericValueChanged" *@
+@*                              FullWidth="true" *@
+@*                              Margin="Margin.Dense" *@
+@*                              Adornment="Adornment.End" *@
+@*                              AdornmentText="@Definition.Unit?.Abbreviation"/> *@
+@*             break; *@
+@* *@
+@*         case AttributeTypeEnum.小数: *@
+             @* <MudNumericField T="decimal?" *@
+             @*                  @bind-Value="_decimalValue" *@
+             @*                  Label="@Definition.Name" *@
+             @*                  Variant="Variant.Outlined" *@
+             @*                  Format="N@(Definition.Scale ?? 2)" *@
+             @*                  Min="0" *@
+             @*                  Step="@(1m / (decimal)Math.Pow(10, Definition.Scale ?? 2))" *@
+             @*                  @onvaluechanged="OnDecimalValueChanged" *@
+             @*                  FullWidth="true" *@
+             @*                  Margin="Margin.Dense" *@
+             @*                  Adornment="Adornment.End" *@
+             @*                  AdornmentText="@Definition.Unit?.Abbreviation"/> *@
+@*             break; *@
+@* *@
+@*         case AttributeTypeEnum.日期: *@
+@*             <MudDatePicker @bind-Date="_dateValue" *@
+@*                            Label="@Definition.Name" *@
+@*                            Variant="Variant.Outlined" *@
+@*                            @onpickerchanged="OnDateValueChanged" *@
+@*                            FullWidth="true" *@
+@*                            Margin="Margin.Dense" *@
+@*                            Editable="true" *@
+@*                            Format="yyyy-MM-dd"/> *@
+@*             break; *@
+@* *@
+@*         case AttributeTypeEnum.时间: *@
+@*             <MudTimePicker @bind-Time="_timeValue" *@
+@*                            Label="@Definition.Name" *@
+@*                            Variant="Variant.Outlined" *@
+@*                            @onpickervaluechanged="OnTimeValueChanged" *@
+@*                            FullWidth="true" *@
+@*                            Margin="Margin.Dense" *@
+@*                            Editable="true" *@
+@*                            Format="HH:mm:ss"/> *@
+@*             break; *@
+@* *@
+@*         case AttributeTypeEnum.日期时间: *@
+@*             <MudDateTimePicker @bind-Date="@_dateTimeValue" *@
+@*                                Label="@Definition.Name" *@
+@*                                Variant="Variant.Outlined" *@
+@*                                @onpickerchanged="OnDateTimeValueChanged" *@
+@*                                FullWidth="true" *@
+@*                                Margin="Margin.Dense" *@
+@*                                Editable="true" *@
+@*                                Format="yyyy-MM-dd HH:mm:ss"/> *@
+@*             break; *@
+@* *@
+@*         case AttributeTypeEnum.文件: *@
+@*             <MudStack Row="true" Justify="Justify.Center"> *@
+@*                 <MudFileUpload T="IBrowserFile?" *@
+@*                                $1$ @bind-Files="_files" #1# *@
+@*                                Accept="*/*" *@
+@*                                Variant="Variant.Outlined" *@
+@*                                Label="选择文件" *@
+@*                                MultiSelection="false" *@
+@*                                @onuploadcompleted="OnFileUploadCompleted"> *@
+@*                     <ButtonTemplate> *@
+@*                         <MudButton Variant="Variant.Filled" *@
+@*                                    Color="Color.Primary" *@
+@*                                    StartIcon="@Icons.Material.Outlined.AttachFile"> *@
+@*                             选择文件 *@
+@*                         </MudButton> *@
+@*                     </ButtonTemplate> *@
+@*                 </MudFileUpload> *@
+@*                  *@
+@*                 @if (!string.IsNullOrEmpty(_value)) *@
+@*                 { *@
+@*                     <MudText Color="Color.Success" Class="align-center"> *@
+@*                         <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Size="Size.Small" /> *@
+@*                         已选择: @_value *@
+@*                     </MudText> *@
+@*                 } *@
+@*             </MudStack> *@
+@*             break; *@
+@* *@
+@*         case AttributeTypeEnum.定位: *@
+@*             <MudGrid> *@
+@*                 <MudItem xs="6"> *@
+@*                     <MudNumericField T="double?" *@
+@*                                      @bind-Value="_latitude" *@
+@*                                      Label="纬度" *@
+@*                                      Variant="Variant.Outlined" *@
+@*                                      Format="N6" *@
+@*                                      Min="-90" *@
+@*                                      Max="90" *@
+@*                                      @onvaluechanged="OnLocationChanged" *@
+@*                                      FullWidth="true" *@
+@*                                      Margin="Margin.Dense"/> *@
+@*                 </MudItem> *@
+@*                 <MudItem xs="6"> *@
+@*                     <MudNumericField T="double?" *@
+@*                                      @bind-Value="_longitude" *@
+@*                                      Label="经度" *@
+@*                                      Variant="Variant.Outlined" *@
+@*                                      Format="N6" *@
+@*                                      Min="-180" *@
+@*                                      Max="180" *@
+@*                                      @onvaluechanged="OnLocationChanged" *@
+@*                                      FullWidth="true" *@
+@*                                      Margin="Margin.Dense"/> *@
+@*                 </MudItem> *@
+@*             </MudGrid> *@
+@*             <MudText Typo="Typo.caption" Color="Color.Tertiary"> *@
+@*                 纬度（-90 ~ 90），经度（-180 ~ 180） *@
+@*             </MudText> *@
+@*             break; *@
+@* *@
+@*         default: *@
+@*             <MudText Color="Color.Warning">暂不支持该属性类型</MudText> *@
+@*             break; *@
+@*     } *@
+@* } *@
+@* *@
+@* @code { *@
+@*     [Parameter] public AttributeDefinitionDto? Definition { get; set; } *@
+@*     [Parameter] public string? Value { get; set; } *@
+@*     [Parameter] public EventCallback<string?> ValueChanged { get; set; } *@
+@* *@
+@*     private string _value = ""; *@
+@*     private long? _numericValue; *@
+@*     private decimal? _decimalValue; *@
+@*     private DateTime? _dateValue; *@
+@*     private TimeSpan? _timeValue; *@
+@*     private DateTime? _dateTimeValue; *@
+@*     private double? _latitude; *@
+@*     private double? _longitude; *@
+@*     private List<IBrowserFile> _files = new(); *@
+@* *@
+@*     protected override void OnParametersSet() *@
+@*     { *@
+@*         base.OnParametersSet(); *@
+@*          *@
+@*         if (Definition == null) return; *@
+@* *@
+@*         switch (Definition.AttributeType?.SystemType) *@
+@*         { *@
+@*             case AttributeTypeEnum.文本: *@
+@*                 _value = Value ?? ""; *@
+@*                 break; *@
+@*             case AttributeTypeEnum.整数: *@
+@*                 _numericValue = long.TryParse(Value, out var intVal) ? intVal : null; *@
+@*                 break; *@
+@*             case AttributeTypeEnum.小数: *@
+@*                 _decimalValue = decimal.TryParse(Value, out var decVal) ? decVal : null; *@
+@*                 break; *@
+@*             case AttributeTypeEnum.日期: *@
+@*                 _dateValue = DateTime.TryParse(Value, out var dateVal) ? dateVal : null; *@
+@*                 break; *@
+@*             case AttributeTypeEnum.时间: *@
+@*                 _timeValue = TimeSpan.TryParse(Value, out var timeVal) ? timeVal : null; *@
+@*                 break; *@
+@*             case AttributeTypeEnum.日期时间: *@
+@*                 _dateTimeValue = DateTime.TryParse(Value, out var dtVal) ? dtVal : null; *@
+@*                 break; *@
+@*             case AttributeTypeEnum.定位: *@
+@*                 if (!string.IsNullOrEmpty(Value)) *@
+@*                 { *@
+@*                     var parts = Value.Split(','); *@
+@*                     if (parts.Length == 2) *@
+@*                     { *@
+@*                         _latitude = double.TryParse(parts[0], out var lat) ? lat : null; *@
+@*                         _longitude = double.TryParse(parts[1], out var lon) ? lon : null; *@
+@*                     } *@
+@*                 } *@
+@*                 break; *@
+@*         } *@
+@*     } *@
+@* *@
+@*     // ============ 事件处理 ============ *@
+@* *@
+@*     private async Task OnValueChanged(string value) *@
+@*     { *@
+@*         _value = value; *@
+@*         await ValueChanged.InvokeAsync(value); *@
+@*     } *@
+@* *@
+@*     private async Task OnNumericValueChanged(long? value) *@
+@*     { *@
+@*         _numericValue = value; *@
+@*         await ValueChanged.InvokeAsync(value?.ToString()); *@
+@*     } *@
+@* *@
+@*     private async Task OnDecimalValueChanged(decimal? value) *@
+@*     { *@
+@*         _decimalValue = value; *@
+@*         await ValueChanged.InvokeAsync(value?.ToString(System.Globalization.CultureInfo.InvariantCulture)); *@
+@*     } *@
+@* *@
+@*     private async Task OnDateValueChanged(DateTime? date) *@
+@*     { *@
+@*         _dateValue = date; *@
+@*         await ValueChanged.InvokeAsync(date?.ToString("yyyy-MM-dd")); *@
+@*     } *@
+@* *@
+@*     private async Task OnTimeValueChanged(TimeSpan? time) *@
+@*     { *@
+@*         _timeValue = time; *@
+@*         await ValueChanged.InvokeAsync(time?.ToString(@"hh\:mm\:ss")); *@
+@*     } *@
+@* *@
+@*     private async Task OnDateTimeValueChanged(DateTime? dateTime) *@
+@*     { *@
+@*         _dateTimeValue = dateTime; *@
+@*         await ValueChanged.InvokeAsync(dateTime?.ToString("O")); *@
+@*     } *@
+@* *@
+@*     private async Task OnFileUploadCompleted(IBrowserFile? file) *@
+@*     { *@
+@*         if (file != null) *@
+@*         { *@
+@*             await ValueChanged.InvokeAsync(file.Name); *@
+@*         } *@
+@*     } *@
+@* *@
+@*     private async Task OnLocationChanged(double? value) *@
+@*     { *@
+@*         if (_latitude.HasValue && _longitude.HasValue) *@
+@*         { *@
+@*             var locValue = $"{_latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}," + *@
+@*                            $"{_longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"; *@
+@*             await ValueChanged.InvokeAsync(locValue); *@
+@*         } *@
+@*         else *@
+@*         { *@
+@*             await ValueChanged.InvokeAsync(null); *@
+@*         } *@
+@*     } *@
+@* } *@

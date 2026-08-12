@@ -78,15 +78,6 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
             entity.Property(d => d.Precision);
             entity.Property(d => d.Scale);
 
-            entity.HasOne(d => d.AttributeType)
-                  .WithMany(t => t.Definitions)
-                  .HasForeignKey(d => d.AttributeTypeId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(d => d.Unit)
-                  .WithMany()
-                  .HasForeignKey(d => d.UnitId)
-                  .OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<AttributeDefinition>().HasData(AttributeDefinition.SeedData());
 
@@ -96,7 +87,9 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
             entity.UseTpcMappingStrategy();
 
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.Id)
+                .HasMaxLength(36)
+                .ValueGeneratedNever(); 
 
             entity.Property(e => e.NodeId).IsRequired().HasMaxLength(255);
             entity.Property(e => e.AttributeDefinitionId).IsRequired().HasMaxLength(36);
@@ -107,61 +100,31 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
         {
             entity.ToTable("TextAttributeValues");
             entity.Property(e => e.Value).IsRequired();
-
-            entity.HasOne(e => e.Definition)
-                  .WithMany(d => d.TextValues)
-                  .HasForeignKey(e => e.AttributeDefinitionId)
-                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<DecimalAttributeValue>(entity =>
         {
             entity.ToTable("DecimalAttributeValues");
-
-            entity.HasOne(e => e.Definition)
-                  .WithMany(d => d.DecimalValues)
-                  .HasForeignKey(e => e.AttributeDefinitionId)
-                  .OnDelete(DeleteBehavior.Restrict);
-        });
+});
 
         modelBuilder.Entity<IntegerAttributeValue>(entity =>
         {
             entity.ToTable("IntegerAttributeValues");
-
-            entity.HasOne(e => e.Definition)
-                  .WithMany(d => d.IntegerValues)
-                  .HasForeignKey(e => e.AttributeDefinitionId)
-                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<DateAttributeValue>(entity =>
         {
             entity.ToTable("DateAttributeValues");
-
-            entity.HasOne(e => e.Definition)
-                  .WithMany(d => d.DateValues)
-                  .HasForeignKey(e => e.AttributeDefinitionId)
-                  .OnDelete(DeleteBehavior.Restrict);
-        });
+});
 
         modelBuilder.Entity<TimeAttributeValue>(entity =>
         {
             entity.ToTable("TimeAttributeValues");
-
-            entity.HasOne(e => e.Definition)
-                  .WithMany(d => d.TimeValues)
-                  .HasForeignKey(e => e.AttributeDefinitionId)
-                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<DateTimeAttributeValue>(entity =>
         {
             entity.ToTable("DateTimeAttributeValues");
-
-            entity.HasOne(e => e.Definition)
-                  .WithMany(d => d.DateTimeValues)
-                  .HasForeignKey(e => e.AttributeDefinitionId)
-                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<FileAttributeValue>(entity =>
@@ -171,21 +134,11 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
             entity.Property(e => e.FileName).HasMaxLength(512);
             entity.Property(e => e.ContentType).HasMaxLength(128);
             entity.Property(e => e.Size);
-
-            entity.HasOne(e => e.Definition)
-                  .WithMany(d => d.FileValues)
-                  .HasForeignKey(e => e.AttributeDefinitionId)
-                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<LocationAttributeValue>(entity =>
         {
             entity.ToTable("LocationAttributeValues");
-
-            entity.HasOne(e => e.Definition)
-                  .WithMany(d => d.LocationValues)
-                  .HasForeignKey(e => e.AttributeDefinitionId)
-                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         base.OnModelCreating(modelBuilder);

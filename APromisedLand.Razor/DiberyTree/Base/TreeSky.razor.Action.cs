@@ -67,7 +67,7 @@ public partial class TreeSky<TItem> : ComponentBase
                 await HandleAttributeAsync(node);
                 break;
             case NodeAction.Sort:
-                await HandleSortAsync(node);
+                // await HandleSortAsync(node);
                 break;
         }
     }
@@ -197,7 +197,7 @@ public partial class TreeSky<TItem> : ComponentBase
         if (selectResult == null) return;
 
         var message = $"节点【{node.Text}】的上级节点：【{node.Value.Parent?.Text()}】 => 【{selectResult.Text()}】!";
-        var result = await BlazorService.BoolBox(message);
+        var result = await BlazorService.BoolBoxAsync(message);
 
         if (!result) return;
 
@@ -246,36 +246,36 @@ public partial class TreeSky<TItem> : ComponentBase
         var formModel = await NodeDialogSvc.ShowNodeAttributesDialogAsync(node.Value!.Id);
     }
 
-    private async Task HandleSortAsync(ITreeItemData<TItem> node)
-    {
-        var sortResult = await NodeDialogSvc.ShowSortDialogAsync(node);
-
-        if (sortResult == null) return;
-
-        var nodeDto = new TreeNodeDto<TItem>
-        {
-            Id = node.Value!.Id,
-            Text = node.Value.Text(),
-            Icon = BlazorHelper.TreeItemIcons,
-            ParentId = node.Value.ParentId!,
-            Value = node.Value,
-            Children = sortResult.Select(i => new TreeNodeDto<TItem>
-            {
-                Id = i.Id,
-                Text = i.Text(),
-                Icon = BlazorHelper.TreeItemIcons,
-                ParentId = node.Value.Id,
-                Value = i,
-                SortOrder = i.SortOrder,
-            }).ToList()
-        };
-
-        await ApiClient.UpdateChildrenAsync(nodeDto);
-
-        await RefreshNodeChildrenAsync(node);
-
-        BlazorService.ShowSuccess($"排序成功");
-    }
+    // private async Task HandleSortAsync(ITreeItemData<TItem> node)
+    // {
+    //     var sortResult = await NodeDialogSvc.ShowSortDialogAsync(node);
+    //
+    //     if (sortResult == null) return;
+    //
+    //     var nodeDto = new TreeNodeDto<TItem>
+    //     {
+    //         Id = node.Value!.Id,
+    //         Text = node.Value.Text(),
+    //         Icon = BlazorHelper.TreeItemIcons,
+    //         ParentId = node.Value.ParentId!,
+    //         Value = node.Value,
+    //         Children = sortResult.Select(i => new TreeNodeDto<TItem>
+    //         {
+    //             Id = i.Id,
+    //             Text = i.Text(),
+    //             Icon = BlazorHelper.TreeItemIcons,
+    //             ParentId = node.Value.Id,
+    //             Value = i,
+    //             SortOrder = i.SortOrder,
+    //         }).ToList()
+    //     };
+    //
+    //     await ApiClient.UpdateChildrenAsync(nodeDto);
+    //
+    //     await RefreshNodeChildrenAsync(node);
+    //
+    //     BlazorService.ShowSuccess($"排序成功");
+    // }
 
     #endregion
 

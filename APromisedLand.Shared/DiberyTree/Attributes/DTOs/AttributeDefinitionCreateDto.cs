@@ -5,7 +5,8 @@ namespace APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 public class AttributeDefinitionCreateDto
 {
     public string Name { get; set; } = null!;
-    public AttributeType AttributeType { get; set; } = null!;
+    public AttributeType AttributeType { get; set; } = new();
+    public int? MaxLength { get; set; }
     public int? Lines { get; set; }
     public int? Precision { get; set; }
     public int? Scale { get; set; }

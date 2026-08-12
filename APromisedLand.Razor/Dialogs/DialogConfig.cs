@@ -14,7 +14,7 @@ public class DialogConfig
     public bool CloseButton { get; set; } = false;
 
     /// <summary>点击背景是否关闭</summary>
-    public bool BackdropClick { get; set; } = true;
+    public bool BackdropClick { get; set; } = false;
 
     /// <summary>是否全屏</summary>
     public bool FullScreen { get; set; } = false;

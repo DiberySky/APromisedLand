@@ -2,14 +2,20 @@
               Label="@Definition?.Name"
               Variant="Variant.Outlined"
               Lines="@(Definition?.Lines ?? 1)"
-              MaxLength="500"
+              MaxLength="@(Definition?.MaxLength ?? 0)" 
               FullWidth="true"
+              Margin="Margin.Normal"
               TextChanged="OnValueChanged"
-              Margin="Margin.Dense"
+              Required="true"
               Immediate="true"/>
+
+<MudText Typo="Typo.caption" Color="Color.Tertiary">
+    类型：@Definition?.AttributeType.Name, 最大长度：@(Definition?.MaxLength is null or 0 ? "无限制" : Definition?.MaxLength.ToString())
+</MudText>
+
 @code {
     [Parameter] public AttributeDefinitionDto? Definition { get; set; }
-    [Parameter] public required string Value { get; set; }
+    [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
     
     private void OnValueChanged(string? value)

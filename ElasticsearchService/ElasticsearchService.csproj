@@ -11,8 +11,8 @@
         <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.5.0" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
         <PackageReference Include="OllamaSharp" Version="5.4.30" />
-        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.24.5" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.24.5" />
+        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.25.2" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.25.2" />
     </ItemGroup>
 
     <ItemGroup>

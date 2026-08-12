@@ -1,0 +1,32 @@
+<MudNumericField T="long?"
+                 Value="@Value"
+                 ValueChanged="@OnValueChanged"
+                 Label="@Definition?.Name"
+                 Variant="Variant.Outlined"
+                 Format="N0"
+                 Min="0"
+                 Step="@(1)"
+                 FullWidth="true"
+                 Margin="Margin.Normal"
+                 Adornment="Adornment.End"
+                 AdornmentText="@Definition?.Unit?.Abbreviation"/>
+
+<MudText Typo="Typo.caption" Color="Color.Tertiary">
+    类型：@Definition?.AttributeType.Name
+    @if (!string.IsNullOrEmpty(Definition?.Unit?.Abbreviation))
+    {
+        <span>，单位：@Definition.Unit?.Abbreviation</span>
+    }
+</MudText>
+
+@code {
+    [Parameter] public AttributeDefinitionDto? Definition { get; set; }
+    [Parameter] public long? Value { get; set; }
+    [Parameter] public EventCallback<long?> ValueChanged { get; set; }
+
+    private async Task OnValueChanged(long? newValue)
+    {
+        Value = newValue;
+        await ValueChanged.InvokeAsync(newValue);
+    }
+}

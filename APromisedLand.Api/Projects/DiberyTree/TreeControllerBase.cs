@@ -395,7 +395,7 @@ public abstract class TreeControllerBase<T>(
     [HttpGet("{nodeId}/attributes/values/{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> GetSingleValue(string nodeId, int id)
+    public virtual async Task<IActionResult> GetSingleValue(string nodeId, string id)
     {
         try
         {
@@ -427,10 +427,10 @@ public abstract class TreeControllerBase<T>(
         }
     }
 
-    [HttpDelete("{nodeId}/attributes/values/{id:int}")]
+    [HttpDelete("{nodeId}/attributes/values/{id}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> DeleteValue(string nodeId, int id)
+    public virtual async Task<IActionResult> DeleteValue(string nodeId, string id)
     {
         try
         {

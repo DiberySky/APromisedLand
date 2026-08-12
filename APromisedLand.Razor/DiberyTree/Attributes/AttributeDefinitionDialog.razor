@@ -13,26 +13,24 @@
         <MudForm @ref="_form" Model="_model" ValidationDelay="0">
             <MudContainer class="my-4">
                 <MudGrid>
-                    <MudItem xs="12">
-                        <AttributeTypeField TItem="TItem" AttributeDefinitionDto="@EditItem"
-                                          AttributeDefinitionChanged="@AttributeDefinitionChanged"/>
-                    </MudItem>
                     @* <MudItem xs="12"> *@
-                    @*     <MudSelect T="AttributeType" *@
-                    @*                @bind-Value="_model.AttributeType" *@
-                    @*                Label="属性类型" *@
-                    @*                Variant="Variant.Outlined" *@
-                    @*                Required="true" *@
-                    @*                RequiredError="请选择属性类型" *@
-                    @*                Disabled="IsEdit" *@
-                    @*                AnchorOrigin="Origin.BottomLeft"> *@
-                    @*         @foreach (var type in AttributeTypes) *@
-                    @*         { *@
-                    @*             <MudSelectItem Value="@type">@type.Name 【@type.Description】</MudSelectItem> *@
-                    @*         } *@
-                    @*     </MudSelect> *@
+                    @*     <AttributeTypeField TItem="TItem" AttributeDefinitionDto="@EditItem" *@
+                    @*                         AttributeDefinitionChanged="@AttributeDefinitionChanged"/> *@
                     @* </MudItem> *@
-
+                    <MudItem xs="12">
+                        <MudSelect T="AttributeTypeEnum"
+                                   @bind-Value="@_selectedType"
+                                   Label="属性类型"
+                                   Variant="Variant.Outlined"
+                                   AnchorOrigin="Origin.BottomLeft"
+                                   Clearable="false"
+                                   ReadOnly="@(EditItem != null)">
+                            @foreach (var type in Enum.GetValues<AttributeTypeEnum>())
+                            {
+                                <MudSelectItem Value="type">@type.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
                     <MudItem xs="12">
                         <MudTextField @bind-Value="_model.Name"
                                       Label="属性名称"
@@ -43,55 +41,106 @@
                                       Counter="256"/>
                     </MudItem>
 
-                    @if (_model.AttributeType?.SystemType == AttributeTypeEnum.文本)
+                    @switch (_selectedType)
                     {
-                        <MudItem xs="12">
-                            <MudNumericField @bind-Value="_model.Lines"
-                                             Label="文本显示行数"
-                                             Variant="Variant.Outlined"
-                                             Min="1"
-                                             Max="20"/>
-                        </MudItem>
+                        case AttributeTypeEnum.文本:
+                            <MudItem xs="12">
+                                <MudNumericField @bind-Value="_model.MaxLength"
+                                                 Label="最大长度"
+                                                 Variant="Variant.Outlined"
+                                                 Min="1"/>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudNumericField @bind-Value="_model.Lines"
+                                                 Label="文本显示行数"
+                                                 Variant="Variant.Outlined"
+                                                 Min="1"
+                                                 Max="20"/>
+                            </MudItem>
+                            break;
+                        case AttributeTypeEnum.整数:
+                            @* <MudItem xs="12"> *@
+                            @*     <MudNumericField @bind-Value="_model.Precision" *@
+                            @*                      Label="位数(精度)" *@
+                            @*                      Variant="Variant.Outlined" *@
+                            @*                      Min="1" *@
+                            @*                      Max="38"/> *@
+                            @* </MudItem> *@
+                            <MudItem xs="12">
+                                <UintTreeField Unit="@Unit"/>
+                            </MudItem>
+                            break;
+                        case AttributeTypeEnum.小数:
+                            <MudItem xs="6">
+                                <MudNumericField @bind-Value="_model.Precision"
+                                                 Label="整数位数(精度)"
+                                                 Variant="Variant.Outlined"
+                                                 Min="1"
+                                                 Max="38"/>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudNumericField @bind-Value="_model.Scale"
+                                                 Label="小数位数(精度)"
+                                                 Variant="Variant.Outlined"
+                                                 Min="0"
+                                                 Max="10"/>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <UintTreeField Unit="@Unit"/>
+                            </MudItem>
+                            break;
+                        case AttributeTypeEnum.日期:
+                            break;
+                        case AttributeTypeEnum.时间:
+                            break;
+                        case AttributeTypeEnum.日期时间:
+                            break;
+                        case AttributeTypeEnum.文件:
+                            break;
+                        case AttributeTypeEnum.定位:
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
                     }
 
-                    @if (_model.AttributeType?.SystemType == AttributeTypeEnum.小数)
-                    {
-                        <MudItem xs="6">
-                            <MudNumericField @bind-Value="_model.Precision"
-                                             Label="精度 (总位数)"
-                                             Variant="Variant.Outlined"
-                                             Min="1"
-                                             Max="38"/>
-                        </MudItem>
-                        <MudItem xs="6">
-                            <MudNumericField @bind-Value="_model.Scale"
-                                             Label="小数位"
-                                             Variant="Variant.Outlined"
-                                             Min="0"
-                                             Max="10"/>
-                        </MudItem>
-                    }
-
-                    @if (_model.AttributeType?.SystemType is AttributeTypeEnum.整数 or AttributeTypeEnum.小数)
-                    {
-                        <MudItem xs="12">
-                            <UintTreeField Unit="@Unit" />
-                            
-                            @* <MudSelect T="string?" *@
-                            @*            @bind-Value="_model.UnitId" *@
-                            @*            Label="计量单位" *@
-                            @*            Variant="Variant.Outlined" *@
-                            @*            Clearable="true" *@
-                            @*            AnchorOrigin="Origin.BottomCenter"> *@
-                            @*     <MudSelectItem T="string?" Value="@((string?)null)">无</MudSelectItem> *@
-                            @*     @foreach (var uom in Units) *@
-                            @*     { *@
-                            @*         <MudSelectItem T="string?" Value="@uom.Id">@uom.Name (@uom.Abbreviation)</MudSelectItem> *@
-                            @*     } *@
-                            @* </MudSelect> *@
-                        </MudItem>
-                    }
-
+                    @* @if (EditItem != null) *@
+                    @* { *@
+                    @*     @if (_model.AttributeType?.SystemType == AttributeTypeEnum.文本) *@
+                    @*     { *@
+                    @*         <MudItem xs="12"> *@
+                    @*             <MudNumericField @bind-Value="_model.Lines" *@
+                    @*                              Label="文本显示行数" *@
+                    @*                              Variant="Variant.Outlined" *@
+                    @*                              Min="1" *@
+                    @*                              Max="20"/> *@
+                    @*         </MudItem> *@
+                    @*     } *@
+                    @* *@
+                    @*     @if (_model.AttributeType?.SystemType == AttributeTypeEnum.小数) *@
+                    @*     { *@
+                    @*         <MudItem xs="6"> *@
+                    @*             <MudNumericField @bind-Value="_model.Precision" *@
+                    @*                              Label="精度 (总位数)" *@
+                    @*                              Variant="Variant.Outlined" *@
+                    @*                              Min="1" *@
+                    @*                              Max="38"/> *@
+                    @*         </MudItem> *@
+                    @*         <MudItem xs="6"> *@
+                    @*             <MudNumericField @bind-Value="_model.Scale" *@
+                    @*                              Label="小数位" *@
+                    @*                              Variant="Variant.Outlined" *@
+                    @*                              Min="0" *@
+                    @*                              Max="10"/> *@
+                    @*         </MudItem> *@
+                    @*     } *@
+                    @* *@
+                    @*     @if (_model.AttributeType?.SystemType is AttributeTypeEnum.整数 or AttributeTypeEnum.小数) *@
+                    @*     { *@
+                    @*         <MudItem xs="12"> *@
+                    @*             <UintTreeField Unit="@Unit"/> *@
+                    @*         </MudItem> *@
+                    @*     } *@
+                    @* } *@
                 </MudGrid>
             </MudContainer>
         </MudForm>
@@ -107,6 +156,7 @@
 
     private MudForm? _form;
     private FormModel _model = new();
+    private AttributeTypeEnum _selectedType = AttributeTypeEnum.文本;
 
     private bool IsEdit => EditItem != null;
 
@@ -118,6 +168,7 @@
             {
                 Name = EditItem.Name,
                 AttributeType = EditItem.AttributeType,
+                MaxLength = EditItem.MaxLength,
                 Lines = EditItem.Lines,
                 Precision = EditItem.Precision,
                 Scale = EditItem.Scale,
@@ -130,12 +181,15 @@
             {
                 Name = string.Empty,
                 AttributeType = AttributeTypes.FirstOrDefault(),
+                MaxLength = 0,
                 Lines = 1,
-                Precision = 0,
-                Scale = 0,
+                Precision = 7,
+                Scale = 3,
                 UnitId = null
             };
         }
+        
+        _selectedType = _model.AttributeType?.SystemType ?? AttributeTypeEnum.文本;
     }
 
     private async Task HandleSubmitAsync()
@@ -170,6 +224,7 @@
                 {
                     Name = _model.Name,
                     AttributeType = _model.AttributeType,
+                    MaxLength = _model.MaxLength,
                     Lines = _model.Lines,
                     Precision = _model.Precision,
                     Scale = _model.Scale,
@@ -204,17 +259,19 @@
         _model.Precision = dto.Precision;
         _model.Scale = dto.Scale;
         // _model.UnitId = dto.UnitId;
-            
+
         StateHasChanged();
     }
-    
+
     private class FormModel
     {
         public string Name { get; set; } = string.Empty;
         public AttributeType? AttributeType { get; set; }
+        public int? MaxLength { get; set; }
         public int? Lines { get; set; }
         public int? Precision { get; set; }
         public int? Scale { get; set; }
         public string? UnitId { get; set; }
     }
+
 }

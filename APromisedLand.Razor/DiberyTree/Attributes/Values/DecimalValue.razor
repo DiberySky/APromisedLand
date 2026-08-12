@@ -1,21 +1,32 @@
-<MudTextField T="string" @bind-Value="@Value"
-              Label="@Definition?.Name"
-              Variant="Variant.Outlined"
-              Lines="@(Definition?.Lines ?? 1)"
-              MaxLength="500"
-              FullWidth="true"
-              Margin="Margin.Normal"
-              TextChanged="OnValueChanged"
-              Required="true"
-              Immediate="true"/>
+<MudNumericField T="decimal?"
+                 Value="@Value"
+                 ValueChanged="@OnValueChanged"
+                 Label="@Definition?.Name"
+                 Variant="Variant.Outlined"
+                 Format="@($"N{Definition?.Scale ?? 2}")"
+                 Min="0"
+                 FullWidth="true"
+                 Margin="Margin.Normal"
+                 Adornment="Adornment.End"
+                 AdornmentText="@Definition?.Unit?.Name" />
+
+<MudText Typo="Typo.caption" Color="Color.Tertiary">
+    类型：@Definition?.AttributeType.Name, 整数位数：@(Definition?.Precision - Definition?.Scale), 小数位数：@Definition?.Scale
+    @if (!string.IsNullOrEmpty(Definition?.Unit?.Abbreviation))
+    {
+        <span>，单位：@Definition.Unit?.Abbreviation</span>
+    }
+</MudText>
+
 @code {
     [Parameter] public AttributeDefinitionDto? Definition { get; set; }
-    [Parameter] public string? Value { get; set; }
-    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
-    
-    private void OnValueChanged(string? value)
+    [Parameter] public decimal? Value { get; set; }
+    [Parameter] public EventCallback<decimal?> ValueChanged { get; set; }
+
+    private async Task OnValueChanged(decimal? newValue)
     {
-        Value = value;
-        _ = ValueChanged.InvokeAsync(Value);
+        Value = newValue;
+        await ValueChanged.InvokeAsync(newValue);
     }
+
 }

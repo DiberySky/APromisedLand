@@ -3,6 +3,8 @@
 @inject DiberyTreeApiClient<TItem> ApiClient
 @inject ISnackbar Snackbar
 @inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@inject DialogService DialogService
+@inject BlazorService BlazorService
 
 <DialogSky Title="添加修改属性"
            CancelButtonVisible="true"
@@ -65,11 +67,11 @@
                             <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                            Color="Color.Warning"
                                            Size="Size.Small"
-                                           OnClick="() => DeleteAsync(context)"/>
+                                           OnClick="@(() => DeleteAsync(context))"/>
                             <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                            Color="Color.Primary"
                                            Size="Size.Small"
-                                           OnClick="() => OpenDialogAsync(context)"/>
+                                           OnClick="@(() => OpenDialogAsync(context))"/>
                         </MudTd>
                     }
                     else
@@ -89,10 +91,10 @@
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
-        <MudButton Variant="Variant.Text"
-                   Color="Color.Warning">
-            双击选择属性！
-        </MudButton>
+        @* <MudButton Variant="Variant.Text" *@
+        @*            Color="Color.Warning"> *@
+        @*     双击选择属性！ *@
+        @* </MudButton> *@
     </DialogLeftActions>
 </DialogSky>
 
@@ -140,30 +142,32 @@
     private async Task OpenDialogAsync(AttributeDefinitionDto? item)
     {
         var result = await TreeNodeDialogService.ShowAttributeDefinitionDialogAsync(item, _attributeTypes);
+        // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
+        if (result == true)
+        {
+            await LoadDataAsync();
+        }
     }
 
     private async Task DeleteAsync(AttributeDefinitionDto item)
     {
-        // var confirmed = await DialogService.ShowMessageBoxAsync(
-        //     "确认删除",
-        //     $"确定要删除属性定义 \"{item.Name}\" 吗？如果已被节点引用将无法删除。",
-        //     yesText: "删除",
-        //     cancelText: "取消");
-        //
-        // if (confirmed != true) return;
+        var confirmed = await BlazorService.DeleteBoxAsync(
+            $"确定要删除属性定义【{item.Name}】吗？如果已被节点引用将无法删除。");
+        
+        if (!confirmed) return;
 
         try
         {
-            // var success = await ApiClient.DeleteDefinitionAsync(item.Id);
-            // if (success)
-            // {
-            //     Snackbar.Add("删除成功", Severity.Success);
-            //     await LoadDataAsync();
-            // }
-            // else
-            // {
-            //     Snackbar.Add("删除失败，属性定义不存在", Severity.Warning);
-            // }
+            var success = await ApiClient.DeleteDefinitionAsync(item.Id);
+            if (success)
+            {
+                Snackbar.Add("删除成功", Severity.Success);
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add("删除失败，属性定义不存在", Severity.Warning);
+            }
         }
         catch (InvalidOperationException ex)
         {
