@@ -1,0 +1,21 @@
+<MudTextField T="string" @bind-Value="@Value"
+              Label="@Definition?.Name"
+              Variant="Variant.Outlined"
+              Lines="@(Definition?.Lines ?? 1)"
+              MaxLength="500"
+              FullWidth="true"
+              Margin="Margin.Normal"
+              TextChanged="OnValueChanged"
+              Required="true"
+              Immediate="true"/>
+@code {
+    [Parameter] public AttributeDefinitionDto? Definition { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    
+    private void OnValueChanged(string? value)
+    {
+        Value = value;
+        _ = ValueChanged.InvokeAsync(Value);
+    }
+}

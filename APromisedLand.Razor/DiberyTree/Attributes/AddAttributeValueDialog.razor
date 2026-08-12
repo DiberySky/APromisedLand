@@ -1,3 +1,4 @@
+@using APromisedLand.Razor.DiberyTree.Attributes.Values
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject IDialogService DialogService
@@ -13,50 +14,68 @@
     <DialogContent>
         <MudGrid Class="pa-4">
             <MudItem xs="12">
-                <AttributeTypeField TItem="TItem" AttributeDefinitionDto="@_attributeDefinition"
-                                  AttributeDefinitionChanged="@(e => _attributeDefinition = e)"/>
+                <AttributeTypeField TItem="TItem" AttributeDefinitionDto="@_definition"
+                                    AttributeDefinitionChanged="@(e => _definition = e)"/>
             </MudItem>
-            @* <MudItem xs="12"> *@
-            @*     <MudTextField @bind-Value="@_attributeDefinition?.Name" Label="@_attributeDefinition?.Name" *@
-            @*                   Variant="Variant.Outlined" ReadOnly="true" *@
-            @*                   InputType="@InputType.Text" Adornment="Adornment.End" *@
-            @*                   AdornmentIcon="@Icons.Material.Outlined.EditNote" *@
-            @*                   AdornmentColor="Color.Info" *@
-            @*                   OnAdornmentClick="@EditClick" *@
-            @*                   AdornmentAriaLabel=""/> *@
-            @* </MudItem> *@
-            @* <MudItem xs="10"> *@
-            @*     <MudSelect T="AttributeDefinitionDto" Label="选择属性定义" *@
-            @*                @bind-Value="_attributeDefinition" *@
-            @*                For="@(() => _attributeDefinition)" *@
-            @*                AnchorOrigin="Origin.BottomLeft" *@
-            @*                Variant="Variant.Outlined" *@
-            @*                Margin="Margin.Dense"> *@
-            @*         @foreach (var def in _definitions) *@
-            @*         { *@
-            @*             <MudSelectItem Value="@def">@def.Name</MudSelectItem> *@
-            @*         } *@
-            @*     </MudSelect> *@
-            @* </MudItem> *@
-            @* <MudItem xs="2"> *@
-            @*     <MudIconButton Icon="@Icons.Material.Outlined.EditNote" *@
-            @*                    Color="Color.Info"/> *@
-            @* </MudItem> *@
             <MudItem xs="12">
-                <MudTextField Label="属性值" @bind-Value="_value"
+                <MudTextField @bind-Value="@_definition?.Name" Label="属性名称"
                               Variant="Variant.Outlined"
-                              Margin="Margin.Dense"/>
-                @if (!string.IsNullOrEmpty(_attributeDefinition?.AttributeType?.Name))
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                        类型：@_attributeDefinition.AttributeType.Name
-                        @if (!string.IsNullOrEmpty(_attributeDefinition.Unit?.Abbreviation))
-                        {
-                            <span>，单位：@_attributeDefinition.Unit?.Abbreviation</span>
-                        }
-                    </MudText>
-                }
+                              InputType="@InputType.Text" />
             </MudItem>
+            @switch (_definition?.AttributeType.SystemType)
+            {
+                case AttributeTypeEnum.文本:
+                    <MudItem xs="12">
+                        <TextValue @bind-Value="@_textValue"
+                                   Definition="@_definition"
+                        />
+                    </MudItem>
+                    break;
+                case AttributeTypeEnum.整数:
+                    <MudItem xs="12">
+                        <IntegerValue @bind-Value="@_integerValue"
+                                      Definition="@_definition"
+                        />
+                    </MudItem>
+                    break;
+                case AttributeTypeEnum.小数:
+                    <MudItem xs="12">
+                        <DecimalValue @bind-Value="@_decimalValue"
+                                      Definition="@_definition"
+                        />
+                    </MudItem>
+                    break;
+                case AttributeTypeEnum.日期:
+                    break;
+                case AttributeTypeEnum.时间:
+                    break;
+                case AttributeTypeEnum.日期时间:
+                    break;
+                case AttributeTypeEnum.文件:
+                    break;
+                case AttributeTypeEnum.定位:
+                    break;
+                case null:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+            
+            @* <MudItem xs="12"> *@
+            @*     <MudTextField Label="属性值" @bind-Value="_textValue" *@
+            @*                   Variant="Variant.Outlined" *@
+            @*                   Margin="Margin.Dense"/> *@
+            @*     @if (!string.IsNullOrEmpty(_definition?.AttributeType?.Name)) *@
+            @*     { *@
+            @*         <MudText Typo="Typo.caption" Color="Color.Tertiary"> *@
+            @*             类型：@_definition.AttributeType.Name *@
+            @*             @if (!string.IsNullOrEmpty(_definition.Unit?.Abbreviation)) *@
+            @*             { *@
+            @*                 <span>，单位：@_definition.Unit?.Abbreviation</span> *@
+            @*             } *@
+            @*         </MudText> *@
+            @*     } *@
+            @* </MudItem> *@
         </MudGrid>
     </DialogContent>
 </DialogSky>
@@ -65,16 +84,18 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
     [Parameter] public required string NodeId { get; set; }
 
-    private List<AttributeDefinitionDto> _definitions = new();
-    private AttributeDefinitionDto? _attributeDefinition;
-    private string _value = "";
+    // private List<AttributeDefinitionDto> _definitions = new();
+    private AttributeDefinitionDto? _definition;
+    private string? _textValue;
+    private long? _integerValue;
+    private decimal? _decimalValue;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var defs = await ApiClient.GetAllDefinitionsAsync();
-            _definitions = defs.ToList();
+            // var defs = await ApiClient.GetAllDefinitionsAsync();
+            // _definitions = defs.ToList();
         }
         catch (Exception ex)
         {
@@ -84,13 +105,13 @@
 
     private async Task SubmitAsync()
     {
-        if (_attributeDefinition == null)
+        if (_definition == null)
         {
             Snackbar.Add("请选择属性定义", Severity.Warning);
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_value))
+        if (string.IsNullOrWhiteSpace(_textValue))
         {
             Snackbar.Add("请输入属性值", Severity.Warning);
             return;
@@ -100,10 +121,10 @@
         {
             // 注意：AddValueDto 的 AttributeDefinitionId 为 string，但后端期望 int，需统一
             var dto = new AddValueDto(
-                AttributeDefinitionId: _attributeDefinition.Id.ToString(),
-                Value: _value
+                AttributeDefinitionId: _definition.Id.ToString(),
+                Value: _textValue
             );
-            // await ApiClient.AddValueAsync(NodeId, dto);
+            await ApiClient.AddValueAsync(NodeId, dto);
             Snackbar.Add("属性添加成功", Severity.Success);
             MudDialog?.Close(DialogResult.Ok(true));
         }
@@ -129,8 +150,8 @@
 
     private void AttributeDefinitionChanged(AttributeDefinitionDto dto)
     {
-        _attributeDefinition = dto;
-        
+        _definition = dto;
+
         StateHasChanged();
     }
 
