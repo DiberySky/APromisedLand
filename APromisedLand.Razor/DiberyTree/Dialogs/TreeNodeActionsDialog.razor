@@ -26,7 +26,7 @@
     </ToolBarContent>
     <DialogContent>
         <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
-            <MudStack Spacing="4">
+            <MudStack Spacing="2">
 
                 <MudTextField T="string"
                               Value="NodeTemplate.Node.Value!.Text()"
@@ -41,15 +41,20 @@
                               ReadOnly="true"
                               Lines="3"/>
                 
-                <MudStack Row>
-                    <MudSpacer/>
-                    <MudSwitch T="bool"
-                               Value="NodeTemplate.Node.Value!.CanHaveChildren"
-                               Label="是否允许添加子节点"
-                               Color="Color.Success"
-                               ReadOnly="true"    />
-                </MudStack>
+                @* <MudStack Row> *@
+                @*     <MudSpacer/> *@
+                @*     <MudSwitch T="bool" *@
+                @*                Value="NodeTemplate.Node.Value!.CanHaveChildren" *@
+                @*                Label="是否允许添加子节点" *@
+                @*                Color="Color.Success" *@
+                @*                ReadOnly="true"    /> *@
+                @* </MudStack> *@
 
+                <BoolFieldSky Label="是否允许添加子节点" ReadOnly="true"
+                              @bind-Value="NodeTemplate.Node.Value!.CanHaveChildren" />
+
+                <NodeAttributesSky TItem="TItem" NodeId="@NodeTemplate.Node.Value?.Id" ReadOnly="true" />
+                
             </MudStack>
         </MudContainer>
     </DialogContent>

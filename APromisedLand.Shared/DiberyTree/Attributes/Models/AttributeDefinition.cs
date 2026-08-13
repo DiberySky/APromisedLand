@@ -1,3 +1,4 @@
+using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Models;
 
@@ -16,7 +17,7 @@ public class AttributeDefinition
     public int? Lines { get; set; }
 
     // 文本最大长度（字符数）
-    public int? MaxLength { get; set; }
+    public int MaxLength { get; set; } = 30;
 
     // 数字专用
     public int? Precision { get; set; }
@@ -26,6 +27,21 @@ public class AttributeDefinition
     public string? UnitId { get; set; }
     public UnitTree? Unit { get; set; }
 
+    public AttributeDefinitionDto ToDto()
+    {
+        return new AttributeDefinitionDto
+        {
+            Id = Id,
+            Name = Name,
+            // AttributeTypeId = AttributeTypeId,
+            AttributeType = AttributeType,  
+            MaxLength = MaxLength,
+            Precision = Precision,
+            Scale = Scale,
+            // UnitId = UnitId,
+            Unit = Unit,
+        };
+    }
     // ---------- 种子数据 ----------
     public static List<AttributeDefinition> SeedData()
     {

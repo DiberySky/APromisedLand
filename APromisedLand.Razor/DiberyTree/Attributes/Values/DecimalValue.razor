@@ -4,24 +4,43 @@
                  Label="@Definition?.Name"
                  Variant="Variant.Outlined"
                  Format="@($"N{Definition?.Scale ?? 2}")"
+                 HideSpinButtons="true"
                  Min="0"
                  FullWidth="true"
                  Margin="Margin.Normal"
                  Adornment="Adornment.End"
-                 AdornmentText="@Definition?.Unit?.Name" />
+                 AdornmentText="@Definition?.Unit?.Name"
+                 ReadOnly="@ReadOnly"/>
 
-<MudText Typo="Typo.caption" Color="Color.Tertiary">
-    类型：@Definition?.AttributeType.Name, 整数位数：@(Definition?.Precision - Definition?.Scale), 小数位数：@Definition?.Scale
-    @if (!string.IsNullOrEmpty(Definition?.Unit?.Abbreviation))
+<MudStack Row="true">
+    @if (_infoVisible)
     {
-        <span>，单位：@Definition.Unit?.Abbreviation</span>
+        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+            类型：@Definition?.AttributeType.Name, 整数位数：@(Definition?.Precision - Definition?.Scale),
+            小数位数：@Definition?.Scale
+            @if (!string.IsNullOrEmpty(Definition?.Unit?.Abbreviation))
+            {
+                <span>，单位：@Definition.Unit?.Abbreviation</span>
+            }
+        </MudText>
     }
-</MudText>
+
+    <MudSpacer/>
+
+    <MudIconButton size="Size.Small" Color="Color.Info" Class="ma-0 pa-0"
+                   Icon="@(_infoVisible
+                             ? Icons.Material.Outlined.KeyboardDoubleArrowRight
+                             : Icons.Material.Outlined.KeyboardDoubleArrowLeft)"
+                   OnClick="@(() => _infoVisible = !_infoVisible)"/>
+</MudStack>
 
 @code {
     [Parameter] public AttributeDefinitionDto? Definition { get; set; }
     [Parameter] public decimal? Value { get; set; }
     [Parameter] public EventCallback<decimal?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    bool _infoVisible;
 
     private async Task OnValueChanged(decimal? newValue)
     {

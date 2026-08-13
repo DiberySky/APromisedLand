@@ -35,7 +35,7 @@ namespace APromisedLand.Api.Data.Migrations
                     b.Property<int?>("Lines")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("MaxLength")
+                    b.Property<int>("MaxLength")
                         .HasColumnType("integer");
 
                     b.Property<string>("Name")
@@ -89,6 +89,7 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b",
                             AttributeTypeId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            MaxLength = 30,
                             Name = "数量",
                             UnitId = "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c"
                         },
@@ -96,12 +97,14 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c",
                             AttributeTypeId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            MaxLength = 30,
                             Name = "等级"
                         },
                         new
                         {
                             Id = "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            MaxLength = 30,
                             Name = "价格",
                             Precision = 18,
                             Scale = 2
@@ -110,6 +113,7 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            MaxLength = 30,
                             Name = "重量",
                             Precision = 10,
                             Scale = 3,
@@ -119,6 +123,7 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            MaxLength = 30,
                             Name = "长度",
                             Precision = 8,
                             Scale = 2,
@@ -128,60 +133,70 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a",
                             AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            MaxLength = 30,
                             Name = "生产日期"
                         },
                         new
                         {
                             Id = "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b",
                             AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            MaxLength = 30,
                             Name = "试验日期"
                         },
                         new
                         {
                             Id = "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
                             AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            MaxLength = 30,
                             Name = "出厂日期"
                         },
                         new
                         {
                             Id = "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
                             AttributeTypeId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            MaxLength = 30,
                             Name = "开始时间"
                         },
                         new
                         {
                             Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
                             AttributeTypeId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            MaxLength = 30,
                             Name = "结束时间"
                         },
                         new
                         {
                             Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
                             AttributeTypeId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            MaxLength = 30,
                             Name = "创建时间"
                         },
                         new
                         {
                             Id = "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a",
                             AttributeTypeId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            MaxLength = 30,
                             Name = "更新时间"
                         },
                         new
                         {
                             Id = "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b",
                             AttributeTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            MaxLength = 30,
                             Name = "附件"
                         },
                         new
                         {
                             Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
                             AttributeTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            MaxLength = 30,
                             Name = "图片"
                         },
                         new
                         {
                             Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d",
                             AttributeTypeId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+                            MaxLength = 30,
                             Name = "位置坐标"
                         });
                 });

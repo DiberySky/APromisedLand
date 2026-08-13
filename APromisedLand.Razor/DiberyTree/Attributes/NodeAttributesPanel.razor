@@ -1,3 +1,5 @@
+@using System.Text.Json
+@using APromisedLand.Shared.Helper
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject DiberyTreeApiClient<TItem> ApiClient
@@ -10,7 +12,8 @@
             <MudText Typo="Typo.h6">属性列表</MudText>
         </CardHeaderContent>
         <CardHeaderActions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                       StartIcon="@Icons.Material.Filled.Add"
                        OnClick="@OpenAddDialog">
                 添加属性
             </MudButton>
@@ -27,25 +30,56 @@
         }
         else
         {
-            <MudTable Items="@_attributes" Hover="true" Striped="true">
-                <HeaderContent>
-                    <MudTh>属性名称</MudTh>
-                    <MudTh>类型</MudTh>
-                    <MudTh>单位</MudTh>
-                    <MudTh>值</MudTh>
-                    <MudTh>操作</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd>@context.DefinitionName</MudTd>
-                    <MudTd>@context.Type</MudTd>
-                    <MudTd>@context.Unit</MudTd>
-                    <MudTd>@context.Value</MudTd>
-                    <MudTd>
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                       OnClick="@(() => DeleteValue(context))" />
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
+            <MudStack Spacing="2">
+                @foreach (var attr in _attributes)
+                {
+                    var typeEnum = attr.GetTypeEnum();
+                    var unit = attr.Definition?.Unit?.Abbreviation ?? attr.Definition?.Unit?.Name;
+                    var lines = attr.Definition?.Lines ?? 1;
+                    var maxLength = attr.Definition?.MaxLength;
+                    var label = attr.Definition?.Name ?? "未命名属性";
+
+                    <MudGrid Class="align-center">
+                        <MudItem xs="12" sm="9">
+                            @if (IsNumericType(typeEnum))
+                            {
+                                <MudNumericField T="decimal?"
+                                                 Value="@(attr.Value.GetValue<decimal?>())"
+                                                 ValueChanged="@((decimal? v) => { attr.Value = JsonSerializer.SerializeToElement(v); StateHasChanged(); })"
+                                                 Label="@label"
+                                                 Variant="Variant.Outlined"
+                                                 Format="@($"N{GetScale(typeEnum)}")"
+                                                 Min="@GetMinValue(typeEnum)"
+                                                 FullWidth="true"
+                                                 Margin="Margin.Normal"
+                                                 Adornment="Adornment.End"
+                                                 AdornmentText="@unit"
+                                                 OnBlur="@(() => SaveValue(attr))" />
+                            }
+                            else
+                            {
+                                <MudTextField T="string"
+                                              Value="@(attr.Value.GetValue<string>())"
+                                              ValueChanged="@((string v) => { attr.Value = JsonSerializer.SerializeToElement(v); StateHasChanged(); })"
+                                              Label="@label"
+                                              Variant="Variant.Outlined"
+                                              Lines="@lines"
+                                              MaxLength="@(maxLength ?? 30)"
+                                              FullWidth="true"
+                                              Margin="Margin.Normal"
+                                              Immediate="true"
+                                              OnBlur="@(() => SaveValue(attr))" />
+                            }
+                        </MudItem>
+                        <MudItem xs="12" sm="3" Class="d-flex justify-end">
+                            <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Success"
+                                           OnClick="@(() => SaveValue(attr))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                           OnClick="@(() => DeleteValue(attr))" />
+                        </MudItem>
+                    </MudGrid>
+                }
+            </MudStack>
         }
     </MudCardContent>
 </MudCard>
@@ -68,7 +102,7 @@
         try
         {
             var result = await ApiClient.GetAllValuesAsync(NodeId);
-            _attributes = result?.Attributes ?? new(); 
+            _attributes = result?.Attributes ?? new();
         }
         catch (Exception ex)
         {
@@ -88,26 +122,25 @@
         };
         var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("添加属性", dialogParams);
         var result = await dialog.Result;
-        // if (!result?.Canceled)
-        // {
-        //     await LoadAttributes(); // 刷新列表
-        // }
+        if (result?.Canceled == false)
+        {
+            await LoadAttributes();
+        }
     }
 
     private async Task DeleteValue(AttributeDto attr)
     {
         bool? confirm = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定要删除属性“{attr.DefinitionName}”吗？",
+            $"确定要删除属性“{attr.Definition?.Name ?? "未命名"}”吗？",
             "删除", "取消");
         if (confirm == true)
         {
             try
             {
-                // 注意：需要 AttributeDto 包含 Id 字段，请自行添加
-                // 假设已有 Id 属性，调用删除
-                // await ApiClient.DeleteValueAsync(NodeId, attr.Id);
-                Snackbar.Add("删除功能需要 AttributeDto 包含 Id 字段", Severity.Warning);
+                await ApiClient.DeleteValueAsync(NodeId, attr.Id);
+                await LoadAttributes();
+                Snackbar.Add($"属性“{attr.Definition?.Name}”已删除", Severity.Success);
             }
             catch (Exception ex)
             {
@@ -115,4 +148,26 @@
             }
         }
     }
+
+    private async Task SaveValue(AttributeDto attr)
+    {
+        try
+        {
+            await ApiClient.UpdateValueAsync(NodeId, attr.Id, attr.Value);
+            Snackbar.Add($"属性“{attr.Definition?.Name}”已更新", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"更新失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ---------- 辅助方法 ----------
+    private bool IsNumericType(AttributeTypeEnum type)
+        => type == AttributeTypeEnum.整数 || type == AttributeTypeEnum.小数;
+
+    private int GetScale(AttributeTypeEnum type)
+        => type == AttributeTypeEnum.小数 ? 2 : 0;
+
+    private decimal? GetMinValue(AttributeTypeEnum type) => 0;
 }

@@ -20,6 +20,13 @@
         <MudIconButton Icon="@Icons.Material.Outlined.LocationOn"
                        Color="Color.Primary"
                        OnClick="@(e => LocationClick(Item))"/>
+
+        <MudSpacer/>
+        
+        @if(ToolBarContent !=null)
+        {
+            @ToolBarContent
+        }
     </ToolBarContent>
     <DialogContent>
 

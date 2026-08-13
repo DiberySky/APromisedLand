@@ -2,25 +2,44 @@
               Label="@Definition?.Name"
               Variant="Variant.Outlined"
               Lines="@(Definition?.Lines ?? 1)"
-              MaxLength="@(Definition?.MaxLength ?? 0)" 
+              MaxLength="@(Definition?.MaxLength ?? 0)"
               FullWidth="true"
               Margin="Margin.Normal"
               TextChanged="OnValueChanged"
               Required="true"
-              Immediate="true"/>
+              Immediate="true"
+              ReadOnly="@ReadOnly"/>
 
-<MudText Typo="Typo.caption" Color="Color.Tertiary">
-    类型：@Definition?.AttributeType.Name, 最大长度：@(Definition?.MaxLength is null or 0 ? "无限制" : Definition?.MaxLength.ToString())
-</MudText>
+<MudStack Row="true">
+    @if (_infoVisible)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+            类型：@Definition?.AttributeType.Name,
+            最大长度：@(Definition?.MaxLength is null or 0 ? "无限制" : Definition?.MaxLength.ToString())
+        </MudText>
+    }
+    
+    <MudSpacer/>
+
+    <MudIconButton size="Size.Small" Color="Color.Info" Class="ma-0 pa-0"
+                   Icon="@(_infoVisible
+                             ? Icons.Material.Outlined.KeyboardDoubleArrowRight
+                             : Icons.Material.Outlined.KeyboardDoubleArrowLeft)"
+                   OnClick="@(() => _infoVisible = !_infoVisible)"/>
+</MudStack>
 
 @code {
     [Parameter] public AttributeDefinitionDto? Definition { get; set; }
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
-    
+    [Parameter] public bool ReadOnly { get; set; }
+
+    bool _infoVisible;
+
     private void OnValueChanged(string? value)
     {
         Value = value;
         _ = ValueChanged.InvokeAsync(Value);
     }
+
 }

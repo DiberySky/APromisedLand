@@ -1,4 +1,8 @@
-﻿namespace APromisedLand.Shared.Helper;
+﻿using System.Text.Json;
+using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using APromisedLand.Shared.DiberyTree.Attributes.Enums;
+
+namespace APromisedLand.Shared.Helper;
 
 public static partial class SharedHelper
 {
@@ -7,5 +11,26 @@ public static partial class SharedHelper
         if (string.IsNullOrEmpty(text)) return string.Empty;
 
         return text.Length < length ? text : $"{text[..length]}...";
+    }
+    
+    public static AttributeTypeEnum GetTypeEnum(this AttributeDto dto)
+    {
+        var systemType = dto.Definition?.AttributeType?.SystemType ?? AttributeTypeEnum.文本;
+        // return Enum.TryParse<AttributeTypeEnum>(systemType, true, out var result)
+        //     ? result
+        //     : AttributeTypeEnum.文本;
+        return systemType;
+    }
+
+    public static T? GetValue<T>(this JsonElement element)
+    {
+        try
+        {
+            return element.Deserialize<T>();
+        }
+        catch
+        {
+            return default;
+        }
     }
 }

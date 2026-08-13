@@ -206,7 +206,7 @@ namespace APromisedLand.Api.Data.Migrations
                     Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     AttributeTypeId = table.Column<string>(type: "character varying(36)", nullable: false),
                     Lines = table.Column<int>(type: "integer", nullable: true),
-                    MaxLength = table.Column<int>(type: "integer", nullable: true),
+                    MaxLength = table.Column<int>(type: "integer", nullable: false),
                     Precision = table.Column<int>(type: "integer", nullable: true),
                     Scale = table.Column<int>(type: "integer", nullable: true),
                     UnitId = table.Column<string>(type: "text", nullable: true)
@@ -315,21 +315,21 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: new[] { "Id", "AttributeTypeId", "Lines", "MaxLength", "Name", "Precision", "Scale", "UnitId" },
                 values: new object[,]
                 {
-                    { "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, null, "开始时间", null, null, null },
-                    { "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, null, "价格", 18, 2, null },
-                    { "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", null, null, "位置坐标", null, null, null },
+                    { "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, 30, "开始时间", null, null, null },
+                    { "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, 30, "价格", 18, 2, null },
+                    { "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", null, 30, "位置坐标", null, null, null },
                     { "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", 1, 50, "名称", null, null, null },
-                    { "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, null, "结束时间", null, null, null },
+                    { "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, 30, "结束时间", null, null, null },
                     { "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", 5, 500, "描述", null, null, null },
-                    { "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, null, "创建时间", null, null, null },
+                    { "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, 30, "创建时间", null, null, null },
                     { "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", 10, 1000, "备注", null, null, null },
-                    { "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, null, "更新时间", null, null, null },
-                    { "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, null, "生产日期", null, null, null },
-                    { "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, null, "试验日期", null, null, null },
-                    { "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, null, "附件", null, null, null },
-                    { "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, null, "出厂日期", null, null, null },
-                    { "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, null, "等级", null, null, null },
-                    { "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, null, "图片", null, null, null }
+                    { "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, 30, "更新时间", null, null, null },
+                    { "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, 30, "生产日期", null, null, null },
+                    { "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, 30, "试验日期", null, null, null },
+                    { "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, 30, "附件", null, null, null },
+                    { "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, 30, "出厂日期", null, null, null },
+                    { "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, 30, "等级", null, null, null },
+                    { "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, 30, "图片", null, null, null }
                 });
 
             migrationBuilder.InsertData(
@@ -419,9 +419,9 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: new[] { "Id", "AttributeTypeId", "Lines", "MaxLength", "Name", "Precision", "Scale", "UnitId" },
                 values: new object[,]
                 {
-                    { "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, null, "重量", 10, 3, "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e" },
-                    { "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, null, "长度", 8, 2, "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e" },
-                    { "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, null, "数量", null, null, "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c" }
+                    { "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, 30, "重量", 10, 3, "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e" },
+                    { "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, 30, "长度", 8, 2, "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e" },
+                    { "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, 30, "数量", null, null, "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c" }
                 });
 
             migrationBuilder.CreateIndex(

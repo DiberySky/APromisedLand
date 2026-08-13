@@ -1,4 +1,3 @@
-
 using APromisedLand.Api.Projects.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
@@ -392,7 +391,8 @@ public abstract class TreeControllerBase<T>(
         }
     }
 
-    [HttpGet("{nodeId}/attributes/values/{id:int}")]
+    // 修改：移除 :int 约束，因为 Id 已改为 string
+    [HttpGet("{nodeId}/attributes/values/{id}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
     public virtual async Task<IActionResult> GetSingleValue(string nodeId, string id)

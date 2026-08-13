@@ -6,7 +6,7 @@
 
 @{
     RenderFragment<CategoryTree> actionTemplate = (context) =>
-        @<div class="node-detail">
+        @<MudStack Spacing="0">
             <MudTextField T="string"
                           Value="@context.Text()"
                           Label="名称"
@@ -20,44 +20,48 @@
                           ReadOnly="true"
                           Lines="3"/>
 
-            <MudChip T="string"
-                     Color="@((context.CanHaveChildren ? Color.Success : Color.Error))"
-                     Size="Size.Small">
-                @(context.CanHaveChildren ? "已启用" : "已禁用")
-            </MudChip>
-        </div>;
+            @* <MudChip T="string" *@
+            @*          Color="@((context.CanHaveChildren ? Color.Success : Color.Error))" *@
+            @*          Size="Size.Small"> *@
+            @*     @(context.CanHaveChildren ? "已启用" : "已禁用") *@
+            @* </MudChip> *@
+
+            <BoolFieldSky Label="是否允许添加子节点"
+                          @bind-Value="context.CanHaveChildren"/>
+        </MudStack>;
 }
 
 @{
     RenderFragment<CategoryTree> editTemplate = (context) =>
-        @<div class="node-detail">
-            <MudStack Spacing="3">
-                <MudTextField T="string"
-                              @bind-Value="context.Name"
-                              Label="名称"
-                              Variant="Variant.Outlined"
-                              Required="true"
-                              RequiredError="名称不能为空"
-                              MaxLength="100"
-                              Counter="100"
-                              Immediate="true"/>
+        @<MudStack Spacing="0">
+            <MudTextField T="string"
+                          @bind-Value="context.Name"
+                          Label="名称"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredError="名称不能为空"
+                          MaxLength="100"
+                          Counter="100"
+                          Immediate="true"/>
 
-                <MudTextField T="string"
-                              @bind-Value="context.Description"
-                              Label="描述"
-                              Variant="Variant.Outlined"
-                              Lines="3"
-                              MaxLength="500"
-                              Counter="500"
-                              Immediate="true"/>
+            <MudTextField T="string"
+                          @bind-Value="context.Description"
+                          Label="描述"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          MaxLength="500"
+                          Counter="500"
+                          Immediate="true"/>
 
-                <MudSwitch T="bool"
-                           @bind-Value="context.CanHaveChildren"
-                           Label="启用状态"
-                           Color="Color.Primary"/>
+            @* <MudSwitch T="bool" *@
+            @*            @bind-Value="context.CanHaveChildren" *@
+            @*            Label="启用状态" *@
+            @*            Color="Color.Primary"/> *@
 
-            </MudStack>
-        </div>;
+            <BoolFieldSky Label="是否允许添加子节点"
+                          @bind-Value="context.CanHaveChildren"/>
+
+        </MudStack>;
 }
 
 <TreeDialogPageSky TItem="CategoryTree"
@@ -66,13 +70,14 @@
                    RootId="@ClickNode?.Value?.Id"
                    ActionTemplate="@actionTemplate"
                    EditTemplate="@editTemplate"
-                   ShowDialogFunc="@ShowDialogAsync" />
+                   ShowDialogFunc="@ShowDialogAsync"/>
 
 @code {
     [Parameter] public ITreeItemData<CategoryTree>? ClickNode { get; set; }
-    
+
     private async Task ShowDialogAsync(ITreeItemData<CategoryTree> node)
     {
         await DialogService.ShowCategoryTreeDialogAsync(node);
     }
+
 }

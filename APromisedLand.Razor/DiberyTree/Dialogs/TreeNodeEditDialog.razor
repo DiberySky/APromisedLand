@@ -1,7 +1,10 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
+@using APromisedLand.Razor.Helper.Blazor
 @implements IDisposable
 
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 @inject TreeNodeDialogService<TItem> TreeNodeDialogService
 
 <DialogTreeSky TItem="@TItem"
@@ -10,6 +13,15 @@
                SubmitButtonVisible="true"
                OnSubmitClick="@SubmitAsync"
                OnCanceledClick="@Close">
+    <ToolBarContent>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Inherit"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@OpenAddDialog">
+            添加属性
+        </MudButton>
+    </ToolBarContent>
     <DialogContent>
         <MudContainer Class="py-8">
             <MudForm @ref="_form" Model="@_node">
@@ -52,6 +64,9 @@
                 {
                     @NodeTemplate.EditTemplate(_node)
                 }
+
+                <NodeAttributesSky TItem="@TItem" NodeId="@_node.Id"/>
+
             </MudForm>
         </MudContainer>
     </DialogContent>
@@ -99,7 +114,7 @@
     {
         var parent = await TreeNodeDialogService.ShowParentSelectDialogAsync();
     }
-    
+
     private async Task SubmitAsync()
     {
         await _form.ValidateAsync();
@@ -112,6 +127,20 @@
     private void Close()
     {
         MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialogParams = new DialogParameters
+        {
+            { nameof(AddAttributeValueDialog<TItem>.NodeId), _node.Id }
+        };
+        var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("添加属性", dialogParams);
+        var result = await dialog.Result;
+        // if (result?.Canceled == false)
+        // {
+        //     await LoadAttributes();
+        // }
     }
 
     public void Dispose()

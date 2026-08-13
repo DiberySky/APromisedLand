@@ -1,0 +1,39 @@
+<MudField Label="@Label" 
+          Variant="Variant.Outlined" InnerPadding="false">
+    <MudRadioGroup T="bool" Value="@Value"
+                   Class="d-flex align-end pr-4"
+                   ReadOnly="@ReadOnly"
+                   ValueChanged="@OnValueChanged">
+        <MudRadio Value="true" Label="@TrueLabel" Color="@_trueColor"/>
+        <MudRadio Value="false" Label="@FalseLabel" Color="@_falseColor"/>
+    </MudRadioGroup>
+</MudField>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public bool Value { get; set; } = true;
+    [Parameter] public EventCallback<bool> ValueChanged { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    [Parameter] public string TrueLabel { get; set; } = "允许";
+    [Parameter] public string FalseLabel { get; set; } = "禁止";
+
+    Color _trueColor = Color.Default;
+    Color _falseColor = Color.Default;
+
+    protected override void OnInitialized()
+    {
+        _trueColor = Value ? Color.Success : Color.Default;
+        _falseColor = Value ? Color.Default : Color.Error;
+    }
+
+    private void OnValueChanged(bool value)
+    {
+        _trueColor = value ? Color.Success : Color.Default;
+        _falseColor = value ? Color.Default : Color.Error;
+        
+        Value = value;
+        _ = ValueChanged.InvokeAsync(value);
+    }
+}

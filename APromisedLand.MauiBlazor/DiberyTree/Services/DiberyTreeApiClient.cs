@@ -1,6 +1,7 @@
 // DiberyTreeApiClient.cs
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
@@ -55,21 +56,21 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     /// </summary>
     private static async Task EnsureSuccessWithApiResponseAsync(HttpResponseMessage response)
     {
-        // if (response.IsSuccessStatusCode)
-        //     return;
-        //
-        // // 尝试读取标准 ApiResponse 中的错误信息
-        // try
-        // {
-        //     var errorResponse = await response.Content.ReadFromJsonAsync<ApiResponse<object>>();
-        //     if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Message))
-        //         throw new HttpRequestException($"请求失败: {errorResponse.Message}", null, response.StatusCode);
-        // }
-        // catch
-        // {
-        //     // 若无法解析，则回退到默认 EnsureSuccessStatusCode
-        //     response.EnsureSuccessStatusCode();
-        // }
+        if (response.IsSuccessStatusCode)
+            return;
+
+        // 尝试读取标准 ApiResponse 中的错误信息
+        try
+        {
+            var errorResponse = await response.Content.ReadFromJsonAsync<ApiResponse<object>>();
+            if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Message))
+                throw new HttpRequestException($"请求失败: {errorResponse.Message}", null, response.StatusCode);
+        }
+        catch
+        {
+            // 若无法解析，则回退到默认 EnsureSuccessStatusCode
+            response.EnsureSuccessStatusCode();
+        }
     }
 
     // ==================== 树节点操作 ====================
@@ -235,10 +236,10 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     /// 根据 ID 获取属性定义（不存在时返回 null）
     /// </summary>
     public async Task<AttributeDefinitionDto?> GetDefinitionByIdAsync(
-        int id,
+        string id,  // 修改为 string
         CancellationToken cancellationToken = default)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, $"{_basePath}/attributes/definitions/{id}");
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{_basePath}/attributes/definitions/{Uri.EscapeDataString(id)}");
         return await SendAndGetDataOrNullAsync<AttributeDefinitionDto>(request, cancellationToken);
     }
 
@@ -264,7 +265,7 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
         AttributeDefinitionUpdateDto dto,
         CancellationToken cancellationToken = default)
     {
-        var request = new HttpRequestMessage(HttpMethod.Put, $"{_basePath}/attributes/definitions/{id}")
+        var request = new HttpRequestMessage(HttpMethod.Put, $"{_basePath}/attributes/definitions/{Uri.EscapeDataString(id)}")
         {
             Content = JsonContent.Create(dto)
         };
@@ -278,9 +279,7 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
         string id,
         CancellationToken cancellationToken = default)
     {
-        var request = new HttpRequestMessage(HttpMethod.Delete, $"{_basePath}/attributes/definitions/{id}");
-        // 注意：控制器可能返回 404，但返回体是 ApiResponse，我们使用 SendAndGetDataAsync 会抛异常；
-        // 但此处我们期望如果不存在则返回 false，所以需特殊处理。
+        var request = new HttpRequestMessage(HttpMethod.Delete, $"{_basePath}/attributes/definitions/{Uri.EscapeDataString(id)}");
         var response = await httpClient.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return false;
@@ -313,11 +312,11 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     /// </summary>
     public async Task<AttributeDto?> GetSingleValueAsync(
         string nodeId,
-        int valueId,
+        string valueId,  // 修改为 string
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get,
-            $"{_basePath}/{Uri.EscapeDataString(nodeId)}/attributes/values/{valueId}");
+            $"{_basePath}/{Uri.EscapeDataString(nodeId)}/attributes/values/{Uri.EscapeDataString(valueId)}");
         return await SendAndGetDataOrNullAsync<AttributeDto>(request, cancellationToken);
     }
 
@@ -334,15 +333,34 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     }
 
     /// <summary>
+    /// 更新指定节点的某个属性值
+    /// </summary>
+    public async Task UpdateValueAsync(
+        string nodeId,
+        string valueId,
+        JsonElement value,
+        CancellationToken cancellationToken = default)
+    {
+        var dto = new { Value = value };
+        var request = new HttpRequestMessage(HttpMethod.Put,
+            $"{_basePath}/{Uri.EscapeDataString(nodeId)}/attributes/values/{Uri.EscapeDataString(valueId)}")
+        {
+            Content = JsonContent.Create(dto)
+        };
+        var response = await httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccessWithApiResponseAsync(response);
+    }
+
+    /// <summary>
     /// 删除指定节点的某个属性值（成功返回 true，不存在返回 false）
     /// </summary>
     public async Task<bool> DeleteValueAsync(
         string nodeId,
-        int valueId,
+        string valueId,  // 修改为 string
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Delete,
-            $"{_basePath}/{Uri.EscapeDataString(nodeId)}/attributes/values/{valueId}");
+            $"{_basePath}/{Uri.EscapeDataString(nodeId)}/attributes/values/{Uri.EscapeDataString(valueId)}");
         var response = await httpClient.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return false;
