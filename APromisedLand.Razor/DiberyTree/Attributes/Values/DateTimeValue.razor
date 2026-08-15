@@ -1,0 +1,96 @@
+@if (ReadOnly)
+{
+    <MudDatePicker Date="@_date"
+                   DateChanged="@(OnDateChanged)"
+                   Label="@Definition?.Name"
+                   DateFormat="yyyy-MM-dd HH:mm"
+                   Variant="Variant.Outlined"
+                   ReadOnly="@ReadOnly"/>
+}
+else
+{
+    <MudStack Row="true">
+        <MudDatePicker Date="@_date"
+                       DateChanged="@(OnDateChanged)"
+                       Label="@Definition?.Name"
+                       DateFormat="yyyy-MM-dd"
+                       Variant="Variant.Outlined"
+                       ReadOnly="@ReadOnly"/>
+
+        <MudTimePicker @bind-Time="_selectedTime"
+                       Label="选择时间"
+                       Variant="Variant.Outlined"
+                       TimeFormat="HH:mm"
+                       ReadOnly="@ReadOnly"
+                       TextChanged="@(OnTimeTextChanged)"/>
+    </MudStack>
+}
+
+@* TimeChanged="@(OnTimeChanged)" *@
+
+@code {
+    [Parameter] public AttributeDefinitionDto? Definition { get; set; }
+    [Parameter] public DateTimeOffset? Value { get; set; }
+    [Parameter] public EventCallback<DateTimeOffset?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    DateTime? _date;
+    TimeSpan? _selectedTime;
+
+    protected override void OnInitialized()
+    {
+        _date = Value?.ToLocalTime().DateTime;
+        _selectedTime = Value?.ToLocalTime().TimeOfDay;
+        
+        StateHasChanged();
+    }
+    
+    private DateTimeOffset? Combine(DateTime? date, TimeSpan? time)
+    {
+        if (date.HasValue && time.HasValue)
+        {
+            // 1. 取出日期的 Date 部分（忽略时间）
+            var datePart = date.Value.Date;
+            // 2. 加上时间部分
+            var combinedDateTime = datePart + time.Value;
+            // 3. 构造 DateTimeOffset，偏移量为 0（UTC）
+            return new DateTimeOffset(combinedDateTime, TimeSpan.Zero);
+        }
+        else if (date.HasValue && !time.HasValue)
+        {
+            // 只有日期，时间设为 00:00:00
+            return new DateTimeOffset(date.Value.Date, TimeSpan.Zero);
+        }
+        else
+        {
+            return null;
+        }
+    }
+    
+    private void OnDateChanged(DateTime? value)
+    {
+        _date = value;
+        
+        Value = Combine(value, _selectedTime);
+        
+        _ = ValueChanged.InvokeAsync(Value);
+    }
+    
+    private void OnTimeTextChanged(string value)
+    {
+        _selectedTime = TimeSpan.Parse(value);
+        
+        Value = Combine(_date, _selectedTime);
+        
+        _ = ValueChanged.InvokeAsync(Value);
+    }
+    
+    private void OnTimeChanged(TimeSpan? value)
+    {
+        _selectedTime = value;
+        
+        Value = Combine(_date, value);
+        
+        _ = ValueChanged.InvokeAsync(Value);
+    }
+}

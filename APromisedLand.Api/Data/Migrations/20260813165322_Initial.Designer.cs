@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(DiberyDbContext))]
-    [Migration("20260813030040_Initial")]
+    [Migration("20260813165322_Initial")]
     partial class Initial
     {
         /// <inheritdoc />

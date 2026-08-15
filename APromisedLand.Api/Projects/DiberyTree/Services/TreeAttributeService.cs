@@ -44,7 +44,8 @@ public class TreeAttributeService : ITreeAttributeService
         return await query.ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<AttributeType>> GetAttributeTypesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AttributeType>> GetAttributeTypesAsync(
+        CancellationToken cancellationToken = default)
         => await _dbContext.AttributeTypes.ToListAsync(cancellationToken);
 
     public async Task<AttributeDefinitionDto?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
@@ -68,12 +69,14 @@ public class TreeAttributeService : ITreeAttributeService
         return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<AttributeDefinitionDto> CreateAsync(AttributeDefinitionCreateDto dto, CancellationToken cancellationToken = default)
+    public async Task<AttributeDefinitionDto> CreateAsync(AttributeDefinitionCreateDto dto,
+        CancellationToken cancellationToken = default)
     {
         // 验证类型存在
         if (dto.AttributeType == null || string.IsNullOrEmpty(dto.AttributeType.Id))
             throw new ArgumentException("AttributeType is required.");
-        var attrTypeExists = await _dbContext.AttributeTypes.AnyAsync(t => t.Id == dto.AttributeType.Id, cancellationToken);
+        var attrTypeExists =
+            await _dbContext.AttributeTypes.AnyAsync(t => t.Id == dto.AttributeType.Id, cancellationToken);
         if (!attrTypeExists)
             throw new ArgumentException($"AttributeType with id {dto.AttributeType.Id} does not exist.");
 
@@ -103,7 +106,8 @@ public class TreeAttributeService : ITreeAttributeService
                ?? throw new Exception("Failed to retrieve created entity.");
     }
 
-    public async Task<AttributeDefinitionDto> UpdateAsync(string id, AttributeDefinitionUpdateDto dto, CancellationToken cancellationToken = default)
+    public async Task<AttributeDefinitionDto> UpdateAsync(string id, AttributeDefinitionUpdateDto dto,
+        CancellationToken cancellationToken = default)
     {
         var entity = await _dbContext.AttributeDefinitions.FindAsync(new object[] { id }, cancellationToken);
         if (entity == null) throw new KeyNotFoundException($"AttributeDefinition with id {id} not found.");
@@ -123,14 +127,15 @@ public class TreeAttributeService : ITreeAttributeService
         var entity = await _dbContext.AttributeDefinitions.FindAsync(new object[] { id }, cancellationToken);
         if (entity == null) return false;
 
-        bool hasReferences = await _dbContext.TextAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
-                             || await _dbContext.IntegerAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
-                             || await _dbContext.DecimalAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
-                             || await _dbContext.DateAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
-                             || await _dbContext.TimeAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
-                             || await _dbContext.DateTimeAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
-                             || await _dbContext.FileAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
-                             || await _dbContext.LocationAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken);
+        bool hasReferences =
+            await _dbContext.TextAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
+            || await _dbContext.IntegerAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
+            || await _dbContext.DecimalAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
+            || await _dbContext.DateAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
+            || await _dbContext.TimeAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
+            || await _dbContext.DateTimeAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
+            || await _dbContext.FileAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
+            || await _dbContext.LocationAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken);
 
         if (hasReferences)
             throw new InvalidOperationException("无法删除定义，因为它正被一个或多个节点属性值使用。");
@@ -155,27 +160,7 @@ public class TreeAttributeService : ITreeAttributeService
         var definition = defWithType.Definition;
         definition.AttributeType = defWithType.AttributeType;
 
-        // 将 JsonElement 转换为原始值字符串或对象
-        // JsonElement rawValue = dto.Value;
-        // var systemType = defWithType.AttributeType.SystemType;
-        // if (dto.Value.ValueKind != JsonValueKind.Null)
-        // {
-        //     rawValue = systemType switch
-        //     {
-        //         AttributeTypeEnum.文本 => dto.Value.GetString(),
-        //         AttributeTypeEnum.整数 => dto.Value.GetInt64(),
-        //         AttributeTypeEnum.小数 => dto.Value.GetDecimal(),
-        //         AttributeTypeEnum.日期 => dto.Value.GetDateTime(),
-        //         AttributeTypeEnum.时间 => dto.Value.GetDateTime(),
-        //         AttributeTypeEnum.日期时间 => dto.Value.GetDateTime(),
-        //         AttributeTypeEnum.文件 => dto.Value.GetString(),
-        //         AttributeTypeEnum.定位 => dto.Value.GetString(), // 或解析为对象
-        //         _ => dto.Value.GetString()
-        //     };
-        // }
-        //
-        // // 将原始值转为字符串传递给验证器（验证器仍使用字符串）
-        // var valueString = rawValue?.ToString() ?? string.Empty;
+        // 直接传递 JsonElement 给验证器
         var validation = ValueValidator.ValidateAndBuild(definition, dto.Value, nodeId);
         if (!validation.IsValid)
             throw new ArgumentException(validation.ErrorMessage);
@@ -183,6 +168,34 @@ public class TreeAttributeService : ITreeAttributeService
         var entity = validation.ValueEntity!;
         entity.Id = Guid.NewGuid().ToString();
 
+        // 🔧 处理 DateTimeAttributeValue 的 UTC 转换
+        if (entity is DateTimeAttributeValue dt)
+        {
+            var original = dt.Value;
+            // 强制转换为 UTC（偏移量为 0）
+            dt.Value = new DateTimeOffset(original.UtcDateTime, TimeSpan.Zero);
+            _logger.LogInformation(
+                "DateTimeAttributeValue 时区转换: 原始 {Original} (Offset={Offset}) -> 转换后 {Converted} (Offset=00:00)",
+                original, original.Offset, dt.Value);
+        }
+
+        // 🔧 处理 DateAttributeValue 的 UTC 转换（修复：PostgreSQL timestamptz 只接受 UTC）
+        if (entity is DateAttributeValue d)
+        {
+            var original = d.Value;
+            d.Value = new DateTimeOffset(original.UtcDateTime, TimeSpan.Zero);
+            _logger.LogInformation(
+                "DateAttributeValue 时区转换: 原始 {Original} (Offset={Offset}) -> 转换后 {Converted} (Offset=00:00)",
+                original, original.Offset, d.Value);
+        }
+
+        // 如果项目中有其他日期时间实体类型，可在此添加
+        // else if (entity is DateTimeOffsetAttributeValue dtoffset)
+        // {
+        //     dtoffset.Value = dtoffset.Value.ToUniversalTime();
+        // }
+
+        // 添加到对应的 DbSet
         switch (entity)
         {
             case TextAttributeValue tv: await _dbContext.TextAttributeValues.AddAsync(tv); break;
@@ -240,19 +253,24 @@ public class TreeAttributeService : ITreeAttributeService
         var tasks = new Func<Task<AttributeValueBase?>>[]
         {
             async () => await _dbContext.TextAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
-            async () => await _dbContext.DecimalAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
-            async () => await _dbContext.IntegerAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await _dbContext.DecimalAttributeValues.FirstOrDefaultAsync(v =>
+                v.NodeId == nodeId && v.Id == id),
+            async () => await _dbContext.IntegerAttributeValues.FirstOrDefaultAsync(v =>
+                v.NodeId == nodeId && v.Id == id),
             async () => await _dbContext.DateAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
             async () => await _dbContext.TimeAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
-            async () => await _dbContext.DateTimeAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await _dbContext.DateTimeAttributeValues.FirstOrDefaultAsync(v =>
+                v.NodeId == nodeId && v.Id == id),
             async () => await _dbContext.FileAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
-            async () => await _dbContext.LocationAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id)
+            async () => await _dbContext.LocationAttributeValues.FirstOrDefaultAsync(v =>
+                v.NodeId == nodeId && v.Id == id)
         };
         foreach (var task in tasks)
         {
             var result = await task();
             if (result != null) return result;
         }
+
         return null;
     }
 
@@ -291,10 +309,12 @@ public class TreeAttributeService : ITreeAttributeService
             if (defInfos.TryGetValue(v.AttributeDefinitionId, out var info))
                 result.Add(MapToDto(v, info.Definition, info.AttributeType, info.Unit));
         }
+
         return result;
     }
 
-    private static AttributeDto MapToDto(AttributeValueBase v, AttributeDefinition? def, AttributeType? attrType, UnitTree? unit)
+    private static AttributeDto MapToDto(AttributeValueBase v, AttributeDefinition? def, AttributeType? attrType,
+        UnitTree? unit)
     {
         // 确保 def 包含导航属性（用于前端）
         if (def != null)
@@ -313,7 +333,7 @@ public class TreeAttributeService : ITreeAttributeService
             TimeAttributeValue timeV => timeV.Value,
             DateTimeAttributeValue dtV => dtV.Value,
             FileAttributeValue fv => fv.Value,
-            LocationAttributeValue lv => new { lv.Latitude, lv.Longitude },  // 或 string
+            LocationAttributeValue lv => new { lv.Latitude, lv.Longitude }, // 或 string
             _ => null
         };
 

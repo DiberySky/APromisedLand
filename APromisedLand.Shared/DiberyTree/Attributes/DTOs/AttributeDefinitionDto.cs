@@ -16,4 +16,19 @@ public class AttributeDefinitionDto
     public UnitTree? Unit { get; set; }
     // public string? UnitId { get; set; }
     // public string? UnitName { get; set; } 
+
+    public AttributeDefinition Definition()
+    {
+        return new AttributeDefinition
+        {
+            Id = Id,
+            Name = Name,
+            AttributeTypeId = AttributeType.Id,
+            Lines = Lines,
+            MaxLength = MaxLength ?? 30,
+            Precision = Precision,
+            Scale = Scale,
+            UnitId = Unit?.Id,
+        };
+    }
 }

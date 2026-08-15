@@ -1,5 +1,6 @@
 @using System.Text.Json
 @using APromisedLand.Razor.DiberyTree.Attributes.Values
+@using APromisedLand.Razor.Helper.Blazor
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject IDialogService DialogService
@@ -15,51 +16,52 @@
     <DialogContent>
         <MudGrid Class="pa-4">
             <MudItem xs="12">
-                <AttributeTypeField TItem="TItem" AttributeDefinitionDto="@_definition"
-                                    AttributeDefinitionChanged="@(e => _definition = e)"/>
+                <AttributeTypeField TItem="TItem" AttributeDefinitionDto="@DefinitionDto"
+                                    AttributeDefinitionChanged="@(e => DefinitionDto = e)"/>
             </MudItem>
             <MudItem xs="12">
-                <MudTextField @bind-Value="@_definition?.Name" Label="属性名称"
+                <MudTextField @bind-Value="@DefinitionDto?.Name" Label="属性名称"
                               Variant="Variant.Outlined"
-                              InputType="@InputType.Text" />
+                              InputType="@InputType.Text"/>
             </MudItem>
-            @switch (_definition?.AttributeType.SystemType)
+            @switch (DefinitionDto?.AttributeType.SystemType)
             {
                 case AttributeTypeEnum.文本:
                     <MudItem xs="12">
-                        <TextValue @bind-Value="@_textValue"
-                                   Definition="@_definition"
-                        />
+                        <TextValue @bind-Value="@TextValue"
+                                   DefinitionDto="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.整数:
                     <MudItem xs="12">
-                        <IntegerValue @bind-Value="@_integerValue"
-                                      Definition="@_definition"
-                        />
+                        <IntegerValue @bind-Value="@IntegerValue"
+                                      Definition="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.小数:
                     <MudItem xs="12">
-                        <DecimalValue @bind-Value="@_decimalValue"
-                                      Definition="@_definition"
-                        />
+                        <DecimalValue @bind-Value="@DecimalValue"
+                                      Definition="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.日期:
                     <MudItem xs="12">
-                        <MudText>日期类型输入控件待实现</MudText>
-                        @* 此处可添加 DateValue 组件 *@
+                        <MudItem xs="12">
+                            <DateValue @bind-Value="@DateValue"
+                                       Definition="@DefinitionDto"/>
+                        </MudItem>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.时间:
                     <MudItem xs="12">
-                        <MudText>时间类型输入控件待实现</MudText>
+                        <TimeValue @bind-Value="@TimeValue"
+                                   Definition="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.日期时间:
                     <MudItem xs="12">
-                        <MudText>日期时间类型输入控件待实现</MudText>
+                        <DateTimeValue @bind-Value="@DateTimeValue"
+                                       Definition="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.文件:
@@ -83,27 +85,40 @@
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+    
     [Parameter] public required string NodeId { get; set; }
+    [Parameter] public required AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public JsonElement? ValueElement { get; set; }
 
-    private AttributeDefinitionDto? _definition;
+    [Parameter] public string? TextValue { get; set; }
+    [Parameter] public long? IntegerValue { get; set; }
+    [Parameter] public decimal? DecimalValue { get; set; }
+    [Parameter] public DateTimeOffset? DateValue { get; set; }
+    [Parameter] public TimeSpan? TimeValue { get; set; }
+    [Parameter] public DateTimeOffset? DateTimeValue { get; set; }
+    [Parameter] public string? FileUrl { get; set; }
+    [Parameter] public double? Latitude { get; set; }
+    [Parameter] public double? Longitude { get; set; }
+
+    // private AttributeDefinitionDto? DefinitionDto;
 
     // 各类型值字段
-    private string? _textValue;
-    private long? _integerValue;
-    private decimal? _decimalValue;
-    private DateTimeOffset? _dateValue;
-    private TimeSpan? _timeValue;
-    private DateTimeOffset? _dateTimeValue;
-    private string? _fileUrl;
-    private double? _latitude;
-    private double? _longitude;
+    // private string? _textValue;
+    // private long? _integerValue;
+    // private decimal? _decimalValue;
+    // private DateTimeOffset? _dateValue;
+    // private TimeSpan? _timeValue;
+    // private DateTimeOffset? _dateTimeValue;
+    // private string? _fileUrl;
+    // private double? _latitude;
+    // private double? _longitude;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             // var defs = await ApiClient.GetAllDefinitionsAsync();
-            // _definitions = defs.ToList();
+            // DefinitionDtos = defs.ToList();
         }
         catch (Exception ex)
         {
@@ -113,70 +128,78 @@
 
     private async Task SubmitAsync()
     {
-        if (_definition == null)
+        if (DefinitionDto == null)
         {
             Snackbar.Add("请选择属性定义", Severity.Warning);
             return;
         }
 
         // 根据类型检查对应的值是否填写
-        switch (_definition.AttributeType.SystemType)
+        switch (DefinitionDto.AttributeType.SystemType)
         {
             case AttributeTypeEnum.文本:
-                if (string.IsNullOrWhiteSpace(_textValue))
+                if (string.IsNullOrWhiteSpace(TextValue))
                 {
                     Snackbar.Add("请输入文本值", Severity.Warning);
                     return;
                 }
+
                 break;
             case AttributeTypeEnum.整数:
-                if (!_integerValue.HasValue)
+                if (!IntegerValue.HasValue)
                 {
                     Snackbar.Add("请输入整数值", Severity.Warning);
                     return;
                 }
+
                 break;
             case AttributeTypeEnum.小数:
-                if (!_decimalValue.HasValue)
+                if (!DecimalValue.HasValue)
                 {
                     Snackbar.Add("请输入小数值", Severity.Warning);
                     return;
                 }
+
                 break;
             case AttributeTypeEnum.日期:
-                if (!_dateValue.HasValue)
+                if (!DateValue.HasValue)
                 {
                     Snackbar.Add("请选择日期", Severity.Warning);
                     return;
                 }
+
                 break;
             case AttributeTypeEnum.时间:
-                if (!_timeValue.HasValue)
+                if (!TimeValue.HasValue)
                 {
                     Snackbar.Add("请选择时间", Severity.Warning);
                     return;
                 }
+
                 break;
             case AttributeTypeEnum.日期时间:
-                if (!_dateTimeValue.HasValue)
+                if (!DateTimeValue.HasValue)
                 {
                     Snackbar.Add("请选择日期时间", Severity.Warning);
                     return;
                 }
+
                 break;
             case AttributeTypeEnum.文件:
-                if (string.IsNullOrWhiteSpace(_fileUrl))
+                if (string.IsNullOrWhiteSpace(FileUrl))
                 {
                     Snackbar.Add("请上传文件", Severity.Warning);
                     return;
                 }
+
                 break;
             case AttributeTypeEnum.定位:
-                if (!_latitude.HasValue || !_longitude.HasValue)
+                if (!Latitude.HasValue || !Longitude.HasValue)
                 {
                     Snackbar.Add("请输入经纬度", Severity.Warning);
                     return;
                 }
+
                 break;
             default:
                 Snackbar.Add("不支持的属性类型", Severity.Warning);
@@ -186,37 +209,37 @@
         try
         {
             JsonElement valueElement;
-            switch (_definition.AttributeType.SystemType)
+            switch (DefinitionDto.AttributeType.SystemType)
             {
                 case AttributeTypeEnum.文本:
-                    valueElement = JsonSerializer.SerializeToElement(_textValue);
+                    valueElement = JsonSerializer.SerializeToElement(TextValue);
                     break;
                 case AttributeTypeEnum.整数:
-                    valueElement = JsonSerializer.SerializeToElement(_integerValue);
+                    valueElement = JsonSerializer.SerializeToElement(IntegerValue);
                     break;
                 case AttributeTypeEnum.小数:
-                    valueElement = JsonSerializer.SerializeToElement(_decimalValue);
+                    valueElement = JsonSerializer.SerializeToElement(DecimalValue);
                     break;
                 case AttributeTypeEnum.日期:
-                    valueElement = JsonSerializer.SerializeToElement(_dateValue!.Value.ToString("yyyy-MM-dd"));
+                    valueElement = JsonSerializer.SerializeToElement(DateValue!.Value.ToString("yyyy-MM-dd"));
                     break;
                 case AttributeTypeEnum.时间:
-                    valueElement = JsonSerializer.SerializeToElement(_timeValue!.Value.ToString(@"hh\:mm\:ss"));
+                    valueElement = JsonSerializer.SerializeToElement(TimeValue!.Value.ToString(@"hh\:mm\:ss"));
                     break;
                 case AttributeTypeEnum.日期时间:
-                    valueElement = JsonSerializer.SerializeToElement(_dateTimeValue!.Value.ToString("O"));
+                    valueElement = JsonSerializer.SerializeToElement(DateTimeValue!.Value.ToString("O"));
                     break;
                 case AttributeTypeEnum.文件:
-                    valueElement = JsonSerializer.SerializeToElement(_fileUrl);
+                    valueElement = JsonSerializer.SerializeToElement(FileUrl);
                     break;
                 case AttributeTypeEnum.定位:
-                    valueElement = JsonSerializer.SerializeToElement(new { latitude = _latitude!.Value, longitude = _longitude!.Value });
+                    valueElement = JsonSerializer.SerializeToElement(new { latitude = Latitude!.Value, longitude = Longitude!.Value });
                     break;
                 default:
-                    throw new NotSupportedException($"不支持的类型 {_definition.AttributeType.SystemType}");
+                    throw new NotSupportedException($"不支持的类型 {DefinitionDto.AttributeType.SystemType}");
             }
 
-            var dto = new AddValueDto(_definition.Id, valueElement);
+            var dto = new AddValueDto(DefinitionDto.Id, valueElement);
             await ApiClient.AddValueAsync(NodeId, dto);
 
             Snackbar.Add("属性添加成功", Severity.Success);
@@ -224,7 +247,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"添加失败: {ex.Message}", Severity.Error);
+            Snackbar.Details("添加失败.", ex.Message, DialogService);
         }
     }
 
@@ -244,17 +267,18 @@
 
     private void AttributeDefinitionChanged(AttributeDefinitionDto dto)
     {
-        _definition = dto;
+        DefinitionDto = dto;
         // 切换定义时清空之前的值，防止类型混淆
-        _textValue = null;
-        _integerValue = null;
-        _decimalValue = null;
-        _dateValue = null;
-        _timeValue = null;
-        _dateTimeValue = null;
-        _fileUrl = null;
-        _latitude = null;
-        _longitude = null;
+        TextValue = null;
+        IntegerValue = null;
+        DecimalValue = null;
+        DateValue = null;
+        TimeValue = null;
+        DateTimeValue = null;
+        FileUrl = null;
+        Latitude = null;
+        Longitude = null;
         StateHasChanged();
     }
+
 }

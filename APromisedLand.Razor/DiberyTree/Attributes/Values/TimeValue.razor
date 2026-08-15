@@ -1,0 +1,32 @@
+<MudTimePicker @bind-Time="@Value"
+               Label="@Definition?.Name"
+               PickerVariant="PickerVariant.Inline"
+               AmPm="false"
+               Variant="Variant.Outlined"
+               TimeFormat="HH:mm"
+               ReadOnly="@ReadOnly"
+               />
+               @* TimeChanged="@(OnTimeChanged)" *@
+@code {
+    [Parameter] public AttributeDefinitionDto? Definition { get; set; }
+    [Parameter] public TimeSpan? Value { get; set; }
+    [Parameter] public EventCallback<TimeSpan?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // 如果父组件未传入值，则初始化为当前本地时间
+        if (!Value.HasValue)
+        {
+            Value = DateTime.Now.TimeOfDay;
+            // 通知父组件更新绑定值
+            _ = ValueChanged.InvokeAsync(Value);
+        }
+    }
+    
+    private void OnTimeChanged(TimeSpan? value)
+    {
+        Value = value;
+        _ = ValueChanged.InvokeAsync(Value);
+    }
+}

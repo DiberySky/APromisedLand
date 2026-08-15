@@ -1,0 +1,44 @@
+@* <MudDateTimePicker T="DateTimeOffset?" *@
+@*                    Value="@Value" *@
+@*                    ValueChanged="@OnValueChanged" *@
+@*                    Label="@Definition?.Name" *@
+@*                    DateFormat="yyyy-MM-dd" *@
+@*                    ShowToolbar="false" *@
+@*                    Variant="Variant.Outlined" /> *@
+
+<MudDatePicker Date="@_date"
+               DateChanged="@(OnDateChanged)"
+               Label="@Definition?.Name"
+               DateFormat="yyyy-MM-dd"
+               Variant="Variant.Outlined"
+               ReadOnly="@ReadOnly" />
+
+@code {
+    [Parameter] public AttributeDefinitionDto? Definition { get; set; }
+    [Parameter] public DateTimeOffset? Value { get; set; }
+    [Parameter] public EventCallback<DateTimeOffset?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    DateTime? _date;
+    
+    protected override void OnInitialized()
+    {
+        _date = Value?.ToLocalTime().DateTime;
+        StateHasChanged();
+    }
+
+    private void OnDateChanged(DateTime? value)
+    {
+        Value = value.HasValue 
+            ? new DateTimeOffset(value.Value, TimeSpan.Zero) 
+            : null;
+        
+        _ = ValueChanged.InvokeAsync(Value);
+    }
+    
+    private void OnValueChanged(DateTimeOffset? value)
+    {
+        Value = value;
+        _ = ValueChanged.InvokeAsync(Value);
+    }
+}

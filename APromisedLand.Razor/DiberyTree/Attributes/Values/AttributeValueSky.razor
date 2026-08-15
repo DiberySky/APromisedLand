@@ -54,6 +54,8 @@
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
+    [Parameter] public RenderFragment? ValueContent { get; set; }
+
     [Parameter] public EventCallback<AttributeDto?> OnSaveClick { get; set; }
     [Parameter] public EventCallback<AttributeDto?> OnDeleteClick { get; set; }
     [Parameter] public EventCallback<AttributeDto?> EditChanged { get; set; }
