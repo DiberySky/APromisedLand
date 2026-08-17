@@ -153,7 +153,7 @@
     {
         try
         {
-            await ApiClient.UpdateValueAsync(NodeId, attr.Id, attr.Value);
+            await ApiClient.UpdateValueAsync(NodeId, attr.Id, new UpdateValueDto { Value = attr.Value });
             Snackbar.Add($"属性“{attr.Definition?.Name}”已更新", Severity.Success);
         }
         catch (Exception ex)

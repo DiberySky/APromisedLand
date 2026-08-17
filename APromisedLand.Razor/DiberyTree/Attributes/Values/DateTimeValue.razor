@@ -1,35 +1,48 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
 @if (ReadOnly)
 {
     <MudDatePicker Date="@_date"
                    DateChanged="@(OnDateChanged)"
-                   Label="@Definition?.Name"
+                   Label="@DefinitionDto?.Name"
                    DateFormat="yyyy-MM-dd HH:mm"
                    Variant="Variant.Outlined"
                    ReadOnly="@ReadOnly"/>
 }
 else
 {
-    <MudStack Row="true">
-        <MudDatePicker Date="@_date"
-                       DateChanged="@(OnDateChanged)"
-                       Label="@Definition?.Name"
-                       DateFormat="yyyy-MM-dd"
-                       Variant="Variant.Outlined"
-                       ReadOnly="@ReadOnly"/>
+    <AttributeValueSky TItem="@TItem"
+                       NodeId="@NodeId"
+                       ValueId="@ValueId"
+                       @bind-JsonValue="@JsonValue"
+                       DefinitionDto="@DefinitionDto"
+                       ReadOnly="@ReadOnly">
+        <ValueContent>
+            <MudStack Class="d-flex flex-grow-1" Row="true" Spacing="0">
+                <MudDatePicker Date="@_date"
+                               DateChanged="@(OnDateChanged)"
+                               Label="@DefinitionDto?.Name"
+                               DateFormat="yyyy-MM-dd"
+                               Variant="Variant.Outlined"
+                               ReadOnly="@ReadOnly"/>
 
-        <MudTimePicker @bind-Time="_selectedTime"
-                       Label="选择时间"
-                       Variant="Variant.Outlined"
-                       TimeFormat="HH:mm"
-                       ReadOnly="@ReadOnly"
-                       TextChanged="@(OnTimeTextChanged)"/>
-    </MudStack>
+                <MudTimePicker @bind-Time="_selectedTime"
+                               Label="选择时间"
+                               Variant="Variant.Outlined"
+                               TimeFormat="HH:mm"
+                               ReadOnly="@ReadOnly"
+                               TextChanged="@(OnTimeTextChanged)"/>
+            </MudStack>
+        </ValueContent>
+    </AttributeValueSky>
 }
 
 @* TimeChanged="@(OnTimeChanged)" *@
 
 @code {
-    [Parameter] public AttributeDefinitionDto? Definition { get; set; }
+    [Parameter] public required string? NodeId { get; set; }
+    [Parameter] public string? ValueId { get; set; }
+    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
     [Parameter] public DateTimeOffset? Value { get; set; }
     [Parameter] public EventCallback<DateTimeOffset?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
@@ -37,60 +50,58 @@ else
     DateTime? _date;
     TimeSpan? _selectedTime;
 
+    private JsonElement? JsonValue { get; set; }
+    
     protected override void OnInitialized()
     {
         _date = Value?.ToLocalTime().DateTime;
         _selectedTime = Value?.ToLocalTime().TimeOfDay;
+
+        JsonValue = Value is not null ? JsonSerializer.SerializeToElement(Value) : null;
         
         StateHasChanged();
     }
-    
+
     private DateTimeOffset? Combine(DateTime? date, TimeSpan? time)
     {
         if (date.HasValue && time.HasValue)
         {
-            // 1. 取出日期的 Date 部分（忽略时间）
             var datePart = date.Value.Date;
-            // 2. 加上时间部分
             var combinedDateTime = datePart + time.Value;
-            // 3. 构造 DateTimeOffset，偏移量为 0（UTC）
-            return new DateTimeOffset(combinedDateTime, TimeSpan.Zero);
+            // 使用当前系统的本地时区偏移
+            var localOffset = TimeZoneInfo.Local.GetUtcOffset(combinedDateTime);
+            return new DateTimeOffset(combinedDateTime, localOffset);
         }
         else if (date.HasValue && !time.HasValue)
         {
-            // 只有日期，时间设为 00:00:00
-            return new DateTimeOffset(date.Value.Date, TimeSpan.Zero);
+            var localOffset = TimeZoneInfo.Local.GetUtcOffset(date.Value);
+            return new DateTimeOffset(date.Value, localOffset);
         }
         else
         {
             return null;
         }
     }
-    
+
     private void OnDateChanged(DateTime? value)
     {
         _date = value;
-        
+
         Value = Combine(value, _selectedTime);
-        
+
         _ = ValueChanged.InvokeAsync(Value);
-    }
-    
-    private void OnTimeTextChanged(string value)
-    {
-        _selectedTime = TimeSpan.Parse(value);
         
+        JsonValue = value is not null ? JsonSerializer.SerializeToElement(Value) : null;
+    }
+
+    private void OnTimeTextChanged(string? value)
+    {
+        _selectedTime = value != null ? TimeSpan.Parse(value) : null;
+
         Value = Combine(_date, _selectedTime);
-        
+
         _ = ValueChanged.InvokeAsync(Value);
-    }
-    
-    private void OnTimeChanged(TimeSpan? value)
-    {
-        _selectedTime = value;
         
-        Value = Combine(_date, value);
-        
-        _ = ValueChanged.InvokeAsync(Value);
+        JsonValue = value is not null ? JsonSerializer.SerializeToElement(Value) : null;
     }
 }

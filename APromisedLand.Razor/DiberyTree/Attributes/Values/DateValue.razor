@@ -1,44 +1,51 @@
-@* <MudDateTimePicker T="DateTimeOffset?" *@
-@*                    Value="@Value" *@
-@*                    ValueChanged="@OnValueChanged" *@
-@*                    Label="@Definition?.Name" *@
-@*                    DateFormat="yyyy-MM-dd" *@
-@*                    ShowToolbar="false" *@
-@*                    Variant="Variant.Outlined" /> *@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-<MudDatePicker Date="@_date"
-               DateChanged="@(OnDateChanged)"
-               Label="@Definition?.Name"
-               DateFormat="yyyy-MM-dd"
-               Variant="Variant.Outlined"
-               ReadOnly="@ReadOnly" />
+<AttributeValueSky TItem="@TItem"
+                   NodeId="@NodeId"
+                   ValueId="@ValueId"
+                   @bind-JsonValue="@JsonValue"
+                   DefinitionDto="@DefinitionDto"
+                   ReadOnly="@ReadOnly">
+    <ValueContent>
+        <MudStack Class="d-flex flex-grow-1" Spacing="0">
+            <MudDatePicker Date="@_date"
+                           DateChanged="@(OnDateChanged)"
+                           Label="@DefinitionDto?.Name"
+                           DateFormat="yyyy-MM-dd"
+                           Variant="Variant.Outlined"
+                           ReadOnly="@ReadOnly"/>
+
+        </MudStack>
+    </ValueContent>
+</AttributeValueSky>
 
 @code {
-    [Parameter] public AttributeDefinitionDto? Definition { get; set; }
+    [Parameter] public required string? NodeId { get; set; }
+    [Parameter] public string? ValueId { get; set; }
+    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
     [Parameter] public DateTimeOffset? Value { get; set; }
     [Parameter] public EventCallback<DateTimeOffset?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
     DateTime? _date;
-    
+    private JsonElement? JsonValue { get; set; }
+
     protected override void OnInitialized()
     {
         _date = Value?.ToLocalTime().DateTime;
+        JsonValue = Value is not null ? JsonSerializer.SerializeToElement(Value) : null;
         StateHasChanged();
     }
 
     private void OnDateChanged(DateTime? value)
     {
-        Value = value.HasValue 
-            ? new DateTimeOffset(value.Value, TimeSpan.Zero) 
+        Value = value.HasValue
+            ? new DateTimeOffset(value.Value, TimeSpan.Zero)
             : null;
-        
+
         _ = ValueChanged.InvokeAsync(Value);
-    }
-    
-    private void OnValueChanged(DateTimeOffset? value)
-    {
-        Value = value;
-        _ = ValueChanged.InvokeAsync(Value);
+
+        JsonValue = value is not null ? JsonSerializer.SerializeToElement(value) : null;
+
     }
 }

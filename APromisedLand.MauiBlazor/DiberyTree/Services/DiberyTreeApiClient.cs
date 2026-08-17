@@ -338,10 +338,10 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     public async Task UpdateValueAsync(
         string nodeId,
         string valueId,
-        JsonElement value,
+        UpdateValueDto valueDto,
         CancellationToken cancellationToken = default)
     {
-        var dto = new { Value = value };
+        var dto = new { Value = valueDto };
         var request = new HttpRequestMessage(HttpMethod.Put,
             $"{_basePath}/{Uri.EscapeDataString(nodeId)}/attributes/values/{Uri.EscapeDataString(valueId)}")
         {

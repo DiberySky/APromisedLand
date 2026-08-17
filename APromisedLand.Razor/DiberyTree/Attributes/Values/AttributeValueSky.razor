@@ -1,57 +1,37 @@
+@using APromisedLand.Razor.Helper.Blazor
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject DiberyTreeApiClient<TItem> ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
 <MudStack Row="true" Class="d-flex flex-grow-1" Justify="Justify.SpaceBetween"
           AlignItems="AlignItems.Center">
-    <MudStack Class="d-flex flex-grow-1" Spacing="0">
-        <MudTextField T="string" @bind-Value="@Value"
-                      Label="@DefinitionDto?.Name"
-                      Variant="Variant.Outlined"
-                      Lines="@(DefinitionDto?.Lines ?? 1)"
-                      MaxLength="@(DefinitionDto?.MaxLength ?? 0)"
-                      FullWidth="true"
-                      Margin="Margin.Normal"
-                      TextChanged="OnValueChanged"
-                      Required="true"
-                      Immediate="true"
-                      ReadOnly="@ReadOnly"/>
+    @if (ValueContent is not null)
+    {
+        @ValueContent
+    }
 
-        <MudStack Row="true">
-            @if (_infoVisible)
-            {
-                <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                    类型：@DefinitionDto?.AttributeType.Name,
-                    最大长度：@(DefinitionDto?.MaxLength is null or 0 ? "无限制" : DefinitionDto?.MaxLength.ToString())
-                </MudText>
-            }
-
-            <MudSpacer/>
-
-            <MudIconButton size="Size.Small" Color="Color.Info" Class="ma-0 pa-0"
-                           Icon="@(_infoVisible
-                                     ? Icons.Material.Outlined.KeyboardDoubleArrowRight
-                                     : Icons.Material.Outlined.KeyboardDoubleArrowLeft)"
-                           OnClick="@(() => _infoVisible = !_infoVisible)"/>
+    @if (!ReadOnly)
+    {
+        <MudStack Row="true" Spacing="0">
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Warning"
+                           Size="Size.Small"
+                           OnClick="@(DeleteClick)"/>
+            <MudIconButton Icon="@Icons.Material.Outlined.Save" Color="Color.Success"
+                           Size="Size.Small"
+                           OnClick="@(SaveClick)"/>
         </MudStack>
-
-    </MudStack>
-
-    <MudStack Row="true" Spacing="0">
-        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Warning"
-                       Size="Size.Small"
-                       OnClick="@(DeleteClick)"/>
-        <MudIconButton Icon="@Icons.Material.Outlined.Save" Color="Color.Success"
-                       Size="Size.Small"
-                       OnClick="@(SaveClick)"/>
-        @* <MudIconButton Icon="@Icons.Material.Outlined.EditNote" Color="Color.Success" *@
-        @*                Size="Size.Small" *@
-        @*                OnClick="@(OnEditValueChanged)"/> *@
-    </MudStack>
+    }
 </MudStack>
 
 
 @code {
-    [Parameter] public string? AttributeId { get; set; }
+    [Parameter] public required string? NodeId { get; set; }
+    [Parameter] public string? ValueId { get; set; }
     [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
-    [Parameter] public string? Value { get; set; }
-    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public JsonElement? JsonValue { get; set; }
+    [Parameter] public EventCallback<JsonElement?> JsonValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
     [Parameter] public RenderFragment? ValueContent { get; set; }
@@ -60,57 +40,47 @@
     [Parameter] public EventCallback<AttributeDto?> OnDeleteClick { get; set; }
     [Parameter] public EventCallback<AttributeDto?> EditChanged { get; set; }
 
-    bool _infoVisible;
-
-    private void OnValueChanged(string? value)
+    protected override void OnInitialized()
     {
-        Value = value;
-        _ = ValueChanged.InvokeAsync(Value);
+        _ = JsonValueChanged.InvokeAsync(JsonValue);
+        base.OnInitialized();
     }
 
     private async Task SaveClick()
     {
-        if (DefinitionDto is null) return;
+        if (ValueId is null || JsonValue is null) return;
 
-        var dto = new AttributeDto
+        try
         {
-            Id = AttributeId ?? Guid.NewGuid().ToString(),
-            DefinitionId = DefinitionDto.Id,
-            Definition = DefinitionDto.Definition(),
-            Value = JsonSerializer.SerializeToElement(Value),
-        };
-
-        await EditChanged.InvokeAsync(dto);
+            await ApiClient.UpdateValueAsync(NodeId!, ValueId, 
+                new UpdateValueDto { Value = JsonValue.Value });
+            Snackbar.Add($"属性“{DefinitionDto?.Name}”已更新", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Details("更新失败。", ex.Message, DialogService);
+        }
     }
 
     private async Task DeleteClick()
     {
-        if (DefinitionDto is null) return;
+        if (DefinitionDto is null || JsonValue is null) return;
 
-        var dto = new AttributeDto
+        bool? confirm = await DialogService.DeleteBox($"确定要删除属性“{DefinitionDto?.Name}”吗？");
+        if (confirm == true)
         {
-            Id = AttributeId ?? Guid.NewGuid().ToString(),
-            DefinitionId = DefinitionDto.Id,
-            Definition = DefinitionDto.Definition(),
-            Value = JsonSerializer.SerializeToElement(Value),
-        };
+            if (ValueId is null || NodeId is null) return;
 
-        await EditChanged.InvokeAsync(dto);
+            try
+            {
+                await ApiClient.DeleteValueAsync(NodeId, ValueId);
+                // await LoadAttributes();
+                Snackbar.Add($"属性“{DefinitionDto?.Name}”已删除", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Details("删除失败。", ex.Message, DialogService);
+            }
+        }
     }
-
-    private async Task OnEditValueChanged()
-    {
-        if (DefinitionDto is null) return;
-
-        var dto = new AttributeDto
-        {
-            Id = AttributeId ?? Guid.NewGuid().ToString(),
-            DefinitionId = DefinitionDto.Id,
-            Definition = DefinitionDto.Definition(),
-            Value = JsonSerializer.SerializeToElement(Value),
-        };
-
-        await EditChanged.InvokeAsync(dto);
-    }
-
 }

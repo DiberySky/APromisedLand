@@ -1,17 +1,35 @@
-<MudTimePicker @bind-Time="@Value"
-               Label="@Definition?.Name"
-               PickerVariant="PickerVariant.Inline"
-               AmPm="false"
-               Variant="Variant.Outlined"
-               TimeFormat="HH:mm"
-               ReadOnly="@ReadOnly"
-               />
-               @* TimeChanged="@(OnTimeChanged)" *@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+<AttributeValueSky TItem="@TItem"
+                   NodeId="@NodeId"
+                   ValueId="@ValueId"
+                   @bind-JsonValue="@JsonValue"
+                   DefinitionDto="@DefinitionDto"
+                   ReadOnly="@ReadOnly">
+    <ValueContent>
+        <MudStack Class="d-flex flex-grow-1" Spacing="0">
+            <MudTimePicker @bind-Time="@Value"
+                           Label="@DefinitionDto?.Name"
+                           PickerVariant="PickerVariant.Inline"
+                           AmPm="false"
+                           Variant="Variant.Outlined"
+                           TimeFormat="HH:mm"
+                           ReadOnly="@ReadOnly"
+                           TextChanged="@(OnTimeTextChanged)"/>
+
+        </MudStack>
+    </ValueContent>
+</AttributeValueSky>
+
 @code {
-    [Parameter] public AttributeDefinitionDto? Definition { get; set; }
+    [Parameter] public required string? NodeId { get; set; }
+    [Parameter] public string? ValueId { get; set; }
+    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
     [Parameter] public TimeSpan? Value { get; set; }
     [Parameter] public EventCallback<TimeSpan?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+
+    private JsonElement? JsonValue { get; set; }
 
     protected override void OnInitialized()
     {
@@ -21,12 +39,17 @@
             Value = DateTime.Now.TimeOfDay;
             // 通知父组件更新绑定值
             _ = ValueChanged.InvokeAsync(Value);
+
+            JsonValue = Value is not null ? JsonSerializer.SerializeToElement(Value) : null;
         }
     }
-    
-    private void OnTimeChanged(TimeSpan? value)
+
+    private void OnTimeTextChanged(string? value)
     {
-        Value = value;
+        Value = value != null ? TimeSpan.Parse(value) : null;
+        
         _ = ValueChanged.InvokeAsync(Value);
+
+        JsonValue = value is not null ? JsonSerializer.SerializeToElement(Value) : null;
     }
 }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using APromisedLand.Api.Projects.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
@@ -427,6 +428,32 @@ public abstract class TreeControllerBase<T>(
         }
     }
 
+    [HttpPut("{nodeId}/attributes/values/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
+    public virtual async Task<IActionResult> UpdateValue(string nodeId, string id, [FromBody] UpdateValueDto valueDto, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await attributeService.UpdateValueAsync(nodeId, id, valueDto.Value, cancellationToken);
+            return Ok(ApiResponse<object>.Ok(null, "属性值更新成功"));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "更新属性值失败, NodeId: {NodeId}, ValueId: {ValueId}", nodeId, id);
+            return StatusCode(500, ApiResponse<object>.Fail($"更新属性值失败: {ex.Message}"));
+        }
+    }
+    
     [HttpDelete("{nodeId}/attributes/values/{id}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]

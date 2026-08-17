@@ -1,6 +1,3 @@
-@using System.Text.Json
-@using APromisedLand.Razor.DiberyTree.Attributes.Values
-@using APromisedLand.Shared.Helper
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject DiberyTreeApiClient<TItem> ApiClient
@@ -22,15 +19,18 @@ else
         @foreach (var attr in _attributes)
         {
             var typeEnum = attr.GetTypeEnum();
-            
+
             <MudGrid Class="align-center">
-                <MudItem sm="@(ReadOnly ? 12 : 10)">
+                <MudItem sm="12">
                     @switch (typeEnum)
                     {
                         case AttributeTypeEnum.文本:
                             var textValue = attr.Value.GetValue<string>();
 
-                            <TextValue DefinitionDto="@attr.Definition?.ToDto()"
+                            <TextValue TItem="@TItem"
+                                       NodeId="@NodeId"
+                                       ValueId="@attr.Id"
+                                       DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@textValue"
                                        ReadOnly="@ReadOnly"/>
 
@@ -40,7 +40,10 @@ else
                         case AttributeTypeEnum.整数:
                             var integerValue = attr.Value.GetValue<long>();
 
-                            <IntegerValue Definition="@attr.Definition?.ToDto()"
+                            <IntegerValue TItem="@TItem"
+                                          NodeId="@NodeId"
+                                          ValueId="@attr.Id"
+                                          DefinitionDto="@attr.Definition?.ToDto()"
                                           Value="@integerValue"
                                           ReadOnly="@ReadOnly"/>
 
@@ -50,17 +53,23 @@ else
                         case AttributeTypeEnum.小数:
                             var decimalValue = attr.Value.GetValue<decimal>();
 
-                            <DecimalValue Definition="@attr.Definition?.ToDto()"
+                            <DecimalValue TItem="@TItem"
+                                          NodeId="@NodeId"
+                                          ValueId="@attr.Id"
+                                          DefinitionDto="@attr.Definition?.ToDto()"
                                           Value="@decimalValue"
                                           ReadOnly="@ReadOnly"/>
-                            
+
                             _definition = attr.Definition;
                             _valueElement = JsonSerializer.SerializeToElement(decimalValue);
                             break;
                         case AttributeTypeEnum.日期:
                             var dateValue = attr.Value.GetValue<DateTimeOffset>();
 
-                            <DateValue Definition="@attr.Definition?.ToDto()"
+                            <DateValue TItem="@TItem"
+                                       NodeId="@NodeId"
+                                       ValueId="@attr.Id"
+                                       DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@dateValue"
                                        ReadOnly="@ReadOnly"/>
 
@@ -70,7 +79,10 @@ else
                         case AttributeTypeEnum.时间:
                             var timeValue = attr.Value.GetValue<TimeSpan>();
 
-                            <TimeValue Definition="@attr.Definition?.ToDto()"
+                            <TimeValue TItem="@TItem"
+                                       NodeId="@NodeId"
+                                       ValueId="@attr.Id"
+                                       DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@timeValue"
                                        ReadOnly="@ReadOnly"/>
 
@@ -80,7 +92,10 @@ else
                         case AttributeTypeEnum.日期时间:
                             var dateTimeValue = attr.Value.GetValue<DateTimeOffset>();
 
-                            <DateTimeValue Definition="@attr.Definition?.ToDto()"
+                            <DateTimeValue TItem="@TItem"
+                                           NodeId="@NodeId"
+                                           ValueId="@attr.Id"
+                                           DefinitionDto="@attr.Definition?.ToDto()"
                                            Value="@dateTimeValue"
                                            ReadOnly="@ReadOnly"/>
 
@@ -88,6 +103,14 @@ else
                             _valueElement = JsonSerializer.SerializeToElement(dateTimeValue);
                             break;
                         case AttributeTypeEnum.文件:
+                            var fileValue = attr.Value.GetValue<string>();
+
+                            <FileValue TItem="@TItem"
+                                       NodeId="@NodeId"
+                                       ValueId="@attr.Id"
+                                       DefinitionDto="@attr.Definition?.ToDto()"
+                                       Value="@fileValue"
+                                       ReadOnly="@ReadOnly"/>
                             break;
                         case AttributeTypeEnum.定位:
                             break;
@@ -95,21 +118,6 @@ else
                             throw new ArgumentOutOfRangeException();
                     }
                 </MudItem>
-                @if (!ReadOnly)
-                {
-                    <MudItem xs="6" sm="1"/>
-                    <MudItem xs="6" sm="1" Class="d-flex justify-end">
-                        <MudIconButton Icon="@Icons.Material.Outlined.Save" Color="Color.Success"
-                                       Size="Size.Small"
-                                       OnClick="@(() => SaveValue(attr))"/>
-                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error"
-                                       Size="Size.Small"
-                                       OnClick="@(() => DeleteValue(attr))"/>
-                        <MudIconButton Icon="@Icons.Material.Outlined.EditNote" Color="Color.Success"
-                                       Size="Size.Small"
-                                       OnClick="@(() => OpenEditDialog(_definition, _valueElement))"/>
-                    </MudItem>
-                }
             </MudGrid>
         }
     </MudStack>
@@ -121,7 +129,7 @@ else
 
     private List<AttributeDto>? _attributes;
     private bool _loading;
-    
+
     private AttributeDefinition? _definition;
     private JsonElement _valueElement;
 
@@ -174,14 +182,7 @@ else
     {
         try
         {
-            // var dto = new AddValueDto(_definition.Id, valueElement);
-            // await ApiClient.AddValueAsync(NodeId, dto);
-
-            // Snackbar.Add("属性添加成功", Severity.Success);
-            // MudDialog?.Close(DialogResult.Ok(true)); 
-            
-            attr.Value = _valueElement;
-            await ApiClient.UpdateValueAsync(NodeId!, attr.Id, attr.Value);
+            await ApiClient.UpdateValueAsync(NodeId!, attr.Id, new UpdateValueDto { Value = attr.Value });
             Snackbar.Add($"属性“{attr.Definition?.Name}”已更新", Severity.Success);
         }
         catch (Exception ex)
@@ -198,7 +199,7 @@ else
             { x => x.DefinitionDto, _definition!.ToDto() },
             { x => x.ValueElement, valueElement }
         };
-        
+
         var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("编辑属性", dialogParams);
         var result = await dialog.Result;
         if (result?.Canceled == false)
@@ -206,7 +207,7 @@ else
             await LoadAttributes();
         }
     }
-    
+
     // ---------- 辅助方法 ----------
     private bool IsNumericType(AttributeTypeEnum type)
         => type == AttributeTypeEnum.整数 || type == AttributeTypeEnum.小数;

@@ -29,39 +29,45 @@
                 case AttributeTypeEnum.文本:
                     <MudItem xs="12">
                         <TextValue @bind-Value="@TextValue"
+                                   TItem="@TItem"
                                    DefinitionDto="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.整数:
                     <MudItem xs="12">
                         <IntegerValue @bind-Value="@IntegerValue"
-                                      Definition="@DefinitionDto"/>
+                                      TItem="@TItem"
+                                      DefinitionDto="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.小数:
                     <MudItem xs="12">
                         <DecimalValue @bind-Value="@DecimalValue"
-                                      Definition="@DefinitionDto"/>
+                                      TItem="@TItem"
+                                      DefinitionDto="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.日期:
                     <MudItem xs="12">
                         <MudItem xs="12">
                             <DateValue @bind-Value="@DateValue"
-                                       Definition="@DefinitionDto"/>
+                                       TItem="@TItem"
+                                       DefinitionDto="@DefinitionDto"/>
                         </MudItem>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.时间:
                     <MudItem xs="12">
                         <TimeValue @bind-Value="@TimeValue"
-                                   Definition="@DefinitionDto"/>
+                                   TItem="@TItem"
+                                   DefinitionDto="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.日期时间:
                     <MudItem xs="12">
                         <DateTimeValue @bind-Value="@DateTimeValue"
-                                       Definition="@DefinitionDto"/>
+                                       TItem="@TItem"
+                                       DefinitionDto="@DefinitionDto"/>
                     </MudItem>
                     break;
                 case AttributeTypeEnum.文件:
@@ -85,7 +91,7 @@
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
-    
+
     [Parameter] public required string NodeId { get; set; }
     [Parameter] public required AttributeDefinitionDto? DefinitionDto { get; set; }
     [Parameter] public JsonElement? ValueElement { get; set; }

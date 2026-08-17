@@ -26,7 +26,7 @@ public static partial class BlazorHelper
         return result ?? false;
     }
 
-    public static async Task<bool> Delete(this IDialogService dialogService, string? message, string? title = "删除")
+    public static async Task<bool> DeleteBox(this IDialogService dialogService, string? message, string? title = "删除")
     {
         var options = new MessageBoxOptions
         {
@@ -48,7 +48,7 @@ public static partial class BlazorHelper
         return result ?? false;
     }
 
-    public static async Task<bool> YesNo(this IDialogService dialogService, string? message, string? title = default)
+    public static async Task<bool> YesNoBox(this IDialogService dialogService, string? message, string? title = default)
     {
         var options = new MessageBoxOptions
         {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
 
@@ -21,4 +22,5 @@ public interface ITreeAttributeService
     Task<NodeDto> GetAllValuesAsync(string nodeId);
     /// <summary>删除属性值，返回是否成功</summary>
     Task<bool> DeleteValueAsync(string nodeId, string id);
+    Task UpdateValueAsync(string nodeId, string id, JsonElement jsonValue, CancellationToken cancellationToken);
 }

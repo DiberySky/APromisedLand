@@ -1,51 +1,76 @@
-<MudNumericField T="decimal?"
-                 Value="@Value"
-                 ValueChanged="@OnValueChanged"
-                 Label="@Definition?.Name"
-                 Variant="Variant.Outlined"
-                 Format="@($"N{Definition?.Scale ?? 2}")"
-                 HideSpinButtons="true"
-                 Min="0"
-                 FullWidth="true"
-                 Margin="Margin.Normal"
-                 Adornment="Adornment.End"
-                 AdornmentText="@Definition?.Unit?.Name"
-                 ReadOnly="@ReadOnly"/>
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-<MudStack Row="true">
-    @if (_infoVisible)
-    {
-        <MudText Typo="Typo.caption" Color="Color.Tertiary">
-            类型：@Definition?.AttributeType.Name, 整数位数：@(Definition?.Precision - Definition?.Scale),
-            小数位数：@Definition?.Scale
-            @if (!string.IsNullOrEmpty(Definition?.Unit?.Abbreviation))
-            {
-                <span>，单位：@Definition.Unit?.Abbreviation</span>
-            }
-        </MudText>
-    }
+<AttributeValueSky TItem="@TItem"
+                   NodeId="@NodeId"
+                   ValueId="@ValueId"
+                   @bind-JsonValue="@JsonValue"
+                   DefinitionDto="@DefinitionDto"
+                   ReadOnly="@ReadOnly">
+    <ValueContent>
+        <MudStack Class="d-flex flex-grow-1" Spacing="0">
+            <MudNumericField T="decimal?"
+                             Value="@Value"
+                             ValueChanged="@OnValueChanged"
+                             Label="@DefinitionDto?.Name"
+                             Variant="Variant.Outlined"
+                             Format="@($"N{DefinitionDto?.Scale ?? 2}")"
+                             HideSpinButtons="true"
+                             Min="0"
+                             FullWidth="true"
+                             Margin="Margin.Normal"
+                             Adornment="Adornment.End"
+                             AdornmentText="@DefinitionDto?.Unit?.Name"
+                             ReadOnly="@ReadOnly"/>
 
-    <MudSpacer/>
+            <MudStack Row="true">
+                @if (_infoVisible)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                        类型：@DefinitionDto?.AttributeType.Name, 整数位数：@(DefinitionDto?.Precision - DefinitionDto?.Scale),
+                        小数位数：@DefinitionDto?.Scale
+                        @if (!string.IsNullOrEmpty(DefinitionDto?.Unit?.Abbreviation))
+                        {
+                            <span>，单位：@DefinitionDto.Unit?.Abbreviation</span>
+                        }
+                    </MudText>
+                }
 
-    <MudIconButton size="Size.Small" Color="Color.Info" Class="ma-0 pa-0"
-                   Icon="@(_infoVisible
-                             ? Icons.Material.Outlined.KeyboardDoubleArrowRight
-                             : Icons.Material.Outlined.KeyboardDoubleArrowLeft)"
-                   OnClick="@(() => _infoVisible = !_infoVisible)"/>
-</MudStack>
+                <MudSpacer/>
+
+                <MudIconButton size="Size.Small" Color="Color.Info" Class="ma-0 pa-0"
+                               Icon="@(_infoVisible
+                                         ? Icons.Material.Outlined.KeyboardDoubleArrowRight
+                                         : Icons.Material.Outlined.KeyboardDoubleArrowLeft)"
+                               OnClick="@(() => _infoVisible = !_infoVisible)"/>
+            </MudStack>
+
+        </MudStack>
+    </ValueContent>
+</AttributeValueSky>
 
 @code {
-    [Parameter] public AttributeDefinitionDto? Definition { get; set; }
+    [Parameter] public required string? NodeId { get; set; }
+    [Parameter] public string? ValueId { get; set; }
+    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
     [Parameter] public decimal? Value { get; set; }
     [Parameter] public EventCallback<decimal?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
     bool _infoVisible;
-
-    private async Task OnValueChanged(decimal? newValue)
+    private JsonElement? JsonValue { get; set; }
+    
+    protected override void OnInitialized()
     {
-        Value = newValue;
-        await ValueChanged.InvokeAsync(newValue);
+        JsonValue = Value is not null ? JsonSerializer.SerializeToElement(Value) : null;
+        base.OnInitialized();
+    }
+    
+    private async Task OnValueChanged(decimal? value)
+    {
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+        
+        JsonValue = value is not null ? JsonSerializer.SerializeToElement(value) : null;
     }
 
 }

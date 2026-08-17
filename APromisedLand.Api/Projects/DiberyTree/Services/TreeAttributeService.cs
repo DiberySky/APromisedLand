@@ -247,6 +247,181 @@ public class TreeAttributeService : ITreeAttributeService
         return true;
     }
 
+    public async Task UpdateValueAsyncDS(string nodeId, string id, JsonElement jsonValue, CancellationToken cancellationToken)
+    {
+        // 1. 查找现有的属性值实体
+        var existing = await FindValueAsync(nodeId, id);
+        if (existing == null)
+            throw new KeyNotFoundException($"属性值 '{id}' 不存在或不属于节点 '{nodeId}'。");
+
+        // 2. 获取属性定义及类型信息
+        var info = await GetDefinitionWithTypeAndUnitAsync(existing.AttributeDefinitionId);
+        if (info == null)
+            throw new InvalidOperationException($"属性定义 '{existing.AttributeDefinitionId}' 不存在。");
+
+        var definition = info.Definition;
+        definition.AttributeType = info.AttributeType; // 为验证器提供类型信息
+
+        // 3. 验证新值（使用现有的验证器）
+        var validation = ValueValidator.ValidateAndBuild(definition, jsonValue, nodeId);
+        if (!validation.IsValid)
+            throw new ArgumentException(validation.ErrorMessage);
+
+        var newEntity = validation.ValueEntity!;
+
+        // 4. 将新值复制到现有实体（类型必须一致）
+        CopyValue(existing, newEntity);
+
+        // 5. 对日期时间类型进行 UTC 转换（与 AddValueAsync 保持一致）
+        if (existing is DateTimeAttributeValue dtExisting)
+        {
+            var original = dtExisting.Value;
+            dtExisting.Value = new DateTimeOffset(original.UtcDateTime, TimeSpan.Zero);
+            _logger.LogInformation(
+                "DateTimeAttributeValue 时区转换: 原始 {Original} (Offset={Offset}) -> 转换后 {Converted} (Offset=00:00)",
+                original, original.Offset, dtExisting.Value);
+        }
+        else if (existing is DateAttributeValue dExisting)
+        {
+            var original = dExisting.Value;
+            dExisting.Value = new DateTimeOffset(original.UtcDateTime, TimeSpan.Zero);
+            _logger.LogInformation(
+                "DateAttributeValue 时区转换: 原始 {Original} (Offset={Offset}) -> 转换后 {Converted} (Offset=00:00)",
+                original, original.Offset, dExisting.Value);
+        }
+
+        // 6. 保存更改
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+    
+    private static void CopyValue(AttributeValueBase target, AttributeValueBase source)
+    {
+        if (target.GetType() != source.GetType())
+            throw new InvalidOperationException("目标类型与源类型不匹配。");
+
+        switch (target)
+        {
+            case TextAttributeValue tTarget:
+                var tSource = (TextAttributeValue)source;
+                tTarget.Value = tSource.Value;
+                break;
+            case DecimalAttributeValue dTarget:
+                var dSource = (DecimalAttributeValue)source;
+                dTarget.Value = dSource.Value;
+                break;
+            case IntegerAttributeValue iTarget:
+                var iSource = (IntegerAttributeValue)source;
+                iTarget.Value = iSource.Value;
+                break;
+            case DateAttributeValue dateTarget:
+                var dateSource = (DateAttributeValue)source;
+                dateTarget.Value = dateSource.Value;
+                break;
+            case TimeAttributeValue timeTarget:
+                var timeSource = (TimeAttributeValue)source;
+                timeTarget.Value = timeSource.Value;
+                break;
+            case DateTimeAttributeValue dtTarget:
+                var dtSource = (DateTimeAttributeValue)source;
+                dtTarget.Value = dtSource.Value;
+                break;
+            case FileAttributeValue fTarget:
+                var fSource = (FileAttributeValue)source;
+                fTarget.Value = fSource.Value;
+                break;
+            case LocationAttributeValue lTarget:
+                var lSource = (LocationAttributeValue)source;
+                lTarget.Latitude = lSource.Latitude;
+                lTarget.Longitude = lSource.Longitude;
+                break;
+            default:
+                throw new NotSupportedException($"不支持的值类型 '{target.GetType().Name}'。");
+        }
+    }
+    
+    public async Task UpdateValueAsync(string nodeId, string id, JsonElement value, CancellationToken cancellationToken)
+    {
+        // 1. 查找现有值
+        var existing = await FindValueAsync(nodeId, id);
+        if (existing == null)
+            throw new KeyNotFoundException($"属性值 '{id}' 在节点 '{nodeId}' 中不存在。");
+
+        // 2. 获取定义并加载类型
+        var defWithType = await _dbContext.AttributeDefinitions
+            .Join(_dbContext.AttributeTypes, d => d.AttributeTypeId, t => t.Id, (d, t) => new { d, t })
+            .Where(x => x.d.Id == existing.AttributeDefinitionId)
+            .Select(x => new { Definition = x.d, AttributeType = x.t })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (defWithType == null)
+            throw new KeyNotFoundException($"属性定义 '{existing.AttributeDefinitionId}' 不存在。");
+
+        var definition = defWithType.Definition;
+        definition.AttributeType = defWithType.AttributeType;
+
+        // 3. 验证新值
+        var validation = ValueValidator.ValidateAndBuild(definition, value, nodeId);
+        if (!validation.IsValid)
+            throw new ArgumentException(validation.ErrorMessage);
+
+        var newEntity = validation.ValueEntity!;
+
+        // 4. 将新值复制到现有实体（保留原 Id）
+        switch (existing)
+        {
+            case TextAttributeValue existingText when newEntity is TextAttributeValue newText:
+                existingText.Value = newText.Value;
+                break;
+            case DecimalAttributeValue existingDec when newEntity is DecimalAttributeValue newDec:
+                existingDec.Value = newDec.Value;
+                break;
+            case IntegerAttributeValue existingInt when newEntity is IntegerAttributeValue newInt:
+                existingInt.Value = newInt.Value;
+                break;
+            case DateAttributeValue existingDate when newEntity is DateAttributeValue newDate:
+                existingDate.Value = newDate.Value;
+                break;
+            case TimeAttributeValue existingTime when newEntity is TimeAttributeValue newTime:
+                existingTime.Value = newTime.Value;
+                break;
+            case DateTimeAttributeValue existingDt when newEntity is DateTimeAttributeValue newDt:
+                existingDt.Value = newDt.Value;
+                break;
+            case FileAttributeValue existingFile when newEntity is FileAttributeValue newFile:
+                existingFile.Value = newFile.Value;
+                break;
+            case LocationAttributeValue existingLoc when newEntity is LocationAttributeValue newLoc:
+                existingLoc.Latitude = newLoc.Latitude;
+                existingLoc.Longitude = newLoc.Longitude;
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"属性值类型不匹配或不受支持：现有类型 '{existing.GetType().Name}'，新值类型 '{newEntity.GetType().Name}'。");
+        }
+
+        // 5. 处理 DateTimeAttributeValue 的 UTC 转换
+        if (existing is DateTimeAttributeValue dt)
+        {
+            var original = dt.Value;
+            dt.Value = new DateTimeOffset(original.UtcDateTime, TimeSpan.Zero);
+            _logger.LogInformation(
+                "DateTimeAttributeValue 更新时区转换: 原始 {Original} (Offset={Offset}) -> 转换后 {Converted} (Offset=00:00)",
+                original, original.Offset, dt.Value);
+        }
+
+        // 6. 处理 DateAttributeValue 的 UTC 转换
+        if (existing is DateAttributeValue d)
+        {
+            var original = d.Value;
+            d.Value = new DateTimeOffset(original.UtcDateTime, TimeSpan.Zero);
+            _logger.LogInformation(
+                "DateAttributeValue 更新时区转换: 原始 {Original} (Offset={Offset}) -> 转换后 {Converted} (Offset=00:00)",
+                original, original.Offset, d.Value);
+        }
+
+        // 7. 保存
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     // ---------- 私有辅助方法 ----------
     private async Task<AttributeValueBase?> FindValueAsync(string nodeId, string id)
     {
