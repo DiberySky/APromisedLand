@@ -24,7 +24,14 @@ public class AppHostContext
 
     // public IResourceBuilder<ParameterResource>? TypesenseApiKey { get; set; }
     public string? TypesenseApiKey { get; set; }
-
+    
+    // NebulaGraph
+    public IResourceBuilder<ContainerResource>? NebulaGraph { get; set; } // NebulaGraph 容器
+    public IResourceBuilder<ContainerResource>? NebulaConsole { get; set; } // NebulaGraph 容器
+    public EndpointReference? NebulaGraphEndpoint { get; set; } // NebulaGraph 服务端口
+    public IResourceBuilder<ContainerResource>? NebulaStudio { get; set; } // NebulaStudio 容器
+    public IResourceBuilder<ProjectResource>? NebulaGraphApiService { get; set; }
+    
     // Storage (SeaweedFS)
     public IResourceBuilder<ContainerResource>? SeaweedMaster { get; set; }
     public IResourceBuilder<ContainerResource>? SeaweedVolume { get; set; }

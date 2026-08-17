@@ -1,0 +1,24 @@
+Log file created at: 2026/08/17 16:02:58
+Running on machine: bc70aa836af6
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+E20260817 16:02:58.958837     1 MemoryUtils.cpp:167] Total memory less than untracked 50 Mib, MemoryTracker limit is not set properly,  Current memory stats:MemoryStats: 8589934592.000GiB/56.000MiB
+E20260817 16:03:03.267534    31 QueryInstance.cpp:151] Existed!, query: ADD HOSTS "nebula-storaged0":9779
+W20260817 16:03:14.039451    33 TagIndexExecutor.cpp:31] SpaceId: 1, Create index `person_index' at tag: `person' failed: Invalid param!
+E20260817 16:03:14.040235    34 QueryInstance.cpp:151] Invalid param!, query: CREATE TAG INDEX IF NOT EXISTS `person_index` ON `person` (`name`)
+W20260817 16:03:16.148393    33 TagIndexExecutor.cpp:31] SpaceId: 1, Create index `person_index' at tag: `person' failed: Invalid param!
+E20260817 16:03:16.148958    30 QueryInstance.cpp:151] Invalid param!, query: CREATE TAG INDEX IF NOT EXISTS `person_index` ON `person` (`name`)
+W20260817 16:03:18.191097    31 TagIndexExecutor.cpp:31] SpaceId: 1, Create index `person_index' at tag: `person' failed: Invalid param!
+E20260817 16:03:18.191605    31 QueryInstance.cpp:151] Invalid param!, query: CREATE TAG INDEX IF NOT EXISTS `person_index` ON `person` (`name`)
+W20260817 16:04:21.180744    30 TagIndexExecutor.cpp:31] SpaceId: 1, Create index `person_index' at tag: `person' failed: Invalid param!
+E20260817 16:04:21.181150    30 QueryInstance.cpp:151] Invalid param!, query: CREATE TAG INDEX IF NOT EXISTS `person_index` ON `person` (`name`)
+W20260817 16:04:23.281093    31 TagIndexExecutor.cpp:31] SpaceId: 1, Create index `person_index' at tag: `person' failed: Invalid param!
+E20260817 16:04:23.281663    29 QueryInstance.cpp:151] Invalid param!, query: CREATE TAG INDEX IF NOT EXISTS `person_index` ON `person` (`name`)
+W20260817 16:04:25.320195    34 TagIndexExecutor.cpp:31] SpaceId: 1, Create index `person_index' at tag: `person' failed: Invalid param!
+E20260817 16:04:25.320649    29 QueryInstance.cpp:151] Invalid param!, query: CREATE TAG INDEX IF NOT EXISTS `person_index` ON `person` (`name`)
+E20260817 16:15:08.497808    49 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260817 16:15:13.345527    49 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260817 16:15:13.346436    49 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260817 16:15:13.347364    49 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260817 16:15:13.348341    25 GraphSessionManager.cpp:168] Remove sessions failed: RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260817 16:15:14.373443    50 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2

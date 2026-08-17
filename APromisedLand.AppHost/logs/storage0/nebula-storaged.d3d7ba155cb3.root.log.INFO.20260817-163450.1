@@ -1,0 +1,410 @@
+Log file created at: 2026/08/17 16:34:50
+Running on machine: d3d7ba155cb3
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20260817 16:34:50.560274     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260817 16:34:50.567446     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260817 16:34:50.581599     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260817 16:34:50.582243     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260817 16:34:50.583240     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260817 16:34:50.601123    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:34:51.606865    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:34:52.610190    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:34:53.614298    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+E20260817 16:34:53.624974    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260817 16:34:53.677784    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260817 16:34:53.683357     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260817 16:34:53.685968     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260817 16:35:03.687639     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260817 16:35:03.690054    54 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.693020    54 MetaClient.cpp:2672] Persist the cluster Id from metad 2557737320329270911
+I20260817 16:35:03.693403    54 FileBasedClusterIdMan.cpp:21] Remove the existed file cluster.id
+I20260817 16:35:03.694079    54 FileBasedClusterIdMan.cpp:34] Persist clusterId 2557737320329270911 succeeded!
+I20260817 16:35:03.695570    55 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.697781    56 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.700284    71 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.702531    72 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.704893    73 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.708205    74 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.710610    75 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.712505     1 MetaClient.cpp:3263] Load leader of "storaged0":9779 in 0 space
+I20260817 16:35:03.712941     1 MetaClient.cpp:3263] Load leader of "nebula-storaged0":9779 in 0 space
+I20260817 16:35:03.713352     1 MetaClient.cpp:3269] Load leader ok
+I20260817 16:35:03.758267    76 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.760980    77 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:03.763141     1 MetaClient.cpp:162] Register time task for heartbeat!
+I20260817 16:35:03.763526     1 StorageServer.cpp:250] Init schema manager
+I20260817 16:35:03.763877     1 StorageServer.cpp:253] Init index manager
+I20260817 16:35:03.764195     1 StorageServer.cpp:256] Init kvstore
+I20260817 16:35:03.764554     1 NebulaStore.cpp:48] Start the raft service...
+I20260817 16:35:03.766050     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260817 16:35:03.800246     1 RaftexService.cpp:46] Start raft service on 9780
+I20260817 16:35:03.810202     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260817 16:35:03.812296     1 NebulaStore.cpp:90] Scan path "/data/storage/nebula/0"
+I20260817 16:35:03.812656     1 NebulaStore.cpp:90] Scan path "/data/storage/nebula/3"
+E20260817 16:35:03.813624    90 MetaClient.cpp:2016] Space 3 not found!
+E20260817 16:35:03.814253    90 MetaClient.cpp:2016] Space 3 not found!
+I20260817 16:35:03.817866    90 RocksEngineConfig.cpp:371] Emplace rocksdb option max_bytes_for_level_base=268435456
+I20260817 16:35:03.818169    90 RocksEngineConfig.cpp:371] Emplace rocksdb option max_write_buffer_number=4
+I20260817 16:35:03.818477    90 RocksEngineConfig.cpp:371] Emplace rocksdb option write_buffer_size=67108864
+I20260817 16:35:03.819049    90 RocksEngineConfig.cpp:371] Emplace rocksdb option block_size=8192
+I20260817 16:35:03.910297    90 RocksEngine.cpp:107] open rocksdb on /data/storage/nebula/3/data
+I20260817 16:35:03.910831     1 NebulaStore.cpp:117] Load space 3 from disk
+I20260817 16:35:03.911300     1 NebulaStore.cpp:179] Part 1 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.912037     1 NebulaStore.cpp:179] Part 2 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.912655     1 NebulaStore.cpp:179] Part 3 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.913357     1 NebulaStore.cpp:179] Part 4 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.913968     1 NebulaStore.cpp:179] Part 5 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.914635     1 NebulaStore.cpp:179] Part 6 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.915210     1 NebulaStore.cpp:179] Part 7 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.915802     1 NebulaStore.cpp:179] Part 8 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.916488     1 NebulaStore.cpp:179] Part 9 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.917129     1 NebulaStore.cpp:179] Part 10 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.917809     1 NebulaStore.cpp:179] Part 11 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.918448     1 NebulaStore.cpp:179] Part 12 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.919082     1 NebulaStore.cpp:179] Part 13 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.919924     1 NebulaStore.cpp:179] Part 14 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.920689     1 NebulaStore.cpp:179] Part 15 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.921286     1 NebulaStore.cpp:179] Part 16 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.921942     1 NebulaStore.cpp:179] Part 17 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.922606     1 NebulaStore.cpp:179] Part 18 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.923288     1 NebulaStore.cpp:179] Part 19 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.924036     1 NebulaStore.cpp:179] Part 20 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.924654     1 NebulaStore.cpp:179] Part 21 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.925239     1 NebulaStore.cpp:179] Part 22 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.925822     1 NebulaStore.cpp:179] Part 23 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.926397     1 NebulaStore.cpp:179] Part 24 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.926972     1 NebulaStore.cpp:179] Part 25 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.927726     1 NebulaStore.cpp:179] Part 26 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.928305     1 NebulaStore.cpp:179] Part 27 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.928900     1 NebulaStore.cpp:179] Part 28 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.929577     1 NebulaStore.cpp:179] Part 29 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.930238     1 NebulaStore.cpp:179] Part 30 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.930860     1 NebulaStore.cpp:179] Part 31 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.931561     1 NebulaStore.cpp:179] Part 32 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.932173     1 NebulaStore.cpp:179] Part 33 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.932750     1 NebulaStore.cpp:179] Part 34 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.933308     1 NebulaStore.cpp:179] Part 35 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.933956     1 NebulaStore.cpp:179] Part 36 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.934511     1 NebulaStore.cpp:179] Part 37 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.935079     1 NebulaStore.cpp:179] Part 38 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.935611     1 NebulaStore.cpp:179] Part 39 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.936179     1 NebulaStore.cpp:179] Part 40 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.936913     1 NebulaStore.cpp:179] Part 41 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.937721     1 NebulaStore.cpp:179] Part 42 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.938264     1 NebulaStore.cpp:179] Part 43 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.938884     1 NebulaStore.cpp:179] Part 44 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.939505     1 NebulaStore.cpp:179] Part 45 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.940152     1 NebulaStore.cpp:179] Part 46 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.940657     1 NebulaStore.cpp:179] Part 47 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.941174     1 NebulaStore.cpp:179] Part 48 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.941808     1 NebulaStore.cpp:179] Part 49 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.942339     1 NebulaStore.cpp:179] Part 50 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.943135     1 NebulaStore.cpp:179] Part 51 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.943804     1 NebulaStore.cpp:179] Part 52 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.944476     1 NebulaStore.cpp:179] Part 53 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.945086     1 NebulaStore.cpp:179] Part 54 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.945668     1 NebulaStore.cpp:179] Part 55 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.946280     1 NebulaStore.cpp:179] Part 56 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.946866     1 NebulaStore.cpp:179] Part 57 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.947489     1 NebulaStore.cpp:179] Part 58 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.948103     1 NebulaStore.cpp:179] Part 59 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.948760     1 NebulaStore.cpp:179] Part 60 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.949471     1 NebulaStore.cpp:179] Part 61 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.950115     1 NebulaStore.cpp:179] Part 62 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.950706     1 NebulaStore.cpp:179] Part 63 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.951352     1 NebulaStore.cpp:179] Part 64 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.952139     1 NebulaStore.cpp:179] Part 65 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.952996     1 NebulaStore.cpp:179] Part 66 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.953682     1 NebulaStore.cpp:179] Part 67 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.954346     1 NebulaStore.cpp:179] Part 68 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.955119     1 NebulaStore.cpp:179] Part 69 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.955796     1 NebulaStore.cpp:179] Part 70 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.956364     1 NebulaStore.cpp:179] Part 71 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.956957     1 NebulaStore.cpp:179] Part 72 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.957784     1 NebulaStore.cpp:179] Part 73 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.958382     1 NebulaStore.cpp:179] Part 74 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.959056     1 NebulaStore.cpp:179] Part 75 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.959664     1 NebulaStore.cpp:179] Part 76 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.960304     1 NebulaStore.cpp:179] Part 77 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.960968     1 NebulaStore.cpp:179] Part 78 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.961678     1 NebulaStore.cpp:179] Part 79 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.962194     1 NebulaStore.cpp:179] Part 80 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.962713     1 NebulaStore.cpp:179] Part 81 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.963192     1 NebulaStore.cpp:179] Part 82 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.963677     1 NebulaStore.cpp:179] Part 83 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.964334     1 NebulaStore.cpp:179] Part 84 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.965027     1 NebulaStore.cpp:179] Part 85 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.965682     1 NebulaStore.cpp:179] Part 86 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.966274     1 NebulaStore.cpp:179] Part 87 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.966738     1 NebulaStore.cpp:179] Part 88 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.967314     1 NebulaStore.cpp:179] Part 89 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.967916     1 NebulaStore.cpp:179] Part 90 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.968542     1 NebulaStore.cpp:179] Part 91 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.969079     1 NebulaStore.cpp:179] Part 92 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.969642     1 NebulaStore.cpp:179] Part 93 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.970142     1 NebulaStore.cpp:179] Part 94 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.970618     1 NebulaStore.cpp:179] Part 95 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.971149     1 NebulaStore.cpp:179] Part 96 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.971822     1 NebulaStore.cpp:179] Part 97 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.972319     1 NebulaStore.cpp:179] Part 98 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.972820     1 NebulaStore.cpp:179] Part 99 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.977723     1 NebulaStore.cpp:179] Part 100 is not in balancing and does not exist in meta any more, will remove it!
+I20260817 16:35:03.978523     1 RocksEngine.h:247] Release rocksdb on /data/storage/nebula/3
+I20260817 16:35:03.986740     1 NebulaStore.cpp:744] Try to remove space directory: /data/storage/nebula/3
+I20260817 16:35:04.617062     1 NebulaStore.cpp:746] Space directory removed: /data/storage/nebula/3
+I20260817 16:35:04.617580     1 NebulaStore.cpp:292] Init data from partManager for "nebula-storaged0":9779
+I20260817 16:35:04.618031     1 NebulaStore.cpp:75] Register handler...
+I20260817 16:35:04.618386     1 StorageServer.cpp:259] Init LogMonitor
+I20260817 16:35:04.618927     1 StorageServer.cpp:126] Starting Storage HTTP Service
+I20260817 16:35:04.619766     1 StorageServer.cpp:130] Http Thread Pool started
+I20260817 16:35:04.624259   113 WebService.cpp:124] Web service started on HTTP[19779]
+I20260817 16:35:04.628795     1 RocksEngineConfig.cpp:371] Emplace rocksdb option max_bytes_for_level_base=268435456
+I20260817 16:35:04.629199     1 RocksEngineConfig.cpp:371] Emplace rocksdb option max_write_buffer_number=4
+I20260817 16:35:04.629750     1 RocksEngineConfig.cpp:371] Emplace rocksdb option write_buffer_size=67108864
+I20260817 16:35:04.630295     1 RocksEngineConfig.cpp:371] Emplace rocksdb option block_size=8192
+I20260817 16:35:04.718942     1 RocksEngine.cpp:107] open rocksdb on /data/storage/nebula/0/data
+I20260817 16:35:04.719628     1 AdminTaskManager.cpp:22] max concurrent subtasks: 10
+I20260817 16:35:04.720273   135 AdminTaskManager.cpp:224] waiting for incoming task
+I20260817 16:35:04.720293     1 AdminTaskManager.cpp:40] exit AdminTaskManager::init()
+E20260817 16:35:04.769170     1 MemoryUtils.cpp:167] Total memory less than untracked 50 Mib, MemoryTracker limit is not set properly,  Current memory stats:MemoryStats: 8589934592.000GiB/129.015MiB
+I20260817 16:35:04.770218     1 MemoryUtils.cpp:171] MemoryTracker set static ratio: 0.8
+I20260817 16:35:14.061209    78 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:14.064370    79 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:14.066021    80 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:14.067845    87 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:14.069785    88 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:14.071425    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260817 16:35:14.078819    81 MetaClient.cpp:3263] Load leader of "storaged0":9779 in 0 space
+I20260817 16:35:14.079316    81 MetaClient.cpp:3263] Load leader of "nebula-storaged0":9779 in 0 space
+I20260817 16:35:14.079856    81 MetaClient.cpp:3269] Load leader ok
+I20260817 16:35:14.080408    81 NebulaStore.cpp:417] Create data space 4
+I20260817 16:35:14.087291   187 RocksEngineConfig.cpp:371] Emplace rocksdb option max_bytes_for_level_base=268435456
+I20260817 16:35:14.087713   187 RocksEngineConfig.cpp:371] Emplace rocksdb option max_write_buffer_number=4
+I20260817 16:35:14.088299   187 RocksEngineConfig.cpp:371] Emplace rocksdb option write_buffer_size=67108864
+I20260817 16:35:14.088932   187 RocksEngineConfig.cpp:371] Emplace rocksdb option block_size=8192
+I20260817 16:35:14.176385   187 RocksEngine.cpp:107] open rocksdb on /data/storage/nebula/4/data
+I20260817 16:35:14.184825    81 NebulaStore.cpp:480] Space 4, part 47 has been added, asLearner 0
+I20260817 16:35:14.193101    81 NebulaStore.cpp:480] Space 4, part 46 has been added, asLearner 0
+I20260817 16:35:14.203058    81 NebulaStore.cpp:480] Space 4, part 45 has been added, asLearner 0
+I20260817 16:35:14.211504    81 NebulaStore.cpp:480] Space 4, part 78 has been added, asLearner 0
+I20260817 16:35:14.221860    81 NebulaStore.cpp:480] Space 4, part 79 has been added, asLearner 0
+I20260817 16:35:14.232556    81 NebulaStore.cpp:480] Space 4, part 80 has been added, asLearner 0
+I20260817 16:35:14.242311    81 NebulaStore.cpp:480] Space 4, part 81 has been added, asLearner 0
+I20260817 16:35:14.253297    81 NebulaStore.cpp:480] Space 4, part 82 has been added, asLearner 0
+I20260817 16:35:14.264825    81 NebulaStore.cpp:480] Space 4, part 83 has been added, asLearner 0
+I20260817 16:35:14.273491    81 NebulaStore.cpp:480] Space 4, part 84 has been added, asLearner 0
+I20260817 16:35:14.287401    81 NebulaStore.cpp:480] Space 4, part 85 has been added, asLearner 0
+I20260817 16:35:14.301349    81 NebulaStore.cpp:480] Space 4, part 86 has been added, asLearner 0
+I20260817 16:35:14.313627    81 NebulaStore.cpp:480] Space 4, part 93 has been added, asLearner 0
+I20260817 16:35:14.325165    81 NebulaStore.cpp:480] Space 4, part 94 has been added, asLearner 0
+I20260817 16:35:14.336055    81 NebulaStore.cpp:480] Space 4, part 95 has been added, asLearner 0
+I20260817 16:35:14.346385    81 NebulaStore.cpp:480] Space 4, part 97 has been added, asLearner 0
+I20260817 16:35:14.356976    81 NebulaStore.cpp:480] Space 4, part 96 has been added, asLearner 0
+I20260817 16:35:14.367578    81 NebulaStore.cpp:480] Space 4, part 92 has been added, asLearner 0
+I20260817 16:35:14.377566    81 NebulaStore.cpp:480] Space 4, part 91 has been added, asLearner 0
+I20260817 16:35:14.387615    81 NebulaStore.cpp:480] Space 4, part 90 has been added, asLearner 0
+I20260817 16:35:14.397715    81 NebulaStore.cpp:480] Space 4, part 89 has been added, asLearner 0
+I20260817 16:35:14.406988    81 NebulaStore.cpp:480] Space 4, part 88 has been added, asLearner 0
+I20260817 16:35:14.416782    81 NebulaStore.cpp:480] Space 4, part 87 has been added, asLearner 0
+I20260817 16:35:14.426740    81 NebulaStore.cpp:480] Space 4, part 74 has been added, asLearner 0
+I20260817 16:35:14.434473    81 NebulaStore.cpp:480] Space 4, part 73 has been added, asLearner 0
+I20260817 16:35:14.440614    81 NebulaStore.cpp:480] Space 4, part 72 has been added, asLearner 0
+I20260817 16:35:14.447049    81 NebulaStore.cpp:480] Space 4, part 71 has been added, asLearner 0
+I20260817 16:35:14.453363    81 NebulaStore.cpp:480] Space 4, part 58 has been added, asLearner 0
+I20260817 16:35:14.459613    81 NebulaStore.cpp:480] Space 4, part 57 has been added, asLearner 0
+I20260817 16:35:14.466275    81 NebulaStore.cpp:480] Space 4, part 55 has been added, asLearner 0
+I20260817 16:35:14.472826    81 NebulaStore.cpp:480] Space 4, part 56 has been added, asLearner 0
+I20260817 16:35:14.478981    81 NebulaStore.cpp:480] Space 4, part 53 has been added, asLearner 0
+I20260817 16:35:14.485306    81 NebulaStore.cpp:480] Space 4, part 100 has been added, asLearner 0
+I20260817 16:35:14.491326    81 NebulaStore.cpp:480] Space 4, part 3 has been added, asLearner 0
+I20260817 16:35:14.497972    81 NebulaStore.cpp:480] Space 4, part 54 has been added, asLearner 0
+I20260817 16:35:14.503302    81 NebulaStore.cpp:480] Space 4, part 99 has been added, asLearner 0
+I20260817 16:35:14.508625    81 NebulaStore.cpp:480] Space 4, part 2 has been added, asLearner 0
+I20260817 16:35:14.514218    81 NebulaStore.cpp:480] Space 4, part 52 has been added, asLearner 0
+I20260817 16:35:14.519353    81 NebulaStore.cpp:480] Space 4, part 98 has been added, asLearner 0
+I20260817 16:35:14.524892    81 NebulaStore.cpp:480] Space 4, part 1 has been added, asLearner 0
+I20260817 16:35:14.530967    81 NebulaStore.cpp:480] Space 4, part 51 has been added, asLearner 0
+I20260817 16:35:14.536322    81 NebulaStore.cpp:480] Space 4, part 59 has been added, asLearner 0
+I20260817 16:35:14.541630    81 NebulaStore.cpp:480] Space 4, part 60 has been added, asLearner 0
+I20260817 16:35:14.546705    81 NebulaStore.cpp:480] Space 4, part 61 has been added, asLearner 0
+I20260817 16:35:14.551901    81 NebulaStore.cpp:480] Space 4, part 62 has been added, asLearner 0
+I20260817 16:35:14.557546    81 NebulaStore.cpp:480] Space 4, part 63 has been added, asLearner 0
+I20260817 16:35:14.563277    81 NebulaStore.cpp:480] Space 4, part 64 has been added, asLearner 0
+I20260817 16:35:14.568928    81 NebulaStore.cpp:480] Space 4, part 65 has been added, asLearner 0
+I20260817 16:35:14.575076    81 NebulaStore.cpp:480] Space 4, part 66 has been added, asLearner 0
+I20260817 16:35:14.580230    81 NebulaStore.cpp:480] Space 4, part 67 has been added, asLearner 0
+I20260817 16:35:14.585597    81 NebulaStore.cpp:480] Space 4, part 68 has been added, asLearner 0
+I20260817 16:35:14.591159    81 NebulaStore.cpp:480] Space 4, part 69 has been added, asLearner 0
+I20260817 16:35:14.597431    81 NebulaStore.cpp:480] Space 4, part 70 has been added, asLearner 0
+I20260817 16:35:14.603372    81 NebulaStore.cpp:480] Space 4, part 77 has been added, asLearner 0
+I20260817 16:35:14.613001    81 NebulaStore.cpp:480] Space 4, part 76 has been added, asLearner 0
+I20260817 16:35:14.620621    81 NebulaStore.cpp:480] Space 4, part 75 has been added, asLearner 0
+I20260817 16:35:14.626715    81 NebulaStore.cpp:480] Space 4, part 50 has been added, asLearner 0
+I20260817 16:35:14.633600    81 NebulaStore.cpp:480] Space 4, part 49 has been added, asLearner 0
+I20260817 16:35:14.639659    81 NebulaStore.cpp:480] Space 4, part 48 has been added, asLearner 0
+I20260817 16:35:14.645340    81 NebulaStore.cpp:480] Space 4, part 23 has been added, asLearner 0
+I20260817 16:35:14.653112    81 NebulaStore.cpp:480] Space 4, part 22 has been added, asLearner 0
+I20260817 16:35:14.660558    81 NebulaStore.cpp:480] Space 4, part 21 has been added, asLearner 0
+I20260817 16:35:14.667634    81 NebulaStore.cpp:480] Space 4, part 20 has been added, asLearner 0
+I20260817 16:35:14.673754    81 NebulaStore.cpp:480] Space 4, part 19 has been added, asLearner 0
+I20260817 16:35:14.680382    81 NebulaStore.cpp:480] Space 4, part 18 has been added, asLearner 0
+I20260817 16:35:14.687224    81 NebulaStore.cpp:480] Space 4, part 17 has been added, asLearner 0
+I20260817 16:35:14.692981    81 NebulaStore.cpp:480] Space 4, part 16 has been added, asLearner 0
+I20260817 16:35:14.698594    81 NebulaStore.cpp:480] Space 4, part 15 has been added, asLearner 0
+I20260817 16:35:14.705068    81 NebulaStore.cpp:480] Space 4, part 14 has been added, asLearner 0
+I20260817 16:35:14.711135    81 NebulaStore.cpp:480] Space 4, part 13 has been added, asLearner 0
+I20260817 16:35:14.720682    81 NebulaStore.cpp:480] Space 4, part 12 has been added, asLearner 0
+I20260817 16:35:14.729800    81 NebulaStore.cpp:480] Space 4, part 5 has been added, asLearner 0
+I20260817 16:35:14.735950    81 NebulaStore.cpp:480] Space 4, part 4 has been added, asLearner 0
+I20260817 16:35:14.742564    81 NebulaStore.cpp:480] Space 4, part 6 has been added, asLearner 0
+I20260817 16:35:14.748131    81 NebulaStore.cpp:480] Space 4, part 7 has been added, asLearner 0
+I20260817 16:35:14.753449    81 NebulaStore.cpp:480] Space 4, part 8 has been added, asLearner 0
+I20260817 16:35:14.759703    81 NebulaStore.cpp:480] Space 4, part 9 has been added, asLearner 0
+I20260817 16:35:14.765308    81 NebulaStore.cpp:480] Space 4, part 10 has been added, asLearner 0
+I20260817 16:35:14.771101    81 NebulaStore.cpp:480] Space 4, part 11 has been added, asLearner 0
+I20260817 16:35:14.777050    81 NebulaStore.cpp:480] Space 4, part 24 has been added, asLearner 0
+I20260817 16:35:14.782699    81 NebulaStore.cpp:480] Space 4, part 25 has been added, asLearner 0
+I20260817 16:35:14.788144    81 NebulaStore.cpp:480] Space 4, part 26 has been added, asLearner 0
+I20260817 16:35:14.794412    81 NebulaStore.cpp:480] Space 4, part 27 has been added, asLearner 0
+I20260817 16:35:14.800192    81 NebulaStore.cpp:480] Space 4, part 28 has been added, asLearner 0
+I20260817 16:35:14.806555    81 NebulaStore.cpp:480] Space 4, part 29 has been added, asLearner 0
+I20260817 16:35:14.812244    81 NebulaStore.cpp:480] Space 4, part 30 has been added, asLearner 0
+I20260817 16:35:14.817809    81 NebulaStore.cpp:480] Space 4, part 31 has been added, asLearner 0
+I20260817 16:35:14.823633    81 NebulaStore.cpp:480] Space 4, part 32 has been added, asLearner 0
+I20260817 16:35:14.829028    81 NebulaStore.cpp:480] Space 4, part 33 has been added, asLearner 0
+I20260817 16:35:14.834632    81 NebulaStore.cpp:480] Space 4, part 34 has been added, asLearner 0
+I20260817 16:35:14.841480    81 NebulaStore.cpp:480] Space 4, part 35 has been added, asLearner 0
+I20260817 16:35:14.848145    81 NebulaStore.cpp:480] Space 4, part 36 has been added, asLearner 0
+I20260817 16:35:14.854302    81 NebulaStore.cpp:480] Space 4, part 37 has been added, asLearner 0
+I20260817 16:35:14.860025    81 NebulaStore.cpp:480] Space 4, part 38 has been added, asLearner 0
+I20260817 16:35:14.865505    81 NebulaStore.cpp:480] Space 4, part 39 has been added, asLearner 0
+I20260817 16:35:14.871217    81 NebulaStore.cpp:480] Space 4, part 40 has been added, asLearner 0
+I20260817 16:35:14.877367    81 NebulaStore.cpp:480] Space 4, part 41 has been added, asLearner 0
+I20260817 16:35:14.883268    81 NebulaStore.cpp:480] Space 4, part 42 has been added, asLearner 0
+I20260817 16:35:14.888947    81 NebulaStore.cpp:480] Space 4, part 43 has been added, asLearner 0
+I20260817 16:35:14.894747    81 NebulaStore.cpp:480] Space 4, part 44 has been added, asLearner 0
+I20260817 16:35:34.927665    81 MetaClient.cpp:3263] Load leader of "storaged0":9779 in 0 space
+I20260817 16:35:34.928256    81 MetaClient.cpp:3263] Load leader of "nebula-storaged0":9779 in 1 space
+I20260817 16:35:34.928949    81 MetaClient.cpp:3269] Load leader ok
+I20260817 16:36:14.651161     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+I20260817 16:36:14.654017     1 NebulaStore.cpp:343] Stop the raft service...
+I20260817 16:36:14.655509     1 RaftexService.cpp:67] Stopping the raftex service on port 9780
+I20260817 16:36:14.656230     1 RaftexService.cpp:77] All partitions have stopped
+I20260817 16:36:14.656973     1 NebulaStore.cpp:346] Stop kv engine...
+I20260817 16:36:14.673121    54 Acceptor.cpp:527] Dropping all connections from Acceptor=0x756478290228 in thread 0x756489e05000
+I20260817 16:36:14.674911    55 Acceptor.cpp:527] Dropping all connections from Acceptor=0x756478290728 in thread 0x756489005000
+I20260817 16:36:14.677003    56 Acceptor.cpp:527] Dropping all connections from Acceptor=0x756478290c28 in thread 0x756488205000
+I20260817 16:36:14.687774     1 AdminTaskManager.cpp:176] enter AdminTaskManager::shutdown()
+I20260817 16:36:14.688503   136 AdminTaskManager.cpp:146] Unreported-Admin-Thread stopped
+I20260817 16:36:14.696882   135 AdminTaskManager.cpp:231] detect AdminTaskManager::shutdown()
+I20260817 16:36:14.697861     1 RocksEngine.h:247] Release rocksdb on /data/storage/nebula/0
+I20260817 16:36:14.708233     1 AdminTaskManager.cpp:193] exit AdminTaskManager::shutdown()
+I20260817 16:36:14.708961     1 NebulaStore.cpp:343] Stop the raft service...
+I20260817 16:36:14.709474     1 RaftexService.cpp:67] Stopping the raftex service on port 9780
+I20260817 16:36:14.709933     1 RaftexService.cpp:77] All partitions have stopped
+I20260817 16:36:14.710417     1 NebulaStore.cpp:346] Stop kv engine...
+I20260817 16:36:14.710923     1 NebulaStore.cpp:36] Cut off the relationship with meta client
+I20260817 16:36:14.712376     1 Part.h:59] [Port: 9780, Space: 4, Part: 44] ~Part()
+I20260817 16:36:14.716161     1 Part.h:59] [Port: 9780, Space: 4, Part: 43] ~Part()
+I20260817 16:36:14.720690     1 Part.h:59] [Port: 9780, Space: 4, Part: 42] ~Part()
+I20260817 16:36:14.725198     1 Part.h:59] [Port: 9780, Space: 4, Part: 64] ~Part()
+I20260817 16:36:14.729537     1 Part.h:59] [Port: 9780, Space: 4, Part: 63] ~Part()
+I20260817 16:36:14.735003     1 Part.h:59] [Port: 9780, Space: 4, Part: 62] ~Part()
+I20260817 16:36:14.743119     1 Part.h:59] [Port: 9780, Space: 4, Part: 61] ~Part()
+I20260817 16:36:14.749653     1 Part.h:59] [Port: 9780, Space: 4, Part: 60] ~Part()
+I20260817 16:36:14.756321     1 Part.h:59] [Port: 9780, Space: 4, Part: 59] ~Part()
+I20260817 16:36:14.761807     1 Part.h:59] [Port: 9780, Space: 4, Part: 51] ~Part()
+I20260817 16:36:14.769078     1 Part.h:59] [Port: 9780, Space: 4, Part: 98] ~Part()
+I20260817 16:36:14.774024     1 Part.h:59] [Port: 9780, Space: 4, Part: 1] ~Part()
+I20260817 16:36:14.779058     1 Part.h:59] [Port: 9780, Space: 4, Part: 52] ~Part()
+I20260817 16:36:14.783048     1 Part.h:59] [Port: 9780, Space: 4, Part: 99] ~Part()
+I20260817 16:36:14.786774     1 Part.h:59] [Port: 9780, Space: 4, Part: 2] ~Part()
+I20260817 16:36:14.790530     1 Part.h:59] [Port: 9780, Space: 4, Part: 54] ~Part()
+I20260817 16:36:14.794674     1 Part.h:59] [Port: 9780, Space: 4, Part: 100] ~Part()
+I20260817 16:36:14.798578     1 Part.h:59] [Port: 9780, Space: 4, Part: 3] ~Part()
+I20260817 16:36:14.802364     1 Part.h:59] [Port: 9780, Space: 4, Part: 53] ~Part()
+I20260817 16:36:14.805848     1 Part.h:59] [Port: 9780, Space: 4, Part: 56] ~Part()
+I20260817 16:36:14.810168     1 Part.h:59] [Port: 9780, Space: 4, Part: 55] ~Part()
+I20260817 16:36:14.814076     1 Part.h:59] [Port: 9780, Space: 4, Part: 57] ~Part()
+I20260817 16:36:14.818037     1 Part.h:59] [Port: 9780, Space: 4, Part: 58] ~Part()
+I20260817 16:36:14.822141     1 Part.h:59] [Port: 9780, Space: 4, Part: 71] ~Part()
+I20260817 16:36:14.826527     1 Part.h:59] [Port: 9780, Space: 4, Part: 72] ~Part()
+I20260817 16:36:14.831068     1 Part.h:59] [Port: 9780, Space: 4, Part: 73] ~Part()
+I20260817 16:36:14.836501     1 Part.h:59] [Port: 9780, Space: 4, Part: 74] ~Part()
+I20260817 16:36:14.840231     1 Part.h:59] [Port: 9780, Space: 4, Part: 85] ~Part()
+I20260817 16:36:14.844501     1 Part.h:59] [Port: 9780, Space: 4, Part: 84] ~Part()
+I20260817 16:36:14.849028     1 Part.h:59] [Port: 9780, Space: 4, Part: 83] ~Part()
+I20260817 16:36:14.853147     1 Part.h:59] [Port: 9780, Space: 4, Part: 82] ~Part()
+I20260817 16:36:14.857296     1 Part.h:59] [Port: 9780, Space: 4, Part: 81] ~Part()
+I20260817 16:36:14.861150     1 Part.h:59] [Port: 9780, Space: 4, Part: 80] ~Part()
+I20260817 16:36:14.865482     1 Part.h:59] [Port: 9780, Space: 4, Part: 91] ~Part()
+I20260817 16:36:14.870252     1 Part.h:59] [Port: 9780, Space: 4, Part: 78] ~Part()
+I20260817 16:36:14.874464     1 Part.h:59] [Port: 9780, Space: 4, Part: 93] ~Part()
+I20260817 16:36:14.879915     1 Part.h:59] [Port: 9780, Space: 4, Part: 46] ~Part()
+I20260817 16:36:14.883970     1 Part.h:59] [Port: 9780, Space: 4, Part: 45] ~Part()
+I20260817 16:36:14.888978     1 Part.h:59] [Port: 9780, Space: 4, Part: 92] ~Part()
+I20260817 16:36:14.893903     1 Part.h:59] [Port: 9780, Space: 4, Part: 79] ~Part()
+I20260817 16:36:14.898792     1 Part.h:59] [Port: 9780, Space: 4, Part: 86] ~Part()
+I20260817 16:36:14.903115     1 Part.h:59] [Port: 9780, Space: 4, Part: 47] ~Part()
+I20260817 16:36:14.907552     1 Part.h:59] [Port: 9780, Space: 4, Part: 94] ~Part()
+I20260817 16:36:14.912050     1 Part.h:59] [Port: 9780, Space: 4, Part: 95] ~Part()
+I20260817 16:36:14.916705     1 Part.h:59] [Port: 9780, Space: 4, Part: 97] ~Part()
+I20260817 16:36:14.920732     1 Part.h:59] [Port: 9780, Space: 4, Part: 96] ~Part()
+I20260817 16:36:14.926373     1 Part.h:59] [Port: 9780, Space: 4, Part: 90] ~Part()
+I20260817 16:36:14.933050     1 Part.h:59] [Port: 9780, Space: 4, Part: 89] ~Part()
+I20260817 16:36:14.939203     1 Part.h:59] [Port: 9780, Space: 4, Part: 88] ~Part()
+I20260817 16:36:14.944463     1 Part.h:59] [Port: 9780, Space: 4, Part: 87] ~Part()
+I20260817 16:36:14.948577     1 Part.h:59] [Port: 9780, Space: 4, Part: 65] ~Part()
+I20260817 16:36:14.952719     1 Part.h:59] [Port: 9780, Space: 4, Part: 66] ~Part()
+I20260817 16:36:14.957157     1 Part.h:59] [Port: 9780, Space: 4, Part: 67] ~Part()
+I20260817 16:36:14.961385     1 Part.h:59] [Port: 9780, Space: 4, Part: 68] ~Part()
+I20260817 16:36:14.965350     1 Part.h:59] [Port: 9780, Space: 4, Part: 69] ~Part()
+I20260817 16:36:14.969122     1 Part.h:59] [Port: 9780, Space: 4, Part: 70] ~Part()
+I20260817 16:36:14.973716     1 Part.h:59] [Port: 9780, Space: 4, Part: 77] ~Part()
+I20260817 16:36:14.982069     1 Part.h:59] [Port: 9780, Space: 4, Part: 76] ~Part()
+I20260817 16:36:14.986163     1 Part.h:59] [Port: 9780, Space: 4, Part: 75] ~Part()
+I20260817 16:36:14.989916     1 Part.h:59] [Port: 9780, Space: 4, Part: 50] ~Part()
+I20260817 16:36:14.993745     1 Part.h:59] [Port: 9780, Space: 4, Part: 49] ~Part()
+I20260817 16:36:14.998025     1 Part.h:59] [Port: 9780, Space: 4, Part: 48] ~Part()
+I20260817 16:36:15.003496     1 Part.h:59] [Port: 9780, Space: 4, Part: 23] ~Part()
+I20260817 16:36:15.008708     1 Part.h:59] [Port: 9780, Space: 4, Part: 22] ~Part()
+I20260817 16:36:15.012981     1 Part.h:59] [Port: 9780, Space: 4, Part: 21] ~Part()
+I20260817 16:36:15.017277     1 Part.h:59] [Port: 9780, Space: 4, Part: 20] ~Part()
+I20260817 16:36:15.021565     1 Part.h:59] [Port: 9780, Space: 4, Part: 19] ~Part()
+I20260817 16:36:15.025902     1 Part.h:59] [Port: 9780, Space: 4, Part: 18] ~Part()
+I20260817 16:36:15.030085     1 Part.h:59] [Port: 9780, Space: 4, Part: 17] ~Part()
+I20260817 16:36:15.034544     1 Part.h:59] [Port: 9780, Space: 4, Part: 16] ~Part()
+I20260817 16:36:15.038839     1 Part.h:59] [Port: 9780, Space: 4, Part: 15] ~Part()
+I20260817 16:36:15.042426     1 Part.h:59] [Port: 9780, Space: 4, Part: 14] ~Part()
+I20260817 16:36:15.046248     1 Part.h:59] [Port: 9780, Space: 4, Part: 13] ~Part()
+I20260817 16:36:15.050006     1 Part.h:59] [Port: 9780, Space: 4, Part: 12] ~Part()
+I20260817 16:36:15.054237     1 Part.h:59] [Port: 9780, Space: 4, Part: 5] ~Part()
+I20260817 16:36:15.058022     1 Part.h:59] [Port: 9780, Space: 4, Part: 4] ~Part()
+I20260817 16:36:15.062651     1 Part.h:59] [Port: 9780, Space: 4, Part: 6] ~Part()
+I20260817 16:36:15.067096     1 Part.h:59] [Port: 9780, Space: 4, Part: 7] ~Part()
+I20260817 16:36:15.071764     1 Part.h:59] [Port: 9780, Space: 4, Part: 8] ~Part()
+I20260817 16:36:15.076653     1 Part.h:59] [Port: 9780, Space: 4, Part: 9] ~Part()
+I20260817 16:36:15.080987     1 Part.h:59] [Port: 9780, Space: 4, Part: 10] ~Part()
+I20260817 16:36:15.084892     1 Part.h:59] [Port: 9780, Space: 4, Part: 11] ~Part()
+I20260817 16:36:15.089141     1 Part.h:59] [Port: 9780, Space: 4, Part: 24] ~Part()
+I20260817 16:36:15.093761     1 Part.h:59] [Port: 9780, Space: 4, Part: 25] ~Part()
+I20260817 16:36:15.098111     1 Part.h:59] [Port: 9780, Space: 4, Part: 26] ~Part()
+I20260817 16:36:15.102437     1 Part.h:59] [Port: 9780, Space: 4, Part: 27] ~Part()
+I20260817 16:36:15.106225     1 Part.h:59] [Port: 9780, Space: 4, Part: 28] ~Part()
+I20260817 16:36:15.110526     1 Part.h:59] [Port: 9780, Space: 4, Part: 29] ~Part()
+I20260817 16:36:15.114413     1 Part.h:59] [Port: 9780, Space: 4, Part: 30] ~Part()
+I20260817 16:36:15.118428     1 Part.h:59] [Port: 9780, Space: 4, Part: 31] ~Part()
+I20260817 16:36:15.122641     1 Part.h:59] [Port: 9780, Space: 4, Part: 32] ~Part()
+I20260817 16:36:15.127137     1 Part.h:59] [Port: 9780, Space: 4, Part: 33] ~Part()
+I20260817 16:36:15.132009     1 Part.h:59] [Port: 9780, Space: 4, Part: 34] ~Part()
+I20260817 16:36:15.136946     1 Part.h:59] [Port: 9780, Space: 4, Part: 35] ~Part()
+I20260817 16:36:15.141469     1 Part.h:59] [Port: 9780, Space: 4, Part: 36] ~Part()
+I20260817 16:36:15.146430     1 Part.h:59] [Port: 9780, Space: 4, Part: 37] ~Part()
+I20260817 16:36:15.152420     1 Part.h:59] [Port: 9780, Space: 4, Part: 38] ~Part()
+I20260817 16:36:15.166584     1 Part.h:59] [Port: 9780, Space: 4, Part: 39] ~Part()
+I20260817 16:36:15.171253     1 Part.h:59] [Port: 9780, Space: 4, Part: 40] ~Part()
+I20260817 16:36:15.176076     1 Part.h:59] [Port: 9780, Space: 4, Part: 41] ~Part()
+I20260817 16:36:15.181404     1 RocksEngine.h:247] Release rocksdb on /data/storage/nebula/4
+I20260817 16:36:15.191025     1 NebulaStore.cpp:44] ~NebulaStore()
+I20260817 16:36:15.192561     1 StorageDaemon.cpp:186] The storage Daemon stopped

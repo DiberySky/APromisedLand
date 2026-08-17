@@ -19,6 +19,9 @@ var context = new AppHostContext();
 // builder.AddKeycloak(context); // Keycloak
 builder.AddPostgres(context); // Postgres
 builder.AddRedis(context); // Redis
+builder.AddNebulaGraph(context); // NebulaGraph
+builder.AddNebulaGraphApiService(context); // NebulaGraphApiService
+builder.AddNebulaStudio(context); // NebulaStudio
 
 // builder.AddWeatherService(context); // WeatherApi
 

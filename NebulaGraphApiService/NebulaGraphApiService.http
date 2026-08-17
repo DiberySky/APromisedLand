@@ -1,0 +1,6 @@
+@NebulaGraphApiService_HostAddress = http://localhost:5054
+
+GET {{NebulaGraphApiService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

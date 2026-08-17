@@ -1,0 +1,8 @@
+Log file created at: 2026/08/17 15:53:51
+Running on machine: f2c8baf5edef
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+E20260817 15:53:51.703279     1 MemoryUtils.cpp:167] Total memory less than untracked 50 Mib, MemoryTracker limit is not set properly,  Current memory stats:MemoryStats: 8589934592.000GiB/56.000MiB
+E20260817 15:53:55.860231    31 QueryInstance.cpp:151] Existed!, query: ADD HOSTS "nebula-storaged0":9779
+W20260817 15:54:03.983465    33 TagIndexExecutor.cpp:31] SpaceId: 1, Create index `user_index' at tag: `user' failed: Invalid param!
+E20260817 15:54:03.984486    33 QueryInstance.cpp:151] Invalid param!, query: CREATE TAG INDEX IF NOT EXISTS `user_index` ON `user` (`name`)

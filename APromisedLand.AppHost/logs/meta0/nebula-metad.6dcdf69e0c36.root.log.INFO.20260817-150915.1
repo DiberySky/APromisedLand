@@ -1,0 +1,107 @@
+Log file created at: 2026/08/17 15:09:15
+Running on machine: 6dcdf69e0c36
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20260817 15:09:15.395475     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260817 15:09:15.417155     1 NebulaStore.cpp:48] Start the raft service...
+I20260817 15:09:15.420373     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260817 15:09:15.501345     1 RaftexService.cpp:46] Start raft service on 9560
+I20260817 15:09:15.504915     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260817 15:09:15.509907     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260817 15:09:15.510360     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260817 15:09:15.510874     1 NebulaStore.cpp:417] Create data space 0
+I20260817 15:09:15.787398    75 EventListener.h:21] Rocksdb start compaction column family: default because of LevelL0FilesNum, status: OK, compacted 4 files into 0, base level is 0, output level is 1
+I20260817 15:09:15.791263    74 RocksEngine.cpp:107] open rocksdb on /data/meta/nebula/0/data
+I20260817 15:09:15.811648    75 EventListener.h:35] Rocksdb compaction completed column family: default because of LevelL0FilesNum, status: OK, compacted 4 files into 1, base level is 0, output level is 1
+I20260817 15:09:19.739907     1 NebulaStore.cpp:480] Space 0, part 0 has been added, asLearner 0
+I20260817 15:09:19.740481     1 NebulaStore.cpp:75] Register handler...
+I20260817 15:09:19.740952     1 MetaDaemonInit.cpp:106] Waiting for the leader elected...
+I20260817 15:09:19.741513     1 MetaDaemonInit.cpp:118] Leader has not been elected, sleep 1s
+I20260817 15:09:20.742108     1 MetaDaemonInit.cpp:153] Get meta version is 4
+I20260817 15:09:20.743005     1 MetaDaemonInit.cpp:169] Nebula store init succeeded, clusterId 2557737320329270911
+I20260817 15:09:20.743682     1 MetaDaemon.cpp:150] Start http service
+I20260817 15:09:20.744735     1 MetaDaemonInit.cpp:226] Starting Meta HTTP Service
+I20260817 15:09:20.749969   104 WebService.cpp:124] Web service started on HTTP[19559]
+I20260817 15:09:20.750530     1 MetaDaemonInit.cpp:192] Check root user
+I20260817 15:09:20.751205     1 RootUserMan.h:35] God user exists
+I20260817 15:09:20.754729     1 MetaDaemon.cpp:193] The meta daemon start on "nebula-metad0":9559
+I20260817 15:09:20.755530     1 JobManager.cpp:64] JobManager initialized
+I20260817 15:09:20.755563   110 JobManager.cpp:150] JobManager::scheduleThread enter
+I20260817 15:09:21.486763   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:09:21.487601   132 HBProcessor.cpp:52] Set clusterId for new host "nebula-storaged0":9779!
+I20260817 15:09:21.488226   132 HBProcessor.cpp:89] Update host "nebula-storaged0":9779 dir info, root path: /usr/local/nebula, data path size: 1
+I20260817 15:09:21.513970   132 SessionManagerProcessor.cpp:155] resp session size: 0
+I20260817 15:09:24.567799   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:09:24.568660   132 HBProcessor.cpp:89] Update host "nebula-graphd":9669 dir info, root path: /usr/local/nebula, data path size: 0
+I20260817 15:09:24.614506   132 SessionManagerProcessor.cpp:155] resp session size: 0
+I20260817 15:09:24.634776   132 SessionManagerProcessor.cpp:155] resp session size: 0
+E20260817 15:09:30.517109   132 AddHostsProcessor.cpp:72] The host "nebula-storaged0":9779 have existed!
+I20260817 15:09:32.294299   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:09:34.992576   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:09:42.306885   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:09:45.003219   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:09:52.323760   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:09:55.015113   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:10:02.332262   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:10:05.026662   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:10:12.345360   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:10:15.036698   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:10:22.360515   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:10:25.048624   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:10:32.372270   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:10:35.060487   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:10:42.382786   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:10:45.070850   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:10:52.395643   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:10:55.079849   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:11:02.403833   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:11:05.091532   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:11:12.409904   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:11:15.101300   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:11:22.421725   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:11:25.109764   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:11:32.425758   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:11:35.119310   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:11:42.436254   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:11:45.129860   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:11:52.448179   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:11:55.141793   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:12:02.452289   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:12:05.153493   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:12:12.454891   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:12:15.162284   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:12:22.466713   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:12:25.167696   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:12:32.478229   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:12:35.179545   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:12:42.486790   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:12:45.184801   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:12:52.491852   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:12:55.196527   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:13:02.498828   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:13:05.207697   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:13:12.510778   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:13:15.218128   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:13:22.517765   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260817 15:13:25.229960   132 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260817 15:13:31.398787     1 MetaDaemon.cpp:230] Signal 15(Terminated) received, stopping this server
+I20260817 15:13:31.438746     1 JobManager.cpp:138] JobManager::shutDown() begin
+I20260817 15:13:31.439761   110 JobManager.cpp:155] Detect shutdown called, exit
+I20260817 15:13:31.441573   110 JobDescription.cpp:113] Loading job description failed, error: E_JOB_NOT_IN_SPACE
+I20260817 15:13:31.442631   110 JobManager.cpp:175] Load an invalid job from space 0 jodId 0
+I20260817 15:13:31.443749     1 JobManager.cpp:146] JobManager::shutDown() end
+I20260817 15:13:31.445452     1 NebulaStore.cpp:343] Stop the raft service...
+I20260817 15:13:31.446096     1 RaftexService.cpp:67] Stopping the raftex service on port 9560
+I20260817 15:13:31.446816     1 RaftexService.cpp:77] All partitions have stopped
+I20260817 15:13:31.447588     1 NebulaStore.cpp:346] Stop kv engine...
+I20260817 15:13:31.449100     1 NebulaStore.cpp:343] Stop the raft service...
+I20260817 15:13:31.453349     1 RaftexService.cpp:67] Stopping the raftex service on port 9560
+I20260817 15:13:31.454313     1 RaftexService.cpp:77] All partitions have stopped
+I20260817 15:13:31.455945     1 NebulaStore.cpp:346] Stop kv engine...
+I20260817 15:13:31.457129     1 NebulaStore.cpp:36] Cut off the relationship with meta client
+I20260817 15:13:31.459772     1 Part.h:59] [Port: 9560, Space: 0, Part: 0] ~Part()
+I20260817 15:13:31.465533     1 RocksEngine.h:247] Release rocksdb on /data/meta/nebula/0
+I20260817 15:13:31.475189     1 NebulaStore.cpp:44] ~NebulaStore()
+I20260817 15:13:31.475857     1 MetaDaemon.cpp:215] The meta Daemon stopped
+I20260817 15:13:31.479074     1 JobManager.cpp:138] JobManager::shutDown() begin
+I20260817 15:13:31.479948     1 JobManager.cpp:141] JobManager not running, exit

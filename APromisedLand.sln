@@ -47,6 +47,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APromisedLand.MauiBlazor", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiberyMauiSky", "DiberyMauiSky\DiberyMauiSky.csproj", "{A444BAC3-001C-4D04-93EB-5D280186EAD4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NebulaGraphApiService", "NebulaGraphApiService\NebulaGraphApiService.csproj", "{C55A1FAF-3F9C-46EB-AB4F-92FEDA5CFFAE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -127,6 +129,10 @@ Global
 		{A444BAC3-001C-4D04-93EB-5D280186EAD4}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
 		{A444BAC3-001C-4D04-93EB-5D280186EAD4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A444BAC3-001C-4D04-93EB-5D280186EAD4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C55A1FAF-3F9C-46EB-AB4F-92FEDA5CFFAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C55A1FAF-3F9C-46EB-AB4F-92FEDA5CFFAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C55A1FAF-3F9C-46EB-AB4F-92FEDA5CFFAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C55A1FAF-3F9C-46EB-AB4F-92FEDA5CFFAE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -148,6 +154,7 @@ Global
 		{B69AAFE8-E9B0-4D48-8E7B-09428511B722} = {DC357836-6548-4918-9C56-E876B4E81A44}
 		{04A010C0-7BE5-4406-9816-E8C6937ACD83} = {DC357836-6548-4918-9C56-E876B4E81A44}
 		{A444BAC3-001C-4D04-93EB-5D280186EAD4} = {94403BB7-A165-404E-8674-5DC28867E92E}
+		{C55A1FAF-3F9C-46EB-AB4F-92FEDA5CFFAE} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9647CF65-ABDB-4637-B56C-E0CDAC22FFFB}

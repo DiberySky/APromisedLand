@@ -1,0 +1,41 @@
+Log file created at: 2026/08/17 15:09:24
+Running on machine: 1e505ecc89b7
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20260817 15:09:24.531476     1 GraphDaemon.cpp:122] Starting Graph HTTP Service
+I20260817 15:09:24.543956     7 WebService.cpp:124] Web service started on HTTP[19669]
+I20260817 15:09:24.544554     1 GraphDaemon.cpp:136] Number of networking IO threads: 16
+I20260817 15:09:24.544834     1 GraphDaemon.cpp:145] Number of worker threads: 16
+I20260817 15:09:24.553200     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260817 15:09:24.553591     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 0
+I20260817 15:09:24.566044    43 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.572826    44 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.576259    45 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.579605    46 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.582851    47 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.613246    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.617338    49 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.620703    50 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.622300     1 MetaClient.cpp:3263] Load leader of "storaged0":9779 in 0 space
+I20260817 15:09:24.622637     1 MetaClient.cpp:3263] Load leader of "nebula-storaged0":9779 in 0 space
+I20260817 15:09:24.622860     1 MetaClient.cpp:3269] Load leader ok
+I20260817 15:09:24.624795    51 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.627765    52 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.630813     1 MetaClient.cpp:162] Register time task for heartbeat!
+I20260817 15:09:24.633173    55 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.636487     1 GraphSessionManager.cpp:337] Total of 0 sessions are loaded
+E20260817 15:09:24.637563     1 MemoryUtils.cpp:167] Total memory less than untracked 50 Mib, MemoryTracker limit is not set properly,  Current memory stats:MemoryStats: 8589934592.000GiB/51.000MiB
+I20260817 15:09:24.651899     1 MemoryUtils.cpp:171] MemoryTracker set static ratio: 0.8
+I20260817 15:09:24.654302    57 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:24.657116     1 Snowflake.cpp:17] WorkerId init success: 1
+I20260817 15:09:24.658311    58 GraphServer.cpp:63] Starting nebula-graphd on nebula-graphd:9669
+I20260817 15:09:30.508080    34 GraphService.cpp:77] Authenticating user root from 172.19.0.9:45472
+I20260817 15:09:30.509536    59 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:30.515038    60 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+E20260817 15:09:30.539198    31 QueryInstance.cpp:151] Existed!, query: ADD HOSTS "nebula-storaged0":9779
+I20260817 15:09:30.541832    61 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:09:34.991655    62 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:13:32.642055     1 GraphDaemon.cpp:176] Signal 15(Terminated) received, stopping this server
+I20260817 15:13:32.657262    58 GraphServer.cpp:74] nebula-graphd on nebula-graphd:9669 has been stopped
+I20260817 15:13:32.658097     1 GraphDaemon.cpp:161] The graph Daemon stopped
+I20260817 15:13:32.658577     1 GraphServer.cpp:109] The graph server has been stopped

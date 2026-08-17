@@ -1,0 +1,94 @@
+Log file created at: 2026/08/17 15:41:42
+Running on machine: dabe7742319a
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20260817 15:41:42.163342     1 GraphDaemon.cpp:122] Starting Graph HTTP Service
+I20260817 15:41:42.172672     7 WebService.cpp:124] Web service started on HTTP[19669]
+I20260817 15:41:42.173043     1 GraphDaemon.cpp:136] Number of networking IO threads: 16
+I20260817 15:41:42.173247     1 GraphDaemon.cpp:145] Number of worker threads: 16
+I20260817 15:41:42.180159     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260817 15:41:42.180465     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 0
+I20260817 15:41:42.192298    43 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.198603    44 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.201078    45 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.203660    46 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.205936    47 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.238783    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.241809    49 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.244032    50 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.245231     1 MetaClient.cpp:3263] Load leader of "storaged0":9779 in 0 space
+I20260817 15:41:42.245482     1 MetaClient.cpp:3263] Load leader of "nebula-storaged0":9779 in 0 space
+I20260817 15:41:42.245677     1 MetaClient.cpp:3269] Load leader ok
+I20260817 15:41:42.246948    51 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.248837    52 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.250914     1 MetaClient.cpp:162] Register time task for heartbeat!
+I20260817 15:41:42.252569    55 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.254243     1 GraphSessionManager.cpp:337] Total of 1 sessions are loaded
+E20260817 15:41:42.254922     1 MemoryUtils.cpp:167] Total memory less than untracked 50 Mib, MemoryTracker limit is not set properly,  Current memory stats:MemoryStats: 8589934592.000GiB/51.000MiB
+I20260817 15:41:42.264071     1 MemoryUtils.cpp:171] MemoryTracker set static ratio: 0.8
+I20260817 15:41:42.266048    57 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:42.268656     1 Snowflake.cpp:17] WorkerId init success: 1
+I20260817 15:41:42.274819    58 GraphServer.cpp:63] Starting nebula-graphd on nebula-graphd:9669
+I20260817 15:41:47.706583    34 GraphService.cpp:77] Authenticating user root from 172.19.0.10:56196
+I20260817 15:41:47.707931    59 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:47.715298    60 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+E20260817 15:41:47.741801    33 QueryInstance.cpp:151] Existed!, query: ADD HOSTS "nebula-storaged0":9779
+I20260817 15:41:47.744871    61 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:41:52.404309    62 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260817 15:44:10.322281    32 GraphService.cpp:77] Authenticating user root from 172.19.0.8:40146
+I20260817 15:45:54.736056    33 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:45:54.771672    30 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:45:54.778348    32 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:45:54.790833    34 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+E20260817 15:45:54.793035    30 UseValidator.cpp:28] Unknown space: social_network : SpaceNotFound: SpaceName `social_network`
+E20260817 15:45:54.793730    30 QueryInstance.cpp:151] SpaceNotFound: SpaceName `social_network`, query: USE social_network
+I20260817 15:45:55.844697    30 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+E20260817 15:45:55.847168    33 UseValidator.cpp:28] Unknown space: social_network : SpaceNotFound: SpaceName `social_network`
+E20260817 15:45:55.847836    33 QueryInstance.cpp:151] SpaceNotFound: SpaceName `social_network`, query: USE social_network
+I20260817 15:45:56.885046    33 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+E20260817 15:45:56.887270    30 UseValidator.cpp:28] Unknown space: social_network : SpaceNotFound: SpaceName `social_network`
+E20260817 15:45:56.887779    30 QueryInstance.cpp:151] SpaceNotFound: SpaceName `social_network`, query: USE social_network
+I20260817 15:45:57.911440    30 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+E20260817 15:45:57.913416    34 UseValidator.cpp:28] Unknown space: social_network : SpaceNotFound: SpaceName `social_network`
+E20260817 15:45:57.914134    34 QueryInstance.cpp:151] SpaceNotFound: SpaceName `social_network`, query: USE social_network
+I20260817 15:45:58.950562    34 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+E20260817 15:45:58.952445    30 UseValidator.cpp:28] Unknown space: social_network : SpaceNotFound: SpaceName `social_network`
+E20260817 15:45:58.952955    30 QueryInstance.cpp:151] SpaceNotFound: SpaceName `social_network`, query: USE social_network
+I20260817 15:45:59.979399    30 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+E20260817 15:45:59.981613    33 UseValidator.cpp:28] Unknown space: social_network : SpaceNotFound: SpaceName `social_network`
+E20260817 15:45:59.982347    33 QueryInstance.cpp:151] SpaceNotFound: SpaceName `social_network`, query: USE social_network
+I20260817 15:46:01.023351    33 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+E20260817 15:46:01.025758    30 UseValidator.cpp:28] Unknown space: social_network : SpaceNotFound: SpaceName `social_network`
+E20260817 15:46:01.026305    30 QueryInstance.cpp:151] SpaceNotFound: SpaceName `social_network`, query: USE social_network
+I20260817 15:46:02.053596    30 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+E20260817 15:46:02.057798    34 UseValidator.cpp:28] Unknown space: social_network : SpaceNotFound: SpaceName `social_network`
+E20260817 15:46:02.058470    34 QueryInstance.cpp:151] SpaceNotFound: SpaceName `social_network`, query: USE social_network
+I20260817 15:46:02.688445    53 MetaClient.cpp:3263] Load leader of "storaged0":9779 in 0 space
+I20260817 15:46:02.688822    53 MetaClient.cpp:3263] Load leader of "nebula-storaged0":9779 in 0 space
+I20260817 15:46:02.689097    53 MetaClient.cpp:3269] Load leader ok
+I20260817 15:46:03.106108    34 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.108867    33 SwitchSpaceExecutor.cpp:45] Graph switched to `social_network', space id: 1
+I20260817 15:46:03.111208    29 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.115785    31 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.118259    30 SwitchSpaceExecutor.cpp:45] Graph switched to `social_network', space id: 1
+I20260817 15:46:03.122030    31 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.128553    34 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.136010    34 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.141287    29 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.146842    31 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.150852    30 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.158005    33 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.162222    31 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.168866    30 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+I20260817 15:46:03.173053    33 GraphService.cpp:77] Authenticating user root from 172.19.0.9:53054
+E20260817 15:46:03.174674    30 QueryInstance.cpp:151] SyntaxError: syntax error near `timestamp', query: CREATE EDGE authored (timestamp timestamp, publish_platform string)
+I20260817 15:46:12.724515    53 MetaClient.cpp:3263] Load leader of "storaged0":9779 in 0 space
+I20260817 15:46:12.725858    53 MetaClient.cpp:3263] Load leader of "nebula-storaged0":9779 in 0 space
+I20260817 15:46:12.726255    53 MetaClient.cpp:3269] Load leader ok
+I20260817 15:46:22.747190    53 MetaClient.cpp:3263] Load leader of "storaged0":9779 in 0 space
+I20260817 15:46:22.747619    53 MetaClient.cpp:3263] Load leader of "nebula-storaged0":9779 in 1 space
+I20260817 15:46:22.747877    53 MetaClient.cpp:3269] Load leader ok
+I20260817 15:49:51.638741     1 GraphDaemon.cpp:176] Signal 15(Terminated) received, stopping this server
+I20260817 15:49:51.656400    58 GraphServer.cpp:74] nebula-graphd on nebula-graphd:9669 has been stopped
+I20260817 15:49:51.657191     1 GraphDaemon.cpp:161] The graph Daemon stopped
+I20260817 15:49:51.657878     1 GraphServer.cpp:109] The graph server has been stopped
