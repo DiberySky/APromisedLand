@@ -1,0 +1,25 @@
+
+APromisedLand/
+├── AppHost/                          # .NET Aspire AppHost
+│   ├── AppHost.cs                    # 主编排文件
+│   ├── AppHostContext.cs             # 上下文（新增 NebulaGraphApi 字段）
+│   └── Extensions/
+│       ├── NebulaGraphExtension.cs   # 你的 NebulaGraph 容器编排
+│       └── NebulaGraphApiServiceExtension.cs  # ← 新增：Python FastAPI 编排
+│
+├── NebulaGraphApiService/            # ← 新增：Python FastAPI 项目
+│   ├── app/
+│   │   ├── main.py                   # FastAPI 入口（已集成 OpenTelemetry）
+│   │   ├── config.py
+│   │   ├── dependencies.py
+│   │   ├── models/
+│   │   ├── routers/
+│   │   ├── services/
+│   │   └── telemetry.py              # ← 新增：Aspire OTLP 集成
+│   ├── requirements.txt
+│   ├── pyproject.toml                # ← 新增：uv 包管理配置
+│   └── Dockerfile
+│
+├── DiberyTreeService/                # .NET 服务（可引用 Python API）
+├── DiberyMauiSky/                    # MAUI 前端
+└── ...

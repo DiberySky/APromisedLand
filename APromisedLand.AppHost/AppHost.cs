@@ -21,6 +21,7 @@ builder.AddPostgres(context); // Postgres
 builder.AddRedis(context); // Redis
 builder.AddNebulaGraph(context); // NebulaGraph
 builder.AddNebulaGraphApiService(context); // NebulaGraphApiService
+// builder.AddNebulaGraphFastApiService(context); // AddNebulaGraphFastApiService
 builder.AddNebulaStudio(context); // NebulaStudio
 
 // builder.AddWeatherService(context); // WeatherApi

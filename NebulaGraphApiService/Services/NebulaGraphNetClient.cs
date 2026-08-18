@@ -1,157 +1,66 @@
-using System;
-using System.Net;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
+// using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
+using Nebula.Graph;
+using NebulaNet;
 
 namespace NebulaGraphApiService.Services;
 
-public class NebulaGraphNetClient : INebulaGraphClient, IDisposable
+public class NebulaGraphNetClient(
+    NebulaPool pool,
+    IOptions<NebulaGraphOptions> options,
+    ILogger<NebulaGraphNetClient> logger)
+    : INebulaGraphClient
 {
-    private readonly HttpClient _httpClient;
-    private readonly NebulaGraphOptions _options;
-    private readonly ILogger<NebulaGraphNetClient> _logger;
-    private readonly CookieContainer _cookieContainer;
-    private bool _disposed;
-    private bool _connected;
+    private readonly NebulaGraphOptions _options = options.Value;
 
-    public NebulaGraphNetClient(
-        IOptions<NebulaGraphOptions> options,
-        ILogger<NebulaGraphNetClient> logger)
+    private async Task<ExecutionResponse> ExecuteInternalAsync(
+        string ngql,
+        CancellationToken cancellationToken,
+        bool useSpace = false)
     {
-        _options = options.Value;
-        _logger = logger;
+        cancellationToken.ThrowIfCancellationRequested();
 
-        _cookieContainer = new CookieContainer();
-        var handler = new HttpClientHandler
+        // 3.0 API: GetSessionAsync 需要用户名和密码
+        var session = await pool.GetSessionAsync();
+        try
         {
-            CookieContainer = _cookieContainer,
-            UseCookies = true
-        };
+            if (useSpace && !string.IsNullOrEmpty(_options.SpaceName))
+            {
+                await session.ExecuteAsync($"USE `{_options.SpaceName}`");
+            }
 
-        _httpClient = new HttpClient(handler)
-        {
-            BaseAddress = new Uri($"http://{_options.GatewayHost}:{_options.GatewayPort}")
-        };
-        _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
-    }
-
-    /// <summary>
-    /// 连接到 Gateway，获取 Session Cookie（nsid）
-    /// </summary>
-    private async Task EnsureConnectedAsync(CancellationToken cancellationToken)
-    {
-        if (_connected) return;
-
-        var request = new
-        {
-            username = _options.Username,
-            password = _options.Password,
-            address = _options.Host,      // graphd 地址（容器内名或 localhost）
-            port = _options.Port            // 9669
-        };
-
-        var content = new StringContent(
-            JsonSerializer.Serialize(request),
-            Encoding.UTF8,
-            "application/json");
-
-        var response = await _httpClient.PostAsync("/api/db/connect", content, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        var doc = JsonDocument.Parse(body);
-
-        var code = doc.RootElement.GetProperty("code").GetInt32();
-        if (code != 0)
-        {
-            var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() : "Unknown";
-            throw new Exception($"Gateway connect failed: {msg}");
+            return await session.ExecuteAsync(ngql);
         }
-
-        _connected = true;
-        _logger.LogInformation("Connected to NebulaGraph via HTTP Gateway");
-    }
-
-    private async Task<JsonDocument> ExecuteQueryAsync(string ngql, CancellationToken cancellationToken)
-    {
-        await EnsureConnectedAsync(cancellationToken);
-
-        var request = new { gql = ngql };
-        var content = new StringContent(
-            JsonSerializer.Serialize(request),
-            Encoding.UTF8,
-            "application/json");
-
-        var response = await _httpClient.PostAsync("/api/db/exec", content, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        var doc = JsonDocument.Parse(body);
-
-        var code = doc.RootElement.GetProperty("code").GetInt32();
-        if (code != 0)
+        finally
         {
-            var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() : "Unknown";
-            throw new Exception($"Gateway exec error: {msg}");
+            session.Release();
         }
-
-        return doc;
     }
-
-    // ---------- 接口实现 ----------
 
     public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            await EnsureConnectedAsync(cancellationToken);
-            await ExecuteQueryAsync("SHOW SPACES", cancellationToken);
+            await ExecuteInternalAsync("SHOW SPACES", cancellationToken, useSpace: false);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Test connection failed");
+            logger.LogWarning(ex, "Test connection failed");
             return false;
         }
     }
 
     public async Task<bool> SpaceExistsAsync(string spaceName, CancellationToken cancellationToken = default)
     {
-        var doc = await ExecuteQueryAsync("SHOW SPACES", cancellationToken);
-        var data = doc.RootElement.GetProperty("data");
-        var tables = data.GetProperty("tables");
-
-        foreach (var item in tables.EnumerateArray())
-        {
-            // Gateway 返回的是 { "Name": "spaceName" } 格式
-            foreach (var prop in item.EnumerateObject())
-            {
-                if (prop.Value.GetString() == spaceName)
-                    return true;
-            }
-        }
-        return false;
-    }
-
-    public async Task CreateSpaceAsync(string spaceName, CancellationToken cancellationToken = default)
-    {
-        var ngql = $"CREATE SPACE IF NOT EXISTS {spaceName} (vid_type=FIXED_STRING(32))";
-        await ExecuteQueryAsync(ngql, cancellationToken);
-        _logger.LogInformation("Space {SpaceName} created.", spaceName);
-    }
-
-    public async Task<bool> SpaceReadyAsync(string spaceName, CancellationToken cancellationToken = default)
-    {
         try
         {
-            await UseSpaceAsync(spaceName, cancellationToken);
-            await ExecuteQueryAsync("SHOW TAGS", cancellationToken);
-            return true;
+            throw new NotImplementedException();
+            
+            // var result = await ExecuteInternalAsync("SHOW SPACES", cancellationToken, useSpace: false);
+            // // 3.0 API: 使用 ResultSet 的方法解析数据
+            // var rows = result.AsStringTable();
+            // return rows.Skip(1).Any(r => r.Length > 0 && r[0] == spaceName);
         }
         catch
         {
@@ -159,103 +68,132 @@ public class NebulaGraphNetClient : INebulaGraphClient, IDisposable
         }
     }
 
+    public async Task CreateSpaceAsync(string spaceName, CancellationToken cancellationToken = default)
+    {
+        var ngql = $"CREATE SPACE IF NOT EXISTS `{spaceName}` (vid_type=FIXED_STRING(32))";
+        await ExecuteInternalAsync(ngql, cancellationToken, useSpace: false);
+        logger.LogInformation("Space {SpaceName} created.", spaceName);
+    }
+
+    public async Task<bool> SpaceReadyAsync(string spaceName, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var session = await pool.GetSessionAsync();
+            try
+            {
+                throw new NotImplementedException();
+                // await session.ExecuteAsync($"USE `{spaceName}`");
+                // var result = await session.ExecuteAsync("SHOW TAGS");
+                // // 检查是否成功执行
+                // return result.IsSucceed();
+            }
+            finally
+            {
+                session.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Space {SpaceName} is not ready", spaceName);
+            return false;
+        }
+    }
+
     public async Task UseSpaceAsync(string spaceName, CancellationToken cancellationToken = default)
     {
-        await ExecuteQueryAsync($"USE {spaceName}", cancellationToken);
-        _logger.LogDebug("Switched to space {SpaceName}.", spaceName);
+        await ExecuteInternalAsync($"USE `{spaceName}`", cancellationToken, useSpace: false);
+        logger.LogDebug("Switched to space {SpaceName}.", spaceName);
     }
 
     public async Task<bool> TagExistsAsync(string tagName, CancellationToken cancellationToken = default)
     {
-        var doc = await ExecuteQueryAsync("SHOW TAGS", cancellationToken);
-        var data = doc.RootElement.GetProperty("data");
-        var tables = data.GetProperty("tables");
-
-        foreach (var item in tables.EnumerateArray())
+        try
         {
-            foreach (var prop in item.EnumerateObject())
-            {
-                if (prop.Value.GetString() == tagName)
-                    return true;
-            }
+            throw new NotImplementedException();
+            // var result = await ExecuteInternalAsync("SHOW TAGS", cancellationToken, useSpace: true);
+            // var rows = result.AsStringTable();
+            // return rows.Skip(1).Any(r => r.Length > 0 && r[0] == tagName);
         }
-        return false;
+        catch
+        {
+            return false;
+        }
     }
 
     public async Task<bool> EdgeExistsAsync(string edgeName, CancellationToken cancellationToken = default)
     {
-        var doc = await ExecuteQueryAsync("SHOW EDGES", cancellationToken);
-        var data = doc.RootElement.GetProperty("data");
-        var tables = data.GetProperty("tables");
-
-        foreach (var item in tables.EnumerateArray())
+        try
         {
-            foreach (var prop in item.EnumerateObject())
-            {
-                if (prop.Value.GetString() == edgeName)
-                    return true;
-            }
+            throw new NotImplementedException();
+            // var result = await ExecuteInternalAsync("SHOW EDGES", cancellationToken, useSpace: true);
+            // var rows = result.AsStringTable();
+            // return rows.Skip(1).Any(r => r.Length > 0 && r[0] == edgeName);
         }
-        return false;
+        catch
+        {
+            return false;
+        }
     }
 
     public async Task<bool> IndexExistsAsync(string indexName, CancellationToken cancellationToken = default)
     {
-        // 同时检查 TAG INDEXES 和 EDGE INDEXES
-        foreach (var showCmd in new[] { "SHOW TAG INDEXES", "SHOW EDGE INDEXES" })
+        try
         {
-            var doc = await ExecuteQueryAsync(showCmd, cancellationToken);
-            var data = doc.RootElement.GetProperty("data");
-            var tables = data.GetProperty("tables");
-
-            foreach (var item in tables.EnumerateArray())
+            foreach (var showCmd in new[] { "SHOW TAG INDEXES", "SHOW EDGE INDEXES" })
             {
-                foreach (var prop in item.EnumerateObject())
-                {
-                    if (prop.Value.GetString() == indexName)
-                        return true;
-                }
+                throw new NotImplementedException();
+                // var result = await ExecuteInternalAsync(showCmd, cancellationToken, useSpace: true);
+                // var rows = result.AsStringTable();
+                // if (rows.Skip(1).Any(r => r.Length > 0 && r[0] == indexName))
+                    return true;
             }
+            return false;
         }
-        return false;
+        catch
+        {
+            return false;
+        }
     }
 
     public async Task<bool> VertexExistsAsync(string vid, CancellationToken cancellationToken = default)
     {
-        var ngql = $"FETCH PROP ON * {vid}";
-        var doc = await ExecuteQueryAsync(ngql, cancellationToken);
-        var data = doc.RootElement.GetProperty("data");
-        var tables = data.GetProperty("tables");
-        return tables.GetArrayLength() > 0;
+        try
+        {
+            throw new NotImplementedException();
+            var result = await ExecuteInternalAsync($"FETCH PROP ON * {vid}", cancellationToken, useSpace: true);
+            // return result.GetRowSize() > 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
-    public async Task<bool> EdgeExistsBetweenAsync(string src, string dst, string edgeName, CancellationToken cancellationToken = default)
+    public async Task<bool> EdgeExistsBetweenAsync(
+        string src,
+        string dst,
+        string edgeName,
+        CancellationToken cancellationToken = default)
     {
-        var ngql = $"FETCH PROP ON {edgeName} {src} -> {dst}";
-        var doc = await ExecuteQueryAsync(ngql, cancellationToken);
-        var data = doc.RootElement.GetProperty("data");
-        var tables = data.GetProperty("tables");
-        return tables.GetArrayLength() > 0;
+        try
+        {
+            throw new NotImplementedException();
+            // var result = await ExecuteInternalAsync(
+            //     $"FETCH PROP ON `{edgeName}` {src} -> {dst}",
+            //     cancellationToken,
+            //     useSpace: true);
+            // return result.GetRowSize() > 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public async Task ExecuteAsync(string statement, CancellationToken cancellationToken = default)
     {
-        await ExecuteQueryAsync(statement, cancellationToken);
-        _logger.LogTrace("Executed: {Statement}", statement);
-    }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-
-        try
-        {
-            // 尝试断开连接
-            _httpClient.PostAsync("/api/db/disconnect", new StringContent("")).Wait(TimeSpan.FromSeconds(2));
-        }
-        catch { /* ignore */ }
-
-        _httpClient.Dispose();
-        _disposed = true;
+        await ExecuteInternalAsync(statement, cancellationToken, useSpace: false);
+        logger.LogTrace("Executed: {Statement}", statement);
     }
 }

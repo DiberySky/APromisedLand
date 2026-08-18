@@ -91,15 +91,6 @@ public static class NebulaGraphExtension
             .WithContainerRuntimeArgs("--health-start-period", "20s")
             .WaitFor(nebulaStoraged0);
 
-        // ========== HTTP Gateway（新增）==========
-        // Gateway 提供 /api/db/connect 和 /api/db/exec REST API
-        // 版本对应：Nebula 3.x → gateway v3.2.x；如 nightly 不兼容可尝试 latest
-        var nebulaGateway = builder.AddContainer("nebula-http-gateway", "docker.io/vesoft/nebula-http-gateway", "v2.2.0")
-            .WithEnvironment("USER", "root")
-            .WithEnvironment("TZ", tz)
-            .WithHttpEndpoint(name: "gateway", port: 8080, targetPort: 8080, isProxied: false)
-            .WaitFor(nebulaGraphd);
-
         // ========== Console ==========
         var nebulaConsole = builder.AddContainer("nebula-console", "docker.io/vesoft/nebula-console", "nightly")
             .WithEntrypoint("/bin/sh")
@@ -111,9 +102,9 @@ public static class NebulaGraphExtension
                 "done && tail -f /dev/null")
             .WaitFor(nebulaGraphd);
 
-        // API Service 应等待 Gateway 就绪（而不是直接等 graphd）
+        // 直连 graphd Thrift 端口，无需 Gateway
         context.NebulaGraph = nebulaGraphd;
-        context.NebulaGraphEndpoint = nebulaGateway.GetEndpoint("gateway");
+        context.NebulaGraphEndpoint = nebulaGraphd.GetEndpoint("graph");
         context.NebulaConsole = nebulaConsole;
 
         return builder;

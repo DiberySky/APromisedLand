@@ -4,6 +4,7 @@
     <attachedFolders>
       <Path>.</Path>
       <Path>FunAsrService</Path>
+      <Path>NebulaGraphFastApiService</Path>
       <Path>Notes</Path>
       <Path>docker</Path>
       <Path>infra</Path>

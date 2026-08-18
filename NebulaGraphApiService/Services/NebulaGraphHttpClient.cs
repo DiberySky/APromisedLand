@@ -13,12 +13,12 @@ namespace NebulaGraphApiService.Services;
 public class NebulaGraphHttpClient : INebulaGraphClient, IDisposable
 {
     private readonly HttpClient _httpClient;
-    private readonly NebulaGraphOptions _options;
+    private readonly NebulaGraphGatewayOptions _options;
     private readonly ILogger<NebulaGraphHttpClient> _logger;
     private bool _disposed;
 
     public NebulaGraphHttpClient(
-        IOptions<NebulaGraphOptions> options,
+        IOptions<NebulaGraphGatewayOptions> options,
         ILogger<NebulaGraphHttpClient> logger)
     {
         _options = options.Value;

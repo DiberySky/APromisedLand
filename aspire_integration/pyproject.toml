@@ -1,0 +1,24 @@
+[project]
+name = "nebula-graph-api"
+version = "1.0.0"
+description = "NebulaGraph FastAPI Service for .NET Aspire"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "nebula3-python>=3.6.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.27.0",
+    "opentelemetry-distro>=0.45b0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.24.0",
+    "opentelemetry-instrumentation-fastapi>=0.45b0",
+    "opentelemetry-instrumentation-httpx>=0.45b0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
