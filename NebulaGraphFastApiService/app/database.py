@@ -75,8 +75,10 @@ class NebulaDB:
 
     @property
     def pool(self) -> ConnectionPool:
+        # Lazy (cold) initialisation: the pool is built on first use, so the
+        # API process can start up independently of NebulaGraph availability.
         if self._pool is None:
-            raise RuntimeError("Nebula pool is not initialised. Call connect().")
+            self.connect()
         return self._pool
 
     # ------------------------------------------------------------------ #

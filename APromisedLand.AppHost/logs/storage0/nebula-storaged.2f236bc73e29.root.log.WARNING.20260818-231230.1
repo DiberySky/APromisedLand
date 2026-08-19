@@ -1,0 +1,14 @@
+Log file created at: 2026/08/18 23:12:30
+Running on machine: 2f236bc73e29
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+W20260818 23:12:30.851929     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260818 23:12:33.957113    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260818 23:12:33.963685    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260818 23:12:33.966043     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+W20260818 23:12:43.968125     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260818 23:12:46.982218    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260818 23:12:46.983225    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260818 23:12:46.984150     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+W20260818 23:12:56.983889     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260818 23:13:52.823983     1 MemoryUtils.cpp:167] Total memory less than untracked 50 Mib, MemoryTracker limit is not set properly,  Current memory stats:MemoryStats: 8589934592.000GiB/128.010MiB

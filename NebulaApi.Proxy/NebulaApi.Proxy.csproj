@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>NebulaApi.Proxy</RootNamespace>
+    <AssemblyName>NebulaApi.Proxy</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Emit XML doc so Swashbuckle can render the /// summary
+         annotations on the controllers in the Swagger UI. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The minimal-hosting Program class is internal by default;
+         expose it to the integration-test project so
+         WebApplicationFactory<Program> can be constructed. -->
+    <InternalsVisibleTo Include="NebulaApi.Proxy.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

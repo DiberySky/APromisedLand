@@ -5,21 +5,22 @@ namespace APromisedLand.AppHost.Extensions;
 
 public static class NebulaGraphFastApiExtension
 {
-    public static IDistributedApplicationBuilder AddNebulaGraphFastApi(
+    public static IDistributedApplicationBuilder AddNebulaGraphFastApiService(
         this IDistributedApplicationBuilder builder,
         AppHostContext context)
     {
         if (context.NebulaGraph != null)
         {
             var fastApi = builder.AddUvicornApp(
-                    name: "nebula-fastapi", // 服务在 Aspire 中的名称
-                    appDirectory: "../NebulaGraphFastApiService", // 指向你的 Python 项目目录
-                    app: "app.main:app" // 指向 ASGI 应用，格式为 "模块名:变量名"
+                    name: "nebula-fastapi",
+                    appDirectory: "../NebulaGraphFastApiService",
+                    app: "app.main:app"
                 )
-                .WithHttpEndpoint(port: 8668, targetPort: 8668, name: "http") // 暴露 HTTP 端口
-                .WithEnvironment("NEBULA_ENDPOINTS", "nebula-graphd:9669") // 传递 NebulaGraph 连接信息
-                .WithEnvironment("API_HOST", "0.0.0.0") // 传递其他环境变量
-                .WaitFor(context.NebulaGraph); // 等待 NebulaGraph 就绪
+                .WithHttpEndpoint(port: 9339, targetPort: 9339, name: "http", isProxied: false)
+                .WithEnvironment("NEBULA_ENDPOINTS", "nebula-graphd:9669")
+                .WithEnvironment("API_HOST", "0.0.0.0")
+                .WithEnvironment("API_PORT", "9339") // ✅ 必须加上这一行
+                .WaitFor(context.NebulaGraph);
 
             // 如果你需要将 FastAPI 的地址传递给其他服务，可以保存到 context
             context.NebulaGraphFastApi = fastApi;

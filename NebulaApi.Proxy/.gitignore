@@ -1,0 +1,15 @@
+# .NET artifacts
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.lock.json
+
+# IDE
+.idea/
+.vscode/
+
+# Local secrets
+appsettings.*.Local.json
+secrets.json

@@ -31,16 +31,11 @@ public class AppHostContext
     public IResourceBuilder<ContainerResource>? NebulaConsole { get; set; } // NebulaGraph 容器
     public EndpointReference? NebulaGraphEndpoint { get; set; } // NebulaGraph 服务端口
     public IResourceBuilder<ContainerResource>? NebulaStudio { get; set; } // NebulaStudio 容器
-    public IResourceBuilder<ProjectResource>? NebulaGraphFastApiService { get; set; }
+    public IResourceBuilder<ProjectResource>? NebulaApiProxy { get; set; }
     
     // ← 新增：Python FastAPI 服务引用
-    public IResourceBuilder<UvicornAppResource>? NebulaGraphApi { get; set; }
-    public EndpointReference? NebulaGraphApiEndpoint { get; set; }
-
     public IResourceBuilder<UvicornAppResource>? NebulaGraphFastApi { get; set; }
     public EndpointReference? NebulaGraphFastApiEndpoint { get; set; }
-
-
     
     // Storage (SeaweedFS)
     public IResourceBuilder<ContainerResource>? SeaweedMaster { get; set; }

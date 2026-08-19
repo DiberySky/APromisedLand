@@ -1,0 +1,167 @@
+Log file created at: 2026/08/19 00:32:04
+Running on machine: f6a63d07dada
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20260819 00:32:04.440021     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 00:32:04.460194     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 00:32:04.462900     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 00:32:04.538499     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 00:32:04.542196     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 00:32:04.545781     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 00:32:04.546471     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 00:32:04.547320     1 NebulaStore.cpp:417] Create data space 0
+I20260819 00:32:04.790454    74 RocksEngine.cpp:107] open rocksdb on /data/meta/nebula/0/data
+I20260819 00:32:30.086099     1 NebulaStore.cpp:480] Space 0, part 0 has been added, asLearner 0
+I20260819 00:32:30.086601     1 NebulaStore.cpp:75] Register handler...
+I20260819 00:32:30.087026     1 MetaDaemonInit.cpp:106] Waiting for the leader elected...
+I20260819 00:32:30.087435     1 MetaDaemonInit.cpp:118] Leader has not been elected, sleep 1s
+I20260819 00:32:31.088485     1 MetaDaemonInit.cpp:153] Get meta version is 4
+I20260819 00:32:31.089052     1 MetaDaemonInit.cpp:169] Nebula store init succeeded, clusterId 2557737320329270911
+I20260819 00:32:31.089396     1 MetaDaemon.cpp:150] Start http service
+I20260819 00:32:31.090301     1 MetaDaemonInit.cpp:226] Starting Meta HTTP Service
+I20260819 00:32:31.095206   125 WebService.cpp:124] Web service started on HTTP[19559]
+I20260819 00:32:31.095950     1 MetaDaemonInit.cpp:192] Check root user
+I20260819 00:32:31.096729     1 RootUserMan.h:35] God user exists
+I20260819 00:32:31.100013     1 MetaDaemon.cpp:193] The meta daemon start on "nebula-metad0":9559
+I20260819 00:32:31.100920     1 JobManager.cpp:64] JobManager initialized
+I20260819 00:32:31.100939   131 JobManager.cpp:150] JobManager::scheduleThread enter
+I20260819 00:32:31.764268   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260819 00:32:31.764816   153 HBProcessor.cpp:89] Update host "nebula-graphd":9669 dir info, root path: /usr/local/nebula, data path size: 0
+I20260819 00:32:31.778059   153 SessionManagerProcessor.cpp:155] resp session size: 0
+I20260819 00:32:31.795092   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.795630   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.795998   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.796378   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.796736   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.797102   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.797487   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.797919   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.798333   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.798732   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.799101   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.799512   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.800115   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.800510   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.800860   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.801246   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.801698   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.802088   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.802464   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.802866   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.803217   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.803679   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.804057   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.804553   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.804929   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.805315   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.805754   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.806128   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.806461   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.806823   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.807370   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.807766   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.808105   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.808497   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.808950   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.809343   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.809790   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.810348   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.810737   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.811103   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.811601   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.812157   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.812711   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.813107   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.813472   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.813851   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.814277   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.814633   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.814975   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.815301   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.815687   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.816136   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.816536   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.816927   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.817298   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.817673   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.818104   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.818461   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.818830   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.819213   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.819670   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.820077   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.820556   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.820950   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.821581   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.822037   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.822455   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.822952   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.823423   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.823793   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.824214   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.824627   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.825044   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.825408   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.825752   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.826107   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.826467   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.826841   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.827212   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.827638   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.828121   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.828488   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.828886   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.829312   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.829737   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.830240   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.830616   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.831056   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.831453   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.831892   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.832230   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.832700   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.833065   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.833542   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.833937   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.834311   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.834713   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.835139   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.835602   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.836074   153 ListHostsProcessor.cpp:249] skip inactive host: "nebula-storaged0":9779
+I20260819 00:32:31.841899   153 SessionManagerProcessor.cpp:155] resp session size: 0
+E20260819 00:32:32.042238   153 AddHostsProcessor.cpp:72] The host "nebula-storaged0":9779 have existed!
+I20260819 00:32:36.729688   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260819 00:32:36.730235   153 HBProcessor.cpp:52] Set clusterId for new host "nebula-storaged0":9779!
+I20260819 00:32:36.730686   153 HBProcessor.cpp:89] Update host "nebula-storaged0":9779 dir info, root path: /usr/local/nebula, data path size: 1
+I20260819 00:32:36.777462   153 SessionManagerProcessor.cpp:155] resp session size: 0
+I20260819 00:32:42.436097   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260819 00:32:47.256456   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260819 00:32:52.447890   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260819 00:32:57.267158   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260819 00:33:02.458596   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260819 00:33:07.279620   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260819 00:33:12.470357   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260819 00:33:17.290659   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260819 00:33:22.482802   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-graphd":9669, role = GRAPH
+I20260819 00:33:27.296129   153 HBProcessor.cpp:33] Receive heartbeat from "nebula-storaged0":9779, role = STORAGE
+I20260819 00:33:27.787595     1 MetaDaemon.cpp:230] Signal 15(Terminated) received, stopping this server
+I20260819 00:33:27.806207     1 JobManager.cpp:138] JobManager::shutDown() begin
+I20260819 00:33:27.808378   131 JobManager.cpp:155] Detect shutdown called, exit
+I20260819 00:33:27.809901   131 JobDescription.cpp:113] Loading job description failed, error: E_JOB_NOT_IN_SPACE
+I20260819 00:33:27.810786   131 JobManager.cpp:175] Load an invalid job from space 0 jodId 0
+I20260819 00:33:27.812000     1 JobManager.cpp:146] JobManager::shutDown() end
+I20260819 00:33:27.813030     1 NebulaStore.cpp:343] Stop the raft service...
+I20260819 00:33:27.813741     1 RaftexService.cpp:67] Stopping the raftex service on port 9560
+I20260819 00:33:27.814528     1 RaftexService.cpp:77] All partitions have stopped
+I20260819 00:33:27.815527     1 NebulaStore.cpp:346] Stop kv engine...
+I20260819 00:33:27.816704     1 NebulaStore.cpp:343] Stop the raft service...
+I20260819 00:33:27.817494     1 RaftexService.cpp:67] Stopping the raftex service on port 9560
+I20260819 00:33:27.818356     1 RaftexService.cpp:77] All partitions have stopped
+I20260819 00:33:27.819124     1 NebulaStore.cpp:346] Stop kv engine...
+I20260819 00:33:27.820024     1 NebulaStore.cpp:36] Cut off the relationship with meta client
+I20260819 00:33:27.822206     1 Part.h:59] [Port: 9560, Space: 0, Part: 0] ~Part()
+I20260819 00:33:27.833189     1 RocksEngine.h:247] Release rocksdb on /data/meta/nebula/0
+I20260819 00:33:27.849027     1 NebulaStore.cpp:44] ~NebulaStore()
+I20260819 00:33:27.849910     1 MetaDaemon.cpp:215] The meta Daemon stopped
+I20260819 00:33:27.853473     1 JobManager.cpp:138] JobManager::shutDown() begin
+I20260819 00:33:27.854738     1 JobManager.cpp:141] JobManager not running, exit

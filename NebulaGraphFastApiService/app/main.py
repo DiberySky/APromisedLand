@@ -29,9 +29,10 @@ logger = logging.getLogger("nebula_api")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    logger.info("Initialising Nebula connection pool ...")
-    db.connect()
-    logger.info("Nebula connection pool ready.")
+    # Cold (lazy) connection mode: Nebula pool is NOT opened on startup.
+    # The first API request that actually needs Nebula will trigger
+    # `db.connect()` via the lazy `pool` property in `NebulaDB`.
+    logger.info("Starting in cold (lazy) connection mode.")
     yield
     logger.info("Closing Nebula connection pool ...")
     db.close()

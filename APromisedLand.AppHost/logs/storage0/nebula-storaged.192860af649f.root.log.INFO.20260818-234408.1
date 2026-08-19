@@ -1,0 +1,131 @@
+Log file created at: 2026/08/18 23:44:08
+Running on machine: 192860af649f
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20260818 23:44:08.075748     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260818 23:44:08.081245     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260818 23:44:08.104322     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260818 23:44:08.107612     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260818 23:44:08.110747     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260818 23:44:08.130070    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:09.136340    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:10.139603    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:11.142926    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+E20260818 23:44:11.143748    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260818 23:44:11.149983    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260818 23:44:11.151557     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260818 23:44:11.152792     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260818 23:44:21.153489     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260818 23:44:21.155490    54 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:22.158679    54 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:23.162176    54 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:24.164093    54 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+E20260818 23:44:24.164768    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260818 23:44:24.165652    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260818 23:44:24.166550     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260818 23:44:24.167435     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260818 23:44:34.168010     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260818 23:44:34.169871    55 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.174146    55 MetaClient.cpp:2672] Persist the cluster Id from metad 2557737320329270911
+I20260818 23:44:34.174631    55 FileBasedClusterIdMan.cpp:21] Remove the existed file cluster.id
+I20260818 23:44:34.175248    55 FileBasedClusterIdMan.cpp:34] Persist clusterId 2557737320329270911 succeeded!
+I20260818 23:44:34.176740    56 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.179118    71 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.181340    72 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.183580    73 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.222910    81 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.225641    89 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.228009    90 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.230280    91 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.232015    92 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.233598    93 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.235428    94 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.237032    95 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.238854    96 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.240983    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.242331     1 MetaClient.cpp:3263] Load leader of "nebula-storaged0":9779 in 1 space
+I20260818 23:44:34.242678     1 MetaClient.cpp:3263] Load leader of "storaged0":9779 in 0 space
+I20260818 23:44:34.243037     1 MetaClient.cpp:3269] Load leader ok
+I20260818 23:44:34.244067    54 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:44:34.246402     1 MetaClient.cpp:162] Register time task for heartbeat!
+I20260818 23:44:34.246861     1 StorageServer.cpp:250] Init schema manager
+I20260818 23:44:34.247228     1 StorageServer.cpp:253] Init index manager
+I20260818 23:44:34.247591     1 StorageServer.cpp:256] Init kvstore
+I20260818 23:44:34.247988     1 NebulaStore.cpp:48] Start the raft service...
+I20260818 23:44:34.249173     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260818 23:44:34.289263     1 RaftexService.cpp:46] Start raft service on 9780
+I20260818 23:44:34.291270     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260818 23:44:34.293431     1 NebulaStore.cpp:90] Scan path "/data/storage/nebula/0"
+I20260818 23:44:34.293802     1 NebulaStore.cpp:90] Scan path "/data/storage/nebula/4"
+I20260818 23:44:34.298494   104 RocksEngineConfig.cpp:371] Emplace rocksdb option max_bytes_for_level_base=268435456
+I20260818 23:44:34.298906   104 RocksEngineConfig.cpp:371] Emplace rocksdb option max_write_buffer_number=4
+I20260818 23:44:34.299324   104 RocksEngineConfig.cpp:371] Emplace rocksdb option write_buffer_size=67108864
+I20260818 23:44:34.299978   104 RocksEngineConfig.cpp:371] Emplace rocksdb option block_size=8192
+I20260818 23:44:34.394250   104 RocksEngine.cpp:107] open rocksdb on /data/storage/nebula/4/data
+I20260818 23:44:34.394663     1 NebulaStore.cpp:117] Load space 4 from disk
+I20260818 23:44:34.395247     1 NebulaStore.cpp:220] Load space 4 from disk
+I20260818 23:44:34.395584     1 NebulaStore.cpp:229] Need to open 100 parts of space 4
+I20260818 23:44:36.607228    99 NebulaStore.cpp:252] Load part 4, 2 from disk
+I20260818 23:44:36.616650   100 NebulaStore.cpp:252] Load part 4, 3 from disk
+I20260818 23:44:36.617705    98 NebulaStore.cpp:252] Load part 4, 1 from disk
+I20260818 23:44:36.623155   101 NebulaStore.cpp:252] Load part 4, 4 from disk
+I20260818 23:44:38.863722    99 NebulaStore.cpp:252] Load part 4, 6 from disk
+I20260818 23:44:38.873414    98 NebulaStore.cpp:252] Load part 4, 5 from disk
+I20260818 23:44:38.874701   100 NebulaStore.cpp:252] Load part 4, 7 from disk
+I20260818 23:44:38.882328   101 NebulaStore.cpp:252] Load part 4, 8 from disk
+I20260818 23:44:41.100436    99 NebulaStore.cpp:252] Load part 4, 10 from disk
+I20260818 23:44:41.112172   100 NebulaStore.cpp:252] Load part 4, 11 from disk
+I20260818 23:44:41.113492    98 NebulaStore.cpp:252] Load part 4, 9 from disk
+I20260818 23:44:41.124261   101 NebulaStore.cpp:252] Load part 4, 12 from disk
+I20260818 23:44:43.299187    99 NebulaStore.cpp:252] Load part 4, 14 from disk
+I20260818 23:44:43.319340   100 NebulaStore.cpp:252] Load part 4, 15 from disk
+I20260818 23:44:43.320212    98 NebulaStore.cpp:252] Load part 4, 13 from disk
+I20260818 23:44:43.323395   101 NebulaStore.cpp:252] Load part 4, 16 from disk
+I20260818 23:44:45.528107    99 NebulaStore.cpp:252] Load part 4, 18 from disk
+I20260818 23:44:45.547168   100 NebulaStore.cpp:252] Load part 4, 19 from disk
+I20260818 23:44:45.548805   101 NebulaStore.cpp:252] Load part 4, 20 from disk
+I20260818 23:44:45.552381    98 NebulaStore.cpp:252] Load part 4, 17 from disk
+I20260818 23:44:47.835422    99 NebulaStore.cpp:252] Load part 4, 22 from disk
+I20260818 23:44:47.848698   101 NebulaStore.cpp:252] Load part 4, 24 from disk
+I20260818 23:44:47.860875   100 NebulaStore.cpp:252] Load part 4, 23 from disk
+I20260818 23:44:47.867722    98 NebulaStore.cpp:252] Load part 4, 21 from disk
+I20260818 23:44:50.258201    99 NebulaStore.cpp:252] Load part 4, 26 from disk
+I20260818 23:44:50.261057   101 NebulaStore.cpp:252] Load part 4, 28 from disk
+I20260818 23:44:50.283823   100 NebulaStore.cpp:252] Load part 4, 27 from disk
+I20260818 23:44:50.298622    98 NebulaStore.cpp:252] Load part 4, 25 from disk
+I20260818 23:44:52.650458    99 NebulaStore.cpp:252] Load part 4, 30 from disk
+I20260818 23:44:52.654839   101 NebulaStore.cpp:252] Load part 4, 32 from disk
+I20260818 23:44:52.677147   100 NebulaStore.cpp:252] Load part 4, 31 from disk
+I20260818 23:44:52.688424    98 NebulaStore.cpp:252] Load part 4, 29 from disk
+I20260818 23:44:54.866258    99 NebulaStore.cpp:252] Load part 4, 34 from disk
+I20260818 23:44:54.872849   101 NebulaStore.cpp:252] Load part 4, 36 from disk
+I20260818 23:44:54.897346   100 NebulaStore.cpp:252] Load part 4, 35 from disk
+I20260818 23:44:54.912779    98 NebulaStore.cpp:252] Load part 4, 33 from disk
+I20260818 23:44:57.098951    99 NebulaStore.cpp:252] Load part 4, 38 from disk
+I20260818 23:44:57.104353   101 NebulaStore.cpp:252] Load part 4, 40 from disk
+I20260818 23:44:57.137509   100 NebulaStore.cpp:252] Load part 4, 39 from disk
+I20260818 23:44:57.152786    98 NebulaStore.cpp:252] Load part 4, 37 from disk
+I20260818 23:44:59.394662    99 NebulaStore.cpp:252] Load part 4, 42 from disk
+I20260818 23:44:59.399914   101 NebulaStore.cpp:252] Load part 4, 44 from disk
+I20260818 23:44:59.437453   100 NebulaStore.cpp:252] Load part 4, 43 from disk
+I20260818 23:44:59.441830    98 NebulaStore.cpp:252] Load part 4, 41 from disk
+I20260818 23:45:01.655905   101 NebulaStore.cpp:252] Load part 4, 48 from disk
+I20260818 23:45:01.657598    99 NebulaStore.cpp:252] Load part 4, 46 from disk
+I20260818 23:45:01.696382   100 NebulaStore.cpp:252] Load part 4, 47 from disk
+I20260818 23:45:01.700789    98 NebulaStore.cpp:252] Load part 4, 45 from disk
+I20260818 23:45:04.556569    72 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260818 23:45:05.923401     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+I20260818 23:45:07.325315    99 NebulaStore.cpp:252] Load part 4, 50 from disk
+I20260818 23:45:07.330096   101 NebulaStore.cpp:252] Load part 4, 52 from disk
+I20260818 23:45:07.359828    98 NebulaStore.cpp:252] Load part 4, 49 from disk
+I20260818 23:45:07.373837   100 NebulaStore.cpp:252] Load part 4, 51 from disk
+E20260818 23:45:09.604185    72 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260818 23:45:10.598362    99 NebulaStore.cpp:252] Load part 4, 54 from disk
+I20260818 23:45:10.600299   101 NebulaStore.cpp:252] Load part 4, 56 from disk
+I20260818 23:45:10.611650    98 NebulaStore.cpp:252] Load part 4, 53 from disk
+I20260818 23:45:10.703833   100 NebulaStore.cpp:252] Load part 4, 55 from disk
+I20260818 23:45:13.474560    98 NebulaStore.cpp:252] Load part 4, 57 from disk
+I20260818 23:45:13.477610    99 NebulaStore.cpp:252] Load part 4, 58 from disk
+I20260818 23:45:13.481807   101 NebulaStore.cpp:252] Load part 4, 60 from disk
+I20260818 23:45:13.523181   100 NebulaStore.cpp:252] Load part 4, 59 from disk
+E20260818 23:45:14.462836    72 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2

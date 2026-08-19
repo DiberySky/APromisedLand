@@ -1,0 +1,10 @@
+Log file created at: 2026/08/18 11:18:33
+Running on machine: a8383c09a9cb
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+W20260818 11:18:33.309909     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260818 11:18:36.339527    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260818 11:18:36.345783    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260818 11:18:36.347277     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+W20260818 11:18:46.348789     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260818 11:19:16.512952     1 MemoryUtils.cpp:167] Total memory less than untracked 50 Mib, MemoryTracker limit is not set properly,  Current memory stats:MemoryStats: 8589934592.000GiB/128.017MiB

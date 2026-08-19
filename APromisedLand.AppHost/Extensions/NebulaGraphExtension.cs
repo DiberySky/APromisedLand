@@ -101,11 +101,31 @@ public static class NebulaGraphExtension
                 "sleep 1; echo \"retry to add hosts.\"; " +
                 "done && tail -f /dev/null")
             .WaitFor(nebulaGraphd);
-
+        
         // 直连 graphd Thrift 端口，无需 Gateway
         context.NebulaGraph = nebulaGraphd;
         context.NebulaGraphEndpoint = nebulaGraphd.GetEndpoint("graph");
         context.NebulaConsole = nebulaConsole;
+        
+        var fastApi = builder.AddUvicornApp(
+                name: "nebula-fastapi",
+                appDirectory: "../NebulaGraphFastApiService",
+                app: "app.main:app"
+            )
+            .WithHttpEndpoint(port: 9339, targetPort: 9339, name: "http", isProxied: false)
+            .WithEnvironment("NEBULA_ENDPOINTS", "nebula-graphd:9669")
+            .WithEnvironment("API_HOST", "0.0.0.0")
+            .WithEnvironment("API_PORT", "9339") // ✅ 必须加上这一行
+            .WaitFor(nebulaGraphd)
+            .WaitFor(nebulaConsole);
+        
+
+        // 如果你需要将 FastAPI 的地址传递给其他服务，可以保存到 context
+        context.NebulaGraphFastApi = fastApi;
+        context.NebulaGraphFastApiEndpoint = fastApi.GetEndpoint("http");
+
+        // builder.AddNebulaGraphFastApiService(context);
+        builder.AddNebulaApiProxyService(context);
 
         return builder;
     }
