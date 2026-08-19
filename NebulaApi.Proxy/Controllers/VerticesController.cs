@@ -1,6 +1,6 @@
+using APromisedLand.Api.NebulaGraph.Services;
 using Microsoft.AspNetCore.Mvc;
 using NebulaApi.Proxy.Dtos;
-using NebulaApi.Proxy.Services;
 
 namespace NebulaApi.Proxy.Controllers;
 

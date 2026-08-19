@@ -1,0 +1,12 @@
+Log file created at: 2026/08/19 02:28:36
+Running on machine: 7153aef388d3
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+E20260819 02:28:36.533605    43 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 02:28:36.547042    43 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 02:28:36.550784     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+E20260819 02:28:49.587750    44 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 02:28:49.588436    44 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 02:28:49.589273     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+E20260819 02:28:59.695271     1 MemoryUtils.cpp:167] Total memory less than untracked 50 Mib, MemoryTracker limit is not set properly,  Current memory stats:MemoryStats: 8589934592.000GiB/56.000MiB
+E20260819 02:29:00.469375    31 QueryInstance.cpp:151] Existed!, query: ADD HOSTS "nebula-storaged0":9779

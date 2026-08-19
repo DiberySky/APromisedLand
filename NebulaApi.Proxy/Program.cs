@@ -1,8 +1,8 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using APromisedLand.Api.NebulaGraph.Services;
 using NebulaApi.Proxy.Models;
-using NebulaApi.Proxy.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

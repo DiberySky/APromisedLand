@@ -34,7 +34,7 @@ public class AppHostContext
     public IResourceBuilder<ProjectResource>? NebulaApiProxy { get; set; }
     
     // ← 新增：Python FastAPI 服务引用
-    public IResourceBuilder<UvicornAppResource>? NebulaGraphFastApi { get; set; }
+    public IResourceBuilder<PythonAppResource>? NebulaGraphFastApi { get; set; }
     public EndpointReference? NebulaGraphFastApiEndpoint { get; set; }
     
     // Storage (SeaweedFS)

@@ -107,10 +107,11 @@ public static class NebulaGraphExtension
         context.NebulaGraphEndpoint = nebulaGraphd.GetEndpoint("graph");
         context.NebulaConsole = nebulaConsole;
         
-        var fastApi = builder.AddUvicornApp(
+        var fastApi = builder.AddPythonApp(
                 name: "nebula-fastapi",
                 appDirectory: "../NebulaGraphFastApiService",
-                app: "app.main:app"
+                scriptPath: "run.py"
+                // app: "app.main:app"
             )
             .WithHttpEndpoint(port: 9339, targetPort: 9339, name: "http", isProxied: false)
             .WithEnvironment("NEBULA_ENDPOINTS", "nebula-graphd:9669")

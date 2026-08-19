@@ -1,5 +1,5 @@
+using APromisedLand.Api.NebulaGraph.Services;
 using Microsoft.AspNetCore.Mvc;
-using NebulaApi.Proxy.Services;
 
 namespace NebulaApi.Proxy.Controllers;
 
@@ -9,16 +9,13 @@ namespace NebulaApi.Proxy.Controllers;
 /// </summary>
 [ApiController]
 [Route("connection")]
-public sealed class ConnectionController : ControllerBase
+public sealed class ConnectionController(NebulaFastApiService api) : ControllerBase
 {
-    private readonly NebulaFastApiService _api;
-    public ConnectionController(NebulaFastApiService api) => _api = api;
-
     /// <summary>NebulaGraph connectivity check.</summary>
     [HttpGet("health")]
     public async Task<IActionResult> Health(CancellationToken ct)
     {
-        var res = await _api.GetAsync("/connection/health", ct: ct);
+        var res = await api.GetAsync("/connection/health", ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 
@@ -26,7 +23,7 @@ public sealed class ConnectionController : ControllerBase
     [HttpGet("spaces")]
     public async Task<IActionResult> ListSpaces(CancellationToken ct)
     {
-        var res = await _api.GetAsync("/connection/spaces", ct: ct);
+        var res = await api.GetAsync("/connection/spaces", ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 }
