@@ -1,3 +1,4 @@
+using APromisedLand.Api.NebulaGraph.ControllerBases;
 using APromisedLand.Api.NebulaGraph.Services;
 using Microsoft.AspNetCore.Mvc;
 using NebulaApi.Proxy.Dtos;
@@ -10,73 +11,73 @@ namespace NebulaApi.Proxy.Controllers;
 /// </summary>
 [ApiController]
 [Route("query")]
-public sealed class QueryController : ControllerBase
+public sealed class QueryController(NebulaFastApiService api) : QueryControllerBase(api)
 {
-    private readonly NebulaFastApiService _api;
-    public QueryController(NebulaFastApiService api) => _api = api;
-
-    /// <summary>Execute raw nGQL and return parsed rows.</summary>
-    [HttpPost("ngql")]
-    public async Task<IActionResult> RawNgql([FromBody] RawStmtIn body, CancellationToken ct)
-    {
-        var res = await _api.PostAsync("/query/ngql", body, ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
-
-    /// <summary>EXPLAIN a statement (return plan).</summary>
-    [HttpPost("explain")]
-    public async Task<IActionResult> Explain([FromBody] RawStmtIn body, CancellationToken ct)
-    {
-        var res = await _api.PostAsync("/query/explain", body, ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
-
-    /// <summary>PROFILE a statement (return plan + latency).</summary>
-    [HttpPost("profile")]
-    public async Task<IActionResult> Profile([FromBody] RawStmtIn body, CancellationToken ct)
-    {
-        var res = await _api.PostAsync("/query/profile", body, ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
-
-    /// <summary>Run a GO traversal.</summary>
-    [HttpPost("go")]
-    public async Task<IActionResult> Go([FromBody] GoIn body, CancellationToken ct)
-    {
-        var res = await _api.PostAsync("/query/go", body, ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
-
-    /// <summary>Run a LOOKUP (index-based search).</summary>
-    [HttpPost("lookup")]
-    public async Task<IActionResult> Lookup([FromBody] LookupIn body, CancellationToken ct)
-    {
-        var res = await _api.PostAsync("/query/lookup", body, ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
-
-    /// <summary>Find paths between two vertices.</summary>
-    [HttpPost("find-path")]
-    public async Task<IActionResult> FindPath([FromBody] FindPathIn body, CancellationToken ct)
-    {
-        var res = await _api.PostAsync("/query/find-path", body, ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
-
-    /// <summary>Get a subgraph around a vertex.</summary>
-    [HttpPost("subgraph")]
-    public async Task<IActionResult> GetSubgraph([FromBody] GetSubgraphIn body, CancellationToken ct)
-    {
-        var res = await _api.PostAsync("/query/subgraph", body, ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
-
-    /// <summary>Show space statistics.</summary>
-    [HttpGet("stats/{space}")]
-    public async Task<IActionResult> Stats(string space, CancellationToken ct)
-    {
-        var res = await _api.GetAsync(
-            $"/query/stats/{Uri.EscapeDataString(space)}", ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
+    // private readonly NebulaFastApiService _api;
+    // public QueryController(NebulaFastApiService api) => _api = api;
+    //
+    // /// <summary>Execute raw nGQL and return parsed rows.</summary>
+    // [HttpPost("ngql")]
+    // public async Task<IActionResult> RawNgql([FromBody] RawStmtIn body, CancellationToken ct)
+    // {
+    //     var res = await _api.PostAsync("/query/ngql", body, ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
+    //
+    // /// <summary>EXPLAIN a statement (return plan).</summary>
+    // [HttpPost("explain")]
+    // public async Task<IActionResult> Explain([FromBody] RawStmtIn body, CancellationToken ct)
+    // {
+    //     var res = await _api.PostAsync("/query/explain", body, ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
+    //
+    // /// <summary>PROFILE a statement (return plan + latency).</summary>
+    // [HttpPost("profile")]
+    // public async Task<IActionResult> Profile([FromBody] RawStmtIn body, CancellationToken ct)
+    // {
+    //     var res = await _api.PostAsync("/query/profile", body, ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
+    //
+    // /// <summary>Run a GO traversal.</summary>
+    // [HttpPost("go")]
+    // public async Task<IActionResult> Go([FromBody] GoIn body, CancellationToken ct)
+    // {
+    //     var res = await _api.PostAsync("/query/go", body, ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
+    //
+    // /// <summary>Run a LOOKUP (index-based search).</summary>
+    // [HttpPost("lookup")]
+    // public async Task<IActionResult> Lookup([FromBody] LookupIn body, CancellationToken ct)
+    // {
+    //     var res = await _api.PostAsync("/query/lookup", body, ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
+    //
+    // /// <summary>Find paths between two vertices.</summary>
+    // [HttpPost("find-path")]
+    // public async Task<IActionResult> FindPath([FromBody] FindPathIn body, CancellationToken ct)
+    // {
+    //     var res = await _api.PostAsync("/query/find-path", body, ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
+    //
+    // /// <summary>Get a subgraph around a vertex.</summary>
+    // [HttpPost("subgraph")]
+    // public async Task<IActionResult> GetSubgraph([FromBody] GetSubgraphIn body, CancellationToken ct)
+    // {
+    //     var res = await _api.PostAsync("/query/subgraph", body, ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
+    //
+    // /// <summary>Show space statistics.</summary>
+    // [HttpGet("stats/{space}")]
+    // public async Task<IActionResult> Stats(string space, CancellationToken ct)
+    // {
+    //     var res = await _api.GetAsync(
+    //         $"/query/stats/{Uri.EscapeDataString(space)}", ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
 }

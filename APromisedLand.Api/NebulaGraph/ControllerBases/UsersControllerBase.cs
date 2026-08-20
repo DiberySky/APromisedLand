@@ -9,7 +9,7 @@ namespace APromisedLand.Api.NebulaGraph.ControllerBases;
 /// reset, and role grant / revoke across spaces.
 /// </summary>
 [ApiController]
-[Route("users")]
+[Route("NebulaGraph/users")]
 public abstract class UsersControllerBase(NebulaFastApiService api) : ControllerBase
 {
     /// <summary>List all users.</summary>

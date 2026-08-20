@@ -11096,3 +11096,483 @@ I20260819 02:54:55.130115     1 NebulaStore.cpp:44] ~NebulaStore()
 I20260819 02:54:55.131433     1 MetaDaemon.cpp:215] The meta Daemon stopped
 I20260819 02:54:55.137741     1 JobManager.cpp:138] JobManager::shutDown() begin
 I20260819 02:54:55.138815     1 JobManager.cpp:141] JobManager not running, exit
+I20260819 22:09:19.368781     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 22:09:19.429934     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 22:09:19.433485     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 22:09:19.561360     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 22:09:19.589206     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 22:09:19.613459     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 22:09:19.617684     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 22:09:19.621757     1 NebulaStore.cpp:417] Create data space 0
+F20260819 22:09:19.900563    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787177362 (Unix time, try 'date -d @1787177362') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x7c0cf8ffb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x7c0d1f2e462f]
+/lib64/libc.so.6(abort+0x297)[0x7c0d1ef3ebc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x7c0d1f2dcea4]
+/lib64/libc.so.6(clone+0x6c)[0x7c0d1f00596c]
+(safe mode, symbolizer not available)
+I20260819 22:13:10.213050     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 22:13:10.223510     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 22:13:10.225111     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 22:13:10.292105     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 22:13:10.295104     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 22:13:10.298359     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 22:13:10.298848     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 22:13:10.299366     1 NebulaStore.cpp:417] Create data space 0
+F20260819 22:13:10.339972    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787177591 (Unix time, try 'date -d @1787177591') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x73a4537fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x73a47a0cd62f]
+/lib64/libc.so.6(abort+0x297)[0x73a479d27bc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x73a47a0c5ea4]
+/lib64/libc.so.6(clone+0x6c)[0x73a479dee96c]
+(safe mode, symbolizer not available)
+I20260819 22:56:49.985442     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 22:56:50.012640     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 22:56:50.017205     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 22:56:50.126157     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 22:56:50.133421     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 22:56:50.139461     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 22:56:50.141947     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 22:56:50.144493     1 NebulaStore.cpp:417] Create data space 0
+F20260819 22:56:50.284993    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787180214 (Unix time, try 'date -d @1787180214') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x71f01affb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x71f0412f462f]
+/lib64/libc.so.6(abort+0x297)[0x71f040f4ebc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x71f0412ecea4]
+/lib64/libc.so.6(clone+0x6c)[0x71f04101596c]
+(safe mode, symbolizer not available)
+I20260819 23:28:34.828543     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 23:28:34.848815     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 23:28:34.851750     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 23:28:34.967039     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 23:28:34.972158     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 23:28:34.975201     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 23:28:34.976465     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 23:28:34.976989     1 NebulaStore.cpp:417] Create data space 0
+F20260819 23:28:35.030925    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787182117 (Unix time, try 'date -d @1787182117') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x76a5877fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x76a5ae20062f]
+/lib64/libc.so.6(abort+0x297)[0x76a5ade5abc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x76a5ae1f8ea4]
+/lib64/libc.so.6(clone+0x6c)[0x76a5adf2196c]
+(safe mode, symbolizer not available)
+I20260819 23:30:16.053753     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 23:30:16.066458     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 23:30:16.068019     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 23:30:16.152073     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 23:30:16.154124     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 23:30:16.156597     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 23:30:16.156996     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 23:30:16.157474     1 NebulaStore.cpp:417] Create data space 0
+F20260819 23:30:16.199868    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787182216 (Unix time, try 'date -d @1787182216') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x70cfc93fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x70cfefd1262f]
+/lib64/libc.so.6(abort+0x297)[0x70cfef96cbc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x70cfefd0aea4]
+/lib64/libc.so.6(clone+0x6c)[0x70cfefa3396c]
+(safe mode, symbolizer not available)
+I20260819 23:33:05.604631     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 23:33:05.621886     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 23:33:05.624639     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 23:33:05.706225     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 23:33:05.709560     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 23:33:05.713001     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 23:33:05.713802     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 23:33:05.714378     1 NebulaStore.cpp:417] Create data space 0
+F20260819 23:33:05.833074    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787182387 (Unix time, try 'date -d @1787182387') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x79cdf29fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x79ce1948862f]
+/lib64/libc.so.6(abort+0x297)[0x79ce190e2bc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x79ce19480ea4]
+/lib64/libc.so.6(clone+0x6c)[0x79ce191a996c]
+(safe mode, symbolizer not available)
+I20260819 23:34:35.573335     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 23:34:35.607409     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 23:34:35.613569     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 23:34:35.721366     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 23:34:35.734004     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 23:34:35.760193     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 23:34:35.763425     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 23:34:35.766932     1 NebulaStore.cpp:417] Create data space 0
+F20260819 23:34:35.839213    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787182478 (Unix time, try 'date -d @1787182478') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x7be6a25fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x7be6c956462f]
+/lib64/libc.so.6(abort+0x297)[0x7be6c91bebc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x7be6c955cea4]
+/lib64/libc.so.6(clone+0x6c)[0x7be6c928596c]
+(safe mode, symbolizer not available)
+I20260819 23:38:36.609401     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 23:38:36.622568     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 23:38:36.624507     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 23:38:36.699683     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 23:38:36.702689     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 23:38:36.705439     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 23:38:36.705917     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 23:38:36.706431     1 NebulaStore.cpp:417] Create data space 0
+F20260819 23:38:36.752197    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787182717 (Unix time, try 'date -d @1787182717') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x743eb21fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x743ed8fcf62f]
+/lib64/libc.so.6(abort+0x297)[0x743ed8c29bc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x743ed8fc7ea4]
+/lib64/libc.so.6(clone+0x6c)[0x743ed8cf096c]
+(safe mode, symbolizer not available)
+I20260819 23:40:49.299561     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 23:40:49.317035     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 23:40:49.318842     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 23:40:49.401083     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 23:40:49.405301     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 23:40:49.409144     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 23:40:49.409827     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 23:40:49.410741     1 NebulaStore.cpp:417] Create data space 0
+F20260819 23:40:49.471072    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787182850 (Unix time, try 'date -d @1787182850') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x72ed2d1fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x72ed53d8762f]
+/lib64/libc.so.6(abort+0x297)[0x72ed539e1bc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x72ed53d7fea4]
+/lib64/libc.so.6(clone+0x6c)[0x72ed53aa896c]
+(safe mode, symbolizer not available)
+I20260819 23:42:05.224037     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 23:42:05.248394     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 23:42:05.257681     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 23:42:05.328238     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 23:42:05.334810     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 23:42:05.354194     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 23:42:05.357558     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 23:42:05.366052     1 NebulaStore.cpp:417] Create data space 0
+F20260819 23:42:05.455765    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787182927 (Unix time, try 'date -d @1787182927') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x7bf30a7fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e9e31]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25e1336]
+/usr/local/nebula/bin/nebula-metad[0x25df2c7]
+/lib64/libpthread.so.0(+0xf62f)[0x7bf33136f62f]
+/lib64/libc.so.6(abort+0x297)[0x7bf330fc9bc7]
+/usr/local/nebula/bin/nebula-metad[0x2612b39]
+/usr/local/nebula/bin/nebula-metad[0x2615c33]
+/usr/local/nebula/bin/nebula-metad[0x2612608]
+/usr/local/nebula/bin/nebula-metad[0x26162e8]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6c4ff]
+/usr/local/nebula/bin/nebula-metad[0x1b790a0]
+/usr/local/nebula/bin/nebula-metad[0x1b7fd69]
+/usr/local/nebula/bin/nebula-metad[0x254a09b]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x2528ac7]
+/usr/local/nebula/bin/nebula-metad[0x251b2de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x25940a0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x25950cc]
+/usr/local/nebula/bin/nebula-metad[0x264ff74]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x26505de]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258e64d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x258ef3d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x2591b77]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x251bcc8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x252a236]
+/usr/local/nebula/bin/nebula-metad[0x2b545ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x7bf331367ea4]
+/lib64/libc.so.6(clone+0x6c)[0x7bf33109096c]
+(safe mode, symbolizer not available)
+I20260819 23:48:01.136471     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 23:48:01.149318     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 23:48:01.150875     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 23:48:01.228554     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 23:48:01.230940     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 23:48:01.233157     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 23:48:01.233549     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 23:48:01.233922     1 NebulaStore.cpp:417] Create data space 0
+F20260819 23:48:01.276886    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787183282 (Unix time, try 'date -d @1787183282') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x7fcd697fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e4a61]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25dbf66]
+/usr/local/nebula/bin/nebula-metad[0x25d9ef7]
+/lib64/libpthread.so.0(+0xf62f)[0x7fcd8f9ff62f]
+/lib64/libc.so.6(abort+0x297)[0x7fcd8f659bc7]
+/usr/local/nebula/bin/nebula-metad[0x260d769]
+/usr/local/nebula/bin/nebula-metad[0x2610863]
+/usr/local/nebula/bin/nebula-metad[0x260d238]
+/usr/local/nebula/bin/nebula-metad[0x2610f18]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6996f]
+/usr/local/nebula/bin/nebula-metad[0x1b76510]
+/usr/local/nebula/bin/nebula-metad[0x1b7d1d9]
+/usr/local/nebula/bin/nebula-metad[0x2544ccb]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x25236f7]
+/usr/local/nebula/bin/nebula-metad[0x2515f0e]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x258ecd0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x258fcfc]
+/usr/local/nebula/bin/nebula-metad[0x264aba4]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x264b20e]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258927d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x2589b6d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x258c7a7]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x25168f8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x2524e66]
+/usr/local/nebula/bin/nebula-metad[0x2b4f5ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x7fcd8f9f7ea4]
+/lib64/libc.so.6(clone+0x6c)[0x7fcd8f72096c]
+(safe mode, symbolizer not available)
+I20260819 23:53:02.094600     1 MetaDaemon.cpp:137] localhost = "nebula-metad0":9559
+I20260819 23:53:02.113057     1 NebulaStore.cpp:48] Start the raft service...
+I20260819 23:53:02.116521     1 NebulaSnapshotManager.cpp:25] Send snapshot is rate limited to 10485760 for each part by default
+I20260819 23:53:02.224701     1 RaftexService.cpp:46] Start raft service on 9560
+I20260819 23:53:02.235180     1 NebulaStore.cpp:82] Scan the local path, and init the spaces_
+I20260819 23:53:02.239741     1 NebulaStore.cpp:90] Scan path "/data/meta/nebula/0"
+I20260819 23:53:02.240869     1 NebulaStore.cpp:292] Init data from partManager for "nebula-metad0":9559
+I20260819 23:53:02.242031     1 NebulaStore.cpp:417] Create data space 0
+F20260819 23:53:02.338440    74 RocksEngine.cpp:82] Check failed: status.ok() Corruption: CURRENT file corrupted
+*** Check failure stack trace: ***
+*** Aborted at 1787183583 (Unix time, try 'date -d @1787183583') ***
+*** Signal 11 (SIGSEGV) (0x0) received by PID 1 (pthread TID 0x71d8595fb700) (linux TID 74) (code: 128), stack trace: ***
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer17getStackTraceSafeEPmm+0x31)[0x25e4a61]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly10symbolizer21SafeStackTracePrinter15printStackTraceEb+0x26)[0x25dbf66]
+/usr/local/nebula/bin/nebula-metad[0x25d9ef7]
+/lib64/libpthread.so.0(+0xf62f)[0x71d87fd1762f]
+/lib64/libc.so.6(abort+0x297)[0x71d87f971bc7]
+/usr/local/nebula/bin/nebula-metad[0x260d769]
+/usr/local/nebula/bin/nebula-metad[0x2610863]
+/usr/local/nebula/bin/nebula-metad[0x260d238]
+/usr/local/nebula/bin/nebula-metad[0x2610f18]
+/usr/local/nebula/bin/nebula-metad(_ZN6nebula7kvstore11RocksEngineC2EiiRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES9_St10shared_ptrIN7rocksdb13MergeOperatorEESA_INSB_23CompactionFilterFactoryEEb+0xb1f)[0x1b6996f]
+/usr/local/nebula/bin/nebula-metad[0x1b76510]
+/usr/local/nebula/bin/nebula-metad[0x1b7d1d9]
+/usr/local/nebula/bin/nebula-metad[0x2544ccb]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly18ThreadPoolExecutor7runTaskERKSt10shared_ptrINS0_6ThreadEEONS0_4TaskE+0x137)[0x25236f7]
+/usr/local/nebula/bin/nebula-metad[0x2515f0e]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly23AtomicNotificationQueueINS_8FunctionIFvvEEEE5driveIRNS_9EventBase10FuncRunnerEEEbOT_+0xd0)[0x258ecd0]
+/usr/local/nebula/bin/nebula-metad(_ZThn40_N5folly32EventBaseAtomicNotificationQueueINS_8FunctionIFvvEEENS_9EventBase10FuncRunnerEE12handlerReadyEt+0x2c)[0x258fcfc]
+/usr/local/nebula/bin/nebula-metad[0x264aba4]
+/usr/local/nebula/bin/nebula-metad(event_base_loop+0x36e)[0x264b20e]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase8loopBodyEib+0x46d)[0x258927d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase4loopEv+0x3d)[0x2589b6d]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly9EventBase11loopForeverEv+0x17)[0x258c7a7]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly20IOThreadPoolExecutor9threadRunESt10shared_ptrINS_18ThreadPoolExecutor6ThreadEE+0x338)[0x25168f8]
+/usr/local/nebula/bin/nebula-metad(_ZN5folly6detail8function14FunctionTraitsIFvvEE7callBigISt5_BindIFMNS_18ThreadPoolExecutorEFvSt10shared_ptrINS7_6ThreadEEEPS7_SA_EEEEvRNS1_4DataE+0x46)[0x2524e66]
+/usr/local/nebula/bin/nebula-metad[0x2b4f5ef]
+/lib64/libpthread.so.0(+0x7ea4)[0x71d87fd0fea4]
+/lib64/libc.so.6(clone+0x6c)[0x71d87fa3896c]
+(safe mode, symbolizer not available)

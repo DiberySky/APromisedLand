@@ -1,0 +1,30 @@
+Log file created at: 2026/08/19 23:38:38
+Running on machine: 5acc270b45e0
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20260819 23:38:38.883047     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 23:38:38.889631     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 23:38:38.903314     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:38:38.903999     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 23:38:38.904779     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 23:38:38.923346    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.6":9559
+I20260819 23:38:39.929311    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.6":9559
+I20260819 23:38:40.932453    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.6":9559
+I20260819 23:38:41.936429    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.6":9559
+E20260819 23:38:41.937284    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:38:41.942015    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 23:38:41.943678     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260819 23:38:41.944720     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:38:51.945415     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:38:55.948777    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:00.951905    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:05.955901    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:10.959760    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:10.960841    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:39:10.961686    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:39:10.962597     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:39:10.963645     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+I20260819 23:39:12.310029     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+W20260819 23:39:12.314260     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:39:16.327330    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:21.332036    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2

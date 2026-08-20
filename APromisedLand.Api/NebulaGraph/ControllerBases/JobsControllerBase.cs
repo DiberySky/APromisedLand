@@ -9,7 +9,7 @@ namespace APromisedLand.Api.NebulaGraph.ControllerBases;
 /// submission, listing, inspection, stop and recover.
 /// </summary>
 [ApiController]
-[Route("jobs")]
+[Route("NebulaGraph/jobs")]
 public abstract class JobsControllerBase(NebulaFastApiService api) : ControllerBase
 {
     /// <summary>Submit a compact job.</summary>

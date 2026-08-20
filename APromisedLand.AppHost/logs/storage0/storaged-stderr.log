@@ -17100,3 +17100,1171 @@ I20260819 02:54:57.520247     1 Part.h:59] [Port: 9780, Space: 4, Part: 95] ~Par
 I20260819 02:54:57.526726     1 RocksEngine.h:247] Release rocksdb on /data/storage/nebula/4
 I20260819 02:54:57.537638     1 NebulaStore.cpp:44] ~NebulaStore()
 I20260819 02:54:57.538527     1 StorageDaemon.cpp:186] The storage Daemon stopped
+I20260819 22:09:27.366524     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 22:09:27.375946     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 22:09:27.402081     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 22:09:27.404076     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 22:09:27.409395     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 22:09:27.439929    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 22:09:28.477888    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 22:09:29.481807    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 22:09:30.499567    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+E20260819 22:09:30.501284    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:09:30.510540    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 22:09:30.513427     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260819 22:09:30.514901     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:09:40.513854     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:09:44.540477    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:09:49.549875    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:09:54.552553    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:09:59.558238    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:09:59.559638    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:09:59.561764    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:09:59.562821     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:09:59.563730     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:10:09.563400     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:10:13.566300    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:10:18.570688    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:10:23.574759    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:10:28.580395    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:10:28.584671    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:10:28.585757    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:10:28.586741     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:10:28.587719     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:10:38.587338     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:10:42.589926    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:10:47.596673    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:10:52.616219    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:10:57.620522    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:10:57.621477    56 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:10:57.622282    56 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:10:57.623179     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:10:57.624131     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:11:07.623121     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:11:11.626232    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:11:16.630774    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:11:21.631476    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:11:26.635308    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:11:26.636288    71 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:11:26.637003    71 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:11:26.638008     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:11:26.638823     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:11:36.638494     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:11:40.640820    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:11:45.645179    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:11:50.648834    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:11:55.652312    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:11:55.653175    79 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:11:55.653755    79 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:11:55.654378     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:11:55.655175     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:12:05.654125     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:12:09.656484    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:12:14.659729    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:12:19.660768    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:12:24.665251    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:12:24.666421    87 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:12:24.667292    87 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:12:24.668232     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:12:24.669130     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:12:34.668129     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:12:38.670663    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 22:12:42.024274     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+E20260819 22:12:43.674788    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:12:48.679603    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:12:53.683490    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:12:53.684832    88 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:12:53.685767    88 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:12:53.686735     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:12:53.687546     1 MetaClient.cpp:143] Connect to the MetaServer Failed
+E20260819 22:12:53.688504     1 StorageServer.cpp:237] waitForMetadReady error!
+E20260819 22:12:53.689383     1 StorageDaemon.cpp:180] Storage server start failed
+I20260819 22:13:21.148253     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 22:13:21.152297     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 22:13:21.160574     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 22:13:21.161049     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 22:13:21.192122     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:13:25.210493    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:13:30.218595    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:13:35.340780    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:13:40.345942    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:13:40.346985    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:13:40.347889    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:13:40.348838     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:13:40.349764     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:13:50.350334     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:13:54.354194    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:13:59.358070    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:14:04.362830    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:14:09.368661    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:14:09.369650    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:14:09.370461    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:14:09.371284     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:14:09.371994     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:14:19.372491     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:14:23.375046    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:14:28.379602    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:14:33.383948    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:14:38.385862    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:14:38.386945    62 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:14:38.387814    62 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:14:38.388727     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:14:38.389648     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:14:48.390352     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:14:52.393180    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:14:57.397470    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:15:02.416157    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:15:07.417598    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:15:07.418749    70 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:15:07.419703    70 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:15:07.420588     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:15:07.421676     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:15:17.422266     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:15:21.424269    85 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:15:26.427523    85 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:15:31.431129    85 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:15:36.420101    85 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:15:36.421288    85 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:15:36.422168    85 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:15:36.423170     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:15:36.424150     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:15:46.424671     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:15:50.420758    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:15:55.424501    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:16:00.428507    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:16:05.430377    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:16:05.431440    86 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:16:05.432119    86 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:16:05.433041     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:16:05.433696     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:16:15.434166     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:16:19.436786    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:16:24.440707    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:16:29.444746    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:16:34.448352    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:16:34.449833    87 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:16:34.450856    87 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:16:34.451823     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:16:34.452519     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:16:44.451570     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:16:48.454800    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:16:53.459326    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:16:58.458105    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:17:03.462249    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:17:03.463269    88 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:17:03.463996    88 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:17:03.464870     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:17:03.465456     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:17:13.464438     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:17:17.466928    96 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:17:22.465394    96 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:17:27.468694    96 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:17:32.473045    96 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:17:32.474229    96 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:17:32.475015    96 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:17:32.476092     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:17:32.476938     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:17:42.476037     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:17:46.479111    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:17:51.483549    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:17:56.487172    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:18:01.491645    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:18:01.493395    97 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:18:01.495393    97 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:18:01.496742     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:18:01.497717     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:18:11.496711     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:18:15.500342    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:18:20.505200    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 22:18:21.833571     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+E20260819 22:18:25.513088    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:18:30.518317    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:18:30.519510    98 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:18:30.520437    98 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:18:30.521528     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:18:30.522472     1 MetaClient.cpp:143] Connect to the MetaServer Failed
+E20260819 22:18:30.523293     1 StorageServer.cpp:237] waitForMetadReady error!
+E20260819 22:18:30.524129     1 StorageDaemon.cpp:180] Storage server start failed
+I20260819 22:56:56.597694     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 22:56:56.629727     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 22:56:56.691217     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 22:56:56.693872     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 22:56:56.715695     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 22:56:56.771543    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260819 22:56:57.842787    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260819 22:56:58.851084    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+I20260819 22:56:59.857298    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.4":9559
+E20260819 22:56:59.859450    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:56:59.875308    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 22:56:59.878031     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260819 22:56:59.879966     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:57:09.874679     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:57:13.925372    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:57:18.934396    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:57:23.939340    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:57:28.946596    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:57:28.957641    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:57:28.963102    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:57:28.964713     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:57:28.967190     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:57:38.966255     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:57:42.970440    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:57:47.974996    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:57:52.980443    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:57:57.985381    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:57:57.986668    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:57:57.987694    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:57:57.988960     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:57:57.990039     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:58:07.990821     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:58:11.990598    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:58:16.995929    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:58:22.029145    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:58:27.034582    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:58:27.035820    56 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:58:27.036696    56 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:58:27.037714     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:58:27.038872     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:58:37.039529     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:58:41.040086    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:58:46.044442    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:58:51.047860    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:58:56.051760    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:58:56.052979    70 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:58:56.053862    70 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:58:56.054729     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:58:56.055505     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:59:06.056181     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:59:10.054402    78 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:59:15.058557    78 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:59:20.059486    78 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:59:25.063647    78 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:59:25.065122    78 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:59:25.065996    78 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:59:25.067034     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:59:25.067924     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 22:59:35.068670     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 22:59:39.069199    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:59:44.073812    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:59:49.077315    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:59:54.080961    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 22:59:54.081992    86 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 22:59:54.082988    86 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 22:59:54.083963     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 22:59:54.084707     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:00:04.085227     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:00:08.088318    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:00:13.089630    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:00:18.093710    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:00:23.097656    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:00:23.098826    87 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:00:23.099643    87 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:00:23.100625     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:00:23.101516     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:00:33.102137     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:00:37.104074    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:00:42.105666    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:00:47.109889    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:00:52.113749    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:00:52.114996    88 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:00:52.115808    88 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:00:52.116549     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:00:52.117229     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:01:02.117722     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:01:06.120440    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:01:11.122162    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:01:16.123083    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:01:21.126837    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:01:21.127995    89 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:01:21.128834    89 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:01:21.129741     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:01:21.130683     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:01:31.131299     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:01:35.134071    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:01:40.136587    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 23:01:42.786449     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+E20260819 23:01:45.140669    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:01:50.144862    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:01:50.145906    97 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:01:50.146628    97 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:01:50.147531     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:01:50.148234     1 MetaClient.cpp:143] Connect to the MetaServer Failed
+E20260819 23:01:50.148945     1 StorageServer.cpp:237] waitForMetadReady error!
+E20260819 23:01:50.149729     1 StorageDaemon.cpp:180] Storage server start failed
+I20260819 23:28:38.312076     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 23:28:38.329298     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 23:28:38.383737     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:28:38.385537     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 23:28:38.393983     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 23:28:38.446038    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 23:28:39.482420    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 23:28:40.486670    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 23:28:41.490801    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+E20260819 23:28:41.516119    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:28:41.623998    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 23:28:41.659669     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260819 23:28:41.690852     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:28:51.699527     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:28:55.729274    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:29:00.738541    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:29:05.743469    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:29:10.747603    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:29:10.749081    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:29:10.750177    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:29:10.751276     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:29:10.752260     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:29:20.752844     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:29:24.753316    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:29:29.760177    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:29:34.764950    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:29:39.772640    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:29:39.774047    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:29:39.775202    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:29:39.776566     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:29:39.777678     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:29:49.778375     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:29:53.779780    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:29:58.784668    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:30:03.816785    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:30:08.821192    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:30:08.822399    56 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:30:08.823323    56 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:30:08.824450     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:30:08.825505     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:30:18.826149     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 23:30:18.827603    71 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 23:30:19.832437    71 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+E20260819 23:30:24.834955    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:30:29.839334    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:30:29.840348    71 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:30:29.841042    71 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:30:29.842026     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:30:29.842823     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:30:39.843469     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:30:43.845367    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:30:48.849097    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:30:53.852110    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:30:58.856357    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:30:58.857371    79 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:30:58.858111    79 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:30:58.858866     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:30:58.859651     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:31:08.860320     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:31:12.863373    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:31:17.867655    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:31:22.871443    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:31:27.872743    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:31:27.874042    87 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:31:27.874898    87 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:31:27.876089     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:31:27.876852     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:31:37.877377     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:31:41.879384    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:31:46.883769    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 23:31:50.559337     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+E20260819 23:31:51.888024    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:31:56.890543    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:31:56.891623    88 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:31:56.892338    88 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:31:56.893127     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:31:56.894037     1 MetaClient.cpp:143] Connect to the MetaServer Failed
+E20260819 23:31:56.894909     1 StorageServer.cpp:237] waitForMetadReady error!
+E20260819 23:31:56.895655     1 StorageDaemon.cpp:180] Storage server start failed
+I20260819 23:33:09.371133     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 23:33:09.379772     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 23:33:09.398944     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:33:09.401016     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 23:33:09.402166     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 23:33:09.423527    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 23:33:10.554736    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 23:33:11.558871    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+I20260819 23:33:12.562906    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.3":9559
+E20260819 23:33:12.564035    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:33:12.573453    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 23:33:12.575608     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260819 23:33:12.576879     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:33:22.577585     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:33:26.580371    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:33:31.584564    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:33:36.588855    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:33:41.593262    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:33:41.596078    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:33:41.596745    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:33:41.597667     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:33:41.598434     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:33:51.598978     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:33:55.600358    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:34:00.604321    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:34:05.608860    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:34:10.613922    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:34:10.615461    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:34:10.616496    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:34:10.617475     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:34:10.618467     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:34:20.619233     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 23:34:22.770471     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+E20260819 23:34:24.621589    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:34:29.634089    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 23:34:40.618752     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 23:34:40.627240     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 23:34:40.646973     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:34:40.648762     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 23:34:40.649982     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 23:34:40.685422    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260819 23:34:41.697508    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260819 23:34:42.701676    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260819 23:34:43.706598    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+E20260819 23:34:43.731743    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:34:43.741434    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 23:34:43.743638     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260819 23:34:43.745069     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:34:53.743813     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:34:57.747712    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:35:02.751744    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:35:07.754307    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:35:12.758849    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:35:12.759956    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:35:12.760983    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:35:12.761876     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:35:12.762780     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:35:22.763348     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:35:26.764619    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:35:31.772475    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:35:36.777128    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:35:41.781222    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:35:41.782271    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:35:41.783092    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:35:41.783924     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:35:41.784678     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:35:51.785284     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:35:55.786433    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 23:35:59.512738     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+E20260819 23:36:00.791015    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:36:05.813024    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 23:38:38.883047     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 23:38:38.889631     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 23:38:38.903314     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:38:38.903999     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 23:38:38.904779     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 23:38:38.923346    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.6":9559
+I20260819 23:38:39.929311    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.6":9559
+I20260819 23:38:40.932453    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.6":9559
+I20260819 23:38:41.936429    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.19.0.6":9559
+E20260819 23:38:41.937284    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:38:41.942015    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 23:38:41.943678     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260819 23:38:41.944720     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:38:51.945415     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:38:55.948777    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:00.951905    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:05.955901    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:10.959760    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:10.960841    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:39:10.961686    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:39:10.962597     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:39:10.963645     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+I20260819 23:39:12.310029     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+W20260819 23:39:12.314260     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:39:16.327330    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:39:21.332036    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 23:41:02.261363     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 23:41:02.267302     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 23:41:02.277959     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:41:02.278900     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 23:41:02.279626     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:41:06.297782    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:11.308004    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:16.313318    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:21.317803    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:21.319177    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:41:21.320679    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:41:21.322011     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:41:21.323014     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:41:31.322302     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:41:35.299723    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:40.304864    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:45.309273    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:50.314296    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:50.315450    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:41:50.316358    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:41:50.317258     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:41:50.318400     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+I20260819 23:41:52.556968     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+W20260819 23:41:52.558445     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:41:56.561790    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:42:01.569272    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 23:42:09.076164     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 23:42:09.087322     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 23:42:09.114014     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:42:09.123303     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 23:42:09.127487     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 23:42:09.154628    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.3":9559
+I20260819 23:42:10.167090    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.3":9559
+I20260819 23:42:11.170748    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.3":9559
+I20260819 23:42:12.174095    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.3":9559
+E20260819 23:42:12.175189    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:42:12.181214    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 23:42:12.183136     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260819 23:42:12.184279     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:42:22.185494     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:42:26.189220    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:42:31.193367    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:42:36.187335    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:42:41.190763    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:42:41.192003    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:42:41.192886    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:42:41.193848     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:42:41.194763     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:42:51.195322     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:42:55.194648    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:43:00.198446    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:43:05.202445    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:43:10.207484    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:43:10.208498    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:43:10.209223    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:43:10.210063     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:43:10.210873     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:43:20.211438     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:43:24.212476    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:43:29.216943    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:43:34.263655    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:43:39.268540    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:43:39.269745    56 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:43:39.270558    56 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:43:39.271452     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:43:39.272295     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:43:49.273244     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:43:53.275156    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:43:58.272138    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:44:03.273679    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:44:08.277318    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:44:08.278769    71 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:44:08.279856    71 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:44:08.280908     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:44:08.281881     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:44:18.282519     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:44:22.285049    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:44:27.288322    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:44:32.292344    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:44:37.295846    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:44:37.297418    79 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:44:37.298204    79 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:44:37.299237     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:44:37.299952     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:44:47.300450     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:44:51.302078    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:44:56.304698    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:45:01.308923    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:45:06.311256    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:45:06.312348    87 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:45:06.313149    87 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:45:06.313941     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:45:06.314658     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:45:16.315142     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:45:20.317080    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:45:25.320278    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:45:30.321915    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:45:35.326165    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:45:35.327278    88 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:45:35.328109    88 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:45:35.328848     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:45:35.329614     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:45:45.330159     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:45:49.333019    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:45:54.334259    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:45:59.338060    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:46:04.342078    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:46:04.343333    89 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:46:04.344172    89 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:46:04.344929     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:46:04.345819     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:46:14.346306     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:46:18.348074    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:46:23.351446    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:46:28.353189    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:46:33.357409    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:46:33.358623    90 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:46:33.359376    90 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:46:33.360222     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:46:33.361001     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:46:43.361483     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:46:47.364230    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:46:52.368021    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:46:57.370158    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:47:02.374059    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:47:02.375473    98 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:47:02.376593    98 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:47:02.377904     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:47:02.378908     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+I20260819 23:48:12.265767     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 23:48:12.271253     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 23:48:12.281826     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:48:12.282377     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 23:48:12.283243     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:48:16.302380    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:48:21.310863    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:48:26.313117    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:48:31.317201    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:48:31.318648    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:48:31.319729    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:48:31.321058     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:48:31.322371     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:48:41.323180     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:48:45.323715    60 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:48:50.327842    60 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:48:55.330196    60 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:00.317647    60 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:00.318789    60 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:49:00.319612    60 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:49:00.320385     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:49:00.321094     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:49:10.321563     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:49:14.324206    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:19.328647    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:24.331646    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:29.336031    62 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:29.337072    62 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:49:29.337728    62 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:49:29.338783     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:49:29.339895     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:49:39.340516     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:49:43.342940    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:48.346911    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:53.372025    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:58.374358    70 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:49:58.375797    70 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:49:58.376678    70 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:49:58.377609     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:49:58.378309     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:50:08.378799     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:50:12.380803    85 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:50:17.385318    85 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:50:22.388944    85 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:50:27.391147    85 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:50:27.392180    85 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:50:27.392884    85 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:50:27.393658     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:50:27.394408     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:50:37.394951     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:50:41.397449    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:50:46.401448    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:50:51.405454    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:50:56.407785    86 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:50:56.408911    86 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:50:56.409571    86 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:50:56.410416     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:50:56.411458     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:51:06.411989     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:51:10.415089    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:51:15.419039    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:51:20.423699    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:51:25.425730    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:51:25.426689    87 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:51:25.427371    87 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:51:25.428212     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:51:25.429257     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:51:35.429821     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:51:39.432572    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:51:44.436389    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:51:49.440075    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:51:54.441288    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:51:54.442400    88 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:51:54.443369    88 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:51:54.444370     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:51:54.445072     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:52:04.445604     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:52:08.448024    96 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:52:13.452361    96 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:52:18.456496    96 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:52:23.459764    96 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:52:23.460983    96 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:52:23.461931    96 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:52:23.462918     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:52:23.463799     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:52:33.463183     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:52:37.465660    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:52:42.469372    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:52:47.472556    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 23:52:49.682353     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+E20260819 23:52:52.471359    97 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:52:52.473839    97 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:52:52.475652    97 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:52:52.477043     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:52:52.478093     1 MetaClient.cpp:143] Connect to the MetaServer Failed
+E20260819 23:52:52.479148     1 StorageServer.cpp:237] waitForMetadReady error!
+E20260819 23:52:52.480185     1 StorageDaemon.cpp:180] Storage server start failed
+I20260819 23:53:05.844705     1 StorageDaemon.cpp:132] localhost = "nebula-storaged0":9779
+I20260819 23:53:05.860996     1 StorageDaemon.cpp:147] data path= /data/storage
+I20260819 23:53:05.902828     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:53:05.904239     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 1
+W20260819 23:53:05.908423     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+I20260819 23:53:05.964434    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260819 23:53:06.977164    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260819 23:53:07.981359    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+I20260819 23:53:08.985401    48 ThriftClientManager-inl.h:67] resolve "nebula-metad0":9559 as "172.20.0.4":9559
+E20260819 23:53:08.986532    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:53:08.993680    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connection refused): Connection refused
+E20260819 23:53:08.995757     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Dropping unsent request. Connection closed after: apache::thrift::transport::TTransportException: AsyncSocketException: connect failed, type = Socket not open, errno = 111 (Connect
+I20260819 23:53:08.997676     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:53:18.998432     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:53:23.002833    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:53:28.008884    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:53:33.015326    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:53:38.014343    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:53:38.018937    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:53:38.019773    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:53:38.020964     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:53:38.021875     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:53:48.022454     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:53:52.025110    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:53:57.025343    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:54:02.029518    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:54:07.033962    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:54:07.034859    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:54:07.035537    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:54:07.036327     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:54:07.037113     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:54:17.037678     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:54:21.040285    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:54:26.039548    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:54:31.067893    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:54:36.072158    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:54:36.073041    56 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:54:36.073931    56 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:54:36.074790     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:54:36.075620     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:54:46.076216     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:54:50.079111    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:54:55.083253    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:55:00.087170    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:55:05.090519    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:55:05.091693    71 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:55:05.092387    71 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:55:05.093183     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:55:05.094146     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:55:15.094820     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:55:19.097365    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:55:24.100103    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:55:29.104439    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:55:34.108093    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:55:34.110495    79 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:55:34.111533    79 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:55:34.112598     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:55:34.113706     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:55:44.114401     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:55:48.116719    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:55:53.119930    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:55:58.122714    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:56:03.125976    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:56:03.127225    87 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:56:03.127997    87 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:56:03.128770     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:56:03.129482     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:56:13.130013     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:56:17.132683    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:56:22.135797    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:56:27.136171    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:56:32.140010    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:56:32.141081    88 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:56:32.141870    88 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:56:32.142589     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:56:32.143275     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:56:42.144016     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:56:46.145974    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:56:51.149437    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:56:56.153739    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:01.158141    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:01.159337    89 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:57:01.160204    89 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:57:01.161010     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:57:01.161767     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:57:11.162305     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:57:15.164891    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:20.168253    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:25.170305    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:30.174542    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:30.175513    90 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:57:30.176208    90 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:57:30.176952     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:57:30.177594     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:57:40.178102     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:57:44.180816    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:49.185014    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:54.186409    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:59.190521    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:57:59.191931    98 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:57:59.192863    98 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:57:59.193787     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:57:59.194547     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:58:09.195125     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:58:13.197940    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:58:18.202265    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:58:23.205366    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:58:28.207657    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:58:28.208593    99 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:58:28.209295    99 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:58:28.210202     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:58:28.211026     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:58:38.211612     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:58:42.214191   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:58:47.218309   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:58:52.222196   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:58:57.223618   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:58:57.224813   100 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:58:57.225507   100 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:58:57.226366     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:58:57.227291     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:59:07.227867     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:59:11.230506   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:59:16.227372   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:59:21.230945   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:59:26.232084   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:59:26.233089   101 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:59:26.233850   101 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:59:26.234651     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:59:26.235484     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260819 23:59:36.236073     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260819 23:59:40.238196   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:59:45.240407   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:59:50.243860   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:59:55.245829   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:59:55.246788   109 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:59:55.247551   109 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:59:55.248277     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:59:55.249109     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:00:05.249631     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:00:09.252027   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:00:14.256561   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:00:19.260035   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:00:24.262427   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:00:24.263492   110 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:00:24.264634   110 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:00:24.265475     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:00:24.266234     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:00:34.266736     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:00:38.268852    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:00:43.272245    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:00:48.276381    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:00:53.279903    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:00:53.281106    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:00:53.281960    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:00:53.282907     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:00:53.283998     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:01:03.282998     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:01:07.284803    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:01:12.287948    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:01:17.291814    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:01:22.296530    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:01:22.297648    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:01:22.298564    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:01:22.299347     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:01:22.300279     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:01:32.299281     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:01:36.302037    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:01:41.306718    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:01:46.310073    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:01:51.313573    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:01:51.314602    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:01:51.315429    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:01:51.316268     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:01:51.317041     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:02:01.315936     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:02:05.318856    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:02:10.322546    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:02:15.329044    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:02:20.333151    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:02:20.334170    56 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:02:20.334848    56 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:02:20.335613     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:02:20.336401     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:02:30.335400     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:02:34.338142    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:02:39.341852    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:02:44.340859    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:02:49.344801    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:02:49.345772    71 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:02:49.346525    71 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:02:49.347250     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:02:49.348042     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:02:59.346899     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:03:03.349695    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:03:08.353207    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:03:13.353746    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:03:18.357611    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:03:18.358834    79 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:03:18.359623    79 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:03:18.360606     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:03:18.361608     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:03:28.360184     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:03:32.362528    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:03:37.366539    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:03:42.369995    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:03:47.370288    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:03:47.371297    87 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:03:47.372094    87 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:03:47.372918     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:03:47.374058     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:03:57.373287     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:04:01.375922    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:04:06.379202    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:04:11.382808    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:04:16.387084    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:04:16.388129    88 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:04:16.388909    88 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:04:16.389729     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:04:16.390417     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:04:26.389808     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:04:30.391848    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:04:35.396191    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:04:40.399541    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:04:45.403455    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:04:45.404577    89 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:04:45.405326    89 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:04:45.406195     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:04:45.407207     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:04:55.406332     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:04:59.408635    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:05:04.412554    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:05:09.415745    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:05:14.419287    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:05:14.420401    90 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:05:14.421126    90 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:05:14.421952     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:05:14.422675     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:05:24.421458     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:05:28.423697    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:05:33.427067    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:05:38.430434    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:05:43.433894    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:05:43.434842    98 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:05:43.435732    98 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:05:43.436483     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:05:43.437176     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:05:53.437696     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:05:57.439152    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:06:02.442559    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:06:07.438321    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:06:12.441675    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:06:12.442746    99 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:06:12.443463    99 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:06:12.444283     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:06:12.445094     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:06:22.445574     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:06:26.446615   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:06:31.450147   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:06:36.453444   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:06:41.456907   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:06:41.457844   100 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:06:41.458441   100 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:06:41.459147     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:06:41.459861     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:06:51.460372     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:06:55.461766   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:07:00.465358   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:07:05.469000   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:07:10.473140   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:07:10.474138   101 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:07:10.475085   101 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:07:10.476176     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:07:10.477103     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:07:20.477691     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:07:24.478531   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:07:29.478004   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:07:34.486625   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:07:39.490434   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:07:39.491822   109 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:07:39.492668   109 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:07:39.493453     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:07:39.494204     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:07:49.494688     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:07:53.497164   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:07:58.499326   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:08:03.503000   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:08:08.506548   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:08:08.507707   110 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:08:08.508527   110 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:08:08.509509     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:08:08.510541     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:08:18.511180     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:08:22.514308    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:08:27.515944    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:08:32.519481    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:08:37.523900    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:08:37.524976    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:08:37.525667    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:08:37.526499     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:08:37.527344     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:08:47.527940     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:08:51.530190    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:08:56.532831    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:09:01.536254    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:09:06.540607    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:09:06.541894    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:09:06.543000    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:09:06.543843     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:09:06.544703     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:09:16.545297     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:09:20.546962    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:09:25.549142    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:09:30.552858    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:09:35.555282    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:09:35.556432    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:09:35.557221    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:09:35.558068     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:09:35.558960     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:09:45.559513     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:09:49.562023    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:09:54.563112    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:09:59.567212    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:10:04.571591    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:10:04.572779    56 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:10:04.573485    56 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:10:04.574416     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:10:04.575321     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:10:14.575815     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:10:18.578199    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:10:23.581692    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:10:28.584723    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:10:33.589108    71 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:10:33.590133    71 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:10:33.590754    71 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:10:33.591738     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:10:33.592665     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:10:43.593189     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:10:47.595362    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:10:52.598955    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:10:57.600868    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:11:02.604149    79 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:11:02.605201    79 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:11:02.606052    79 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:11:02.606909     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:11:02.607805     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:11:12.608341     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:11:16.611014    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:11:21.614498    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:11:26.617033    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:11:31.621328    87 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:11:31.622360    87 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:11:31.623056    87 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:11:31.623821     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:11:31.624596     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:11:41.625064     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:11:45.627123    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:11:50.631145    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:11:55.631717    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:00.636008    88 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:00.637137    88 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:12:00.637914    88 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:12:00.638830     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:12:00.639708     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:12:10.640321     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:12:14.643185    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:19.646644    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:24.650482    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:29.653792    89 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:29.654731    89 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:12:29.655596    89 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:12:29.656545     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:12:29.657312     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:12:39.657814     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:12:43.659655    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:48.663771    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:53.665381    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:58.668875    90 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:12:58.670255    90 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:12:58.671217    90 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:12:58.672241     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:12:58.673115     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:13:08.673705     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:13:12.676254    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:13:17.680045    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:13:22.683753    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:13:27.686756    98 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:13:27.687994    98 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:13:27.688794    98 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:13:27.689586     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:13:27.690450     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:13:37.690973     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:13:41.692826    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:13:46.696744    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:13:51.697940    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:13:56.700870    99 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:13:56.702490    99 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:13:56.703295    99 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:13:56.704006     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:13:56.705121     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:14:06.705783     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:14:10.708767   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:14:15.713074   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:14:20.717561   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:14:25.719807   100 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:14:25.720705   100 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:14:25.721352   100 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:14:25.721995     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:14:25.722870     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:14:35.723366     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:14:39.725919   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:14:44.730228   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:14:49.733956   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:14:54.736624   101 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:14:54.737927   101 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:14:54.738711   101 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:14:54.739555     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:14:54.740337     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:15:04.740895     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:15:08.744040   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:15:13.748410   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:15:18.748770   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:15:23.751370   109 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:15:23.752504   109 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:15:23.753178   109 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:15:23.753931     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:15:23.754567     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:15:33.755095     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:15:37.758219   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:15:42.762481   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:15:47.766386   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:15:52.769873   110 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:15:52.770812   110 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:15:52.771504   110 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:15:52.772498     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:15:52.773487     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:16:02.772478     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:16:06.775163    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:16:11.779129    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:16:16.782349    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:16:21.786269    48 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:16:21.787349    48 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:16:21.788160    48 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:16:21.788992     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:16:21.789731     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:16:31.788522     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:16:35.791215    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:16:40.795037    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:16:45.799528    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:16:50.803021    54 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:16:50.804160    54 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:16:50.804934    54 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:16:50.805933     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:16:50.806756     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:17:00.806052     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:17:04.808250    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:17:09.812306    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:17:14.816506    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:17:19.820207    55 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:17:19.821270    55 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:17:19.821929    55 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:17:19.822700     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260820 00:17:19.823453     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+W20260820 00:17:29.822631     1 FileBasedClusterIdMan.cpp:43] Open file failed, error No such file or directory
+E20260820 00:17:33.825419    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:17:38.829527    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:17:43.833736    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260820 00:17:43.928253     1 StorageDaemon.cpp:201] Signal 15(Terminated) received, stopping this server
+E20260820 00:17:48.840888    56 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260820 00:17:48.841925    56 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260820 00:17:48.842743    56 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:17:48.843726     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260820 00:17:48.844672     1 MetaClient.cpp:143] Connect to the MetaServer Failed
+E20260820 00:17:48.845641     1 StorageServer.cpp:237] waitForMetadReady error!
+E20260820 00:17:48.846611     1 StorageDaemon.cpp:180] Storage server start failed

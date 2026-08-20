@@ -1,0 +1,22 @@
+Log file created at: 2026/08/19 23:41:16
+Running on machine: db145df80ca0
+Running duration (h:mm:ss): 0:00:00
+Log line format: [IWEF]yyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I20260819 23:41:16.231215     1 GraphDaemon.cpp:122] Starting Graph HTTP Service
+I20260819 23:41:16.241519     7 WebService.cpp:124] Web service started on HTTP[19669]
+I20260819 23:41:16.241845     1 GraphDaemon.cpp:136] Number of networking IO threads: 16
+I20260819 23:41:16.242151     1 GraphDaemon.cpp:145] Number of worker threads: 16
+I20260819 23:41:16.248908     1 MetaClient.cpp:80] Create meta client to "nebula-metad0":9559
+I20260819 23:41:16.249289     1 MetaClient.cpp:81] root path: /usr/local/nebula, data path size: 0
+E20260819 23:41:20.262977    43 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:25.275864    43 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:30.281399    43 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:35.286295    43 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:35.287292    43 MetaClient.cpp:772] Send request to "nebula-metad0":9559, exceed retry limit
+E20260819 23:41:35.287945    43 MetaClient.cpp:773] RpcResponse exception: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+E20260819 23:41:35.288622     1 MetaClient.cpp:112] Heartbeat failed, status:RPC failure in MetaClient: apache::thrift::transport::TTransportException: Connection not open: apache::thrift::transport::TTransportException: AsyncSocketException: setReadCallback() called with socket in invalid state, type = Socket not open
+I20260819 23:41:35.289264     1 MetaClient.cpp:137] Waiting for the metad to be ready!
+E20260819 23:41:49.286504    45 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+I20260819 23:41:52.635147     1 GraphDaemon.cpp:176] Signal 15(Terminated) received, stopping this server
+E20260819 23:41:54.288846    45 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2
+E20260819 23:41:59.317363    45 ThriftClientManager-inl.h:70] Failed to resolve address for 'nebula-metad0': Name or service not known (error=-2): Unknown error -2

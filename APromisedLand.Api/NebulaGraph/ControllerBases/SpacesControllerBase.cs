@@ -8,7 +8,7 @@ namespace APromisedLand.Api.NebulaGraph.ControllerBases;
 /// Mirrors <c>app.routers.spaces</c>: CRUD for graph spaces.
 /// </summary>
 [ApiController]
-[Route("spaces")]
+[Route("NebulaGraph/spaces")]
 public abstract class SpacesControllerBase(NebulaFastApiService api) : ControllerBase
 {
     /// <summary>List all graph spaces.</summary>

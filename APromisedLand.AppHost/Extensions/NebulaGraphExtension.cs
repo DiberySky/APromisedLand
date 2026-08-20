@@ -11,7 +11,7 @@ public static class NebulaGraphExtension
         var tz = builder.Configuration["TZ"] ?? "UTC";
 
         // ========== Meta ==========
-        var nebulaMetad0 = builder.AddContainer("nebula-metad0", "docker.io/vesoft/nebula-metad", "nightly")
+        var nebulaMetad0 = builder.AddContainer("nebula-metad0", "docker.io/vesoft/nebula-metad", "v3.8.0")
             .WithEnvironment("USER", "root")
             .WithEnvironment("TZ", tz)
             .WithArgs(
@@ -23,22 +23,16 @@ public static class NebulaGraphExtension
                 "--data_path=/data/meta",
                 "--log_dir=/logs",
                 "--v=0",
-                "--minloglevel=0"
+                "--minloglevel=0",
+                "--redirect_stdout=false", // 新增
+                "--logtostderr=true" // 新增
             )
-            .WithEndpoint(name: "meta", port: 9559, targetPort: 9559, isProxied: false)
-            .WithHttpEndpoint(name: "ws", port: 19559, targetPort: 19559, isProxied: false)
-            .WithEndpoint(name: "ws2", port: 19560, targetPort: 19560, isProxied: false)
-            .WithBindMount("./data/meta0", "/data/meta")
-            .WithBindMount("./logs/meta0", "/logs")
-            .WithContainerRuntimeArgs("--cap-add", "SYS_PTRACE")
-            .WithContainerRuntimeArgs("--health-cmd", "curl -sf http://nebula-metad0:19559/status")
-            .WithContainerRuntimeArgs("--health-interval", "30s")
-            .WithContainerRuntimeArgs("--health-timeout", "10s")
-            .WithContainerRuntimeArgs("--health-retries", "3")
-            .WithContainerRuntimeArgs("--health-start-period", "20s");
+            // ... endpoints, mounts ...
+            .WithContainerRuntimeArgs("--hostname", "nebula-metad0")
+            .WithContainerRuntimeArgs("--memory", "1g");
 
         // ========== Storage ==========
-        var nebulaStoraged0 = builder.AddContainer("nebula-storaged0", "docker.io/vesoft/nebula-storaged", "nightly")
+        var nebulaStoraged0 = builder.AddContainer("nebula-storaged0", "docker.io/vesoft/nebula-storaged", "v3.8.0")
             .WithEnvironment("USER", "root")
             .WithEnvironment("TZ", tz)
             .WithArgs(
@@ -50,23 +44,18 @@ public static class NebulaGraphExtension
                 "--data_path=/data/storage",
                 "--log_dir=/logs",
                 "--v=0",
-                "--minloglevel=0"
+                "--minloglevel=0",
+                "--redirect_stdout=false",
+                "--logtostderr=true"
             )
-            .WithEndpoint(name: "storage", port: 9779, targetPort: 9779, isProxied: false)
-            .WithHttpEndpoint(name: "ws", port: 19779, targetPort: 19779, isProxied: false)
-            .WithEndpoint(name: "ws2", port: 19780, targetPort: 19780, isProxied: false)
-            .WithBindMount("./data/storage0", "/data/storage")
-            .WithBindMount("./logs/storage0", "/logs")
-            .WithContainerRuntimeArgs("--cap-add", "SYS_PTRACE")
-            .WithContainerRuntimeArgs("--health-cmd", "curl -sf http://nebula-storaged0:19779/status")
-            .WithContainerRuntimeArgs("--health-interval", "30s")
-            .WithContainerRuntimeArgs("--health-timeout", "10s")
-            .WithContainerRuntimeArgs("--health-retries", "3")
-            .WithContainerRuntimeArgs("--health-start-period", "20s")
+            // ... endpoints, mounts ...
+            .WithContainerRuntimeArgs("--hostname", "nebula-storaged0") // 新增
+            .WithContainerRuntimeArgs("--memory", "1g") // 可选
+            // 如需健康检查可保留，但建议统一
             .WaitFor(nebulaMetad0);
 
         // ========== Graphd ==========
-        var nebulaGraphd = builder.AddContainer("nebula-graphd", "docker.io/vesoft/nebula-graphd", "nightly")
+        var nebulaGraphd = builder.AddContainer("nebula-graphd", "docker.io/vesoft/nebula-graphd", "v3.8.0")
             .WithEnvironment("USER", "root")
             .WithEnvironment("TZ", tz)
             .WithArgs(
@@ -77,22 +66,17 @@ public static class NebulaGraphExtension
                 "--ws_http_port=19669",
                 "--log_dir=/logs",
                 "--v=0",
-                "--minloglevel=0"
+                "--minloglevel=0",
+                "--redirect_stdout=false",
+                "--logtostderr=true"
             )
-            .WithEndpoint(name: "graph", port: 9669, targetPort: 9669, isProxied: false)
-            .WithHttpEndpoint(name: "ws", port: 19669, targetPort: 19669, isProxied: false)
-            .WithEndpoint(name: "ws2", port: 19670, targetPort: 19670, isProxied: false)
-            .WithBindMount("./logs/graph", "/logs")
-            .WithContainerRuntimeArgs("--cap-add", "SYS_PTRACE")
-            .WithContainerRuntimeArgs("--health-cmd", "curl -sf http://nebula-graphd:19669/status")
-            .WithContainerRuntimeArgs("--health-interval", "30s")
-            .WithContainerRuntimeArgs("--health-timeout", "10s")
-            .WithContainerRuntimeArgs("--health-retries", "3")
-            .WithContainerRuntimeArgs("--health-start-period", "20s")
+            // ... endpoints, mounts ...
+            .WithContainerRuntimeArgs("--hostname", "nebula-graphd") // 新增
+            .WithContainerRuntimeArgs("--memory", "1g") // 可选
             .WaitFor(nebulaStoraged0);
 
         // ========== Console ==========
-        var nebulaConsole = builder.AddContainer("nebula-console", "docker.io/vesoft/nebula-console", "nightly")
+        var nebulaConsole = builder.AddContainer("nebula-console", "docker.io/vesoft/nebula-console", "v3.8.0")
             .WithEntrypoint("/bin/sh")
             .WithArgs("-c",
                 "for i in $(seq 1 60); do " +

@@ -9,7 +9,7 @@ namespace APromisedLand.Api.NebulaGraph.ControllerBases;
 /// GET SUBGRAPH, EXPLAIN / PROFILE and per-space statistics.
 /// </summary>
 [ApiController]
-[Route("query")]
+[Route("NebulaGraph/query")]
 public abstract class QueryControllerBase(NebulaFastApiService api) : ControllerBase
 {
     /// <summary>Execute raw nGQL and return parsed rows.</summary>

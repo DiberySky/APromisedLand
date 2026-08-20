@@ -10,53 +10,51 @@ namespace APromisedLand.Api.NebulaGraph.ControllerBases;
 /// and override the body's <c>space</c> field.
 /// </summary>
 [ApiController]
+[Route("NebulaGraph/spaces/{space}/edges")]
 public abstract class EdgesControllerBase(NebulaFastApiService api) : ControllerBase
 {
-    private string BasePath(string space)
-        => $"/spaces/{Uri.EscapeDataString(space)}/edges";
-
-    [HttpPost("/spaces/{space}/edges")]
+    [HttpPost("")]
     public async Task<IActionResult> Insert(
         string space, [FromBody] EdgeInsertIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.PostAsync(BasePath(space), body, ct: ct);
+        var res = await api.PostAsync($"/spaces/{Uri.EscapeDataString(space)}/edges", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 
-    [HttpPost("/spaces/{space}/edges/fetch")]
+    [HttpPost("fetch")]
     public async Task<IActionResult> Fetch(
         string space, [FromBody] EdgeFetchIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.PostAsync(BasePath(space) + "/fetch", body, ct: ct);
+        var res = await api.PostAsync($"/spaces/{Uri.EscapeDataString(space)}/edges/fetch", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 
-    [HttpPost("/spaces/{space}/edges/upsert")]
+    [HttpPost("upsert")]
     public async Task<IActionResult> Upsert(
         string space, [FromBody] EdgeUpsertIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.PostAsync(BasePath(space) + "/upsert", body, ct: ct);
+        var res = await api.PostAsync($"/spaces/{Uri.EscapeDataString(space)}/edges/upsert", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 
-    [HttpPost("/spaces/{space}/edges/update")]
+    [HttpPost("update")]
     public async Task<IActionResult> Update(
         string space, [FromBody] EdgeUpdateIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.PostAsync(BasePath(space) + "/update", body, ct: ct);
+        var res = await api.PostAsync($"/spaces/{Uri.EscapeDataString(space)}/edges/update", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 
-    [HttpDelete("/spaces/{space}/edges")]
+    [HttpDelete("")]
     public async Task<IActionResult> Delete(
         string space, [FromBody] EdgeDeleteIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.DeleteAsync(BasePath(space), body, ct: ct);
+        var res = await api.DeleteAsync($"/spaces/{Uri.EscapeDataString(space)}/edges", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 }

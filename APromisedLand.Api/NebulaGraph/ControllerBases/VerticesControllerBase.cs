@@ -10,53 +10,51 @@ namespace APromisedLand.Api.NebulaGraph.ControllerBases;
 /// URL and override the body's <c>space</c> field.
 /// </summary>
 [ApiController]
+[Route("NebulaGraph/spaces/{space}/vertices")]
 public abstract class VerticesControllerBase(NebulaFastApiService api) : ControllerBase
 {
-    private string BasePath(string space)
-        => $"/spaces/{Uri.EscapeDataString(space)}/vertices";
-
-    [HttpPost("/spaces/{space}/vertices")]
+    [HttpPost("")]
     public async Task<IActionResult> Insert(
         string space, [FromBody] VertexInsertIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.PostAsync(BasePath(space), body, ct: ct);
+        var res = await api.PostAsync($"/spaces/{Uri.EscapeDataString(space)}/vertices", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 
-    [HttpPost("/spaces/{space}/vertices/fetch")]
+    [HttpPost("fetch")]
     public async Task<IActionResult> Fetch(
         string space, [FromBody] VertexFetchIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.PostAsync(BasePath(space) + "/fetch", body, ct: ct);
+        var res = await api.PostAsync($"/spaces/{Uri.EscapeDataString(space)}/vertices/fetch", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 
-    [HttpPost("/spaces/{space}/vertices/upsert")]
+    [HttpPost("upsert")]
     public async Task<IActionResult> Upsert(
         string space, [FromBody] VertexUpsertIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.PostAsync(BasePath(space) + "/upsert", body, ct: ct);
+        var res = await api.PostAsync($"/spaces/{Uri.EscapeDataString(space)}/vertices/upsert", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 
-    [HttpPost("/spaces/{space}/vertices/update")]
+    [HttpPost("update")]
     public async Task<IActionResult> Update(
         string space, [FromBody] VertexUpdateIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.PostAsync(BasePath(space) + "/update", body, ct: ct);
+        var res = await api.PostAsync($"/spaces/{Uri.EscapeDataString(space)}/vertices/update", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 
-    [HttpDelete("/spaces/{space}/vertices")]
+    [HttpDelete("")]
     public async Task<IActionResult> Delete(
         string space, [FromBody] VertexDeleteIn body, CancellationToken ct)
     {
         body.Space = space;
-        var res = await api.DeleteAsync(BasePath(space), body, ct: ct);
+        var res = await api.DeleteAsync($"/spaces/{Uri.EscapeDataString(space)}/vertices", body, ct: ct);
         return StatusCode(res.StatusCode, res.Body);
     }
 }

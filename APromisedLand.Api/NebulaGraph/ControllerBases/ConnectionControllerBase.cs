@@ -8,8 +8,8 @@ namespace APromisedLand.Api.NebulaGraph.ControllerBases;
 /// list of spaces visible to the FastAPI + nebula-python service.
 /// </summary>
 [ApiController]
-[Route("connection")]
-public abstract  class ConnectionControllerBase(NebulaFastApiService api) : ControllerBase
+[Route("NebulaGraph/connection")]
+public abstract class ConnectionControllerBase(NebulaFastApiService api) : ControllerBase
 {
     /// <summary>NebulaGraph connectivity check.</summary>
     [HttpGet("health")]

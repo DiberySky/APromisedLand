@@ -1,3 +1,4 @@
+using APromisedLand.Api.NebulaGraph.ControllerBases;
 using APromisedLand.Api.NebulaGraph.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,21 +10,21 @@ namespace NebulaApi.Proxy.Controllers;
 /// </summary>
 [ApiController]
 [Route("connection")]
-public sealed class ConnectionController(NebulaFastApiService api) : ControllerBase
+public sealed class ConnectionController(NebulaFastApiService api) : ConnectionControllerBase(api)
 {
-    /// <summary>NebulaGraph connectivity check.</summary>
-    [HttpGet("health")]
-    public async Task<IActionResult> Health(CancellationToken ct)
-    {
-        var res = await api.GetAsync("/connection/health", ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
-
-    /// <summary>List all graph spaces.</summary>
-    [HttpGet("spaces")]
-    public async Task<IActionResult> ListSpaces(CancellationToken ct)
-    {
-        var res = await api.GetAsync("/connection/spaces", ct: ct);
-        return StatusCode(res.StatusCode, res.Body);
-    }
+    // /// <summary>NebulaGraph connectivity check.</summary>
+    // [HttpGet("health")]
+    // public async Task<IActionResult> Health(CancellationToken ct)
+    // {
+    //     var res = await api.GetAsync("/connection/health", ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
+    //
+    // /// <summary>List all graph spaces.</summary>
+    // [HttpGet("spaces")]
+    // public async Task<IActionResult> ListSpaces(CancellationToken ct)
+    // {
+    //     var res = await api.GetAsync("/connection/spaces", ct: ct);
+    //     return StatusCode(res.StatusCode, res.Body);
+    // }
 }
