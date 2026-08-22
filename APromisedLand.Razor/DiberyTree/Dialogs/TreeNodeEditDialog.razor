@@ -131,9 +131,20 @@
 
     private async Task OpenAddDialog()
     {
-        var dialogParams = new DialogParameters
+        var result = await TreeNodeDialogService.ShowAttributeDefinitionListDialogAsync();
+     
+        if (result == null) return;
+        
+        // AttributeDefinitionDto = result;
+        await OpenEditDialog(result);
+    }
+
+    private async Task OpenEditDialog(AttributeDefinitionDto definition)
+    {
+        var dialogParams = new DialogParameters<AddAttributeValueDialog<TItem>>
         {
-            { nameof(AddAttributeValueDialog<TItem>.NodeId), _node.Id }
+            { x => x.NodeId, _node.Id },
+            { x => x.DefinitionDto, definition },
         };
         var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("添加属性", dialogParams);
         var result = await dialog.Result;
@@ -142,7 +153,7 @@
         //     await LoadAttributes();
         // }
     }
-
+    
     public void Dispose()
     {
     }

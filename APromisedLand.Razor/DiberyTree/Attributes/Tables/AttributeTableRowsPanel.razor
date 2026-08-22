@@ -1,0 +1,143 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject AttributeApiClient AttributeApiClient
+@inject TableValueApiClient TableValueApiClient
+@inject ISnackbar Snackbar
+@inject DialogService DialogService
+@inject BlazorService BlazorService
+
+<DialogSky Title="@($"行数据 - {Table?.Name}")"
+           CancelButtonVisible="true"
+           SubmitButtonVisible="false"
+           OnCanceledClick="@(() => MudDialog?.Close(DialogResult.Cancel()))">
+    <ToolBarContent>
+        <MudText Color="Color.Inherit">行数据</MudText>
+        <MudSpacer/>
+        <MudButton Variant="Variant.Text" Color="Color.Warning"
+                   StartIcon="@Icons.Material.Outlined.Refresh"
+                   OnClick="LoadRowsAsync" Class="ml-2">
+            刷新
+        </MudButton>
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer>
+            <MudTable T="TableRowDto"
+                      Items="_rows"
+                      Dense="true" Hover="true"
+                      Loading="_loading"
+                      Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>行号</MudTh>
+                    @foreach (var col in _columns)
+                    {
+                        <MudTh>@col.Name</MudTh>
+                    }
+                    <MudTh Style="text-align:right">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                                       Color="Color.Info" Size="Size.Small"
+                                       OnClick="AddRowAsync"/>
+                    </MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="行号">@context.RowNo</MudTd>
+                    @foreach (var col in _columns)
+                    {
+                        <MudTd DataLabel="@col.Name">
+                            @(FormatCell(context, col.Id))
+                        </MudTd>
+                    }
+                    <MudTd Style="text-align:right">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                       Color="Color.Primary" Size="Size.Small"
+                                       OnClick="@(() => EditRowAsync(context))"/>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                       Color="Color.Warning" Size="Size.Small"
+                                       OnClick="@(() => DeleteRowAsync(context))"/>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Align="Align.Center" Class="py-8">暂无行数据</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudContainer>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+    [Parameter] public AttributeDefinitionDto? Table { get; set; }
+
+    private List<TableRowDto> _rows = new();
+    private List<AttributeDefinitionDto> _columns = new();
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var all = await AttributeApiClient.GetAllDefinitionsAsync();
+        _columns = all.Where(d => d.ParentId == Table?.Id)
+                      .OrderBy(d => d.Order)
+                      .ThenBy(d => d.Name)
+                      .ToList();
+        await LoadRowsAsync();
+    }
+
+    private async Task LoadRowsAsync()
+    {
+        _loading = true;
+        try
+        {
+            _rows = [.. await TableValueApiClient.ListRowsAsync(Table!.Id)];
+        }
+        catch (Exception ex) { Snackbar.Add($"加载行失败: {ex.Message}", Severity.Error); }
+        finally { _loading = false; }
+    }
+
+    private async Task AddRowAsync()
+    {
+        var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
+        {
+            { x => x.Table, Table },
+            { x => x.Columns, _columns }
+        };
+        var dialog = await DialogService.ShowAsync<AttributeTableRowEditDialog<TItem>>("新增行", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadRowsAsync();
+    }
+
+    private async Task EditRowAsync(TableRowDto row)
+    {
+        var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
+        {
+            { x => x.Table, Table },
+            { x => x.Columns, _columns },
+            { x => x.EditRow, row }
+        };
+        var dialog = await DialogService.ShowAsync<AttributeTableRowEditDialog<TItem>>("编辑行", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadRowsAsync();
+    }
+
+    private async Task DeleteRowAsync(TableRowDto row)
+    {
+        var confirmed = await BlazorService.DeleteBoxAsync($"确定删除第 {row.RowNo} 行？");
+        if (!confirmed) return;
+        try
+        {
+            var ok = await TableValueApiClient.DeleteRowAsync(row.RowId);
+            if (ok) { Snackbar.Add("删除成功", Severity.Success); await LoadRowsAsync(); }
+            else Snackbar.Add("行不存在", Severity.Warning);
+        }
+        catch (Exception ex) { Snackbar.Add($"删除失败: {ex.Message}", Severity.Error); }
+    }
+
+    private static string FormatCell(TableRowDto row, string columnId)
+    {
+        var cell = row.Values.FirstOrDefault(c => c.ColumnId == columnId);
+        return cell?.Value switch
+        {
+            null => "-",
+            System.Text.Json.JsonElement je => je.ToString(),
+            _ => cell.Value.ToString() ?? "-"
+        };
+    }
+}

@@ -5,6 +5,7 @@
 
 @inject IDialogService DialogService
 @inject DiberyTreeApiClient<TItem> ApiClient
+@inject AttributeApiClient AttributeApiClient
 @inject ISnackbar Snackbar
 @inject TreeNodeDialogService<TItem> TreeNodeDialogService
 
@@ -24,66 +25,72 @@
                               Variant="Variant.Outlined"
                               InputType="@InputType.Text"/>
             </MudItem>
-            @switch (DefinitionDto?.AttributeType.SystemType)
+            @if (DefinitionDto != null)
             {
-                case AttributeTypeEnum.文本:
-                    <MudItem xs="12">
-                        <TextValue @bind-Value="@TextValue"
-                                   TItem="@TItem"
-                                   DefinitionDto="@DefinitionDto"/>
-                    </MudItem>
-                    break;
-                case AttributeTypeEnum.整数:
-                    <MudItem xs="12">
-                        <IntegerValue @bind-Value="@IntegerValue"
-                                      TItem="@TItem"
-                                      DefinitionDto="@DefinitionDto"/>
-                    </MudItem>
-                    break;
-                case AttributeTypeEnum.小数:
-                    <MudItem xs="12">
-                        <DecimalValue @bind-Value="@DecimalValue"
-                                      TItem="@TItem"
-                                      DefinitionDto="@DefinitionDto"/>
-                    </MudItem>
-                    break;
-                case AttributeTypeEnum.日期:
-                    <MudItem xs="12">
+                @switch (DefinitionDto!.AttributeType)
+                {
+                    case AttributeTypeEnum.文本:
                         <MudItem xs="12">
-                            <DateValue @bind-Value="@DateValue"
+                            <TextValue @bind-Value="@TextValue"
                                        TItem="@TItem"
                                        DefinitionDto="@DefinitionDto"/>
                         </MudItem>
-                    </MudItem>
-                    break;
-                case AttributeTypeEnum.时间:
-                    <MudItem xs="12">
-                        <TimeValue @bind-Value="@TimeValue"
-                                   TItem="@TItem"
-                                   DefinitionDto="@DefinitionDto"/>
-                    </MudItem>
-                    break;
-                case AttributeTypeEnum.日期时间:
-                    <MudItem xs="12">
-                        <DateTimeValue @bind-Value="@DateTimeValue"
+                        break;
+                    case AttributeTypeEnum.整数:
+                        <MudItem xs="12">
+                            <IntegerValue @bind-Value="@IntegerValue"
+                                          TItem="@TItem"
+                                          DefinitionDto="@DefinitionDto"/>
+                        </MudItem>
+                        break;
+                    case AttributeTypeEnum.小数:
+                        <MudItem xs="12">
+                            <DecimalValue @bind-Value="@DecimalValue"
+                                          TItem="@TItem"
+                                          DefinitionDto="@DefinitionDto"/>
+                        </MudItem>
+                        break;
+                    case AttributeTypeEnum.日期:
+                        <MudItem xs="12">
+                            <MudItem xs="12">
+                                <DateValue @bind-Value="@DateValue"
+                                           TItem="@TItem"
+                                           DefinitionDto="@DefinitionDto"/>
+                            </MudItem>
+                        </MudItem>
+                        break;
+                    case AttributeTypeEnum.时间:
+                        <MudItem xs="12">
+                            <TimeValue @bind-Value="@TimeValue"
                                        TItem="@TItem"
                                        DefinitionDto="@DefinitionDto"/>
-                    </MudItem>
-                    break;
-                case AttributeTypeEnum.文件:
-                    <MudItem xs="12">
-                        <MudText>文件类型输入控件待实现</MudText>
-                    </MudItem>
-                    break;
-                case AttributeTypeEnum.定位:
-                    <MudItem xs="12">
-                        <MudText>定位类型输入控件待实现</MudText>
-                    </MudItem>
-                    break;
-                case null:
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
+                        </MudItem>
+                        break;
+                    case AttributeTypeEnum.日期时间:
+                        <MudItem xs="12">
+                            <DateTimeValue @bind-Value="@DateTimeValue"
+                                           TItem="@TItem"
+                                           DefinitionDto="@DefinitionDto"/>
+                        </MudItem>
+                        break;
+                    case AttributeTypeEnum.文件:
+                        <MudItem xs="12">
+                            <MudText>文件类型输入控件待实现</MudText>
+                        </MudItem>
+                        break;
+                    case AttributeTypeEnum.定位:
+                        <MudItem xs="12">
+                            <MudText>定位类型输入控件待实现</MudText>
+                        </MudItem>
+                        break;
+                    case AttributeTypeEnum.表格:
+                        <MudItem xs="12">
+                            <MudText>表格值类型输入控件待实现</MudText>
+                        </MudItem>
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
             }
         </MudGrid>
     </DialogContent>
@@ -106,7 +113,7 @@
     [Parameter] public double? Latitude { get; set; }
     [Parameter] public double? Longitude { get; set; }
 
-    // private AttributeDefinitionDto? DefinitionDto;
+    private List<AttributeDefinitionDto>? DefinitionDtos;
 
     // 各类型值字段
     // private string? _textValue;
@@ -123,8 +130,8 @@
     {
         try
         {
-            // var defs = await ApiClient.GetAllDefinitionsAsync();
-            // DefinitionDtos = defs.ToList();
+            var defs = await AttributeApiClient.GetAllDefinitionsAsync();
+            DefinitionDtos = defs.ToList();
         }
         catch (Exception ex)
         {
@@ -141,7 +148,7 @@
         }
 
         // 根据类型检查对应的值是否填写
-        switch (DefinitionDto.AttributeType.SystemType)
+        switch (DefinitionDto.AttributeType)
         {
             case AttributeTypeEnum.文本:
                 if (string.IsNullOrWhiteSpace(TextValue))
@@ -207,6 +214,9 @@
                 }
 
                 break;
+            case AttributeTypeEnum.表格:
+                
+                break;
             default:
                 Snackbar.Add("不支持的属性类型", Severity.Warning);
                 return;
@@ -215,7 +225,7 @@
         try
         {
             JsonElement valueElement;
-            switch (DefinitionDto.AttributeType.SystemType)
+            switch (DefinitionDto.AttributeType)
             {
                 case AttributeTypeEnum.文本:
                     valueElement = JsonSerializer.SerializeToElement(TextValue);
@@ -242,7 +252,7 @@
                     valueElement = JsonSerializer.SerializeToElement(new { latitude = Latitude!.Value, longitude = Longitude!.Value });
                     break;
                 default:
-                    throw new NotSupportedException($"不支持的类型 {DefinitionDto.AttributeType.SystemType}");
+                    throw new NotSupportedException($"不支持的类型 {DefinitionDto.AttributeType}");
             }
 
             var dto = new AddValueDto(DefinitionDto.Id, valueElement);

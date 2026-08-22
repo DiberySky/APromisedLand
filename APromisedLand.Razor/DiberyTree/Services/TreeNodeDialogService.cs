@@ -7,10 +7,12 @@ using APromisedLand.Shared.DiberyTree.Interfaces;
 using MudBlazor;
 using APromisedLand.MauiBlazor.DiberyTree.Services;
 using APromisedLand.Razor.DiberyTree.Attributes;
+using APromisedLand.Razor.DiberyTree.Attributes.Tables;
 using APromisedLand.Razor.DiberyTree.Base;
 using APromisedLand.Razor.DiberyTree.Trees.Category;
 using APromisedLand.Razor.Services;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using APromisedLand.Shared.DiberyTree.Attributes.Enums;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DiberyTree.Models;
 using MudBlazor.Extensions;
@@ -494,7 +496,7 @@ public class TreeNodeDialogService<TItem>(
     {
         var parameters = new DialogParameters<AttributeDefinitionListDialog<TItem>>
         {
-            // { x => x.NodeId, nodeId }
+             { x => x.ReadOnly, false }
         };
 
         var options = (config ?? new DialogConfig
@@ -516,16 +518,14 @@ public class TreeNodeDialogService<TItem>(
     }
 
     public async Task<bool?> ShowAttributeDefinitionDialogAsync(
-        AttributeDefinitionDto? item,
-        List<AttributeType> attributeTypes,
-        UnitTree? unit = null,
+        AttributeDefinitionDto? item = null,
+        string? tableId  = null,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters<AttributeDefinitionDialog<TItem>>
         {
+            { x => x.TableId, tableId },
             { x => x.EditItem, item },
-            { x => x.AttributeTypes, attributeTypes },
-            { x => x.Unit, unit }
         };
 
         var options = (config ?? new DialogConfig
@@ -533,11 +533,60 @@ public class TreeNodeDialogService<TItem>(
         }).ToDialogOptions();
 
         var dialog = await dialogService.ShowAsync<AttributeDefinitionDialog<TItem>>(
-            "节点属性", parameters, options);
+            "节点属性定义", parameters, options);
 
         var result = await dialog.Result;
         // 只要不是取消就返回 true（表示可能已修改）
         return result is not { Canceled: true };
     }
     #endregion
+
+    // ==================== 新增：表格属性定义管理 ====================
+    
+    #region 表格属性定义管理
+    
+    public async Task<bool> ShowAttributeTableDefinitionListDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeTableDefinitionListDialog<TItem>>
+        {
+            // { x => x.Item, item },
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<AttributeTableDefinitionListDialog<TItem>>(
+            "表格属性定义", parameters, options);
+
+        var result = await dialog.Result;
+        // 只要不是取消就返回 true（表示可能已修改）
+        return result is not { Canceled: true };
+    }
+
+    public async Task<bool> ShowAttributeTableDefinitionDialogAsync(
+        AttributeDefinitionDto item, 
+        // List<AttributeTypeEnum> attributeTypes,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeTableDefinitionDialog<TItem>>
+        {
+            { x => x.Table, item },
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<AttributeTableDefinitionDialog<TItem>>(
+            "表格属性定义", parameters, options);
+
+        var result = await dialog.Result;
+        // 只要不是取消就返回 true（表示可能已修改）
+        return result is not { Canceled: true };
+    }
+    
+    #endregion
+
 }

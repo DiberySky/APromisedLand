@@ -2,7 +2,8 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject ISnackbar Snackbar
-@inject DiberyTreeApiClient<CategoryTree> ApiClient
+@inject AttributeApiClient AttributeApiClient
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
 
 <DialogSky Title="@(IsEdit ? "编辑属性定义" : "新建属性定义")"
            SubmitButtonVisible="true"
@@ -13,10 +14,6 @@
         <MudForm @ref="_form" Model="_model" ValidationDelay="0">
             <MudContainer class="my-4">
                 <MudGrid>
-                    @* <MudItem xs="12"> *@
-                    @*     <AttributeTypeField TItem="TItem" AttributeDefinitionDto="@EditItem" *@
-                    @*                         AttributeDefinitionChanged="@AttributeDefinitionChanged"/> *@
-                    @* </MudItem> *@
                     <MudItem xs="12">
                         <MudSelect T="AttributeTypeEnum"
                                    @bind-Value="@_selectedType"
@@ -24,7 +21,8 @@
                                    Variant="Variant.Outlined"
                                    AnchorOrigin="Origin.BottomLeft"
                                    Clearable="false"
-                                   ReadOnly="@(EditItem != null)">
+                                   ReadOnly="@(EditItem != null)"
+                                   SelectedValuesChanged="@SelectedValuesChanged">
                             @foreach (var type in Enum.GetValues<AttributeTypeEnum>())
                             {
                                 <MudSelectItem Value="type">@type.ToString()</MudSelectItem>
@@ -59,15 +57,8 @@
                             </MudItem>
                             break;
                         case AttributeTypeEnum.整数:
-                            @* <MudItem xs="12"> *@
-                            @*     <MudNumericField @bind-Value="_model.Precision" *@
-                            @*                      Label="位数(精度)" *@
-                            @*                      Variant="Variant.Outlined" *@
-                            @*                      Min="1" *@
-                            @*                      Max="38"/> *@
-                            @* </MudItem> *@
                             <MudItem xs="12">
-                                <UintTreeField Unit="@Unit"/>
+                                <UintTreeField @bind-Unit="@_unit"/>
                             </MudItem>
                             break;
                         case AttributeTypeEnum.小数:
@@ -86,7 +77,7 @@
                                                  Max="10"/>
                             </MudItem>
                             <MudItem xs="12">
-                                <UintTreeField Unit="@Unit"/>
+                                <UintTreeField @bind-Unit="@_unit"/>
                             </MudItem>
                             break;
                         case AttributeTypeEnum.日期:
@@ -99,48 +90,12 @@
                             break;
                         case AttributeTypeEnum.定位:
                             break;
+                        case AttributeTypeEnum.表格:
+
+                            break;
                         default:
                             throw new ArgumentOutOfRangeException();
                     }
-
-                    @* @if (EditItem != null) *@
-                    @* { *@
-                    @*     @if (_model.AttributeType?.SystemType == AttributeTypeEnum.文本) *@
-                    @*     { *@
-                    @*         <MudItem xs="12"> *@
-                    @*             <MudNumericField @bind-Value="_model.Lines" *@
-                    @*                              Label="文本显示行数" *@
-                    @*                              Variant="Variant.Outlined" *@
-                    @*                              Min="1" *@
-                    @*                              Max="20"/> *@
-                    @*         </MudItem> *@
-                    @*     } *@
-                    @* *@
-                    @*     @if (_model.AttributeType?.SystemType == AttributeTypeEnum.小数) *@
-                    @*     { *@
-                    @*         <MudItem xs="6"> *@
-                    @*             <MudNumericField @bind-Value="_model.Precision" *@
-                    @*                              Label="精度 (总位数)" *@
-                    @*                              Variant="Variant.Outlined" *@
-                    @*                              Min="1" *@
-                    @*                              Max="38"/> *@
-                    @*         </MudItem> *@
-                    @*         <MudItem xs="6"> *@
-                    @*             <MudNumericField @bind-Value="_model.Scale" *@
-                    @*                              Label="小数位" *@
-                    @*                              Variant="Variant.Outlined" *@
-                    @*                              Min="0" *@
-                    @*                              Max="10"/> *@
-                    @*         </MudItem> *@
-                    @*     } *@
-                    @* *@
-                    @*     @if (_model.AttributeType?.SystemType is AttributeTypeEnum.整数 or AttributeTypeEnum.小数) *@
-                    @*     { *@
-                    @*         <MudItem xs="12"> *@
-                    @*             <UintTreeField Unit="@Unit"/> *@
-                    @*         </MudItem> *@
-                    @*     } *@
-                    @* } *@
                 </MudGrid>
             </MudContainer>
         </MudForm>
@@ -150,9 +105,11 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
+    [Parameter] public string? TableId { get; set; }
     [Parameter] public AttributeDefinitionDto? EditItem { get; set; }
-    [Parameter] public List<AttributeType> AttributeTypes { get; set; } = new();
-    [Parameter] public UnitTree? Unit { get; set; }
+
+    // private AttributeType _attributeType = new();
+    private UnitTree? _unit;
 
     private MudForm? _form;
     private FormModel _model = new();
@@ -162,6 +119,9 @@
 
     protected override void OnInitialized()
     {
+        // _attributeType = EditItem?.AttributeType ?? new();
+        _unit = EditItem?.Unit;
+
         if (IsEdit && EditItem != null)
         {
             _model = new FormModel
@@ -180,7 +140,7 @@
             _model = new FormModel
             {
                 Name = string.Empty,
-                AttributeType = AttributeTypes.FirstOrDefault(),
+                AttributeType = AttributeTypeEnum.文本,
                 MaxLength = 0,
                 Lines = 1,
                 Precision = 7,
@@ -188,52 +148,110 @@
                 UnitId = null
             };
         }
+
+        _selectedType = _model.AttributeType ?? AttributeTypeEnum.文本;
+    }
+
+    private async Task SelectedValuesChanged(IReadOnlyCollection<AttributeTypeEnum>? value)
+    {
+        if (value == null) return;
         
-        _selectedType = _model.AttributeType?.SystemType ?? AttributeTypeEnum.文本;
+        // _selectedType = value.FirstOrDefault();
+
+        switch (value.FirstOrDefault())
+        {
+            case AttributeTypeEnum.表格:
+                await OpenTableDialogAsync();
+                break;
+            default:
+                break;
+        }
     }
 
     private async Task HandleSubmitAsync()
     {
-        if (_form == null) return;
+        if (_form == null || _model.AttributeType == null) return;
+        
         await _form.ValidateAsync();
 
         if (!_form.IsValid) return;
 
         try
         {
-            if (IsEdit)
+            _model.AttributeType = _selectedType;
+            
+            _model.UnitId = _unit?.Id;
+            
+            if (TableId == null)
             {
-                var updateDto = new AttributeDefinitionUpdateDto
+                if (IsEdit)
                 {
-                    Name = _model.Name,
-                    Lines = _model.Lines,
-                    Precision = _model.Precision,
-                    Scale = _model.Scale,
-                    UnitId = _model.UnitId
-                };
+                    var updateDto = new AttributeDefinitionUpdateDto
+                    {
+                        Name = _model.Name,
+                        Lines = _model.Lines,
+                        Precision = _model.Precision,
+                        Scale = _model.Scale,
+                        UnitId = _model.UnitId
+                    };
 
-                await ApiClient.UpdateDefinitionAsync(EditItem!.Id, updateDto);
+                    await AttributeApiClient.UpdateDefinitionAsync(EditItem!.Id, updateDto);
 
-                Snackbar.Add("属性定义更新成功", Severity.Success);
+                    Snackbar.Add("属性定义更新成功", Severity.Success);
+                }
+                else
+                {
+                    if (_model.AttributeType == null) return;
+
+                    var createDto = new AttributeDefinitionCreateDto
+                    {
+                        Name = _model.Name,
+                        AttributeType = _model.AttributeType.Value,
+                        MaxLength = _model.MaxLength,
+                        Lines = _model.Lines,
+                        Precision = _model.Precision,
+                        Scale = _model.Scale,
+                        UnitId = _model.UnitId
+                    };
+
+                    await AttributeApiClient.CreateDefinitionAsync(createDto);
+
+                    Snackbar.Add("属性定义创建成功", Severity.Success);
+                }
             }
             else
             {
-                if (_model.AttributeType == null) return;
-
-                var createDto = new AttributeDefinitionCreateDto
+                if (IsEdit)
                 {
-                    Name = _model.Name,
-                    AttributeType = _model.AttributeType,
-                    MaxLength = _model.MaxLength,
-                    Lines = _model.Lines,
-                    Precision = _model.Precision,
-                    Scale = _model.Scale,
-                    UnitId = _model.UnitId
-                };
-
-                await ApiClient.CreateDefinitionAsync(createDto);
-
-                Snackbar.Add("属性定义创建成功", Severity.Success);
+                    await AttributeApiClient.UpdateDefinitionAsync(EditItem!.Id, 
+                        new AttributeDefinitionUpdateDto
+                    {
+                        Name = _model.Name,
+                        MaxLength = _model.MaxLength,
+                        Lines = _model.Lines,
+                        Precision = _model.Precision,
+                        Scale = _model.Scale,
+                        UnitId = _model.UnitId
+                    });
+                    Snackbar.Add("列更新成功", Severity.Success);
+                }
+                else
+                {
+                    // 新 API：ParentId 由路由 tableId 确定，body 不传（后端强制注入 + 校验列≠表格类型）
+                    await AttributeApiClient.CreateTableColumnAsync(TableId, 
+                        new AttributeDefinitionCreateDto
+                    {
+                        Name = _model.Name,
+                        AttributeType = _model.AttributeType.Value,
+                        MaxLength = _model.MaxLength,
+                        Lines = _model.Lines,
+                        Precision = _model.Precision,
+                        Scale = _model.Scale,
+                        UnitId = _model.UnitId,
+                        ParentId = TableId
+                    });
+                    Snackbar.Add("列创建成功", Severity.Success);
+                }
             }
 
             MudDialog?.Close(DialogResult.Ok(true));
@@ -241,6 +259,16 @@
         catch (Exception ex)
         {
             Snackbar.Add($"操作失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenTableDialogAsync()
+    {
+        var result = await TreeNodeDialogService.ShowAttributeTableDefinitionListDialogAsync();
+        // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
+        if (result == true)
+        {
+            // await LoadDataAsync();
         }
     }
 
@@ -255,6 +283,7 @@
 
         _model.Name = dto.Name;
         _model.AttributeType = dto.AttributeType;
+        _model.MaxLength = dto.MaxLength;
         _model.Lines = dto.Lines;
         _model.Precision = dto.Precision;
         _model.Scale = dto.Scale;
@@ -266,7 +295,7 @@
     private class FormModel
     {
         public string Name { get; set; } = string.Empty;
-        public AttributeType? AttributeType { get; set; }
+        public AttributeTypeEnum? AttributeType { get; set; }
         public int? MaxLength { get; set; }
         public int? Lines { get; set; }
         public int? Precision { get; set; }

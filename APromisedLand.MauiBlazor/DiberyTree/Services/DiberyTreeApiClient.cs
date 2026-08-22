@@ -11,7 +11,7 @@ namespace APromisedLand.MauiBlazor.DiberyTree.Services;
 
 /// <summary>
 /// 泛型树 API 客户端，用于调用后端的 TreeControllerBase<T>，
-/// 包含树节点 CRUD 以及属性定义和值的操作。
+/// 包含树节点 CRUD 以及节点属性值的操作（属性定义已分离至 AttributeApiClient，表数据见 TableValueApiClient）。
 /// </summary>
 /// <typeparam name="T">节点值的类型</typeparam>
 public class DiberyTreeApiClient<T>(HttpClient httpClient)
@@ -210,83 +210,7 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
         return await SendAndGetDataAsync<bool>(request, cancellationToken);
     }
 
-    // ==================== 属性定义操作 ====================
-
-    /// <summary>
-    /// 获取所有属性定义
-    /// </summary>
-    public async Task<IReadOnlyList<AttributeDefinitionDto>> GetAllDefinitionsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Get, $"{_basePath}/attributes/definitions");
-        return await SendAndGetDataAsync<IReadOnlyList<AttributeDefinitionDto>>(request, cancellationToken);
-    }
-
-    /// <summary>
-    /// 获取所有属性类型
-    /// </summary>
-    public async Task<IReadOnlyList<AttributeType>> GetAttributeTypesAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Get, $"{_basePath}/attributes/types");
-        return await SendAndGetDataAsync<IReadOnlyList<AttributeType>>(request, cancellationToken);
-    }
-
-    /// <summary>
-    /// 根据 ID 获取属性定义（不存在时返回 null）
-    /// </summary>
-    public async Task<AttributeDefinitionDto?> GetDefinitionByIdAsync(
-        string id,  // 修改为 string
-        CancellationToken cancellationToken = default)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Get, $"{_basePath}/attributes/definitions/{Uri.EscapeDataString(id)}");
-        return await SendAndGetDataOrNullAsync<AttributeDefinitionDto>(request, cancellationToken);
-    }
-
-    /// <summary>
-    /// 创建新的属性定义
-    /// </summary>
-    public async Task<AttributeDefinitionDto> CreateDefinitionAsync(
-        AttributeDefinitionCreateDto dto,
-        CancellationToken cancellationToken = default)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{_basePath}/attributes/definitions")
-        {
-            Content = JsonContent.Create(dto)
-        };
-        return await SendAndGetDataAsync<AttributeDefinitionDto>(request, cancellationToken);
-    }
-
-    /// <summary>
-    /// 更新属性定义
-    /// </summary>
-    public async Task<AttributeDefinitionDto> UpdateDefinitionAsync(
-        string id,
-        AttributeDefinitionUpdateDto dto,
-        CancellationToken cancellationToken = default)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Put, $"{_basePath}/attributes/definitions/{Uri.EscapeDataString(id)}")
-        {
-            Content = JsonContent.Create(dto)
-        };
-        return await SendAndGetDataAsync<AttributeDefinitionDto>(request, cancellationToken);
-    }
-
-    /// <summary>
-    /// 删除属性定义（成功返回 true，不存在返回 false）
-    /// </summary>
-    public async Task<bool> DeleteDefinitionAsync(
-        string id,
-        CancellationToken cancellationToken = default)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Delete, $"{_basePath}/attributes/definitions/{Uri.EscapeDataString(id)}");
-        var response = await httpClient.SendAsync(request, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return false;
-        await EnsureSuccessWithApiResponseAsync(response);
-        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(cancellationToken);
-        return apiResponse?.Success == true && apiResponse.Data;
-    }
+    // 属性定义操作已分离至 AttributeApiClient（属性定义为全局资源，不耦合具体树）
 
     // ==================== 属性值操作 ====================
 

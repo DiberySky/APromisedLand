@@ -1,17 +1,15 @@
-using System.Text.Json;
 using APromisedLand.Api.Projects.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
-using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace APromisedLand.Api.Projects.DiberyTree;
+namespace APromisedLand.Api.Projects.DiberyTree.Controllers;
 
 /// <summary>
-/// 泛型树控制器基类，支持任意节点值类型 T，并包含属性定义与值的操作。
+/// 泛型树控制器基类，支持任意节点值类型 T，并包含属性值的操作（属性定义已分离至 <see cref="T"/>）。
 /// </summary>
 /// <typeparam name="T">节点值的类型</typeparam>
 [ApiController]
@@ -244,125 +242,7 @@ public abstract class TreeControllerBase<T>(
         }
     }
 
-    // ==================== 属性定义 (路由前缀: attributes/definitions) ====================
-
-    [HttpPost("attributes/definitions")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> CreateDefinition([FromBody] AttributeDefinitionCreateDto dto)
-    {
-        try
-        {
-            var created = await attributeService.CreateAsync(dto);
-            return CreatedAtAction(nameof(GetDefinitionById), new { id = created.Id }, ApiResponse<AttributeDefinitionDto>.Ok(created));
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(ApiResponse<object>.Fail(ex.Message));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "创建属性定义失败");
-            return StatusCode(500, ApiResponse<object>.Fail($"创建属性定义时发生错误: {ex.Message}"));
-        }
-    }
-
-    [HttpGet("attributes/definitions/{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> GetDefinitionById(string id)
-    {
-        try
-        {
-            var dto = await attributeService.GetByIdAsync(id);
-            if (dto is null)
-                return NotFound(ApiResponse<object>.Fail($"属性定义 {id} 不存在"));
-            return Ok(ApiResponse<AttributeDefinitionDto>.Ok(dto));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "获取属性定义失败, Id: {Id}", id);
-            return StatusCode(500, ApiResponse<object>.Fail($"获取属性定义失败: {ex.Message}"));
-        }
-    }
-
-    [HttpGet("attributes/definitions")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> GetAllDefinitions()
-    {
-        try
-        {
-            var list = await attributeService.GetAllAsync();
-            return Ok(ApiResponse<IReadOnlyList<AttributeDefinitionDto>>.Ok(list));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "获取属性定义列表失败");
-            return StatusCode(500, ApiResponse<IReadOnlyList<AttributeDefinitionDto>>.Fail($"获取属性定义列表失败: {ex.Message}"));
-        }
-    }
-
-    [HttpGet("attributes/types")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> GetAttributeTypesAsync()
-    {
-        try
-        {
-            var list = await attributeService.GetAttributeTypesAsync();
-            return Ok(ApiResponse<IReadOnlyList<AttributeType>>.Ok(list));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "获取属性类型列表失败");
-            return StatusCode(500, ApiResponse<IReadOnlyList<AttributeType>>.Fail($"获取属性类型列表失败: {ex.Message}"));
-        }
-    }
-
-    [HttpPut("attributes/definitions/{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> UpdateDefinition(string id, [FromBody] AttributeDefinitionUpdateDto dto)
-    {
-        try
-        {
-            var updated = await attributeService.UpdateAsync(id, dto);
-            return Ok(ApiResponse<AttributeDefinitionDto>.Ok(updated));
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(ApiResponse<object>.Fail($"属性定义 {id} 不存在"));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "更新属性定义失败, Id: {Id}", id);
-            return StatusCode(500, ApiResponse<object>.Fail($"更新属性定义失败: {ex.Message}"));
-        }
-    }
-
-    [HttpDelete("attributes/definitions/{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> DeleteDefinition(string id)
-    {
-        try
-        {
-            var result = await attributeService.DeleteAsync(id);
-            if (!result)
-                return NotFound(ApiResponse<object>.Fail($"属性定义 {id} 不存在"));
-            return Ok(ApiResponse<bool>.Ok(true));
-        }
-        catch (InvalidOperationException ex) // 被节点值引用
-        {
-            return Conflict(ApiResponse<object>.Fail(ex.Message));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "删除属性定义失败, Id: {Id}", id);
-            return StatusCode(500, ApiResponse<object>.Fail($"删除属性定义失败: {ex.Message}"));
-        }
-    }
+    // 属性定义端点已分离至 AttributesControllerBase（属性定义不耦合具体树，可独立路由）
 
     // ==================== 属性值 (路由前缀: {nodeId}/attributes/values) ====================
 
@@ -375,7 +255,7 @@ public abstract class TreeControllerBase<T>(
         try
         {
             var result = await attributeService.AddValueAsync(nodeId, dto);
-            return CreatedAtAction(nameof(GetSingleValue), new { nodeId, id = result.Id }, ApiResponse<object>.Ok(null, "属性值添加成功"));
+            return CreatedAtAction(nameof(GetSingleValue), new { nodeId, id = result.Id }, ApiResponse<object>.Ok(result, "属性值添加成功"));
         }
         catch (KeyNotFoundException ex)
         {
@@ -437,7 +317,7 @@ public abstract class TreeControllerBase<T>(
         try
         {
             await attributeService.UpdateValueAsync(nodeId, id, valueDto.Value, cancellationToken);
-            return Ok(ApiResponse<object>.Ok(null, "属性值更新成功"));
+            return Ok(ApiResponse<object>.Ok(valueDto, "属性值更新成功"));
         }
         catch (KeyNotFoundException ex)
         {

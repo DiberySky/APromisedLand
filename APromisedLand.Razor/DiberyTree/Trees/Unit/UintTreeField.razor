@@ -27,6 +27,7 @@
         if (result == null) return;
         
         Unit = result;
+        _ = UnitChanged.InvokeAsync(result);
         
         _fullName = Unit?.Text();
         

@@ -33,7 +33,7 @@
             <MudStack Spacing="2">
                 @foreach (var attr in _attributes)
                 {
-                    var typeEnum = attr.GetTypeEnum();
+                    var typeEnum = attr.Definition.AttributeTypeId.ToAttributeTypeEnum();
                     var unit = attr.Definition?.Unit?.Abbreviation ?? attr.Definition?.Unit?.Name;
                     var lines = attr.Definition?.Lines ?? 1;
                     var maxLength = attr.Definition?.MaxLength;
@@ -102,7 +102,7 @@
         try
         {
             var result = await ApiClient.GetAllValuesAsync(NodeId);
-            _attributes = result?.Attributes ?? new();
+            _attributes = result?.AttributeDtos ?? new();
         }
         catch (Exception ex)
         {

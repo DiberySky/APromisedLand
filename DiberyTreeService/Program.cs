@@ -28,8 +28,10 @@ builder.Services.AddScoped<ITreeService<UnitTree>, UnitTreeService>();
 
 //ITreeAttributeService 
 builder.Services.AddScoped<ITreeAttributeService, TreeAttributeService>();
-
 builder.Services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
+
+builder.Services.AddScoped<AttributeDefinitionService>();
+builder.Services.AddScoped<AttributeTableValueService>();
 
 var app = builder.Build();
 

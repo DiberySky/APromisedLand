@@ -26,7 +26,7 @@
                 @if (_infoVisible)
                 {
                     <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                        类型：@DefinitionDto?.AttributeType.Name, 整数位数：@(DefinitionDto?.Precision - DefinitionDto?.Scale),
+                        类型：@DefinitionDto!.AttributeType.ToName(), 整数位数：@(DefinitionDto?.Precision - DefinitionDto?.Scale),
                         小数位数：@DefinitionDto?.Scale
                         @if (!string.IsNullOrEmpty(DefinitionDto?.Unit?.Abbreviation))
                         {

@@ -6,12 +6,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace APromisedLand.Api.Data;
 
-public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbContext(options)
+public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbContext(options)
 {
     public DbSet<CategoryTree> CategoryTrees { get; set; }
     public DbSet<UnitTree> UnitTrees { get; set; }
     public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
-    public DbSet<AttributeType> AttributeTypes => Set<AttributeType>();
+    // public DbSet<AttributeType> AttributeTypes => Set<AttributeType>();
     public DbSet<AttributeDefinition> AttributeDefinitions => Set<AttributeDefinition>();
 
     public DbSet<TextAttributeValue> TextAttributeValues => Set<TextAttributeValue>();
@@ -22,6 +22,8 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
     public DbSet<DateTimeAttributeValue> DateTimeAttributeValues => Set<DateTimeAttributeValue>();
     public DbSet<FileAttributeValue> FileAttributeValues => Set<FileAttributeValue>();
     public DbSet<LocationAttributeValue> LocationAttributeValues => Set<LocationAttributeValue>();
+    // 动态表类型行实例值（表属性的一行实例）
+    public DbSet<TableAttributeValue> TableAttributeValues => Set<TableAttributeValue>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,17 +57,16 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
         modelBuilder.Entity<UnitOfMeasure>().HasData(UnitOfMeasure.SeedData());
 
         // ------ AttributeType ------
-        modelBuilder.Entity<AttributeType>(entity =>
-        {
-            entity.HasKey(t => t.Id);
-            entity.Property(t => t.Id).HasMaxLength(36).ValueGeneratedNever();
-            entity.Property(t => t.Name).HasMaxLength(50).IsRequired();
-            entity.Property(t => t.Description).HasMaxLength(512);
-            entity.Property(t => t.SystemType)
-                  .HasConversion<string>()
-                  .HasMaxLength(32);
-        });
-        modelBuilder.Entity<AttributeType>().HasData(AttributeType.SeedData());
+        // modelBuilder.Entity<AttributeType>(entity =>
+        // {
+        //     entity.HasKey(t => t.Id);
+        //     entity.Property(t => t.Id).HasMaxLength(36).ValueGeneratedNever();
+        //     entity.Property(t => t.Description).HasMaxLength(512);
+        //     entity.Property(t => t.SystemType)
+        //           .HasConversion<string>()
+        //           .HasMaxLength(32);
+        // });
+        // modelBuilder.Entity<AttributeType>().HasData(AttributeType.List());
        
 
         // ------ AttributeDefinition (Id 改为 string) ------
@@ -141,6 +142,13 @@ public class DiberyDbContext(DbContextOptions<DiberyDbContext> options) : DbCont
             entity.ToTable("LocationAttributeValues");
         });
 
+        OnModelCreatingPartial(modelBuilder);
+
         base.OnModelCreating(modelBuilder);
     }
+
+    /// <summary>
+    /// 动态表相关的模型配置挂载点（实现在 partial 文件 DiberyDbContext.DynamicTable.cs）。
+    /// </summary>
+    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }

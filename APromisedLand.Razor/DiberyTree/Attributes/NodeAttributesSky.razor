@@ -10,15 +10,15 @@
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
 }
-else if (_attributes == null || !_attributes.Any())
+else if (_attributeDtos == null || !_attributeDtos.Any())
 {
 }
 else
 {
     <MudStack Spacing="0">
-        @foreach (var attr in _attributes)
+        @foreach (var attr in _attributeDtos)
         {
-            var typeEnum = attr.GetTypeEnum();
+            var typeEnum = attr.Definition.AttributeTypeId.ToAttributeTypeEnum();
 
             <MudGrid Class="align-center">
                 <MudItem sm="12">
@@ -127,7 +127,7 @@ else
     [Parameter] public required string? NodeId { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
-    private List<AttributeDto>? _attributes;
+    private List<AttributeDto>? _attributeDtos;
     private bool _loading;
 
     private AttributeDefinition? _definition;
@@ -145,7 +145,7 @@ else
         try
         {
             var result = await ApiClient.GetAllValuesAsync(NodeId);
-            _attributes = result?.Attributes ?? new();
+            _attributeDtos = result?.AttributeDtos ?? new();
         }
         catch (Exception ex)
         {

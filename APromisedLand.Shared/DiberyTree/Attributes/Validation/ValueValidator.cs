@@ -10,7 +10,7 @@ public static class ValueValidator
     public static (bool IsValid, string? ErrorMessage, AttributeValueBase? ValueEntity) 
         ValidateAndBuild(AttributeDefinition def, JsonElement jsonValue, string nodeId)
     {
-        var typeEnum = def.AttributeType.SystemType;
+        var typeEnum = def.AttributeTypeId.ToAttributeTypeEnum();
         try
         {
             switch (typeEnum)

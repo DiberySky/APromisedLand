@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Models;
@@ -11,7 +12,8 @@ public class AttributeDefinition
 
     // 外键改为 string，匹配 AttributeType.Id
     public string AttributeTypeId { get; set; } = null!;
-    public AttributeType AttributeType { get; set; } = null!;
+    // [NotMapped]
+    // public AttributeType AttributeType { get; set; } = null!;
 
     // 文本专用
     public int? Lines { get; set; }
@@ -27,19 +29,37 @@ public class AttributeDefinition
     public string? UnitId { get; set; }
     public UnitTree? Unit { get; set; }
 
+    // ===== 动态表专用（AttributeType=表 时启用）=====
+    // 自引用：列定义指向所属的"表定义"；表定义自身为 null
+    public string? ParentId { get; set; }
+    public AttributeDefinition? Parent { get; set; }
+
+    // 列在表内的显示顺序
+    public int Order { get; set; }
+
+    // 该列是否必填
+    public bool IsRequired { get; set; }
+
+    // 列默认值（字符串形式，按列类型解析）
+    public string? DefaultValue { get; set; }
+
     public AttributeDefinitionDto ToDto()
-    {
+{
         return new AttributeDefinitionDto
         {
             Id = Id,
             Name = Name,
-            // AttributeTypeId = AttributeTypeId,
-            AttributeType = AttributeType,  
+            AttributeType = AttributeTypeId.ToAttributeTypeEnum(),
+            Lines = Lines,
             MaxLength = MaxLength,
             Precision = Precision,
             Scale = Scale,
-            // UnitId = UnitId,
+            UnitId = UnitId,
             Unit = Unit,
+            ParentId = ParentId,
+            Order = Order,
+            IsRequired = IsRequired,
+            DefaultValue = DefaultValue,
         };
     }
     // ---------- 种子数据 ----------
@@ -54,6 +74,7 @@ public class AttributeDefinition
         var dateTimeTypeId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b";
         var fileTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c";
         var locationTypeId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d";
+        var tableTypeId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e";
 
         // ===== 引用 UnitTree 中常用单位的固定 GUID（从 UnitTree.SeedData() 中提取） =====
         // 长度单位
@@ -146,7 +167,31 @@ public class AttributeDefinition
             new() { Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", Name = "图片", AttributeTypeId = fileTypeId },
 
             // ---------- 定位类型 ----------
-            new() { Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", Name = "位置坐标", AttributeTypeId = locationTypeId },
+            new() { Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", Name = "位置坐标", 
+                AttributeTypeId = locationTypeId },
+
+            // ---------- 动态表类型 ----------
+            // 表定义：规格表（ParentId = null，自身不存单值，仅作为"虚拟表"容器）
+            new()
+            {
+                Id = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e", Name = "规格表",
+                AttributeTypeId = tableTypeId
+            },
+            // 表「规格表」的列定义（ParentId 指向表定义）
+            new()
+            {
+                Id = "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6f", Name = "规格-材质",
+                AttributeTypeId = textTypeId, 
+                ParentId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
+                Lines = 1,
+                Order = 1, IsRequired = true, MaxLength = 50
+            },
+            new()
+            {
+                Id = "3c4d5e6f-7a8b-4c9d-0e1f-2a3b4c5d6e7a", Name = "规格-长度",
+                AttributeTypeId = decimalTypeId, ParentId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
+                Order = 2, IsRequired = false, Precision = 8, Scale = 2, UnitId = UNIT_CENTIMETER
+            },
         };
     }
 }

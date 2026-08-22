@@ -1,0 +1,201 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject AttributeApiClient AttributeApiClient
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@inject ISnackbar Snackbar
+@inject BlazorService BlazorService
+
+<MudContainer>
+    <MudGrid>
+        @* 左侧列列表 *@
+        <MudItem xs="12">
+            <MudTable T="AttributeDefinitionDto"
+                      Items="_columns"
+                      Dense="true" Hover="true"
+                      Loading="_loading"
+                      SelectedItemChanged="OnColumnSelected">
+                <HeaderContent>
+                    <MudTh>列名</MudTh>
+                    <MudTh>类型</MudTh>
+                    <MudTh Style="text-align:right">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                                       Color="Color.Info" Size="Size.Small"
+                                       OnClick="NewColumn"/>
+                    </MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.AttributeType.ToName()</MudTd>
+                    <MudTd Style="text-align:right">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                       Color="Color.Warning" Size="Size.Small"
+                                       OnClick="@(() => DeleteColumnAsync(context))"/>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="@(() => OpenDefinitionDialogAsync(context))"/>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Align="Align.Center" Class="py-4">暂无列定义</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudItem>
+        
+    </MudGrid>
+</MudContainer>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+    // [Parameter] public AttributeDefinitionDto? Table { get; set; }
+    [Parameter] public required string TableId { get; set; }
+
+    private List<AttributeDefinitionDto> _columns = new();
+    // private List<AttributeType> _types = new();
+    private bool _loading;
+    private ColumnFormModel _model = new();
+    private string? _editingId;
+
+    // private bool IsEdit => _editingId != null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // var allTypes = await AttributeApiClient.GetAttributeTypesAsync();
+        // _types = allTypes.Where(t => t.SystemType != AttributeTypeEnum.表格).ToList();
+        await LoadColumnsAsync();
+    }
+
+    private async Task LoadColumnsAsync()
+    {
+        _loading = true;
+        try
+        {
+            // 新 API：服务端过滤 ParentId + 按 Order 排序（已返回正确顺序）
+            var list = await AttributeApiClient.ListTableColumnsAsync(TableId);
+            _columns = [.. list];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载列失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnColumnSelected(AttributeDefinitionDto? col)
+    {
+        if (col == null) return;
+        _editingId = col.Id;
+        _model.Name = col.Name;
+        _model.Type = col.AttributeType;
+        _model.Order = col.Order;
+        _model.IsRequired = col.IsRequired;
+        _model.DefaultValue = col.DefaultValue;
+    }
+
+    private async Task NewColumn()
+    {
+        var result = await TreeNodeDialogService.ShowAttributeDefinitionDialogAsync(null, TableId);
+        // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
+        if (result == true)
+        {
+            // await LoadDataAsync();
+        }
+    }
+    
+    private async Task OpenDefinitionDialogAsync(AttributeDefinitionDto? item)
+    {
+        var result = await TreeNodeDialogService.ShowAttributeDefinitionDialogAsync(item, TableId);
+        // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
+        if (result == true)
+        {
+            // await LoadDataAsync();
+        }
+    }
+
+    // private async Task SaveColumnAsync()
+    // {
+    //     if (_form == null) return;
+    //     await _form.ValidateAsync();
+    //     if (!_form.IsValid) return;
+    //
+    //     var type = _types.FirstOrDefault(t => t.SystemType == _model.Type);
+    //     if (type == null)
+    //     {
+    //         Snackbar.Add("请选择列类型", Severity.Warning);
+    //         return;
+    //     }
+    //
+    //     try
+    //     {
+    //         if (IsEdit)
+    //         {
+    //             await AttributeApiClient.UpdateDefinitionAsync(_editingId!, new AttributeDefinitionUpdateDto
+    //             {
+    //                 Name = _model.Name,
+    //                 Order = _model.Order,
+    //                 IsRequired = _model.IsRequired,
+    //                 DefaultValue = _model.DefaultValue
+    //             });
+    //             Snackbar.Add("列更新成功", Severity.Success);
+    //         }
+    //         else
+    //         {
+    //             // 新 API：ParentId 由路由 tableId 确定，body 不传（后端强制注入 + 校验列≠表格类型）
+    //             await AttributeApiClient.CreateTableColumnAsync(TableId, new AttributeDefinitionCreateDto
+    //             {
+    //                 Name = _model.Name,
+    //                 AttributeType = type,
+    //                 Order = _model.Order,
+    //                 IsRequired = _model.IsRequired,
+    //                 DefaultValue = _model.DefaultValue
+    //             });
+    //             Snackbar.Add("列创建成功", Severity.Success);
+    //         }
+    //
+    //         await LoadColumnsAsync();
+    //         NewColumn();
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Snackbar.Add($"保存失败: {ex.Message}", Severity.Error);
+    //     }
+    // }
+
+    private async Task DeleteColumnAsync(AttributeDefinitionDto col)
+    {
+        var confirmed = await BlazorService.DeleteBoxAsync($"确定删除列【{col.Name}】？");
+        if (!confirmed) return;
+        try
+        {
+            var ok = await AttributeApiClient.DeleteDefinitionAsync(col.Id);
+            if (ok)
+            {
+                Snackbar.Add("删除成功", Severity.Success);
+                await LoadColumnsAsync();
+                NewColumn();
+            }
+            else Snackbar.Add("列不存在", Severity.Warning);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private class ColumnFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public AttributeTypeEnum Type { get; set; }
+        public int Order { get; set; }
+        public bool IsRequired { get; set; }
+        public string? DefaultValue { get; set; }
+    }
+
+}

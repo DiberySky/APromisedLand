@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(DiberyDbContext))]
-    [Migration("20260813165322_Initial")]
+    [Migration("20260821203738_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -20,7 +20,7 @@ namespace APromisedLand.Api.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -33,7 +33,14 @@ namespace APromisedLand.Api.Data.Migrations
 
                     b.Property<string>("AttributeTypeId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("text");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
 
                     b.Property<int?>("Lines")
                         .HasColumnType("integer");
@@ -46,6 +53,13 @@ namespace APromisedLand.Api.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ParentId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
                     b.Property<int?>("Precision")
                         .HasColumnType("integer");
 
@@ -57,7 +71,7 @@ namespace APromisedLand.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AttributeTypeId");
+                    b.HasIndex("ParentId");
 
                     b.HasIndex("UnitId");
 
@@ -68,47 +82,59 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
                             AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            IsRequired = false,
                             Lines = 1,
                             MaxLength = 50,
-                            Name = "名称"
+                            Name = "名称",
+                            Order = 0
                         },
                         new
                         {
                             Id = "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f",
                             AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            IsRequired = false,
                             Lines = 5,
                             MaxLength = 500,
-                            Name = "描述"
+                            Name = "描述",
+                            Order = 0
                         },
                         new
                         {
                             Id = "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a",
                             AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            IsRequired = false,
                             Lines = 10,
                             MaxLength = 1000,
-                            Name = "备注"
+                            Name = "备注",
+                            Order = 0
                         },
                         new
                         {
                             Id = "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b",
                             AttributeTypeId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            IsRequired = false,
                             MaxLength = 30,
                             Name = "数量",
+                            Order = 0,
                             UnitId = "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c"
                         },
                         new
                         {
                             Id = "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c",
                             AttributeTypeId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "等级"
+                            Name = "等级",
+                            Order = 0
                         },
                         new
                         {
                             Id = "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            IsRequired = false,
                             MaxLength = 30,
                             Name = "价格",
+                            Order = 0,
                             Precision = 18,
                             Scale = 2
                         },
@@ -116,8 +142,10 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            IsRequired = false,
                             MaxLength = 30,
                             Name = "重量",
+                            Order = 0,
                             Precision = 10,
                             Scale = 3,
                             UnitId = "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e"
@@ -126,8 +154,10 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            IsRequired = false,
                             MaxLength = 30,
                             Name = "长度",
+                            Order = 0,
                             Precision = 8,
                             Scale = 2,
                             UnitId = "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
@@ -136,154 +166,124 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a",
                             AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "生产日期"
+                            Name = "生产日期",
+                            Order = 0
                         },
                         new
                         {
                             Id = "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b",
                             AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "试验日期"
+                            Name = "试验日期",
+                            Order = 0
                         },
                         new
                         {
                             Id = "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
                             AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "出厂日期"
+                            Name = "出厂日期",
+                            Order = 0
                         },
                         new
                         {
                             Id = "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
                             AttributeTypeId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "开始时间"
+                            Name = "开始时间",
+                            Order = 0
                         },
                         new
                         {
                             Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
                             AttributeTypeId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "结束时间"
+                            Name = "结束时间",
+                            Order = 0
                         },
                         new
                         {
                             Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
                             AttributeTypeId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "创建时间"
+                            Name = "创建时间",
+                            Order = 0
                         },
                         new
                         {
                             Id = "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a",
                             AttributeTypeId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "更新时间"
+                            Name = "更新时间",
+                            Order = 0
                         },
                         new
                         {
                             Id = "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b",
                             AttributeTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "附件"
+                            Name = "附件",
+                            Order = 0
                         },
                         new
                         {
                             Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
                             AttributeTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "图片"
+                            Name = "图片",
+                            Order = 0
                         },
                         new
                         {
                             Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d",
                             AttributeTypeId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+                            IsRequired = false,
                             MaxLength = 30,
-                            Name = "位置坐标"
-                        });
-                });
-
-            modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeType", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("SystemType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("AttributeTypes");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
-                            Description = "用于存储短文本、备注、名称等单行或多行文字信息",
-                            Name = "文本",
-                            SystemType = "文本"
+                            Name = "位置坐标",
+                            Order = 0
                         },
                         new
                         {
-                            Id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-                            Description = "用于存储整数值，如数量、计数、等级等",
-                            Name = "整数",
-                            SystemType = "整数"
+                            Id = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
+                            AttributeTypeId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+                            IsRequired = false,
+                            MaxLength = 30,
+                            Name = "规格表",
+                            Order = 0
                         },
                         new
                         {
-                            Id = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-                            Description = "用于存储带小数的数值，如价格、重量等",
-                            Name = "小数",
-                            SystemType = "小数"
+                            Id = "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6f",
+                            AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            IsRequired = true,
+                            Lines = 1,
+                            MaxLength = 50,
+                            Name = "规格-材质",
+                            Order = 1,
+                            ParentId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e"
                         },
                         new
                         {
-                            Id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
-                            Description = "用于存储日期（不含时间）",
-                            Name = "日期",
-                            SystemType = "日期"
-                        },
-                        new
-                        {
-                            Id = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
-                            Description = "用于存储时间（不含日期）",
-                            Name = "时间",
-                            SystemType = "时间"
-                        },
-                        new
-                        {
-                            Id = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
-                            Description = "用于存储精确的日期和时间",
-                            Name = "日期时间",
-                            SystemType = "日期时间"
-                        },
-                        new
-                        {
-                            Id = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
-                            Description = "用于上传和存储文件，记录文件路径、名称等",
-                            Name = "文件",
-                            SystemType = "文件"
-                        },
-                        new
-                        {
-                            Id = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
-                            Description = "用于存储地理位置信息（经度、纬度）",
-                            Name = "定位",
-                            SystemType = "定位"
+                            Id = "3c4d5e6f-7a8b-4c9d-0e1f-2a3b4c5d6e7a",
+                            AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            IsRequired = false,
+                            MaxLength = 30,
+                            Name = "规格-长度",
+                            Order = 2,
+                            ParentId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
+                            Precision = 8,
+                            Scale = 2,
+                            UnitId = "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
                         });
                 });
 
@@ -1731,6 +1731,16 @@ namespace APromisedLand.Api.Data.Migrations
                     b.ToTable("LocationAttributeValues", (string)null);
                 });
 
+            modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TableAttributeValue", b =>
+                {
+                    b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
+
+                    b.Property<int?>("RowNo")
+                        .HasColumnType("integer");
+
+                    b.ToTable("TableAttributeValues", (string)null);
+                });
+
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TextAttributeValue", b =>
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
@@ -1754,17 +1764,16 @@ namespace APromisedLand.Api.Data.Migrations
 
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeDefinition", b =>
                 {
-                    b.HasOne("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeType", "AttributeType")
+                    b.HasOne("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeDefinition", "Parent")
                         .WithMany()
-                        .HasForeignKey("AttributeTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("APromisedLand.Shared.DiberyTree.Models.UnitTree", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId");
 
-                    b.Navigation("AttributeType");
+                    b.Navigation("Parent");
 
                     b.Navigation("Unit");
                 });

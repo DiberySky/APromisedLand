@@ -1,6 +1,6 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-@inject DiberyTreeApiClient<TItem> ApiClient
+@inject AttributeApiClient AttributeApiClient
 @inject ISnackbar Snackbar
 @inject TreeNodeDialogService<TItem> TreeNodeDialogService
 @inject DialogService DialogService
@@ -13,61 +13,80 @@
     <ToolBarContent>
         <MudText Color="Color.Inherit">附加属性</MudText>
         <MudSpacer/>
-        @if (_modifiable)
-        {
-            <MudButton Variant="Variant.Text"
-                       Color="Color.Warning"
-                       StartIcon="@Icons.Material.Outlined.Refresh"
-                       OnClick="LoadDataAsync"
-                       Class="ml-2">
-                刷新
-            </MudButton>
-        }
-        <MudSwitch T="bool" Label="修改" Color="Color.Success"
-                   ValueChanged="@Modifiable"/>
+        <MudSwitch T="bool"
+                   @bind-Value="@ReadOnly"
+                   Label="仅查看" Color="Color.Info"/>
     </ToolBarContent>
     <DialogContent>
         <MudContainer>
             <MudTable T="AttributeDefinitionDto"
                       Items="_definitions"
+                      @ref="_tableRef"
+                      GroupBy="@_groupDefinition"
+                      GroupHeaderStyle="background-color:var(--mud-palette-background-gray)"
                       Dense="true"
                       Hover="true"
                       Striped="false"
                       Loading="_loading"
                       LoadingProgressColor="Color.Primary"
                       Breakpoint="Breakpoint.Sm"
-                      SelectedItemChanged="@(SelectedItemChanged)">
+                      SelectedItemChanged="@SelectedItemChanged">
+                <GroupHeaderTemplate>
+                    <MudTh Class="mud-table-cell-custom-group" colspan="3">
+                        @($"{context.GroupName} => {context.Key}")
+                    </MudTh>
+                </GroupHeaderTemplate>
                 <HeaderContent>
                     <MudTh>属性名称</MudTh>
                     <MudTh>类型</MudTh>
-                    @if (_modifiable)
-                    {
-                        <MudTh Style="text-align:right">
+                    <MudTh Style="text-align:right">
+                        <!-- 新增：展开/折叠所有分组按钮 -->
+                        @if (_expand)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.KeyboardDoubleArrowUp"
+                                           Size="Size.Small"
+                                           OnClick="@(() =>
+                                                    {
+                                                        _expand = !_expand;
+                                                        _tableRef?.CollapseAllGroups();
+                                                    })"/>
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.KeyboardDoubleArrowDown"
+                                           Size="Size.Small"
+                                           OnClick="@(() =>
+                                                    {
+                                                        _expand = !_expand;
+                                                        _tableRef?.ExpandAllGroups();
+                                                    })"/>
+                        }
+                        @if (!ReadOnly)
+                        {
                             <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                            Color="Color.Info"
                                            Size="Size.Small"
-                                           OnClick="() => OpenDialogAsync(null)"/>
-                        </MudTh>
-                    }
-                    else
-                    {
-                        <MudTh Style="text-align:right">查看详情</MudTh>
-                    }
+                                           OnClick="@(() => OpenDialogAsync())"/>
+                        }
+                    </MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="属性名称">
                         <MudText Typo="Typo.body1" Color="Color.Success">@context.Name</MudText>
                     </MudTd>
                     <MudTd DataLabel="类型">
-                        <MudText Typo="Typo.body1" Color="Color.Info">@context.AttributeType.Name</MudText>
+                        <MudText Typo="Typo.body1" Color="Color.Info">@context.Definition().AttributeTypeId.ToAttributeTypeName()?.ToLowerInvariant()</MudText>
                     </MudTd>
-                    @if (_modifiable)
+                    @if (!ReadOnly)
                     {
                         <MudTd Style="text-align:right">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                           Color="Color.Warning"
-                                           Size="Size.Small"
-                                           OnClick="@(() => DeleteAsync(context))"/>
+                            @if (_deleteable)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                               Color="Color.Warning"
+                                               Size="Size.Small"
+                                               OnClick="@(() => DeleteAsync(context))"/>
+                            }
                             <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                            Color="Color.Primary"
                                            Size="Size.Small"
@@ -91,21 +110,45 @@
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
-        @* <MudButton Variant="Variant.Text" *@
-        @*            Color="Color.Warning"> *@
-        @*     双击选择属性！ *@
-        @* </MudButton> *@
+        @if (!ReadOnly)
+        {
+            <MudSwitch T="bool" @bind-Value="@_deleteable"
+                       Size="Size.Small"
+                       Label="可删除" Color="Color.Error"/>
+        }
     </DialogLeftActions>
 </DialogSky>
+
+<style>
+    .mud-table-cell-custom-group {
+        font-weight: 500;
+    }
+</style>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
+    [Parameter] public bool ReadOnly { get; set; }
+
     private List<AttributeDefinitionDto> _definitions = new();
-    private List<AttributeType> _attributeTypes = new();
-    private List<UnitTree> _units = new();
+    private List<AttributeTypeEnum> _attributeTypes = new();
+    private List<UnitTree> _units = new(); // 保留未使用，可后续扩展
     private bool _loading;
-    private bool _modifiable;
+    private bool _deleteable;
+    private bool _expand;
+
+    // 新增：表格引用，用于控制分组展开/折叠
+    private MudTable<AttributeDefinitionDto>? _tableRef;
+
+    // 新增：分组定义（默认折叠，可展开）
+    private TableGroupDefinition<AttributeDefinitionDto> _groupDefinition = new()
+    {
+        GroupName = "属性类型",
+        Indentation = false,
+        Expandable = true,
+        IsInitiallyExpanded = false,
+        Selector = (e) => e.Definition().AttributeTypeId
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -117,17 +160,13 @@
         _loading = true;
         try
         {
-            // 并行加载数据
-            var defsTask = await ApiClient.GetAllDefinitionsAsync();
-
-            // 注意：如果 API Client 没有提供获取 AttributeTypes 和 UnitsOfMeasure 的方法，
-            // 需要额外注入对应的服务或从其他接口获取
+            var defsTask = await AttributeApiClient.GetAllDefinitionsAsync();
             _definitions = [.. defsTask];
 
-            // 这里假设你有获取类型和单位的方法，如果没有可以从 DbContext 或其他服务获取
-            var types = await ApiClient.GetAttributeTypesAsync();
-            _attributeTypes = [.. types];
-            // _unitsOfMeasure = ...
+            // 按属性类型枚举排序（升序）
+            _definitions = _definitions.OrderBy(d => d.Definition().AttributeTypeId.ToAttributeTypeEnum()).ToList();
+
+            _attributeTypes = AttributeTypeMapping.All;
         }
         catch (Exception ex)
         {
@@ -139,9 +178,45 @@
         }
     }
 
-    private async Task OpenDialogAsync(AttributeDefinitionDto? item)
+    private async Task OpenDialogAsync(AttributeDefinitionDto? item = null)
     {
-        var result = await TreeNodeDialogService.ShowAttributeDefinitionDialogAsync(item, _attributeTypes);
+        if (item == null)
+        {
+            await OpenDefinitionDialogAsync(item);
+            return;
+        }
+        
+        switch (item.Definition().AttributeTypeId.ToAttributeTypeEnum())
+        {
+            case AttributeTypeEnum.表格:
+                await OpenTableDialogAsync(item);
+                break;
+            case AttributeTypeEnum.文本:
+            case AttributeTypeEnum.整数:
+            case AttributeTypeEnum.日期:
+            case AttributeTypeEnum.时间:
+                await OpenDefinitionDialogAsync(item);
+                break;
+            default:
+                throw new NotImplementedException($"不支持的属性类型: {item.Definition().AttributeTypeId}");
+        }
+    }
+
+    private async Task OpenDefinitionDialogAsync(AttributeDefinitionDto? item)
+    {
+        var result = await TreeNodeDialogService.ShowAttributeDefinitionDialogAsync(item);
+        // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
+        if (result == true)
+        {
+            await LoadDataAsync();
+        }
+    }
+
+    private async Task OpenTableDialogAsync(AttributeDefinitionDto? item)
+    {
+        if (item == null) return;
+
+        var result = await TreeNodeDialogService.ShowAttributeTableDefinitionDialogAsync(item);
         // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
         if (result == true)
         {
@@ -153,12 +228,12 @@
     {
         var confirmed = await BlazorService.DeleteBoxAsync(
             $"确定要删除属性定义【{item.Name}】吗？如果已被节点引用将无法删除。");
-        
+
         if (!confirmed) return;
 
         try
         {
-            var success = await ApiClient.DeleteDefinitionAsync(item.Id);
+            var success = await AttributeApiClient.DeleteDefinitionAsync(item.Id);
             if (success)
             {
                 Snackbar.Add("删除成功", Severity.Success);
@@ -181,7 +256,16 @@
 
     private void Modifiable(bool modify)
     {
-        _modifiable = modify;
+        ReadOnly = modify;
+
+        _deleteable = !ReadOnly;
+
+        StateHasChanged();
+    }
+
+    private void Deletable(bool delete)
+    {
+        _deleteable = delete;
         StateHasChanged();
     }
 

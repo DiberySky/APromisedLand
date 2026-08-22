@@ -1,3 +1,4 @@
+using APromisedLand.Shared.DiberyTree.Attributes.Enums;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DiberyTree.Models;
 
@@ -7,15 +8,20 @@ public class AttributeDefinitionDto
 {
     public string Id { get; set; } = null!;
     public string Name { get; set; } = null!;
-    public AttributeType AttributeType { get; set; } = new();
-    // public string AttributeTypeName { get; set; } = null!; // 便于前端展示
+    // public AttributeType AttributeType { get; set; } = new();
+    public AttributeTypeEnum AttributeType { get; set; }
     public int? MaxLength { get; set; }  
     public int? Lines { get; set; }
     public int? Precision { get; set; }
     public int? Scale { get; set; }
+    public string? UnitId { get; set; }
     public UnitTree? Unit { get; set; }
-    // public string? UnitId { get; set; }
-    // public string? UnitName { get; set; } 
+
+    // ===== 动态表专用（列定义时启用）=====
+    public string? ParentId { get; set; }
+    public int Order { get; set; }
+    public bool IsRequired { get; set; }
+    public string? DefaultValue { get; set; }
 
     public AttributeDefinition Definition()
     {
@@ -23,12 +29,16 @@ public class AttributeDefinitionDto
         {
             Id = Id,
             Name = Name,
-            AttributeTypeId = AttributeType.Id,
+            AttributeTypeId = AttributeType.ToAttributeTypeId(),
             Lines = Lines,
             MaxLength = MaxLength ?? 30,
             Precision = Precision,
             Scale = Scale,
             UnitId = Unit?.Id,
+            ParentId = ParentId,
+            Order = Order,
+            IsRequired = IsRequired,
+            DefaultValue = DefaultValue,
         };
     }
 }

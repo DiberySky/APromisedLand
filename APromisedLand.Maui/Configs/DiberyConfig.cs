@@ -1,6 +1,7 @@
 using APromisedLand.Maui.Authentication;
 using APromisedLand.Maui.DiberyTree;
 using APromisedLand.MauiBlazor.DiberyTree.Interfaces;
+using APromisedLand.MauiBlazor.DiberyTree.Services;
 using APromisedLand.Razor.DiberyTree.Navigation;
 using APromisedLand.Razor.DiberyTree.Services;
 using APromisedLand.Razor.Services;
@@ -31,8 +32,12 @@ public static class DiberyConfig
             builder.AddAuthenticationServices();
             builder.AddKeycloakClient();
             
-            builder.AddDiberyTreeClient<CategoryTree>();
-            builder.AddDiberyTreeClient<UnitTree>();
+            // builder.AddDiberyTreeClient<CategoryTree>();
+            // builder.AddDiberyTreeClient<UnitTree>();
+            
+            builder.TreeClient<CategoryTree>();
+            builder.TreeClient<UnitTree>();
+            builder.AttributeClient();
             
             builder.Services.AddScoped<TreeNodeDialogService<CategoryTree>>();
             builder.Services.AddScoped<TreeNodeDialogService<UnitTree>>();
@@ -43,6 +48,38 @@ public static class DiberyConfig
             builder.Services.AddSingleton<ITreeClientService<UnitTree>, UnitTreeClientService>();
         }
 
+        private void AttributeClient()
+        {
+            //http://localhost:5085
+            builder.Services.AddHttpClient<AttributeApiClient>(client =>
+                {
+                    client.BaseAddress = new Uri("http://localhost:5085");
+                })
+                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
+
+            builder.Services.AddHttpClient<TableValueApiClient>(client =>
+                {
+                    client.BaseAddress = new Uri("http://localhost:5085");
+                })
+                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
+
+        }
+        private void TreeClient<T>()
+        {
+            // builder.Services.AddHttpClient<UnitsOfMeasureApiClient>(client =>
+            //     {
+            //         client.BaseAddress = new Uri("http://localhost:5085");
+            //     })
+            //     .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
+
+            //http://localhost:5085
+            builder.Services.AddHttpClient<DiberyTreeApiClient<T>>(client =>
+                {
+                    client.BaseAddress = new Uri("http://localhost:5085");
+                })
+                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
+        }
+        
         public void AddAuthenticationServices()
         {
             // 注册 SecureStorage

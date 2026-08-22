@@ -47,7 +47,7 @@
                 @if (_infoVisible)
                 {
                     <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                        类型：@DefinitionDto?.AttributeType.Name，
+                        类型：@DefinitionDto!.AttributeType.ToName()，
                         最大大小：@(DefinitionDto?.MaxLength is null or 0 ? "无限制" : $"{DefinitionDto?.MaxLength} 字节")
                     </MudText>
                 }

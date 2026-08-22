@@ -14,20 +14,6 @@ namespace APromisedLand.Api.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "AttributeTypes",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Description = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    SystemType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AttributeTypes", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "CategoryTrees",
                 columns: table => new
                 {
@@ -133,6 +119,20 @@ namespace APromisedLand.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "TableAttributeValues",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    RowNo = table.Column<int>(type: "integer", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TableAttributeValues", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "TextAttributeValues",
                 columns: table => new
                 {
@@ -204,22 +204,26 @@ namespace APromisedLand.Api.Data.Migrations
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    AttributeTypeId = table.Column<string>(type: "character varying(36)", nullable: false),
+                    AttributeTypeId = table.Column<string>(type: "text", nullable: false),
                     Lines = table.Column<int>(type: "integer", nullable: true),
                     MaxLength = table.Column<int>(type: "integer", nullable: false),
                     Precision = table.Column<int>(type: "integer", nullable: true),
                     Scale = table.Column<int>(type: "integer", nullable: true),
-                    UnitId = table.Column<string>(type: "text", nullable: true)
+                    UnitId = table.Column<string>(type: "text", nullable: true),
+                    ParentId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    Order = table.Column<int>(type: "integer", nullable: false),
+                    IsRequired = table.Column<bool>(type: "boolean", nullable: false),
+                    DefaultValue = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AttributeDefinitions", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_AttributeDefinitions_AttributeTypes_AttributeTypeId",
-                        column: x => x.AttributeTypeId,
-                        principalTable: "AttributeTypes",
+                        name: "FK_AttributeDefinitions_AttributeDefinitions_ParentId",
+                        column: x => x.ParentId,
+                        principalTable: "AttributeDefinitions",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_AttributeDefinitions_UnitTrees_UnitId",
                         column: x => x.UnitId,
@@ -228,18 +232,26 @@ namespace APromisedLand.Api.Data.Migrations
                 });
 
             migrationBuilder.InsertData(
-                table: "AttributeTypes",
-                columns: new[] { "Id", "Description", "Name", "SystemType" },
+                table: "AttributeDefinitions",
+                columns: new[] { "Id", "AttributeTypeId", "DefaultValue", "IsRequired", "Lines", "MaxLength", "Name", "Order", "ParentId", "Precision", "Scale", "UnitId" },
                 values: new object[,]
                 {
-                    { "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", "用于存储短文本、备注、名称等单行或多行文字信息", "文本", "文本" },
-                    { "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", "用于存储整数值，如数量、计数、等级等", "整数", "整数" },
-                    { "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", "用于存储地理位置信息（经度、纬度）", "定位", "定位" },
-                    { "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", "用于存储带小数的数值，如价格、重量等", "小数", "小数" },
-                    { "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", "用于存储日期（不含时间）", "日期", "日期" },
-                    { "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", "用于存储时间（不含日期）", "时间", "时间" },
-                    { "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", "用于存储精确的日期和时间", "日期时间", "日期时间" },
-                    { "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", "用于上传和存储文件，记录文件路径、名称等", "文件", "文件" }
+                    { "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e", "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", null, false, null, 30, "规格表", 0, null, null, null, null },
+                    { "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, false, null, 30, "开始时间", 0, null, null, null, null },
+                    { "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, false, null, 30, "价格", 0, null, 18, 2, null },
+                    { "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", null, false, null, 30, "位置坐标", 0, null, null, null, null },
+                    { "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", null, false, 1, 50, "名称", 0, null, null, null, null },
+                    { "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, false, null, 30, "结束时间", 0, null, null, null, null },
+                    { "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", null, false, 5, 500, "描述", 0, null, null, null, null },
+                    { "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, false, null, 30, "创建时间", 0, null, null, null, null },
+                    { "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", null, false, 10, 1000, "备注", 0, null, null, null, null },
+                    { "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, false, null, 30, "更新时间", 0, null, null, null, null },
+                    { "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, false, null, 30, "生产日期", 0, null, null, null, null },
+                    { "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, false, null, 30, "试验日期", 0, null, null, null, null },
+                    { "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, false, null, 30, "附件", 0, null, null, null, null },
+                    { "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, false, null, 30, "出厂日期", 0, null, null, null, null },
+                    { "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, false, null, 30, "等级", 0, null, null, null, null },
+                    { "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, false, null, 30, "图片", 0, null, null, null, null }
                 });
 
             migrationBuilder.InsertData(
@@ -312,25 +324,8 @@ namespace APromisedLand.Api.Data.Migrations
 
             migrationBuilder.InsertData(
                 table: "AttributeDefinitions",
-                columns: new[] { "Id", "AttributeTypeId", "Lines", "MaxLength", "Name", "Precision", "Scale", "UnitId" },
-                values: new object[,]
-                {
-                    { "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, 30, "开始时间", null, null, null },
-                    { "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, 30, "价格", 18, 2, null },
-                    { "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", null, 30, "位置坐标", null, null, null },
-                    { "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", 1, 50, "名称", null, null, null },
-                    { "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", null, 30, "结束时间", null, null, null },
-                    { "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", 5, 500, "描述", null, null, null },
-                    { "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, 30, "创建时间", null, null, null },
-                    { "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", 10, 1000, "备注", null, null, null },
-                    { "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a", "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", null, 30, "更新时间", null, null, null },
-                    { "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, 30, "生产日期", null, null, null },
-                    { "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, 30, "试验日期", null, null, null },
-                    { "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, 30, "附件", null, null, null },
-                    { "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", null, 30, "出厂日期", null, null, null },
-                    { "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, 30, "等级", null, null, null },
-                    { "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", null, 30, "图片", null, null, null }
-                });
+                columns: new[] { "Id", "AttributeTypeId", "DefaultValue", "IsRequired", "Lines", "MaxLength", "Name", "Order", "ParentId", "Precision", "Scale", "UnitId" },
+                values: new object[] { "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6f", "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a", null, true, 1, 50, "规格-材质", 1, "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e", null, null, null });
 
             migrationBuilder.InsertData(
                 table: "UnitTrees",
@@ -416,18 +411,19 @@ namespace APromisedLand.Api.Data.Migrations
 
             migrationBuilder.InsertData(
                 table: "AttributeDefinitions",
-                columns: new[] { "Id", "AttributeTypeId", "Lines", "MaxLength", "Name", "Precision", "Scale", "UnitId" },
+                columns: new[] { "Id", "AttributeTypeId", "DefaultValue", "IsRequired", "Lines", "MaxLength", "Name", "Order", "ParentId", "Precision", "Scale", "UnitId" },
                 values: new object[,]
                 {
-                    { "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, 30, "重量", 10, 3, "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e" },
-                    { "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, 30, "长度", 8, 2, "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e" },
-                    { "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, 30, "数量", null, null, "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c" }
+                    { "3c4d5e6f-7a8b-4c9d-0e1f-2a3b4c5d6e7a", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, false, null, 30, "规格-长度", 2, "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e", 8, 2, "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e" },
+                    { "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, false, null, 30, "重量", 0, null, 10, 3, "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e" },
+                    { "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f", "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", null, false, null, 30, "长度", 0, null, 8, 2, "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e" },
+                    { "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b", "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", null, false, null, 30, "数量", 0, null, null, null, "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c" }
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AttributeDefinitions_AttributeTypeId",
+                name: "IX_AttributeDefinitions_ParentId",
                 table: "AttributeDefinitions",
-                column: "AttributeTypeId");
+                column: "ParentId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AttributeDefinitions_UnitId",
@@ -479,6 +475,9 @@ namespace APromisedLand.Api.Data.Migrations
                 name: "LocationAttributeValues");
 
             migrationBuilder.DropTable(
+                name: "TableAttributeValues");
+
+            migrationBuilder.DropTable(
                 name: "TextAttributeValues");
 
             migrationBuilder.DropTable(
@@ -486,9 +485,6 @@ namespace APromisedLand.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "UnitsOfMeasure");
-
-            migrationBuilder.DropTable(
-                name: "AttributeTypes");
 
             migrationBuilder.DropTable(
                 name: "UnitTrees");

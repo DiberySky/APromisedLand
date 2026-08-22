@@ -9,5 +9,6 @@ public enum AttributeTypeEnum
     时间,
     日期时间,
     文件,
-    定位
+    定位,
+    表格
 }

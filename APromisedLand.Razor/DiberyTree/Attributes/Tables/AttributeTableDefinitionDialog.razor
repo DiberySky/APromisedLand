@@ -1,0 +1,101 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject AttributeApiClient AttributeApiClient
+@inject DiberyTreeApiClient<TItem> ApiClient
+
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@(IsEdit ? "编辑表格定义" : "新建表格定义")"
+           SubmitButtonVisible="true"
+           CancelButtonVisible="true"
+           OnSubmitClick="HandleSubmitAsync"
+           OnCanceledClick="HandleCancel">
+    <DialogContent>
+        <MudForm @ref="_form" Model="_model" ValidationDelay="0">
+            <MudContainer class="my-4">
+
+                <MudTextField @bind-Value="_model.Name"
+                              Label="表格名称"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="表格名称不能为空"
+                              MaxLength="256"
+                              Counter="256"/>
+
+                <AttributeTableColumnsSky TItem="@TItem" TableId="@Table!.Id"/>
+
+            </MudContainer>
+        </MudForm>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public AttributeDefinitionDto? Table { get; set; }
+
+    private MudForm? _form;
+    private FormModel _model = new();
+    private AttributeTypeEnum _tableType;
+
+    private bool IsEdit => Table != null;
+
+    protected override void OnInitialized()
+    {
+        // var types = await AttributeApiClient.GetAttributeTypesAsync();
+        // _tableType = types.FirstOrDefault(t => t.SystemType == AttributeTypeEnum.表格);
+
+        _tableType = Table?.AttributeType ?? AttributeTypeEnum.表格;
+        
+        _model.Name = Table?.Name ?? string.Empty;
+    }
+    
+    private async Task HandleSubmitAsync()
+    {
+        if (_form == null) return;
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        if (_tableType == null)
+        {
+            Snackbar.Add("未找到「表」类型定义", Severity.Error);
+            return;
+        }
+
+        try
+        {
+            if (IsEdit)
+            {
+                await AttributeApiClient.UpdateDefinitionAsync(Table!.Id,
+                    new AttributeDefinitionUpdateDto { Name = _model.Name });
+                Snackbar.Add("表更新成功", Severity.Success);
+            }
+            else
+            {
+                await AttributeApiClient.CreateDefinitionAsync(new AttributeDefinitionCreateDto
+                {
+                    Name = _model.Name,
+                    AttributeType = _tableType,
+                    ParentId = null
+                });
+                Snackbar.Add("表创建成功", Severity.Success);
+            }
+
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"操作失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void HandleCancel()
+    {
+    }
+
+    private class FormModel
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+}

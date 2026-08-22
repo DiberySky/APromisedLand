@@ -1,0 +1,176 @@
+@using System.Text.Json
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject TableValueApiClient TableValueApiClient
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@(IsEdit ? "编辑行" : "新增行")"
+           SubmitButtonVisible="true"
+           CancelButtonVisible="true"
+           OnSubmitClick="HandleSubmitAsync"
+           OnCanceledClick="HandleCancel">
+    <DialogContent>
+        <MudForm @ref="_form" ValidationDelay="0">
+            <MudContainer class="my-4">
+                <MudGrid>
+                    @foreach (var col in Columns)
+                    {
+                        <MudItem xs="12" md="6">
+                            @switch (col.Definition().AttributeTypeId.ToAttributeTypeEnum())
+                            {
+                                case AttributeTypeEnum.文本:
+                                    <MudTextField Label="@col.Name" Variant="Variant.Outlined"
+                                                  @bind-Value="_values[col.Id].Text"
+                                                  Required="@col.IsRequired"
+                                                  RequiredError="@($"{col.Name}不能为空")"/>
+                                    break;
+                                case AttributeTypeEnum.整数:
+                                    <MudNumericField T="int?" Label="@col.Name" Variant="Variant.Outlined"
+                                                     @bind-Value="_values[col.Id].Integer"
+                                                     Required="@col.IsRequired"/>
+                                    break;
+                                case AttributeTypeEnum.小数:
+                                    <MudNumericField T="decimal?" Label="@col.Name" Variant="Variant.Outlined"
+                                                     @bind-Value="_values[col.Id].Decimal"
+                                                     Required="@col.IsRequired"/>
+                                    break;
+                                case AttributeTypeEnum.日期:
+                                    <MudDatePicker Label="@col.Name" Variant="Variant.Outlined"
+                                                   @bind-Value="_values[col.Id].Date"
+                                                   Required="@col.IsRequired"/>
+                                    break;
+                                case AttributeTypeEnum.时间:
+                                    <MudTimePicker Label="@col.Name" Variant="Variant.Outlined"
+                                                   @bind-Value="_values[col.Id].Time"
+                                                   Required="@col.IsRequired"/>
+                                    break;
+                                case AttributeTypeEnum.日期时间:
+                                    <MudDatePicker Label="@col.Name" Variant="Variant.Outlined"
+                                                   @bind-Value="_values[col.Id].DateTime"
+                                                   Required="@col.IsRequired"/>
+                                    break;
+                                case AttributeTypeEnum.定位:
+                                    <MudTextField Label="@col.Name" Variant="Variant.Outlined"
+                                                  Placeholder="lat,lng"
+                                                  @bind-Value="_values[col.Id].Text"
+                                                  Required="@col.IsRequired"/>
+                                    break;
+                                default:
+                                    <MudTextField Label="@col.Name" Variant="Variant.Outlined"
+                                                  @bind-Value="_values[col.Id].Text"
+                                                  Required="@col.IsRequired"/>
+                                    break;
+                            }
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudContainer>
+        </MudForm>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+    [Parameter] public AttributeDefinitionDto? Table { get; set; }
+    [Parameter] public List<AttributeDefinitionDto> Columns { get; set; } = new();
+    [Parameter] public TableRowDto? EditRow { get; set; }
+
+    private MudForm? _form;
+    private Dictionary<string, CellValue> _values = new();
+    private bool IsEdit => EditRow != null;
+
+    protected override void OnInitialized()
+    {
+        foreach (var col in Columns)
+            _values[col.Id] = new CellValue();
+
+        if (IsEdit && EditRow != null)
+        {
+            foreach (var cell in EditRow.Values)
+            {
+                if (!_values.TryGetValue(cell.ColumnId, out var v)) continue;
+                var typeId = Columns.FirstOrDefault(c => c.Id == cell.ColumnId)?.AttributeType;
+                v.SetFrom(cell.Value, typeId);
+            }
+        }
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        if (_form == null) return;
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        // 校验必填
+        foreach (var col in Columns)
+        {
+            if (col.IsRequired && _values[col.Id].IsEmpty())
+            {
+                Snackbar.Add($"{col.Name}不能为空", Severity.Warning);
+                return;
+            }
+        }
+
+        var dict = _values.ToDictionary(kv => kv.Key, kv => kv.Value.ToJsonElement());
+
+        try
+        {
+            if (IsEdit)
+                await TableValueApiClient.UpdateRowAsync(EditRow!.RowId, dict);
+            else
+                await TableValueApiClient.AddRowAsync(Table!.Id, dict);
+
+            Snackbar.Add("保存成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (ArgumentException ex) { Snackbar.Add(ex.Message, Severity.Warning); }
+        catch (Exception ex) { Snackbar.Add($"保存失败: {ex.Message}", Severity.Error); }
+    }
+
+    private void HandleCancel() { }
+
+    private class CellValue
+    {
+        public string? Text { get; set; }
+        public int? Integer { get; set; }
+        public decimal? Decimal { get; set; }
+        public DateTime? Date { get; set; }
+        public TimeSpan? Time { get; set; }
+        public DateTime? DateTime { get; set; }
+
+        public bool IsEmpty() =>
+            string.IsNullOrEmpty(Text) && Integer == null && Decimal == null
+            && Date == null && Time == null && DateTime == null;
+
+        public void SetFrom(object? raw, AttributeTypeEnum? type)
+        {
+            if (raw is not JsonElement je) return;
+            try
+            {
+                switch (type)
+                {
+                    case AttributeTypeEnum.整数: Integer = je.GetInt32(); break;
+                    case AttributeTypeEnum.小数: Decimal = je.GetDecimal(); break;
+                    case AttributeTypeEnum.日期: Date = je.GetDateTime(); break;
+                    case AttributeTypeEnum.时间: Time = je.GetValue<TimeSpan>(); break;
+                    case AttributeTypeEnum.日期时间: DateTime = je.GetDateTime(); break;
+                    default: Text = je.ToString(); break;
+                }
+            }
+            catch { Text = je.ToString(); }
+        }
+
+        public JsonElement ToJsonElement() => type switch
+        {
+            AttributeTypeEnum.整数 => JsonSerializer.SerializeToElement(Integer),
+            AttributeTypeEnum.小数 => JsonSerializer.SerializeToElement(Decimal),
+            AttributeTypeEnum.日期 => JsonSerializer.SerializeToElement(Date),
+            AttributeTypeEnum.时间 => JsonSerializer.SerializeToElement(Time),
+            AttributeTypeEnum.日期时间 => JsonSerializer.SerializeToElement(DateTime),
+            _ => JsonSerializer.SerializeToElement(Text)
+        };
+
+        private AttributeTypeEnum? type;
+        public void SetType(AttributeTypeEnum t) => type = t;
+    }
+}
