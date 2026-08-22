@@ -14,10 +14,15 @@ namespace APromisedLand.Shared.DiberyTree.Attributes.Models;
 ///           → Text/Decimal/… 列值(NodeId=行实例 Id, DefId=列定义)。
 /// </para>
 /// </summary>
-public class TableAttributeValue : AttributeValueBase
+public class TableRowAttributeValue : AttributeValueBase
 {
     /// <summary>
-    /// 表名称，用于表 Id。
+    /// 行序号，用于表内多行排序（可选）。
     /// </summary>
-    public string Value { get; set; } = null!;
+    public string? TableId { get; set; }
+
+    /// <summary>
+    /// 行序号，用于表内多行排序（可选）。
+    /// </summary>
+    public int? RowNo { get; set; }
 }

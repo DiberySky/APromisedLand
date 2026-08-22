@@ -27,9 +27,12 @@
                     <MudTd>@context.Name</MudTd>
                     <MudTd>@context.AttributeType.ToName()</MudTd>
                     <MudTd Style="text-align:right">
-                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                       Color="Color.Warning" Size="Size.Small"
-                                       OnClick="@(() => DeleteColumnAsync(context))"/>
+                        @if (Deletable)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                           Color="Color.Warning" Size="Size.Small"
+                                           OnClick="@(() => DeleteColumnAsync(context))"/>
+                        }
                         <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                        Color="Color.Primary"
                                        Size="Size.Small"
@@ -49,6 +52,8 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
     // [Parameter] public AttributeDefinitionDto? Table { get; set; }
     [Parameter] public required string TableId { get; set; }
+    [Parameter] public bool Deletable { get; set; } = true;
+    [Parameter] public EventCallback<bool> DeletableChanged { get; set; }
 
     private List<AttributeDefinitionDto> _columns = new();
     // private List<AttributeType> _types = new();

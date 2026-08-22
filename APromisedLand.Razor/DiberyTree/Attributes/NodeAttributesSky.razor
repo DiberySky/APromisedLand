@@ -114,6 +114,19 @@ else
                             break;
                         case AttributeTypeEnum.定位:
                             break;
+                        case AttributeTypeEnum.表格:
+                            var tableValue = attr.Value.GetValue<string>();
+
+                            <TableValue TItem="@TItem"
+                                       NodeId="@NodeId"
+                                       ValueId="@attr.Id"
+                                       DefinitionDto="@attr.Definition?.ToDto()"
+                                       Value="@tableValue"          
+                                       ReadOnly="@ReadOnly"/>
+
+                            _definition = attr.Definition;
+                            _valueElement = JsonSerializer.SerializeToElement(tableValue);
+                            break;
                         default:
                             throw new ArgumentOutOfRangeException();
                     }

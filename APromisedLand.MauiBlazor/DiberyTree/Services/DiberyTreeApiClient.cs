@@ -185,18 +185,23 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     }
 
     /// <summary>
-    /// 删除节点及其所有子节点
+    /// 删除节点及其所有子节点（不存在返回 false，其他失败抛异常）
     /// </summary>
     public async Task<bool> DeleteNodeAsync(
         string nodeId,
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Delete, $"{_basePath}/{Uri.EscapeDataString(nodeId)}");
-        return await SendAndGetDataAsync<bool>(request, cancellationToken);
+        var response = await httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+        await EnsureSuccessWithApiResponseAsync(response);
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(cancellationToken);
+        return apiResponse?.Success == true && apiResponse.Data;
     }
 
     /// <summary>
-    /// 移动节点到新的父节点（null 表示移至根）
+    /// 移动节点到新的父节点（null 表示移至根）。若节点或新父节点不存在返回 false，其他失败抛异常。
     /// </summary>
     public async Task<bool> MoveNodeAsync(
         string nodeId,
@@ -207,7 +212,12 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
         if (!string.IsNullOrEmpty(newParentId))
             url += $"&newParentId={Uri.EscapeDataString(newParentId)}";
         var request = new HttpRequestMessage(HttpMethod.Post, url);
-        return await SendAndGetDataAsync<bool>(request, cancellationToken);
+        var response = await httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+        await EnsureSuccessWithApiResponseAsync(response);
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(cancellationToken);
+        return apiResponse?.Success == true && apiResponse.Data;
     }
 
     // 属性定义操作已分离至 AttributeApiClient（属性定义为全局资源，不耦合具体树）
@@ -215,7 +225,7 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     // ==================== 属性值操作 ====================
 
     /// <summary>
-    /// 为指定节点添加一个属性值
+    /// 为指定节点添加一个属性值（201 No Content）
     /// </summary>
     public async Task AddValueAsync(
         string nodeId,
@@ -236,7 +246,7 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     /// </summary>
     public async Task<AttributeDto?> GetSingleValueAsync(
         string nodeId,
-        string valueId,  // 修改为 string
+        string valueId,
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get,
@@ -257,7 +267,7 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     }
 
     /// <summary>
-    /// 更新指定节点的某个属性值
+    /// 更新指定节点的某个属性值（204 No Content）
     /// </summary>
     public async Task UpdateValueAsync(
         string nodeId,
@@ -276,11 +286,11 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     }
 
     /// <summary>
-    /// 删除指定节点的某个属性值（成功返回 true，不存在返回 false）
+    /// 删除指定节点的某个属性值（不存在返回 false，其他失败抛异常）
     /// </summary>
     public async Task<bool> DeleteValueAsync(
         string nodeId,
-        string valueId,  // 修改为 string
+        string valueId,
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Delete,
@@ -289,6 +299,7 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
         if (response.StatusCode == HttpStatusCode.NotFound)
             return false;
         await EnsureSuccessWithApiResponseAsync(response);
-        return true;
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(cancellationToken);
+        return apiResponse?.Success == true && apiResponse.Data;
     }
 }

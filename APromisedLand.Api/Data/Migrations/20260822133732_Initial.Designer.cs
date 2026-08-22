@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(DiberyDbContext))]
-    [Migration("20260821203738_Initial")]
+    [Migration("20260822133732_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -1735,10 +1735,25 @@ namespace APromisedLand.Api.Data.Migrations
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
 
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.ToTable("TableAttributeValues", (string)null);
+                });
+
+            modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TableRowAttributeValue", b =>
+                {
+                    b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
+
                     b.Property<int?>("RowNo")
                         .HasColumnType("integer");
 
-                    b.ToTable("TableAttributeValues", (string)null);
+                    b.Property<string>("TableId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.ToTable("TableRowAttributeValues", (string)null);
                 });
 
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TextAttributeValue", b =>

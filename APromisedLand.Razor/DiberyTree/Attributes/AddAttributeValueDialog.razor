@@ -85,7 +85,9 @@
                         break;
                     case AttributeTypeEnum.表格:
                         <MudItem xs="12">
-                            <MudText>表格值类型输入控件待实现</MudText>
+                            <TableValue @bind-Value="@TableName"
+                                        TItem="@TItem"
+                                        DefinitionDto="@DefinitionDto"/>
                         </MudItem>
                         break;
                     default:
@@ -112,20 +114,10 @@
     [Parameter] public string? FileUrl { get; set; }
     [Parameter] public double? Latitude { get; set; }
     [Parameter] public double? Longitude { get; set; }
+    [Parameter] public string? TableName { get; set; }
 
     private List<AttributeDefinitionDto>? DefinitionDtos;
-
-    // 各类型值字段
-    // private string? _textValue;
-    // private long? _integerValue;
-    // private decimal? _decimalValue;
-    // private DateTimeOffset? _dateValue;
-    // private TimeSpan? _timeValue;
-    // private DateTimeOffset? _dateTimeValue;
-    // private string? _fileUrl;
-    // private double? _latitude;
-    // private double? _longitude;
-
+    
     protected override async Task OnInitializedAsync()
     {
         try
@@ -147,109 +139,91 @@
             return;
         }
 
-        // 根据类型检查对应的值是否填写
-        switch (DefinitionDto.AttributeType)
-        {
-            case AttributeTypeEnum.文本:
-                if (string.IsNullOrWhiteSpace(TextValue))
-                {
-                    Snackbar.Add("请输入文本值", Severity.Warning);
-                    return;
-                }
-
-                break;
-            case AttributeTypeEnum.整数:
-                if (!IntegerValue.HasValue)
-                {
-                    Snackbar.Add("请输入整数值", Severity.Warning);
-                    return;
-                }
-
-                break;
-            case AttributeTypeEnum.小数:
-                if (!DecimalValue.HasValue)
-                {
-                    Snackbar.Add("请输入小数值", Severity.Warning);
-                    return;
-                }
-
-                break;
-            case AttributeTypeEnum.日期:
-                if (!DateValue.HasValue)
-                {
-                    Snackbar.Add("请选择日期", Severity.Warning);
-                    return;
-                }
-
-                break;
-            case AttributeTypeEnum.时间:
-                if (!TimeValue.HasValue)
-                {
-                    Snackbar.Add("请选择时间", Severity.Warning);
-                    return;
-                }
-
-                break;
-            case AttributeTypeEnum.日期时间:
-                if (!DateTimeValue.HasValue)
-                {
-                    Snackbar.Add("请选择日期时间", Severity.Warning);
-                    return;
-                }
-
-                break;
-            case AttributeTypeEnum.文件:
-                if (string.IsNullOrWhiteSpace(FileUrl))
-                {
-                    Snackbar.Add("请上传文件", Severity.Warning);
-                    return;
-                }
-
-                break;
-            case AttributeTypeEnum.定位:
-                if (!Latitude.HasValue || !Longitude.HasValue)
-                {
-                    Snackbar.Add("请输入经纬度", Severity.Warning);
-                    return;
-                }
-
-                break;
-            case AttributeTypeEnum.表格:
-                
-                break;
-            default:
-                Snackbar.Add("不支持的属性类型", Severity.Warning);
-                return;
-        }
-
         try
         {
             JsonElement valueElement;
             switch (DefinitionDto.AttributeType)
             {
                 case AttributeTypeEnum.文本:
+                    if (string.IsNullOrWhiteSpace(TextValue))
+                    {
+                        Snackbar.Add("请输入文本值", Severity.Warning);
+                        return;
+                    }
+
                     valueElement = JsonSerializer.SerializeToElement(TextValue);
                     break;
                 case AttributeTypeEnum.整数:
+                    if (!IntegerValue.HasValue)
+                    {
+                        Snackbar.Add("请输入整数值", Severity.Warning);
+                        return;
+                    }
+
                     valueElement = JsonSerializer.SerializeToElement(IntegerValue);
                     break;
                 case AttributeTypeEnum.小数:
+                    if (!DecimalValue.HasValue)
+                    {
+                        Snackbar.Add("请输入小数值", Severity.Warning);
+                        return;
+                    }
+
                     valueElement = JsonSerializer.SerializeToElement(DecimalValue);
                     break;
                 case AttributeTypeEnum.日期:
+                    if (!DateValue.HasValue)
+                    {
+                        Snackbar.Add("请选择日期", Severity.Warning);
+                        return;
+                    }
+
                     valueElement = JsonSerializer.SerializeToElement(DateValue!.Value.ToString("yyyy-MM-dd"));
                     break;
                 case AttributeTypeEnum.时间:
+                    if (!TimeValue.HasValue)
+                    {
+                        Snackbar.Add("请选择时间", Severity.Warning);
+                        return;
+                    }
+
                     valueElement = JsonSerializer.SerializeToElement(TimeValue!.Value.ToString(@"hh\:mm\:ss"));
                     break;
                 case AttributeTypeEnum.日期时间:
+                    if (!DateTimeValue.HasValue)
+                    {
+                        Snackbar.Add("请选择日期时间", Severity.Warning);
+                        return;
+                    }
+
                     valueElement = JsonSerializer.SerializeToElement(DateTimeValue!.Value.ToString("O"));
                     break;
                 case AttributeTypeEnum.文件:
+                    if (string.IsNullOrWhiteSpace(FileUrl))
+                    {
+                        Snackbar.Add("请上传文件", Severity.Warning);
+                        return;
+                    }
+
                     valueElement = JsonSerializer.SerializeToElement(FileUrl);
                     break;
                 case AttributeTypeEnum.定位:
+                    if (!Latitude.HasValue || !Longitude.HasValue)
+                    {
+                        Snackbar.Add("请输入经纬度", Severity.Warning);
+                        return;
+                    }
+
                     valueElement = JsonSerializer.SerializeToElement(new { latitude = Latitude!.Value, longitude = Longitude!.Value });
+                    break;
+                case AttributeTypeEnum.表格:
+                    if (string.IsNullOrWhiteSpace(TableName))
+                    {
+                        Snackbar.Add("请输入表格名称", Severity.Warning);
+                        return;
+                    }
+
+                    valueElement = JsonSerializer.SerializeToElement(TableName);
                     break;
                 default:
                     throw new NotSupportedException($"不支持的类型 {DefinitionDto.AttributeType}");

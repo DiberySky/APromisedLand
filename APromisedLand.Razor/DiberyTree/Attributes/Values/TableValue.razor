@@ -1,0 +1,49 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+<AttributeValueSky TItem="@TItem"
+                   NodeId="@NodeId"
+                   ValueId="@ValueId"
+                   @bind-JsonValue="@JsonValue"
+                   DefinitionDto="@DefinitionDto"
+                   ReadOnly="@ReadOnly">
+    <ValueContent>
+        <MudTextField T="string"
+                      Value="@Value"
+                      Label="表格名称"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      RequiredError="表格名称不能为空"
+                      MaxLength="50"
+                      Counter="50"
+                      ReadOnly="@ReadOnly"
+                      ValueChanged="@(HandleValueChanged)"/>
+    </ValueContent>
+</AttributeValueSky>
+
+@code {
+    [Parameter] public required string? NodeId { get; set; }
+    [Parameter] public string? ValueId { get; set; }
+    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private JsonElement? JsonValue { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Value ??= DefinitionDto?.Name;
+
+        JsonValue = JsonSerializer.SerializeToElement(Value);
+
+        base.OnInitialized();
+    }
+
+    private void HandleValueChanged(string? value)
+    {
+        Value = value;
+        _ = ValueChanged.InvokeAsync(Value);
+
+        JsonValue = value is not null ? JsonSerializer.SerializeToElement(value) : null;
+    }
+}

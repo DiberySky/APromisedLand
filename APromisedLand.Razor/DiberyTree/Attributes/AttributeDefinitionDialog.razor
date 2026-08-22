@@ -110,7 +110,6 @@
 
     // private AttributeType _attributeType = new();
     private UnitTree? _unit;
-
     private MudForm? _form;
     private FormModel _model = new();
     private AttributeTypeEnum _selectedType = AttributeTypeEnum.文本;
@@ -141,7 +140,7 @@
             {
                 Name = string.Empty,
                 AttributeType = AttributeTypeEnum.文本,
-                MaxLength = 0,
+                MaxLength = 30,
                 Lines = 1,
                 Precision = 7,
                 Scale = 3,
@@ -155,7 +154,7 @@
     private async Task SelectedValuesChanged(IReadOnlyCollection<AttributeTypeEnum>? value)
     {
         if (value == null) return;
-        
+
         // _selectedType = value.FirstOrDefault();
 
         switch (value.FirstOrDefault())
@@ -171,7 +170,7 @@
     private async Task HandleSubmitAsync()
     {
         if (_form == null || _model.AttributeType == null) return;
-        
+
         await _form.ValidateAsync();
 
         if (!_form.IsValid) return;
@@ -179,9 +178,9 @@
         try
         {
             _model.AttributeType = _selectedType;
-            
+
             _model.UnitId = _unit?.Id;
-            
+
             if (TableId == null)
             {
                 if (IsEdit)
@@ -223,33 +222,33 @@
             {
                 if (IsEdit)
                 {
-                    await AttributeApiClient.UpdateDefinitionAsync(EditItem!.Id, 
+                    await AttributeApiClient.UpdateDefinitionAsync(EditItem!.Id,
                         new AttributeDefinitionUpdateDto
-                    {
-                        Name = _model.Name,
-                        MaxLength = _model.MaxLength,
-                        Lines = _model.Lines,
-                        Precision = _model.Precision,
-                        Scale = _model.Scale,
-                        UnitId = _model.UnitId
-                    });
+                        {
+                            Name = _model.Name,
+                            MaxLength = _model.MaxLength,
+                            Lines = _model.Lines,
+                            Precision = _model.Precision,
+                            Scale = _model.Scale,
+                            UnitId = _model.UnitId
+                        });
                     Snackbar.Add("列更新成功", Severity.Success);
                 }
                 else
                 {
                     // 新 API：ParentId 由路由 tableId 确定，body 不传（后端强制注入 + 校验列≠表格类型）
-                    await AttributeApiClient.CreateTableColumnAsync(TableId, 
+                    await AttributeApiClient.CreateTableColumnAsync(TableId,
                         new AttributeDefinitionCreateDto
-                    {
-                        Name = _model.Name,
-                        AttributeType = _model.AttributeType.Value,
-                        MaxLength = _model.MaxLength,
-                        Lines = _model.Lines,
-                        Precision = _model.Precision,
-                        Scale = _model.Scale,
-                        UnitId = _model.UnitId,
-                        ParentId = TableId
-                    });
+                        {
+                            Name = _model.Name,
+                            AttributeType = _model.AttributeType.Value,
+                            MaxLength = _model.MaxLength,
+                            Lines = _model.Lines,
+                            Precision = _model.Precision,
+                            Scale = _model.Scale,
+                            UnitId = _model.UnitId,
+                            ParentId = TableId
+                        });
                     Snackbar.Add("列创建成功", Severity.Success);
                 }
             }
@@ -296,10 +295,10 @@
     {
         public string Name { get; set; } = string.Empty;
         public AttributeTypeEnum? AttributeType { get; set; }
-        public int? MaxLength { get; set; }
-        public int? Lines { get; set; }
-        public int? Precision { get; set; }
-        public int? Scale { get; set; }
+        public int? MaxLength { get; set; } = 30;
+        public int? Lines { get; set; } = 1;
+        public int? Precision { get; set; } = 10;
+        public int? Scale { get; set; } = 2;
         public string? UnitId { get; set; }
     }
 

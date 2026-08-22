@@ -22,8 +22,10 @@ public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) 
     public DbSet<DateTimeAttributeValue> DateTimeAttributeValues => Set<DateTimeAttributeValue>();
     public DbSet<FileAttributeValue> FileAttributeValues => Set<FileAttributeValue>();
     public DbSet<LocationAttributeValue> LocationAttributeValues => Set<LocationAttributeValue>();
-    // 动态表类型行实例值（表属性的一行实例）
     public DbSet<TableAttributeValue> TableAttributeValues => Set<TableAttributeValue>();
+
+    // 动态表类型行实例值（表属性的一行实例）
+    public DbSet<TableRowAttributeValue> TableRowAttributeValues => Set<TableRowAttributeValue>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -140,6 +142,12 @@ public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) 
         modelBuilder.Entity<LocationAttributeValue>(entity =>
         {
             entity.ToTable("LocationAttributeValues");
+        });
+        
+        modelBuilder.Entity<TableAttributeValue>(entity =>
+        {
+            entity.ToTable("TableAttributeValues");
+            entity.Property(e => e.Value).IsRequired();
         });
 
         OnModelCreatingPartial(modelBuilder);

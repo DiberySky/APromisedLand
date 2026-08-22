@@ -11,16 +11,17 @@ public partial class DiberyDbContext
 {
     /// <summary>
     /// 注册动态表相关的实体配置：
-    /// <para>1) <see cref="TableAttributeValue"/> 行实例表（TPC 派生类型）；</para>
+    /// <para>1) <see cref="APromisedLand.Shared.DiberyTree.Attributes.Models.TableRowAttributeValue"/> 行实例表（TPC 派生类型）；</para>
     /// <para>2) <see cref="AttributeDefinition"/> 的 <c>ParentId</c> 自引用关系（表定义 ↔ 列定义）。</para>
     /// </summary>
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
-        // ------ TableAttributeValue：表类型属性的“行实例”值 ------
+        // ------ TableRowAttributeValue：表类型属性的“行实例”值 ------
         // 根类型 AttributeValueBase 已在主文件配置为 TPC，此处仅声明派生表名与额外字段。
-        modelBuilder.Entity<TableAttributeValue>(entity =>
+        modelBuilder.Entity<TableRowAttributeValue>(entity =>
         {
-            entity.ToTable("TableAttributeValues");
+            entity.ToTable("TableRowAttributeValues");
+            entity.Property(e => e.TableId).HasMaxLength(36);
             entity.Property(e => e.RowNo);
         });
 

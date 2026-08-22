@@ -15,18 +15,24 @@
             <MudContainer class="my-4">
 
                 <MudTextField @bind-Value="_model.Name"
-                              Label="表格名称"
+                              Label="表格类型名称"
                               Variant="Variant.Outlined"
                               Required="true"
-                              RequiredError="表格名称不能为空"
-                              MaxLength="256"
-                              Counter="256"/>
+                              RequiredError="表格类型名称不能为空"
+                              MaxLength="50"
+                              Counter="50"/>
 
-                <AttributeTableColumnsSky TItem="@TItem" TableId="@Table!.Id"/>
+                <AttributeTableColumnsSky TItem="@TItem" TableId="@Table!.Id"
+                                          @bind-Deletable="@_deletable"/>
 
             </MudContainer>
         </MudForm>
     </DialogContent>
+    <DialogLeftActions>
+        <MudSwitch T="bool" @bind-Value="@_deletable"
+                   Size="Size.Small"
+                   Label="允许删除" Color="Color.Error"/>
+    </DialogLeftActions>
 </DialogSky>
 
 @code {
@@ -37,6 +43,7 @@
     private MudForm? _form;
     private FormModel _model = new();
     private AttributeTypeEnum _tableType;
+    private bool _deletable;
 
     private bool IsEdit => Table != null;
 
@@ -58,7 +65,7 @@
 
         if (_tableType == null)
         {
-            Snackbar.Add("未找到「表」类型定义", Severity.Error);
+            Snackbar.Add("未找到「表格」类型定义", Severity.Error);
             return;
         }
 

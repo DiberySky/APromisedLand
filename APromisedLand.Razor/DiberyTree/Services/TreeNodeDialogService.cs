@@ -496,7 +496,7 @@ public class TreeNodeDialogService<TItem>(
     {
         var parameters = new DialogParameters<AttributeDefinitionListDialog<TItem>>
         {
-             { x => x.ReadOnly, false }
+             { x => x.ReadOnly, true }
         };
 
         var options = (config ?? new DialogConfig

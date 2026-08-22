@@ -32,6 +32,7 @@ public class AttributeDefinitionService(DiberyDbContext db)
     public async Task<IReadOnlyList<AttributeDefinitionDto>> GetAllAsync()
     {
         var list = await db.AttributeDefinitions
+            .Where(x  => x.ParentId == null)
             // 移除了 .Include(d => d.AttributeType)
             .Include(d => d.Unit)
             .AsNoTracking()
@@ -214,7 +215,7 @@ public class AttributeDefinitionService(DiberyDbContext db)
         if (await db.DateTimeAttributeValues.AnyAsync(v => v.AttributeDefinitionId == defId)) return true;
         if (await db.FileAttributeValues.AnyAsync(v => v.AttributeDefinitionId == defId)) return true;
         if (await db.LocationAttributeValues.AnyAsync(v => v.AttributeDefinitionId == defId)) return true;
-        if (await db.TableAttributeValues.AnyAsync(v => v.AttributeDefinitionId == defId)) return true;
+        if (await db.TableRowAttributeValues.AnyAsync(v => v.AttributeDefinitionId == defId)) return true;
         return false;
     }
 }

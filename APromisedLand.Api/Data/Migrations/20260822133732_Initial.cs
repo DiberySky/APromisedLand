@@ -125,11 +125,26 @@ namespace APromisedLand.Api.Data.Migrations
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    RowNo = table.Column<int>(type: "integer", nullable: true)
+                    Value = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_TableAttributeValues", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TableRowAttributeValues",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    TableId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    RowNo = table.Column<int>(type: "integer", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TableRowAttributeValues", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -476,6 +491,9 @@ namespace APromisedLand.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "TableAttributeValues");
+
+            migrationBuilder.DropTable(
+                name: "TableRowAttributeValues");
 
             migrationBuilder.DropTable(
                 name: "TextAttributeValues");

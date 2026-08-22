@@ -10,7 +10,7 @@ namespace APromisedLand.Api.Projects.DiberyTree.Services;
 
 /// <summary>
 /// 动态表数据（行实例 + 列值）的业务服务。
-/// <para>行实例 = <see cref="TableAttributeValue"/>（AttributeDefinitionId=表定义, NodeId=表定义）；
+/// <para>行实例 = <see cref="APromisedLand.Shared.DiberyTree.Attributes.Models.TableRowAttributeValue"/>（AttributeDefinitionId=表定义, NodeId=表定义）；
 /// 列值复用各 Typed AttributeValue 表（NodeId=行实例 Id, AttributeDefinitionId=列定义）。</para>
 /// 列值经 <see cref="ValueValidator"/> 校验后写入对应 typed value 表。
 /// </summary>
@@ -54,10 +54,10 @@ public class AttributeTableValueService(DiberyDbContext db)
 
         // 4. 生成行 ID 和行号
         var rowId = Guid.NewGuid().ToString();
-        var rowNo = await db.TableAttributeValues.CountAsync(r => r.AttributeDefinitionId == tableDefId) + 1;
+        var rowNo = await db.TableRowAttributeValues.CountAsync(r => r.AttributeDefinitionId == tableDefId) + 1;
 
         // 5. 添加行实例
-        db.TableAttributeValues.Add(new TableAttributeValue
+        db.TableRowAttributeValues.Add(new TableRowAttributeValue
         {
             Id = rowId,
             NodeId = tableDefId,
@@ -83,7 +83,7 @@ public class AttributeTableValueService(DiberyDbContext db)
     /// <summary>列出指定表的所有行实例（含各列值），按 RowNo 排序。</summary>
     public async Task<List<TableRowDto>> ListRowsAsync(string tableDefId)
     {
-        var rows = await db.TableAttributeValues.AsNoTracking()
+        var rows = await db.TableRowAttributeValues.AsNoTracking()
             .Where(r => r.AttributeDefinitionId == tableDefId)
             .OrderBy(r => r.RowNo).ToListAsync();
         if (rows.Count == 0) return new();
@@ -112,7 +112,7 @@ public class AttributeTableValueService(DiberyDbContext db)
     /// <summary>取单行实例（含各列值）。</summary>
     public async Task<TableRowDto?> GetRowAsync(string rowId)
     {
-        var row = await db.TableAttributeValues.AsNoTracking()
+        var row = await db.TableRowAttributeValues.AsNoTracking()
             .FirstOrDefaultAsync(r => r.Id == rowId);
         if (row is null) return null;
 
@@ -141,7 +141,7 @@ public class AttributeTableValueService(DiberyDbContext db)
     /// <summary>更新某行实例的列值（先删旧列值，再重建）。</summary>
     public async Task<string?> UpdateRowAsync(string rowId, Dictionary<string, JsonElement> values)
     {
-        var row = await db.TableAttributeValues.FindAsync(rowId);
+        var row = await db.TableRowAttributeValues.FindAsync(rowId);
         if (row is null) return $"行 '{rowId}' 不存在";
 
         var columns = await db.AttributeDefinitions
@@ -171,11 +171,11 @@ public class AttributeTableValueService(DiberyDbContext db)
     /// <summary>删除行实例及其所有列值。</summary>
     public async Task<string?> DeleteRowAsync(string rowId)
     {
-        var row = await db.TableAttributeValues.FindAsync(rowId);
+        var row = await db.TableRowAttributeValues.FindAsync(rowId);
         if (row is null) return $"行 '{rowId}' 不存在";
 
         DeleteCells(rowId);
-        db.TableAttributeValues.Remove(row);
+        db.TableRowAttributeValues.Remove(row);
         await db.SaveChangesAsync();
         return null;
     }
@@ -193,6 +193,7 @@ public class AttributeTableValueService(DiberyDbContext db)
         await AddCells(db.DateTimeAttributeValues, ids, map);
         await AddCells(db.FileAttributeValues, ids, map);
         await AddCells(db.LocationAttributeValues, ids, map);
+        await AddCells(db.TableAttributeValues, ids, map);
         return map;
     }
 
@@ -215,6 +216,7 @@ public class AttributeTableValueService(DiberyDbContext db)
         db.DateTimeAttributeValues.RemoveRange(db.DateTimeAttributeValues.Where(c => c.NodeId == rowId));
         db.FileAttributeValues.RemoveRange(db.FileAttributeValues.Where(c => c.NodeId == rowId));
         db.LocationAttributeValues.RemoveRange(db.LocationAttributeValues.Where(c => c.NodeId == rowId));
+        db.TableAttributeValues.RemoveRange(db.TableAttributeValues.Where(c => c.NodeId == rowId));
     }
 
     // ---------- 辅助：把值实体加到对应 DbSet ----------
@@ -230,6 +232,7 @@ public class AttributeTableValueService(DiberyDbContext db)
             case DateTimeAttributeValue dtt: db.DateTimeAttributeValues.Add(dtt); break;
             case FileAttributeValue f: db.FileAttributeValues.Add(f); break;
             case LocationAttributeValue l: db.LocationAttributeValues.Add(l); break;
+            case TableAttributeValue tv: db.TableAttributeValues.Add(tv); break;
             default: throw new InvalidOperationException($"未知值实体类型 {entity.GetType().Name}");
         }
     }
@@ -245,6 +248,7 @@ public class AttributeTableValueService(DiberyDbContext db)
         DateTimeAttributeValue dtt => dtt.Value,
         FileAttributeValue f => f.Value,
         LocationAttributeValue l => new { l.Latitude, l.Longitude },
+        TableAttributeValue tv => tv.Value,
         _ => null
     };
 }

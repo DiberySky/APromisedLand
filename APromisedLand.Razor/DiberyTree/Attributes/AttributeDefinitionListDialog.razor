@@ -32,8 +32,8 @@
                       Breakpoint="Breakpoint.Sm"
                       SelectedItemChanged="@SelectedItemChanged">
                 <GroupHeaderTemplate>
-                    <MudTh Class="mud-table-cell-custom-group" colspan="3">
-                        @($"{context.GroupName} => {context.Key}")
+                    <MudTh Class="mud-table-cell-custom-group" colspan="7">
+                        @($"{context.GroupName} => {context.Key?.ToString().ToAttributeTypeName()}")
                     </MudTh>
                 </GroupHeaderTemplate>
                 <HeaderContent>
@@ -100,6 +100,10 @@
                                            Color="Color.Primary"
                                            Size="Size.Small"
                                            OnClick="() => OpenDialogAsync(context)"/>
+                            <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                                           Color="Color.Success"
+                                           Size="Size.Small"
+                                           OnClick="() => SelectedItemChanged(context)"/>
                         </MudTd>
                     }
                 </RowTemplate>
@@ -114,7 +118,7 @@
         {
             <MudSwitch T="bool" @bind-Value="@_deleteable"
                        Size="Size.Small"
-                       Label="可删除" Color="Color.Error"/>
+                       Label="允许删除" Color="Color.Error"/>
         }
     </DialogLeftActions>
 </DialogSky>

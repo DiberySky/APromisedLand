@@ -1732,10 +1732,25 @@ namespace APromisedLand.Api.Data.Migrations
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
 
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.ToTable("TableAttributeValues", (string)null);
+                });
+
+            modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TableRowAttributeValue", b =>
+                {
+                    b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
+
                     b.Property<int?>("RowNo")
                         .HasColumnType("integer");
 
-                    b.ToTable("TableAttributeValues", (string)null);
+                    b.Property<string>("TableId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.ToTable("TableRowAttributeValues", (string)null);
                 });
 
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TextAttributeValue", b =>

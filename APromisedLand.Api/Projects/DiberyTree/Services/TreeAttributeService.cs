@@ -19,39 +19,40 @@ public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttribu
     public async Task<IReadOnlyList<AttributeDefinitionDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var query = from def in dbContext.AttributeDefinitions
-                    join unit in dbContext.UnitTrees on def.UnitId equals unit.Id into units
-                    from u in units.DefaultIfEmpty()
-                    select new AttributeDefinitionDto
-                    {
-                        Id = def.Id,
-                        Name = def.Name,
-                        AttributeType = def.AttributeTypeId.ToAttributeTypeEnum(),
-                        MaxLength = def.MaxLength,
-                        Lines = def.Lines,
-                        Precision = def.Precision,
-                        Scale = def.Scale,
-                        Unit = u
-                    };
+            where def.ParentId == null
+            join unit in dbContext.UnitTrees on def.UnitId equals unit.Id into units
+            from u in units.DefaultIfEmpty()
+            select new AttributeDefinitionDto
+            {
+                Id = def.Id,
+                Name = def.Name,
+                AttributeType = def.AttributeTypeId.ToAttributeTypeEnum(),
+                MaxLength = def.MaxLength,
+                Lines = def.Lines,
+                Precision = def.Precision,
+                Scale = def.Scale,
+                Unit = u
+            };
         return await query.ToListAsync(cancellationToken);
     }
 
     public async Task<AttributeDefinitionDto?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
     {
         var query = from def in dbContext.AttributeDefinitions
-                    where def.Id == id
-                    join unit in dbContext.UnitTrees on def.UnitId equals unit.Id into units
-                    from u in units.DefaultIfEmpty()
-                    select new AttributeDefinitionDto
-                    {
-                        Id = def.Id,
-                        Name = def.Name,
-                        AttributeType = def.AttributeTypeId.ToAttributeTypeEnum(),  
-                        MaxLength = def.MaxLength,
-                        Lines = def.Lines,
-                        Precision = def.Precision,
-                        Scale = def.Scale,
-                        Unit = u
-                    };
+            where def.Id == id
+            join unit in dbContext.UnitTrees on def.UnitId equals unit.Id into units
+            from u in units.DefaultIfEmpty()
+            select new AttributeDefinitionDto
+            {
+                Id = def.Id,
+                Name = def.Name,
+                AttributeType = def.AttributeTypeId.ToAttributeTypeEnum(),
+                MaxLength = def.MaxLength,
+                Lines = def.Lines,
+                Precision = def.Precision,
+                Scale = def.Scale,
+                Unit = u
+            };
         return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -119,7 +120,8 @@ public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttribu
             || await dbContext.TimeAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
             || await dbContext.DateTimeAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
             || await dbContext.FileAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
-            || await dbContext.LocationAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken);
+            || await dbContext.LocationAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken)
+            || await dbContext.TableAttributeValues.AnyAsync(v => v.AttributeDefinitionId == id, cancellationToken);
 
         if (hasReferences)
             throw new InvalidOperationException("无法删除定义，因为它正被一个或多个节点属性值使用。");
@@ -179,6 +181,7 @@ public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttribu
             case DateTimeAttributeValue dtav: await dbContext.DateTimeAttributeValues.AddAsync(dtav); break;
             case FileAttributeValue fav: await dbContext.FileAttributeValues.AddAsync(fav); break;
             case LocationAttributeValue lav: await dbContext.LocationAttributeValues.AddAsync(lav); break;
+            case TableAttributeValue tv: await dbContext.TableAttributeValues.AddAsync(tv); break;
             default: throw new NotSupportedException($"不支持的值类型 '{entity.GetType().Name}'。");
         }
 
@@ -208,6 +211,7 @@ public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttribu
         list.AddRange(await QueryValues<DateTimeAttributeValue>(nodeId));
         list.AddRange(await QueryValues<FileAttributeValue>(nodeId));
         list.AddRange(await QueryValues<LocationAttributeValue>(nodeId));
+        list.AddRange(await QueryValues<TableAttributeValue>(nodeId));
         return new NodeDto { Id = nodeId, AttributeDtos = list };
     }
 
@@ -274,19 +278,25 @@ public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttribu
         var tasks = new Func<Task<AttributeValueBase?>>[]
         {
             async () => await dbContext.TextAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
-            async () => await dbContext.DecimalAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
-            async () => await dbContext.IntegerAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () =>
+                await dbContext.DecimalAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () =>
+                await dbContext.IntegerAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
             async () => await dbContext.DateAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
             async () => await dbContext.TimeAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
-            async () => await dbContext.DateTimeAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await dbContext.DateTimeAttributeValues.FirstOrDefaultAsync(v =>
+                v.NodeId == nodeId && v.Id == id),
             async () => await dbContext.FileAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
-            async () => await dbContext.LocationAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id)
+            async () => await dbContext.LocationAttributeValues.FirstOrDefaultAsync(v =>
+                v.NodeId == nodeId && v.Id == id),
+            async () => await dbContext.TableAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
         };
         foreach (var task in tasks)
         {
             var result = await task();
             if (result != null) return result;
         }
+
         return null;
     }
 
@@ -323,10 +333,12 @@ public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttribu
             if (info != null)
                 result.Add(MapToDto(v, info.Definition, info.AttributeType, info.Unit));
         }
+
         return result;
     }
 
-    private static AttributeDto MapToDto(AttributeValueBase v, AttributeDefinition? def, AttributeTypeEnum attrType, UnitTree? unit)
+    private static AttributeDto MapToDto(AttributeValueBase v, AttributeDefinition? def, AttributeTypeEnum attrType,
+        UnitTree? unit)
     {
         // 如果 def 不为空，可设置一个未映射的属性（若实体中有）
         // 但此处不需要，因为 DTO 已包含枚举
@@ -341,6 +353,7 @@ public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttribu
             DateTimeAttributeValue dtV => dtV.Value,
             FileAttributeValue fv => fv.Value,
             LocationAttributeValue lv => new { lv.Latitude, lv.Longitude },
+            TableAttributeValue tv => tv.Value,
             _ => null
         };
 
@@ -397,6 +410,10 @@ public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttribu
                 var lSource = (LocationAttributeValue)source;
                 lTarget.Latitude = lSource.Latitude;
                 lTarget.Longitude = lSource.Longitude;
+                break;
+            case TableAttributeValue tvTarget:
+                var tvSource = (TableAttributeValue)source;
+                tvTarget.Value = tvSource.Value;
                 break;
             default:
                 throw new NotSupportedException($"不支持的值类型 '{target.GetType().Name}'。");
