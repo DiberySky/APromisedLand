@@ -94,7 +94,7 @@ public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) 
                 .HasMaxLength(36)
                 .ValueGeneratedNever(); 
 
-            entity.Property(e => e.NodeId).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.NodeId).IsRequired().HasMaxLength(36);
             entity.Property(e => e.AttributeDefinitionId).IsRequired().HasMaxLength(36);
         });
 
@@ -148,6 +148,14 @@ public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) 
         {
             entity.ToTable("TableAttributeValues");
             entity.Property(e => e.Value).IsRequired();
+        });
+        
+        modelBuilder.Entity<TableRowAttributeValue>(entity =>
+        {
+            entity.ToTable("TableRowAttributeValues");
+            entity.Property(e => e.NodeId).IsRequired().HasMaxLength(36);
+            entity.Property(e => e.TableId).IsRequired().HasMaxLength(36);
+            entity.Property(e => e.AttributeDefinitionId).IsRequired().HasMaxLength(36);
         });
 
         OnModelCreatingPartial(modelBuilder);

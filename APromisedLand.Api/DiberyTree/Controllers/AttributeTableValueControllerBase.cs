@@ -20,16 +20,29 @@ public abstract class AttributeTableValueControllerBase(
 {
     // ==================== 表行数据 ====================
 
-    [HttpPost("{tableId}/rows")]
+    [HttpPost("node/{nodeId}/table/{tableId}/definition/{tableDefId}/rows")]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> AddRow(string tableId, [FromBody] AddTableRowDto dto)
+    public virtual async Task<IActionResult> AddRow(string nodeId, string tableId, string tableDefId,
+        [FromBody] AddTableRowDto dto)
     {
         try
         {
-            var row = await valueService.AddRowAsync(tableId, dto.Values);
-            return CreatedAtAction(nameof(GetRow), new { rowId = row.RowId }, ApiResponse<bool>.Ok(true));
+            logger.LogInformation("新增表行, NodeId: {NodeId}, TableId: {TableId}, TableDefId: {TableDefId}", nodeId, tableId, tableDefId);
+            var (rowId, error) = await valueService.AddRowAsync(nodeId, tableId, tableDefId, dto.Values);
+            logger.LogInformation("新增表行成功, RowId: {RowId}", rowId);
+            
+            if (!string.IsNullOrEmpty(error))
+                return BadRequest(ApiResponse<object>.Fail(error));
+            
+            // 返回新创建的行数据
+            var row = await valueService.GetRowAsync(rowId!);
+            return Ok(ApiResponse<TableRowDto>.Ok(row!));
+            return CreatedAtAction(nameof(GetRow), new { rowId }, ApiResponse<TableRowDto>.Ok(row!));
+
+            // var row = await valueService.AddRowAsync(nodeId, tableId, tableDefId, dto.Values);
+            // return CreatedAtAction(nameof(GetRow), new { rowId = row.RowId }, ApiResponse<bool>.Ok(true));
         }
         catch (KeyNotFoundException ex)
         {

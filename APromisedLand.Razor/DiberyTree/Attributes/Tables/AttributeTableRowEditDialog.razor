@@ -74,6 +74,9 @@
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required string NodeId { get; set; }
+    [Parameter] public required string TableId { get; set; }
     [Parameter] public required AttributeDefinitionDto TableDefinitionDto { get; set; }
     [Parameter] public required List<AttributeDefinitionDto> Columns { get; set; } 
     [Parameter] public TableRowDto? EditRow { get; set; }
@@ -128,9 +131,9 @@
         try
         {
             if (IsEdit)
-                await TableValueApiClient.UpdateRowAsync(EditRow!.RowId, dict);
+                await TableValueApiClient.UpdateRowAsync(TableId, EditRow!.RowId, dict);
             else
-                await TableValueApiClient.AddRowAsync(TableDefinitionDto!.Id, dict);
+                await TableValueApiClient.AddRowAsync(NodeId, TableId, TableDefinitionDto!.Id, dict);
 
             Snackbar.Add("保存成功", Severity.Success);
             MudDialog?.Close(DialogResult.Ok(true));

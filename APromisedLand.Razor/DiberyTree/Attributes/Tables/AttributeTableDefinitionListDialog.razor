@@ -21,7 +21,7 @@
     <DialogContent>
         <MudContainer>
             <MudTable T="AttributeDefinitionDto"
-                      Items="_tables"
+                      Items="_tableDefinitions"
                       Dense="true"
                       Hover="true"
                       Loading="_loading"
@@ -64,7 +64,10 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    private List<AttributeDefinitionDto> _tables = new();
+    [Parameter] public required string NodeId { get; set; }
+    [Parameter] public required string TableId { get; set; }
+
+    private List<AttributeDefinitionDto> _tableDefinitions = new();
     private bool _loading;
 
     protected override async Task OnInitializedAsync() => await LoadDataAsync();
@@ -76,7 +79,7 @@
         {
             // 新 API：服务端过滤表定义（ParentId=null 且 AttributeType=表格）+ 按名称排序
             var list = await AttributeApiClient.ListTablesAsync();
-            _tables = [.. list];
+            _tableDefinitions = [.. list];
         }
         catch (Exception ex)
         {
@@ -85,29 +88,42 @@
         finally { _loading = false; }
     }
 
-    private async Task OpenTableDialogAsync(AttributeDefinitionDto? item)
+    private async Task OpenTableDialogAsync(AttributeDefinitionDto? definitionDto)
     {
         var parameters = new DialogParameters<AttributeTableDefinitionDialog<TItem>>
         {
-            { x => x.Table, item }
+            { x => x.TableId, TableId },
+            { x => x.TableDefinitionDto, definitionDto }
         };
         var dialog = await DialogService.ShowAsync<AttributeTableDefinitionDialog<TItem>>(
-            item == null ? "新建表" : "编辑表", parameters);
+            definitionDto == null ? "新建表" : "编辑表", parameters);
+        
         var result = await dialog.Result;
         if (!result.Canceled) await LoadDataAsync();
     }
 
-    private async Task OpenColumnsAsync(AttributeDefinitionDto table)
+    private async Task OpenColumnsAsync(AttributeDefinitionDto tableDefinitionDto)
     {
-        var parameters = new DialogParameters<AttributeTableColumnsDialog<TItem>> { { x => x.Table, table } };
-        await (await DialogService.ShowAsync<AttributeTableColumnsDialog<TItem>>($"列管理 - {table.Name}", parameters)).Result;
+        var parameters = new DialogParameters<AttributeTableColumnsDialog<TItem>>
+        {
+            { x => x.TableId, TableId },
+            { x => x.TableDefinitionDto, tableDefinitionDto } 
+        };
+        
+        await (await DialogService.ShowAsync<AttributeTableColumnsDialog<TItem>>($"列管理 - {tableDefinitionDto.Name}", parameters)).Result;
+        
         await LoadDataAsync();
     }
 
-    private async Task OpenRowsAsync(AttributeDefinitionDto table)
+    private async Task OpenRowsAsync(AttributeDefinitionDto tableDefinitionDto)
     {
-        var parameters = new DialogParameters<AttributeTableRowsPanelDialog<TItem>> { { x => x.TableDefinitionDto, table } };
-        await (await DialogService.ShowAsync<AttributeTableRowsPanelDialog<TItem>>($"行数据 - {table.Name}", parameters)).Result;
+        var parameters = new DialogParameters<AttributeTableRowsPanelDialog<TItem>>
+        {
+            { x => x.TableId, TableId },
+            { x => x.TableDefinitionDto, tableDefinitionDto }
+        };
+        
+        await (await DialogService.ShowAsync<AttributeTableRowsPanelDialog<TItem>>($"行数据 - {tableDefinitionDto.Name}", parameters)).Result;
     }
 
     private async Task DeleteTableAsync(AttributeDefinitionDto table)

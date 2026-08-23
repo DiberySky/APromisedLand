@@ -5,7 +5,7 @@
 @inject ISnackbar Snackbar
 @inject MessageService Message
 
-<DialogSky Title="@($"列管理 - {Table?.Name}")"
+<DialogSky Title="@($"列管理 - {TableDefinitionDto?.Name}")"
            CancelButtonVisible="true"
            SubmitButtonVisible="false"
            OnCanceledClick="@(() => MudDialog?.Close(DialogResult.Cancel()))">
@@ -92,7 +92,9 @@
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
-    [Parameter] public AttributeDefinitionDto? Table { get; set; }
+    
+    [Parameter] public required string TableId { get; set; }
+    [Parameter] public AttributeDefinitionDto? TableDefinitionDto { get; set; }
 
     private MudForm? _form;
     private List<AttributeDefinitionDto> _columns = new();
@@ -117,7 +119,7 @@
         try
         {
             // 新 API：服务端过滤 ParentId + 按 Order 排序（已返回正确顺序）
-            var list = await AttributeApiClient.ListTableColumnsAsync(Table!.Id);
+            var list = await AttributeApiClient.ListTableColumnsAsync(TableDefinitionDto!.Id);
             _columns = [.. list];
         }
         catch (Exception ex) { Snackbar.Add($"加载列失败: {ex.Message}", Severity.Error); }
@@ -170,7 +172,7 @@
             else
             {
                 // 新 API：ParentId 由路由 tableId 确定，body 不传（后端强制注入 + 校验列≠表格类型）
-                await AttributeApiClient.CreateTableColumnAsync(Table!.Id, new AttributeDefinitionCreateDto
+                await AttributeApiClient.CreateTableColumnAsync(TableDefinitionDto!.Id, new AttributeDefinitionCreateDto
                 {
                     Name = _model.Name,
                     AttributeType = type,

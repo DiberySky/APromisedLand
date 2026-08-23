@@ -22,7 +22,7 @@
                               MaxLength="50"
                               Counter="50"/>
 
-                <AttributeTableColumnsSky TItem="@TItem" TableId="@Table!.Id"
+                <AttributeTableColumnsSky TItem="@TItem" TableId="@TableDefinitionDto!.Id"
                                           @bind-Deletable="@_deletable"/>
 
             </MudContainer>
@@ -38,23 +38,25 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    [Parameter] public AttributeDefinitionDto? Table { get; set; }
+    [Parameter] public required string NodeId { get; set; }
+    [Parameter] public required string TableId { get; set; }
+    [Parameter] public AttributeDefinitionDto? TableDefinitionDto { get; set; }
 
     private MudForm? _form;
     private FormModel _model = new();
     private AttributeTypeEnum _tableType;
     private bool _deletable;
 
-    private bool IsEdit => Table != null;
+    private bool IsEdit => TableDefinitionDto != null;
 
     protected override void OnInitialized()
     {
         // var types = await AttributeApiClient.GetAttributeTypesAsync();
         // _tableType = types.FirstOrDefault(t => t.SystemType == AttributeTypeEnum.表格);
 
-        _tableType = Table?.AttributeType ?? AttributeTypeEnum.表格;
+        _tableType = TableDefinitionDto?.AttributeType ?? AttributeTypeEnum.表格;
         
-        _model.Name = Table?.Name ?? string.Empty;
+        _model.Name = TableDefinitionDto?.Name ?? string.Empty;
     }
     
     private async Task HandleSubmitAsync()
@@ -73,7 +75,7 @@
         {
             if (IsEdit)
             {
-                await AttributeApiClient.UpdateDefinitionAsync(Table!.Id,
+                await AttributeApiClient.UpdateDefinitionAsync(TableDefinitionDto!.Id,
                     new AttributeDefinitionUpdateDto { Name = _model.Name });
                 Snackbar.Add("表更新成功", Severity.Success);
             }

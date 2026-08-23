@@ -9,9 +9,9 @@
     <ItemGroup>
         <PackageReference Include="Aspire.Elastic.Clients.Elasticsearch" Version="13.3.0" />
         <PackageReference Include="Aspire.Keycloak.Authentication" Version="13.4.6-preview.1.26319.6" />
-        <PackageReference Include="Aspire.NATS.Net" Version="13.5.0" />
-        <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.5.0" />
-        <PackageReference Include="Aspire.StackExchange.Redis" Version="13.5.0" />
+        <PackageReference Include="Aspire.NATS.Net" Version="13.5.2" />
+        <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.5.2" />
+        <PackageReference Include="Aspire.StackExchange.Redis" Version="13.5.2" />
         <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.5.0" />
         <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
@@ -21,8 +21,8 @@
         </PackageReference>
         <PackageReference Include="OllamaSharp" Version="5.4.30" />
         <PackageReference Include="Typesense" Version="8.5.0" />
-        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.29.1" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.29.1" />
+        <PackageReference Include="WolverineFx.RabbitMQ" Version="6.29.2" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.29.2" />
     </ItemGroup>
 
     <ItemGroup>

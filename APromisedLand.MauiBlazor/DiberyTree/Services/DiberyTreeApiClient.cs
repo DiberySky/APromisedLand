@@ -60,17 +60,17 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
             return;
 
         // 尝试读取标准 ApiResponse 中的错误信息
-        try
-        {
+        // try
+        // {
             var errorResponse = await response.Content.ReadFromJsonAsync<ApiResponse<object>>();
             if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Message))
                 throw new HttpRequestException($"请求失败: {errorResponse.Message}", null, response.StatusCode);
-        }
-        catch
-        {
-            // 若无法解析，则回退到默认 EnsureSuccessStatusCode
-            response.EnsureSuccessStatusCode();
-        }
+        // }
+        // catch (Exception ex)
+        // {
+        //     // 若无法解析，则回退到默认 EnsureSuccessStatusCode
+        //     // response.EnsureSuccessStatusCode();
+        // }
     }
 
     // ==================== 树节点操作 ====================

@@ -19,14 +19,16 @@ public class AttributeTableValueService(DiberyDbContext db)
     // ---------- 新增行 ----------
 
     /// <summary>向指定表定义添加一行数据。返回 (行实例 Id, 错误信息)。</summary>
-    public async Task<(string? RowId, string? Error)> AddRowAsync(
+    public async Task<(string? RowId, string? Error)> AddRowAsync(string nodeId, string tableId, 
         string tableDefId, Dictionary<string, JsonElement> values)
     {
+        // return ("2f8c90fc-e6a6-4ff4-9588-cbf977745c97", null);
+        
         // 1. 获取表定义（不再 Include AttributeType）
         var tableDef = await db.AttributeDefinitions
             .FirstOrDefaultAsync(d => d.Id == tableDefId);
         if (tableDef == null) return (null, $"表定义 '{tableDefId}' 不存在");
-
+        
         // 通过映射判断是否为表格类型
         if (!AttributeTypeMapping.IdToEnum.TryGetValue(tableDef.AttributeTypeId, out var tableType) || tableType != AttributeTypeEnum.表格)
             return (null, $"'{tableDefId}' 不是表定义");
@@ -34,12 +36,15 @@ public class AttributeTableValueService(DiberyDbContext db)
         if (tableDef.ParentId != null)
             return (null, $"'{tableDefId}' 不是表定义（有父级）");
 
+        // return ("107b5d97-15d8-4f42-8c24-d01a49f0b399", null);
+        
         // 2. 获取该表的所有列定义（不再 Include AttributeType）
         var columns = await db.AttributeDefinitions
             .Where(d => d.ParentId == tableDefId)
             .OrderBy(d => d.Order)
             .ToListAsync();
         var colMap = columns.ToDictionary(c => c.Id);
+
 
         // 3. 校验：列 Id 必须属于该表；列不可为「表」类型
         foreach (var kv in values)
@@ -60,8 +65,9 @@ public class AttributeTableValueService(DiberyDbContext db)
         db.TableRowAttributeValues.Add(new TableRowAttributeValue
         {
             Id = rowId,
-            NodeId = tableDefId,
+            NodeId = nodeId,
             AttributeDefinitionId = tableDefId,
+            TableId = tableId,
             RowNo = rowNo
         });
 
@@ -75,6 +81,7 @@ public class AttributeTableValueService(DiberyDbContext db)
         }
 
         await db.SaveChangesAsync();
+        
         return (rowId, null);
     }
 

@@ -35,7 +35,7 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Value = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -49,7 +49,7 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Value = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -63,7 +63,7 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Value = table.Column<decimal>(type: "numeric", nullable: false)
                 },
@@ -77,7 +77,7 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Value = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: false),
                     FileName = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
@@ -94,7 +94,7 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Value = table.Column<long>(type: "bigint", nullable: false)
                 },
@@ -108,7 +108,7 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Latitude = table.Column<double>(type: "double precision", nullable: false),
                     Longitude = table.Column<double>(type: "double precision", nullable: false)
@@ -123,7 +123,7 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Value = table.Column<string>(type: "text", nullable: false)
                 },
@@ -137,9 +137,9 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    TableId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    TableId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     RowNo = table.Column<int>(type: "integer", nullable: true)
                 },
                 constraints: table =>
@@ -152,7 +152,7 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Value = table.Column<string>(type: "text", nullable: false)
                 },
@@ -166,7 +166,7 @@ namespace APromisedLand.Api.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    NodeId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     Value = table.Column<TimeSpan>(type: "interval", nullable: false)
                 },

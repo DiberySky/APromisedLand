@@ -60,12 +60,12 @@ public class TableValueApiClient(HttpClient httpClient)
     // ---------- 表行数据 ----------
 
     /// <summary>向指定表添加一行数据（列定义 Id → JSON 值），返回该行 DTO</summary>
-    public async Task<TableRowDto> AddRowAsync(
-        string tableId, Dictionary<string, JsonElement> values, CancellationToken cancellationToken = default)
+    public async Task<TableRowDto> AddRowAsync(string nodeId, string tabledId, 
+        string tableDefId, Dictionary<string, JsonElement> values, CancellationToken cancellationToken = default)
     {
         var dto = new AddTableRowDto { Values = values };
         var request = new HttpRequestMessage(HttpMethod.Post,
-            $"{BasePath}/{Uri.EscapeDataString(tableId)}/rows")
+            $"{BasePath}/node/{Uri.EscapeDataString(nodeId)}/table/{Uri.EscapeDataString(tabledId)}/definition/{Uri.EscapeDataString(tableDefId)}/rows")
         {
             Content = JsonContent.Create(dto)
         };
@@ -91,7 +91,7 @@ public class TableValueApiClient(HttpClient httpClient)
     }
 
     /// <summary>更新某行的列值（先删旧列值再重建），返回该行 DTO</summary>
-    public async Task<TableRowDto> UpdateRowAsync(
+    public async Task<TableRowDto> UpdateRowAsync(string tabledId, 
         string rowId, Dictionary<string, JsonElement> values, CancellationToken cancellationToken = default)
     {
         var dto = new UpdateTableRowDto { Values = values };

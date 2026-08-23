@@ -546,11 +546,12 @@ public class TreeNodeDialogService<TItem>(
     #region 表格属性定义管理
     
     public async Task<bool> ShowAttributeTableDefinitionListDialogAsync(
+        string tableId,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters<AttributeTableDefinitionListDialog<TItem>>
         {
-            // { x => x.Item, item },
+            { x => x.TableId, tableId },
         };
 
         var options = (config ?? new DialogConfig
@@ -572,7 +573,7 @@ public class TreeNodeDialogService<TItem>(
     {
         var parameters = new DialogParameters<AttributeTableDefinitionDialog<TItem>>
         {
-            { x => x.Table, item },
+            { x => x.TableDefinitionDto, item },
         };
 
         var options = (config ?? new DialogConfig
@@ -588,6 +589,8 @@ public class TreeNodeDialogService<TItem>(
     }
     
     public async Task ShowAttributeTableRowEditDialogAsync(
+        string nodeId,
+        string tableId,
         AttributeDefinitionDto definitionDto, 
         List<AttributeDefinitionDto> columns,
         TableRowDto? editRow = null,
@@ -595,6 +598,8 @@ public class TreeNodeDialogService<TItem>(
     {
         var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
         {
+            { x => x.NodeId, nodeId },
+            { x => x.TableId, tableId },
             { x => x.TableDefinitionDto, definitionDto },
             { x => x.Columns, columns },
             { x => x.EditRow, editRow },
@@ -613,12 +618,16 @@ public class TreeNodeDialogService<TItem>(
     }
     
     public async Task ShowAttributeTableRowsPanelDialogAsync(
+        string nodeId,
+        string tableId,
         AttributeDefinitionDto definitionDto,
         List<AttributeDefinitionDto> columns,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters<AttributeTableRowsPanelDialog<TItem>>
         {
+            { x => x.NodeId, nodeId },
+            { x => x.TableId, tableId },
             { x => x.TableDefinitionDto, definitionDto },
             { x => x.Columns, columns },
         };

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(DiberyDbContext))]
-    [Migration("20260823003751_Initial")]
+    [Migration("20260823173525_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -298,8 +298,8 @@ namespace APromisedLand.Api.Data.Migrations
 
                     b.Property<string>("NodeId")
                         .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
 
                     b.HasKey("Id");
 
@@ -1748,6 +1748,7 @@ namespace APromisedLand.Api.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("TableId")
+                        .IsRequired()
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
 
