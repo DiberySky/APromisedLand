@@ -3,7 +3,7 @@ using APromisedLand.Shared.DiberyTree;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Services;
+namespace APromisedLand.Api.DiberyTree.Services;
 
 /// <summary>
 /// 泛型树服务实现（内存存储示例）

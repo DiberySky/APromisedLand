@@ -1,9 +1,6 @@
-using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
-using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DiberyTree.Models;
-using Microsoft.AspNetCore.Mvc;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Interface;
+namespace APromisedLand.Api.DiberyTree.Interface;
 
 /// <summary>
 /// 泛型树服务接口

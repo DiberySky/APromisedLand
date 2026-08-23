@@ -3,7 +3,7 @@
 @inject AttributeApiClient AttributeApiClient
 @inject TreeNodeDialogService<TItem> TreeNodeDialogService
 @inject ISnackbar Snackbar
-@inject BlazorService BlazorService
+@inject MessageService Message
 
 <MudContainer>
     <MudGrid>
@@ -165,13 +165,13 @@
     //     }
     //     catch (Exception ex)
     //     {
-    //         Snackbar.Add($"保存失败: {ex.Message}", Severity.Error);
+    //         Snackbar.Add($"保存失败: {ex.MessageService}", Severity.Error);
     //     }
     // }
 
     private async Task DeleteColumnAsync(AttributeDefinitionDto col)
     {
-        var confirmed = await BlazorService.DeleteBoxAsync($"确定删除列【{col.Name}】？");
+        var confirmed = await Message.DeleteBoxAsync($"确定删除列【{col.Name}】？");
         if (!confirmed) return;
         try
         {

@@ -587,6 +587,51 @@ public class TreeNodeDialogService<TItem>(
         return result is not { Canceled: true };
     }
     
-    #endregion
+    public async Task ShowAttributeTableRowEditDialogAsync(
+        AttributeDefinitionDto definitionDto, 
+        List<AttributeDefinitionDto> columns,
+        TableRowDto? editRow = null,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
+        {
+            { x => x.TableDefinitionDto, definitionDto },
+            { x => x.Columns, columns },
+            { x => x.EditRow, editRow },
+        };
 
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<AttributeTableRowEditDialog<TItem>>(
+            "表格编辑器", parameters, options);
+
+        var result = await dialog.Result;
+        // 只要不是取消就返回 true（表示可能已修改）
+        // return result is not { Canceled: true };
+    }
+    
+    public async Task ShowAttributeTableRowsPanelDialogAsync(
+        AttributeDefinitionDto definitionDto,
+        List<AttributeDefinitionDto> columns,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeTableRowsPanelDialog<TItem>>
+        {
+            { x => x.TableDefinitionDto, definitionDto },
+            { x => x.Columns, columns },
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowAsync<AttributeTableRowsPanelDialog<TItem>>(
+            "表格行编辑器", parameters, options);
+
+        var result = await dialog.Result;
+    }
+    #endregion
+    
 }

@@ -3,6 +3,7 @@ using APromisedLand.Maui.DiberyTree;
 using APromisedLand.Razor.DiberyTree;
 using APromisedLand.Razor.DiberyTree.Navigation;
 using APromisedLand.Razor.DiberyTree.Services;
+using APromisedLand.Razor.Helper.Blazor;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs;
 using Microsoft.Extensions.Hosting;
@@ -25,7 +26,7 @@ namespace DiberyMauiSky
             builder.Services.AddMauiBlazorWebView();
             builder.AddServiceDefaults();
             
-            builder.AddDiberyConfig();
+            builder.AddBuilderConfig();
             
             // builder.AddDiberyTreeClient<CategoryTree>();
             
@@ -38,7 +39,10 @@ namespace DiberyMauiSky
     		builder.Logging.AddDebug();
 #endif
 
-            return builder.Build();
+            var app = builder.Build();
+            // app.Services.AddDialogService();
+            app.Services.AddAppConfig();
+            return app;
         }
     }
 }

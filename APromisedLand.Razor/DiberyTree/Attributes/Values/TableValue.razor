@@ -1,5 +1,8 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@inject AttributeApiClient AttributeApiClient
+
 <AttributeValueSky TItem="@TItem"
                    NodeId="@NodeId"
                    ValueId="@ValueId"
@@ -7,16 +10,31 @@
                    DefinitionDto="@DefinitionDto"
                    ReadOnly="@ReadOnly">
     <ValueContent>
-        <MudTextField T="string"
-                      Value="@Value"
-                      Label="表格名称"
-                      Variant="Variant.Outlined"
-                      Required="true"
-                      RequiredError="表格名称不能为空"
-                      MaxLength="50"
-                      Counter="50"
-                      ReadOnly="@ReadOnly"
-                      ValueChanged="@(HandleValueChanged)"/>
+        @if (ReadOnly)
+        {
+            <MudTextField T="string"
+                          Value="@Value"
+                          Label="表格名称"
+                          Variant="Variant.Outlined"
+                          ReadOnly="@ReadOnly"
+                          Adornment="Adornment.End"
+                          AdornmentColor="Color.Success"
+                          AdornmentIcon="@Icons.Material.Outlined.EditNote"
+                          OnAdornmentClick="@(HandleAdornmentClick)"/>
+        }
+        else
+        {
+            <MudTextField T="string"
+                          Value="@Value"
+                          Label="表格名称"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredError="表格名称不能为空"
+                          MaxLength="50"
+                          Counter="50"
+                          ReadOnly="@ReadOnly"
+                          ValueChanged="@(HandleValueChanged)"/>
+        }
     </ValueContent>
 </AttributeValueSky>
 
@@ -45,5 +63,17 @@
         _ = ValueChanged.InvokeAsync(Value);
 
         JsonValue = value is not null ? JsonSerializer.SerializeToElement(value) : null;
+    }
+    
+    private async Task HandleAdornmentClick()
+    {
+        var list = await AttributeApiClient.ListTableColumnsAsync(DefinitionDto!.Id);
+        List<AttributeDefinitionDto> columns = [.. list];
+        
+        // await TreeNodeDialogService.
+        //     ShowAttributeTableRowEditDialogAsync(DefinitionDto, columns);
+
+        await TreeNodeDialogService.
+            ShowAttributeTableRowsPanelDialogAsync(DefinitionDto, columns);
     }
 }

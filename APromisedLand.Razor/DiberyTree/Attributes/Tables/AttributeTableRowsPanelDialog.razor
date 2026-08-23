@@ -4,9 +4,10 @@
 @inject TableValueApiClient TableValueApiClient
 @inject ISnackbar Snackbar
 @inject DialogService DialogService
-@inject BlazorService BlazorService
+@inject MessageService Message
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
 
-<DialogSky Title="@($"行数据 - {Table?.Name}")"
+<DialogSky Title="@($"行数据 - {TableDefinitionDto?.Name}")"
            CancelButtonVisible="true"
            SubmitButtonVisible="false"
            OnCanceledClick="@(() => MudDialog?.Close(DialogResult.Cancel()))">
@@ -28,7 +29,7 @@
                       Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>行号</MudTh>
-                    @foreach (var col in _columns)
+                    @foreach (var col in Columns)
                     {
                         <MudTh>@col.Name</MudTh>
                     }
@@ -40,7 +41,7 @@
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="行号">@context.RowNo</MudTd>
-                    @foreach (var col in _columns)
+                    @foreach (var col in Columns)
                     {
                         <MudTd DataLabel="@col.Name">
                             @(FormatCell(context, col.Id))
@@ -65,19 +66,20 @@
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
-    [Parameter] public AttributeDefinitionDto? Table { get; set; }
-
+    [Parameter] public required AttributeDefinitionDto TableDefinitionDto { get; set; }
+    [Parameter] public required List<AttributeDefinitionDto> Columns { get; set; }
+    
     private List<TableRowDto> _rows = new();
-    private List<AttributeDefinitionDto> _columns = new();
+    // private List<AttributeDefinitionDto> _columns = new();
     private bool _loading;
 
     protected override async Task OnInitializedAsync()
     {
-        var all = await AttributeApiClient.GetAllDefinitionsAsync();
-        _columns = all.Where(d => d.ParentId == Table?.Id)
-                      .OrderBy(d => d.Order)
-                      .ThenBy(d => d.Name)
-                      .ToList();
+        // var all = await AttributeApiClient.GetAllDefinitionsAsync();
+        // _columns = all.Where(d => d.ParentId == TableDefinitionDto?.Id)
+        //               .OrderBy(d => d.Order)
+        //               .ThenBy(d => d.Name)
+        //               .ToList();
         await LoadRowsAsync();
     }
 
@@ -86,7 +88,7 @@
         _loading = true;
         try
         {
-            _rows = [.. await TableValueApiClient.ListRowsAsync(Table!.Id)];
+            _rows = [.. await TableValueApiClient.ListRowsAsync(TableDefinitionDto!.Id)];
         }
         catch (Exception ex) { Snackbar.Add($"加载行失败: {ex.Message}", Severity.Error); }
         finally { _loading = false; }
@@ -94,32 +96,38 @@
 
     private async Task AddRowAsync()
     {
-        var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
-        {
-            { x => x.Table, Table },
-            { x => x.Columns, _columns }
-        };
-        var dialog = await DialogService.ShowAsync<AttributeTableRowEditDialog<TItem>>("新增行", parameters);
-        var result = await dialog.Result;
-        if (!result.Canceled) await LoadRowsAsync();
+        await TreeNodeDialogService.
+            ShowAttributeTableRowEditDialogAsync(TableDefinitionDto, Columns);
+        
+        // var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
+        // {
+        //     { x => x.TableDefinitionDto, TableDefinitionDto },
+        //     { x => x.Columns, Columns }
+        // };
+        // var dialog = await DialogService.ShowAsync<AttributeTableRowEditDialog<TItem>>("新增行", parameters);
+        // var result = await dialog.Result;
+        // if (!result.Canceled) await LoadRowsAsync();
     }
 
     private async Task EditRowAsync(TableRowDto row)
     {
-        var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
-        {
-            { x => x.Table, Table },
-            { x => x.Columns, _columns },
-            { x => x.EditRow, row }
-        };
-        var dialog = await DialogService.ShowAsync<AttributeTableRowEditDialog<TItem>>("编辑行", parameters);
-        var result = await dialog.Result;
-        if (!result.Canceled) await LoadRowsAsync();
+        await TreeNodeDialogService.
+            ShowAttributeTableRowEditDialogAsync(TableDefinitionDto, Columns, row);
+        
+        // var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
+        // {
+        //     { x => x.TableDefinitionDto, TableDefinitionDto },
+        //     { x => x.Columns, Columns },
+        //     { x => x.EditRow, row }
+        // };
+        // var dialog = await DialogService.ShowAsync<AttributeTableRowEditDialog<TItem>>("编辑行", parameters);
+        // var result = await dialog.Result;
+        // if (!result.Canceled) await LoadRowsAsync();
     }
 
     private async Task DeleteRowAsync(TableRowDto row)
     {
-        var confirmed = await BlazorService.DeleteBoxAsync($"确定删除第 {row.RowNo} 行？");
+        var confirmed = await Message.DeleteBoxAsync($"确定删除第 {row.RowNo} 行？");
         if (!confirmed) return;
         try
         {

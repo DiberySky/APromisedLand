@@ -4,6 +4,7 @@ using APromisedLand.MauiBlazor.DiberyTree.Interfaces;
 using APromisedLand.MauiBlazor.DiberyTree.Services;
 using APromisedLand.Razor.DiberyTree.Navigation;
 using APromisedLand.Razor.DiberyTree.Services;
+using APromisedLand.Razor.Helper.Blazor;
 using APromisedLand.Razor.Services;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Interfaces;
@@ -15,11 +16,11 @@ using MudBlazor.Services;
 
 namespace APromisedLand.Maui.Configs;
 
-public static class DiberyConfig
+public static class BuilderConfig
 {
     extension(MauiAppBuilder builder)
     {
-        public void AddDiberyConfig()
+        public void AddBuilderConfig()
         {
             builder.Services.AddMudServices();
             builder.AddMudBlazorServices();
@@ -28,6 +29,8 @@ public static class DiberyConfig
             builder.Services.AddScoped<SolutionService>();
 
             builder.AddPlatformInfo();
+
+            builder.Services.AddScoped<MessageService>();
 
             builder.AddAuthenticationServices();
             builder.AddKeycloakClient();

@@ -1,8 +1,11 @@
+@using APromisedLand.Razor.Helper.Blazor
 @using System.Text.Json
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject TableValueApiClient TableValueApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject MessageService Message
 
 <DialogSky Title="@(IsEdit ? "编辑行" : "新增行")"
            SubmitButtonVisible="true"
@@ -71,8 +74,8 @@
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
-    [Parameter] public AttributeDefinitionDto? Table { get; set; }
-    [Parameter] public List<AttributeDefinitionDto> Columns { get; set; } = new();
+    [Parameter] public required AttributeDefinitionDto TableDefinitionDto { get; set; }
+    [Parameter] public required List<AttributeDefinitionDto> Columns { get; set; } 
     [Parameter] public TableRowDto? EditRow { get; set; }
 
     private MudForm? _form;
@@ -84,6 +87,15 @@
         foreach (var col in Columns)
             _values[col.Id] = new CellValue();
 
+        _values = Columns.ToDictionary(
+            col => col.Id,
+            col => {
+                var cv = new CellValue();
+                cv.SetType(col.AttributeType);   // 关键：设置类型
+                return cv;
+            }
+        );
+            
         if (IsEdit && EditRow != null)
         {
             foreach (var cell in EditRow.Values)
@@ -118,13 +130,19 @@
             if (IsEdit)
                 await TableValueApiClient.UpdateRowAsync(EditRow!.RowId, dict);
             else
-                await TableValueApiClient.AddRowAsync(Table!.Id, dict);
+                await TableValueApiClient.AddRowAsync(TableDefinitionDto!.Id, dict);
 
             Snackbar.Add("保存成功", Severity.Success);
             MudDialog?.Close(DialogResult.Ok(true));
         }
-        catch (ArgumentException ex) { Snackbar.Add(ex.Message, Severity.Warning); }
-        catch (Exception ex) { Snackbar.Add($"保存失败: {ex.Message}", Severity.Error); }
+        catch (ArgumentException ex)
+        {
+            Message.Details("保存失败.", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Message.Details("保存失败.", ex.Message); 
+        }
     }
 
     private void HandleCancel() { }
@@ -158,6 +176,7 @@
                 }
             }
             catch { Text = je.ToString(); }
+            this.type = type;   // ✅ 保存类型
         }
 
         public JsonElement ToJsonElement() => type switch

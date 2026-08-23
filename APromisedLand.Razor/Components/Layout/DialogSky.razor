@@ -77,6 +77,8 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required string Title { get; set; }
+    [Parameter] public bool TitleDense { get; set; } = true;
+
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
 
     [Parameter] public bool CancelButtonVisible { get; set; } = true;
@@ -99,6 +101,14 @@
     [Parameter] public EventCallback OnCanceledClick { get; set; }
     [Parameter] public EventCallback OnSubmitClick { get; set; }
 
+    protected override void OnParametersSet()
+    {
+        if (TitleDense)
+        {
+            TitleClass =  TitleClass.Contains("pa-0") ? TitleClass : TitleClass + " pa-0";
+        }
+    }
+    
     private async Task CancelAsync()
     {
         MudDialog?.Close(DialogResult.Cancel());

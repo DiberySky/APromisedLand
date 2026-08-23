@@ -6,7 +6,7 @@ using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DiberyTree.Attributes.Validation;
 using Microsoft.EntityFrameworkCore;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Services;
+namespace APromisedLand.Api.DiberyTree.Services;
 
 /// <summary>
 /// 动态表数据（行实例 + 列值）的业务服务。

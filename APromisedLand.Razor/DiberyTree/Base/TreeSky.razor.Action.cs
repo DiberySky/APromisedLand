@@ -107,11 +107,11 @@ public partial class TreeSky<TItem> : ComponentBase
 
             parent.Expanded = true;
             await RefreshNodeChildrenAsync(parent);
-            BlazorService.ShowSuccess("创建成功");
+            Message.Success("创建成功");
         }
         catch (Exception e)
         {
-            BlazorService.ShowError("创建失败", e.Message);
+            Message.Details("创建失败", e.Message);
         }
     }
 
@@ -140,11 +140,11 @@ public partial class TreeSky<TItem> : ComponentBase
             await ApiClient.UpdateNodeAsync(dto.Id, dto);
 
             node.Text = formModel.Text();
-            BlazorService.ShowSuccess("更新成功");
+            Message.Success("更新成功");
         }
         catch (Exception e)
         {
-            BlazorService.ShowError("创建失败", e.Message);
+            Message.Details("创建失败", e.Message);
         }
     }
 
@@ -167,11 +167,11 @@ public partial class TreeSky<TItem> : ComponentBase
             var parent = _items?.FindTreeItem(node.Value!.ParentId!);
             await RefreshNodeChildrenAsync(parent!);
 
-            BlazorService.ShowSuccess("删除成功");
+            Message.Success("删除成功");
         }
         catch (Exception e)
         {
-            BlazorService.ShowError("删除失败", e.Message);
+            Message.Details("删除失败", e.Message);
         }
     }
 
@@ -181,7 +181,7 @@ public partial class TreeSky<TItem> : ComponentBase
         if (formModel == null) return;
 
         await RefreshTreeAsync();
-        BlazorService.ShowSuccess("根分类已创建");
+        Message.Success("根分类已创建");
     }
 
     #endregion
@@ -197,7 +197,7 @@ public partial class TreeSky<TItem> : ComponentBase
         if (selectResult == null) return;
 
         var message = $"节点【{node.Text}】的上级节点：【{node.Value.Parent?.Text()}】 => 【{selectResult.Text()}】!";
-        var result = await BlazorService.BoolBoxAsync(message);
+        var result = await Message.BoolBoxAsync(message);
 
         if (!result) return;
 
@@ -220,11 +220,11 @@ public partial class TreeSky<TItem> : ComponentBase
 
             await ReLoadingAsync(node);
 
-            BlazorService.ShowSuccess("转移成功");
+            Message.Success("转移成功");
         }
         catch (Exception e)
         {
-            BlazorService.ShowError("转移失败", e.Message);
+            Message.Details("转移失败", e.Message);
         }
 
         // var allNodes = await GetAllNodesAsync();
@@ -287,7 +287,7 @@ public partial class TreeSky<TItem> : ComponentBase
     {
         await operation();
         await RefreshTreeAsync();
-        BlazorService.ShowSuccess(successMessage);
+        Message.Success(successMessage);
     }
 
     #endregion

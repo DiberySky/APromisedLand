@@ -4,6 +4,7 @@
 @inject DiberyTreeApiClient<TItem> ApiClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject MessageService Message
 
 <MudStack Row="true" Class="d-flex flex-grow-1" Justify="Justify.SpaceBetween"
           AlignItems="AlignItems.Center">
@@ -58,7 +59,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Details("更新失败。", ex.Message, DialogService);
+            Message.Details("更新失败。", ex.Message);
         }
     }
 
@@ -66,7 +67,7 @@
     {
         if (DefinitionDto is null || JsonValue is null) return;
 
-        bool? confirm = await DialogService.DeleteBox($"确定要删除属性“{DefinitionDto?.Name}”吗？");
+        bool? confirm = await Message.DeleteBoxAsync($"确定要删除属性“{DefinitionDto?.Name}”吗？");
         if (confirm == true)
         {
             if (ValueId is null || NodeId is null) return;
@@ -79,7 +80,7 @@
             }
             catch (Exception ex)
             {
-                Snackbar.Details("删除失败。", ex.Message, DialogService);
+                Message.Details("删除失败。", ex.Message);
             }
         }
     }

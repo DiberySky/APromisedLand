@@ -1,11 +1,11 @@
-using APromisedLand.Api.Projects.DiberyTree.Services;
+using APromisedLand.Api.DiberyTree.Services;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Controllers;
+namespace APromisedLand.Api.DiberyTree.Controllers;
 
 /// <summary>
 /// 动态表数据控制器基类。负责行实例与列值的 CRUD。
@@ -14,9 +14,9 @@ namespace APromisedLand.Api.Projects.DiberyTree.Controllers;
 /// </summary>
 [ApiController]
 [Route("[controller]")]
-public abstract class TableValueControllerBase(
+public abstract class TableValuesControllerBase(
     AttributeTableValueService valueService,
-    ILogger<TableValueControllerBase> logger) : ControllerBase
+    ILogger<TableValuesControllerBase> logger) : ControllerBase
 {
     // ==================== 表行数据 ====================
 

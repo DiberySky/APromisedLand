@@ -14,7 +14,7 @@ namespace APromisedLand.MauiBlazor.DiberyTree.Services;
 /// </summary>
 public class TableValueApiClient(HttpClient httpClient)
 {
-    private const string BasePath = "tablevalues";
+    private const string BasePath = "AttributeTableValue";
 
     // ---------- 辅助 ----------
 

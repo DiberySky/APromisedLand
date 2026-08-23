@@ -8,6 +8,7 @@
 @inject AttributeApiClient AttributeApiClient
 @inject ISnackbar Snackbar
 @inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@inject MessageService Message
 
 <DialogSky Title="添加属性"
            CancelButtonVisible="true"
@@ -237,7 +238,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Details("添加失败.", ex.Message, DialogService);
+            Message.Details("添加失败.", ex.Message);
         }
     }
 

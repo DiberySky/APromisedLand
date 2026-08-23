@@ -49,7 +49,7 @@ public partial class TreeSky<TItem> : ComponentBase
         }
         catch (Exception e)
         {
-            BlazorService.ShowError("数据加载失败。", e.Message);
+            Message.Details("数据加载失败。", e.Message);
         }
     }
 
@@ -171,7 +171,7 @@ public partial class TreeSky<TItem> : ComponentBase
         }
         catch (Exception e)
         {
-            Snackbar.Details("加载初始数据失败。", e.Message, DialogService);
+            Message.Details("加载初始数据失败。", e.Message);
             return [];
         }
     }

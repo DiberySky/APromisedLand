@@ -4,7 +4,7 @@
 @inject ISnackbar Snackbar
 @inject TreeNodeDialogService<TItem> TreeNodeDialogService
 @inject DialogService DialogService
-@inject BlazorService BlazorService
+@inject MessageService Message
 
 <DialogSky Title="添加修改属性"
            CancelButtonVisible="true"
@@ -230,7 +230,7 @@
 
     private async Task DeleteAsync(AttributeDefinitionDto item)
     {
-        var confirmed = await BlazorService.DeleteBoxAsync(
+        var confirmed = await Message.DeleteBoxAsync(
             $"确定要删除属性定义【{item.Name}】吗？如果已被节点引用将无法删除。");
 
         if (!confirmed) return;

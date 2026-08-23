@@ -1,13 +1,12 @@
-using APromisedLand.Api.Projects.DiberyTree.Services;
+using APromisedLand.Api.DiberyTree.Services;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Enums;
-using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Controllers;
+namespace APromisedLand.Api.DiberyTree.Controllers;
 
 /// <summary>
 /// 属性定义控制器基类。从 <see cref="TreeControllerBase{T}"/> 分离——

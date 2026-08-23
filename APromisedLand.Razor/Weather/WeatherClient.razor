@@ -6,6 +6,7 @@
 @inject WeatherApiClient WeatherApi
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject MessageService Message
 
 <PageSky Title="Weather Client" BottomBarVisible>
     <PageContent>
@@ -51,7 +52,7 @@
         }
         catch (HttpRequestException ex)
         {
-            Snackbar.Details("检索失败。", ex.Message, DialogService);
+            Message.Details("检索失败。", ex.Message);
         }
     }
 

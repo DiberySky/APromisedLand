@@ -1,5 +1,5 @@
-using APromisedLand.Api.Projects.DiberyTree.Controllers;
-using APromisedLand.Api.Projects.DiberyTree.Services;
+using APromisedLand.Api.DiberyTree.Controllers;
+using APromisedLand.Api.DiberyTree.Services;
 
 namespace DiberyTreeService.Controllers;
 

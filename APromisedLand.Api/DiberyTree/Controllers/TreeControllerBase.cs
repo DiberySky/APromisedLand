@@ -1,4 +1,4 @@
-using APromisedLand.Api.Projects.DiberyTree.Interface;
+using APromisedLand.Api.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs;
@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Controllers;
+namespace APromisedLand.Api.DiberyTree.Controllers;
 
 /// <summary>
 /// 泛型树控制器基类，支持任意节点值类型 T，并包含属性值的操作（属性定义已分离至 <see cref="T"/>）。

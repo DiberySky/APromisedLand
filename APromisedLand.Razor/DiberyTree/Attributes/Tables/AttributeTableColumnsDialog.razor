@@ -3,7 +3,7 @@
 
 @inject AttributeApiClient AttributeApiClient
 @inject ISnackbar Snackbar
-@inject BlazorService BlazorService
+@inject MessageService Message
 
 <DialogSky Title="@($"列管理 - {Table?.Name}")"
            CancelButtonVisible="true"
@@ -188,7 +188,7 @@
 
     private async Task DeleteColumnAsync(AttributeDefinitionDto col)
     {
-        var confirmed = await BlazorService.DeleteBoxAsync($"确定删除列【{col.Name}】？");
+        var confirmed = await Message.DeleteBoxAsync($"确定删除列【{col.Name}】？");
         if (!confirmed) return;
         try
         {

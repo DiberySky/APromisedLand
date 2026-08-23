@@ -1,7 +1,7 @@
 using APromisedLand.Api.Data;
+using APromisedLand.Api.DiberyTree.Interface;
+using APromisedLand.Api.DiberyTree.Services;
 using APromisedLand.Api.Interfaces;
-using APromisedLand.Api.Projects.DiberyTree.Interface;
-using APromisedLand.Api.Projects.DiberyTree.Services;
 using APromisedLand.Api.Services;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using APromisedLand.Shared.DiberyTree.Models;

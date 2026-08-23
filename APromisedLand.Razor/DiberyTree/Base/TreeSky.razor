@@ -9,6 +9,7 @@
 @inject BlazorService BlazorService
 @inject ITreeClientService<TItem> ClientService
 @inject TreeNodeDialogService<TItem> NodeDialogSvc
+@inject MessageService Message
 
 @if (_items == null || _items.Count == 0)
 {

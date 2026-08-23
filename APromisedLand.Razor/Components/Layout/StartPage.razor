@@ -11,6 +11,7 @@
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 @inject TreeNodeDialogService<UnitTree> TreeNodeDialogService
+@inject MessageService Message
 
 <PageSky Title="导航" 
          ArrowBackVisible="@(SolutionService.Authorized == false)"
@@ -98,7 +99,7 @@
         });
         var result = dialog.Result;
         
-        BlazorService.ShowError("测试", "测试参数");
-        BlazorService.ShowSuccess("测试成功");
+        // Message.ShowError("测试", "测试参数");
+        Message.Success("测试成功");
     }
 }

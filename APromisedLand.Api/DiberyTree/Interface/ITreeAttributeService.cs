@@ -2,7 +2,7 @@ using System.Text.Json;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Interface;
+namespace APromisedLand.Api.DiberyTree.Interface;
 
 public interface ITreeAttributeService
 {

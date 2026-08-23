@@ -1,7 +1,6 @@
-using System.Globalization;
 using System.Text.Json;
 using APromisedLand.Api.Data;
-using APromisedLand.Api.Projects.DiberyTree.Interface;
+using APromisedLand.Api.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Enums;
 using APromisedLand.Shared.DiberyTree.Attributes.Models;
@@ -10,7 +9,7 @@ using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Services;
+namespace APromisedLand.Api.DiberyTree.Services;
 
 public class TreeAttributeService(DiberyDbContext dbContext, ILogger<TreeAttributeService> logger)
     : ITreeAttributeService

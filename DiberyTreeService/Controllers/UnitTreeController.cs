@@ -1,6 +1,5 @@
-using APromisedLand.Api.Projects.DiberyTree;
-using APromisedLand.Api.Projects.DiberyTree.Controllers;
-using APromisedLand.Api.Projects.DiberyTree.Interface;
+using APromisedLand.Api.DiberyTree.Controllers;
+using APromisedLand.Api.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.AspNetCore.Mvc;
 

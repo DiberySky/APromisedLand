@@ -4,6 +4,7 @@
 @using APromisedLand.Shared.Services.Solution
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject MessageService Message
 
 @inject IAuthenticationService AuthenticationService
 @inject AuthenticationStateProvider AuthProvider
@@ -90,7 +91,7 @@
         }
         catch (Exception e)
         {
-            Snackbar.Details("登录失败。", e.Message, DialogService);
+            Message.Details("登录失败", e.Message);
         }
     }
 
@@ -113,18 +114,18 @@
 
                 SolutionService.Authorized = true;
 
-                Snackbar.Success($"登录成功: {SolutionService.UserName}");
+                Message.Success($"登录成功: {SolutionService.UserName}");
 
                 Navigator.NavigateTo(SolutionService.StartPage);
             }
             else
             {
-                Snackbar.Error("登录失败，请检查用户名或密码。");
+                Message.Error("登录失败，请检查用户名或密码。");
             }
         }
         catch (Exception e)
         {
-            Snackbar.Details("登录失败。", e.Message, DialogService);
+            Message.Details("登录失败。", e.Message);
         }
         finally
         {

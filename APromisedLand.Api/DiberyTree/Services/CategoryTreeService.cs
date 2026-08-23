@@ -1,29 +1,31 @@
+// APromisedLand.Api.Projects.DiberyTree.Services/CategoryTreeService.cs
+
 using APromisedLand.Api.Data;
-using APromisedLand.Api.Projects.DiberyTree.Interface;
+using APromisedLand.Api.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree;
 using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Services;
+namespace APromisedLand.Api.DiberyTree.Services;
 
-public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
+public class CategoryTreeService(DiberyDbContext dbContext) : ITreeService<CategoryTree>
 {
-    public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> GetRootNodesAsync(string? rootId = null,
+    public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
     {
-        List<TreeNodeDto<UnitTree>> roots = [];
+        List<TreeNodeDto<CategoryTree>> roots = [];
 
         if (rootId != null)
         {
-            var rootItem = await dbContext.UnitTrees
+            var rootItem = await dbContext.CategoryTrees
                 .FirstAsync(c => c.Id == rootId, cancellationToken);
 
             roots.Add(rootItem.ToNodeDto());
         }
         else
         {
-            roots = await dbContext.UnitTrees
+            roots = await dbContext.CategoryTrees
                 .Where(c => c.ParentId == null)
                 .OrderBy(c => c.SortOrder)
                 .Select(c => c.ToNodeDto())
@@ -53,10 +55,10 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         return roots;
     }
 
-    public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> GetChildrenAsync(string parentId,
+    public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> GetChildrenAsync(string parentId,
         CancellationToken cancellationToken = default)
     {
-        var children = await dbContext.UnitTrees
+        var children = await dbContext.CategoryTrees
             .Where(c => c.ParentId == parentId)
             .OrderBy(c => c.SortOrder)
             .Select(c => c.ToNodeDto())
@@ -64,13 +66,13 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
 
         foreach (var child in children)
         {
-            var parent = await dbContext.UnitTrees
+            var parent = await dbContext.CategoryTrees
                 .FirstAsync(c => c.Id == parentId, cancellationToken);
 
             child.Parent = parent;
             child.Value!.Parent = parent;
 
-            var grandson = await dbContext.UnitTrees
+            var grandson = await dbContext.CategoryTrees
                 .Where(c => c.ParentId == child.Id)
                 .OrderBy(c => c.SortOrder)
                 .Select(c => c.ToNodeDto())
@@ -83,10 +85,10 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         return children;
     }
 
-    public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> QueryNodesAsync(TreeQueryParams queryParams,
+    public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> QueryNodesAsync(TreeQueryParams queryParams,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.UnitTrees.AsQueryable();
+        var query = dbContext.CategoryTrees.AsQueryable();
 
         if (!string.IsNullOrEmpty(queryParams.ParentId))
             query = query.Where(c => c.ParentId == queryParams.ParentId);
@@ -108,18 +110,18 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         return result;
     }
 
-    public async Task<TreeNodeDto<UnitTree>?> GetFullTreeAsync(string? rootId = null,
+    public async Task<TreeNodeDto<CategoryTree>?> GetFullTreeAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
     {
         // 1. 加载所有节点到内存
-        var allNodes = await dbContext.UnitTrees
+        var allNodes = await dbContext.CategoryTrees
             .OrderBy(c => c.SortOrder)
             .ToListAsync(cancellationToken);
         if (allNodes.Count == 0)
             return null;
 
         // 2. 确定起始根节点
-        UnitTree? rootEntity;
+        CategoryTree? rootEntity;
         if (string.IsNullOrEmpty(rootId))
         {
             rootEntity = allNodes.FirstOrDefault(n => n.ParentId == null);
@@ -139,13 +141,13 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         {
             if (node.ParentId != null && dict.TryGetValue(node.ParentId, out var parent))
             {
-                // parent.Children ??= new List<UnitTree>();
+                // parent.Children ??= new List<CategoryTree>();
                 // parent.Children.Add(node);
             }
         }
 
         // 4. 递归构建 DTO 树，并对子节点排序
-        TreeNodeDto<UnitTree> BuildDto(UnitTree entity)
+        TreeNodeDto<CategoryTree> BuildDto(CategoryTree entity)
         {
             var dto = entity.ToNodeDto();
             // if (entity.Children != null && entity.Children.Any())
@@ -168,10 +170,10 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         return rootDto;
     }
 
-    public async Task<TreeNodeDto<UnitTree>> CreateNodeAsync(TreeNodeDto<UnitTree> nodeDto,
+    public async Task<TreeNodeDto<CategoryTree>> CreateNodeAsync(TreeNodeDto<CategoryTree> nodeDto,
         CancellationToken cancellationToken = default)
     {
-        var entity = new UnitTree
+        var entity = new CategoryTree
         {
             Id = nodeDto.Id ?? Guid.NewGuid().ToString(),
             Name = nodeDto.Text ?? string.Empty,
@@ -182,7 +184,7 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
 
         if (!string.IsNullOrEmpty(entity.ParentId))
         {
-            var parent = await dbContext.UnitTrees.FindAsync(new object[] { entity.ParentId }, cancellationToken);
+            var parent = await dbContext.CategoryTrees.FindAsync(new object[] { entity.ParentId }, cancellationToken);
             if (parent != null && !parent.HasChildren)
             {
                 parent.HasChildren = true;
@@ -190,59 +192,86 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
             }
         }
 
-        await dbContext.UnitTrees.AddAsync(entity, cancellationToken);
+        await dbContext.CategoryTrees.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         return entity.ToNodeDto();
     }
 
-    public async Task<TreeNodeDto<UnitTree>> UpdateNodeAsync(TreeNodeDto<UnitTree> nodeDto,
+    public async Task<TreeNodeDto<CategoryTree>> UpdateNodeAsync(TreeNodeDto<CategoryTree> nodeDto,
         CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.UnitTrees.FindAsync(new object[] { nodeDto.Id }, cancellationToken);
+        var entity = await dbContext.CategoryTrees.FindAsync(new object[] { nodeDto.Id }, cancellationToken);
         if (entity == null)
             throw new KeyNotFoundException($"节点 {nodeDto.Id} 不存在");
 
         entity.Name = nodeDto.Text ?? entity.Name;
         entity.SortOrder = nodeDto.SortOrder;
-
+        
         // 不在此修改 ParentId，请使用 MoveNodeAsync
         entity.ParentId = nodeDto.ParentId;
-
+        
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
         return entity.ToNodeDto();
     }
 
-    public async Task<TreeNodeDto<UnitTree>> UpdateChildrenAsync(TreeNodeDto<UnitTree> nodeDto,
-        CancellationToken cancellationToken = default)
+    public async Task<TreeNodeDto<CategoryTree>> UpdateChildrenAsync(TreeNodeDto<CategoryTree> nodeDto, CancellationToken cancellationToken = default)
     {
-        var entityChildren =
-            await dbContext.UnitTrees.Where(x => x.ParentId == nodeDto.Id).ToListAsync(cancellationToken);
+        var entityChildren = await dbContext.CategoryTrees.Where(x => x.ParentId == nodeDto.Id).ToListAsync(cancellationToken);
 
         foreach (var entity in entityChildren)
         {
             entity.SortOrder = nodeDto.Children?.FirstOrDefault(x => x.Id == entity.Id)?.SortOrder ?? 0;
         }
-
+        
         dbContext.UpdateRange(entityChildren);
-
+        
         await dbContext.SaveChangesAsync(cancellationToken);
-
+        
         return nodeDto;
     }
 
     public async Task<bool> DeleteNodeAsync(string nodeId, CancellationToken cancellationToken = default)
     {
         // 1. 查找节点
-        var node = await dbContext.UnitTrees
+        var node = await dbContext.CategoryTrees
             .FirstOrDefaultAsync(c => c.Id == nodeId, cancellationToken);
 
         if (node == null)
             return false;
 
-        dbContext.UnitTrees.Remove(node);
+        // 2. 检查是否为叶子节点（没有子节点）
+        // var hasChildren = await dbContext.CategoryTrees
+        //     .AnyAsync(c => c.ParentId == nodeId, cancellationToken);
+        //
+        // if (hasChildren)
+        //     throw new InvalidOperationException("只能删除叶子节点，请先删除子节点");
 
+        // 3. 获取父节点ID
+        // var parentId = node.ParentId;
+
+        // 4. 删除节点
+        dbContext.CategoryTrees.Remove(node);
+        
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // 5. 更新父节点的 HasChildren
+        // if (!string.IsNullOrEmpty(parentId))
+        // {
+        //     var parentStillHasChildren = await dbContext.CategoryTrees
+        //         .AnyAsync(c => c.ParentId == parentId, cancellationToken);
+        //
+        //     if (!parentStillHasChildren)
+        //     {
+        //         var parent = await dbContext.CategoryTrees
+        //             .FindAsync(new object[] { parentId }, cancellationToken);
+        //         if (parent != null)
+        //         {
+        //             parent.HasChildren = false;
+        //             await dbContext.SaveChangesAsync(cancellationToken);
+        //         }
+        //     }
+        // }
 
         return true;
     }
@@ -250,7 +279,7 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
     public async Task<bool> MoveNodeAsync(string nodeId, string? newParentId,
         CancellationToken cancellationToken = default)
     {
-        var node = await dbContext.UnitTrees.FindAsync(new object[] { nodeId }, cancellationToken);
+        var node = await dbContext.CategoryTrees.FindAsync(new object[] { nodeId }, cancellationToken);
         if (node == null)
             return false;
 
@@ -265,13 +294,13 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         // 更新旧父节点 HasChildren
         if (!string.IsNullOrEmpty(oldParentId))
         {
-            var oldParentChildrenCount = await dbContext.UnitTrees
+            var oldParentChildrenCount = await dbContext.CategoryTrees
                 .Where(c => c.ParentId == oldParentId)
                 .CountAsync(cancellationToken);
             if (oldParentChildrenCount == 0)
             {
                 var oldParent =
-                    await dbContext.UnitTrees.FindAsync(new object[] { oldParentId }, cancellationToken);
+                    await dbContext.CategoryTrees.FindAsync(new object[] { oldParentId }, cancellationToken);
                 if (oldParent != null)
                 {
                     oldParent.HasChildren = false;
@@ -283,7 +312,7 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         // 更新新父节点 HasChildren
         if (!string.IsNullOrEmpty(newParentId))
         {
-            var newParent = await dbContext.UnitTrees.FindAsync(new object[] { newParentId }, cancellationToken);
+            var newParent = await dbContext.CategoryTrees.FindAsync(new object[] { newParentId }, cancellationToken);
             if (newParent != null)
             {
                 newParent.HasChildren = true;
@@ -302,9 +331,9 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
 
         var sql = @"
             WITH RECURSIVE descendants AS (
-                SELECT id FROM ""UnitTrees"" WHERE id = @ancestorId
+                SELECT id FROM ""CategoryTrees"" WHERE id = @ancestorId
                 UNION ALL
-                SELECT c.id FROM ""UnitTrees"" c
+                SELECT c.id FROM ""CategoryTrees"" c
                 INNER JOIN descendants d ON c.""ParentId"" = d.id
             )
             SELECT EXISTS (SELECT 1 FROM descendants WHERE id = @nodeId);";
@@ -317,8 +346,17 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         return exists;
     }
 
-    public async Task<IReadOnlyList<string>> GetAncestorPathAsync(string nodeId,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 优化版：减少内存占用（逐层查询）
+    /// 如果树很深，不需要加载全部节点：
+    /// 
+    /// 方案	   查询次数	        内存占用	适用场景
+    /// 逐层查询	N 次（路径深度）	1 个节点	节点数很大、树很深
+    /// </summary>
+    /// <param name="nodeId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task<IReadOnlyList<string>> GetAncestorPathAsync(string nodeId, CancellationToken cancellationToken = default)
     {
         var path = new List<string>();
         var currentId = nodeId;
@@ -326,7 +364,7 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         while (!string.IsNullOrEmpty(currentId))
         {
             // 只查当前节点
-            var node = await dbContext.UnitTrees
+            var node = await dbContext.CategoryTrees
                 .Where(c => c.Id == currentId)
                 .Select(c => new { c.Id, c.ParentId })
                 .FirstOrDefaultAsync(cancellationToken);
@@ -347,8 +385,7 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
     /// <param name="nodeId"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public async Task<IReadOnlyList<string>> GetAncestorPathAsyncAll(string nodeId,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<string>> GetAncestorPathAsyncAll(string nodeId, CancellationToken cancellationToken = default)
     {
         var path = new List<string>();
         var currentId = nodeId;
@@ -356,7 +393,7 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
         while (!string.IsNullOrEmpty(currentId))
         {
             // 只查当前节点
-            var node = await dbContext.UnitTrees
+            var node = await dbContext.CategoryTrees
                 .Where(c => c.Id == currentId)
                 .Select(c => new { c.Id, c.ParentId })
                 .FirstOrDefaultAsync(cancellationToken);
@@ -369,6 +406,6 @@ public class UnitTreeService(DiberyDbContext dbContext) : ITreeService<UnitTree>
 
         return path.AsReadOnly();
     }
+    
+    
 }
-    
-    

@@ -5,7 +5,7 @@ using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DiberyTree.Attributes.Validation;
 using Microsoft.EntityFrameworkCore;
 
-namespace APromisedLand.Api.Projects.DiberyTree.Services;
+namespace APromisedLand.Api.DiberyTree.Services;
 
 /// <summary>
 /// 属性定义（含动态表定义与列定义）的业务服务。
@@ -20,20 +20,27 @@ public class AttributeDefinitionService(DiberyDbContext db)
     public async Task<AttributeDefinitionDto?> GetByIdAsync(string id)
     {
         var def = await db.AttributeDefinitions
-            // 移除了 .Include(d => d.AttributeType)
-            .Include(d => d.Unit)
-            .Include(d => d.Parent)
+            .Include(d => d.Unit)           // Unit 导航保留（若有配置）
             .AsNoTracking()
             .FirstOrDefaultAsync(d => d.Id == id);
+        if (def == null) return null;
+
+        // 手动填充父定义（替代原先的 Include(d => d.Parent)）
+        if (!string.IsNullOrEmpty(def.ParentId))
+        {
+            def.Parent = await db.AttributeDefinitions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == def.ParentId);
+        }
+
         return def?.ToDto();
     }
 
-    /// <summary>获取所有属性定义。</summary>
+    /// <summary>获取所有属性定义（仅根定义，即表定义）。</summary>
     public async Task<IReadOnlyList<AttributeDefinitionDto>> GetAllAsync()
     {
         var list = await db.AttributeDefinitions
-            .Where(x  => x.ParentId == null)
-            // 移除了 .Include(d => d.AttributeType)
+            .Where(x => x.ParentId == null)
             .Include(d => d.Unit)
             .AsNoTracking()
             .OrderBy(d => d.Name)
@@ -44,10 +51,8 @@ public class AttributeDefinitionService(DiberyDbContext db)
     /// <summary>列出所有「表定义」（ParentId 为空且类型=表）。</summary>
     public async Task<List<AttributeDefinitionDto>> ListTablesAsync()
     {
-        // 改用 AttributeTypeMapping 获取表格类型的 ID
         var tableTypeId = AttributeTypeEnum.表格.ToAttributeTypeId();
         var tables = await db.AttributeDefinitions
-            // 移除了 .Include(d => d.AttributeType)
             .Include(d => d.Unit)
             .AsNoTracking()
             .Where(d => d.ParentId == null && d.AttributeTypeId == tableTypeId)
@@ -61,7 +66,6 @@ public class AttributeDefinitionService(DiberyDbContext db)
     public async Task<List<AttributeDefinitionDto>> ListColumnsAsync(string tableId)
     {
         var cols = await db.AttributeDefinitions
-            // 移除了 .Include(d => d.AttributeType)
             .Include(d => d.Unit)
             .AsNoTracking()
             .Where(d => d.ParentId == tableId)
@@ -75,13 +79,11 @@ public class AttributeDefinitionService(DiberyDbContext db)
     /// <summary>创建属性定义（表定义或列定义）。非合法时抛 ArgumentException。</summary>
     public async Task<AttributeDefinitionDto> CreateAsync(AttributeDefinitionCreateDto dto)
     {
-        // 假设 dto.AttributeType 现在是 AttributeTypeEnum 类型
         var def = new AttributeDefinition
         {
             Id = Guid.NewGuid().ToString(),
             Name = dto.Name,
-            AttributeTypeId = dto.AttributeType.ToAttributeTypeId(), // 转换为 ID
-            // 删除了 AttributeType = dto.AttributeType（导航已移除）
+            AttributeTypeId = dto.AttributeType.ToAttributeTypeId(),
             Lines = dto.Lines,
             MaxLength = dto.MaxLength ?? 30,
             Precision = dto.Precision,
@@ -97,7 +99,7 @@ public class AttributeDefinitionService(DiberyDbContext db)
         var (ok, err) = DefinitionValidator.Validate(def);
         if (!ok) throw new ArgumentException(err);
 
-        // 列定义：校验父表存在
+        // 列定义：校验父表存在（因已移除数据库外键约束，需手动校验）
         if (!string.IsNullOrEmpty(def.ParentId))
         {
             var parentExists = await db.AttributeDefinitions.AnyAsync(d => d.Id == def.ParentId);
@@ -109,11 +111,18 @@ public class AttributeDefinitionService(DiberyDbContext db)
 
         // 重新查询返回完整 DTO（含导航）
         var created = await db.AttributeDefinitions
-            // 移除了 .Include(d => d.AttributeType)
             .Include(d => d.Unit)
-            .Include(d => d.Parent)
             .AsNoTracking()
             .FirstAsync(d => d.Id == def.Id);
+
+        // 手动填充父定义
+        if (!string.IsNullOrEmpty(created.ParentId))
+        {
+            created.Parent = await db.AttributeDefinitions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == created.ParentId);
+        }
+
         return created.ToDto();
     }
 
@@ -128,7 +137,6 @@ public class AttributeDefinitionService(DiberyDbContext db)
     {
         // 获取表定义并检查是否为表格类型
         var table = await db.AttributeDefinitions
-            // 不再需要 Include，直接通过 AttributeTypeId 判断
             .FirstOrDefaultAsync(d => d.Id == tableId)
             ?? throw new KeyNotFoundException($"表定义 '{tableId}' 不存在");
 
@@ -149,7 +157,6 @@ public class AttributeDefinitionService(DiberyDbContext db)
     public async Task<AttributeDefinitionDto> UpdateAsync(string id, AttributeDefinitionUpdateDto dto)
     {
         var def = await db.AttributeDefinitions
-            // 移除了 .Include(d => d.AttributeType)
             .FirstOrDefaultAsync(d => d.Id == id)
             ?? throw new KeyNotFoundException($"定义 '{id}' 不存在");
 
@@ -170,11 +177,18 @@ public class AttributeDefinitionService(DiberyDbContext db)
         await db.SaveChangesAsync();
 
         var updated = await db.AttributeDefinitions
-            // 移除了 .Include(d => d.AttributeType)
             .Include(d => d.Unit)
-            .Include(d => d.Parent)
             .AsNoTracking()
             .FirstAsync(d => d.Id == id);
+
+        // 手动填充父定义
+        if (!string.IsNullOrEmpty(updated.ParentId))
+        {
+            updated.Parent = await db.AttributeDefinitions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == updated.ParentId);
+        }
+
         return updated.ToDto();
     }
 

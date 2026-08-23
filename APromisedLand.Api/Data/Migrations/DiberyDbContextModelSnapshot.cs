@@ -33,8 +33,7 @@ namespace APromisedLand.Api.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("DefaultValue")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsRequired")
                         .HasColumnType("boolean");
@@ -54,7 +53,6 @@ namespace APromisedLand.Api.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("ParentId")
-                        .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
 
                     b.Property<int?>("Precision")
@@ -1778,8 +1776,7 @@ namespace APromisedLand.Api.Data.Migrations
                 {
                     b.HasOne("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeDefinition", "Parent")
                         .WithMany()
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("ParentId");
 
                     b.HasOne("APromisedLand.Shared.DiberyTree.Models.UnitTree", "Unit")
                         .WithMany()

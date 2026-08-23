@@ -40,7 +40,7 @@ public partial class TestingDialog
         //}
         //catch (Exception err)
         //{
-        //    Snackbar.Error(err.Message, this);
+        //    Snackbar.Error(err.MessageService, this);
         //}
     }
 }

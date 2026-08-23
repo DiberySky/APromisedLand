@@ -225,10 +225,10 @@ namespace APromisedLand.Api.Data.Migrations
                     Precision = table.Column<int>(type: "integer", nullable: true),
                     Scale = table.Column<int>(type: "integer", nullable: true),
                     UnitId = table.Column<string>(type: "text", nullable: true),
-                    ParentId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    ParentId = table.Column<string>(type: "character varying(36)", nullable: true),
                     Order = table.Column<int>(type: "integer", nullable: false),
                     IsRequired = table.Column<bool>(type: "boolean", nullable: false),
-                    DefaultValue = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true)
+                    DefaultValue = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -237,8 +237,7 @@ namespace APromisedLand.Api.Data.Migrations
                         name: "FK_AttributeDefinitions_AttributeDefinitions_ParentId",
                         column: x => x.ParentId,
                         principalTable: "AttributeDefinitions",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_AttributeDefinitions_UnitTrees_UnitId",
                         column: x => x.UnitId,
