@@ -4,8 +4,8 @@ using APromisedLand.Api.DiberyTree.Services;
 namespace DiberyTreeService.Controllers;
 
 public class AttributesController(
-    AttributeDefinitionService attributeService,
-    ILogger<AttributesControllerBase> logger) 
+    AttributeService attributeService,
+    ILogger<AttributesController> logger) 
     : AttributesControllerBase(attributeService, logger)
 {
 }

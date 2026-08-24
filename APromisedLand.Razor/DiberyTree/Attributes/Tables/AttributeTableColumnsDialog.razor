@@ -154,7 +154,7 @@
         if (!_form.IsValid) return;
 
         var type = _types.FirstOrDefault(t => t == _model.Type);
-        if (type == null) { Snackbar.Add("请选择列类型", Severity.Warning); return; }
+        if (type == default) { Snackbar.Add("请选择列类型", Severity.Warning); return; }
 
         try
         {

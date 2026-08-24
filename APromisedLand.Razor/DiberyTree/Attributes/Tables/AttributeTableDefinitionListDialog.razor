@@ -43,13 +43,13 @@
                     </MudTd>
                     <MudTd Style="text-align:right">
                         <MudIconButton Icon="@Icons.Material.Outlined.TableRows" Color="Color.Info"
-                                       Size="Size.Small" Title="行数据"
+                                       Size="Size.Small" title="行数据"
                                        OnClick="@(() => OpenRowsAsync(context))"/>
                         <MudIconButton Icon="@Icons.Material.Outlined.Edit" Color="Color.Primary"
-                                       Size="Size.Small" Title="编辑表"
+                                       Size="Size.Small" title="编辑表"
                                        OnClick="@(() => OpenTableDialogAsync(context))"/>
                         <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Warning"
-                                       Size="Size.Small" Title="删除表"
+                                       Size="Size.Small" title="删除表"
                                        OnClick="@(() => DeleteTableAsync(context))"/>
                     </MudTd>
                 </RowTemplate>
@@ -99,7 +99,7 @@
             definitionDto == null ? "新建表" : "编辑表", parameters);
         
         var result = await dialog.Result;
-        if (!result.Canceled) await LoadDataAsync();
+        if (result is { Canceled: false }) await LoadDataAsync();
     }
 
     private async Task OpenColumnsAsync(AttributeDefinitionDto tableDefinitionDto)

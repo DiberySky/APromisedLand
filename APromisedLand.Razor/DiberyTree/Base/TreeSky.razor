@@ -11,7 +11,7 @@
 @inject TreeNodeDialogService<TItem> NodeDialogSvc
 @inject MessageService Message
 
-@if (_items == null || _items.Count == 0)
+@if (_items == null || _items.Count == 0 || _loading)
 {
     <ProgressCircularSky/>
 }

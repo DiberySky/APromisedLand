@@ -17,6 +17,9 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.AddServiceDefaults();
 
+// 幂等去重所需（SHA256 指纹 + 内存缓存时间窗）
+builder.Services.AddMemoryCache();
+
 builder.AddNpgsqlDbContext<DiberyDbContext>("TreeDb");
 
 // 注册泛型树服务（以 string 类型为例）
@@ -27,11 +30,12 @@ builder.Services.AddScoped<ITreeService<CategoryTree>, CategoryTreeService>();
 builder.Services.AddScoped<ITreeService<UnitTree>, UnitTreeService>();
 
 //ITreeAttributeService 
-builder.Services.AddScoped<ITreeAttributeService, TreeAttributeService>();
+// builder.Services.AddScoped<ITreeAttributeService, TreeAttributeService>();
 builder.Services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
 
-builder.Services.AddScoped<AttributeDefinitionService>();
-builder.Services.AddScoped<AttributeTableValueService>();
+builder.Services.AddScoped<AttributeService>();
+// builder.Services.AddScoped<AttributeTableValueService>();
+// builder.Services.AddScoped<AttributeLocationValueService>();
 
 var app = builder.Build();
 

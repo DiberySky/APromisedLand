@@ -182,7 +182,7 @@
             {
                 Snackbar.Add("删除成功", Severity.Success);
                 await LoadColumnsAsync();
-                NewColumn();
+                await NewColumn();
             }
             else Snackbar.Add("列不存在", Severity.Warning);
         }

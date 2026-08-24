@@ -34,19 +34,19 @@ public static class BuilderConfig
 
             builder.AddAuthenticationServices();
             builder.AddKeycloakClient();
-            
+
             // builder.AddDiberyTreeClient<CategoryTree>();
             // builder.AddDiberyTreeClient<UnitTree>();
-            
+
             builder.TreeClient<CategoryTree>();
             builder.TreeClient<UnitTree>();
             builder.AttributeClient();
-            
+
             builder.Services.AddScoped<TreeNodeDialogService<CategoryTree>>();
             builder.Services.AddScoped<TreeNodeDialogService<UnitTree>>();
 
             builder.Services.AddSingleton<ITreeNavigationHistoryService, TreeNavigationHistoryService>();
-            
+
             builder.Services.AddSingleton<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
             builder.Services.AddSingleton<ITreeClientService<UnitTree>, UnitTreeClientService>();
         }
@@ -58,15 +58,21 @@ public static class BuilderConfig
                 {
                     client.BaseAddress = new Uri("http://localhost:5085");
                 })
-                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
+                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
 
             builder.Services.AddHttpClient<TableValueApiClient>(client =>
                 {
                     client.BaseAddress = new Uri("http://localhost:5085");
                 })
-                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
+                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
 
+            // builder.Services.AddHttpClient<AttributeLocationValueApiClient>(client =>
+            //     {
+            //         client.BaseAddress = new Uri("http://localhost:5085");
+            //     })
+            //     .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
         }
+
         private void TreeClient<T>()
         {
             // builder.Services.AddHttpClient<UnitsOfMeasureApiClient>(client =>
@@ -77,12 +83,12 @@ public static class BuilderConfig
 
             //http://localhost:5085
             builder.Services.AddHttpClient<DiberyTreeApiClient<T>>(client =>
-                {
-                    client.BaseAddress = new Uri("http://localhost:5085");
-                })
-                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
+            {
+                client.BaseAddress = new Uri("http://localhost:5085");
+            });
+            // .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();    
         }
-        
+
         public void AddAuthenticationServices()
         {
             // 注册 SecureStorage
@@ -100,7 +106,7 @@ public static class BuilderConfig
 
             // 注册 HttpClient 并添加自动附加令牌的处理程序
             builder.Services.AddScoped<JwtAuthorizationMessageHandler>();
-            
+
             // 新增：树节点权限处理器
             // builder.Services.AddScoped<
             //     ITreeNodeAuthorizationHandler<CategoryTree>,
@@ -121,7 +127,7 @@ public static class BuilderConfig
                 config.SnackbarConfiguration.ShowTransitionDuration = 500;
                 config.SnackbarConfiguration.SnackbarVariant = Variant.Filled;
             });
-            
+
             builder.Services.AddMudServicesWithExtensions();
         }
 

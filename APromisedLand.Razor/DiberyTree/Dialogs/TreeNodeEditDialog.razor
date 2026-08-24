@@ -15,7 +15,7 @@
                OnCanceledClick="@Close">
     <ToolBarContent>
         <MudButton Variant="Variant.Text"
-                   Color="Color.Inherit"
+                   Color="Color.Info"
                    Size="Size.Small"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="@OpenAddDialog">
@@ -65,7 +65,8 @@
                     @NodeTemplate.EditTemplate(_node)
                 }
 
-                <NodeAttributesSky TItem="@TItem" NodeId="@_node.Id"/>
+                <NodeAttributesSky @ref="_nodeAttributesSky" TItem="@TItem" NodeId="@_node.Id"
+                                   OnEditChanged="ValueChanged"/>
 
             </MudForm>
         </MudContainer>
@@ -75,13 +76,12 @@
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
-
-    // [Parameter] public TItem? Node { get; set; }
-    // [Parameter] public TItem? ParentNode { get; set; }
+    
     [Parameter] public bool IsCreate { get; set; }
 
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
 
+    private NodeAttributesSky<TItem> _nodeAttributesSky = null!;
     private MudForm _form = null!;
 
     // private TreeNodeFormModel _model = new();
@@ -93,17 +93,6 @@
     protected override void OnInitialized()
     {
         _node = NodeTemplate.Node.Value!;
-
-        // if (!IsCreate)
-        // {
-        //     _model = new TreeNodeFormModel
-        //     {
-        //         Name = _node.Text(),
-        //         Description = _node.Description,
-        //         SortOrder = _node.SortOrder,
-        //         IsActive = _node.IsActive
-        //     };
-        // }
 
         _title = IsCreate ? $"创建【{_node.Parent!.Text()}】子节点" : _node.Text();
 
@@ -135,7 +124,6 @@
      
         if (result == null) return;
         
-        // AttributeDefinitionDto = result;
         await OpenEditDialog(result);
     }
 
@@ -148,10 +136,15 @@
         };
         var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("添加属性", dialogParams);
         var result = await dialog.Result;
-        // if (result?.Canceled == false)
-        // {
-        //     await LoadAttributes();
-        // }
+        if (result?.Canceled == false)
+        {
+            await _nodeAttributesSky.LoadAttributes();
+        }
+    }
+
+    private async Task ValueChanged(AttributeDefinitionDto? definition)
+    {
+        await _nodeAttributesSky.LoadAttributes();
     }
     
     public void Dispose()

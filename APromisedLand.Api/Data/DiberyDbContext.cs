@@ -22,7 +22,8 @@ public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) 
     public DbSet<DateTimeAttributeValue> DateTimeAttributeValues => Set<DateTimeAttributeValue>();
     public DbSet<FileAttributeValue> FileAttributeValues => Set<FileAttributeValue>();
     public DbSet<LocationAttributeValue> LocationAttributeValues => Set<LocationAttributeValue>();
-    public DbSet<TableAttributeValue> TableAttributeValues => Set<TableAttributeValue>();
+    public DbSet<TableAttributeDefValue> TableAttributeValues => Set<TableAttributeDefValue>();
+    public DbSet<LocationAttributeDefValue> LocationAttributeDefValues => Set<LocationAttributeDefValue>();
 
     // 动态表类型行实例值（表属性的一行实例）
     public DbSet<TableRowAttributeValue> TableRowAttributeValues => Set<TableRowAttributeValue>();
@@ -139,12 +140,21 @@ public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) 
             entity.Property(e => e.Size);
         });
 
+        modelBuilder.Entity<LocationAttributeDefValue>(entity =>
+        {
+            entity.ToTable("LocationAttributeDefValues");
+            entity.Property(e => e.Value).IsRequired();
+        });
+
         modelBuilder.Entity<LocationAttributeValue>(entity =>
         {
             entity.ToTable("LocationAttributeValues");
+            entity.Property(e => e.NodeId).IsRequired().HasMaxLength(36);
+            entity.Property(e => e.LocationId).IsRequired().HasMaxLength(36);
+            entity.Property(e => e.AttributeDefinitionId).IsRequired().HasMaxLength(36);
         });
         
-        modelBuilder.Entity<TableAttributeValue>(entity =>
+        modelBuilder.Entity<TableAttributeDefValue>(entity =>
         {
             entity.ToTable("TableAttributeValues");
             entity.Property(e => e.Value).IsRequired();

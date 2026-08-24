@@ -2,6 +2,7 @@
 @using APromisedLand.Shared.Helper
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
+@inject AttributeApiClient AttributeApiClient
 @inject DiberyTreeApiClient<TItem> ApiClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -33,7 +34,7 @@
             <MudStack Spacing="2">
                 @foreach (var attr in _attributes)
                 {
-                    var typeEnum = attr.Definition.AttributeTypeId.ToAttributeTypeEnum();
+                    var typeEnum = attr.Definition?.AttributeTypeId.ToAttributeTypeEnum() ?? default;
                     var unit = attr.Definition?.Unit?.Abbreviation ?? attr.Definition?.Unit?.Name;
                     var lines = attr.Definition?.Lines ?? 1;
                     var maxLength = attr.Definition?.MaxLength;
@@ -101,7 +102,7 @@
         _loading = true;
         try
         {
-            var result = await ApiClient.GetAllValuesAsync(NodeId);
+            var result = await AttributeApiClient.GetAllValuesAsync(NodeId);
             _attributes = result?.AttributeDtos ?? new();
         }
         catch (Exception ex)
@@ -138,7 +139,7 @@
         {
             try
             {
-                await ApiClient.DeleteValueAsync(NodeId, attr.Id);
+                await AttributeApiClient.DeleteValueAsync(NodeId, attr.Id);
                 await LoadAttributes();
                 Snackbar.Add($"属性“{attr.Definition?.Name}”已删除", Severity.Success);
             }
@@ -153,7 +154,7 @@
     {
         try
         {
-            await ApiClient.UpdateValueAsync(NodeId, attr.Id, new UpdateValueDto { Value = attr.Value });
+            await AttributeApiClient.UpdateValueAsync(NodeId, attr.Id, new UpdateValueDto { Value = attr.Value });
             Snackbar.Add($"属性“{attr.Definition?.Name}”已更新", Severity.Success);
         }
         catch (Exception ex)

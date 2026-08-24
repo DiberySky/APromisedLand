@@ -33,7 +33,7 @@
                       SelectedItemChanged="@SelectedItemChanged">
                 <GroupHeaderTemplate>
                     <MudTh Class="mud-table-cell-custom-group" colspan="7">
-                        @($"{context.GroupName} => {context.Key?.ToString().ToAttributeTypeName()}")
+                        @($"{context.GroupName} => {context.Key?.ToString()!.ToAttributeTypeName()}")
                     </MudTh>
                 </GroupHeaderTemplate>
                 <HeaderContent>

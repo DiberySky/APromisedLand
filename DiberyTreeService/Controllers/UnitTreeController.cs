@@ -8,9 +8,8 @@ namespace DiberyTreeService.Controllers;
 [ApiController]
 [Route("[controller]")]  // 路由: /api/UnitTree
 public class UnitTreeController(ITreeService<UnitTree> treeService, 
-ITreeAttributeService attributeService,
 ILogger<UnitTreeController> logger)
-: TreeControllerBase<UnitTree>(treeService, attributeService, logger)
+: TreeControllerBase<UnitTree>(treeService, logger)
 {
     
 }

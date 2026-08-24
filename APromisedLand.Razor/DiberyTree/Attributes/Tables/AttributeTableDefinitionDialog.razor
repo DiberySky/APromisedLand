@@ -65,7 +65,7 @@
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
 
-        if (_tableType == null)
+        if (_tableType == default)
         {
             Snackbar.Add("未找到「表格」类型定义", Severity.Error);
             return;

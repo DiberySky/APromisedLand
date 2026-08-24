@@ -9,8 +9,7 @@ using MudBlazor;
 
 namespace APromisedLand.Razor.DiberyTree.Base;
 
-public partial class TreeSky<TItem> : ComponentBase
-    where TItem : class, ITreeNodeBase<TItem>, new()
+public partial class TreeSky<TItem> 
 {
     // ========== 节点操作回调（由外部页面处理具体业务） ==========
     private async Task ShowAddChildActionsAsync(ITreeItemData<TItem> node)

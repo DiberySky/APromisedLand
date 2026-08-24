@@ -81,12 +81,14 @@
                         break;
                     case AttributeTypeEnum.定位:
                         <MudItem xs="12">
-                            <MudText>定位类型输入控件待实现</MudText>
+                            <LocationDefValue @bind-Value="@LocationName"
+                                           TItem="@TItem"
+                                           DefinitionDto="@DefinitionDto"/>
                         </MudItem>
                         break;
                     case AttributeTypeEnum.表格:
                         <MudItem xs="12">
-                            <TableValue @bind-Value="@TableName"
+                            <TableDefValue @bind-Value="@TableName"
                                         TItem="@TItem"
                                         DefinitionDto="@DefinitionDto"/>
                         </MudItem>
@@ -113,8 +115,9 @@
     [Parameter] public TimeSpan? TimeValue { get; set; }
     [Parameter] public DateTimeOffset? DateTimeValue { get; set; }
     [Parameter] public string? FileUrl { get; set; }
-    [Parameter] public double? Latitude { get; set; }
-    [Parameter] public double? Longitude { get; set; }
+    [Parameter] public string? LocationName { get; set; }
+    // [Parameter] public double? Latitude { get; set; }
+    // [Parameter] public double? Longitude { get; set; }
     [Parameter] public string? TableName { get; set; }
 
     private List<AttributeDefinitionDto>? DefinitionDtos;
@@ -209,13 +212,13 @@
                     valueElement = JsonSerializer.SerializeToElement(FileUrl);
                     break;
                 case AttributeTypeEnum.定位:
-                    if (!Latitude.HasValue || !Longitude.HasValue)
+                    if (string.IsNullOrWhiteSpace(LocationName))
                     {
-                        Snackbar.Add("请输入经纬度", Severity.Warning);
+                        Snackbar.Add("请输入地点位置名称", Severity.Warning);
                         return;
                     }
 
-                    valueElement = JsonSerializer.SerializeToElement(new { latitude = Latitude!.Value, longitude = Longitude!.Value });
+                    valueElement = JsonSerializer.SerializeToElement(LocationName);
                     break;
                 case AttributeTypeEnum.表格:
                     if (string.IsNullOrWhiteSpace(TableName))
@@ -231,7 +234,7 @@
             }
 
             var dto = new AddValueDto(DefinitionDto.Id, valueElement);
-            await ApiClient.AddValueAsync(NodeId, dto);
+            await AttributeApiClient.AddValueAsync(NodeId, dto);
 
             Snackbar.Add("属性添加成功", Severity.Success);
             MudDialog?.Close(DialogResult.Ok(true));
@@ -241,35 +244,4 @@
             Message.Details("添加失败.", ex.Message);
         }
     }
-
-    private async Task EditClick()
-    {
-        var dialogParams = new DialogParameters<AttributeDefinitionListDialog<TItem>>
-        {
-            // { x => x.NodeId, NodeId }
-        };
-        var result = await TreeNodeDialogService.ShowAttributeDefinitionListDialogAsync();
-        // var result = await dialog;
-        // if (!result.Canceled)
-        // {
-        //     // await LoadAttributes(); // 刷新列表
-        // }
-    }
-
-    private void AttributeDefinitionChanged(AttributeDefinitionDto dto)
-    {
-        DefinitionDto = dto;
-        // 切换定义时清空之前的值，防止类型混淆
-        TextValue = null;
-        IntegerValue = null;
-        DecimalValue = null;
-        DateValue = null;
-        TimeValue = null;
-        DateTimeValue = null;
-        FileUrl = null;
-        Latitude = null;
-        Longitude = null;
-        StateHasChanged();
-    }
-
 }

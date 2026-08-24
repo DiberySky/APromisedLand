@@ -1,0 +1,98 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@using System.Text.Json
+
+<AttributeValueSky TItem="@TItem"
+                   NodeId="@NodeId"
+                   ValueId="@ValueId"
+                   @bind-JsonValue="@JsonValue"
+                   DefinitionDto="@DefinitionDto"
+                   ReadOnly="@ReadOnly"
+                   OnSaveClick="@OnSaveClick"
+                   OnDeleteClick="@OnDeleteClick"
+                   OnEditChanged="@OnEditChanged">
+    <ValueContent>
+        <MudStack Class="d-flex flex-grow-1" Spacing="0">
+            <MudGrid Class="ma-0 pa-0">
+                <MudItem xs="12" sm="6" Class="pa-1">
+                    <MudNumericField T="double" Value="@Latitude"
+                                     Label="纬度 (Latitude)"
+                                     Variant="Variant.Outlined"
+                                     Min="-90" Max="90"
+                                     FullWidth="true"
+                                     Immediate="true"
+                                     ValueChanged="OnLatitudeChanged"
+                                     ReadOnly="@ReadOnly"/>
+                </MudItem>
+                <MudItem xs="12" sm="6" Class="pa-1">
+                    <MudNumericField T="double" Value="@Longitude"
+                                     Label="经度 (Longitude)"
+                                     Variant="Variant.Outlined"
+                                     Min="-180" Max="180"
+                                     FullWidth="true"
+                                     Immediate="true"
+                                     ValueChanged="OnLongitudeChanged"
+                                     ReadOnly="@ReadOnly"/>
+                </MudItem>
+            </MudGrid>
+
+            <MudStack Row="true">
+                @if (_infoVisible)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                        类型：@DefinitionDto!.AttributeType.ToName()，
+                        纬度范围 [-90, 90]，经度范围 [-180, 180]
+                    </MudText>
+                }
+                <MudSpacer/>
+                <MudIconButton Size="Size.Small" Color="Color.Info" Class="ma-0 pa-0"
+                               Icon="@(_infoVisible
+                                         ? Icons.Material.Outlined.KeyboardDoubleArrowRight
+                                         : Icons.Material.Outlined.KeyboardDoubleArrowLeft)"
+                               OnClick="@(() => _infoVisible = !_infoVisible)"/>
+            </MudStack>
+        </MudStack>
+    </ValueContent>
+</AttributeValueSky>
+
+@code {
+    [Parameter] public required string? NodeId { get; set; }
+    [Parameter] public string? ValueId { get; set; }
+    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public double Latitude { get; set; }
+    [Parameter] public EventCallback<double> LatitudeChanged { get; set; }
+    [Parameter] public double Longitude { get; set; }
+    [Parameter] public EventCallback<double> LongitudeChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+    
+    private bool _infoVisible;
+    private JsonElement? JsonValue { get; set; }
+
+    protected override void OnInitialized()
+    {
+        JsonValue = JsonSerializer.SerializeToElement(new { latitude = Latitude, longitude = Longitude });
+        base.OnInitialized();
+    }
+
+    private void OnLatitudeChanged(double value)
+    {
+        Latitude = value;
+        _ = LatitudeChanged.InvokeAsync(value);
+        UpdateJsonValue();
+    }
+
+    private void OnLongitudeChanged(double value)
+    {
+        Longitude = value;
+        _ = LongitudeChanged.InvokeAsync(value);
+        UpdateJsonValue();
+    }
+
+    private void UpdateJsonValue()
+    {
+        JsonValue = JsonSerializer.SerializeToElement(new { latitude = Latitude, longitude = Longitude });
+    }
+}

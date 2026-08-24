@@ -119,8 +119,6 @@
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
     
-    private string ParentName => ParentNode?.Text() ?? "根分类";
-
     private void OnAttribute()
     {
         CloseWithAction(NodeAction.Attribute);

@@ -22,8 +22,8 @@ public static class ValueValidator
                 case AttributeTypeEnum.时间: return ValidateTime(def, jsonValue, nodeId);
                 case AttributeTypeEnum.日期时间: return ValidateDateTime(def, jsonValue, nodeId);
                 case AttributeTypeEnum.文件: return ValidateFile(def, jsonValue, nodeId);
-                case AttributeTypeEnum.定位: return ValidateLocation(def, jsonValue, nodeId);
-                case AttributeTypeEnum.表格: return ValidateTable(def, jsonValue, nodeId);
+                case AttributeTypeEnum.定位: return ValidateLocationDef(def, jsonValue, nodeId);
+                case AttributeTypeEnum.表格: return ValidateTableDef(def, jsonValue, nodeId);
                 default: return (false, $"不支持的类型 '{typeEnum}'", null);
             }
         }
@@ -177,8 +177,23 @@ public static class ValueValidator
             Longitude = lon
         });
     }
+    private static (bool, string?, AttributeValueBase?) ValidateLocationDef(AttributeDefinition def, JsonElement json, string nodeId)
+    {
+        var actual = ExtractValue(json);
+        if (actual.ValueKind != JsonValueKind.String)
+            return (false, "文本类型必须提供字符串", null);
+        string value = actual.GetString()!;
+        if (value.Length > def.MaxLength)
+            return (false, $"文本长度不能超过 {def.MaxLength} 个字符", null);
+        return (true, null, new TextAttributeValue
+        {
+            NodeId = nodeId,
+            AttributeDefinitionId = def.Id,
+            Value = value
+        });
+    }
     
-    private static (bool, string?, AttributeValueBase?) ValidateTable(AttributeDefinition def, JsonElement json, string nodeId)
+    private static (bool, string?, AttributeValueBase?) ValidateTableDef(AttributeDefinition def, JsonElement json, string nodeId)
     {
         var actual = ExtractValue(json);
         if (actual.ValueKind != JsonValueKind.String)

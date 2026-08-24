@@ -16,7 +16,10 @@ else
                        ValueId="@ValueId"
                        @bind-JsonValue="@JsonValue"
                        DefinitionDto="@DefinitionDto"
-                       ReadOnly="@ReadOnly">
+                       ReadOnly="@ReadOnly"
+                       OnSaveClick="@OnSaveClick"
+                       OnDeleteClick="@OnDeleteClick"
+                       OnEditChanged="@OnEditChanged">
         <ValueContent>
             <MudStack Class="d-flex flex-grow-1" Row="true" Spacing="0">
                 <MudDatePicker Date="@_date"
@@ -47,6 +50,10 @@ else
     [Parameter] public EventCallback<DateTimeOffset?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+    
     DateTime? _date;
     TimeSpan? _selectedTime;
 

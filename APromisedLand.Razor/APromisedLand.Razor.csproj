@@ -35,6 +35,15 @@
     <Compile Update="DiberyTree\Base\TreeSky.razor.Action.cs">
       <DependentUpon>TreeSky.razor</DependentUpon>
     </Compile>
+    <Compile Update="DiberyTree\Base\TreeSky.razor.Helper.cs">
+      <DependentUpon>TreeSky.razor</DependentUpon>
+    </Compile>
+    <Compile Update="DiberyTree\Base\TreeSky.razor.Loading.cs">
+      <DependentUpon>TreeSky.razor</DependentUpon>
+    </Compile>
+    <Compile Update="DiberyTree\Base\TreeSky.razor.Node.cs">
+      <DependentUpon>TreeSky.razor</DependentUpon>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup>

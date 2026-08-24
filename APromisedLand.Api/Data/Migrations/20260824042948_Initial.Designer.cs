@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(DiberyDbContext))]
-    [Migration("20260823173525_Initial")]
+    [Migration("20260824042948_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -1716,6 +1716,17 @@ namespace APromisedLand.Api.Data.Migrations
                     b.ToTable("IntegerAttributeValues", (string)null);
                 });
 
+            modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.LocationAttributeDefValue", b =>
+                {
+                    b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.ToTable("LocationAttributeDefValues", (string)null);
+                });
+
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.LocationAttributeValue", b =>
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
@@ -1723,13 +1734,18 @@ namespace APromisedLand.Api.Data.Migrations
                     b.Property<double>("Latitude")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("LocationId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
                     b.Property<double>("Longitude")
                         .HasColumnType("double precision");
 
                     b.ToTable("LocationAttributeValues", (string)null);
                 });
 
-            modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TableAttributeValue", b =>
+            modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TableAttributeDefValue", b =>
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
 

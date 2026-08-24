@@ -1,0 +1,86 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@inject AttributeApiClient AttributeApiClient
+
+<AttributeValueSky TItem="@TItem"
+                   NodeId="@NodeId"
+                   ValueId="@ValueId"
+                   @bind-JsonValue="@JsonValue"
+                   DefinitionDto="@DefinitionDto"
+                   ReadOnly="@ReadOnly"
+                   OnSaveClick="@OnSaveClick"
+                   OnDeleteClick="@OnDeleteClick"
+                   OnEditChanged="@OnEditChanged">
+    <ValueContent>
+        @if (ReadOnly)
+        {
+            <MudTextField T="string"
+                          Value="@Value"
+                          Label="表格名称"
+                          Variant="Variant.Outlined"
+                          ReadOnly="@ReadOnly"
+                          Adornment="Adornment.End"
+                          AdornmentColor="Color.Success"
+                          AdornmentIcon="@Icons.Material.Outlined.EditNote"
+                          OnAdornmentClick="@(HandleAdornmentClick)"/>
+        }
+        else
+        {
+            <MudTextField T="string"
+                          Value="@Value"
+                          Label="表格名称"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredError="表格名称不能为空"
+                          MaxLength="50"
+                          Counter="50"
+                          ReadOnly="@ReadOnly"
+                          ValueChanged="@(HandleValueChanged)"/>
+        }
+    </ValueContent>
+</AttributeValueSky>
+
+@code {
+    [Parameter] public required string? NodeId { get; set; }
+    [Parameter] public string? ValueId { get; set; }
+    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+
+    private JsonElement? JsonValue { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Value ??= DefinitionDto?.Name;
+
+        JsonValue = JsonSerializer.SerializeToElement(Value);
+
+        base.OnInitialized();
+    }
+
+    private void HandleValueChanged(string? value)
+    {
+        Value = value;
+        _ = ValueChanged.InvokeAsync(Value);
+
+        JsonValue = value is not null ? JsonSerializer.SerializeToElement(value) : null;
+    }
+    
+    private async Task HandleAdornmentClick()
+    {
+        var list = await AttributeApiClient.ListTableColumnsAsync(DefinitionDto!.Id);
+        List<AttributeDefinitionDto> columns = [.. list];
+        
+        // await TreeNodeDialogService.
+        //     ShowAttributeTableRowEditDialogAsync(DefinitionDto, columns);
+
+        await TreeNodeDialogService.
+            ShowAttributeTableRowsPanelDialogAsync(NodeId!, ValueId!, DefinitionDto, columns);
+    }
+}

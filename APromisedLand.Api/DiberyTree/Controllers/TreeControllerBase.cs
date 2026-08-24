@@ -1,5 +1,4 @@
 using APromisedLand.Api.DiberyTree.Interface;
-using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.DTOs;
 using Microsoft.AspNetCore.Http;
@@ -16,7 +15,6 @@ namespace APromisedLand.Api.DiberyTree.Controllers;
 [Route("[controller]")]
 public abstract class TreeControllerBase<T>(
     ITreeService<T> treeService,
-    ITreeAttributeService attributeService,
     ILogger<TreeControllerBase<T>> logger)
     : ControllerBase
 {
@@ -239,117 +237,6 @@ public abstract class TreeControllerBase<T>(
         {
             Logger.LogError(ex, "获取祖先路径失败");
             return StatusCode(500, ApiResponse<object>.Fail($"获取祖先路径失败: {ex.Message}"));
-        }
-    }
-
-    // 属性定义端点已分离至 AttributesControllerBase（属性定义不耦合具体树，可独立路由）
-
-    // ==================== 属性值 (路由前缀: {nodeId}/attributes/values) ====================
-
-    [HttpPost("{nodeId}/attributes/values")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> AddValue(string nodeId, [FromBody] AddValueDto dto)
-    {
-        try
-        {
-            var result = await attributeService.AddValueAsync(nodeId, dto);
-            return CreatedAtAction(nameof(GetSingleValue), new { nodeId, id = result.Id }, ApiResponse<object>.Ok(result, "属性值添加成功"));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(ApiResponse<object>.Fail(ex.Message));
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(ApiResponse<object>.Fail(ex.Message));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "添加节点属性值失败, NodeId: {NodeId}", nodeId);
-            return StatusCode(500, ApiResponse<object>.Fail($"添加属性值时发生错误: {ex.Message}"));
-        }
-    }
-
-    // 修改：移除 :int 约束，因为 Id 已改为 string
-    [HttpGet("{nodeId}/attributes/values/{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> GetSingleValue(string nodeId, string id)
-    {
-        try
-        {
-            var dto = await attributeService.GetValueAsync(nodeId, id);
-            if (dto is null)
-                return NotFound(ApiResponse<object>.Fail($"属性值 {id} 不存在或不属于节点 {nodeId}"));
-            return Ok(ApiResponse<AttributeDto>.Ok(dto));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "获取属性值失败, NodeId: {NodeId}, ValueId: {ValueId}", nodeId, id);
-            return StatusCode(500, ApiResponse<object>.Fail($"获取属性值失败: {ex.Message}"));
-        }
-    }
-
-    [HttpGet("{nodeId}/attributes/values")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> GetAllValues(string nodeId)
-    {
-        try
-        {
-            var nodeDto = await attributeService.GetAllValuesAsync(nodeId);
-            return Ok(ApiResponse<NodeDto>.Ok(nodeDto));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "获取节点所有属性值失败, NodeId: {NodeId}", nodeId);
-            return StatusCode(500, ApiResponse<object>.Fail($"获取节点所有属性值失败: {ex.Message}"));
-        }
-    }
-
-    [HttpPut("{nodeId}/attributes/values/{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> UpdateValue(string nodeId, string id, [FromBody] UpdateValueDto valueDto, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await attributeService.UpdateValueAsync(nodeId, id, valueDto.Value, cancellationToken);
-            return Ok(ApiResponse<object>.Ok(valueDto, "属性值更新成功"));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(ApiResponse<object>.Fail(ex.Message));
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(ApiResponse<object>.Fail(ex.Message));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "更新属性值失败, NodeId: {NodeId}, ValueId: {ValueId}", nodeId, id);
-            return StatusCode(500, ApiResponse<object>.Fail($"更新属性值失败: {ex.Message}"));
-        }
-    }
-    
-    [HttpDelete("{nodeId}/attributes/values/{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> DeleteValue(string nodeId, string id)
-    {
-        try
-        {
-            var deleted = await attributeService.DeleteValueAsync(nodeId, id);
-            if (!deleted)
-                return NotFound(ApiResponse<object>.Fail($"属性值 {id} 不存在或不属于节点 {nodeId}"));
-            return Ok(ApiResponse<bool>.Ok(true));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "删除属性值失败, NodeId: {NodeId}, ValueId: {ValueId}", nodeId, id);
-            return StatusCode(500, ApiResponse<object>.Fail($"删除属性值失败: {ex.Message}"));
         }
     }
 }

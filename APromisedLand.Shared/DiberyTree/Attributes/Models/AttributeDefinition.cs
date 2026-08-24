@@ -79,19 +79,9 @@ public class AttributeDefinition
         // ===== 引用 UnitTree 中常用单位的固定 GUID（从 UnitTree.SeedData() 中提取） =====
         // 长度单位
         const string UNIT_METER = "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c"; // 米
-        const string UNIT_KILOMETER = "d1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"; // 千米
         const string UNIT_CENTIMETER = "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"; // 厘米
         // 质量单位
         const string UNIT_KILOGRAM = "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e"; // 千克
-        const string UNIT_GRAM = "f9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f"; // 克
-        // 时间单位
-        const string UNIT_SECOND = "e4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e"; // 秒
-        const string UNIT_MINUTE = "f5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f"; // 分钟
-        // 体积单位
-        const string UNIT_LITER = "7f0af6a9-ba1a-469c-b967-e32afe43cad2"; // 升
-        const string UNIT_MILLILITER = "780e7a01-350d-45ec-b963-b36a996de614"; // 毫升
-        // 面积单位
-        const string UNIT_SQUARE_METER = "e88b04db-40ac-4bb7-b420-1f3b37180673"; // 平方米
 
         // 温度、电流、电压等其他单位可自行引用，此处仅示例常用
 

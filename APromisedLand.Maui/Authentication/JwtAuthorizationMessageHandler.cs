@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Headers;
@@ -42,7 +42,18 @@ public class JwtAuthorizationMessageHandler : DelegatingHandler
         if (response.StatusCode != HttpStatusCode.Unauthorized)
             return response;
 
-        // 4. 收到 401，尝试刷新令牌
+        // 4. 仅对幂等方法 (GET / PUT / DELETE) 执行 401 自动重试
+        //    POST / PATCH 是非幂等操作，重试会导致重复创建/重复修改，必须禁止
+        var method = request.Method;
+        if (method != HttpMethod.Get && method != HttpMethod.Put && method != HttpMethod.Delete)
+        {
+            Console.WriteLine($"[JwtHandler] 401 但跳过自动重试（非幂等方法 {method.Method}），Uri: {request.RequestUri}");
+            // 非幂等方法：尝试刷新令牌更新存储，但不重试请求本身
+            _ = TryRefreshTokenAsync(cancellationToken);
+            return response;
+        }
+
+        // 5. 收到 401，尝试刷新令牌
         var newToken = await TryRefreshTokenAsync(cancellationToken);
         if (newToken == null)
         {
@@ -51,7 +62,7 @@ public class JwtAuthorizationMessageHandler : DelegatingHandler
             return response;
         }
 
-        // 5. 用新令牌重试原始请求（注意：需要克隆请求，因为原请求已发送）
+        // 6. 用新令牌重试原始请求（注意：需要克隆请求，因为原请求已发送）
         var retryRequest = await CloneHttpRequestMessageAsync(request);
         retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
         return await base.SendAsync(retryRequest, cancellationToken);

@@ -8,13 +8,16 @@
                    ValueId="@ValueId"
                    @bind-JsonValue="@JsonValue"
                    DefinitionDto="@DefinitionDto"
-                   ReadOnly="@ReadOnly">
+                   ReadOnly="@ReadOnly"
+                   OnSaveClick="@OnSaveClick"
+                   OnDeleteClick="@OnDeleteClick"
+                   OnEditChanged="@OnEditChanged">
     <ValueContent>
         @if (ReadOnly)
         {
             <MudTextField T="string"
                           Value="@Value"
-                          Label="表格名称"
+                          Label="地点位置名称"
                           Variant="Variant.Outlined"
                           ReadOnly="@ReadOnly"
                           Adornment="Adornment.End"
@@ -26,10 +29,10 @@
         {
             <MudTextField T="string"
                           Value="@Value"
-                          Label="表格名称"
+                          Label="地点位置名称"
                           Variant="Variant.Outlined"
                           Required="true"
-                          RequiredError="表格名称不能为空"
+                          RequiredError="地点位置名称不能为空"
                           MaxLength="50"
                           Counter="50"
                           ReadOnly="@ReadOnly"
@@ -46,6 +49,10 @@
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+    
     private JsonElement? JsonValue { get; set; }
 
     protected override void OnInitialized()
@@ -74,6 +81,6 @@
         //     ShowAttributeTableRowEditDialogAsync(DefinitionDto, columns);
 
         await TreeNodeDialogService.
-            ShowAttributeTableRowsPanelDialogAsync(NodeId, ValueId!, DefinitionDto, columns);
+            ShowAttributeTableRowsPanelDialogAsync(NodeId!, ValueId!, DefinitionDto, columns);
     }
 }

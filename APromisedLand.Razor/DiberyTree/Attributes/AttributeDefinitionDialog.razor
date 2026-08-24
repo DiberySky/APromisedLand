@@ -263,7 +263,7 @@
 
     private async Task OpenTableDialogAsync()
     {
-        var result = await TreeNodeDialogService.ShowAttributeTableDefinitionListDialogAsync(TableId);
+        var result = await TreeNodeDialogService.ShowAttributeTableDefinitionListDialogAsync(TableId!);
         // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
         if (result == true)
         {

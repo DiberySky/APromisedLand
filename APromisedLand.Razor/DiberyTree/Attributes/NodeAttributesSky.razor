@@ -1,10 +1,8 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-@inject DiberyTreeApiClient<TItem> ApiClient
-@inject IDialogService DialogService
+@inject AttributeApiClient AttributeApiClient
 @inject ISnackbar Snackbar
-@inject TreeNodeDialogService<TItem> TreeNodeDialogService
-@inject BlazorService BlazorService
+
 
 @if (_loading)
 {
@@ -32,10 +30,8 @@ else
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@textValue"
-                                       ReadOnly="@ReadOnly"/>
-
-                            _definition = attr.Definition;
-                            _valueElement = JsonSerializer.SerializeToElement(textValue);
+                                       ReadOnly="@ReadOnly"
+                                       OnEditChanged="@ValueEditChanged"/>
                             break;
                         case AttributeTypeEnum.整数:
                             var integerValue = attr.Value.GetValue<long>();
@@ -46,9 +42,6 @@ else
                                           DefinitionDto="@attr.Definition?.ToDto()"
                                           Value="@integerValue"
                                           ReadOnly="@ReadOnly"/>
-
-                            _definition = attr.Definition;
-                            _valueElement = JsonSerializer.SerializeToElement(integerValue);
                             break;
                         case AttributeTypeEnum.小数:
                             var decimalValue = attr.Value.GetValue<decimal>();
@@ -59,9 +52,6 @@ else
                                           DefinitionDto="@attr.Definition?.ToDto()"
                                           Value="@decimalValue"
                                           ReadOnly="@ReadOnly"/>
-
-                            _definition = attr.Definition;
-                            _valueElement = JsonSerializer.SerializeToElement(decimalValue);
                             break;
                         case AttributeTypeEnum.日期:
                             var dateValue = attr.Value.GetValue<DateTimeOffset>();
@@ -72,9 +62,6 @@ else
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@dateValue"
                                        ReadOnly="@ReadOnly"/>
-
-                            _definition = attr.Definition;
-                            _valueElement = JsonSerializer.SerializeToElement(dateValue);
                             break;
                         case AttributeTypeEnum.时间:
                             var timeValue = attr.Value.GetValue<TimeSpan>();
@@ -85,9 +72,6 @@ else
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@timeValue"
                                        ReadOnly="@ReadOnly"/>
-
-                            _definition = attr.Definition;
-                            _valueElement = JsonSerializer.SerializeToElement(timeValue);
                             break;
                         case AttributeTypeEnum.日期时间:
                             var dateTimeValue = attr.Value.GetValue<DateTimeOffset>();
@@ -98,9 +82,6 @@ else
                                            DefinitionDto="@attr.Definition?.ToDto()"
                                            Value="@dateTimeValue"
                                            ReadOnly="@ReadOnly"/>
-
-                            _definition = attr.Definition;
-                            _valueElement = JsonSerializer.SerializeToElement(dateTimeValue);
                             break;
                         case AttributeTypeEnum.文件:
                             var fileValue = attr.Value.GetValue<string>();
@@ -113,19 +94,24 @@ else
                                        ReadOnly="@ReadOnly"/>
                             break;
                         case AttributeTypeEnum.定位:
+                            var locationDefValue = attr.Value.GetValue<string>();
+
+                            <LocationDefValue TItem="@TItem"
+                                           NodeId="@NodeId"
+                                           ValueId="@attr.Id"
+                                           DefinitionDto="@attr.Definition?.ToDto()"
+                                           Value="@locationDefValue"          
+                                           ReadOnly="@ReadOnly"/>
                             break;
                         case AttributeTypeEnum.表格:
-                            var tableValue = attr.Value.GetValue<string>();
+                            var tableDefValue = attr.Value.GetValue<string>();
 
-                            <TableValue TItem="@TItem"
+                            <TableDefValue TItem="@TItem"
                                        NodeId="@NodeId"
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
-                                       Value="@tableValue"          
+                                       Value="@tableDefValue"          
                                        ReadOnly="@ReadOnly"/>
-
-                            _definition = attr.Definition;
-                            _valueElement = JsonSerializer.SerializeToElement(tableValue);
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();
@@ -140,24 +126,25 @@ else
     [Parameter] public required string? NodeId { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+    
     private List<AttributeDto>? _attributeDtos;
     private bool _loading;
-
-    private AttributeDefinition? _definition;
-    private JsonElement _valueElement;
-
+    
     protected override async Task OnInitializedAsync()
     {
         await LoadAttributes();
     }
 
-    private async Task LoadAttributes()
+    public async Task LoadAttributes()
     {
         if (string.IsNullOrEmpty(NodeId)) return;
         _loading = true;
         try
         {
-            var result = await ApiClient.GetAllValuesAsync(NodeId);
+            var result = await AttributeApiClient.GetAllValuesAsync(NodeId);
             _attributeDtos = result?.AttributeDtos ?? new();
         }
         catch (Exception ex)
@@ -167,66 +154,76 @@ else
         finally
         {
             _loading = false;
+            StateHasChanged();
         }
     }
 
-    private async Task DeleteValue(AttributeDto attr)
+    private async Task ValueEditChanged(AttributeDefinitionDto? definition)
     {
-        bool? confirm = await DialogService.ShowMessageBoxAsync(
-            "确认删除",
-            $"确定要删除属性“{attr.Definition?.Name ?? "未命名"}”吗？",
-            "删除", "取消");
-        if (confirm == true)
-        {
-            try
-            {
-                await ApiClient.DeleteValueAsync(NodeId, attr.Id);
-                await LoadAttributes();
-                Snackbar.Add($"属性“{attr.Definition?.Name}”已删除", Severity.Success);
-            }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"删除失败: {ex.Message}", Severity.Error);
-            }
-        }
+        await LoadAttributes();
+        
+        await OnEditChanged.InvokeAsync(definition);
+        await OnDeleteClick.InvokeAsync(definition);
+        await OnSaveClick.InvokeAsync(definition);
     }
 
-    private async Task SaveValue(AttributeDto attr)
-    {
-        try
-        {
-            await ApiClient.UpdateValueAsync(NodeId!, attr.Id, new UpdateValueDto { Value = attr.Value });
-            Snackbar.Add($"属性“{attr.Definition?.Name}”已更新", Severity.Success);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"更新失败: {ex.Message}", Severity.Error);
-        }
-    }
-
-    private async Task OpenEditDialog(AttributeDefinition? _definition, JsonElement valueElement)
-    {
-        var dialogParams = new DialogParameters<AddAttributeValueDialog<TItem>>
-        {
-            { x => x.NodeId, NodeId },
-            { x => x.DefinitionDto, _definition!.ToDto() },
-            { x => x.ValueElement, valueElement }
-        };
-
-        var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("编辑属性", dialogParams);
-        var result = await dialog.Result;
-        if (result?.Canceled == false)
-        {
-            await LoadAttributes();
-        }
-    }
-
-    // ---------- 辅助方法 ----------
-    private bool IsNumericType(AttributeTypeEnum type)
-        => type == AttributeTypeEnum.整数 || type == AttributeTypeEnum.小数;
-
-    private int GetScale(AttributeTypeEnum type)
-        => type == AttributeTypeEnum.小数 ? 2 : 0;
-
-    private decimal? GetMinValue(AttributeTypeEnum type) => 0;
+    // private async Task DeleteValue(AttributeDto attr)
+    // {
+    //     bool? confirm = await DialogService.ShowMessageBoxAsync(
+    //         "确认删除",
+    //         $"确定要删除属性“{attr.Definition?.Name ?? "未命名"}”吗？",
+    //         "删除", "取消");
+    //     if (confirm == true)
+    //     {
+    //         try
+    //         {
+    //             await AttributeApiClient.DeleteValueAsync(NodeId!, attr.Id);
+    //             await LoadAttributes();
+    //             Snackbar.Add($"属性“{attr.Definition?.Name}”已删除", Severity.Success);
+    //         }
+    //         catch (Exception ex)
+    //         {
+    //             Snackbar.Add($"删除失败: {ex.Message}", Severity.Error);
+    //         }
+    //     }
+    // }
+    //
+    // private async Task SaveValue(AttributeDto attr)
+    // {
+    //     try
+    //     {
+    //         await AttributeApiClient.UpdateValueAsync(NodeId!, attr.Id, new UpdateValueDto { Value = attr.Value });
+    //         Snackbar.Add($"属性“{attr.Definition?.Name}”已更新", Severity.Success);
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Snackbar.Add($"更新失败: {ex.Message}", Severity.Error);
+    //     }
+    // }
+    //
+    // private async Task OpenEditDialog(AttributeDefinition? _definition, JsonElement valueElement)
+    // {
+    //     var dialogParams = new DialogParameters<AddAttributeValueDialog<TItem>>
+    //     {
+    //         { x => x.NodeId, NodeId },
+    //         { x => x.DefinitionDto, _definition!.ToDto() },
+    //         { x => x.ValueElement, valueElement }
+    //     };
+    //
+    //     var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("编辑属性", dialogParams);
+    //     var result = await dialog.Result;
+    //     if (result?.Canceled == false)
+    //     {
+    //         await LoadAttributes();
+    //     }
+    // }
+    //
+    // // ---------- 辅助方法 ----------
+    // private bool IsNumericType(AttributeTypeEnum type)
+    //     => type == AttributeTypeEnum.整数 || type == AttributeTypeEnum.小数;
+    //
+    // private int GetScale(AttributeTypeEnum type)
+    //     => type == AttributeTypeEnum.小数 ? 2 : 0;
+    //
+    // private decimal? GetMinValue(AttributeTypeEnum type) => 0;
 }

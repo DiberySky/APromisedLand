@@ -13,9 +13,8 @@ namespace DiberyTreeService.Controllers;
 [Route("[controller]")]  // 路由: /api/CategoryTree
 public class CategoryTreeController(
     ITreeService<CategoryTree> treeService,
-    ITreeAttributeService attributeService,
     ILogger<CategoryTreeController> logger)
-    : TreeControllerBase<CategoryTree>(treeService, attributeService, logger)
+    : TreeControllerBase<CategoryTree>(treeService, logger)
 {
     // ==================== 自定义扩展端点 ====================
 

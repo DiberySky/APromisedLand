@@ -14,7 +14,7 @@ namespace APromisedLand.Shared.DiberyTree.Attributes.Models;
 ///           → Text/Decimal/… 列值(NodeId=行实例 Id, DefId=列定义)。
 /// </para>
 /// </summary>
-public class TableAttributeValue : AttributeValueBase
+public class TableAttributeDefValue : AttributeValueBase
 {
     /// <summary>
     /// 表名称，用于表 Id。

@@ -1,9 +1,6 @@
-@using APromisedLand.Razor.Helper.Blazor
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-@inject DiberyTreeApiClient<TItem> ApiClient
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject AttributeApiClient AttributeApiClient
 @inject MessageService Message
 
 <MudStack Row="true" Class="d-flex flex-grow-1" Justify="Justify.SpaceBetween"
@@ -37,9 +34,10 @@
 
     [Parameter] public RenderFragment? ValueContent { get; set; }
 
-    [Parameter] public EventCallback<AttributeDto?> OnSaveClick { get; set; }
-    [Parameter] public EventCallback<AttributeDto?> OnDeleteClick { get; set; }
-    [Parameter] public EventCallback<AttributeDto?> EditChanged { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+
 
     protected override void OnInitialized()
     {
@@ -53,9 +51,11 @@
 
         try
         {
-            await ApiClient.UpdateValueAsync(NodeId!, ValueId, 
+            await AttributeApiClient.UpdateValueAsync(NodeId!, ValueId, 
                 new UpdateValueDto { Value = JsonValue.Value });
-            Snackbar.Add($"属性“{DefinitionDto?.Name}”已更新", Severity.Success);
+            Message.Success($"属性“{DefinitionDto?.Name}”已更新");
+            await OnSaveClick.InvokeAsync(DefinitionDto);
+            await OnEditChanged.InvokeAsync(DefinitionDto);
         }
         catch (Exception ex)
         {
@@ -74,9 +74,11 @@
 
             try
             {
-                await ApiClient.DeleteValueAsync(NodeId, ValueId);
+                await AttributeApiClient.DeleteValueAsync(NodeId, ValueId);
                 // await LoadAttributes();
-                Snackbar.Add($"属性“{DefinitionDto?.Name}”已删除", Severity.Success);
+                Message.Success($"属性“{DefinitionDto?.Name}”已删除");
+                await OnDeleteClick.InvokeAsync(DefinitionDto);
+                await OnEditChanged.InvokeAsync(DefinitionDto);
             }
             catch (Exception ex)
             {

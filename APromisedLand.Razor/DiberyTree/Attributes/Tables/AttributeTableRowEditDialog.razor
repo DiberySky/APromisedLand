@@ -83,6 +83,7 @@
 
     private MudForm? _form;
     private Dictionary<string, CellValue> _values = new();
+    private bool _isSubmitting;
     private bool IsEdit => EditRow != null;
 
     protected override void OnInitialized()
@@ -112,39 +113,49 @@
 
     private async Task HandleSubmitAsync()
     {
-        if (_form == null) return;
-        await _form.ValidateAsync();
-        if (!_form.IsValid) return;
-
-        // 校验必填
-        foreach (var col in Columns)
-        {
-            if (col.IsRequired && _values[col.Id].IsEmpty())
-            {
-                Snackbar.Add($"{col.Name}不能为空", Severity.Warning);
-                return;
-            }
-        }
-
-        var dict = _values.ToDictionary(kv => kv.Key, kv => kv.Value.ToJsonElement());
-
+        // 提交锁：防止连续点击/事件重入导致多次调用
+        if (_isSubmitting) return;
+        _isSubmitting = true;
         try
         {
-            if (IsEdit)
-                await TableValueApiClient.UpdateRowAsync(TableId, EditRow!.RowId, dict);
-            else
-                await TableValueApiClient.AddRowAsync(NodeId, TableId, TableDefinitionDto!.Id, dict);
+            if (_form == null) return;
+            await _form.ValidateAsync();
+            if (!_form.IsValid) return;
 
-            Snackbar.Add("保存成功", Severity.Success);
-            MudDialog?.Close(DialogResult.Ok(true));
+            // 校验必填
+            foreach (var col in Columns)
+            {
+                if (col.IsRequired && _values[col.Id].IsEmpty())
+                {
+                    Snackbar.Add($"{col.Name}不能为空", Severity.Warning);
+                    return;
+                }
+            }
+
+            var dict = _values.ToDictionary(kv => kv.Key, kv => kv.Value.ToJsonElement());
+
+            try
+            {
+                if (IsEdit)
+                    await TableValueApiClient.UpdateRowAsync(TableId, EditRow!.RowId, dict);
+                else
+                    await TableValueApiClient.AddRowAsync(NodeId, TableId, TableDefinitionDto!.Id, dict);
+
+                Snackbar.Add("保存成功", Severity.Success);
+                MudDialog?.Close(DialogResult.Ok(true));
+            }
+            catch (ArgumentException ex)
+            {
+                Message.Details("保存失败.", ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Message.Details("保存失败.", ex.Message);
+            }
         }
-        catch (ArgumentException ex)
+        finally
         {
-            Message.Details("保存失败.", ex.Message);
-        }
-        catch (Exception ex)
-        {
-            Message.Details("保存失败.", ex.Message); 
+            _isSubmitting = false;
         }
     }
 

@@ -73,6 +73,18 @@
                    ReadOnly="@ReadOnly"/>
         break;
     case AttributeTypeEnum.定位:
+        var locLat = AttributeDto.Value.TryGetProperty("Latitude", out var latP) ? latP.GetDouble()
+                    : AttributeDto.Value.TryGetProperty("latitude", out var latL) ? latL.GetDouble() : 0;
+        var locLon = AttributeDto.Value.TryGetProperty("Longitude", out var lonP) ? lonP.GetDouble()
+                    : AttributeDto.Value.TryGetProperty("longitude", out var lonL) ? lonL.GetDouble() : 0;
+
+        <LocationValue TItem="@TItem"
+                       NodeId="@ParentId"
+                       ValueId="@AttributeDto.Id"
+                       DefinitionDto="@AttributeDto.Definition?.ToDto()"
+                       Latitude="@locLat"
+                       Longitude="@locLon"
+                       ReadOnly="@ReadOnly"/>
         break;
     case AttributeTypeEnum.表格:
         break;
