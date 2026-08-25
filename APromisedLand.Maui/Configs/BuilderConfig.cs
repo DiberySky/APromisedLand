@@ -10,6 +10,7 @@ using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Interfaces;
 using APromisedLand.Shared.Services.Solution;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Http.Resilience;
 using MudBlazor;
 using MudBlazor.Extensions;
 using MudBlazor.Services;
@@ -54,17 +55,28 @@ public static class BuilderConfig
         private void AttributeClient()
         {
             //http://localhost:5085
+            // 注意：AddServiceDefaults() 会给所有 HttpClient 挂 AddStandardResilienceHandler()，
+            // 其默认重试策略不区分方法——会对 POST/PATCH 在 5xx/超时 时自动重试，
+            // 从而把一次 AddValue/AddRow 请求放大成多次服务端调用并产生重复数据。
+            // 此处移除这两个值类客户端的韧性重试：
+            //   - 401 刷新重试由 JwtAuthorizationMessageHandler 处理（仅 GET/PUT/DELETE）；
+            //   - 重复提交由服务端 SHA256 指纹幂等去重兜底；
+            //   - 客户端 _isSubmitting 锁与 ButtonLoadingSky 入口守卫拦截重入。
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers 为实验性 API，此处需用其移除全局标准韧性重试
             builder.Services.AddHttpClient<AttributeApiClient>(client =>
                 {
                     client.BaseAddress = new Uri("http://localhost:5085");
                 })
-                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
+                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>()
+                .RemoveAllResilienceHandlers();
 
             builder.Services.AddHttpClient<TableValueApiClient>(client =>
                 {
                     client.BaseAddress = new Uri("http://localhost:5085");
                 })
-                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>();
+                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>()
+                .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
 
             // builder.Services.AddHttpClient<AttributeLocationValueApiClient>(client =>
             //     {

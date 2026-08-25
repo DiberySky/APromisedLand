@@ -254,7 +254,7 @@ public partial class AttributeService
         await AddCells(db.DateTimeAttributeValues, ids, map);
         await AddCells(db.FileAttributeValues, ids, map);
         await AddCells(db.LocationAttributeValues, ids, map);
-        await AddCells(db.TableAttributeValues, ids, map);
+        await AddCells(db.TableAttributeDefValues, ids, map);
         return map;
     }
 
@@ -277,7 +277,7 @@ public partial class AttributeService
         db.DateTimeAttributeValues.RemoveRange(db.DateTimeAttributeValues.Where(c => c.NodeId == rowId));
         db.FileAttributeValues.RemoveRange(db.FileAttributeValues.Where(c => c.NodeId == rowId));
         db.LocationAttributeValues.RemoveRange(db.LocationAttributeValues.Where(c => c.NodeId == rowId));
-        db.TableAttributeValues.RemoveRange(db.TableAttributeValues.Where(c => c.NodeId == rowId));
+        db.TableAttributeDefValues.RemoveRange(db.TableAttributeDefValues.Where(c => c.NodeId == rowId));
     }
 
     // ---------- 辅助：把值实体加到对应 DbSet ----------
@@ -293,7 +293,7 @@ public partial class AttributeService
             case DateTimeAttributeValue dtt: db.DateTimeAttributeValues.Add(dtt); break;
             case FileAttributeValue f: db.FileAttributeValues.Add(f); break;
             case LocationAttributeValue l: db.LocationAttributeValues.Add(l); break;
-            case TableAttributeDefValue tv: db.TableAttributeValues.Add(tv); break;
+            case TableAttributeDefValue tv: db.TableAttributeDefValues.Add(tv); break;
             default: throw new InvalidOperationException($"未知值实体类型 {entity.GetType().Name}");
         }
     }

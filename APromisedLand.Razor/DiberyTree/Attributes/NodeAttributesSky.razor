@@ -41,7 +41,8 @@ else
                                           ValueId="@attr.Id"
                                           DefinitionDto="@attr.Definition?.ToDto()"
                                           Value="@integerValue"
-                                          ReadOnly="@ReadOnly"/>
+                                          ReadOnly="@ReadOnly"
+                                          OnEditChanged="@ValueEditChanged"/>
                             break;
                         case AttributeTypeEnum.小数:
                             var decimalValue = attr.Value.GetValue<decimal>();
@@ -51,7 +52,8 @@ else
                                           ValueId="@attr.Id"
                                           DefinitionDto="@attr.Definition?.ToDto()"
                                           Value="@decimalValue"
-                                          ReadOnly="@ReadOnly"/>
+                                          ReadOnly="@ReadOnly"
+                                          OnEditChanged="@ValueEditChanged"/>
                             break;
                         case AttributeTypeEnum.日期:
                             var dateValue = attr.Value.GetValue<DateTimeOffset>();
@@ -61,7 +63,8 @@ else
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@dateValue"
-                                       ReadOnly="@ReadOnly"/>
+                                       ReadOnly="@ReadOnly"
+                                       OnEditChanged="@ValueEditChanged"/>
                             break;
                         case AttributeTypeEnum.时间:
                             var timeValue = attr.Value.GetValue<TimeSpan>();
@@ -71,7 +74,8 @@ else
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@timeValue"
-                                       ReadOnly="@ReadOnly"/>
+                                       ReadOnly="@ReadOnly"
+                                       OnEditChanged="@ValueEditChanged"/>
                             break;
                         case AttributeTypeEnum.日期时间:
                             var dateTimeValue = attr.Value.GetValue<DateTimeOffset>();
@@ -81,7 +85,8 @@ else
                                            ValueId="@attr.Id"
                                            DefinitionDto="@attr.Definition?.ToDto()"
                                            Value="@dateTimeValue"
-                                           ReadOnly="@ReadOnly"/>
+                                           ReadOnly="@ReadOnly"
+                                           OnEditChanged="@ValueEditChanged"/>
                             break;
                         case AttributeTypeEnum.文件:
                             var fileValue = attr.Value.GetValue<string>();
@@ -91,17 +96,19 @@ else
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@fileValue"
-                                       ReadOnly="@ReadOnly"/>
+                                       ReadOnly="@ReadOnly"
+                                       OnEditChanged="@ValueEditChanged"/>
                             break;
                         case AttributeTypeEnum.定位:
                             var locationDefValue = attr.Value.GetValue<string>();
 
                             <LocationDefValue TItem="@TItem"
-                                           NodeId="@NodeId"
-                                           ValueId="@attr.Id"
-                                           DefinitionDto="@attr.Definition?.ToDto()"
-                                           Value="@locationDefValue"          
-                                           ReadOnly="@ReadOnly"/>
+                                              NodeId="@NodeId"
+                                              ValueId="@attr.Id"
+                                              DefinitionDto="@attr.Definition?.ToDto()"
+                                              Value="@locationDefValue"          
+                                              ReadOnly="@ReadOnly"
+                                              OnEditChanged="@ValueEditChanged"/>
                             break;
                         case AttributeTypeEnum.表格:
                             var tableDefValue = attr.Value.GetValue<string>();
@@ -111,7 +118,8 @@ else
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@tableDefValue"          
-                                       ReadOnly="@ReadOnly"/>
+                                       ReadOnly="@ReadOnly"
+                                       OnEditChanged="@ValueEditChanged"/>
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();
@@ -141,9 +149,11 @@ else
     public async Task LoadAttributes()
     {
         if (string.IsNullOrEmpty(NodeId)) return;
-        _loading = true;
         try
         {
+            _loading = true;
+            StateHasChanged();
+            
             var result = await AttributeApiClient.GetAllValuesAsync(NodeId);
             _attributeDtos = result?.AttributeDtos ?? new();
         }
@@ -166,64 +176,4 @@ else
         await OnDeleteClick.InvokeAsync(definition);
         await OnSaveClick.InvokeAsync(definition);
     }
-
-    // private async Task DeleteValue(AttributeDto attr)
-    // {
-    //     bool? confirm = await DialogService.ShowMessageBoxAsync(
-    //         "确认删除",
-    //         $"确定要删除属性“{attr.Definition?.Name ?? "未命名"}”吗？",
-    //         "删除", "取消");
-    //     if (confirm == true)
-    //     {
-    //         try
-    //         {
-    //             await AttributeApiClient.DeleteValueAsync(NodeId!, attr.Id);
-    //             await LoadAttributes();
-    //             Snackbar.Add($"属性“{attr.Definition?.Name}”已删除", Severity.Success);
-    //         }
-    //         catch (Exception ex)
-    //         {
-    //             Snackbar.Add($"删除失败: {ex.Message}", Severity.Error);
-    //         }
-    //     }
-    // }
-    //
-    // private async Task SaveValue(AttributeDto attr)
-    // {
-    //     try
-    //     {
-    //         await AttributeApiClient.UpdateValueAsync(NodeId!, attr.Id, new UpdateValueDto { Value = attr.Value });
-    //         Snackbar.Add($"属性“{attr.Definition?.Name}”已更新", Severity.Success);
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         Snackbar.Add($"更新失败: {ex.Message}", Severity.Error);
-    //     }
-    // }
-    //
-    // private async Task OpenEditDialog(AttributeDefinition? _definition, JsonElement valueElement)
-    // {
-    //     var dialogParams = new DialogParameters<AddAttributeValueDialog<TItem>>
-    //     {
-    //         { x => x.NodeId, NodeId },
-    //         { x => x.DefinitionDto, _definition!.ToDto() },
-    //         { x => x.ValueElement, valueElement }
-    //     };
-    //
-    //     var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("编辑属性", dialogParams);
-    //     var result = await dialog.Result;
-    //     if (result?.Canceled == false)
-    //     {
-    //         await LoadAttributes();
-    //     }
-    // }
-    //
-    // // ---------- 辅助方法 ----------
-    // private bool IsNumericType(AttributeTypeEnum type)
-    //     => type == AttributeTypeEnum.整数 || type == AttributeTypeEnum.小数;
-    //
-    // private int GetScale(AttributeTypeEnum type)
-    //     => type == AttributeTypeEnum.小数 ? 2 : 0;
-    //
-    // private decimal? GetMinValue(AttributeTypeEnum type) => 0;
 }

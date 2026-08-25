@@ -1,4 +1,4 @@
-﻿@namespace APromisedLand.Razor.Components
+@namespace APromisedLand.Razor.Components
 
 @inject ISnackbar Snackbar
 
@@ -42,6 +42,10 @@
 
     private async Task ProcessSomething()
     {
+        // 入口守卫：Disabled 属性是渲染期生效，无法阻止已入队的回调重入；
+        // 此处显式拦截，防止连续点击 / 事件重入导致 OnClickFunc 被多次调用
+        if (_processing) return;
+
         try
         {
             _processing = true;

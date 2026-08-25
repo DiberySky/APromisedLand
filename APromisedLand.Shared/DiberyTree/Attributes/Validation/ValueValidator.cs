@@ -185,7 +185,7 @@ public static class ValueValidator
         string value = actual.GetString()!;
         if (value.Length > def.MaxLength)
             return (false, $"文本长度不能超过 {def.MaxLength} 个字符", null);
-        return (true, null, new TextAttributeValue
+        return (true, null, new LocationAttributeDefValue()
         {
             NodeId = nodeId,
             AttributeDefinitionId = def.Id,
@@ -201,7 +201,7 @@ public static class ValueValidator
         string value = actual.GetString()!;
         if (value.Length > def.MaxLength)
             return (false, $"文本长度不能超过 {def.MaxLength} 个字符", null);
-        return (true, null, new TextAttributeValue
+        return (true, null, new TableAttributeDefValue()
         {
             NodeId = nodeId,
             AttributeDefinitionId = def.Id,

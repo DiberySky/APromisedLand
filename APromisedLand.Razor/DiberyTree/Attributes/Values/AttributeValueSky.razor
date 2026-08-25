@@ -54,6 +54,7 @@
             await AttributeApiClient.UpdateValueAsync(NodeId!, ValueId, 
                 new UpdateValueDto { Value = JsonValue.Value });
             Message.Success($"属性“{DefinitionDto?.Name}”已更新");
+            
             await OnSaveClick.InvokeAsync(DefinitionDto);
             await OnEditChanged.InvokeAsync(DefinitionDto);
         }
@@ -77,6 +78,7 @@
                 await AttributeApiClient.DeleteValueAsync(NodeId, ValueId);
                 // await LoadAttributes();
                 Message.Success($"属性“{DefinitionDto?.Name}”已删除");
+                
                 await OnDeleteClick.InvokeAsync(DefinitionDto);
                 await OnEditChanged.InvokeAsync(DefinitionDto);
             }

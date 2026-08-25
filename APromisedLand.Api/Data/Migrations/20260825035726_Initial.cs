@@ -134,7 +134,7 @@ namespace APromisedLand.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "TableAttributeValues",
+                name: "TableAttributeDefValues",
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
@@ -144,7 +144,7 @@ namespace APromisedLand.Api.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_TableAttributeValues", x => x.Id);
+                    table.PrimaryKey("PK_TableAttributeDefValues", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -507,7 +507,7 @@ namespace APromisedLand.Api.Data.Migrations
                 name: "LocationAttributeValues");
 
             migrationBuilder.DropTable(
-                name: "TableAttributeValues");
+                name: "TableAttributeDefValues");
 
             migrationBuilder.DropTable(
                 name: "TableRowAttributeValues");

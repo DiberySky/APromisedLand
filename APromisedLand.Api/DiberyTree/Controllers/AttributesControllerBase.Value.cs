@@ -15,33 +15,65 @@ namespace APromisedLand.Api.DiberyTree.Controllers;
 /// <para>属性值端点（依赖 nodeId）仍保留在 <see cref="TreeControllerBase{T}"/>。</para>
 /// <para>派生类只需继承并配置路由前缀，例如 <c>AttributesController : AttributeControllerBase</c>。</para>
 /// </summary>
-public abstract partial class AttributesControllerBase : ControllerBase
+public abstract partial class AttributesControllerBase
 {
     
     // ==================== 属性值 (路由前缀: {nodeId}/attributes/values) ====================
 
     [HttpPost("{nodeId}/attributes/values")]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResponse<object>))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
     public virtual async Task<IActionResult> AddValue(string nodeId, [FromBody] AddValueDto dto)
     {
+        var traceId = HttpContext.TraceIdentifier;
         try
         {
-            var result = await attributeService.AddValueAsync(nodeId, dto);
-            return CreatedAtAction(nameof(GetSingleValue), new { nodeId, id = result.Id }, ApiResponse<object>.Ok(result, "属性值添加成功"));
+            var (value, error, duplicated) = await attributeService.AddValueAsync(nodeId, dto);
+
+            if (duplicated && value is null)
+            {
+                // 首次请求仍在处理中（占位命中），提示客户端勿重复提交
+                logger.LogWarning(
+                    "[TraceId: {TraceId}] 检测到重复 AddValue 请求且首次仍在处理中, NodeId: {NodeId}",
+                    traceId, nodeId);
+                return StatusCode(StatusCodes.Status409Conflict,
+                    ApiResponse<object>.Fail("请求正在处理中，请勿重复提交"));
+            }
+
+            if (duplicated)
+            {
+                logger.LogWarning(
+                    "[TraceId: {TraceId}] 检测到重复 AddValue 请求，直接复用上次结果。ValueId: {ValueId}",
+                    traceId, value!.Id);
+            }
+            else
+            {
+                logger.LogInformation(
+                    "[TraceId: {TraceId}] 新增属性值成功, NodeId: {NodeId}, ValueId: {ValueId}",
+                    traceId, nodeId, value!.Id);
+            }
+
+            if (!string.IsNullOrEmpty(error))
+                return BadRequest(ApiResponse<object>.Fail(error));
+
+            return CreatedAtAction(nameof(GetSingleValue), new { nodeId, id = value!.Id },
+                ApiResponse<object>.Ok(value, "属性值添加成功"));
         }
         catch (KeyNotFoundException ex)
         {
+            logger.LogWarning("[TraceId: {TraceId}] 新增属性值未找到资源: {Msg}", traceId, ex.Message);
             return NotFound(ApiResponse<object>.Fail(ex.Message));
         }
         catch (ArgumentException ex)
         {
+            logger.LogWarning("[TraceId: {TraceId}] 新增属性值参数错误: {Msg}", traceId, ex.Message);
             return BadRequest(ApiResponse<object>.Fail(ex.Message));
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "添加节点属性值失败, NodeId: {NodeId}", nodeId);
+            logger.LogError(ex, "[TraceId: {TraceId}] 添加节点属性值失败, NodeId: {NodeId}", traceId, nodeId);
             return StatusCode(500, ApiResponse<object>.Fail($"添加属性值时发生错误: {ex.Message}"));
         }
     }
@@ -52,16 +84,22 @@ public abstract partial class AttributesControllerBase : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
     public virtual async Task<IActionResult> GetSingleValue(string nodeId, string id)
     {
+        var traceId = HttpContext.TraceIdentifier;
         try
         {
             var dto = await attributeService.GetValueAsync(nodeId, id);
             if (dto is null)
+            {
+                logger.LogWarning("[TraceId: {TraceId}] 获取属性值未找到, NodeId: {NodeId}, ValueId: {ValueId}",
+                    traceId, nodeId, id);
                 return NotFound(ApiResponse<object>.Fail($"属性值 {id} 不存在或不属于节点 {nodeId}"));
+            }
             return Ok(ApiResponse<AttributeDto>.Ok(dto));
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "获取属性值失败, NodeId: {NodeId}, ValueId: {ValueId}", nodeId, id);
+            logger.LogError(ex, "[TraceId: {TraceId}] 获取属性值失败, NodeId: {NodeId}, ValueId: {ValueId}",
+                traceId, nodeId, id);
             return StatusCode(500, ApiResponse<object>.Fail($"获取属性值失败: {ex.Message}"));
         }
     }
@@ -70,14 +108,18 @@ public abstract partial class AttributesControllerBase : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
     public virtual async Task<IActionResult> GetAllValues(string nodeId)
     {
+        var traceId = HttpContext.TraceIdentifier;
         try
         {
             var nodeDto = await attributeService.GetAllValuesAsync(nodeId);
+            logger.LogInformation(
+                "[TraceId: {TraceId}] 获取节点所有属性值成功, NodeId: {NodeId}, ValueCount: {Count}",
+                traceId, nodeId, nodeDto.AttributeDtos.Count);
             return Ok(ApiResponse<NodeDto>.Ok(nodeDto));
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "获取节点所有属性值失败, NodeId: {NodeId}", nodeId);
+            logger.LogError(ex, "[TraceId: {TraceId}] 获取节点所有属性值失败, NodeId: {NodeId}", traceId, nodeId);
             return StatusCode(500, ApiResponse<object>.Fail($"获取节点所有属性值失败: {ex.Message}"));
         }
     }
@@ -88,22 +130,28 @@ public abstract partial class AttributesControllerBase : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
     public virtual async Task<IActionResult> UpdateValue(string nodeId, string id, [FromBody] UpdateValueDto valueDto, CancellationToken cancellationToken = default)
     {
+        var traceId = HttpContext.TraceIdentifier;
         try
         {
             await attributeService.UpdateValueAsync(nodeId, id, valueDto.Value, cancellationToken);
+            logger.LogInformation("[TraceId: {TraceId}] 更新属性值成功, NodeId: {NodeId}, ValueId: {ValueId}",
+                traceId, nodeId, id);
             return Ok(ApiResponse<object>.Ok(valueDto, "属性值更新成功"));
         }
         catch (KeyNotFoundException ex)
         {
+            logger.LogWarning("[TraceId: {TraceId}] 更新属性值未找到资源: {Msg}", traceId, ex.Message);
             return NotFound(ApiResponse<object>.Fail(ex.Message));
         }
         catch (ArgumentException ex)
         {
+            logger.LogWarning("[TraceId: {TraceId}] 更新属性值参数错误: {Msg}", traceId, ex.Message);
             return BadRequest(ApiResponse<object>.Fail(ex.Message));
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "更新属性值失败, NodeId: {NodeId}, ValueId: {ValueId}", nodeId, id);
+            logger.LogError(ex, "[TraceId: {TraceId}] 更新属性值失败, NodeId: {NodeId}, ValueId: {ValueId}",
+                traceId, nodeId, id);
             return StatusCode(500, ApiResponse<object>.Fail($"更新属性值失败: {ex.Message}"));
         }
     }
@@ -113,16 +161,24 @@ public abstract partial class AttributesControllerBase : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
     public virtual async Task<IActionResult> DeleteValue(string nodeId, string id)
     {
+        var traceId = HttpContext.TraceIdentifier;
         try
         {
             var deleted = await attributeService.DeleteValueAsync(nodeId, id);
             if (!deleted)
+            {
+                logger.LogWarning("[TraceId: {TraceId}] 删除属性值未找到, NodeId: {NodeId}, ValueId: {ValueId}",
+                    traceId, nodeId, id);
                 return NotFound(ApiResponse<object>.Fail($"属性值 {id} 不存在或不属于节点 {nodeId}"));
+            }
+            logger.LogInformation("[TraceId: {TraceId}] 删除属性值成功, NodeId: {NodeId}, ValueId: {ValueId}",
+                traceId, nodeId, id);
             return Ok(ApiResponse<bool>.Ok(true));
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "删除属性值失败, NodeId: {NodeId}, ValueId: {ValueId}", nodeId, id);
+            logger.LogError(ex, "[TraceId: {TraceId}] 删除属性值失败, NodeId: {NodeId}, ValueId: {ValueId}",
+                traceId, nodeId, id);
             return StatusCode(500, ApiResponse<object>.Fail($"删除属性值失败: {ex.Message}"));
         }
     }

@@ -15,8 +15,6 @@ namespace APromisedLand.Api.DiberyTree.Controllers;
 /// <para>属性值端点（依赖 nodeId）仍保留在 <see cref="TreeControllerBase{T}"/>。</para>
 /// <para>派生类只需继承并配置路由前缀，例如 <c>AttributesController : AttributeControllerBase</c>。</para>
 /// </summary>
-[ApiController]
-[Route("[controller]")]
 public abstract partial class AttributesControllerBase(
     AttributeService attributeService,
     ILogger<AttributesControllerBase> logger) : ControllerBase

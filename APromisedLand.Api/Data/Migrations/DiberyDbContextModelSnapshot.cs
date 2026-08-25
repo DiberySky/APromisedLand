@@ -1750,7 +1750,7 @@ namespace APromisedLand.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.ToTable("TableAttributeValues", (string)null);
+                    b.ToTable("TableAttributeDefValues", (string)null);
                 });
 
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TableRowAttributeValue", b =>

@@ -116,12 +116,11 @@
     [Parameter] public DateTimeOffset? DateTimeValue { get; set; }
     [Parameter] public string? FileUrl { get; set; }
     [Parameter] public string? LocationName { get; set; }
-    // [Parameter] public double? Latitude { get; set; }
-    // [Parameter] public double? Longitude { get; set; }
     [Parameter] public string? TableName { get; set; }
 
     private List<AttributeDefinitionDto>? DefinitionDtos;
-    
+    private bool _isSubmitting;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -136,6 +135,21 @@
     }
 
     private async Task SubmitAsync()
+    {
+        // 提交锁：防止连续点击 / 事件重入 / 底层重试导致多次提交
+        if (_isSubmitting) return;
+        _isSubmitting = true;
+        try
+        {
+            await SubmitCoreAsync();
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task SubmitCoreAsync()
     {
         if (DefinitionDto == null)
         {

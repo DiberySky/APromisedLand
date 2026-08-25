@@ -6,9 +6,9 @@
                    @bind-JsonValue="@JsonValue"
                    DefinitionDto="@DefinitionDto"
                    ReadOnly="@ReadOnly"
-                   OnSaveClick="@OnSaveClick"
-                   OnDeleteClick="@OnDeleteClick"
-                   OnEditChanged="@OnEditChanged">
+                   OnSaveClick="@(e => OnSaveClick.InvokeAsync(e))"
+                   OnDeleteClick="@(e => OnDeleteClick.InvokeAsync(e))"
+                   OnEditChanged="@(e => OnEditChanged.InvokeAsync(e))">
     <ValueContent>
         <MudStack Class="d-flex flex-grow-1" Spacing="0">
             <MudTextField T="string" @bind-Value="@Value"

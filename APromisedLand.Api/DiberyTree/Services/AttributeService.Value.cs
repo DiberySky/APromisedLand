@@ -1,5 +1,8 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using APromisedLand.Api.Data;
+using Microsoft.Extensions.Caching.Memory;
 using APromisedLand.Api.DiberyTree.Interface;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Enums;
@@ -13,8 +16,66 @@ namespace APromisedLand.Api.DiberyTree.Services;
 
 public partial class AttributeService
 {
+    // 幂等去重：属性值请求指纹缓存的时间窗口（秒）
+    private const int ValueDedupWindowSeconds = 30;
+    private const string ValueDedupCachePrefix = "Attr_AddValue_Dedup_";
+
     // ---------- 属性值操作 ----------
-    public async Task<AttributeValueBase> AddValueAsync(string nodeId, AddValueDto dto)
+
+    /// <summary>为指定节点添加一个属性值（带幂等去重）。</summary>
+    /// <returns>(值实体, 错误信息, 是否为重复请求)。当 Duplicated=true 表示请求已在 30 秒窗口内处理过，已直接返回第一次结果。</returns>
+    public async Task<(AttributeValueBase? Value, string? Error, bool Duplicated)> AddValueAsync(string nodeId, AddValueDto dto)
+    {
+        // ========== 第一步：基于请求内容计算 SHA256 指纹，做幂等去重 ==========
+        var fingerprint = ComputeAddValueFingerprint(nodeId, dto);
+        var cacheKey = ValueDedupCachePrefix + fingerprint;
+
+        // 命中缓存（含占位）：直接复用第一次结果，不再落库
+        if (cache.TryGetValue<(string? ValueId, string? Error)>(cacheKey, out var cached))
+        {
+            AttributeValueBase? cachedValue = null;
+            if (!string.IsNullOrEmpty(cached.ValueId))
+                cachedValue = await FindValueAsync(nodeId, cached.ValueId!);
+            return (cachedValue, cached.Error, Duplicated: true);
+        }
+
+        // 占位：防止首次落库完成前又进来相同请求（重试 / 并发窗口保护）
+        cache.Set(cacheKey, (ValueId: (string?)null, Error: (string?)null),
+            TimeSpan.FromSeconds(ValueDedupWindowSeconds));
+
+        // ========== 第二步：执行业务插入逻辑 ==========
+        try
+        {
+            var entity = await AddValueInternalAsync(nodeId, dto);
+
+            // 将实际结果写回缓存，覆盖占位值
+            cache.Set(cacheKey, (ValueId: entity.Id, Error: (string?)null),
+                TimeSpan.FromSeconds(ValueDedupWindowSeconds));
+
+            return (entity, null, Duplicated: false);
+        }
+        catch (Exception)
+        {
+            // 失败：移除占位，允许后续重试真正执行（而非被误判为重复而返回空结果）
+            cache.Remove(cacheKey);
+            throw;
+        }
+    }
+
+    /// <summary>计算 AddValue 请求的 SHA256 指纹。相同 nodeId + 相同定义 Id + 相同值得到相同指纹。</summary>
+    private static string ComputeAddValueFingerprint(string nodeId, AddValueDto dto)
+    {
+        var sb = new StringBuilder();
+        sb.Append("nodeId=").Append(nodeId).Append('|');
+        sb.Append("defId=").Append(dto.AttributeDefinitionId).Append('|');
+        sb.Append("value=").Append(dto.Value.ValueKind == JsonValueKind.Undefined ? "" : dto.Value.GetRawText());
+
+        var raw = Encoding.UTF8.GetBytes(sb.ToString());
+        return Convert.ToBase64String(SHA256.HashData(raw));
+    }
+
+    /// <summary>实际的属性值插入逻辑（不含去重）。校验失败时抛出异常由控制器映射 HTTP 状态码。</summary>
+    private async Task<AttributeValueBase> AddValueInternalAsync(string nodeId, AddValueDto dto)
     {
         // 1. 获取定义
         var definition = await db.AttributeDefinitions
@@ -25,7 +86,9 @@ public partial class AttributeService
         // 2. 从映射获取枚举类型
         if (!AttributeTypeMapping.IdToEnum.TryGetValue(definition.AttributeTypeId, out var attrType))
             throw new InvalidOperationException($"无法识别属性类型ID: {definition.AttributeTypeId}");
-
+        
+        var attrTypeEmun = definition.AttributeTypeId.ToAttributeTypeName();
+        
         // 3. 验证并构建值实体（传入枚举类型）
         var validation = ValueValidator.ValidateAndBuild(definition, dto.Value, nodeId);
         if (!validation.IsValid)
@@ -62,8 +125,8 @@ public partial class AttributeService
             case TimeAttributeValue tav: await db.TimeAttributeValues.AddAsync(tav); break;
             case DateTimeAttributeValue dtav: await db.DateTimeAttributeValues.AddAsync(dtav); break;
             case FileAttributeValue fav: await db.FileAttributeValues.AddAsync(fav); break;
-            case LocationAttributeValue lav: await db.LocationAttributeValues.AddAsync(lav); break;
-            case TableAttributeDefValue tv: await db.TableAttributeValues.AddAsync(tv); break;
+            case LocationAttributeDefValue lav: await db.LocationAttributeDefValues.AddAsync(lav); break;
+            case TableAttributeDefValue tv: await db.TableAttributeDefValues.AddAsync(tv); break;
             default: throw new NotSupportedException($"不支持的值类型 '{entity.GetType().Name}'。");
         }
 
@@ -92,7 +155,9 @@ public partial class AttributeService
         list.AddRange(await QueryValues<TimeAttributeValue>(nodeId));
         list.AddRange(await QueryValues<DateTimeAttributeValue>(nodeId));
         list.AddRange(await QueryValues<FileAttributeValue>(nodeId));
-        list.AddRange(await QueryValues<LocationAttributeValue>(nodeId));
+        // 注意：AddValueAsync 对「定位」写入的是 LocationAttributeDefValue（定义值/名称字符串），
+        // 而非 LocationAttributeValue（经纬度对象）。查询必须与写入保持一致，否则查不到刚写入的数据。
+        list.AddRange(await QueryValues<LocationAttributeDefValue>(nodeId));
         list.AddRange(await QueryValues<TableAttributeDefValue>(nodeId));
         return new NodeDto { Id = nodeId, AttributeDtos = list };
     }
@@ -169,9 +234,12 @@ public partial class AttributeService
             async () => await db.DateTimeAttributeValues.FirstOrDefaultAsync(v =>
                 v.NodeId == nodeId && v.Id == id),
             async () => await db.FileAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            // 定位有两张表：LocationAttributeValue（经纬度对象）与 LocationAttributeDefValue（定义/名称字符串）
             async () => await db.LocationAttributeValues.FirstOrDefaultAsync(v =>
                 v.NodeId == nodeId && v.Id == id),
-            async () => await db.TableAttributeValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
+            async () => await db.LocationAttributeDefValues.FirstOrDefaultAsync(v =>
+                v.NodeId == nodeId && v.Id == id),
+            async () => await db.TableAttributeDefValues.FirstOrDefaultAsync(v => v.NodeId == nodeId && v.Id == id),
         };
         foreach (var task in tasks)
         {
@@ -235,6 +303,8 @@ public partial class AttributeService
             DateTimeAttributeValue dtV => dtV.Value,
             FileAttributeValue fv => fv.Value,
             LocationAttributeValue lv => new { lv.Latitude, lv.Longitude },
+            // 定位定义值：存储的是地点名称/字符串，直接返回 Value（与 AddValueAsync 的写入方式一致）
+            LocationAttributeDefValue ldv => ldv.Value,
             TableAttributeDefValue tv => tv.Value,
             _ => null
         };
@@ -292,6 +362,10 @@ public partial class AttributeService
                 var lSource = (LocationAttributeValue)source;
                 lTarget.Latitude = lSource.Latitude;
                 lTarget.Longitude = lSource.Longitude;
+                break;
+            case LocationAttributeDefValue ldvTarget:
+                var ldvSource = (LocationAttributeDefValue)source;
+                ldvTarget.Value = ldvSource.Value;
                 break;
             case TableAttributeDefValue tvTarget:
                 var tvSource = (TableAttributeDefValue)source;
