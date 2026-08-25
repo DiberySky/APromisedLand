@@ -15,7 +15,52 @@ namespace APromisedLand.Api.DiberyTree.Controllers;
 public abstract partial class AttributesControllerBase
 {
     // ==================== 定位值 CRUD ====================
+//            $"{BasePath}/locations/node/{Uri.EscapeDataString(nodeId)}/attribute/{Uri.EscapeDataString(attributeId)}/location/{Uri.EscapeDataString(locationId)}");
 
+    [HttpGet("locations/{locationId}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<AttributeLocationDto>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
+    public virtual async Task<IActionResult> GetLocation(string locationId)
+    {
+        // var traceId = HttpContext.TraceIdentifier;
+        try
+        {
+            var dto = await attributeService.GetLocationAsync(locationId);
+            if (dto is null)
+                return NotFound(ApiResponse<object>.Fail($"定位值 '{locationId}' 不存在"));
+            
+            return Ok(ApiResponse<AttributeLocationDto>.Ok(dto));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "获取定位值失败, LocationId: {LocationId}", locationId);
+            return StatusCode(500, ApiResponse<object>.Fail($"获取定位值失败: {ex.Message}"));
+        }
+    }
+    
+    [HttpPut("locations/{locationId}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<AttributeLocationDto>))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
+    public virtual async Task<IActionResult> UpdateLocation(string locationId, [FromBody] AttributeLocationDto dto)
+    {
+        var traceId = HttpContext.TraceIdentifier;
+        try
+        {
+            var error = await attributeService.UpdateLocationAsync(locationId, dto);
+            if (!string.IsNullOrEmpty(error))
+                return BadRequest(ApiResponse<object>.Fail(error));
+
+            var result = await attributeService.GetLocationAsync(locationId);
+            return Ok(ApiResponse<AttributeLocationDto>.Ok(result!));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[TraceId: {TraceId}] 更新定位值失败, ValueId: {ValueId}", traceId, locationId);
+            return StatusCode(500, ApiResponse<object>.Fail($"更新定位值失败: {ex.Message}"));
+        }
+    }
+    
     [HttpPost("node/{nodeId}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<AttributeLocationValueDto>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]

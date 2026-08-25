@@ -1,11 +1,11 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
 @inject TableValueApiClient TableValueApiClient
 @inject ISnackbar Snackbar
 @inject DialogService DialogService
 @inject MessageService Message
-@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@* @inject TreeNodeDialogService<TItem> TreeNodeDialogService *@
 
 <DialogSky Title="@($"行数据 - {TableDefinitionDto?.Name}")"
            CancelButtonVisible="true"
@@ -99,33 +99,12 @@
 
     private async Task AddRowAsync()
     {
-        await TreeNodeDialogService.
-            ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns);
-        
-        // var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
-        // {
-        //     { x => x.TableDefinitionDto, TableDefinitionDto },
-        //     { x => x.Columns, Columns }
-        // };
-        // var dialog = await DialogService.ShowAsync<AttributeTableRowEditDialog<TItem>>("新增行", parameters);
-        // var result = await dialog.Result;
-        // if (!result.Canceled) await LoadRowsAsync();
+        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns);
     }
 
     private async Task EditRowAsync(TableRowDto row)
     {
-        await TreeNodeDialogService.
-            ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns, row);
-        
-        // var parameters = new DialogParameters<AttributeTableRowEditDialog<TItem>>
-        // {
-        //     { x => x.TableDefinitionDto, TableDefinitionDto },
-        //     { x => x.Columns, Columns },
-        //     { x => x.EditRow, row }
-        // };
-        // var dialog = await DialogService.ShowAsync<AttributeTableRowEditDialog<TItem>>("编辑行", parameters);
-        // var result = await dialog.Result;
-        // if (!result.Canceled) await LoadRowsAsync();
+        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns, row);
     }
 
     private async Task DeleteRowAsync(TableRowDto row)
@@ -151,4 +130,34 @@
             _ => cell.Value.ToString() ?? "-"
         };
     }
+    
+    public async Task ShowAttributeTableRowEditDialogAsync(
+        string nodeId,
+        string tableId,
+        AttributeDefinitionDto definitionDto, 
+        List<AttributeDefinitionDto> columns,
+        TableRowDto? editRow = null,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeTableRowEditDialog>
+        {
+            { x => x.NodeId, nodeId },
+            { x => x.TableId, tableId },
+            { x => x.TableDefinitionDto, definitionDto },
+            { x => x.Columns, columns },
+            { x => x.EditRow, editRow },
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await DialogService.ShowAsync<AttributeTableRowEditDialog>(
+            "表格编辑器", parameters, options);
+
+        var result = await dialog.Result;
+        // 只要不是取消就返回 true（表示可能已修改）
+        // return result is not { Canceled: true };
+    }
+
 }

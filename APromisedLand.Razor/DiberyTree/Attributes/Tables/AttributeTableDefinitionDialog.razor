@@ -1,7 +1,6 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
-@inject DiberyTreeApiClient<TItem> ApiClient
 
 @inject ISnackbar Snackbar
 
@@ -22,7 +21,7 @@
                               MaxLength="50"
                               Counter="50"/>
 
-                <AttributeTableColumnsSky TItem="@TItem" TableId="@TableDefinitionDto!.Id"
+                <AttributeTableColumnsSky TableId="@TableDefinitionDto!.Id"
                                           @bind-Deletable="@_deletable"/>
 
             </MudContainer>

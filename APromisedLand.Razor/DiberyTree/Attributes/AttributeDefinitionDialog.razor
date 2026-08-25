@@ -1,9 +1,10 @@
+@using APromisedLand.Razor.DiberyTree.Attributes.Tables
 
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject ISnackbar Snackbar
 @inject AttributeApiClient AttributeApiClient
-@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@inject DialogService DialogService
 
 <DialogSky Title="@(IsEdit ? "编辑属性定义" : "新建属性定义")"
            SubmitButtonVisible="true"
@@ -263,7 +264,7 @@
 
     private async Task OpenTableDialogAsync()
     {
-        var result = await TreeNodeDialogService.ShowAttributeTableDefinitionListDialogAsync(TableId!);
+        var result = await ShowAttributeTableDefinitionListDialogAsync(TableId!);
         // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
         if (result == true)
         {
@@ -271,6 +272,27 @@
         }
     }
 
+    public async Task<bool> ShowAttributeTableDefinitionListDialogAsync(
+        string tableId,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeTableDefinitionListDialog>
+        {
+            { x => x.TableId, tableId },
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await DialogService.ShowAsync<AttributeTableDefinitionListDialog>(
+            "表格属性定义", parameters, options);
+
+        var result = await dialog.Result;
+        // 只要不是取消就返回 true（表示可能已修改）
+        return result is not { Canceled: true };
+    }
+    
     private void HandleCancel()
     {
         // DialogSky 内部已处理 MudDialog.Close，此处仅做额外清理

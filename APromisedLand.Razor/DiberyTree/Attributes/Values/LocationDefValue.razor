@@ -1,10 +1,10 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@using APromisedLand.Razor.DiberyTree.Attributes.Locations
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
-@inject TreeNodeDialogService<TItem> TreeNodeDialogService
-@inject AttributeApiClient AttributeApiClient
+@* @inject TreeNodeDialogService<TItem> TreeNodeDialogService *@
+@inject IDialogService DialogService
 
-<AttributeValueSky TItem="@TItem"
-                   NodeId="@NodeId"
+<AttributeValueSky NodeId="@NodeId"
                    ValueId="@ValueId"
                    @bind-JsonValue="@JsonValue"
                    DefinitionDto="@DefinitionDto"
@@ -74,13 +74,28 @@
     
     private async Task HandleAdornmentClick()
     {
-        var list = await AttributeApiClient.ListTableColumnsAsync(DefinitionDto!.Id);
-        List<AttributeDefinitionDto> columns = [.. list];
-        
-        // await TreeNodeDialogService.
-        //     ShowAttributeTableRowEditDialogAsync(DefinitionDto, columns);
+        await ShowAttributeLocationEditDialogAsync(NodeId!, ValueId!, DefinitionDto);
+    }
+    
+     public async Task ShowAttributeLocationEditDialogAsync(string nodeId, object locationId,
+        AttributeDefinitionDto? definitionDto,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeLocationEditDialog>
+        {
+            { x => x.NodeId, nodeId },
+            { x => x.LocationId, locationId },
+            { x => x.DefinitionDto, definitionDto },
+        };
 
-        await TreeNodeDialogService.
-            ShowAttributeTableRowsPanelDialogAsync(NodeId!, ValueId!, DefinitionDto, columns);
+        var options = (config ?? new DialogConfig
+        {
+            Position = DialogPosition.Center
+        }).ToDialogOptions();
+
+        var dialog = await DialogService.ShowAsync<AttributeLocationEditDialog>(
+            "位置编辑器", parameters, options);
+
+        var result = await dialog.Result;
     }
 }

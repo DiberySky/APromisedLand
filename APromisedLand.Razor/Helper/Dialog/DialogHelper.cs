@@ -1,4 +1,7 @@
 ﻿using APromisedLand.Razor.Components;
+using APromisedLand.Razor.Dialogs;
+using APromisedLand.Razor.DiberyTree.Attributes;
+using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using MudBlazor;
 
 namespace APromisedLand.Razor.Helper.Dialog;
@@ -31,7 +34,7 @@ public static partial class DialogHelper
         var dialog = await dialogService.ShowAsync<TestingDialog>(title,
             parameters, options);
 
-        var result = await dialog.Result;
+        var result = await dialog.Result;   
 
         //return result.Canceled == false;
     }

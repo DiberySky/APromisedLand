@@ -1717,6 +1717,12 @@ namespace APromisedLand.Api.Data.Migrations
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
 
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasColumnType("text");

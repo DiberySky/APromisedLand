@@ -1,14 +1,13 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
-<AttributeValueSky TItem="@TItem"
-                   NodeId="@NodeId"
+<AttributeValueSky NodeId="@NodeId"
                    ValueId="@ValueId"
                    @bind-JsonValue="@JsonValue"
                    DefinitionDto="@DefinitionDto"
                    ReadOnly="@ReadOnly"
                    OnSaveClick="@(e => OnSaveClick.InvokeAsync(e))"
                    OnDeleteClick="@(e => OnDeleteClick.InvokeAsync(e))"
-                   OnEditChanged="@(e => OnEditChanged.InvokeAsync(e))">
+                   OnEditChanged="@(e => OnEditChanged.InvokeAsync(e))">    
     <ValueContent>
         <MudStack Class="d-flex flex-grow-1" Spacing="0">
             <MudNumericField T="long?"

@@ -1,10 +1,11 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@using APromisedLand.Razor.DiberyTree.Attributes.Tables
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
-@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@* @inject TreeNodeDialogService<TItem> TreeNodeDialogService *@
 @inject AttributeApiClient AttributeApiClient
+@inject DialogService DialogService
 
-<AttributeValueSky TItem="@TItem"
-                   NodeId="@NodeId"
+<AttributeValueSky NodeId="@NodeId"
                    ValueId="@ValueId"
                    @bind-JsonValue="@JsonValue"
                    DefinitionDto="@DefinitionDto"
@@ -80,7 +81,31 @@
         // await TreeNodeDialogService.
         //     ShowAttributeTableRowEditDialogAsync(DefinitionDto, columns);
 
-        await TreeNodeDialogService.
-            ShowAttributeTableRowsPanelDialogAsync(NodeId!, ValueId!, DefinitionDto, columns);
+        await ShowAttributeTableRowsPanelDialogAsync(NodeId!, ValueId!, DefinitionDto, columns);
+    }
+    
+    public async Task ShowAttributeTableRowsPanelDialogAsync(
+        string nodeId,
+        string tableId,
+        AttributeDefinitionDto definitionDto,
+        List<AttributeDefinitionDto> columns,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeTableRowsPanelDialog>
+        {
+            { x => x.NodeId, nodeId },
+            { x => x.TableId, tableId },
+            { x => x.TableDefinitionDto, definitionDto },
+            { x => x.Columns, columns },
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await DialogService.ShowAsync<AttributeTableRowsPanelDialog>(
+            "表格行编辑器", parameters, options);
+
+        var result = await dialog.Result;
     }
 }

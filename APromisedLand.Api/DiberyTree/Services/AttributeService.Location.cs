@@ -70,6 +70,20 @@ public partial class AttributeService
 
     // ---------- 查询 ----------
 
+    /// <summary>获取定位值。</summary>
+    public async Task<AttributeLocationDto?> GetLocationAsync(string locationId)
+    {
+        var v = await db.LocationAttributeDefValues.FirstOrDefaultAsync(x => x.Id == locationId);
+        if (v == null) return null;
+
+        return new AttributeLocationDto
+        {
+            LocationId = v.Id,
+            Latitude = v.Latitude,
+            Longitude = v.Longitude
+        };
+    }
+    
     /// <summary>获取节点的所有定位值。</summary>
     public async Task<List<AttributeLocationValueDto>> ListByNodeAsync(string nodeId)
     {
@@ -113,7 +127,22 @@ public partial class AttributeService
     }
 
     // ---------- 更新 ----------
+    /// <summary>更新定位值。返回错误信息（null 表示成功）。</summary>
+    public async Task<string?> UpdateLocationAsync(string locationId, AttributeLocationDto dto)
+    {
+        var v = await db.LocationAttributeDefValues.FirstOrDefaultAsync(x => x.Id == locationId);
+        if (v == null) return $"定位值 '{locationId}' 不存在";
 
+        if (dto.Latitude < -90 || dto.Latitude > 90) return "纬度范围 [-90, 90]";
+        if (dto.Longitude < -180 || dto.Longitude > 180) return "经度范围 [-180, 180]";
+
+        v.Latitude = dto.Latitude;
+        v.Longitude = dto.Longitude;
+
+        await db.SaveChangesAsync();
+        return null;
+    }
+    
     /// <summary>更新定位值。返回错误信息（null 表示成功）。</summary>
     public async Task<string?> UpdateAsync(string valueId, UpdateAttributeLocationValueDto dto)
     {

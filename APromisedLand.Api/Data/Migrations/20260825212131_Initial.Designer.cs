@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(DiberyDbContext))]
-    [Migration("20260825035726_Initial")]
+    [Migration("20260825212131_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -1719,6 +1719,12 @@ namespace APromisedLand.Api.Data.Migrations
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.LocationAttributeDefValue", b =>
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
 
                     b.Property<string>("Value")
                         .IsRequired()

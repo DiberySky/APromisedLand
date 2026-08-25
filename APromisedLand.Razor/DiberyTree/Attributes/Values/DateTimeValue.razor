@@ -1,4 +1,4 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @if (ReadOnly)
 {
@@ -11,8 +11,7 @@
 }
 else
 {
-    <AttributeValueSky TItem="@TItem"
-                       NodeId="@NodeId"
+    <AttributeValueSky NodeId="@NodeId"
                        ValueId="@ValueId"
                        @bind-JsonValue="@JsonValue"
                        DefinitionDto="@DefinitionDto"

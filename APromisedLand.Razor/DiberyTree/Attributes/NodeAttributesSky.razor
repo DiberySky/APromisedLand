@@ -25,8 +25,7 @@ else
                         case AttributeTypeEnum.文本:
                             var textValue = attr.Value.GetValue<string>();
 
-                            <TextValue TItem="@TItem"
-                                       NodeId="@NodeId"
+                            <TextValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@textValue"
@@ -36,8 +35,7 @@ else
                         case AttributeTypeEnum.整数:
                             var integerValue = attr.Value.GetValue<long>();
 
-                            <IntegerValue TItem="@TItem"
-                                          NodeId="@NodeId"
+                            <IntegerValue NodeId="@NodeId"
                                           ValueId="@attr.Id"
                                           DefinitionDto="@attr.Definition?.ToDto()"
                                           Value="@integerValue"
@@ -47,8 +45,7 @@ else
                         case AttributeTypeEnum.小数:
                             var decimalValue = attr.Value.GetValue<decimal>();
 
-                            <DecimalValue TItem="@TItem"
-                                          NodeId="@NodeId"
+                            <DecimalValue NodeId="@NodeId"
                                           ValueId="@attr.Id"
                                           DefinitionDto="@attr.Definition?.ToDto()"
                                           Value="@decimalValue"
@@ -58,8 +55,7 @@ else
                         case AttributeTypeEnum.日期:
                             var dateValue = attr.Value.GetValue<DateTimeOffset>();
 
-                            <DateValue TItem="@TItem"
-                                       NodeId="@NodeId"
+                            <DateValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@dateValue"
@@ -69,8 +65,7 @@ else
                         case AttributeTypeEnum.时间:
                             var timeValue = attr.Value.GetValue<TimeSpan>();
 
-                            <TimeValue TItem="@TItem"
-                                       NodeId="@NodeId"
+                            <TimeValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@timeValue"
@@ -80,8 +75,7 @@ else
                         case AttributeTypeEnum.日期时间:
                             var dateTimeValue = attr.Value.GetValue<DateTimeOffset>();
 
-                            <DateTimeValue TItem="@TItem"
-                                           NodeId="@NodeId"
+                            <DateTimeValue NodeId="@NodeId"
                                            ValueId="@attr.Id"
                                            DefinitionDto="@attr.Definition?.ToDto()"
                                            Value="@dateTimeValue"
@@ -91,8 +85,7 @@ else
                         case AttributeTypeEnum.文件:
                             var fileValue = attr.Value.GetValue<string>();
 
-                            <FileValue TItem="@TItem"
-                                       NodeId="@NodeId"
+                            <FileValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@fileValue"
@@ -102,8 +95,7 @@ else
                         case AttributeTypeEnum.定位:
                             var locationDefValue = attr.Value.GetValue<string>();
 
-                            <LocationDefValue TItem="@TItem"
-                                              NodeId="@NodeId"
+                            <LocationDefValue NodeId="@NodeId"
                                               ValueId="@attr.Id"
                                               DefinitionDto="@attr.Definition?.ToDto()"
                                               Value="@locationDefValue"          
@@ -113,8 +105,7 @@ else
                         case AttributeTypeEnum.表格:
                             var tableDefValue = attr.Value.GetValue<string>();
 
-                            <TableDefValue TItem="@TItem"
-                                       NodeId="@NodeId"
+                            <TableDefValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
                                        DefinitionDto="@attr.Definition?.ToDto()"
                                        Value="@tableDefValue"          

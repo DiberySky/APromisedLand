@@ -1,6 +1,6 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
-@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@inject IDialogService DialogService
 
 <MudTextField @bind-Value="@AttributeDefinitionDto?.Name"
               Label="属性默认名称"
@@ -17,7 +17,7 @@
 
     private async Task EditClick()
     {
-        var result = await TreeNodeDialogService.ShowAttributeDefinitionListDialogAsync();
+        var result = await DialogService.ShowAttributeDefinitionListDialogAsync();
      
         if (result == null) return;
         

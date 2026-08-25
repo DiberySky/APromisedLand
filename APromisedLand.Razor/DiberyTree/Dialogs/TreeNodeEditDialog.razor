@@ -4,8 +4,6 @@
 @implements IDisposable
 
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
-@inject TreeNodeDialogService<TItem> TreeNodeDialogService
 
 <DialogTreeSky TItem="@TItem"
                Item="@_node"
@@ -98,10 +96,10 @@
         base.OnInitialized();
     }
 
-    private async Task ParentSelectAsync()
-    {
-        var parent = await TreeNodeDialogService.ShowParentSelectDialogAsync();
-    }
+    // private async Task ParentSelectAsync()
+    // {
+    //     var parent = await TreeNodeDialogService.ShowParentSelectDialogAsync();
+    // }
 
     private async Task SubmitAsync()
     {
@@ -119,7 +117,7 @@
 
     private async Task OpenAddDialog()
     {
-        var result = await TreeNodeDialogService.ShowAttributeDefinitionListDialogAsync();
+        var result = await DialogService.ShowAttributeDefinitionListDialogAsync();
      
         if (result == null) return;
         
@@ -128,12 +126,12 @@
 
     private async Task OpenEditDialog(AttributeDefinitionDto definition)
     {
-        var dialogParams = new DialogParameters<AddAttributeValueDialog<TItem>>
+        var dialogParams = new DialogParameters<AddAttributeValueDialog>
         {
             { x => x.NodeId, _node.Id },
             { x => x.DefinitionDto, definition },
         };
-        var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("添加属性", dialogParams);
+        var dialog = await DialogService.ShowAsync<AddAttributeValueDialog>("添加属性", dialogParams);
         var result = await dialog.Result;
         if (result?.Canceled == false)
         {

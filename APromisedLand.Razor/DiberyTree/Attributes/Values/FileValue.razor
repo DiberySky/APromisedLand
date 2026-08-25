@@ -1,9 +1,6 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
-@using MudBlazor
-@using System.Text.Json
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
-<AttributeValueSky TItem="@TItem"
-                   NodeId="@NodeId"
+<AttributeValueSky NodeId="@NodeId"
                    ValueId="@ValueId"
                    @bind-JsonValue="@JsonValue"
                    DefinitionDto="@DefinitionDto"

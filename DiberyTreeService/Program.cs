@@ -55,8 +55,13 @@ using var scope = app.Services.CreateScope();
 var services = scope.ServiceProvider;
 try
 {
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("开始迁移或初始化数据库。");
+
     var context = services.GetRequiredService<DiberyDbContext>();
     await context.Database.MigrateAsync();
+
+    logger.LogInformation("迁移或初始化数据库成功。");
 }
 catch (Exception e)
 {

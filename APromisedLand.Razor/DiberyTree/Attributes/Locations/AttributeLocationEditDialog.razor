@@ -1,6 +1,4 @@
-@using APromisedLand.Razor.Helper.Blazor
-@using System.Text.Json
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
 @inject ISnackbar Snackbar
@@ -77,13 +75,38 @@
     private JsonElement? JsonValue { get; set; }
     private MudForm? _form;
     private bool _isSubmitting;
+    private bool _loading;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        JsonValue = JsonSerializer.SerializeToElement(new { latitude = Latitude, longitude = Longitude });
-        base.OnInitialized();
+        await LoadDataAsync();
+        
+        await base.OnInitializedAsync();
     }
 
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var locationDto = await AttributeApiClient.GetLocationAsync(LocationId!);
+            if (locationDto == null) return;
+            Latitude = locationDto.Latitude;
+            Longitude = locationDto.Longitude;
+            UpdateJsonValue();
+        }
+        catch (Exception ex)
+        {
+            Message.Details($"加载失败", ex.Message);
+        }
+        finally
+        {
+            _loading = false; 
+            StateHasChanged(); 
+        }
+    }
+        
     private void OnLatitudeChanged(double value)
     {
         Latitude = value;
@@ -117,8 +140,13 @@
             // 校验必填
             try
             {
-                await AttributeApiClient.UpdateValueAsync(NodeId!, LocationId, 
-                    new UpdateValueDto { Value = JsonValue.Value });
+                var locationDto = await AttributeApiClient.UpdateLocationAsync(new AttributeLocationDto
+                {
+                    LocationId = LocationId!,
+                    Latitude = Latitude,
+                    Longitude = Longitude,
+                });
+                
                 Message.Success($"属性“{DefinitionDto?.Name}”已更新");
                 
                 Message.Success("保存成功");

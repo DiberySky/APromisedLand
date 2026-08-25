@@ -110,7 +110,9 @@ namespace APromisedLand.Api.Data.Migrations
                     Id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    Value = table.Column<string>(type: "text", nullable: false)
+                    Value = table.Column<string>(type: "text", nullable: false),
+                    Latitude = table.Column<double>(type: "double precision", nullable: false),
+                    Longitude = table.Column<double>(type: "double precision", nullable: false)
                 },
                 constraints: table =>
                 {

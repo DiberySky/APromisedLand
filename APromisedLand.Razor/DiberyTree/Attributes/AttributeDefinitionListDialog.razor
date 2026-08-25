@@ -1,8 +1,9 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@using APromisedLand.Razor.DiberyTree.Attributes.Tables
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
 @inject ISnackbar Snackbar
-@inject TreeNodeDialogService<TItem> TreeNodeDialogService
+@* @inject TreeNodeDialogService<TItem> TreeNodeDialogService *@
 @inject DialogService DialogService
 @inject MessageService Message
 
@@ -208,7 +209,7 @@
 
     private async Task OpenDefinitionDialogAsync(AttributeDefinitionDto? item)
     {
-        var result = await TreeNodeDialogService.ShowAttributeDefinitionDialogAsync(item);
+        var result = await DialogService.ShowAttributeDefinitionDialogAsync(item);
         // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
         if (result == true)
         {
@@ -220,14 +221,36 @@
     {
         if (item == null) return;
 
-        var result = await TreeNodeDialogService.ShowAttributeTableDefinitionDialogAsync(item);
+        var result = await ShowAttributeTableDefinitionDialogAsync(item);
         // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
         if (result == true)
         {
             await LoadDataAsync();
         }
     }
+    
+    public async Task<bool> ShowAttributeTableDefinitionDialogAsync(
+        AttributeDefinitionDto item, 
+        // List<AttributeTypeEnum> attributeTypes,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters<AttributeTableDefinitionDialog>
+        {
+            { x => x.TableDefinitionDto, item },
+        };
 
+        var options = (config ?? new DialogConfig
+        {
+        }).ToDialogOptions();
+
+        var dialog = await DialogService.ShowAsync<AttributeTableDefinitionDialog>(
+            "表格属性定义", parameters, options);
+
+        var result = await dialog.Result;
+        // 只要不是取消就返回 true（表示可能已修改）
+        return result is not { Canceled: true };
+    }
+    
     private async Task DeleteAsync(AttributeDefinitionDto item)
     {
         var confirmed = await Message.DeleteBoxAsync(

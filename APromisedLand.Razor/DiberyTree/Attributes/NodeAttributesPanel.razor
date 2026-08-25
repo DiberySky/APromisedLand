@@ -1,9 +1,6 @@
-@using System.Text.Json
-@using APromisedLand.Shared.Helper
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
-@inject DiberyTreeApiClient<TItem> ApiClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -119,9 +116,9 @@
     {
         var dialogParams = new DialogParameters
         {
-            { nameof(AddAttributeValueDialog<TItem>.NodeId), NodeId }
+            { nameof(AddAttributeValueDialog.NodeId), NodeId }
         };
-        var dialog = await DialogService.ShowAsync<AddAttributeValueDialog<TItem>>("添加属性", dialogParams);
+        var dialog = await DialogService.ShowAsync<AddAttributeValueDialog>("添加属性", dialogParams);
         var result = await dialog.Result;
         if (result?.Canceled == false)
         {
