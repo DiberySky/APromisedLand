@@ -25,7 +25,11 @@
                           AdornmentColor="Color.Success"
                           AdornmentIcon="@Icons.Material.Outlined.EditNote"
                           OnAdornmentClick="@(HandleAdornmentClick)"/>
-        }
+            <MudTextField T="bool"
+                          bind-Value="@_isRecord"
+                          Label="记录类型"
+                          Variant="Variant.Outlined"
+                          ReadOnly="@ReadOnly"/>        }
         else
         {
             <MudTextField T="string"
@@ -38,6 +42,11 @@
                           Counter="50"
                           ReadOnly="@ReadOnly"
                           ValueChanged="@(HandleValueChanged)"/>
+            <MudTextField T="bool"
+                          bind-Value="@_isRecord"
+                          Label="记录类型"
+                          Variant="Variant.Outlined"
+                          ReadOnly="@ReadOnly"/>
         }
     </ValueContent>
 </AttributeValueSky>
@@ -54,6 +63,7 @@
     [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
     [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
 
+    private bool _isRecord;
     private JsonElement? JsonValue { get; set; }
 
     protected override void OnInitialized()
@@ -82,30 +92,5 @@
         //     ShowAttributeTableRowEditDialogAsync(DefinitionDto, columns);
 
         await DialogService.ShowAttributeTableRowsPanelDialogAsync(NodeId!, ValueId!, Value!, DefinitionDto!, columns, ReadOnly);
-    }
-    
-    public async Task ShowAttributeTableRowsPanelDialogAsync(
-        string nodeId,
-        string tableId,
-        AttributeDefinitionDto definitionDto,
-        List<AttributeDefinitionDto> columns,
-        DialogConfig? config = null)
-    {
-        var parameters = new DialogParameters<AttributeTableRowsPanelDialog>
-        {
-            { x => x.NodeId, nodeId },
-            { x => x.TableId, tableId },
-            { x => x.TableDefinitionDto, definitionDto },
-            { x => x.Columns, columns },
-        };
-
-        var options = (config ?? new DialogConfig
-        {
-        }).ToDialogOptions();
-
-        var dialog = await DialogService.ShowAsync<AttributeTableRowsPanelDialog>(
-            "表格行编辑器", parameters, options);
-
-        var result = await dialog.Result;
     }
 }

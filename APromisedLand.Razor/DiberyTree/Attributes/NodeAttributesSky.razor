@@ -112,6 +112,16 @@ else
                                        ReadOnly="@ReadOnly"
                                        OnEditChanged="@ValueEditChanged"/>
                             break;
+                        case AttributeTypeEnum.记录:
+                            var recordDefValue = attr.Value.GetValue<string>();
+
+                            <RecordDefValue NodeId="@NodeId"
+                                           ValueId="@attr.Id"
+                                           DefinitionDto="@attr.Definition?.ToDto()"
+                                           Value="@recordDefValue"          
+                                           ReadOnly="@ReadOnly"
+                                           OnEditChanged="@ValueEditChanged"/>
+                            break;
                         default:
                             throw new ArgumentOutOfRangeException();
                     }

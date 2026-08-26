@@ -25,4 +25,6 @@ public class TableRowAttributeValue : AttributeValueBase
     /// 行序号，用于表内多行排序（可选）。
     /// </summary>
     public int? RowNo { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
 }

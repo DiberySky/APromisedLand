@@ -166,6 +166,7 @@ public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) 
             entity.Property(e => e.NodeId).IsRequired().HasMaxLength(36);
             entity.Property(e => e.TableId).IsRequired().HasMaxLength(36);
             entity.Property(e => e.AttributeDefinitionId).IsRequired().HasMaxLength(36);
+            entity.Property(e => e.CreatedAt).IsRequired();
         });
 
         OnModelCreatingPartial(modelBuilder);

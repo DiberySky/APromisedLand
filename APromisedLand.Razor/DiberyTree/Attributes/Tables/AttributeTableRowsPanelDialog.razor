@@ -27,7 +27,14 @@
                       Loading="_loading"
                       Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
-                    <MudTh>行号</MudTh>
+                    @if (TableDefinitionDto.AttributeType == AttributeTypeEnum.表格)
+                    {
+                        <MudTh>行号</MudTh>
+                    }
+                    else
+                    {
+                        <MudTh>创建时间</MudTh>
+                    }
                     @foreach (var col in Columns)
                     {
                         <MudTh>@col.Name</MudTh>
@@ -39,7 +46,14 @@
                     </MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd DataLabel="行号" Class="text-info">@context.RowNo</MudTd>
+                    @if (TableDefinitionDto.AttributeType == AttributeTypeEnum.表格)
+                    {
+                        <MudTd DataLabel="行号" Class="text-info">@context.RowNo</MudTd>
+                    }
+                    else
+                    {
+                        <MudTd DataLabel="创建时间" Class="text-info">@context.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+                    }
                     @foreach (var col in Columns)
                     {
                         <MudTd DataLabel="@col.Name" Class="text-info">

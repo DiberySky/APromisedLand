@@ -20,4 +20,6 @@ public class TableAttributeDefValue : AttributeValueBase
     /// 表名称，用于表 Id。
     /// </summary>
     public string Value { get; set; } = null!;
+
+    public bool IsRecord { get; set; }
 }

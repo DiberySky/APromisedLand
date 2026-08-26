@@ -1763,6 +1763,9 @@ namespace APromisedLand.Api.Data.Migrations
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int?>("RowNo")
                         .HasColumnType("integer");
 

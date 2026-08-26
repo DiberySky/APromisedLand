@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(DiberyDbContext))]
-    [Migration("20260825212131_Initial")]
+    [Migration("20260826130650_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -1765,6 +1765,9 @@ namespace APromisedLand.Api.Data.Migrations
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TableRowAttributeValue", b =>
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("RowNo")
                         .HasColumnType("integer");

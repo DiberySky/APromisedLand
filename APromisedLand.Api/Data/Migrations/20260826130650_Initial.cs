@@ -157,7 +157,8 @@ namespace APromisedLand.Api.Data.Migrations
                     NodeId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     AttributeDefinitionId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     TableId = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    RowNo = table.Column<int>(type: "integer", nullable: true)
+                    RowNo = table.Column<int>(type: "integer", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {

@@ -7,6 +7,7 @@ public class TableRowDto
 {
     public string RowId { get; set; } = null!;
     public int RowNo { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
     public List<TableCellDto> Values { get; set; } = new();
 }
 

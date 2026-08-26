@@ -122,7 +122,8 @@ public partial class AttributeService
             NodeId = nodeId,
             AttributeDefinitionId = tableDefId,
             TableId = tableId,
-            RowNo = rowNo
+            RowNo = rowNo,
+            CreatedAt = DateTimeOffset.UtcNow,
         });
 
         // 6. 写入各列值（NodeId = 行实例 Id）
@@ -159,6 +160,7 @@ public partial class AttributeService
         {
             RowId = r.Id,
             RowNo = r.RowNo ?? 0,
+            CreatedAt = r.CreatedAt,
             Values = cells.TryGetValue(r.Id, out var list)
                 ? list.Select(c => new TableCellDto
                 {
@@ -188,6 +190,7 @@ public partial class AttributeService
         {
             RowId = row.Id,
             RowNo = row.RowNo ?? 0,
+            CreatedAt = row.CreatedAt,
             Values = list.Select(c => new TableCellDto
             {
                 ColumnId = c.AttributeDefinitionId,
