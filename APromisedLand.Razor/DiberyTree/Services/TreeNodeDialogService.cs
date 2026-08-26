@@ -1,23 +1,13 @@
 using APromisedLand.Razor.Dialogs;
-using APromisedLand.Razor.DiberyTree.Dialogs;
+using APromisedLand.Razor.DiberyTree.Nodes;
 using APromisedLand.Razor.DiberyTree.Models;
 using APromisedLand.Razor.DiberyTree.Pages;
-using APromisedLand.Razor.Helper;
 using APromisedLand.Shared.DiberyTree.Interfaces;
 using MudBlazor;
-using APromisedLand.MauiBlazor.DiberyTree.Services;
 using APromisedLand.Razor.DiberyTree.Attributes;
-using APromisedLand.Razor.DiberyTree.Attributes.Locations;
-using APromisedLand.Razor.DiberyTree.Attributes.Tables;
 using APromisedLand.Razor.DiberyTree.Base;
-using APromisedLand.Razor.DiberyTree.Trees.Category;
 using APromisedLand.Razor.Services;
-using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
-using APromisedLand.Shared.DiberyTree.Attributes.Enums;
-using APromisedLand.Shared.DiberyTree.Attributes.Models;
-using APromisedLand.Shared.DiberyTree.Models;
 using MudBlazor.Extensions;
-using MudBlazor.Extensions.Options;
 
 namespace APromisedLand.Razor.DiberyTree.Services;
 
@@ -183,29 +173,29 @@ public class TreeNodeDialogService<TItem>(
 
     #region 删除确认对话框
 
-    public async Task<bool> ShowDeleteDialogAsync(
-        TItem node,
-        bool hasChildren = false,
-        DialogConfig? config = null)
-    {
-        var parameters = new DialogParameters
-        {
-            { "Node", node },
-            { "HasChildren", hasChildren }
-        };
-
-        var options = (config ?? new DialogConfig
-        {
-            MaxWidth = MaxWidth.ExtraSmall,
-            CloseButton = false,
-            BackdropClick = false
-        }).ToDialogOptions();
-
-        var dialog = await dialogService.ShowAsync<TreeNodeDeleteDialog<TItem>>("确认删除", parameters, options);
-
-        var result = await dialog.Result;
-        return result is { Canceled: false };
-    }
+    // public async Task<bool> ShowDeleteDialogAsync(
+    //     TItem node,
+    //     bool hasChildren = false,
+    //     DialogConfig? config = null)
+    // {
+    //     var parameters = new DialogParameters
+    //     {
+    //         { "Node", node },
+    //         { "HasChildren", hasChildren }
+    //     };
+    //
+    //     var options = (config ?? new DialogConfig
+    //     {
+    //         MaxWidth = MaxWidth.ExtraSmall,
+    //         CloseButton = false,
+    //         BackdropClick = false
+    //     }).ToDialogOptions();
+    //
+    //     var dialog = await dialogService.ShowAsync<TreeNodeDelebbteDialog<TItem>>("确认删除", parameters, options);
+    //
+    //     var result = await dialog.Result;
+    //     return result is { Canceled: false };
+    // }
 
     #endregion
 

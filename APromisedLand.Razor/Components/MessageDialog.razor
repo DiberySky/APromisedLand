@@ -1,11 +1,16 @@
 
 <DialogSky Title="@Title"
            TitleClass="mud-theme-primary"
-           SubmitButtonVisible="false"
-           CancelButtonText="关闭">
+           SubmitButtonVisible="@SubmitButtonVisible"
+           IconsVisible="@IconsVisible"
+           SubmitButtonText="@SubmitButtonText"
+           CancelButtonText="@CancelButtonText"
+           OnSubmitClick="OnSubmit">
     <DialogContent>
         <MudContainer class="my-4">
-            <MudText Typo="Typo.body1" Style="word-wrap: break-word; overflow-wrap: break-word;">@Message</MudText>
+            <MudText Typo="Typo.body1"
+                     Color="Color.Warning"
+                     Style="word-wrap: break-word; overflow-wrap: break-word;">@Message</MudText>
         </MudContainer>
     </DialogContent>
 </DialogSky>
@@ -13,6 +18,16 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
+    [Parameter] public bool SubmitButtonVisible { get; set; }
+    [Parameter] public bool IconsVisible { get; set; }
+    [Parameter] public string SubmitButtonText { get; set; } = "提交";
+    [Parameter] public string CancelButtonText { get; set; } = "关闭";
+
     [Parameter] public required string Title { get; set; }
     [Parameter] public required string Message { get; set; }
+    
+    private void OnSubmit()
+    {
+        MudDialog?.Close(true);
+    }
 }

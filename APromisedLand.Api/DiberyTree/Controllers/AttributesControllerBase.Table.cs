@@ -141,22 +141,23 @@ public abstract partial class AttributesControllerBase
     }
 
     [HttpDelete("rows/{rowId}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<string>))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<string>))]
     public virtual async Task<IActionResult> DeleteRow(string rowId)
     {
         var traceId = HttpContext.TraceIdentifier;
         try
         {
             var result = await attributeService.DeleteRowAsync(rowId);
-            if (result is null)
-                return NotFound(ApiResponse<object>.Fail($"行 '{rowId}' 不存在"));
-            return Ok(ApiResponse<bool>.Ok(true));
+            // if (result is false)
+            //     return NotFound(ApiResponse<bool>.Fail($"行 '{rowId}' 不存在"));
+            
+            return Ok(ApiResponse<string>.Ok("删除成功"));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "[TraceId: {TraceId}] 删除表行失败, RowId: {Id}", traceId, rowId);
-            return StatusCode(500, ApiResponse<object>.Fail($"删除表行失败: {ex.Message}"));
+            return StatusCode(500, ApiResponse<string>.Fail($"删除表行失败: {ex.Message}"));
         }
     }
 }

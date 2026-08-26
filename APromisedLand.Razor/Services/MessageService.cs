@@ -21,7 +21,7 @@ public class MessageService(IDialogService dialogService, ISnackbar snackbar)
         AnimateClose = true,
     };
 
-    public async Task<bool> DeleteBoxAsync(string? message, string? title = "删除")
+    public async Task<bool> DeleteBox(string? message, string? title = "删除")
     {
         var options = new MessageBoxOptions
         {
@@ -43,20 +43,41 @@ public class MessageService(IDialogService dialogService, ISnackbar snackbar)
         return result ?? false;
     }
     
-    // public async Task<bool> DeleteBoxAsync(string message = "删除操作无法撤消！", string title = "警告")
-    // {
-    //     var result = await dialogService.ShowMessageBoxAsync(
-    //         title, message,
-    //         yesText: "删除！", cancelText: "取消",
-    //         options: new DialogOptions
-    //         {
-    //             MaxWidth = MaxWidth.ExtraSmall,
-    //             BackdropClick = false,
-    //             FullWidth = true
-    //         });
-    //
-    //     return result != null;
-    // }
+    public async Task<bool> DeleteBoxAsync(string message, string title = "警告 : 删除操作无法撤消！")
+    {
+        var options = new DialogParameters<MessageDialog>()
+        {
+            { x => x.Title, title },
+            { x => x.Message, message },
+            { x => x.SubmitButtonText, "确认" },
+            { x => x.CancelButtonText, "取消" },
+            { x => x.IconsVisible, false },
+            { x => x.SubmitButtonVisible, true },
+        };
+
+        var dialogOptions = new DialogOptions
+        {
+            BackdropClick = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true,
+            CloseButton = false,
+        };
+
+// 获取对话框引用
+        var dialogRef = await dialogService.ShowExAsync<MessageDialog>("提示", options, dialogOptions);
+        // if (dialogRef == null)
+        //     return false; // 或按需处理异常
+
+        // 等待用户操作结果
+        var dialogResult = await dialogRef.Result;
+
+        // 如果用户取消了对话框或结果为空，返回 false
+        if (dialogResult == null || dialogResult.Canceled)
+            return false;
+
+        // 用户点击了确认按钮，返回 true
+        return true;
+    }
 
     public async Task<bool> BoolBoxAsync(string message = "删除操作无法撤消！", string title = "请确认")
     {
@@ -97,6 +118,7 @@ public class MessageService(IDialogService dialogService, ISnackbar snackbar)
         {
             { x => x.Title, message },
             { x => x.Message, details },
+            { x => x.CancelButtonText, "确定" },
         };
 
         var dialogOptions = new DialogOptions

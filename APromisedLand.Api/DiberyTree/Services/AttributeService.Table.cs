@@ -230,15 +230,16 @@ public partial class AttributeService
     // ---------- 删除行 ----------
 
     /// <summary>删除行实例及其所有列值。</summary>
-    public async Task<string?> DeleteRowAsync(string rowId)
+    public async Task<bool> DeleteRowAsync(string rowId)
     {
         var row = await db.TableRowAttributeValues.FindAsync(rowId);
-        if (row is null) return $"行 '{rowId}' 不存在";
+        if (row is null) 
+            throw new ArgumentException($"删除行 '{rowId}' 不存在");
 
         DeleteCells(rowId);
         db.TableRowAttributeValues.Remove(row);
         await db.SaveChangesAsync();
-        return null;
+        return true;
     }
 
     // ---------- 辅助：批量加载列值（按行实例 Id 分组）----------

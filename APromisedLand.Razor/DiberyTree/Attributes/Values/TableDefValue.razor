@@ -3,7 +3,7 @@
 
 @* @inject TreeNodeDialogService<TItem> TreeNodeDialogService *@
 @inject AttributeApiClient AttributeApiClient
-@inject DialogService DialogService
+@inject IDialogService DialogService
 
 <AttributeValueSky NodeId="@NodeId"
                    ValueId="@ValueId"
@@ -81,7 +81,7 @@
         // await TreeNodeDialogService.
         //     ShowAttributeTableRowEditDialogAsync(DefinitionDto, columns);
 
-        await ShowAttributeTableRowsPanelDialogAsync(NodeId!, ValueId!, DefinitionDto, columns);
+        await DialogService.ShowAttributeTableRowsPanelDialogAsync(NodeId!, ValueId!, Value!, DefinitionDto!, columns, ReadOnly);
     }
     
     public async Task ShowAttributeTableRowsPanelDialogAsync(

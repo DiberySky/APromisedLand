@@ -1,6 +1,6 @@
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
-@inject TableValueApiClient TableValueApiClient
+@inject AttributeApiClient AttributeApiClient
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject MessageService Message
@@ -31,7 +31,9 @@
                                                      Required="@col.IsRequired"/>
                                     break;
                                 case AttributeTypeEnum.小数:
-                                    <MudNumericField T="decimal?" Label="@col.Name" Variant="Variant.Outlined"
+                                    <MudNumericField T="decimal?" Label="@col.Name" 
+                                                     Variant="Variant.Outlined"
+                                                     HideSpinButtons="true"
                                                      @bind-Value="_values[col.Id].Decimal"
                                                      Required="@col.IsRequired"/>
                                     break;
@@ -135,9 +137,9 @@
             try
             {
                 if (IsEdit)
-                    await TableValueApiClient.UpdateRowAsync(TableId, EditRow!.RowId, dict);
+                    await AttributeApiClient.UpdateRowAsync(TableId, EditRow!.RowId, dict);
                 else
-                    await TableValueApiClient.AddRowAsync(NodeId, TableId, TableDefinitionDto!.Id, dict);
+                    await AttributeApiClient.AddRowAsync(NodeId, TableId, TableDefinitionDto!.Id, dict);
 
                 Snackbar.Add("保存成功", Severity.Success);
                 MudDialog?.Close(DialogResult.Ok(true));

@@ -70,12 +70,12 @@ public static class BuilderConfig
                 .AddHttpMessageHandler<JwtAuthorizationMessageHandler>()
                 .RemoveAllResilienceHandlers();
 
-            builder.Services.AddHttpClient<TableValueApiClient>(client =>
-                {
-                    client.BaseAddress = new Uri("http://localhost:5085");
-                })
-                .AddHttpMessageHandler<JwtAuthorizationMessageHandler>()
-                .RemoveAllResilienceHandlers();
+            // builder.Services.AddHttpClient<TableValueApiClient>(client =>
+            //     {
+            //         client.BaseAddress = new Uri("http://localhost:5085");
+            //     })
+            //     .AddHttpMessageHandler<JwtAuthorizationMessageHandler>()
+            //     .RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
 
             // builder.Services.AddHttpClient<AttributeLocationValueApiClient>(client =>

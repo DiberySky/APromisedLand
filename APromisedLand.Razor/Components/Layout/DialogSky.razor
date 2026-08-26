@@ -1,6 +1,4 @@
 
-@inject ISnackbar Snackbar
-
 <MudDialog TitleClass="@TitleClass"
            ContentClass="@ContentClass"
            ActionsClass="@ActionsClass">
@@ -31,7 +29,6 @@
         }
     </DialogContent>
     <DialogActions>
-        @* <MudToolBar Dense> *@
         <MudContainer MaxWidth="@MaxWidth">
 
             <MudStack Row Class="@ActionsContentClass" Spacing="2" AlignItems="AlignItems.Center">
@@ -51,15 +48,15 @@
                 {
                     <ButtonLoadingSky Text="@SubmitButtonText"
                                       Variant="Variant.Text"
-                                      Color="Color.Primary"
-                                      StartIcon="@Icons.Material.Filled.SaveAs"
+                                      Color="Color.Success"
+                                      StartIcon="@(IconsVisible ? Icons.Material.Filled.SaveAs : null)"
                                       OnClickFunc=@(() => OnSubmitClick.InvokeAsync())/>
                 }
 
                 @if (CancelButtonVisible)
                 {
                     <MudButton Variant="Variant.Text"
-                               StartIcon="@Icons.Material.Filled.Close"
+                               StartIcon="@(IconsVisible ? Icons.Material.Filled.Close : null)"
                                Color="Color.Default"
                                OnClick="@CancelAsync">
                         @CancelButtonText
@@ -69,7 +66,6 @@
             </MudStack>
 
         </MudContainer>
-        @* </MudToolBar> *@
     </DialogActions>
 </MudDialog>
 
@@ -83,6 +79,7 @@
 
     [Parameter] public bool CancelButtonVisible { get; set; } = true;
     [Parameter] public bool SubmitButtonVisible { get; set; }
+    [Parameter] public bool IconsVisible { get; set; } = true;
     
     [Parameter] public string CancelButtonText { get; set; } = "取消";
     [Parameter] public string SubmitButtonText { get; set; } = "提交";
@@ -115,5 +112,4 @@
 
         await OnCanceledClick.InvokeAsync();
     }
-
 }
