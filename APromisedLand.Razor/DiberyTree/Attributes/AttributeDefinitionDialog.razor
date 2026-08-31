@@ -92,6 +92,24 @@
                         case AttributeTypeEnum.定位:
                             break;
                         case AttributeTypeEnum.表格:
+                            <MudItem xs="12">
+                                <BoolFieldSky @bind-Value="_model.HasDate"
+                                              Label="包涵日期列"
+                                              TrueLabel="是"
+                                              FalseLabel="否"/>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <BoolFieldSky @bind-Value="_model.HasTime"
+                                              Label="包涵时间列"
+                                              TrueLabel="是"
+                                              FalseLabel="否"/>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <BoolFieldSky @bind-Value="_model.HasRowNo"
+                                              Label="包涵行号列"
+                                              TrueLabel="是"
+                                              FalseLabel="否"/>
+                            </MudItem>
 
                             break;
                         default:
@@ -107,7 +125,7 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public string? TableId { get; set; }
-    [Parameter] public AttributeDefinitionDto? EditItem { get; set; }
+    [Parameter] public AttributeDefinition? EditItem { get; set; }
 
     // private AttributeType _attributeType = new();
     private UnitTree? _unit;
@@ -127,7 +145,7 @@
             _model = new FormModel
             {
                 Name = EditItem.Name,
-                AttributeType = EditItem.AttributeType,
+                AttributeType = EditItem.TypeEnum,
                 MaxLength = EditItem.MaxLength,
                 Lines = EditItem.Lines,
                 Precision = EditItem.Precision,
@@ -231,7 +249,10 @@
                             Lines = _model.Lines,
                             Precision = _model.Precision,
                             Scale = _model.Scale,
-                            UnitId = _model.UnitId
+                            UnitId = _model.UnitId,
+                            HasDate = _model.HasDate,
+                            HasTime = _model.HasTime,
+                            HasRowNo = _model.HasRowNo,
                         });
                     Snackbar.Add("列更新成功", Severity.Success);
                 }
@@ -248,7 +269,10 @@
                             Precision = _model.Precision,
                             Scale = _model.Scale,
                             UnitId = _model.UnitId,
-                            ParentId = TableId
+                            ParentId = TableId,
+                            HasDate = _model.HasDate,
+                            HasTime = _model.HasTime,
+                            HasRowNo = _model.HasRowNo,
                         });
                     Snackbar.Add("列创建成功", Severity.Success);
                 }
@@ -292,21 +316,24 @@
         // 只要不是取消就返回 true（表示可能已修改）
         return result is not { Canceled: true };
     }
-    
+
     private void HandleCancel()
     {
         // DialogSky 内部已处理 MudDialog.Close，此处仅做额外清理
     }
 
-    private void AttributeDefinitionChanged(AttributeDefinitionDto dto)
+    private void AttributeDefinitionChanged(AttributeDefinition dto)
     {
         EditItem = dto;
 
         _model.Name = dto.Name;
-        _model.AttributeType = dto.AttributeType;
+        _model.AttributeType = dto.TypeEnum;
         _model.MaxLength = dto.MaxLength;
         _model.Lines = dto.Lines;
         _model.Precision = dto.Precision;
+        _model.HasDate = dto.HasDate;
+        _model.HasTime = dto.HasTime;
+        _model.HasRowNo = dto.HasRowNo;
         _model.Scale = dto.Scale;
         // _model.UnitId = dto.UnitId;
 
@@ -322,6 +349,9 @@
         public int? Precision { get; set; } = 10;
         public int? Scale { get; set; } = 2;
         public string? UnitId { get; set; }
+        public bool HasDate { get; set; }
+        public bool HasTime { get; set; }
+        public bool HasRowNo { get; set; }
     }
 
 }

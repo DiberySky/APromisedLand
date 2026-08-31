@@ -20,7 +20,7 @@
     </ToolBarContent>
     <DialogContent>
         <MudContainer>
-            <MudTable T="AttributeDefinitionDto"
+            <MudTable T="AttributeDefinition"
                       Items="_definitions"
                       @ref="_tableRef"
                       GroupBy="@_groupDefinition"
@@ -76,7 +76,7 @@
                         <MudText Typo="Typo.body1" Color="Color.Success">@context.Name</MudText>
                     </MudTd>
                     <MudTd DataLabel="类型">
-                        <MudText Typo="Typo.body1" Color="Color.Info">@context.Definition().AttributeTypeId.ToAttributeTypeName()?.ToLowerInvariant()</MudText>
+                        <MudText Typo="Typo.body1" Color="Color.Info">@context.TypeName</MudText>
                     </MudTd>
                     @if (!ReadOnly)
                     {
@@ -135,7 +135,7 @@
 
     [Parameter] public bool ReadOnly { get; set; }
 
-    private List<AttributeDefinitionDto> _definitions = new();
+    private List<AttributeDefinition> _definitions = new();
     private List<AttributeTypeEnum> _attributeTypes = new();
     private List<UnitTree> _units = new(); // 保留未使用，可后续扩展
     private bool _loading;
@@ -143,16 +143,16 @@
     private bool _expand;
 
     // 新增：表格引用，用于控制分组展开/折叠
-    private MudTable<AttributeDefinitionDto>? _tableRef;
+    private MudTable<AttributeDefinition>? _tableRef;
 
     // 新增：分组定义（默认折叠，可展开）
-    private TableGroupDefinition<AttributeDefinitionDto> _groupDefinition = new()
+    private TableGroupDefinition<AttributeDefinition> _groupDefinition = new()
     {
         GroupName = "属性类型",
         Indentation = false,
         Expandable = true,
         IsInitiallyExpanded = false,
-        Selector = (e) => e.Definition().AttributeTypeId
+        Selector = (e) => e.AttributeTypeId
     };
 
     protected override async Task OnInitializedAsync()
@@ -169,7 +169,7 @@
             _definitions = [.. defsTask];
 
             // 按属性类型枚举排序（升序）
-            _definitions = _definitions.OrderBy(d => d.Definition().AttributeTypeId.ToAttributeTypeEnum()).ToList();
+            _definitions = _definitions.OrderBy(d => d.TypeEnum).ToList();
 
             _attributeTypes = AttributeTypeMapping.All;
         }
@@ -183,7 +183,7 @@
         }
     }
 
-    private async Task OpenDialogAsync(AttributeDefinitionDto? item = null)
+    private async Task OpenDialogAsync(AttributeDefinition? item = null)
     {
         if (item == null)
         {
@@ -191,7 +191,7 @@
             return;
         }
         
-        switch (item.Definition().AttributeTypeId.ToAttributeTypeEnum())
+        switch (item.TypeEnum)
         {
             case AttributeTypeEnum.表格:
                 await OpenTableDialogAsync(item);
@@ -200,14 +200,15 @@
             case AttributeTypeEnum.整数:
             case AttributeTypeEnum.日期:
             case AttributeTypeEnum.时间:
+            case AttributeTypeEnum.日期时间:
                 await OpenDefinitionDialogAsync(item);
                 break;
             default:
-                throw new NotImplementedException($"不支持的属性类型: {item.Definition().AttributeTypeId}");
+                throw new NotImplementedException($"不支持的属性类型: {item.TypeEnum}");
         }
     }
 
-    private async Task OpenDefinitionDialogAsync(AttributeDefinitionDto? item)
+    private async Task OpenDefinitionDialogAsync(AttributeDefinition? item)
     {
         var result = await DialogService.ShowAttributeDefinitionDialogAsync(item);
         // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
@@ -217,7 +218,7 @@
         }
     }
 
-    private async Task OpenTableDialogAsync(AttributeDefinitionDto? item)
+    private async Task OpenTableDialogAsync(AttributeDefinition? item)
     {
         if (item == null) return;
 
@@ -230,7 +231,7 @@
     }
     
     public async Task<bool> ShowAttributeTableDefinitionDialogAsync(
-        AttributeDefinitionDto item, 
+        AttributeDefinition item, 
         // List<AttributeTypeEnum> attributeTypes,
         DialogConfig? config = null)
     {
@@ -251,7 +252,7 @@
         return result is not { Canceled: true };
     }
     
-    private async Task DeleteAsync(AttributeDefinitionDto item)
+    private async Task DeleteAsync(AttributeDefinition item)
     {
         var confirmed = await Message.DeleteBoxAsync(
             $"确定要删除属性定义【{item.Name}】吗？如果已被节点引用将无法删除。");
@@ -296,7 +297,7 @@
         StateHasChanged();
     }
 
-    private void SelectedItemChanged(AttributeDefinitionDto selectedItem)
+    private void SelectedItemChanged(AttributeDefinition selectedItem)
     {
         MudDialog?.Close(DialogResult.Ok(selectedItem));
     }

@@ -29,26 +29,26 @@ public partial class AttributeApiClient
     /// <summary>
     /// 获取指定节点的单个属性值（不存在返回 null）
     /// </summary>
-    public async Task<AttributeDto?> GetSingleValueAsync(
+    public async Task<AttributeJsonValueDto?> GetSingleValueAsync(
         string nodeId,
         string valueId,
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get,
             $"{BasePath}/{Uri.EscapeDataString(nodeId)}/attributes/values/{Uri.EscapeDataString(valueId)}");
-        return await SendAndGetDataOrNullAsync<AttributeDto>(request, cancellationToken);
+        return await SendAndGetDataOrNullAsync<AttributeJsonValueDto>(request, cancellationToken);
     }
     
     /// <summary>
-    /// 获取指定节点的所有属性值（返回 NodeDto 包含属性列表，不存在返回 null）
+    /// 获取指定节点的所有属性值（返回 NodeAttributesDto 包含属性列表，不存在返回 null）
     /// </summary>
-    public async Task<NodeDto?> GetAllValuesAsync(
+    public async Task<NodeAttributesDto?> GetAllValuesAsync(
         string nodeId,
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get,
             $"{BasePath}/{Uri.EscapeDataString(nodeId)}/attributes/values");
-        return await SendAndGetDataOrNullAsync<NodeDto>(request, cancellationToken);
+        return await SendAndGetDataOrNullAsync<NodeAttributesDto>(request, cancellationToken);
     }
     
     /// <summary>

@@ -1,3 +1,4 @@
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
@@ -20,7 +21,7 @@
     </ToolBarContent>
     <DialogContent>
         <MudContainer>
-            <MudTable T="AttributeDefinitionDto"
+            <MudTable T="AttributeDefinition"
                       Items="_tableDefinitions"
                       Dense="true"
                       Hover="true"
@@ -67,7 +68,7 @@
     [Parameter] public required string NodeId { get; set; }
     [Parameter] public required string TableId { get; set; }
 
-    private List<AttributeDefinitionDto> _tableDefinitions = new();
+    private List<AttributeDefinition> _tableDefinitions = new();
     private bool _loading;
 
     protected override async Task OnInitializedAsync() => await LoadDataAsync();
@@ -88,7 +89,7 @@
         finally { _loading = false; }
     }
 
-    private async Task OpenTableDialogAsync(AttributeDefinitionDto? definitionDto)
+    private async Task OpenTableDialogAsync(AttributeDefinition? definitionDto)
     {
         var parameters = new DialogParameters<AttributeTableDefinitionDialog>
         {
@@ -102,7 +103,7 @@
         if (result is { Canceled: false }) await LoadDataAsync();
     }
 
-    private async Task OpenColumnsAsync(AttributeDefinitionDto tableDefinitionDto)
+    private async Task OpenColumnsAsync(AttributeDefinition tableDefinitionDto)
     {
         var parameters = new DialogParameters<AttributeTableColumnsDialog>
         {
@@ -115,7 +116,7 @@
         await LoadDataAsync();
     }
 
-    private async Task OpenRowsAsync(AttributeDefinitionDto tableDefinitionDto)
+    private async Task OpenRowsAsync(AttributeDefinition tableDefinitionDto)
     {
         var parameters = new DialogParameters<AttributeTableRowsPanelDialog>
         {
@@ -126,7 +127,7 @@
         await (await DialogService.ShowAsync<AttributeTableRowsPanelDialog>($"行数据 - {tableDefinitionDto.Name}", parameters)).Result;
     }
 
-    private async Task DeleteTableAsync(AttributeDefinitionDto table)
+    private async Task DeleteTableAsync(AttributeDefinition table)
     {
         var confirmed = await Message.DeleteBoxAsync(
             $"确定删除表【{table.Name}】？其下所有列定义将一并删除。");

@@ -1,4 +1,5 @@
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
 @inject ISnackbar Snackbar
@@ -27,7 +28,7 @@ else
 
                             <TextValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition?.ToDto()"
+                                       DefinitionDto="@attr.Definition"
                                        Value="@textValue"
                                        ReadOnly="@ReadOnly"
                                        OnEditChanged="@ValueEditChanged"/>
@@ -37,7 +38,7 @@ else
 
                             <IntegerValue NodeId="@NodeId"
                                           ValueId="@attr.Id"
-                                          DefinitionDto="@attr.Definition?.ToDto()"
+                                          DefinitionDto="@attr.Definition"
                                           Value="@integerValue"
                                           ReadOnly="@ReadOnly"
                                           OnEditChanged="@ValueEditChanged"/>
@@ -47,7 +48,7 @@ else
 
                             <DecimalValue NodeId="@NodeId"
                                           ValueId="@attr.Id"
-                                          DefinitionDto="@attr.Definition?.ToDto()"
+                                          DefinitionDto="@attr.Definition"
                                           Value="@decimalValue"
                                           ReadOnly="@ReadOnly"
                                           OnEditChanged="@ValueEditChanged"/>
@@ -57,7 +58,7 @@ else
 
                             <DateValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition?.ToDto()"
+                                       DefinitionDto="@attr.Definition"
                                        Value="@dateValue"
                                        ReadOnly="@ReadOnly"
                                        OnEditChanged="@ValueEditChanged"/>
@@ -67,7 +68,7 @@ else
 
                             <TimeValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition?.ToDto()"
+                                       DefinitionDto="@attr.Definition"
                                        Value="@timeValue"
                                        ReadOnly="@ReadOnly"
                                        OnEditChanged="@ValueEditChanged"/>
@@ -77,7 +78,7 @@ else
 
                             <DateTimeValue NodeId="@NodeId"
                                            ValueId="@attr.Id"
-                                           DefinitionDto="@attr.Definition?.ToDto()"
+                                           DefinitionDto="@attr.Definition"
                                            Value="@dateTimeValue"
                                            ReadOnly="@ReadOnly"
                                            OnEditChanged="@ValueEditChanged"/>
@@ -87,7 +88,7 @@ else
 
                             <FileValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition?.ToDto()"
+                                       DefinitionDto="@attr.Definition"
                                        Value="@fileValue"
                                        ReadOnly="@ReadOnly"
                                        OnEditChanged="@ValueEditChanged"/>
@@ -97,8 +98,8 @@ else
 
                             <LocationDefValue NodeId="@NodeId"
                                               ValueId="@attr.Id"
-                                              DefinitionDto="@attr.Definition?.ToDto()"
-                                              Value="@locationDefValue"          
+                                              DefinitionDto="@attr.Definition"
+                                              Value="@locationDefValue"
                                               ReadOnly="@ReadOnly"
                                               OnEditChanged="@ValueEditChanged"/>
                             break;
@@ -106,19 +107,9 @@ else
                             var tableDefValue = attr.Value.GetValue<string>();
 
                             <TableDefValue NodeId="@NodeId"
-                                       ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition?.ToDto()"
-                                       Value="@tableDefValue"          
-                                       ReadOnly="@ReadOnly"
-                                       OnEditChanged="@ValueEditChanged"/>
-                            break;
-                        case AttributeTypeEnum.记录:
-                            var recordDefValue = attr.Value.GetValue<string>();
-
-                            <RecordDefValue NodeId="@NodeId"
                                            ValueId="@attr.Id"
-                                           DefinitionDto="@attr.Definition?.ToDto()"
-                                           Value="@recordDefValue"          
+                                           DefinitionDto="@attr.Definition"
+                                           Value="@tableDefValue"
                                            ReadOnly="@ReadOnly"
                                            OnEditChanged="@ValueEditChanged"/>
                             break;
@@ -135,13 +126,13 @@ else
     [Parameter] public required string? NodeId { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
-    
-    private List<AttributeDto>? _attributeDtos;
+    [Parameter] public EventCallback<AttributeDefinition?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnEditChanged { get; set; }
+
+    private List<AttributeJsonValueDto>? _attributeDtos;
     private bool _loading;
-    
+
     protected override async Task OnInitializedAsync()
     {
         await LoadAttributes();
@@ -155,8 +146,9 @@ else
             _loading = true;
             StateHasChanged();
             
-            var result = await AttributeApiClient.GetAllValuesAsync(NodeId);
-            _attributeDtos = result?.AttributeDtos ?? new();
+            var nodeAttributes = await AttributeApiClient.GetAllValuesAsync(NodeId);
+
+            _attributeDtos = nodeAttributes?.AttributeJsonValueDtos;
         }
         catch (Exception ex)
         {
@@ -169,12 +161,13 @@ else
         }
     }
 
-    private async Task ValueEditChanged(AttributeDefinitionDto? definition)
+    private async Task ValueEditChanged(AttributeDefinition? definition)
     {
         await LoadAttributes();
-        
+
         await OnEditChanged.InvokeAsync(definition);
         await OnDeleteClick.InvokeAsync(definition);
         await OnSaveClick.InvokeAsync(definition);
     }
+
 }

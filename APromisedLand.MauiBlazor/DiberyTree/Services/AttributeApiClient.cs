@@ -51,15 +51,26 @@ public partial class AttributeApiClient(HttpClient httpClient)
     {
         if (response.IsSuccessStatusCode)
             return;
+        // 尝试提取业务错误信息
         try
         {
             var errorResponse = await response.Content.ReadFromJsonAsync<ApiResponse<object>>();
-            
-            if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Message))
-                throw new HttpRequestException($"请求失败: {errorResponse.Message}", null, response.StatusCode);
+            // 只要有业务错误信息就用它，没有就用 HTTP 默认原因
+            string message = errorResponse?.Message;
+            if (string.IsNullOrEmpty(message))
+            {
+                message = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
+            }
+            throw new HttpRequestException($"请求失败: {message}", null, response.StatusCode);
+        }
+        catch (HttpRequestException)
+        {
+            // 如果是上面手动抛出的，直接重新抛出
+            throw;
         }
         catch
         {
+            // 反序列化或其他异常发生，回退到默认的 EnsureSuccessStatusCode 兜底
             response.EnsureSuccessStatusCode();
         }
     }

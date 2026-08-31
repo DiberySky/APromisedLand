@@ -11,6 +11,9 @@ public class AttributeDefinitionUpdateDto
 
     // ===== 列元信息（动态表列定义时可更新）=====
     // 注：ParentId 一般不可改（列不可换表），故不提供
+    public bool? HasDate { get; set; }
+    public bool? HasTime { get; set; }
+    public bool? HasRowNo { get; set; }
     public int? Order { get; set; }
     public bool? IsRequired { get; set; }
     public string? DefaultValue { get; set; }

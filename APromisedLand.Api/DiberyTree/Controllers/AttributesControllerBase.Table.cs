@@ -16,11 +16,12 @@ public abstract partial class AttributesControllerBase
 {
     // ==================== 表行数据 ====================
 
-    [HttpPost("node/{nodeId}/table/{tableId}/definition/{tableDefId}/rows")]
+    [HttpPost("node/table/{tableId}/rows")]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
-    public virtual async Task<IActionResult> AddRow(string nodeId, string tableId, string tableDefId,
+    public virtual async Task<IActionResult> AddRow(
+        [FromRoute] string tableId,
         [FromBody] AddTableRowDto dto)
     {
         var traceId = HttpContext.TraceIdentifier;
@@ -28,9 +29,9 @@ public abstract partial class AttributesControllerBase
         {
             logger.LogInformation(
                 "[TraceId: {TraceId}] 新增表行, NodeId: {NodeId}, TableId: {TableId}, TableDefId: {TableDefId}",
-                traceId, nodeId, tableId, tableDefId);
+                traceId, dto.NodeId, tableId, dto.DefinitionId);
 
-            var (rowId, error, duplicated) = await attributeService.AddRowAsync(nodeId, tableId, tableDefId, dto.Values);
+            var (rowId, error, duplicated) = await attributeService.AddRowAsync(tableId, dto);
 
             if (duplicated)
             {
@@ -115,7 +116,7 @@ public abstract partial class AttributesControllerBase
         var traceId = HttpContext.TraceIdentifier;
         try
         {
-            var error = await attributeService.UpdateRowAsync(rowId, dto.Values);
+            var error = await attributeService.UpdateRowAsync(rowId, dto);
             if (!string.IsNullOrEmpty(error))
                 return BadRequest(ApiResponse<object>.Fail(error));
 
@@ -136,7 +137,7 @@ public abstract partial class AttributesControllerBase
         catch (Exception ex)
         {
             logger.LogError(ex, "[TraceId: {TraceId}] 更新表行失败, RowId: {Id}", traceId, rowId);
-            return StatusCode(500, ApiResponse<object>.Fail($"更新表行失败: {ex.Message}"));
+            return StatusCode(500, ApiResponse<object>.Fail($"更新表行失败: {ex.InnerException?.ToString() ?? ex.Message}"));
         }
     }
 

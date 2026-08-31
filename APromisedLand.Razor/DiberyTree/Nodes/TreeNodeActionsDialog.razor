@@ -53,7 +53,7 @@
                 <BoolFieldSky Label="是否允许添加子节点" ReadOnly="true"
                               @bind-Value="NodeTemplate.Node.Value!.CanHaveChildren" />
 
-                <NodeAttributesSky TItem="TItem" NodeId="@NodeTemplate.Node.Value?.Id" ReadOnly="true" />
+                <NodeAttributesSky NodeId="@NodeTemplate.Node.Value?.Id" ReadOnly="true" />
                 
             </MudStack>
         </MudContainer>

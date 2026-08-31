@@ -3,6 +3,7 @@ using APromisedLand.Razor.DiberyTree.Attributes;
 using APromisedLand.Razor.DiberyTree.Attributes.Locations;
 using APromisedLand.Razor.DiberyTree.Attributes.Tables;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using MudBlazor;
 
 namespace APromisedLand.Razor.Helper.Dialog;
@@ -13,8 +14,8 @@ public static partial class DialogHelper
         string nodeId,
         string tableId,
         string tableName,
-        AttributeDefinitionDto definitionDto,
-        List<AttributeDefinitionDto> columns,
+        AttributeDefinition definitionDto,
+        List<AttributeDefinition> columns,
         bool readOnly = false,
         DialogConfig? config = null)
     {
@@ -41,7 +42,7 @@ public static partial class DialogHelper
     
     public static async Task ShowAttributeLocationEditDialogAsync(this IDialogService dialogService,
         string nodeId, object locationId,
-        AttributeDefinitionDto? definitionDto,
+        AttributeDefinition? definitionDto,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters<AttributeLocationEditDialog>
@@ -62,7 +63,7 @@ public static partial class DialogHelper
         var result = await dialog.Result;
     }
     
-    public static async Task<AttributeDefinitionDto?> ShowAttributeDefinitionListDialogAsync(this IDialogService dialogService,
+    public static async Task<AttributeDefinition?> ShowAttributeDefinitionListDialogAsync(this IDialogService dialogService,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters<AttributeDefinitionListDialog>
@@ -85,11 +86,11 @@ public static partial class DialogHelper
             return null;
 
         // 从 Data 中提取并转换返回值
-        return result.Data as AttributeDefinitionDto;
+        return result.Data as AttributeDefinition;
     }
     
     public static async Task<bool?> ShowAttributeDefinitionDialogAsync(this IDialogService dialogService,
-        AttributeDefinitionDto? item = null,
+        AttributeDefinition? item = null,
         string? tableId  = null,
         DialogConfig? config = null) 
     {

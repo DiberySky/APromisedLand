@@ -1,4 +1,5 @@
 
+
 @inject AttributeApiClient AttributeApiClient
 @inject IDialogService DialogService
 @inject MessageService Message
@@ -27,13 +28,17 @@
                       Loading="_loading"
                       Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
-                    @if (TableDefinitionDto.AttributeType == AttributeTypeEnum.表格)
+                    @if (TableDefinitionDto.HasRowNo)
                     {
                         <MudTh>行号</MudTh>
                     }
-                    else
+                    @if (TableDefinitionDto.HasDate)
                     {
-                        <MudTh>创建时间</MudTh>
+                        <MudTh>日期</MudTh>
+                    }
+                    @if (TableDefinitionDto.HasTime)
+                    {
+                        <MudTh>时间</MudTh>
                     }
                     @foreach (var col in Columns)
                     {
@@ -46,14 +51,21 @@
                     </MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    @if (TableDefinitionDto.AttributeType == AttributeTypeEnum.表格)
+                    @if (TableDefinitionDto.HasRowNo)
                     {
                         <MudTd DataLabel="行号" Class="text-info">@context.RowNo</MudTd>
                     }
-                    else
+
+                    @if (TableDefinitionDto.HasDate)
                     {
-                        <MudTd DataLabel="创建时间" Class="text-info">@context.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+                        <MudTd DataLabel="日期" Class="text-info">@context.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</MudTd>
                     }
+
+                    @if (TableDefinitionDto.HasTime)
+                    {
+                        <MudTd DataLabel="时间" Class="text-info">@context.CreatedAt.ToLocalTime().ToString("HH:mm")</MudTd>
+                    }
+
                     @foreach (var col in Columns)
                     {
                         <MudTd DataLabel="@col.Name" Class="text-info">
@@ -103,8 +115,8 @@
     [Parameter] public required string NodeId { get; set; }
     [Parameter] public required string TableId { get; set; }
     [Parameter] public required string TableName { get; set; }
-    [Parameter] public required AttributeDefinitionDto TableDefinitionDto { get; set; }
-    [Parameter] public required List<AttributeDefinitionDto> Columns { get; set; }
+    [Parameter] public required AttributeDefinition TableDefinitionDto { get; set; }
+    [Parameter] public required List<AttributeDefinition> Columns { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     
     private List<TableRowDto> _rows = new();
@@ -133,14 +145,15 @@
 
     private async Task AddRowAsync()
     {
-        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns);
+        var row = new TableRowDto();
+        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns, row, ReadOnly);
         
         await LoadRowsAsync();
     }
 
     private async Task EditRowAsync(TableRowDto row)
     {
-        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns, row);
+        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns, row, ReadOnly);
         
         await LoadRowsAsync();
     }
@@ -179,18 +192,20 @@
     public async Task ShowAttributeTableRowEditDialogAsync(
         string nodeId,
         string tableId,
-        AttributeDefinitionDto definitionDto, 
-        List<AttributeDefinitionDto> columns,
+        AttributeDefinition definitionDto, 
+        List<AttributeDefinition> columns,
         TableRowDto? editRow = null,
+        bool readOnly = false,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters<AttributeTableRowEditDialog>
         {
             { x => x.NodeId, nodeId },
             { x => x.TableId, tableId },
-            { x => x.TableDefinitionDto, definitionDto },
-            { x => x.Columns, columns },
+            { x => x.TableDefDto, definitionDto },
+            { x => x.ColumnDefDtos, columns },
             { x => x.EditRow, editRow },
+            { x => x.ReadOnly, readOnly },
         };
 
         var options = (config ?? new DialogConfig

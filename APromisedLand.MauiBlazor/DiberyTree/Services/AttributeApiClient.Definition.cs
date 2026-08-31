@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DTOs;
 
 namespace APromisedLand.MauiBlazor.DiberyTree.Services;
@@ -10,11 +11,11 @@ public partial class AttributeApiClient
     // ---------- 属性定义 ----------
 
     /// <summary>获取所有属性定义</summary>
-    public async Task<IReadOnlyList<AttributeDefinitionDto>> GetAllDefinitionsAsync(
+    public async Task<IReadOnlyList<AttributeDefinition>> GetAllDefinitionsAsync(
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, $"{BasePath}/definitions");
-        return await SendAndGetDataAsync<IReadOnlyList<AttributeDefinitionDto>>(request, cancellationToken);
+        return await SendAndGetDataAsync<IReadOnlyList<AttributeDefinition>>(request, cancellationToken);
     }
 
     // /// <summary>获取所有属性类型</summary>
@@ -26,27 +27,27 @@ public partial class AttributeApiClient
     // }
 
     /// <summary>根据 ID 获取属性定义（不存在返回 null）</summary>
-    public async Task<AttributeDefinitionDto?> GetDefinitionByIdAsync(
+    public async Task<AttributeDefinition?> GetDefinitionByIdAsync(
         string id, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get,
             $"{BasePath}/definitions/{Uri.EscapeDataString(id)}");
-        return await SendAndGetDataOrNullAsync<AttributeDefinitionDto>(request, cancellationToken);
+        return await SendAndGetDataOrNullAsync<AttributeDefinition>(request, cancellationToken);
     }
 
     /// <summary>创建新的属性定义</summary>
-    public async Task<AttributeDefinitionDto> CreateDefinitionAsync(
+    public async Task<AttributeDefinition> CreateDefinitionAsync(
         AttributeDefinitionCreateDto dto, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, $"{BasePath}/definitions")
         {
             Content = JsonContent.Create(dto)
         };
-        return await SendAndGetDataAsync<AttributeDefinitionDto>(request, cancellationToken);
+        return await SendAndGetDataAsync<AttributeDefinition>(request, cancellationToken);
     }
 
     /// <summary>更新属性定义</summary>
-    public async Task<AttributeDefinitionDto> UpdateDefinitionAsync(
+    public async Task<AttributeDefinition> UpdateDefinitionAsync(
         string id, AttributeDefinitionUpdateDto dto, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Put,
@@ -54,7 +55,7 @@ public partial class AttributeApiClient
         {
             Content = JsonContent.Create(dto)
         };
-        return await SendAndGetDataAsync<AttributeDefinitionDto>(request, cancellationToken);
+        return await SendAndGetDataAsync<AttributeDefinition>(request, cancellationToken);
     }
 
     /// <summary>删除属性定义（成功返回 true，不存在返回 false）</summary>

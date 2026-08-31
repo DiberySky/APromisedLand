@@ -1,10 +1,12 @@
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 <AttributeValueSky NodeId="@NodeId"
                    ValueId="@ValueId"
                    @bind-JsonValue="@JsonValue"
-                   DefinitionDto="@DefinitionDto"
+                   Definition="@DefinitionDto"
                    ReadOnly="@ReadOnly"
+                   SubmitVisible="@SubmitVisible"
                    OnSaveClick="@(e => OnSaveClick.InvokeAsync(e))"
                    OnDeleteClick="@(e => OnDeleteClick.InvokeAsync(e))"
                    OnEditChanged="@(e => OnEditChanged.InvokeAsync(e))">    
@@ -28,7 +30,7 @@
                 @if (_infoVisible)
                 {
                     <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                        类型：@DefinitionDto!.AttributeType.ToName(),
+                        类型：@DefinitionDto!.TypeName,
                         @if (!string.IsNullOrEmpty(DefinitionDto?.Unit?.Abbreviation))
                         {
                             <span>，单位：@DefinitionDto.Unit?.Abbreviation</span>
@@ -52,14 +54,16 @@
 @code {
     [Parameter] public required string? NodeId { get; set; }
     [Parameter] public string? ValueId { get; set; }
-    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public AttributeDefinition? DefinitionDto { get; set; }
     [Parameter] public long? Value { get; set; }
     [Parameter] public EventCallback<long?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+    
+    [Parameter] public bool SubmitVisible { get; set; } = true;
 
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnEditChanged { get; set; }
     
     bool _infoVisible;
     private JsonElement? JsonValue { get; set; }

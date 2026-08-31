@@ -1,3 +1,4 @@
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
@@ -9,14 +10,14 @@
     <MudGrid>
         @* 左侧列列表 *@
         <MudItem xs="12">
-            <MudTable T="AttributeDefinitionDto"
+            <MudTable T="AttributeDefinition"
                       Items="_columns"
                       Dense="true" Hover="true"
                       Loading="_loading"
                       SelectedItemChanged="OnColumnSelected">
                 <HeaderContent>
-                    <MudTh>列名</MudTh>
-                    <MudTh>类型</MudTh>
+                    <MudTh class="text-info">列名</MudTh>
+                    <MudTh class="text-info">类型</MudTh>
                     <MudTh Style="text-align:right">
                         <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                        Color="Color.Info" Size="Size.Small"
@@ -25,7 +26,7 @@
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd>@context.Name</MudTd>
-                    <MudTd>@context.AttributeType.ToName()</MudTd>
+                    <MudTd>@context.TypeEnum</MudTd>
                     <MudTd Style="text-align:right">
                         @if (Deletable)
                         {
@@ -53,11 +54,11 @@
     
     [Parameter] public required string NodeId { get; set; }
     [Parameter] public required string TableId { get; set; }
-    [Parameter] public AttributeDefinitionDto? TableDefinitionDto { get; set; }
+    [Parameter] public AttributeDefinition? TableDefinitionDto { get; set; }
     [Parameter] public bool Deletable { get; set; } = true;
     [Parameter] public EventCallback<bool> DeletableChanged { get; set; }
 
-    private List<AttributeDefinitionDto> _columns = new();
+    private List<AttributeDefinition> _columns = new();
     // private List<AttributeType> _types = new();
     private bool _loading;
     private ColumnFormModel _model = new();
@@ -91,12 +92,12 @@
         }
     }
 
-    private void OnColumnSelected(AttributeDefinitionDto? col)
+    private void OnColumnSelected(AttributeDefinition? col)
     {
         if (col == null) return;
         _editingId = col.Id;
         _model.Name = col.Name;
-        _model.Type = col.AttributeType;
+        _model.Type = col.TypeEnum;
         _model.Order = col.Order;
         _model.IsRequired = col.IsRequired;
         _model.DefaultValue = col.DefaultValue;
@@ -112,7 +113,7 @@
         }
     }
     
-    private async Task OpenDefinitionDialogAsync(AttributeDefinitionDto? item)
+    private async Task OpenDefinitionDialogAsync(AttributeDefinition? item)
     {
         var result = await DialogService.ShowAttributeDefinitionDialogAsync(item, TableId);
         // 如果子对话框返回了 true（表示成功创建/修改），刷新列表
@@ -194,7 +195,7 @@
     //     }
     // }
 
-    private async Task DeleteColumnAsync(AttributeDefinitionDto col)
+    private async Task DeleteColumnAsync(AttributeDefinition col)
     {
         var confirmed = await Message.DeleteBoxAsync($"确定删除列【{col.Name}】？");
         if (!confirmed) return;

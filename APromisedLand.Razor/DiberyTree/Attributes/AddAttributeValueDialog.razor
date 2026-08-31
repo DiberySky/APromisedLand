@@ -1,3 +1,4 @@
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
@@ -22,7 +23,7 @@
             </MudItem>
             @if (DefinitionDto != null)
             {
-                @switch (DefinitionDto!.AttributeType)
+                @switch (DefinitionDto!.TypeEnum)
                 {
                     case AttributeTypeEnum.文本:
                         <MudItem xs="12">
@@ -91,7 +92,7 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required string NodeId { get; set; }
-    [Parameter] public required AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public required AttributeDefinition? DefinitionDto { get; set; }
     [Parameter] public JsonElement? ValueElement { get; set; }
 
     [Parameter] public string? TextValue { get; set; }
@@ -104,7 +105,7 @@
     [Parameter] public string? LocationName { get; set; }
     [Parameter] public string? TableName { get; set; }
 
-    private List<AttributeDefinitionDto>? DefinitionDtos;
+    private List<AttributeDefinition>? DefinitionDtos;
     private bool _isSubmitting;
 
     protected override async Task OnInitializedAsync()
@@ -146,7 +147,7 @@
         try
         {
             JsonElement valueElement;
-            switch (DefinitionDto.AttributeType)
+            switch (DefinitionDto.TypeEnum)
             {
                 case AttributeTypeEnum.文本:
                     if (string.IsNullOrWhiteSpace(TextValue))
@@ -230,7 +231,7 @@
                     valueElement = JsonSerializer.SerializeToElement(TableName);
                     break;
                 default:
-                    throw new NotSupportedException($"不支持的类型 {DefinitionDto.AttributeType}");
+                    throw new NotSupportedException($"不支持的类型 {DefinitionDto.TypeEnum}");
             }
 
             var dto = new AddValueDto(DefinitionDto.Id, valueElement);

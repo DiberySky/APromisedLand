@@ -2,6 +2,7 @@ using APromisedLand.Api.DiberyTree.Interface;
 using APromisedLand.Api.DiberyTree.Services;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Enums;
+using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -94,7 +95,7 @@ public abstract partial class AttributesControllerBase
                     traceId, nodeId, id);
                 return NotFound(ApiResponse<object>.Fail($"属性值 {id} 不存在或不属于节点 {nodeId}"));
             }
-            return Ok(ApiResponse<AttributeDto>.Ok(dto));
+            return Ok(ApiResponse<AttributeJsonValueDto>.Ok(dto));
         }
         catch (Exception ex)
         {
@@ -114,8 +115,8 @@ public abstract partial class AttributesControllerBase
             var nodeDto = await attributeService.GetAllValuesAsync(nodeId);
             logger.LogInformation(
                 "[TraceId: {TraceId}] 获取节点所有属性值成功, NodeId: {NodeId}, ValueCount: {Count}",
-                traceId, nodeId, nodeDto.AttributeDtos.Count);
-            return Ok(ApiResponse<NodeDto>.Ok(nodeDto));
+                traceId, nodeId, nodeDto.AttributeJsonValueDtos.Count);
+            return Ok(ApiResponse<NodeAttributesDto>.Ok(nodeDto));
         }
         catch (Exception ex)
         {
@@ -193,16 +194,16 @@ public abstract partial class AttributesControllerBase
         try
         {
             var list = await attributeService.ListTablesAsync();
-            return Ok(ApiResponse<List<AttributeDefinitionDto>>.Ok(list));
+            return Ok(ApiResponse<List<AttributeDefinition>>.Ok(list));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "获取表定义列表失败");
-            return StatusCode(500, ApiResponse<List<AttributeDefinitionDto>>.Fail($"获取表定义列表失败: {ex.Message}"));
+            return StatusCode(500, ApiResponse<List<AttributeDefinition>>.Fail($"获取表定义列表失败: {ex.Message}"));
         }
     }
 
-    /// <summary>获取指定表下的所有列定义，按 Order 排序（服务端过滤 ParentId）。</summary>
+   /// <summary>获取指定表下的所有列定义，按 Order 排序（服务端过滤 ParentId）。</summary>
     [HttpGet("tables/{tableId}/columns")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
@@ -212,16 +213,16 @@ public abstract partial class AttributesControllerBase
         {
             // 先确认该表存在且是表定义
             var table = await attributeService.GetByIdAsync(tableId);
-            if (table is null || table.ParentId != null || table.AttributeType != AttributeTypeEnum.表格)
+            if (table is null || table.ParentId != null || table.TypeEnum != AttributeTypeEnum.表格)
                 return NotFound(ApiResponse<object>.Fail($"表定义 '{tableId}' 不存在或不是表格类型"));
 
             var list = await attributeService.ListColumnsAsync(tableId);
-            return Ok(ApiResponse<List<AttributeDefinitionDto>>.Ok(list));
+            return Ok(ApiResponse<List<AttributeDefinition>>.Ok(list));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "获取表列列表失败, TableId: {TableId}", tableId);
-            return StatusCode(500, ApiResponse<List<AttributeDefinitionDto>>.Fail($"获取表列列表失败: {ex.Message}"));
+            return StatusCode(500, ApiResponse<List<AttributeDefinition>>.Fail($"获取表列列表失败: {ex.Message}"));
         }
     }
 
@@ -237,7 +238,7 @@ public abstract partial class AttributesControllerBase
         {
             var created = await attributeService.CreateTableColumnAsync(tableId, dto);
             return CreatedAtAction(nameof(GetDefinitionById), new { id = created.Id },
-                ApiResponse<AttributeDefinitionDto>.Ok(created));
+                ApiResponse<AttributeDefinition>.Ok(created));
         }
         catch (KeyNotFoundException ex)
         {

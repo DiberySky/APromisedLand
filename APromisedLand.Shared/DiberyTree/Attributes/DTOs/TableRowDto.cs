@@ -18,15 +18,3 @@ public class TableCellDto
     public string? ColumnName { get; set; }
     public object? Value { get; set; }
 }
-
-/// <summary>新增行 DTO：列定义 Id -> 列值（JSON，由 ValueValidator 按列类型解析）。</summary>
-public class AddTableRowDto
-{
-    public Dictionary<string, JsonElement> Values { get; set; } = new();
-}
-
-/// <summary>更新行 DTO：列定义 Id -> 列值（JSON）。</summary>
-public class UpdateTableRowDto
-{
-    public Dictionary<string, JsonElement> Values { get; set; } = new();
-}

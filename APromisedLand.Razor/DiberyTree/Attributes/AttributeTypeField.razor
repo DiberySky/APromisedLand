@@ -1,3 +1,4 @@
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject IDialogService DialogService
@@ -12,8 +13,8 @@
               AdornmentAriaLabel=""/>
 
 @code {
-    [Parameter] public AttributeDefinitionDto? AttributeDefinitionDto { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto> AttributeDefinitionChanged { get; set; }
+    [Parameter] public AttributeDefinition? AttributeDefinitionDto { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition> AttributeDefinitionChanged { get; set; }
 
     private async Task EditClick()
     {

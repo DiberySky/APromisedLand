@@ -3,6 +3,7 @@ using APromisedLand.Shared.DiberyTree.Attributes.Enums;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace APromisedLand.Api.Data;
 
@@ -30,6 +31,22 @@ public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // 遍历所有 DateTimeOffset 属性，配置 UTC 转换
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTimeOffset) || 
+                    property.ClrType == typeof(DateTimeOffset?))
+                {
+                    property.SetValueConverter(
+                        new ValueConverter<DateTimeOffset, DateTimeOffset>(
+                            v => v.ToUniversalTime(),
+                            v => v));
+                }
+            }
+        }
+        
         // ------ CategoryTree ------
         modelBuilder.Entity<CategoryTree>(entity =>
         {

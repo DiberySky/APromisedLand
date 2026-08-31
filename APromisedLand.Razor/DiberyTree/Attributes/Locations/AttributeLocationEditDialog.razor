@@ -1,3 +1,4 @@
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
@@ -41,7 +42,7 @@
                         @if (_infoVisible)
                         {
                             <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                                类型：@DefinitionDto!.AttributeType.ToName()，
+                                类型：@DefinitionDto!.TypeName
                                 纬度范围 [-90, 90]，经度范围 [-180, 180]
                             </MudText>
                         }
@@ -62,7 +63,7 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
     [Parameter] public required string? NodeId { get; set; }
     [Parameter] public required string? LocationId { get; set; }
-    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public AttributeDefinition? DefinitionDto { get; set; }
     
     [Parameter] public double Latitude { get; set; }
     [Parameter] public EventCallback<double> LatitudeChanged { get; set; }

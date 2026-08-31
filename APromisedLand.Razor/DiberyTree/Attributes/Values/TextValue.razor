@@ -1,10 +1,12 @@
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 <AttributeValueSky NodeId="@NodeId"
                    ValueId="@ValueId"
                    @bind-JsonValue="@JsonValue"
-                   DefinitionDto="@DefinitionDto"
+                   Definition="@DefinitionDto"
                    ReadOnly="@ReadOnly"
+                   SubmitVisible="@SubmitVisible"
                    OnSaveClick="@(e => OnSaveClick.InvokeAsync(e))"
                    OnDeleteClick="@(e => OnDeleteClick.InvokeAsync(e))"
                    OnEditChanged="@(e => OnEditChanged.InvokeAsync(e))">
@@ -26,7 +28,7 @@
                 @if (_infoVisible)
                 {
                     <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                        类型：@DefinitionDto!.AttributeType.ToName(),
+                        类型：@DefinitionDto!.TypeName,
                         最大长度：@(DefinitionDto?.MaxLength is null or 0 ? "无限制" : DefinitionDto?.MaxLength.ToString())
                     </MudText>
                 }
@@ -47,14 +49,19 @@
 @code {
     [Parameter] public required string? NodeId { get; set; }
     [Parameter] public string? ValueId { get; set; }
-    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public AttributeDefinition? DefinitionDto { get; set; }
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
-    [Parameter] public bool ReadOnly { get; set; }
+    // [Parameter] public JsonElement? JsonValue { get; set; }
+    // [Parameter] public EventCallback<JsonElement?> JsonValueChanged { get; set; }
 
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    
+    [Parameter] public bool SubmitVisible { get; set; } = true;
+    
+    [Parameter] public EventCallback<AttributeDefinition?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnEditChanged { get; set; }
     
     bool _infoVisible;
 
@@ -72,5 +79,6 @@
         _ = ValueChanged.InvokeAsync(Value);
 
         JsonValue = value is not null ? JsonSerializer.SerializeToElement(value) : null;
+        // _ = JsonValueChanged.InvokeAsync(JsonValue);
     }
 }

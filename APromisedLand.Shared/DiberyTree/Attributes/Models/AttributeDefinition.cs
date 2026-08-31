@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using APromisedLand.Shared.DiberyTree.Attributes.Enums;
 using APromisedLand.Shared.DiberyTree.Models;
 using APromisedLand.Shared.Models;
 
@@ -7,8 +8,18 @@ namespace APromisedLand.Shared.DiberyTree.Attributes.Models;
 
 public class AttributeDefinition
 {
+    public AttributeDefinition()
+    {
+        AttributeTypeId = AttributeTypeEnum.文本.ToAttributeTypeId();
+    }
+    
+    public AttributeDefinition(AttributeTypeEnum typeEnum)
+    {
+        AttributeTypeId = typeEnum.ToAttributeTypeId();
+    }
+    
     public string Id { get; set; } = Guid.NewGuid().ToString(); // 由种子数据提供固定 GUID
-    public string Name { get; set; } = null!;
+    public string Name { get; set; } = "名称";
 
     // 外键改为 string，匹配 AttributeType.Id
     public string AttributeTypeId { get; set; } = null!;
@@ -34,6 +45,10 @@ public class AttributeDefinition
     public string? ParentId { get; set; }
     public AttributeDefinition? Parent { get; set; }
 
+    public bool HasDate { get; set; }
+    public bool HasTime { get; set; }
+    public bool HasRowNo { get; set; }
+    
     // 列在表内的显示顺序
     public int Order { get; set; }
 
@@ -43,25 +58,33 @@ public class AttributeDefinition
     // 列默认值（字符串形式，按列类型解析）
     public string? DefaultValue { get; set; }
 
-    public AttributeDefinitionDto ToDto()
-{
-        return new AttributeDefinitionDto
-        {
-            Id = Id,
-            Name = Name,
-            AttributeType = AttributeTypeId.ToAttributeTypeEnum(),
-            Lines = Lines,
-            MaxLength = MaxLength,
-            Precision = Precision,
-            Scale = Scale,
-            UnitId = UnitId,
-            Unit = Unit,
-            ParentId = ParentId,
-            Order = Order,
-            IsRequired = IsRequired,
-            DefaultValue = DefaultValue,
-        };
-    }
+    public string TypeName
+        => AttributeTypeId.ToAttributeTypeEnum().ToString(); 
+    public AttributeTypeEnum TypeEnum
+        => AttributeTypeId.ToAttributeTypeEnum(); 
+    
+//     public DTOs.AttributeDefinition ToDto()
+// {
+//         return new DTOs.AttributeDefinition
+//         {
+//             Id = Id,
+//             Name = Name,
+//             AttributeType = AttributeTypeId.ToAttributeTypeEnum(),
+//             Lines = Lines,
+//             MaxLength = MaxLength,
+//             Precision = Precision,
+//             Scale = Scale,
+//             UnitId = UnitId,
+//             Unit = Unit,
+//             ParentId = ParentId,
+//             HasDate = HasDate,
+//             HasTime = HasTime,
+//             HasRowNo = HasRowNo,
+//             Order = Order,  
+//             IsRequired = IsRequired,
+//             DefaultValue = DefaultValue,
+//         };
+//     }
     // ---------- 种子数据 ----------
     public static List<AttributeDefinition> SeedData()
     {
@@ -88,7 +111,7 @@ public class AttributeDefinition
         return new List<AttributeDefinition>
         {
             // ---------- 文本类型 ----------
-            new()
+            new(AttributeTypeEnum.文本)
             {
                 Id = "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
                 Name = "名称",
@@ -97,7 +120,7 @@ public class AttributeDefinition
                 MaxLength = 50
             }, // 最大 50 字符
 
-            new()
+            new(AttributeTypeEnum.文本)
             {
                 Id = "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f",
                 Name = "描述",
@@ -106,7 +129,7 @@ public class AttributeDefinition
                 MaxLength = 500
             }, // 最大 500 字符
 
-            new()
+            new(AttributeTypeEnum.文本)
             {
                 Id = "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a",
                 Name = "备注",
@@ -115,60 +138,60 @@ public class AttributeDefinition
                 MaxLength = 1000
             }, // 最大 1000 字符
             // ---------- 整数类型 ----------
-            new()
+            new(AttributeTypeEnum.整数)
             {
                 Id = "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b", Name = "数量", AttributeTypeId = intTypeId,
                 UnitId = UNIT_METER
             }, // 单位：米
-            new() { Id = "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c", Name = "等级", AttributeTypeId = intTypeId },
+            new(AttributeTypeEnum.整数) { Id = "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c", Name = "等级", AttributeTypeId = intTypeId },
 
             // ---------- 小数类型 ----------
-            new()
+            new(AttributeTypeEnum.小数)
             {
                 Id = "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d", Name = "价格", AttributeTypeId = decimalTypeId,
                 Precision = 18, Scale = 2
             },
-            new()
+            new(AttributeTypeEnum.小数)
             {
                 Id = "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e", Name = "重量", AttributeTypeId = decimalTypeId,
                 Precision = 10, Scale = 3, UnitId = UNIT_KILOGRAM
             },
-            new()
+            new(AttributeTypeEnum.小数)
             {
                 Id = "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f", Name = "长度", AttributeTypeId = decimalTypeId,
                 Precision = 8, Scale = 2, UnitId = UNIT_CENTIMETER
             },
 
             // ---------- 日期类型（多个种子，满足你的需求） ----------
-            new() { Id = "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a", Name = "生产日期", AttributeTypeId = dateTypeId },
-            new() { Id = "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b", Name = "试验日期", AttributeTypeId = dateTypeId },
-            new() { Id = "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", Name = "出厂日期", AttributeTypeId = dateTypeId },
+            new(AttributeTypeEnum.日期) { Id = "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a", Name = "生产日期", AttributeTypeId = dateTypeId },
+            new(AttributeTypeEnum.日期) { Id = "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b", Name = "试验日期", AttributeTypeId = dateTypeId },
+            new(AttributeTypeEnum.日期) { Id = "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", Name = "出厂日期", AttributeTypeId = dateTypeId },
 
             // ---------- 时间类型 ----------
-            new() { Id = "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", Name = "开始时间", AttributeTypeId = timeTypeId },
-            new() { Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", Name = "结束时间", AttributeTypeId = timeTypeId },
+            new(AttributeTypeEnum.时间) { Id = "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", Name = "开始时间", AttributeTypeId = timeTypeId },
+            new(AttributeTypeEnum.时间) { Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", Name = "结束时间", AttributeTypeId = timeTypeId },
 
             // ---------- 日期时间类型 ----------
-            new() { Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", Name = "创建时间", AttributeTypeId = dateTimeTypeId },
-            new() { Id = "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a", Name = "更新时间", AttributeTypeId = dateTimeTypeId },
+            new(AttributeTypeEnum.日期时间) { Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", Name = "创建时间", AttributeTypeId = dateTimeTypeId },
+            new(AttributeTypeEnum.日期时间) { Id = "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a", Name = "更新时间", AttributeTypeId = dateTimeTypeId },
 
             // ---------- 文件类型 ----------
-            new() { Id = "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b", Name = "附件", AttributeTypeId = fileTypeId },
-            new() { Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", Name = "图片", AttributeTypeId = fileTypeId },
+            new(AttributeTypeEnum.文件) { Id = "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b", Name = "附件", AttributeTypeId = fileTypeId },
+            new(AttributeTypeEnum.文件) { Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", Name = "图片", AttributeTypeId = fileTypeId },
 
             // ---------- 定位类型 ----------
-            new() { Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", Name = "位置坐标", 
+            new(AttributeTypeEnum.定位) { Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", Name = "位置坐标", 
                 AttributeTypeId = locationTypeId },
 
             // ---------- 动态表类型 ----------
             // 表定义：规格表（ParentId = null，自身不存单值，仅作为"虚拟表"容器）
-            new()
+            new(AttributeTypeEnum.表格)
             {
                 Id = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e", Name = "规格表",
                 AttributeTypeId = tableTypeId
             },
             // 表「规格表」的列定义（ParentId 指向表定义）
-            new()
+            new(AttributeTypeEnum.文本)
             {
                 Id = "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6f", Name = "规格-材质",
                 AttributeTypeId = textTypeId, 
@@ -176,10 +199,33 @@ public class AttributeDefinition
                 Lines = 1,
                 Order = 1, IsRequired = true, MaxLength = 50
             },
-            new()
+            new(AttributeTypeEnum.小数)
             {
                 Id = "3c4d5e6f-7a8b-4c9d-0e1f-2a3b4c5d6e7a", Name = "规格-长度",
                 AttributeTypeId = decimalTypeId, ParentId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
+                Order = 2, IsRequired = false, Precision = 8, Scale = 2, UnitId = UNIT_CENTIMETER
+            },
+            
+            // ---------- 动态记录类型 ----------
+            // 表定义：规格表（ParentId = null，自身不存单值，仅作为"虚拟表"容器）
+            new(AttributeTypeEnum.表格)
+            {
+                Id = "0C1E0FB8-B731-4F38-9379-A96B9F13FC1F", Name = "生长日记",
+                AttributeTypeId = tableTypeId, HasDate = true
+            },
+            // 表「生长记录」的列定义（ParentId 指向表定义）
+            // new()
+            // {
+            //     Id = "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6f", Name = "规格-材质",
+            //     AttributeTypeId = textTypeId, 
+            //     ParentId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
+            //     Lines = 1,
+            //     Order = 1, IsRequired = true, MaxLength = 50
+            // },
+            new(AttributeTypeEnum.小数)
+            {
+                Id = "97868637-556F-433F-BD31-E9DED37A5FE8", Name = "高度",
+                AttributeTypeId = decimalTypeId, ParentId = "0C1E0FB8-B731-4F38-9379-A96B9F13FC1F",
                 Order = 2, IsRequired = false, Precision = 8, Scale = 2, UnitId = UNIT_CENTIMETER
             },
         };

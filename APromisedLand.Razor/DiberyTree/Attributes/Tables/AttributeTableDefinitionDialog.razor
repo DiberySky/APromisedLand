@@ -1,3 +1,4 @@
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @inject AttributeApiClient AttributeApiClient
@@ -13,17 +14,32 @@
         <MudForm @ref="_form" Model="_model" ValidationDelay="0">
             <MudContainer class="my-4">
 
-                <MudTextField @bind-Value="_model.Name"
-                              Label="表格类型名称"
-                              Variant="Variant.Outlined"
-                              Required="true"
-                              RequiredError="表格类型名称不能为空"
-                              MaxLength="50"
-                              Counter="50"/>
+                <MudStack Spacing="2">
+                    <MudTextField @bind-Value="_model.Name"
+                                  Label="表格类型名称"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="表格类型名称不能为空"
+                                  MaxLength="50"
+                                  Counter="50"/>
 
-                <AttributeTableColumnsSky TableId="@TableDefinitionDto!.Id"
-                                          @bind-Deletable="@_deletable"/>
+                    <BoolFieldSky @bind-Value="_model.HasDate"
+                                  Label="包涵日期列"
+                                  TrueLabel="是"
+                                  FalseLabel="否"/>
+                    <BoolFieldSky @bind-Value="_model.HasTime"
+                                  Label="包涵时间列"
+                                  TrueLabel="是"
+                                  FalseLabel="否"/>
+                    <BoolFieldSky @bind-Value="_model.HasRowNo"
+                                  Label="包涵行号列"
+                                  TrueLabel="是"
+                                  FalseLabel="否"/>
 
+                    <AttributeTableColumnsSky TableId="@TableDefinitionDto!.Id"
+                                              @bind-Deletable="@_deletable"/>
+
+                </MudStack>
             </MudContainer>
         </MudForm>
     </DialogContent>
@@ -39,7 +55,7 @@
 
     [Parameter] public required string NodeId { get; set; }
     [Parameter] public required string TableId { get; set; }
-    [Parameter] public AttributeDefinitionDto? TableDefinitionDto { get; set; }
+    [Parameter] public AttributeDefinition? TableDefinitionDto { get; set; }
 
     private MudForm? _form;
     private FormModel _model = new();
@@ -53,11 +69,14 @@
         // var types = await AttributeApiClient.GetAttributeTypesAsync();
         // _tableType = types.FirstOrDefault(t => t.SystemType == AttributeTypeEnum.表格);
 
-        _tableType = TableDefinitionDto?.AttributeType ?? AttributeTypeEnum.表格;
-        
+        _tableType = TableDefinitionDto?.TypeEnum ?? AttributeTypeEnum.表格;
+
         _model.Name = TableDefinitionDto?.Name ?? string.Empty;
+        _model.HasDate = TableDefinitionDto?.HasDate ?? false;
+        _model.HasTime = TableDefinitionDto?.HasTime ?? false;
+        _model.HasRowNo = TableDefinitionDto?.HasRowNo ?? false;
     }
-    
+
     private async Task HandleSubmitAsync()
     {
         if (_form == null) return;
@@ -75,7 +94,13 @@
             if (IsEdit)
             {
                 await AttributeApiClient.UpdateDefinitionAsync(TableDefinitionDto!.Id,
-                    new AttributeDefinitionUpdateDto { Name = _model.Name });
+                    new AttributeDefinitionUpdateDto
+                    {
+                        Name = _model.Name, 
+                        HasDate = _model.HasDate, 
+                        HasTime = _model.HasTime,
+                        HasRowNo = _model.HasRowNo
+                    });
                 Snackbar.Add("表更新成功", Severity.Success);
             }
             else
@@ -104,6 +129,9 @@
     private class FormModel
     {
         public string Name { get; set; } = string.Empty;
+        public bool HasDate { get; set; } = false;
+        public bool HasTime { get; set; } = false;
+        public bool HasRowNo { get; set; } = false;
     }
 
 }

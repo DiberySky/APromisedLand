@@ -27,11 +27,11 @@ public partial class AttributeService
 
     /// <summary>向指定表定义添加一行数据（带幂等去重）。</summary>
     /// <returns>(行实例 Id, 错误信息, 是否为重复请求)。当 Duplicated=true 时表示请求已在 30 秒窗口内处理过，已直接返回第一次的结果。</returns>
-    public async Task<(string? RowId, string? Error, bool Duplicated)> AddRowAsync(string nodeId, string tableId,
-        string tableDefId, Dictionary<string, JsonElement> values)
+    public async Task<(string? RowId, string? Error, bool Duplicated)> AddRowAsync(string tableId,
+        AddTableRowDto dto)
     {
         // ========== 第一步：基于请求内容计算 SHA256 指纹，做幂等去重 ==========
-        var fingerprint = ComputeAddRowFingerprint(nodeId, tableId, tableDefId, values);
+        var fingerprint = ComputeAddRowFingerprint(dto.NodeId, tableId, dto);
         var cacheKey = TableDedupCachePrefix + fingerprint;
 
         // 如果 30 秒窗口内已经处理过完全相同的请求，直接返回第一次结果，不做插入
@@ -45,7 +45,7 @@ public partial class AttributeService
         cache.Set(cacheKey, placeholder, TimeSpan.FromSeconds(TabelDedupWindowSeconds));
 
         // ========== 第二步：执行业务插入逻辑 ==========
-        var (rowId, error) = await AddRowInternalAsync(nodeId, tableId, tableDefId, values);
+        var (rowId, error) = await AddRowInternalAsync(dto);
 
         // 将实际结果写回缓存，覆盖占位值，后续相同请求直接拿到真实 RowId/Error
         var finalResult = (RowId: rowId, Error: error);
@@ -55,16 +55,16 @@ public partial class AttributeService
     }
 
     /// <summary>计算 AddRow 请求的 SHA256 指纹。对相同 nodeId+tableId+tableDefId+相同列值（含顺序）得到相同指纹。</summary>
-    private static string ComputeAddRowFingerprint(
-        string nodeId, string tableId, string tableDefId, Dictionary<string, JsonElement> values)
+    private static string ComputeAddRowFingerprint( 
+        string nodeId, string tableId, AddTableRowDto dto)
     {
         // 使用有序键序列，确保相同列值集合（即便字典遍历顺序不同）也能生成一致指纹
         var sb = new StringBuilder();
         sb.Append("nodeId=").Append(nodeId).Append('|');
         sb.Append("tableId=").Append(tableId).Append('|');
-        sb.Append("tableDefId=").Append(tableDefId).Append('|');
+        sb.Append("tableDefId=").Append(dto.DefinitionId).Append('|');
 
-        foreach (var kv in values.OrderBy(k => k.Key, StringComparer.Ordinal))
+        foreach (var kv in dto.Values.OrderBy(k => k.Key, StringComparer.Ordinal))
         {
             sb.Append(kv.Key).Append('=');
             // JsonElement 的 GetRawText() 输出稳定，适合指纹
@@ -78,30 +78,29 @@ public partial class AttributeService
     }
 
     /// <summary>实际的行插入逻辑（不含去重）。返回 (行实例 Id, 错误信息)。</summary>
-    private async Task<(string? RowId, string? Error)> AddRowInternalAsync(string nodeId, string tableId,
-        string tableDefId, Dictionary<string, JsonElement> values)
+    private async Task<(string? RowId, string? Error)> AddRowInternalAsync(AddTableRowDto dto)
     {
         // 1. 获取表定义（不再 Include AttributeType）
         var tableDef = await db.AttributeDefinitions
-            .FirstOrDefaultAsync(d => d.Id == tableDefId);
-        if (tableDef == null) return (null, $"表定义 '{tableDefId}' 不存在");
-
+            .FirstOrDefaultAsync(d => d.Id == dto.DefinitionId);
+        if (tableDef == null) return (null, $"表定义 '{dto.DefinitionId}' 不存在");
+        
         // 通过映射判断是否为表格类型
         if (!AttributeTypeMapping.IdToEnum.TryGetValue(tableDef.AttributeTypeId, out var tableType) || tableType != AttributeTypeEnum.表格)
-            return (null, $"'{tableDefId}' 不是表定义");
+            return (null, $"'{dto.DefinitionId}' 不是表定义");
         // 同时检查是否为表定义（ParentId 为 null 表示是表定义，而非列定义）
         if (tableDef.ParentId != null)
-            return (null, $"'{tableDefId}' 不是表定义（有父级）");
+            return (null, $"'{dto.DefinitionId}' 不是表定义（有父级）");
 
         // 2. 获取该表的所有列定义（不再 Include AttributeType）
         var columns = await db.AttributeDefinitions
-            .Where(d => d.ParentId == tableDefId)
+            .Where(d => d.ParentId == dto.DefinitionId)
             .OrderBy(d => d.Order)
             .ToListAsync();
         var colMap = columns.ToDictionary(c => c.Id);
 
         // 3. 校验：列 Id 必须属于该表；列不可为「表」类型
-        foreach (var kv in values)
+        foreach (var kv in dto.Values)
         {
             if (!colMap.TryGetValue(kv.Key, out var colDef))
                 return (null, $"列定义 '{kv.Key}' 不属于表 '{tableDef.Name}'");
@@ -113,21 +112,21 @@ public partial class AttributeService
 
         // 4. 生成行 ID 和行号
         var rowId = Guid.NewGuid().ToString();
-        var rowNo = await db.TableRowAttributeValues.CountAsync(r => r.AttributeDefinitionId == tableDefId) + 1;
+        var rowNo = await db.TableRowAttributeValues.CountAsync(r => r.AttributeDefinitionId == dto.DefinitionId) + 1;
 
         // 5. 添加行实例
         db.TableRowAttributeValues.Add(new TableRowAttributeValue
         {
             Id = rowId,
-            NodeId = nodeId,
-            AttributeDefinitionId = tableDefId,
-            TableId = tableId,
+            NodeId = dto.NodeId,
+            AttributeDefinitionId = dto.DefinitionId,
+            TableId = dto.TableId,
             RowNo = rowNo,
-            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = dto.CreatedAt,
         });
 
         // 6. 写入各列值（NodeId = 行实例 Id）
-        foreach (var kv in values)
+        foreach (var kv in dto.Values)
         {
             var colDef = colMap[kv.Key];
             var (ok, err, entity) = ValueValidator.ValidateAndBuild(colDef, kv.Value, rowId);
@@ -203,22 +202,26 @@ public partial class AttributeService
     // ---------- 更新行 ----------
 
     /// <summary>更新某行实例的列值（先删旧列值，再重建）。</summary>
-    public async Task<string?> UpdateRowAsync(string rowId, Dictionary<string, JsonElement> values)
+    public async Task<string?> UpdateRowAsync(string rowId, UpdateTableRowDto dto)
     {
         var row = await db.TableRowAttributeValues.FindAsync(rowId);
         if (row is null) return $"行 '{rowId}' 不存在";
 
+        row.CreatedAt = dto.CreatedAt;
+        
         var columns = await db.AttributeDefinitions
             .Where(d => d.ParentId == row.AttributeDefinitionId)
             .ToListAsync();
+        
         var colMap = columns.ToDictionary(c => c.Id);
-        foreach (var kv in values)
+        
+        foreach (var kv in dto.Values)
             if (!colMap.ContainsKey(kv.Key))
                 return $"列 '{kv.Key}' 不属于该表";
 
         DeleteCells(rowId);
 
-        foreach (var kv in values)
+        foreach (var kv in dto.Values)
         {
             var colDef = colMap[kv.Key];
             var (ok, err, entity) = ValueValidator.ValidateAndBuild(colDef, kv.Value, rowId);

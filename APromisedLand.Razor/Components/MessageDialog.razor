@@ -1,3 +1,6 @@
+@using Microsoft.JSInterop
+
+@inject ISnackbar Snackbar
 
 <DialogSky Title="@Title"
            TitleClass="mud-theme-primary"
@@ -6,6 +9,13 @@
            SubmitButtonText="@SubmitButtonText"
            CancelButtonText="@CancelButtonText"
            OnSubmitClick="OnSubmit">
+    <ToolBarContent>
+        <MudSpacer />
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                       Size="Size.Small"
+                       Color="Color.Default"
+                       OnClick="@CopyToClipboard"/>
+    </ToolBarContent>
     <DialogContent>
         <MudContainer class="my-4">
             <MudText Typo="Typo.body1"
@@ -25,9 +35,24 @@
 
     [Parameter] public required string Title { get; set; }
     [Parameter] public required string Message { get; set; }
-    
+
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
     private void OnSubmit()
     {
         MudDialog?.Close(true);
     }
+
+    private async Task CopyToClipboard()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", Message);
+        
+        Snackbar.Add("复制成功", Severity.Success, options =>
+        {
+            options.HideTransitionDuration = 3000;
+            options.ShowCloseIcon = false;
+        });
+    }
+
 }

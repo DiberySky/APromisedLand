@@ -1,4 +1,5 @@
 @using APromisedLand.Razor.DiberyTree.Attributes.Tables
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 @* @inject TreeNodeDialogService<TItem> TreeNodeDialogService *@
@@ -8,8 +9,9 @@
 <AttributeValueSky NodeId="@NodeId"
                    ValueId="@ValueId"
                    @bind-JsonValue="@JsonValue"
-                   DefinitionDto="@DefinitionDto"
+                   Definition="@DefinitionDto"
                    ReadOnly="@ReadOnly"
+                   SubmitVisible="@SubmitVisible"
                    OnSaveClick="@(e => OnSaveClick.InvokeAsync(e))"
                    OnDeleteClick="@(e => OnDeleteClick.InvokeAsync(e))"
                    OnEditChanged="@(e => OnEditChanged.InvokeAsync(e))">
@@ -25,11 +27,7 @@
                           AdornmentColor="Color.Success"
                           AdornmentIcon="@Icons.Material.Outlined.EditNote"
                           OnAdornmentClick="@(HandleAdornmentClick)"/>
-            <MudTextField T="bool"
-                          bind-Value="@_isRecord"
-                          Label="记录类型"
-                          Variant="Variant.Outlined"
-                          ReadOnly="@ReadOnly"/>        }
+        }
         else
         {
             <MudTextField T="string"
@@ -42,11 +40,6 @@
                           Counter="50"
                           ReadOnly="@ReadOnly"
                           ValueChanged="@(HandleValueChanged)"/>
-            <MudTextField T="bool"
-                          bind-Value="@_isRecord"
-                          Label="记录类型"
-                          Variant="Variant.Outlined"
-                          ReadOnly="@ReadOnly"/>
         }
     </ValueContent>
 </AttributeValueSky>
@@ -54,16 +47,17 @@
 @code {
     [Parameter] public required string? NodeId { get; set; }
     [Parameter] public string? ValueId { get; set; }
-    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public AttributeDefinition? DefinitionDto { get; set; }
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+    [Parameter] public bool SubmitVisible { get; set; } = true;
 
-    private bool _isRecord;
+    [Parameter] public EventCallback<AttributeDefinition?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnEditChanged { get; set; }
+
     private JsonElement? JsonValue { get; set; }
 
     protected override void OnInitialized()
@@ -86,7 +80,7 @@
     private async Task HandleAdornmentClick()
     {
         var list = await AttributeApiClient.ListTableColumnsAsync(DefinitionDto!.Id);
-        List<AttributeDefinitionDto> columns = [.. list];
+        List<AttributeDefinition> columns = [.. list];
         
         // await TreeNodeDialogService.
         //     ShowAttributeTableRowEditDialogAsync(DefinitionDto, columns);

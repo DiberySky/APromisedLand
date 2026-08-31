@@ -10,6 +10,5 @@ public enum AttributeTypeEnum
     日期时间,
     文件,
     定位,
-    表格,
-    记录
+    表格
 }

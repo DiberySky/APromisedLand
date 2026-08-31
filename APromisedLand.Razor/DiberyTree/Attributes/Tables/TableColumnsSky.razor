@@ -1,0 +1,224 @@
+
+@inject AttributeApiClient AttributeApiClient
+@inject ISnackbar Snackbar
+
+<MudStack Spacing="0">
+    @foreach (var attr in AttributeDtos)
+    {
+        var typeEnum = attr.Definition.AttributeTypeId.ToAttributeTypeEnum();
+
+        <MudGrid Class="align-center">
+            <MudItem sm="12">
+                @switch (typeEnum)
+                {
+                    case AttributeTypeEnum.文本:
+                        var textValue = attr.Value.GetValue<string>();
+
+                        <TextValue NodeId="@TableId"
+                                   ValueId="@attr.Id"
+                                   DefinitionDto="@attr.Definition"
+                                   Value="@textValue"
+                                   ReadOnly="@ReadOnly"
+                                   SubmitVisible="false"
+                                   OnEditChanged="@ValueEditChanged"/>
+                        break;
+                    case AttributeTypeEnum.整数:
+                        var integerValue = attr.Value.GetValue<long>();
+
+                        <IntegerValue NodeId="@TableId"
+                                      ValueId="@attr.Id"
+                                      DefinitionDto="@attr.Definition"
+                                      Value="@integerValue"
+                                      ReadOnly="@ReadOnly"
+                                      SubmitVisible="false"
+                                      OnEditChanged="@ValueEditChanged"/>
+
+                        // attr.Value = JsonSerializer.SerializeToElement(integerValue);
+                        break;
+                    case AttributeTypeEnum.小数:
+                        var decimalValue = attr.Value.GetValue<decimal>();
+
+                        <DecimalValue NodeId="@TableId"
+                                      ValueId="@attr.Id"
+                                      DefinitionDto="@attr.Definition"
+                                      @* Value="@decimalValue" *@
+                                      @bind-JsonValue="@attr.Value"
+                                      ReadOnly="@ReadOnly"
+                                      SubmitVisible="false"
+                                      OnEditChanged="@ValueEditChanged"/>
+
+                        // attr.Value = JsonSerializer.SerializeToElement(decimalValue);
+                        break;
+                    case AttributeTypeEnum.日期:
+                        var dateValue = attr.Value.GetValue<DateTimeOffset>();
+
+                        <DateValue NodeId="@TableId"
+                                   ValueId="@attr.Id"
+                                   DefinitionDto="@attr.Definition"
+                                   Value="@dateValue"
+                                   ReadOnly="@ReadOnly"
+                                   SubmitVisible="false"
+                                   OnEditChanged="@ValueEditChanged"/>
+                        break;
+                    case AttributeTypeEnum.时间:
+                        var timeValue = attr.Value.GetValue<TimeSpan>();
+
+                        <TimeValue NodeId="@TableId"
+                                   ValueId="@attr.Id"
+                                   DefinitionDto="@attr.Definition"
+                                   Value="@timeValue"
+                                   ReadOnly="@ReadOnly"
+                                   SubmitVisible="false"
+                                   OnEditChanged="@ValueEditChanged"/>
+
+                        // attr.Value = JsonSerializer.SerializeToElement(timeValue);
+                        break;
+                    case AttributeTypeEnum.日期时间:
+                        var dateTimeValue = attr.Value.GetValue<DateTimeOffset>();
+
+                        <DateTimeValue NodeId="@TableId"
+                                       ValueId="@attr.Id"
+                                       DefinitionDto="@attr.Definition"
+                                       Value="@dateTimeValue"
+                                       ReadOnly="@ReadOnly"
+                                       SubmitVisible="false"
+                                       OnEditChanged="@ValueEditChanged"/>
+
+                        // attr.Value = JsonSerializer.SerializeToElement(dateTimeValue);
+                        break;
+                    case AttributeTypeEnum.文件:
+                        var fileValue = attr.Value.GetValue<string>();
+
+                        <FileValue NodeId="@TableId"
+                                   ValueId="@attr.Id"
+                                   DefinitionDto="@attr.Definition"
+                                   Value="@fileValue"
+                                   ReadOnly="@ReadOnly"
+                                   SubmitVisible="false"
+                                   OnEditChanged="@ValueEditChanged"/>
+                        break;
+                    case AttributeTypeEnum.定位:
+                        var locationDefValue = attr.Value.GetValue<string>();
+
+                        <LocationDefValue NodeId="@TableId"
+                                          ValueId="@attr.Id"
+                                          DefinitionDto="@attr.Definition"
+                                          Value="@locationDefValue"
+                                          ReadOnly="@ReadOnly"
+                                          SubmitVisible="false"
+                                          OnEditChanged="@ValueEditChanged"/>
+                        break;
+                    case AttributeTypeEnum.表格:
+                        var tableDefValue = attr.Value.GetValue<string>();
+
+                        <TableDefValue NodeId="@TableId"
+                                       ValueId="@attr.Id"
+                                       DefinitionDto="@attr.Definition"
+                                       Value="@tableDefValue"
+                                       ReadOnly="@ReadOnly"
+                                       SubmitVisible="false"
+                                       OnEditChanged="@ValueEditChanged"/>
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    [Parameter] public required string? TableId { get; set; }
+
+    [Parameter] public List<AttributeJsonValueDto> AttributeDtos { get; set; } = [];
+    [Parameter] public required AttributeDefinition TableDefinitionDto { get; set; }
+    [Parameter] public required List<AttributeDefinition> Columns { get; set; }
+    [Parameter] public TableRowDto? EditRow { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    [Parameter] public EventCallback<AttributeDefinition?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnEditChanged { get; set; }
+
+  
+    private bool _loading;
+    private Dictionary<string, CellValue> _values = new();
+
+    protected override void OnInitialized()
+    { 
+        LoadAttributes();
+    }
+
+    private void LoadAttributes()
+    {
+        AttributeDtos = Columns.Select(x => new AttributeJsonValueDto
+        {
+            Definition = x,
+        }).ToList();
+
+        foreach (var cell in EditRow?.Values ?? [])
+        {
+            // if (!_values.TryGetValue(cell.ColumnId, out var v)) continue;
+            
+            var typeEnum = Columns.FirstOrDefault(c => c.Id == cell.ColumnId)?.TypeEnum;
+        
+            SetAttributeDto(cell.Value, typeEnum);
+            
+            // v.SetFrom(cell.Value, typeEnum);
+        }
+        
+        foreach (var cell in EditRow?.Values ?? [])
+        {
+            if (!_values.TryGetValue(cell.ColumnId, out var v)) continue;
+            
+            var typeEnum = Columns.FirstOrDefault(c => c.Id == cell.ColumnId)?.TypeEnum;
+
+            SetAttributeDto(cell.Value, typeEnum);
+            
+            v.SetFrom(cell.Value, typeEnum);
+        }
+        
+    }
+    
+    private void SetAttributeDto(object? raw, AttributeTypeEnum? type)
+    {
+        if (raw is not JsonElement je) return;
+        
+        var attr = AttributeDtos.FirstOrDefault(x  => x.Definition?.AttributeTypeId.ToAttributeTypeEnum() == type);
+        
+        if (attr == null) return;
+        
+        attr.Value = je;
+        
+        // try
+        // {
+        //     switch (type)
+        //     {
+        //         case AttributeTypeEnum.整数: Integer = je.GetInt32(); break;
+        //         case AttributeTypeEnum.小数: Decimal = je.GetDecimal(); break;
+        //         case AttributeTypeEnum.日期: Date = je.GetDateTime(); break;
+        //         case AttributeTypeEnum.时间: Time = je.GetValue<TimeSpan>(); break;
+        //         case AttributeTypeEnum.日期时间: DateTime = je.GetDateTime(); break;
+        //         default: Text = je.ToString(); break;
+        //     }
+        // }
+        // catch
+        // {
+        //     Text = je.ToString();
+        // }
+        //
+        // this.type = type; // ✅ 保存类型
+    }
+    
+
+    private async Task ValueEditChanged(AttributeDefinition? definition)
+    {
+        // await LoadAttributes();
+
+        await OnEditChanged.InvokeAsync(definition);
+        await OnDeleteClick.InvokeAsync(definition);
+        await OnSaveClick.InvokeAsync(definition);
+    }
+
+}

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
+using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DTOs;
 
 namespace APromisedLand.MauiBlazor.DiberyTree.Services;
@@ -11,15 +12,15 @@ public partial class AttributeApiClient
     // ---------- 动态表：表定义 & 列定义 ----------
 
     /// <summary>获取所有「表格」类型的表定义。</summary>
-    public async Task<IReadOnlyList<AttributeDefinitionDto>> ListTablesAsync(
+    public async Task<IReadOnlyList<AttributeDefinition>> ListTablesAsync(
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, $"{BasePath}/tables");
-        return await SendAndGetDataAsync<IReadOnlyList<AttributeDefinitionDto>>(request, cancellationToken);
+        return await SendAndGetDataAsync<IReadOnlyList<AttributeDefinition>>(request, cancellationToken);
     }
 
     /// <summary>获取指定表下的所有列定义（按 Order 排序）。</summary>
-    public async Task<IReadOnlyList<AttributeDefinitionDto>> ListTableColumnsAsync(
+    public async Task<IReadOnlyList<AttributeDefinition>> ListTableColumnsAsync(
         string tableId, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get,
@@ -27,16 +28,16 @@ public partial class AttributeApiClient
         
         var resp = await httpClient.SendAsync(request, cancellationToken);
         if (resp.StatusCode == HttpStatusCode.NotFound)
-            return Array.Empty<AttributeDefinitionDto>();
+            return Array.Empty<AttributeDefinition>();
         
         await EnsureSuccessWithApiResponseAsync(resp);
         
-        var apiResponse = await resp.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<AttributeDefinitionDto>>>(cancellationToken);
-        return apiResponse?.Success == true ? apiResponse.Data! : Array.Empty<AttributeDefinitionDto>();
+        var apiResponse = await resp.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<AttributeDefinition>>>(cancellationToken);
+        return apiResponse?.Success == true ? apiResponse.Data! : Array.Empty<AttributeDefinition>();
     }
 
     /// <summary>在指定表下新建列定义（ParentId 由服务端强制为 tableId）。</summary>
-    public async Task<AttributeDefinitionDto> CreateTableColumnAsync(
+    public async Task<AttributeDefinition> CreateTableColumnAsync(
         string tableId, AttributeDefinitionCreateDto dto, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Post,
@@ -45,20 +46,20 @@ public partial class AttributeApiClient
                 Content = JsonContent.Create(dto)
             };
         
-        return await SendAndGetDataAsync<AttributeDefinitionDto>(request, cancellationToken);
+        return await SendAndGetDataAsync<AttributeDefinition>(request, cancellationToken);
     }
     
     // ---------- 表行数据 ----------
 
     /// <summary>向指定表添加一行数据（列定义 Id → JSON 值），返回该行 DTO</summary>
-    public async Task<TableRowDto> AddRowAsync(string nodeId, string tabledId, 
-        string tableDefId, Dictionary<string, JsonElement> values, CancellationToken cancellationToken = default)
+    public async Task<TableRowDto> AddRowAsync(AddTableRowDto addDto, 
+        CancellationToken cancellationToken = default)
     {
-        var dto = new AddTableRowDto { Values = values };
+        // var dto = new AddTableRowDto { Values = values };
         var request = new HttpRequestMessage(HttpMethod.Post,
-            $"{BasePath}/node/{Uri.EscapeDataString(nodeId)}/table/{Uri.EscapeDataString(tabledId)}/definition/{Uri.EscapeDataString(tableDefId)}/rows")
+            $"{BasePath}/table/{Uri.EscapeDataString(addDto.TableId)}/rows")
         {
-            Content = JsonContent.Create(dto)
+            Content = JsonContent.Create(addDto)
         };
         return await SendAndGetDataAsync<TableRowDto>(request, cancellationToken);
     }
@@ -82,14 +83,14 @@ public partial class AttributeApiClient
     }
 
     /// <summary>更新某行的列值（先删旧列值再重建），返回该行 DTO</summary>
-    public async Task<TableRowDto> UpdateRowAsync(string tabledId, 
-        string rowId, Dictionary<string, JsonElement> values, CancellationToken cancellationToken = default)
+    public async Task<TableRowDto> UpdateRowAsync(
+        UpdateTableRowDto updateDto, 
+        CancellationToken cancellationToken = default)
     {
-        var dto = new UpdateTableRowDto { Values = values };
         var request = new HttpRequestMessage(HttpMethod.Put,
-            $"{BasePath}/rows/{Uri.EscapeDataString(rowId)}")
+            $"{BasePath}/rows/{Uri.EscapeDataString(updateDto.RowId)}")
         {
-            Content = JsonContent.Create(dto)
+            Content = JsonContent.Create(updateDto)
         };
         return await SendAndGetDataAsync<TableRowDto>(request, cancellationToken);
     }

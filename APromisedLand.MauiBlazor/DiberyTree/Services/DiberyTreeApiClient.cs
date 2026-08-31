@@ -28,10 +28,13 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
         CancellationToken cancellationToken = default)
     {
         var response = await httpClient.SendAsync(request, cancellationToken);
+        
         await EnsureSuccessWithApiResponseAsync(response);
+
         var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<TData>>(cancellationToken);
         if (apiResponse?.Success != true)
             throw new Exception(apiResponse?.Message ?? "操作失败，未返回具体错误信息");
+        
         return apiResponse.Data!;
     }
 
@@ -244,26 +247,26 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     // /// <summary>
     // /// 获取指定节点的单个属性值（不存在返回 null）
     // /// </summary>
-    // public async Task<AttributeDto?> GetSingleValueAsync(
+    // public async Task<AttributeJsonValueDto?> GetSingleValueAsync(
     //     string nodeId,
     //     string valueId,
     //     CancellationToken cancellationToken = default)
     // {
     //     var request = new HttpRequestMessage(HttpMethod.Get,
     //         $"{_basePath}/{Uri.EscapeDataString(nodeId)}/attributes/values/{Uri.EscapeDataString(valueId)}");
-    //     return await SendAndGetDataOrNullAsync<AttributeDto>(request, cancellationToken);
+    //     return await SendAndGetDataOrNullAsync<AttributeJsonValueDto>(request, cancellationToken);
     // }
     //
     // /// <summary>
-    // /// 获取指定节点的所有属性值（返回 NodeDto 包含属性列表，不存在返回 null）
+    // /// 获取指定节点的所有属性值（返回 NodeAttributesDto 包含属性列表，不存在返回 null）
     // /// </summary>
-    // public async Task<NodeDto?> GetAllValuesAsync(
+    // public async Task<NodeAttributesDto?> GetAllValuesAsync(
     //     string nodeId,
     //     CancellationToken cancellationToken = default)
     // {
     //     var request = new HttpRequestMessage(HttpMethod.Get,
     //         $"{_basePath}/{Uri.EscapeDataString(nodeId)}/attributes/values");
-    //     return await SendAndGetDataOrNullAsync<NodeDto>(request, cancellationToken);
+    //     return await SendAndGetDataOrNullAsync<NodeAttributesDto>(request, cancellationToken);
     // }
     //
     // /// <summary>

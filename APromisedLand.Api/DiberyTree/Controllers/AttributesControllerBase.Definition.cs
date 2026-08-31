@@ -2,6 +2,7 @@ using APromisedLand.Api.DiberyTree.Interface;
 using APromisedLand.Api.DiberyTree.Services;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Enums;
+using APromisedLand.Shared.DiberyTree.Attributes.Models;
 using APromisedLand.Shared.DTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -27,7 +28,7 @@ public abstract partial class AttributesControllerBase
         try
         {
             var created = await attributeService.CreateAsync(dto);
-            return CreatedAtAction(nameof(GetDefinitionById), new { id = created.Id }, ApiResponse<AttributeDefinitionDto>.Ok(created));
+            return CreatedAtAction(nameof(GetDefinitionById), new { id = created.Id }, ApiResponse<Shared.DiberyTree.Attributes.Models.AttributeDefinition>.Ok(created));
         }
         catch (ArgumentException ex)
         {
@@ -50,7 +51,7 @@ public abstract partial class AttributesControllerBase
             var dto = await attributeService.GetByIdAsync(id);
             if (dto is null)
                 return NotFound(ApiResponse<object>.Fail($"属性定义 {id} 不存在"));
-            return Ok(ApiResponse<AttributeDefinitionDto>.Ok(dto));
+            return Ok(ApiResponse<AttributeDefinition>.Ok(dto));
         }
         catch (Exception ex)
         {
@@ -66,12 +67,12 @@ public abstract partial class AttributesControllerBase
         try
         {
             var list = await attributeService.GetAllAsync();
-            return Ok(ApiResponse<IReadOnlyList<AttributeDefinitionDto>>.Ok(list));
+            return Ok(ApiResponse<IReadOnlyList<AttributeDefinition>>.Ok(list));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "获取属性定义列表失败");
-            return StatusCode(500, ApiResponse<IReadOnlyList<AttributeDefinitionDto>>.Fail($"获取属性定义列表失败: {ex.Message}"));
+            return StatusCode(500, ApiResponse<IReadOnlyList<AttributeDefinition>>.Fail($"获取属性定义列表失败: {ex.Message}"));
         }
     }
 
@@ -84,7 +85,7 @@ public abstract partial class AttributesControllerBase
         try
         {
             var updated = await attributeService.UpdateAsync(id, dto);
-            return Ok(ApiResponse<AttributeDefinitionDto>.Ok(updated));
+            return Ok(ApiResponse<AttributeDefinition>.Ok(updated));
         }
         catch (KeyNotFoundException)
         {

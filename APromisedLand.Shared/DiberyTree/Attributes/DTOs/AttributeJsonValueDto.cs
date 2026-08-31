@@ -4,11 +4,11 @@ using APromisedLand.Shared.DiberyTree.Attributes.Models;
 
 namespace APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 
-public class AttributeDto
+public class AttributeJsonValueDto
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string DefinitionId { get; set; } = null!;
-    public AttributeDefinition Definition { get; set; } = new();
+    public Models.AttributeDefinition Definition { get; set; } = null!;
     
     public JsonElement Value { get; set; }
 

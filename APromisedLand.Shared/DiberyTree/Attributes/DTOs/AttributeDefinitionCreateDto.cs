@@ -17,6 +17,10 @@ public class AttributeDefinitionCreateDto
     // ===== 动态表专用（创建列定义时指定）=====
     // ParentId 指向所属表定义；为 null 表示这是表定义本身
     public string? ParentId { get; set; }
+
+    public bool HasDate { get; set; }
+    public bool HasTime { get; set; }
+    public bool HasRowNo { get; set; }
     public int Order { get; set; }
     public bool IsRequired { get; set; }
     public string? DefaultValue { get; set; }

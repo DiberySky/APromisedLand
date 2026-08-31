@@ -17,7 +17,7 @@ public partial class AttributeService
     // ---------- 查询 ----------
 
     /// <summary>获取单个属性定义（含类型/单位/父表）。</summary>
-    public async Task<AttributeDefinitionDto?> GetByIdAsync(string id)
+    public async Task<AttributeDefinition?> GetByIdAsync(string id)
     {
         var def = await db.AttributeDefinitions
             .Include(d => d.Unit)           // Unit 导航保留（若有配置）
@@ -33,11 +33,11 @@ public partial class AttributeService
                 .FirstOrDefaultAsync(p => p.Id == def.ParentId);
         }
 
-        return def?.ToDto();
+        return def;
     }
 
     /// <summary>获取所有属性定义（仅根定义，即表定义）。</summary>
-    public async Task<IReadOnlyList<AttributeDefinitionDto>> GetAllAsync()
+    public async Task<IReadOnlyList<AttributeDefinition>> GetAllAsync()
     {
         var list = await db.AttributeDefinitions
             .Where(x => x.ParentId == null)
@@ -45,11 +45,12 @@ public partial class AttributeService
             .AsNoTracking()
             .OrderBy(d => d.Name)
             .ToListAsync();
-        return list.Select(d => d.ToDto()).ToList();
+        
+        return list;
     }
 
     /// <summary>列出所有「表定义」（ParentId 为空且类型=表）。</summary>
-    public async Task<List<AttributeDefinitionDto>> ListTablesAsync()
+    public async Task<List<AttributeDefinition>> ListTablesAsync()
     {
         var tableTypeId = AttributeTypeEnum.表格.ToAttributeTypeId();
         var tables = await db.AttributeDefinitions
@@ -59,11 +60,11 @@ public partial class AttributeService
             .OrderBy(d => d.Name)
             .ToListAsync();
         
-        return tables.Select(d => d.ToDto()).ToList();
+        return tables;
     }
 
     /// <summary>列出指定表下的所有列定义，按 Order 排序。</summary>
-    public async Task<List<AttributeDefinitionDto>> ListColumnsAsync(string tableId)
+    public async Task<List<AttributeDefinition>> ListColumnsAsync(string tableId)
     {
         var cols = await db.AttributeDefinitions
             .Include(d => d.Unit)
@@ -71,15 +72,15 @@ public partial class AttributeService
             .Where(d => d.ParentId == tableId)
             .OrderBy(d => d.Order)
             .ToListAsync();
-        return cols.Select(d => d.ToDto()).ToList();
+        return cols;
     }
 
     // ---------- 创建 ----------
 
     /// <summary>创建属性定义（表定义或列定义）。非合法时抛 ArgumentException。</summary>
-    public async Task<AttributeDefinitionDto> CreateAsync(AttributeDefinitionCreateDto dto)
+    public async Task<AttributeDefinition> CreateAsync(AttributeDefinitionCreateDto dto)
     {
-        var def = new AttributeDefinition
+        var def = new Shared.DiberyTree.Attributes.Models.AttributeDefinition(dto.AttributeType)
         {
             Id = Guid.NewGuid().ToString(),
             Name = dto.Name,
@@ -90,6 +91,9 @@ public partial class AttributeService
             Scale = dto.Scale,
             UnitId = dto.UnitId,
             ParentId = dto.ParentId,
+            HasDate = dto.HasDate,
+            HasTime = dto.HasRowNo,
+            HasRowNo = dto.HasRowNo,
             Order = dto.Order,
             IsRequired = dto.IsRequired,
             DefaultValue = dto.DefaultValue,
@@ -123,7 +127,7 @@ public partial class AttributeService
                 .FirstOrDefaultAsync(p => p.Id == created.ParentId);
         }
 
-        return created.ToDto();
+        return created;
     }
 
     /// <summary>
@@ -132,7 +136,7 @@ public partial class AttributeService
     /// </summary>
     /// <exception cref="KeyNotFoundException">tableId 不存在或不是表定义</exception>
     /// <exception cref="ArgumentException">列定义非法（如类型=表格）</exception>
-    public async Task<AttributeDefinitionDto> CreateTableColumnAsync(
+    public async Task<AttributeDefinition> CreateTableColumnAsync(
         string tableId, AttributeDefinitionCreateDto dto)
     {
         // 获取表定义并检查是否为表格类型
@@ -154,7 +158,7 @@ public partial class AttributeService
     // ---------- 更新 ----------
 
     /// <summary>更新属性定义（类型不可改）。不存在抛 KeyNotFoundException，非合法抛 ArgumentException。</summary>
-    public async Task<AttributeDefinitionDto> UpdateAsync(string id, AttributeDefinitionUpdateDto dto)
+    public async Task<AttributeDefinition> UpdateAsync(string id, AttributeDefinitionUpdateDto dto)
     {
         var def = await db.AttributeDefinitions
             .FirstOrDefaultAsync(d => d.Id == id)
@@ -165,6 +169,9 @@ public partial class AttributeService
         if (dto.MaxLength.HasValue) def.MaxLength = dto.MaxLength.Value;
         if (dto.Precision.HasValue) def.Precision = dto.Precision;
         if (dto.Scale.HasValue) def.Scale = dto.Scale;
+        if (dto.HasDate.HasValue) def.HasDate = dto.HasDate.Value;
+        if (dto.HasTime.HasValue) def.HasTime = dto.HasTime.Value;
+        if (dto.HasRowNo.HasValue) def.HasRowNo = dto.HasRowNo.Value;
         if (dto.UnitId is not null) def.UnitId = dto.UnitId;
         if (dto.Order.HasValue) def.Order = dto.Order.Value;
         if (dto.IsRequired.HasValue) def.IsRequired = dto.IsRequired.Value;
@@ -189,7 +196,7 @@ public partial class AttributeService
                 .FirstOrDefaultAsync(p => p.Id == updated.ParentId);
         }
 
-        return updated.ToDto();
+        return updated;
     }
 
     // ---------- 删除 ----------

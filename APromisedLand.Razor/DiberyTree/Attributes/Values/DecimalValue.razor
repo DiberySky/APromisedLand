@@ -1,10 +1,13 @@
+
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
 <AttributeValueSky NodeId="@NodeId"
                    ValueId="@ValueId"
-                   @bind-JsonValue="@JsonValue"
-                   DefinitionDto="@DefinitionDto"
+                   @bind-JsonValue="@_jsonValue"
+                   Definition="@DefinitionDto"
                    ReadOnly="@ReadOnly"
+                   SubmitVisible="@SubmitVisible"
+                   @bind-JsonValue="@_jsonValue"
                    OnSaveClick="@(e => OnSaveClick.InvokeAsync(e))"
                    OnDeleteClick="@(e => OnDeleteClick.InvokeAsync(e))"
                    OnEditChanged="@(e => OnEditChanged.InvokeAsync(e))">
@@ -28,7 +31,7 @@
                 @if (_infoVisible)
                 {
                     <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                        类型：@DefinitionDto!.AttributeType.ToName(), 整数位数：@(DefinitionDto?.Precision - DefinitionDto?.Scale),
+                        类型：@DefinitionDto?.TypeName, 整数位数：@(DefinitionDto?.Precision - DefinitionDto?.Scale),
                         小数位数：@DefinitionDto?.Scale
                         @if (!string.IsNullOrEmpty(DefinitionDto?.Unit?.Abbreviation))
                         {
@@ -53,30 +56,42 @@
 @code {
     [Parameter] public required string? NodeId { get; set; }
     [Parameter] public string? ValueId { get; set; }
-    [Parameter] public AttributeDefinitionDto? DefinitionDto { get; set; }
+    [Parameter] public AttributeDefinition? DefinitionDto { get; set; }
     [Parameter] public decimal? Value { get; set; }
     [Parameter] public EventCallback<decimal?> ValueChanged { get; set; }
-    [Parameter] public bool ReadOnly { get; set; }
+    
+    // [Parameter] public JsonElement? JsonValue { get; set; }
+    // [Parameter] public EventCallback<JsonElement?> JsonValueChanged { get; set; }
 
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnSaveClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnDeleteClick { get; set; }
-    [Parameter] public EventCallback<AttributeDefinitionDto?> OnEditChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    
+    [Parameter] public bool SubmitVisible { get; set; } = true;
+
+    [Parameter] public EventCallback<AttributeDefinition?> OnSaveClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnDeleteClick { get; set; }
+    [Parameter] public EventCallback<AttributeDefinition?> OnEditChanged { get; set; }
     
     bool _infoVisible;
-    private JsonElement? JsonValue { get; set; }
+    private JsonElement? _jsonValue;
     
     protected override void OnInitialized()
     {
-        JsonValue = Value is not null ? JsonSerializer.SerializeToElement(Value) : null;
+        // Value = JsonValue?.GetValue<decimal>() ?? default;
+        
+        // _jsonValue = Value is not null ? JsonSerializer.SerializeToElement(Value) : default;
+        // _ = JsonValueChanged.InvokeAsync(_jsonValue);
+        
         base.OnInitialized();
     }
     
-    private async Task OnValueChanged(decimal? value)
+    private void OnValueChanged(decimal? value)
     {
         Value = value;
-        await ValueChanged.InvokeAsync(value);
+        // _ = ValueChanged.InvokeAsync(value);
         
-        JsonValue = value is not null ? JsonSerializer.SerializeToElement(value) : null;
+        _jsonValue = JsonSerializer.SerializeToElement(value);
+        // AttributeJsonValue = _jsonValue.Value;
+        // _ = AttributeJsonValueChanged.InvokeAsync(AttributeJsonValue);
     }
 
 }

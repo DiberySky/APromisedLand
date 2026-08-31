@@ -11,6 +11,7 @@ using APromisedLand.Shared.DiberyTree.Attributes.Validation;
 using APromisedLand.Shared.DiberyTree.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using AttributeDefinition = APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeDefinition;
 
 namespace APromisedLand.Api.DiberyTree.Services;
 
@@ -134,7 +135,7 @@ public partial class AttributeService
         return entity;
     }
 
-    public async Task<AttributeDto?> GetValueAsync(string nodeId, string id)
+    public async Task<AttributeJsonValueDto?> GetValueAsync(string nodeId, string id)
     {
         var value = await FindValueAsync(nodeId, id);
         if (value == null) return null;
@@ -145,9 +146,9 @@ public partial class AttributeService
         return MapToDto(value, info.Definition, info.AttributeType, info.Unit);
     }
 
-    public async Task<NodeDto> GetAllValuesAsync(string nodeId)
+    public async Task<NodeAttributesDto> GetAllValuesAsync(string nodeId)
     {
-        var list = new List<AttributeDto>();
+        var list = new List<AttributeJsonValueDto>();
         list.AddRange(await QueryValues<TextAttributeValue>(nodeId));
         list.AddRange(await QueryValues<DecimalAttributeValue>(nodeId));
         list.AddRange(await QueryValues<IntegerAttributeValue>(nodeId));
@@ -159,7 +160,7 @@ public partial class AttributeService
         // 而非 LocationAttributeValue（经纬度对象）。查询必须与写入保持一致，否则查不到刚写入的数据。
         list.AddRange(await QueryValues<LocationAttributeDefValue>(nodeId));
         list.AddRange(await QueryValues<TableAttributeDefValue>(nodeId));
-        return new NodeDto { Id = nodeId, AttributeDtos = list };
+        return new NodeAttributesDto { Id = nodeId, AttributeJsonValueDtos = list };
     }
 
     public async Task<bool> DeleteValueAsync(string nodeId, string id)
@@ -271,12 +272,12 @@ public partial class AttributeService
         };
     }
 
-    private async Task<List<AttributeDto>> QueryValues<TValue>(string nodeId) where TValue : AttributeValueBase
+    private async Task<List<AttributeJsonValueDto>> QueryValues<TValue>(string nodeId) where TValue : AttributeValueBase
     {
         var items = await db.Set<TValue>().Where(v => v.NodeId == nodeId).ToListAsync();
-        if (items.Count == 0) return new List<AttributeDto>();
+        if (items.Count == 0) return new List<AttributeJsonValueDto>();
 
-        var result = new List<AttributeDto>();
+        var result = new List<AttributeJsonValueDto>();
         foreach (var v in items)
         {
             var info = await GetDefinitionWithTypeAndUnitAsync(v.AttributeDefinitionId);
@@ -287,7 +288,7 @@ public partial class AttributeService
         return result;
     }
 
-    private static AttributeDto MapToDto(AttributeValueBase v, AttributeDefinition? def, AttributeTypeEnum attrType,
+    private static AttributeJsonValueDto MapToDto(AttributeValueBase v, AttributeDefinition? def, AttributeTypeEnum attrType,
         UnitTree? unit)
     {
         // 如果 def 不为空，可设置一个未映射的属性（若实体中有）
@@ -314,11 +315,11 @@ public partial class AttributeService
             Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
         });
 
-        return new AttributeDto
+        return new AttributeJsonValueDto
         {
             Id = v.Id,
             DefinitionId = v.AttributeDefinitionId,
-            Definition = def ?? new AttributeDefinition(),
+            Definition = def ?? new AttributeDefinition(attrType),
             Value = jsonElement
         };
     }

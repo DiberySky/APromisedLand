@@ -14,7 +14,7 @@ public static partial class SharedHelper
         return text.Length < length ? text : $"{text[..length]}...";
     }
     
-    // public static AttributeTypeEnum GetTypeEnum(this AttributeDto dto)
+    // public static AttributeTypeEnum GetTypeEnum(this AttributeJsonValueDto dto)
     // {
     //     var systemType = AttributeTypeMapping.GetType(dto.Definition.AttributeTypeId);
     //     // return Enum.TryParse<AttributeTypeEnum>(systemType, true, out var result)

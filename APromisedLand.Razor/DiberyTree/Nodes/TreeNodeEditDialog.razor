@@ -1,6 +1,7 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @using APromisedLand.Razor.Helper.Blazor
+
 @implements IDisposable
 
 @inject IDialogService DialogService
@@ -63,7 +64,7 @@
                     @NodeTemplate.EditTemplate(_node)
                 }
 
-                <NodeAttributesSky @ref="_nodeAttributesSky" TItem="@TItem" NodeId="@_node.Id"/>
+                <NodeAttributesSky @ref="_nodeAttributesSky" NodeId="@_node.Id"/>
 
             </MudForm>
         </MudContainer>
@@ -78,7 +79,7 @@
 
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
 
-    private NodeAttributesSky<TItem> _nodeAttributesSky = null!;
+    private NodeAttributesSky _nodeAttributesSky = null!;
     private MudForm _form = null!;
 
     // private TreeNodeFormModel _model = new();
@@ -124,7 +125,7 @@
         await OpenEditDialog(result);
     }
 
-    private async Task OpenEditDialog(AttributeDefinitionDto definition)
+    private async Task OpenEditDialog(AttributeDefinition definition)
     {
         var dialogParams = new DialogParameters<AddAttributeValueDialog>
         {
@@ -139,7 +140,7 @@
         }
     }
 
-    private async Task ValueChanged(AttributeDefinitionDto? definition)
+    private async Task ValueChanged(AttributeDefinition? definition)
     {
         await _nodeAttributesSky.LoadAttributes();
     }

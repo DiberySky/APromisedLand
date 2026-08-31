@@ -1,3 +1,4 @@
+
 @using Nextended.Core.Helper
 @* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
 
@@ -14,7 +15,7 @@
             <MudGrid>
                 @* 左侧列列表 *@
                 <MudItem xs="12" md="5">
-                    <MudTable T="AttributeDefinitionDto"
+                    <MudTable T="AttributeDefinition"
                               Items="_columns"
                               Dense="true" Hover="true"
                               Loading="_loading"
@@ -30,7 +31,7 @@
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd>@context.Name</MudTd>
-                            <MudTd>@context.AttributeType.ToName()</MudTd>
+                            <MudTd>@context.TypeName</MudTd>
                             <MudTd Style="text-align:right">
                                 <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                                Color="Color.Warning" Size="Size.Small"
@@ -94,10 +95,10 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
     
     [Parameter] public required string TableId { get; set; }
-    [Parameter] public AttributeDefinitionDto? TableDefinitionDto { get; set; }
+    [Parameter] public AttributeDefinition? TableDefinitionDto { get; set; }
 
     private MudForm? _form;
-    private List<AttributeDefinitionDto> _columns = new();
+    private List<AttributeDefinition> _columns = new();
     private List<AttributeTypeEnum> _types = new();
     private bool _loading;
     private ColumnFormModel _model = new();
@@ -126,12 +127,12 @@
         finally { _loading = false; }
     }
 
-    private void OnColumnSelected(AttributeDefinitionDto? col)
+    private void OnColumnSelected(AttributeDefinition? col)
     {
         if (col == null) return;
         _editingId = col.Id;
         _model.Name = col.Name;
-        _model.Type = col.AttributeType;
+        _model.Type = col.TypeEnum;
         _model.Order = col.Order;
         _model.IsRequired = col.IsRequired;
         _model.DefaultValue = col.DefaultValue;
@@ -188,7 +189,7 @@
         catch (Exception ex) { Snackbar.Add($"保存失败: {ex.Message}", Severity.Error); }
     }
 
-    private async Task DeleteColumnAsync(AttributeDefinitionDto col)
+    private async Task DeleteColumnAsync(AttributeDefinition col)
     {
         var confirmed = await Message.DeleteBoxAsync($"确定删除列【{col.Name}】？");
         if (!confirmed) return;

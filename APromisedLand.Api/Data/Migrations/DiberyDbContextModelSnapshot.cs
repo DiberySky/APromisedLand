@@ -35,6 +35,15 @@ namespace APromisedLand.Api.Data.Migrations
                     b.Property<string>("DefaultValue")
                         .HasColumnType("text");
 
+                    b.Property<bool>("HasDate")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("HasRowNo")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("HasTime")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsRequired")
                         .HasColumnType("boolean");
 
@@ -77,6 +86,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
                             AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             Lines = 1,
                             MaxLength = 50,
@@ -87,6 +99,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f",
                             AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             Lines = 5,
                             MaxLength = 500,
@@ -97,6 +112,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a",
                             AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             Lines = 10,
                             MaxLength = 1000,
@@ -107,6 +125,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b",
                             AttributeTypeId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "数量",
@@ -117,6 +138,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c",
                             AttributeTypeId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "等级",
@@ -126,6 +150,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "a6b7c8d9-e0f1-4a2b-3c4d-5e6f7a8b9c0d",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "价格",
@@ -137,6 +164,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "b7c8d9e0-f1a2-4b3c-4d5e-6f7a8b9c0d1e",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "重量",
@@ -149,6 +179,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "c8d9e0f1-a2b3-4c4d-5e6f-7a8b9c0d1e2f",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "长度",
@@ -161,6 +194,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a",
                             AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "生产日期",
@@ -170,6 +206,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b",
                             AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "试验日期",
@@ -179,6 +218,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
                             AttributeTypeId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "出厂日期",
@@ -188,6 +230,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
                             AttributeTypeId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "开始时间",
@@ -197,6 +242,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
                             AttributeTypeId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "结束时间",
@@ -206,6 +254,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
                             AttributeTypeId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "创建时间",
@@ -215,6 +266,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a",
                             AttributeTypeId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "更新时间",
@@ -224,6 +278,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b",
                             AttributeTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "附件",
@@ -233,6 +290,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
                             AttributeTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "图片",
@@ -242,6 +302,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d",
                             AttributeTypeId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "位置坐标",
@@ -251,6 +314,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
                             AttributeTypeId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "规格表",
@@ -260,6 +326,9 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6f",
                             AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = true,
                             Lines = 1,
                             MaxLength = 50,
@@ -271,11 +340,42 @@ namespace APromisedLand.Api.Data.Migrations
                         {
                             Id = "3c4d5e6f-7a8b-4c9d-0e1f-2a3b4c5d6e7a",
                             AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
                             IsRequired = false,
                             MaxLength = 30,
                             Name = "规格-长度",
                             Order = 2,
                             ParentId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
+                            Precision = 8,
+                            Scale = 2,
+                            UnitId = "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
+                        },
+                        new
+                        {
+                            Id = "0C1E0FB8-B731-4F38-9379-A96B9F13FC1F",
+                            AttributeTypeId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+                            HasDate = true,
+                            HasRowNo = false,
+                            HasTime = false,
+                            IsRequired = false,
+                            MaxLength = 30,
+                            Name = "生长日记",
+                            Order = 0
+                        },
+                        new
+                        {
+                            Id = "97868637-556F-433F-BD31-E9DED37A5FE8",
+                            AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
+                            IsRequired = false,
+                            MaxLength = 30,
+                            Name = "高度",
+                            Order = 2,
+                            ParentId = "0C1E0FB8-B731-4F38-9379-A96B9F13FC1F",
                             Precision = 8,
                             Scale = 2,
                             UnitId = "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
@@ -1751,6 +1851,9 @@ namespace APromisedLand.Api.Data.Migrations
             modelBuilder.Entity("APromisedLand.Shared.DiberyTree.Attributes.Models.TableAttributeDefValue", b =>
                 {
                     b.HasBaseType("APromisedLand.Shared.DiberyTree.Attributes.Models.AttributeValueBase");
+
+                    b.Property<bool>("IsRecord")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Value")
                         .IsRequired()
