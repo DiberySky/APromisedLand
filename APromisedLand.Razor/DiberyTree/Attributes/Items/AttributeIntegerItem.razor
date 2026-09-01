@@ -1,0 +1,56 @@
+
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
+
+        <MudStack Class="d-flex flex-grow-1" Spacing="0">
+            <MudNumericField T="long?"
+                             Value="@DefItemDto?.IntegerValue"
+                             ValueChanged="@OnValueChanged"
+                             Label="@DefItemDto?.Def?.Name"
+                             Variant="Variant.Outlined"
+                             Format="N0"
+                             Min="0"
+                             Step="@(1)"
+                             FullWidth="true"
+                             Margin="Margin.Normal"
+                             Adornment="Adornment.End"
+                             AdornmentText="@DefItemDto?.Def?.Unit?.Name"
+                             ReadOnly="@ReadOnly"/>
+
+            <MudStack Row="true">
+                @if (_infoVisible)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                        类型：@DefItemDto?.Def?.TypeName,
+                        @if (!string.IsNullOrEmpty(DefItemDto?.Def?.Unit?.Abbreviation))
+                        {
+                            <span>，单位：@DefItemDto?.Def?.Unit?.Abbreviation</span>
+                        }
+                    </MudText>
+                }
+
+                <MudSpacer/>
+
+                <MudIconButton size="Size.Small" Color="Color.Info" Class="ma-0 pa-0"
+                               Icon="@(_infoVisible
+                                         ? Icons.Material.Outlined.KeyboardDoubleArrowRight
+                                         : Icons.Material.Outlined.KeyboardDoubleArrowLeft)"
+                               OnClick="@(() => _infoVisible = !_infoVisible)"/>
+            </MudStack>
+
+        </MudStack>
+
+@code {
+   
+    [Parameter] public AttributeItemDto? DefItemDto { get; set; }
+    [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    bool _infoVisible;
+    
+    private async Task OnValueChanged(long? value)
+    {
+        DefItemDto?.IntegerValue = value ?? 0;
+        await DefItemDtoChanged.InvokeAsync(DefItemDto);
+    }
+}

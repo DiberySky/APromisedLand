@@ -11,10 +11,3 @@ public class TableRowDto
     public List<TableCellDto> Values { get; set; } = new();
 }
 
-/// <summary>行内单个单元格（列值）。</summary>
-public class TableCellDto
-{
-    public string ColumnId { get; set; } = null!;
-    public string? ColumnName { get; set; }
-    public object? Value { get; set; }
-}

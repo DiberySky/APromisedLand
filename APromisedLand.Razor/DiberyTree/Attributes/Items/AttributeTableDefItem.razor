@@ -1,0 +1,55 @@
+@using APromisedLand.Razor.DiberyTree.Attributes.Tables
+
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
+
+@* @inject TreeNodeDialogService<TItem> TreeNodeDialogService *@
+@inject AttributeApiClient AttributeApiClient
+@inject IDialogService DialogService
+
+
+@if (ReadOnly)
+{
+    <MudTextField T="string"
+                  Value="@DefItemDto?.TableName"
+                  Label="表格名称"
+                  Variant="Variant.Outlined"
+                  ReadOnly="@ReadOnly"
+                  Adornment="Adornment.End"
+                  AdornmentColor="Color.Success"
+                  AdornmentIcon="@Icons.Material.Outlined.MoreHoriz"
+                  OnAdornmentClick="@(HandleAdornmentClick)"/>
+}
+else
+{
+    <MudTextField T="string"
+                  Value="@DefItemDto?.TableName"
+                  Label="表格名称"
+                  Variant="Variant.Outlined"
+                  Required="true"
+                  RequiredError="表格名称不能为空"
+                  MaxLength="50"
+                  Counter="50"
+                  ReadOnly="@ReadOnly"/>
+}
+
+@code {
+    [Parameter] public required string? NodeId { get; set; }
+    
+    [Parameter] public AttributeItemDto? DefItemDto { get; set; }
+    [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private async Task HandleAdornmentClick()
+    {
+        var list = await AttributeApiClient.ListTableColumnsAsync(DefItemDto!.Id);
+        List<AttributeDefinition> columns = [.. list];
+
+        // await TreeNodeDialogService.
+        //     ShowAttributeTableRowEditDialogAsync(DefinitionDto, columns);
+
+        await DialogService.ShowAttributeTableRowsPanelDialogAsync(NodeId!, DefItemDto.Id, DefItemDto.TableName!,
+            DefItemDto!.Def!, columns, ReadOnly);
+    }
+
+}

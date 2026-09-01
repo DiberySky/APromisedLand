@@ -13,107 +13,124 @@
     <DialogContent>
         <MudGrid Class="pa-4">
             <MudItem xs="12">
-                <AttributeTypeField AttributeDefinitionDto="@DefinitionDto"
-                                    AttributeDefinitionChanged="@(e => DefinitionDto = e)"/>
+                <AttributeTypeField AttributeDefinitionDto="@Definition"
+                                    AttributeDefinitionChanged="@(e => Definition = e)"/>
             </MudItem>
             <MudItem xs="12">
-                <MudTextField @bind-Value="@DefinitionDto?.Name" Label="属性名称"
+                <MudTextField @bind-Value="@Definition?.Name" Label="属性名称"
                               Variant="Variant.Outlined"
                               InputType="@InputType.Text"/>
             </MudItem>
-            @if (DefinitionDto != null)
-            {
-                @switch (DefinitionDto!.TypeEnum)
-                {
-                    case AttributeTypeEnum.文本:
-                        <MudItem xs="12">
-                            <TextValue @bind-Value="@TextValue"
-                                       DefinitionDto="@DefinitionDto"/>
-                        </MudItem>
-                        break;
-                    case AttributeTypeEnum.整数:
-                        <MudItem xs="12">
-                            <IntegerValue @bind-Value="@IntegerValue"
-                                          DefinitionDto="@DefinitionDto"/>
-                        </MudItem>
-                        break;
-                    case AttributeTypeEnum.小数:
-                        <MudItem xs="12">
-                            <DecimalValue @bind-Value="@DecimalValue"
-                                          DefinitionDto="@DefinitionDto"/>
-                        </MudItem>
-                        break;
-                    case AttributeTypeEnum.日期:
-                        <MudItem xs="12">
-                            <MudItem xs="12">
-                                <DateValue @bind-Value="@DateValue"
-                                           DefinitionDto="@DefinitionDto"/>
-                            </MudItem>
-                        </MudItem>
-                        break;
-                    case AttributeTypeEnum.时间:
-                        <MudItem xs="12">
-                            <TimeValue @bind-Value="@TimeValue"
-                                       DefinitionDto="@DefinitionDto"/>
-                        </MudItem>
-                        break;
-                    case AttributeTypeEnum.日期时间:
-                        <MudItem xs="12">
-                            <DateTimeValue @bind-Value="@DateTimeValue"
-                                           DefinitionDto="@DefinitionDto"/>
-                        </MudItem>
-                        break;
-                    case AttributeTypeEnum.文件:
-                        <MudItem xs="12">
-                            <MudText>文件类型输入控件待实现</MudText>
-                        </MudItem>
-                        break;
-                    case AttributeTypeEnum.定位:
-                        <MudItem xs="12">
-                            <LocationDefValue @bind-Value="@LocationName"
-                                           DefinitionDto="@DefinitionDto"/>
-                        </MudItem>
-                        break;
-                    case AttributeTypeEnum.表格:
-                        <MudItem xs="12">
-                            <TableDefValue @bind-Value="@TableName"
-                                        DefinitionDto="@DefinitionDto"/>
-                        </MudItem>
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
+            @* @if (Definition != null) *@
+            @* { *@
+            @*     @switch (Definition!.TypeEnum) *@
+            @*     { *@
+            @*         case AttributeTypeEnum.文本: *@
+            @*             <MudItem xs="12"> *@
+            @*                 <TextValue @bind-Value="@TextValue" *@
+            @*                            DefinitionDto="@Definition"/> *@
+            @*             </MudItem> *@
+            @*             break; *@
+            @*         case AttributeTypeEnum.整数: *@
+            @*             <MudItem xs="12"> *@
+            @*                 <IntegerValue @bind-Value="@IntegerValue" *@
+            @*                               DefinitionDto="@Definition"/> *@
+            @*             </MudItem> *@
+            @*             break; *@
+            @*         case AttributeTypeEnum.小数: *@
+            @*             <MudItem xs="12"> *@
+            @*                 <DecimalValue @bind-Value="@DecimalValue" *@
+            @*                               DefinitionDto="@Definition"/> *@
+            @*             </MudItem> *@
+            @*             break; *@
+            @*         case AttributeTypeEnum.日期: *@
+            @*             <MudItem xs="12"> *@
+            @*                 <MudItem xs="12"> *@
+            @*                     <DateValue @bind-Value="@DateValue" *@
+            @*                                DefinitionDto="@Definition"/> *@
+            @*                 </MudItem> *@
+            @*             </MudItem> *@
+            @*             break; *@
+            @*         case AttributeTypeEnum.时间: *@
+            @*             <MudItem xs="12"> *@
+            @*                 <TimeValue @bind-Value="@TimeValue" *@
+            @*                            DefinitionDto="@Definition"/> *@
+            @*             </MudItem> *@
+            @*             break; *@
+            @*         case AttributeTypeEnum.日期时间: *@
+            @*             <MudItem xs="12"> *@
+            @*                 <DateTimeValue @bind-Value="@DateTimeValue" *@
+            @*                                DefinitionDto="@Definition"/> *@
+            @*             </MudItem> *@
+            @*             break; *@
+            @*         case AttributeTypeEnum.文件: *@
+            @*             <MudItem xs="12"> *@
+            @*                 <MudText>文件类型输入控件待实现</MudText> *@
+            @*             </MudItem> *@
+            @*             break; *@
+            @*         case AttributeTypeEnum.定位: *@
+            @*             <MudItem xs="12"> *@
+            @*                 <LocationDefValue @bind-Value="@LocationName" *@
+            @*                                   DefinitionDto="@Definition"/> *@
+            @*             </MudItem> *@
+            @*             break; *@
+            @*         case AttributeTypeEnum.表格: *@
+            @*             <MudItem xs="12"> *@
+            @*                 <TableDefValue @bind-Value="@TableName" *@
+            @*                                DefinitionDto="@Definition"/> *@
+            @*             </MudItem> *@
+            @*             break; *@
+            @*         default: *@
+            @*             throw new ArgumentOutOfRangeException(); *@
+            @*     } *@
+            @* } *@
+            <MudItem xs="12">
+                <NodeAttributeItemsSky @ref="@_itemsSky"
+                                       NodeId="@NodeId"
+                                       CreateDefinition="@Definition"
+                                       @bind-DefItemDtos="@AttributeItems"
+                                       ReadOnly="false"/>
+            </MudItem>
         </MudGrid>
     </DialogContent>
 </DialogSky>
 
 @code {
+    NodeAttributeItemsSky _itemsSky = null!;
+    
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required string NodeId { get; set; }
-    [Parameter] public required AttributeDefinition? DefinitionDto { get; set; }
-    [Parameter] public JsonElement? ValueElement { get; set; }
+    [Parameter] public required AttributeDefinition? Definition { get; set; }
+    // [Parameter] public JsonElement? ValueElement { get; set; }
+    //
+    // [Parameter] public string? TextValue { get; set; }
+    // [Parameter] public long? IntegerValue { get; set; }
+    // [Parameter] public decimal? DecimalValue { get; set; }
+    // [Parameter] public DateTimeOffset? DateValue { get; set; }
+    // [Parameter] public TimeSpan? TimeValue { get; set; }
+    // [Parameter] public DateTimeOffset? DateTimeValue { get; set; }
+    // [Parameter] public string? FileUrl { get; set; }
+    // [Parameter] public string? LocationName { get; set; }
+    // [Parameter] public string? TableName { get; set; }
+    //
+    // private List<AttributeDefinition>? DefinitionDtos;
+    
+    private List<AttributeItemDto> AttributeItems { get; set; }= [];
 
-    [Parameter] public string? TextValue { get; set; }
-    [Parameter] public long? IntegerValue { get; set; }
-    [Parameter] public decimal? DecimalValue { get; set; }
-    [Parameter] public DateTimeOffset? DateValue { get; set; }
-    [Parameter] public TimeSpan? TimeValue { get; set; }
-    [Parameter] public DateTimeOffset? DateTimeValue { get; set; }
-    [Parameter] public string? FileUrl { get; set; }
-    [Parameter] public string? LocationName { get; set; }
-    [Parameter] public string? TableName { get; set; }
-
-    private List<AttributeDefinition>? DefinitionDtos;
     private bool _isSubmitting;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var defs = await AttributeApiClient.GetAllDefinitionsAsync();
-            DefinitionDtos = defs.ToList();
+            // _attributeItems.Add(new AttributeItemDto
+            // {
+            //     Def = Definition,
+            // });
+
+            // var defs = await AttributeApiClient.GetAllDefinitionsAsync();
+            // DefinitionDtos = defs.ToList();
         }
         catch (Exception ex)
         {
@@ -138,7 +155,7 @@
 
     private async Task SubmitCoreAsync()
     {
-        if (DefinitionDto == null)
+        if (Definition == null)
         {
             Snackbar.Add("请选择属性定义", Severity.Warning);
             return;
@@ -146,98 +163,104 @@
 
         try
         {
-            JsonElement valueElement;
-            switch (DefinitionDto.TypeEnum)
-            {
-                case AttributeTypeEnum.文本:
-                    if (string.IsNullOrWhiteSpace(TextValue))
-                    {
-                        Snackbar.Add("请输入文本值", Severity.Warning);
-                        return;
-                    }
+            // JsonElement valueElement;
+            // switch (Definition.TypeEnum)
+            // {
+            //     case AttributeTypeEnum.文本:
+            //         if (string.IsNullOrWhiteSpace(TextValue))
+            //         {
+            //             Snackbar.Add("请输入文本值", Severity.Warning);
+            //             return;
+            //         }
+            //
+            //         valueElement = JsonSerializer.SerializeToElement(TextValue);
+            //         break;
+            //     case AttributeTypeEnum.整数:
+            //         if (!IntegerValue.HasValue)
+            //         {
+            //             Snackbar.Add("请输入整数值", Severity.Warning);
+            //             return;
+            //         }
+            //
+            //         valueElement = JsonSerializer.SerializeToElement(IntegerValue);
+            //         break;
+            //     case AttributeTypeEnum.小数:
+            //         if (!DecimalValue.HasValue)
+            //         {
+            //             Snackbar.Add("请输入小数值", Severity.Warning);
+            //             return;
+            //         }
+            //
+            //         valueElement = JsonSerializer.SerializeToElement(DecimalValue);
+            //         break;
+            //     case AttributeTypeEnum.日期:
+            //         if (!DateValue.HasValue)
+            //         {
+            //             Snackbar.Add("请选择日期", Severity.Warning);
+            //             return;
+            //         }
+            //
+            //         valueElement = JsonSerializer.SerializeToElement(DateValue!.Value.ToString("yyyy-MM-dd"));
+            //         break;
+            //     case AttributeTypeEnum.时间:
+            //         if (!TimeValue.HasValue)
+            //         {
+            //             Snackbar.Add("请选择时间", Severity.Warning);
+            //             return;
+            //         }
+            //
+            //         valueElement = JsonSerializer.SerializeToElement(TimeValue!.Value.ToString(@"hh\:mm\:ss"));
+            //         break;
+            //     case AttributeTypeEnum.日期时间:
+            //         if (!DateTimeValue.HasValue)
+            //         {
+            //             Snackbar.Add("请选择日期时间", Severity.Warning);
+            //             return;
+            //         }
+            //
+            //         valueElement = JsonSerializer.SerializeToElement(DateTimeValue!.Value.ToString("O"));
+            //         break;
+            //     case AttributeTypeEnum.文件:
+            //         if (string.IsNullOrWhiteSpace(FileUrl))
+            //         {
+            //             Snackbar.Add("请上传文件", Severity.Warning);
+            //             return;
+            //         }
+            //
+            //         valueElement = JsonSerializer.SerializeToElement(FileUrl);
+            //         break;
+            //     case AttributeTypeEnum.定位:
+            //         if (string.IsNullOrWhiteSpace(LocationName))
+            //         {
+            //             Snackbar.Add("请输入地点位置名称", Severity.Warning);
+            //             return;
+            //         }
+            //
+            //         valueElement = JsonSerializer.SerializeToElement(LocationName);
+            //         break;
+            //     case AttributeTypeEnum.表格:
+            //         if (string.IsNullOrWhiteSpace(TableName))
+            //         {
+            //             Snackbar.Add("请输入表格名称", Severity.Warning);
+            //             return;
+            //         }
+            //
+            //         valueElement = JsonSerializer.SerializeToElement(TableName);
+            //         break;
+            //     default:
+            //         throw new NotSupportedException($"不支持的类型 {Definition.TypeEnum}");
+            // }
 
-                    valueElement = JsonSerializer.SerializeToElement(TextValue);
-                    break;
-                case AttributeTypeEnum.整数:
-                    if (!IntegerValue.HasValue)
-                    {
-                        Snackbar.Add("请输入整数值", Severity.Warning);
-                        return;
-                    }
-
-                    valueElement = JsonSerializer.SerializeToElement(IntegerValue);
-                    break;
-                case AttributeTypeEnum.小数:
-                    if (!DecimalValue.HasValue)
-                    {
-                        Snackbar.Add("请输入小数值", Severity.Warning);
-                        return;
-                    }
-
-                    valueElement = JsonSerializer.SerializeToElement(DecimalValue);
-                    break;
-                case AttributeTypeEnum.日期:
-                    if (!DateValue.HasValue)
-                    {
-                        Snackbar.Add("请选择日期", Severity.Warning);
-                        return;
-                    }
-
-                    valueElement = JsonSerializer.SerializeToElement(DateValue!.Value.ToString("yyyy-MM-dd"));
-                    break;
-                case AttributeTypeEnum.时间:
-                    if (!TimeValue.HasValue)
-                    {
-                        Snackbar.Add("请选择时间", Severity.Warning);
-                        return;
-                    }
-
-                    valueElement = JsonSerializer.SerializeToElement(TimeValue!.Value.ToString(@"hh\:mm\:ss"));
-                    break;
-                case AttributeTypeEnum.日期时间:
-                    if (!DateTimeValue.HasValue)
-                    {
-                        Snackbar.Add("请选择日期时间", Severity.Warning);
-                        return;
-                    }
-
-                    valueElement = JsonSerializer.SerializeToElement(DateTimeValue!.Value.ToString("O"));
-                    break;
-                case AttributeTypeEnum.文件:
-                    if (string.IsNullOrWhiteSpace(FileUrl))
-                    {
-                        Snackbar.Add("请上传文件", Severity.Warning);
-                        return;
-                    }
-
-                    valueElement = JsonSerializer.SerializeToElement(FileUrl);
-                    break;
-                case AttributeTypeEnum.定位:
-                    if (string.IsNullOrWhiteSpace(LocationName))
-                    {
-                        Snackbar.Add("请输入地点位置名称", Severity.Warning);
-                        return;
-                    }
-
-                    valueElement = JsonSerializer.SerializeToElement(LocationName);
-                    break;
-                case AttributeTypeEnum.表格:
-                    if (string.IsNullOrWhiteSpace(TableName))
-                    {
-                        Snackbar.Add("请输入表格名称", Severity.Warning);
-                        return;
-                    }
-
-                    valueElement = JsonSerializer.SerializeToElement(TableName);
-                    break;
-                default:
-                    throw new NotSupportedException($"不支持的类型 {DefinitionDto.TypeEnum}");
-            }
-
-            var dto = new AddValueDto(DefinitionDto.Id, valueElement);
-            await AttributeApiClient.AddValueAsync(NodeId, dto);
-
-            Snackbar.Add("属性添加成功", Severity.Success);
+            await _itemsSky.SubmitAddNodeAttributesAsync();
+            
+            // var valueElement = AttributeItems[0].ToJsonElement();
+            //
+            // var dto = new AddValueDto(Definition.Id, valueElement);
+            //
+            // await AttributeApiClient.AddValueAsync(NodeId, dto);
+            //
+            // Snackbar.Add("属性添加成功", Severity.Success);
+            
             MudDialog?.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)
@@ -245,4 +268,5 @@
             Message.Details("添加失败.", ex.Message);
         }
     }
+
 }

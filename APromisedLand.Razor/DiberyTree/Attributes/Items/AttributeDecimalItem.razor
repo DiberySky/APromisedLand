@@ -1,0 +1,55 @@
+
+<MudStack Class="d-flex flex-grow-1" Spacing="0">
+    <MudNumericField T="decimal?"
+                     @bind-Value="@DefItemDto?.DecimalValue"
+                     Label="@DefItemDto?.Def?.Name"
+                     Variant="Variant.Outlined"
+                     Format="@($"N{DefItemDto?.Def?.Scale ?? 2}")"
+                     HideSpinButtons="true"
+                     Min="0"
+                     FullWidth="true"
+                     Margin="Margin.Normal"
+                     Adornment="Adornment.End"
+                     AdornmentText="@DefItemDto?.Def?.Unit?.Name"
+                     ReadOnly="@ReadOnly"/>
+
+    <MudStack Row="true">
+        @if (_infoVisible)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                类型：@DefItemDto?.Def?.TypeName,
+                整数位数：@(DefItemDto?.Def?.Precision - DefItemDto?.Def?.Scale),
+                小数位数：@DefItemDto?.Def?.Scale
+                @if (!string.IsNullOrEmpty(DefItemDto?.Def?.Unit?.Abbreviation))
+                {
+                    <span>，单位：@DefItemDto.Def?.Unit?.Abbreviation</span>
+                }
+            </MudText>
+        }
+
+        <MudSpacer/>
+
+        <MudIconButton size="Size.Small" Color="Color.Info" Class="ma-0 pa-0"
+                       Icon="@(_infoVisible
+                                 ? Icons.Material.Outlined.KeyboardDoubleArrowRight
+                                 : Icons.Material.Outlined.KeyboardDoubleArrowLeft)"
+                       OnClick="@(() => _infoVisible = !_infoVisible)"/>
+    </MudStack>
+
+</MudStack>
+
+@code {
+    
+    [Parameter] public AttributeItemDto? DefItemDto { get; set; }
+    [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    bool _infoVisible;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+    }
+
+}

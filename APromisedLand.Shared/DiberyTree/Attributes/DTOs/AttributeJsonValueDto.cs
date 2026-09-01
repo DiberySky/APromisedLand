@@ -8,7 +8,7 @@ public class AttributeJsonValueDto
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string DefinitionId { get; set; } = null!;
-    public Models.AttributeDefinition Definition { get; set; } = null!;
+    public AttributeDefinition Def { get; set; } = null!;
     
     public JsonElement Value { get; set; }
 

@@ -95,8 +95,7 @@ public partial class AttributeService
             HasTime = dto.HasRowNo,
             HasRowNo = dto.HasRowNo,
             Order = dto.Order,
-            IsRequired = dto.IsRequired,
-            DefaultValue = dto.DefaultValue,
+            IsRequired = dto.IsRequired
         };
 
         // 结构性校验：表定义必须为表类型；列定义不可为表类型
@@ -175,7 +174,6 @@ public partial class AttributeService
         if (dto.UnitId is not null) def.UnitId = dto.UnitId;
         if (dto.Order.HasValue) def.Order = dto.Order.Value;
         if (dto.IsRequired.HasValue) def.IsRequired = dto.IsRequired.Value;
-        if (dto.DefaultValue is not null) def.DefaultValue = dto.DefaultValue;
 
         var (ok, err) = DefinitionValidator.Validate(def);
         if (!ok) throw new ArgumentException(err);

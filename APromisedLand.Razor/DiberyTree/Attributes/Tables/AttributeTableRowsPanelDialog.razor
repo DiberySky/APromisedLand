@@ -11,17 +11,13 @@
     <ToolBarContent>
         <MudText Class="text-info">行数据</MudText>
         <MudSpacer/>
-        @* <MudButton Variant="Variant.Text" Color="Color.Warning" *@
-        @*            StartIcon="@Icons.Material.Outlined.Refresh" *@
-        @*            OnClick="LoadRowsAsync" Class="ml-2"> *@
-        @*     刷新 *@
-        @* </MudButton> *@
-        <MudSwitch T="bool"
-                   @bind-Value="@ReadOnly"
-                   Label="只读模式" Color="Color.Info"/>
+        <ReadOnlySky @bind-ReadOnly="@ReadOnly" />
+        @* <MudSwitch T="bool" *@
+        @*            @bind-Value="@ReadOnly" *@
+        @*            Label="只读模式" Color="Color.Info"/> *@
     </ToolBarContent>
     <DialogContent>
-        <MudContainer>
+        @* <MudContainer> *@
             <MudTable T="TableRowDto"
                       Items="_rows"
                       Dense="true" Hover="true"
@@ -45,9 +41,12 @@
                         <MudTh>@col.Name</MudTh>
                     }
                     <MudTh Style="text-align:right">
-                        <MudIconButton Icon="@Icons.Material.Outlined.Add"
-                                       Color="Color.Info" Size="Size.Small"
-                                       OnClick="AddRowAsync"/>
+                        @if (!ReadOnly)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Outlined.Add"
+                                           Color="Color.Info" Size="Size.Small"
+                                           OnClick="AddRowAsync"/>
+                        }
                     </MudTh>
                 </HeaderContent>
                 <RowTemplate>
@@ -97,14 +96,14 @@
                     <MudText Align="Align.Center" Class="py-8">暂无行数据</MudText>
                 </NoRecordsContent>
             </MudTable>
-        </MudContainer>
+        @* </MudContainer> *@
     </DialogContent>
     <DialogLeftActions>
         @if (!ReadOnly)
         {
             <MudSwitch T="bool" @bind-Value="@_deleteable"
                        Size="Size.Small"
-                       Label="删除模式" Color="Color.Error"/>
+                       Label="删除行" Color="Color.Error"/>
         }
     </DialogLeftActions>
 </DialogSky>
@@ -145,15 +144,17 @@
 
     private async Task AddRowAsync()
     {
-        var row = new TableRowDto();
-        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns, row, ReadOnly);
+        // var row = new TableRowDto();
+        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableName,
+            TableDefinitionDto, Columns, null, ReadOnly);
         
         await LoadRowsAsync();
     }
 
     private async Task EditRowAsync(TableRowDto row)
     {
-        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableDefinitionDto, Columns, row, ReadOnly);
+        await ShowAttributeTableRowEditDialogAsync(NodeId, TableId!, TableName,
+            TableDefinitionDto, Columns, row, ReadOnly);
         
         await LoadRowsAsync();
     }
@@ -184,7 +185,7 @@
         return cell?.Value switch
         {
             null => "-",
-            System.Text.Json.JsonElement je => je.ToString(),
+            JsonElement je => je.ToString(),
             _ => cell.Value.ToString() ?? "-"
         };
     }
@@ -192,6 +193,7 @@
     public async Task ShowAttributeTableRowEditDialogAsync(
         string nodeId,
         string tableId,
+        string tableName,
         AttributeDefinition definitionDto, 
         List<AttributeDefinition> columns,
         TableRowDto? editRow = null,
@@ -202,8 +204,9 @@
         {
             { x => x.NodeId, nodeId },
             { x => x.TableId, tableId },
+            { x => x.TableName, tableName },
             { x => x.TableDefDto, definitionDto },
-            { x => x.ColumnDefDtos, columns },
+            { x => x.ColumnDefs, columns },
             { x => x.EditRow, editRow },
             { x => x.ReadOnly, readOnly },
         };

@@ -16,12 +16,12 @@ public abstract partial class AttributesControllerBase
 {
     // ==================== 表行数据 ====================
 
-    [HttpPost("node/table/{tableId}/rows")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResponse<object>))]
+    [HttpPost("tables/{tableId}/rows")]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ApiResponse<TableRowDto>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
     public virtual async Task<IActionResult> AddRow(
-        [FromRoute] string tableId,
+        string tableId,
         [FromBody] AddTableRowDto dto)
     {
         var traceId = HttpContext.TraceIdentifier;
@@ -70,7 +70,7 @@ public abstract partial class AttributesControllerBase
         }
     }
 
-    [HttpGet("{tableId}/rows")]
+    [HttpGet("tables/{tableId}/rows")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
     public virtual async Task<IActionResult> ListRows(string tableId)
     {
@@ -87,7 +87,7 @@ public abstract partial class AttributesControllerBase
         }
     }
 
-    [HttpGet("rows/{rowId}")]
+    [HttpGet("tables/rows/{rowId}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
     public virtual async Task<IActionResult> GetRow(string rowId)
@@ -107,7 +107,7 @@ public abstract partial class AttributesControllerBase
         }
     }
 
-    [HttpPut("rows/{rowId}")]
+    [HttpPut("tables/rows/{rowId}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<TableRowDto>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<object>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiResponse<object>))]
@@ -141,7 +141,7 @@ public abstract partial class AttributesControllerBase
         }
     }
 
-    [HttpDelete("rows/{rowId}")]
+    [HttpDelete("tables/rows/{rowId}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<string>))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ApiResponse<string>))]
     public virtual async Task<IActionResult> DeleteRow(string rowId)

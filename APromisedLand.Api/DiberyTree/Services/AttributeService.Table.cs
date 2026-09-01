@@ -154,6 +154,16 @@ public partial class AttributeService
             .Where(d => d.ParentId == tableDefId)
             .Select(d => new { d.Id, d.Name })
             .ToDictionaryAsync(d => d.Id);
+        
+        var colDefs = await db.AttributeDefinitions.AsNoTracking()
+            .Where(d => d.ParentId == tableDefId)
+            .ToDictionaryAsync(d => d.Id);
+        
+        foreach (var col in colDefs.Values)
+        {
+            col.Unit = await db.UnitTrees.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == col.UnitId);
+        }
 
         return rows.Select(r => new TableRowDto
         {
@@ -165,6 +175,7 @@ public partial class AttributeService
                 {
                     ColumnId = c.AttributeDefinitionId,
                     ColumnName = colNames.TryGetValue(c.AttributeDefinitionId, out var n) ? n.Name : null,
+                    ColumnDef = colDefs.TryGetValue(c.AttributeDefinitionId, out var d) ? d : null,
                     Value = GetRawValue(c)
                 }).ToList()
                 : new()
@@ -183,9 +194,13 @@ public partial class AttributeService
             .Where(d => d.ParentId == row.AttributeDefinitionId)
             .Select(d => new { d.Id, d.Name })
             .ToDictionaryAsync(d => d.Id);
-
+        
+        var colDefs = await db.AttributeDefinitions.AsNoTracking()
+            .Where(d => d.ParentId == row.AttributeDefinitionId)
+            .ToDictionaryAsync(d => d.Id);
+        
         var list = cells.TryGetValue(rowId, out var l) ? l : new();
-        return new TableRowDto
+        var rowDto = new TableRowDto
         {
             RowId = row.Id,
             RowNo = row.RowNo ?? 0,
@@ -194,9 +209,18 @@ public partial class AttributeService
             {
                 ColumnId = c.AttributeDefinitionId,
                 ColumnName = colNames.TryGetValue(c.AttributeDefinitionId, out var n) ? n.Name : null,
+                ColumnDef = colDefs.TryGetValue(c.AttributeDefinitionId, out var d) ? d : null,
                 Value = GetRawValue(c)
             }).ToList()
         };
+        
+        foreach (var cellDto in rowDto.Values)
+        {
+            cellDto.ColumnDef?.Unit = await db.UnitTrees.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == cellDto.ColumnDef.UnitId);
+        }
+        
+        return rowDto;
     }
 
     // ---------- 更新行 ----------

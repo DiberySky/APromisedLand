@@ -319,7 +319,7 @@ public partial class AttributeService
         {
             Id = v.Id,
             DefinitionId = v.AttributeDefinitionId,
-            Definition = def ?? new AttributeDefinition(attrType),
+            Def = def ?? new AttributeDefinition(attrType),
             Value = jsonElement
         };
     }

@@ -3,9 +3,9 @@
 @inject ISnackbar Snackbar
 
 <MudStack Spacing="0">
-    @foreach (var attr in AttributeDtos)
+    @foreach (var attr in AttributeJsonValueDtos)
     {
-        var typeEnum = attr.Definition.AttributeTypeId.ToAttributeTypeEnum();
+        var typeEnum = attr.Def.AttributeTypeId.ToAttributeTypeEnum();
 
         <MudGrid Class="align-center">
             <MudItem sm="12">
@@ -16,7 +16,7 @@
 
                         <TextValue NodeId="@TableId"
                                    ValueId="@attr.Id"
-                                   DefinitionDto="@attr.Definition"
+                                   DefinitionDto="@attr.Def"
                                    Value="@textValue"
                                    ReadOnly="@ReadOnly"
                                    SubmitVisible="false"
@@ -27,7 +27,7 @@
 
                         <IntegerValue NodeId="@TableId"
                                       ValueId="@attr.Id"
-                                      DefinitionDto="@attr.Definition"
+                                      DefinitionDto="@attr.Def"
                                       Value="@integerValue"
                                       ReadOnly="@ReadOnly"
                                       SubmitVisible="false"
@@ -40,7 +40,7 @@
 
                         <DecimalValue NodeId="@TableId"
                                       ValueId="@attr.Id"
-                                      DefinitionDto="@attr.Definition"
+                                      DefinitionDto="@attr.Def"
                                       @* Value="@decimalValue" *@
                                       @bind-JsonValue="@attr.Value"
                                       ReadOnly="@ReadOnly"
@@ -54,7 +54,7 @@
 
                         <DateValue NodeId="@TableId"
                                    ValueId="@attr.Id"
-                                   DefinitionDto="@attr.Definition"
+                                   DefinitionDto="@attr.Def"
                                    Value="@dateValue"
                                    ReadOnly="@ReadOnly"
                                    SubmitVisible="false"
@@ -65,7 +65,7 @@
 
                         <TimeValue NodeId="@TableId"
                                    ValueId="@attr.Id"
-                                   DefinitionDto="@attr.Definition"
+                                   DefinitionDto="@attr.Def"
                                    Value="@timeValue"
                                    ReadOnly="@ReadOnly"
                                    SubmitVisible="false"
@@ -78,7 +78,7 @@
 
                         <DateTimeValue NodeId="@TableId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition"
+                                       DefinitionDto="@attr.Def"
                                        Value="@dateTimeValue"
                                        ReadOnly="@ReadOnly"
                                        SubmitVisible="false"
@@ -91,7 +91,7 @@
 
                         <FileValue NodeId="@TableId"
                                    ValueId="@attr.Id"
-                                   DefinitionDto="@attr.Definition"
+                                   DefinitionDto="@attr.Def"
                                    Value="@fileValue"
                                    ReadOnly="@ReadOnly"
                                    SubmitVisible="false"
@@ -102,7 +102,7 @@
 
                         <LocationDefValue NodeId="@TableId"
                                           ValueId="@attr.Id"
-                                          DefinitionDto="@attr.Definition"
+                                          DefinitionDto="@attr.Def"
                                           Value="@locationDefValue"
                                           ReadOnly="@ReadOnly"
                                           SubmitVisible="false"
@@ -113,7 +113,7 @@
 
                         <TableDefValue NodeId="@TableId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition"
+                                       DefinitionDto="@attr.Def"
                                        Value="@tableDefValue"
                                        ReadOnly="@ReadOnly"
                                        SubmitVisible="false"
@@ -130,7 +130,7 @@
 @code {
     [Parameter] public required string? TableId { get; set; }
 
-    [Parameter] public List<AttributeJsonValueDto> AttributeDtos { get; set; } = [];
+    [Parameter] public List<AttributeJsonValueDto> AttributeJsonValueDtos { get; set; } = [];
     [Parameter] public required AttributeDefinition TableDefinitionDto { get; set; }
     [Parameter] public required List<AttributeDefinition> Columns { get; set; }
     [Parameter] public TableRowDto? EditRow { get; set; }
@@ -152,9 +152,9 @@
 
     private void LoadAttributes()
     {
-        AttributeDtos = Columns.Select(x => new AttributeJsonValueDto
+        AttributeJsonValueDtos = Columns.Select(x => new AttributeJsonValueDto
         {
-            Definition = x,
+            Def = x,
         }).ToList();
 
         foreach (var cell in EditRow?.Values ?? [])
@@ -185,7 +185,7 @@
     {
         if (raw is not JsonElement je) return;
         
-        var attr = AttributeDtos.FirstOrDefault(x  => x.Definition?.AttributeTypeId.ToAttributeTypeEnum() == type);
+        var attr = AttributeJsonValueDtos.FirstOrDefault(x  => x.Def?.AttributeTypeId.ToAttributeTypeEnum() == type);
         
         if (attr == null) return;
         

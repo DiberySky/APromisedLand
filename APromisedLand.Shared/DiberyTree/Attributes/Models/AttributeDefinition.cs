@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 using APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 using APromisedLand.Shared.DiberyTree.Attributes.Enums;
 using APromisedLand.Shared.DiberyTree.Models;
@@ -55,36 +56,16 @@ public class AttributeDefinition
     // 该列是否必填
     public bool IsRequired { get; set; }
 
-    // 列默认值（字符串形式，按列类型解析）
-    public string? DefaultValue { get; set; }
+    [NotMapped]
+    // 列值（JsonElement形式，按列类型解析）
+    public JsonElement? JsonValue { get; set; }
 
     public string TypeName
         => AttributeTypeId.ToAttributeTypeEnum().ToString(); 
     public AttributeTypeEnum TypeEnum
         => AttributeTypeId.ToAttributeTypeEnum(); 
     
-//     public DTOs.AttributeDefinition ToDto()
-// {
-//         return new DTOs.AttributeDefinition
-//         {
-//             Id = Id,
-//             Name = Name,
-//             AttributeType = AttributeTypeId.ToAttributeTypeEnum(),
-//             Lines = Lines,
-//             MaxLength = MaxLength,
-//             Precision = Precision,
-//             Scale = Scale,
-//             UnitId = UnitId,
-//             Unit = Unit,
-//             ParentId = ParentId,
-//             HasDate = HasDate,
-//             HasTime = HasTime,
-//             HasRowNo = HasRowNo,
-//             Order = Order,  
-//             IsRequired = IsRequired,
-//             DefaultValue = DefaultValue,
-//         };
-//     }
+
     // ---------- 种子数据 ----------
     public static List<AttributeDefinition> SeedData()
     {

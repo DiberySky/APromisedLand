@@ -1,0 +1,39 @@
+@using APromisedLand.Razor.DiberyTree.Attributes.Locations
+
+@* @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new() *@
+
+@* @inject TreeNodeDialogService<TItem> TreeNodeDialogService *@
+@inject IDialogService DialogService
+
+
+@if (ReadOnly)
+{
+    <MudTextField T="string"
+                  Value="@DefItemDto?.LocationName"
+                  Label="地点位置名称"
+                  Variant="Variant.Outlined"
+                  ReadOnly="@ReadOnly"
+                  Adornment="Adornment.End"
+                  AdornmentColor="Color.Success"
+                  AdornmentIcon="@Icons.Material.Outlined.EditNote"/>
+}
+else
+{
+    <MudTextField T="string"
+                  Value="@DefItemDto?.LocationName"
+                  Label="地点位置名称"
+                  Variant="Variant.Outlined"
+                  Required="true"
+                  RequiredError="地点位置名称不能为空"
+                  MaxLength="50"
+                  Counter="50"
+                  ReadOnly="@ReadOnly"/>
+}
+
+
+@code {
+    [Parameter] public AttributeItemDto? DefItemDto { get; set; }
+    [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+}

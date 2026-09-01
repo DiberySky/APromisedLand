@@ -64,7 +64,12 @@
                     @NodeTemplate.EditTemplate(_node)
                 }
 
-                <NodeAttributesSky @ref="_nodeAttributesSky" NodeId="@_node.Id"/>
+                @* <NodeAttributesSky @ref="_nodeAttributesSky" NodeId="@_node.Id"/> *@
+                
+                <NodeAttributeItemsSky @ref="@_itemsSky" 
+                                       NodeId="@_node.Id" 
+                                       @bind-DefItemDtos="@AttributeItems"
+                                       ReadOnly="@false"/>
 
             </MudForm>
         </MudContainer>
@@ -73,15 +78,19 @@
 </DialogTreeSky>
 
 @code {
+    NodeAttributeItemsSky _itemsSky = null!;
+    
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
     
     [Parameter] public bool IsCreate { get; set; }
 
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
 
-    private NodeAttributesSky _nodeAttributesSky = null!;
+    // private NodeAttributesSky _nodeAttributesSky = null!;
     private MudForm _form = null!;
 
+    private List<AttributeItemDto> AttributeItems { get; set; } = new();
+    
     // private TreeNodeFormModel _model = new();
     // private bool _isSubmitting = false;
     private TItem _node = null!;
@@ -107,6 +116,8 @@
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
 
+        await _itemsSky.SubmitUpdateNodeAttributesAsync();
+        
         // _isSubmitting = true;
         MudDialog?.Close(DialogResult.Ok(_node));
     }
@@ -130,20 +141,21 @@
         var dialogParams = new DialogParameters<AddAttributeValueDialog>
         {
             { x => x.NodeId, _node.Id },
-            { x => x.DefinitionDto, definition },
+            { x => x.Definition, definition },
         };
         var dialog = await DialogService.ShowAsync<AddAttributeValueDialog>("添加属性", dialogParams);
         var result = await dialog.Result;
         if (result?.Canceled == false)
         {
-            await _nodeAttributesSky.LoadAttributes();
+            // await _nodeAttributesSky.LoadAttributes();
+            await _itemsSky.LoadAttributes();
         }
     }
 
-    private async Task ValueChanged(AttributeDefinition? definition)
-    {
-        await _nodeAttributesSky.LoadAttributes();
-    }
+    // private async Task ValueChanged(AttributeDefinition? definition)
+    // {
+    //     await _nodeAttributesSky.LoadAttributes();
+    // }
     
     public void Dispose()
     {

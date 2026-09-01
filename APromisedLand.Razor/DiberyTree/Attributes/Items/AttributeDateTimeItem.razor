@@ -1,0 +1,86 @@
+
+@if (ReadOnly)
+{
+    <MudDatePicker Date="@_date"
+                   DateChanged="@(OnDateChanged)"
+                   Label="@DefItemDto?.Def?.Name"
+                   DateFormat="yyyy-MM-dd HH:mm"
+                   Variant="Variant.Outlined"
+                   ReadOnly="@ReadOnly"/>
+}
+else
+{
+    <MudStack Class="d-flex flex-grow-1" Row="true" Spacing="0">
+        <MudDatePicker Date="@_date"
+                       DateChanged="@(OnDateChanged)"
+                       Label="@DefItemDto?.Def?.Name"
+                       DateFormat="yyyy-MM-dd"
+                       Variant="Variant.Outlined"
+                       ReadOnly="@ReadOnly"/>
+
+        <MudTimePicker @Time="@_selectedTime"
+                       Label="选择时间"
+                       Variant="Variant.Outlined"
+                       TimeFormat="HH:mm"
+                       ReadOnly="@ReadOnly"
+                       TimeChanged="@(OnTimeChanged)"/>
+    </MudStack>
+}
+
+@code {
+    [Parameter] public AttributeItemDto? DefItemDto { get; set; }
+    [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    DateTime? _date;
+    TimeSpan? _selectedTime;
+
+    protected override void OnInitialized()
+    {
+        _date = DefItemDto?.DateTimeValue?.ToLocalTime().DateTime;
+        _selectedTime = DefItemDto?.DateTimeValue?.ToLocalTime().TimeOfDay;
+        
+        StateHasChanged();
+    }
+
+    private DateTimeOffset? Combine(DateTime? date, TimeSpan? time)
+    {
+        if (date.HasValue && time.HasValue)
+        {
+            var datePart = date.Value.Date;
+            var combinedDateTime = datePart + time.Value;
+            // 使用当前系统的本地时区偏移
+            var localOffset = TimeZoneInfo.Local.GetUtcOffset(combinedDateTime);
+            return new DateTimeOffset(combinedDateTime, localOffset);
+        }
+        else if (date.HasValue && !time.HasValue)
+        {
+            var localOffset = TimeZoneInfo.Local.GetUtcOffset(date.Value);
+            return new DateTimeOffset(date.Value, localOffset);
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    private void OnDateChanged(DateTime? value)
+    {
+        _date = value;
+
+        DefItemDto?.DateTimeValue = Combine(value, _selectedTime);
+
+        _ = DefItemDtoChanged.InvokeAsync(DefItemDto);
+
+    }
+
+    private void OnTimeChanged(TimeSpan? value)
+    {
+        _selectedTime = value;
+
+        DefItemDto?.DateTimeValue = Combine(_date, _selectedTime);
+
+        _ = DefItemDtoChanged.InvokeAsync(DefItemDto);
+    }
+}

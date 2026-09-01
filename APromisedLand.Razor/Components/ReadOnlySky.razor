@@ -1,0 +1,24 @@
+
+<MudToggleIconButton @Toggled="@ReadOnly"
+                     Icon="@Icons.Material.Filled.EditNote"
+                     Color="@Color.Info"
+                     ToggledIcon="@Icons.Material.Filled.EditOff"
+                     ToggledColor="@Color.Default"
+                     ToggledChanged="@handleReadOnlyChanged"/>
+
+@code {
+    [Parameter] public bool ReadOnly { get; set; } = true;
+    [Parameter] public EventCallback<bool> ReadOnlyChanged { get; set; }
+
+    [Parameter] public EventCallback<bool> ToggledChanged { get; set; }
+
+    private void handleReadOnlyChanged(bool value)
+    {
+        ReadOnly = !ReadOnly;
+        
+        _ = ReadOnlyChanged.InvokeAsync(ReadOnly);
+
+        _ = ToggledChanged.InvokeAsync(ReadOnly);
+    }
+}
+

@@ -143,6 +143,17 @@ public class MessageService(IDialogService dialogService, ISnackbar snackbar)
             });
     }
 
+    public void Warning(string? message)
+    {
+        snackbar.Add(message ?? "没有信息。", Severity.Warning,
+            config =>
+            {
+                config.VisibleStateDuration = 3000;
+                config.ShowCloseIcon = true;
+                config.SnackbarVariant = Variant.Outlined;
+            });
+    }
+
     public void Info(string message) //=> snackbar.Add(message, Severity.Success);
     {
         snackbar.Add(message, Severity.Info, config => { config.VisibleStateDuration = 3000; });

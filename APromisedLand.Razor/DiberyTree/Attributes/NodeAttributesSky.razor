@@ -17,7 +17,7 @@ else
     <MudStack Spacing="0">
         @foreach (var attr in _attributeDtos)
         {
-            var typeEnum = attr.Definition.AttributeTypeId.ToAttributeTypeEnum();
+            var typeEnum = attr.Def.AttributeTypeId.ToAttributeTypeEnum();
 
             <MudGrid Class="align-center">
                 <MudItem sm="12">
@@ -28,7 +28,7 @@ else
 
                             <TextValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition"
+                                       DefinitionDto="@attr.Def"
                                        Value="@textValue"
                                        ReadOnly="@ReadOnly"
                                        OnEditChanged="@ValueEditChanged"/>
@@ -38,7 +38,7 @@ else
 
                             <IntegerValue NodeId="@NodeId"
                                           ValueId="@attr.Id"
-                                          DefinitionDto="@attr.Definition"
+                                          DefinitionDto="@attr.Def"
                                           Value="@integerValue"
                                           ReadOnly="@ReadOnly"
                                           OnEditChanged="@ValueEditChanged"/>
@@ -48,7 +48,7 @@ else
 
                             <DecimalValue NodeId="@NodeId"
                                           ValueId="@attr.Id"
-                                          DefinitionDto="@attr.Definition"
+                                          DefinitionDto="@attr.Def"
                                           Value="@decimalValue"
                                           ReadOnly="@ReadOnly"
                                           OnEditChanged="@ValueEditChanged"/>
@@ -58,7 +58,7 @@ else
 
                             <DateValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition"
+                                       DefinitionDto="@attr.Def"
                                        Value="@dateValue"
                                        ReadOnly="@ReadOnly"
                                        OnEditChanged="@ValueEditChanged"/>
@@ -68,7 +68,7 @@ else
 
                             <TimeValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition"
+                                       DefinitionDto="@attr.Def"
                                        Value="@timeValue"
                                        ReadOnly="@ReadOnly"
                                        OnEditChanged="@ValueEditChanged"/>
@@ -78,7 +78,7 @@ else
 
                             <DateTimeValue NodeId="@NodeId"
                                            ValueId="@attr.Id"
-                                           DefinitionDto="@attr.Definition"
+                                           DefinitionDto="@attr.Def"
                                            Value="@dateTimeValue"
                                            ReadOnly="@ReadOnly"
                                            OnEditChanged="@ValueEditChanged"/>
@@ -88,7 +88,7 @@ else
 
                             <FileValue NodeId="@NodeId"
                                        ValueId="@attr.Id"
-                                       DefinitionDto="@attr.Definition"
+                                       DefinitionDto="@attr.Def"
                                        Value="@fileValue"
                                        ReadOnly="@ReadOnly"
                                        OnEditChanged="@ValueEditChanged"/>
@@ -98,7 +98,7 @@ else
 
                             <LocationDefValue NodeId="@NodeId"
                                               ValueId="@attr.Id"
-                                              DefinitionDto="@attr.Definition"
+                                              DefinitionDto="@attr.Def"
                                               Value="@locationDefValue"
                                               ReadOnly="@ReadOnly"
                                               OnEditChanged="@ValueEditChanged"/>
@@ -108,7 +108,7 @@ else
 
                             <TableDefValue NodeId="@NodeId"
                                            ValueId="@attr.Id"
-                                           DefinitionDto="@attr.Definition"
+                                           DefinitionDto="@attr.Def"
                                            Value="@tableDefValue"
                                            ReadOnly="@ReadOnly"
                                            OnEditChanged="@ValueEditChanged"/>

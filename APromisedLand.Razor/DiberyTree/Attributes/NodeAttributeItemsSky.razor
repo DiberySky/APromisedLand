@@ -1,0 +1,261 @@
+@using System.Text.Json.Nodes
+@using APromisedLand.Razor.DiberyTree.Attributes.Items
+
+@inject AttributeApiClient AttributeApiClient
+@inject MessageService Message
+
+<MudStack Spacing="0">
+    <MudForm @ref="_form" Model="@DefItemDtos">
+        @for (int i = 0; i < DefItemDtos.Count; i++)
+        {
+            var index = i;
+
+            <MudGrid Class="align-center">
+                <MudItem sm="12">
+                    @switch (DefItemDtos[index].Def?.TypeEnum)
+                    {
+                        case AttributeTypeEnum.文本:
+                            <AttributeTextItem @bind-DefItemDto="@DefItemDtos[index]"
+                                               ReadOnly="@ReadOnly"/>
+                            break;
+                        case AttributeTypeEnum.整数:
+                            <AttributeIntegerItem @bind-DefItemDto="@DefItemDtos[index]"
+                                                  ReadOnly="@ReadOnly"/>
+                            break;
+                        case AttributeTypeEnum.小数:
+                            <AttributeDecimalItem @bind-DefItemDto="@DefItemDtos[index]"
+                                                  ReadOnly="@ReadOnly"/>
+                            break;
+                        case AttributeTypeEnum.日期:
+                            <AttributeDateItem @bind-DefItemDto="@DefItemDtos[index]"
+                                               ReadOnly="@ReadOnly"/>
+                            break;
+                        case AttributeTypeEnum.时间:
+                            <AttributeTimeItem @bind-DefItemDto="@DefItemDtos[index]"
+                                               ReadOnly="@ReadOnly"/>
+                            break;
+                        case AttributeTypeEnum.日期时间:
+                            <AttributeDateTimeItem @bind-DefItemDto="@DefItemDtos[index]"
+                                                   ReadOnly="@ReadOnly"/>
+                            break;
+                        @* case AttributeTypeEnum.文件: *@
+                        @*     var fileValue = item.Value.GetValue<string>(); *@
+                        @* *@
+                        @*     <FileValue NodeId="@NodeId" *@
+                        @*                ValueId="@item.Id" *@
+                        @*                DefinitionDto="@item.Definition" *@
+                        @*                Value="@fileValue" *@
+                        @*                ReadOnly="@ReadOnly" *@
+                        @*                OnEditChanged="@ValueEditChanged"/> *@
+                        @*     break; *@
+                        case AttributeTypeEnum.定位:
+                            <AttributeLocationDefItem @bind-DefItemDto="@DefItemDtos[index]"
+                                                      ReadOnly="@ReadOnly"/>
+                            break;
+                        case AttributeTypeEnum.表格:
+                            <AttributeTableDefItem @bind-DefItemDto="@DefItemDtos[index]"
+                                                   ReadOnly="@ReadOnly"/>
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
+                </MudItem>
+            </MudGrid>
+        }
+    </MudForm>
+</MudStack>
+
+@code {
+    MudForm _form = null!;
+    // [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+    
+    [Parameter] public required string? NodeId { get; set; }
+    [Parameter] public required string? ParentId { get; set; }
+
+    [Parameter] public List<AttributeItemDto> DefItemDtos { get; set; } = [];
+    [Parameter] public EventCallback<List<AttributeItemDto>> DefItemDtosChanged { get; set; }
+
+    [Parameter] public AttributeDefinition? CreateDefinition { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private List<AttributeDefinition> _columns = [];
+
+    private List<AttributeJsonValueDto>? _attributeDtos;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ParentId == null)
+        {
+            await LoadAttributes();
+        }
+        else
+        {
+            await LoadColumnsAsync();
+        }
+
+        StateHasChanged();
+    }
+    
+    public async Task SubmitAddNodeAttributesAsync()
+    {
+        await _form.ValidateAsync();
+        
+        if (!_form.IsValid) return;
+
+        try
+        {
+            foreach (var defItemDto in DefItemDtos)
+            {
+                var dto = new AddValueDto(defItemDto.Def!.Id, defItemDto.ToJsonElement());
+                
+                await AttributeApiClient.AddValueAsync(NodeId!, dto);
+            }
+
+            Message.Success("属性添加成功");
+            // MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception e)
+        {
+            Message.Details("属性添加失败", e.Message);
+        }
+    }
+    
+    public async Task SubmitUpdateNodeAttributesAsync()
+    {
+        await _form.ValidateAsync();
+        
+        if (!_form.IsValid) return;
+
+        try
+        {
+            foreach (var defItemDto in DefItemDtos)
+            {
+                // var dto = new AddValueDto(defItemDto.Def!.Id, defItemDto.ToJsonElement());
+                //
+                // await AttributeApiClient.AddValueAsync(NodeId!, dto);
+                
+                await AttributeApiClient.UpdateValueAsync(NodeId!, defItemDto.Id!, 
+                    new UpdateValueDto { Value = defItemDto.ToJsonElement()});
+                // Message.Success($"属性“{defItemDto.Def?.Name}”已更新");
+            }
+
+            // Message.Success("属性添加成功");
+            Message.Success($"属性已更新!");
+            // MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception e)
+        {
+           Message.Details("属性更新失败", e.Message);
+        }
+    }
+
+    public async Task LoadAttributes()
+    {
+        if (string.IsNullOrEmpty(NodeId)) return;
+
+        try
+        {
+            _loading = true;
+            StateHasChanged();
+
+            if (CreateDefinition == null)
+            {
+                var nodeAttributes = await AttributeApiClient.GetAllValuesAsync(NodeId);
+
+                _attributeDtos = nodeAttributes?.AttributeJsonValueDtos ?? [];
+
+                foreach (var valueDto in _attributeDtos ?? [])
+                {
+                    var item = SetItem(valueDto);
+                    if (item != null)
+                    {
+                        DefItemDtos.Add(item);
+                    }
+                }
+            }
+            else
+            {
+                DefItemDtos.Add(new AttributeItemDto
+                {
+                    Def = CreateDefinition,
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Details("加载属性失败", ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadColumnsAsync()
+    {
+        _loading = true;
+        try
+        {
+            // 新 API：服务端过滤 ParentId + 按 Order 排序（已返回正确顺序）
+            var list = await AttributeApiClient.ListTableColumnsAsync(ParentId);
+            _columns = [.. list];
+        }
+        catch (Exception ex)
+        {
+            Message.Details("加载列失败", ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private AttributeItemDto? SetItem(AttributeJsonValueDto valueDto)
+    {
+        var item = new AttributeItemDto
+        {
+            Id = valueDto.Id,
+            Def = valueDto.Def,
+            ParentId = ParentId,
+        };
+
+        switch (valueDto.Def.TypeEnum)
+        {
+            case AttributeTypeEnum.文本:
+                item.TextValue = valueDto.Value.GetValue<string>();
+                break;
+            case AttributeTypeEnum.整数:
+                item.IntegerValue = valueDto.Value.GetValue<int>();
+                break;
+            case AttributeTypeEnum.小数:
+                item.DecimalValue = valueDto.Value.GetValue<decimal>();
+                break;
+            case AttributeTypeEnum.日期:
+                item.DateValue = valueDto.Value.GetValue<DateTimeOffset>();
+                break;
+            case AttributeTypeEnum.时间:
+                item.TimeValue = valueDto.Value.GetValue<TimeSpan>();
+                break;
+            case AttributeTypeEnum.日期时间:
+                item.DateTimeValue = valueDto.Value.GetValue<DateTimeOffset>();
+                break;
+            case AttributeTypeEnum.文件:
+                break;
+            case AttributeTypeEnum.定位:
+                break;
+            case AttributeTypeEnum.表格:
+                item.TableName = valueDto.Value.GetValue<string>();
+                break;
+            default:
+                Message.Warning($"未知属性类型:{valueDto.Def.TypeEnum}");
+                item = null;
+                break;
+        }
+
+        return item;
+    }
+
+}

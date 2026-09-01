@@ -1,0 +1,41 @@
+<MudStack Class="d-flex flex-grow-1" Spacing="0">
+    <MudTextField T="@string" 
+                  @bind-Value="@DefItemDto?.TextValue"
+                  Label="@DefItemDto?.Def?.Name"
+                  Variant="Variant.Outlined"
+                  Lines="@(DefItemDto?.Def?.Lines ?? 1)"
+                  MaxLength="@(DefItemDto?.Def?.MaxLength ?? 30)"
+                  FullWidth="true"
+                  Margin="Margin.Normal"
+                  Required="true"
+                  Immediate="true"
+                  ReadOnly="@ReadOnly"/>
+
+    <MudStack Row="true">
+        @if (_infoVisible)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                类型：@DefItemDto?.Def?.TypeName,
+                最大长度：@(DefItemDto?.Def?.MaxLength is null or 0 ? "无限制" : DefItemDto?.Def?.MaxLength.ToString())
+            </MudText>
+        }
+
+        <MudSpacer/>
+
+        <MudIconButton size="Size.Small" Color="Color.Info" Class="ma-0 pa-0"
+                       Icon="@(_infoVisible
+                                 ? Icons.Material.Outlined.KeyboardDoubleArrowRight
+                                 : Icons.Material.Outlined.KeyboardDoubleArrowLeft)"
+                       OnClick="@(() => _infoVisible = !_infoVisible)"/>
+    </MudStack>
+
+</MudStack>
+
+@code {
+    [Parameter] public AttributeItemDto? DefItemDto { get; set; }
+    [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    bool _infoVisible;
+}

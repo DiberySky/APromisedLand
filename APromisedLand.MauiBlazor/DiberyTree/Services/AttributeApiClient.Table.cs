@@ -57,7 +57,7 @@ public partial class AttributeApiClient
     {
         // var dto = new AddTableRowDto { Values = values };
         var request = new HttpRequestMessage(HttpMethod.Post,
-            $"{BasePath}/table/{Uri.EscapeDataString(addDto.TableId)}/rows")
+            $"{BasePath}/tables/{Uri.EscapeDataString(addDto.TableId)}/rows")
         {
             Content = JsonContent.Create(addDto)
         };
@@ -69,7 +69,7 @@ public partial class AttributeApiClient
         string tableId, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get,
-            $"{BasePath}/{Uri.EscapeDataString(tableId)}/rows");
+            $"{BasePath}/tables/{Uri.EscapeDataString(tableId)}/rows");
         return await SendAndGetDataAsync<List<TableRowDto>>(request, cancellationToken);
     }
 
@@ -78,7 +78,7 @@ public partial class AttributeApiClient
         string rowId, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get,
-            $"{BasePath}/rows/{Uri.EscapeDataString(rowId)}");
+            $"{BasePath}/tables/rows/{Uri.EscapeDataString(rowId)}");
         return await SendAndGetDataOrNullAsync<TableRowDto>(request, cancellationToken);
     }
 
@@ -88,7 +88,7 @@ public partial class AttributeApiClient
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Put,
-            $"{BasePath}/rows/{Uri.EscapeDataString(updateDto.RowId)}")
+            $"{BasePath}/tables/rows/{Uri.EscapeDataString(updateDto.RowId)}")
         {
             Content = JsonContent.Create(updateDto)
         };
@@ -100,7 +100,7 @@ public partial class AttributeApiClient
         string rowId, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Delete,
-            $"{BasePath}/rows/{Uri.EscapeDataString(rowId)}");
+            $"{BasePath}/tables/rows/{Uri.EscapeDataString(rowId)}");
         
         var response = await httpClient.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)

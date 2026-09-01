@@ -1,0 +1,35 @@
+
+<MudTimePicker @Time="@DefItemDto?.TimeValue"
+               Label="@DefItemDto?.Def?.Name"
+               PickerVariant="PickerVariant.Inline"
+               AmPm="false"
+               Variant="Variant.Outlined"
+               TimeFormat="HH:mm"
+               ReadOnly="@ReadOnly"
+               TimeChanged="@(OnTimeChanged)"/>
+
+@code {
+    [Parameter] public AttributeItemDto? DefItemDto { get; set; }
+    [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // 如果父组件未传入值，则初始化为当前本地时间
+        if (!DefItemDto?.TimeValue.HasValue ?? false)
+        {
+            DefItemDto?.TimeValue = DateTime.Now.TimeOfDay;
+            // 通知父组件更新绑定值
+            _ = DefItemDtoChanged.InvokeAsync(DefItemDto);
+        }
+    }
+
+    private void OnTimeChanged(TimeSpan? value)
+    {
+        DefItemDto?.TimeValue = value;
+
+        _ = DefItemDtoChanged.InvokeAsync(DefItemDto);
+    }
+
+}
