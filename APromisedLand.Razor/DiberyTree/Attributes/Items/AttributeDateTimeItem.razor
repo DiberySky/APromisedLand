@@ -18,16 +18,18 @@ else
                        Variant="Variant.Outlined"
                        ReadOnly="@ReadOnly"/>
 
-        <MudTimePicker @Time="@_selectedTime"
+        <MudTimePicker @bind-Time="@_selectedTime"
                        Label="选择时间"
                        Variant="Variant.Outlined"
                        TimeFormat="HH:mm"
                        ReadOnly="@ReadOnly"
-                       TimeChanged="@(OnTimeChanged)"/>
+                       TextChanged="@(OnTimeChanged)"/>
     </MudStack>
 }
 
 @code {
+    [Parameter] public required string? NodeId { get; set; }
+
     [Parameter] public AttributeItemDto? DefItemDto { get; set; }
     [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
 
@@ -75,10 +77,10 @@ else
 
     }
 
-    private void OnTimeChanged(TimeSpan? value)
+    private void OnTimeChanged(string value)
     {
-        _selectedTime = value;
-
+        _selectedTime = TimeSpan.Parse(value);
+        
         DefItemDto?.DateTimeValue = Combine(_date, _selectedTime);
 
         _ = DefItemDtoChanged.InvokeAsync(DefItemDto);

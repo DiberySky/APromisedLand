@@ -170,11 +170,11 @@ public partial class AttributeService
             RowId = r.Id,
             RowNo = r.RowNo ?? 0,
             CreatedAt = r.CreatedAt,
-            Values = cells.TryGetValue(r.Id, out var list)
+            CellValues = cells.TryGetValue(r.Id, out var list)
                 ? list.Select(c => new TableCellDto
                 {
                     ColumnId = c.AttributeDefinitionId,
-                    ColumnName = colNames.TryGetValue(c.AttributeDefinitionId, out var n) ? n.Name : null,
+                    // ColumnName = colNames.TryGetValue(c.AttributeDefinitionId, out var n) ? n.Name : null,
                     ColumnDef = colDefs.TryGetValue(c.AttributeDefinitionId, out var d) ? d : null,
                     Value = GetRawValue(c)
                 }).ToList()
@@ -205,16 +205,16 @@ public partial class AttributeService
             RowId = row.Id,
             RowNo = row.RowNo ?? 0,
             CreatedAt = row.CreatedAt,
-            Values = list.Select(c => new TableCellDto
+            CellValues = list.Select(c => new TableCellDto
             {
                 ColumnId = c.AttributeDefinitionId,
-                ColumnName = colNames.TryGetValue(c.AttributeDefinitionId, out var n) ? n.Name : null,
+                // ColumnName = colNames.TryGetValue(c.AttributeDefinitionId, out var n) ? n.Name : null,
                 ColumnDef = colDefs.TryGetValue(c.AttributeDefinitionId, out var d) ? d : null,
                 Value = GetRawValue(c)
             }).ToList()
         };
         
-        foreach (var cellDto in rowDto.Values)
+        foreach (var cellDto in rowDto.CellValues)
         {
             cellDto.ColumnDef?.Unit = await db.UnitTrees.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == cellDto.ColumnDef.UnitId);

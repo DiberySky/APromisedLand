@@ -14,25 +14,25 @@
         <MudForm @ref="_form" ValidationDelay="0">
             <MudContainer class="my-4">
                 <MudGrid>
-                    @if (TableDefDto.HasDate)
-                    {
-                        <MudItem xs="12">
-                            <DateValue @bind-Value="@_dateOffset"
-                                       DefinitionDto="@_dateDef"
-                                       ReadOnly="@ReadOnly"
-                                       NodeId="@NodeId"/>
-                        </MudItem>
-                    }
-
-                    @if (TableDefDto.HasTime)
-                    {
-                        <MudItem xs="12">
-                            <TimeValue @bind-Value="@_timeSpan"
-                                       DefinitionDto="@_timeDef"
-                                       ReadOnly="@ReadOnly"
-                                       NodeId="@NodeId"/>
-                        </MudItem>
-                    }
+                    @* @if (TableDef.HasDate) *@
+                    @* { *@
+                    @*     <MudItem xs="12"> *@
+                    @*         <DateValue @bind-Value="@_dateOffset" *@
+                    @*                    DefinitionDto="@_dateDef" *@
+                    @*                    ReadOnly="@ReadOnly" *@
+                    @*                    NodeId="@NodeId"/> *@
+                    @*     </MudItem> *@
+                    @* } *@
+                    @* *@
+                    @* @if (TableDef.HasTime) *@
+                    @* { *@
+                    @*     <MudItem xs="12"> *@
+                    @*         <TimeValue @bind-Value="@_timeSpan" *@
+                    @*                    DefinitionDto="@_timeDef" *@
+                    @*                    ReadOnly="@ReadOnly" *@
+                    @*                    NodeId="@NodeId"/> *@
+                    @*     </MudItem> *@
+                    @* } *@
 
                     @* @foreach (var col in ColumnDefs) *@
                     @* { *@
@@ -88,28 +88,33 @@
                     @* } *@
                 </MudGrid>
 
-                <NodeAttributeItemsSky @bind-DefItemDtos="@DefItemDtos"
+                @* @bind-DefItemDtos="@DefItemDtos" *@
+                <NodeAttributeItemsSky @ref="@_nodeAttributeItemsSky"
                                        NodeId="@NodeId"
                                        ParentId="@TableId"
+                                       RowId="@EditRow?.RowId"
+                                       @bind-DefItemDtos="@DefItemDtos"
                                        ReadOnly="@ReadOnly"/>
-                
+
             </MudContainer>
         </MudForm>
     </DialogContent>
 </DialogSky>
 
 @code {
+    NodeAttributeItemsSky _nodeAttributeItemsSky = null!;
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required string NodeId { get; set; }
     [Parameter] public required string TableId { get; set; }
     [Parameter] public required string TableName { get; set; }
-    [Parameter] public required AttributeDefinition TableDefDto { get; set; }
+    [Parameter] public required AttributeDefinition TableDef { get; set; }
     [Parameter] public required List<AttributeDefinition> ColumnDefs { get; set; }
     [Parameter] public TableRowDto? EditRow { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
 
     private MudForm? _form;
+
     // private Dictionary<string, CellValue> _values = new();
     private bool _isSubmitting;
     private bool IsEdit => EditRow != null;
@@ -124,87 +129,64 @@
 
     protected override void OnInitialized()
     {
-        _dateDef = new AttributeDefinition()
-        {
-            AttributeTypeId = AttributeTypeEnum.日期.ToAttributeTypeId(),
-            Name = "日期",
-        };
-
-        _timeDef = new AttributeDefinition
-        {
-            AttributeTypeId = AttributeTypeEnum.时间.ToAttributeTypeId(),
-            Name = "时间",
-        };
-
-        _dateOffset = EditRow?.CreatedAt.LocalDateTime.Date ?? DateTimeOffset.UtcNow;
-        _timeSpan = EditRow?.CreatedAt.LocalDateTime.TimeOfDay ?? TimeSpan.Zero;
-
+        // _dateDef = new AttributeDefinition()
+        // {
+        //     AttributeTypeId = AttributeTypeEnum.日期.ToAttributeTypeId(),
+        //     Name = "日期",
+        // };
+        //
+        // _timeDef = new AttributeDefinition
+        // {
+        //     AttributeTypeId = AttributeTypeEnum.时间.ToAttributeTypeId(),
+        //     Name = "时间",
+        // };
+        //
+        // _dateOffset = EditRow?.CreatedAt.LocalDateTime.Date ?? DateTimeOffset.UtcNow;
+        // _timeSpan = EditRow?.CreatedAt.LocalDateTime.TimeOfDay ?? TimeSpan.Zero;
+        //
+        // var cellValues = new List<CellValue>();
+        //
         // foreach (var col in ColumnDefs)
-        //     _values[col.Id] = new CellValue();
-
-        // _values = ColumnDefs.ToDictionary(
-        //     col => col.Id,
-        //     col =>
+        // {
+        //     var cv = new CellValue();
+        //     cv.SetType(col.TypeEnum); // 关键：设置类型
+        //     cv.Definition = col; // 关键：设置定义DTO
+        //     cellValues.Add(cv);
+        // }
+        //     
+        // if (IsEdit && EditRow != null)
+        // {
+        //     foreach (var cell in EditRow.CellValues)
         //     {
-        //         var cv = new CellValue();
-        //         
-        //         cv.SetType(col.TypeEnum); // 关键：设置类型
-        //         
-        //         cv.Definition = col; // 关键：设置定义DTO
-        //         return cv;
+        //         var item = SetItemDto(cell);
+        //
+        //         if (item != null)
+        //         {
+        //             DefItemDtos.Add(item);
+        //         }
         //     }
-        // );
-
-        var cellValues = new List<CellValue>();
-        
-        foreach (var col in ColumnDefs)
-        {
-            var cv = new CellValue();
-            cv.SetType(col.TypeEnum); // 关键：设置类型
-            cv.Definition = col; // 关键：设置定义DTO
-            cellValues.Add(cv);
-        }
-            
-        if (IsEdit && EditRow != null)
-        {
-            // foreach (var cell in EditRow.Values)
-            // {
-            //     if (!_values.TryGetValue(cell.ColumnId, out var v)) continue;
-            //     var typeEnum = ColumnDefs.FirstOrDefault(c => c.Id == cell.ColumnId)?.TypeEnum;
-            //     v.SetFrom(cell.Value, typeEnum);
-            // }
-
-            foreach (var cell in EditRow.Values)
-            {
-                var item = SetItemDto(cell);
-
-                if (item != null)
-                {
-                    DefItemDtos.Add(item);
-                }
-            }
-            
-            StateHasChanged();
-        }
-        else
-        {
-            foreach (var cell in cellValues)
-            {
-                var cellDto = new TableCellDto
-                {
-                    ColumnId = cell.Definition!.Id,
-                    ColumnName = cell.Definition.Name,
-                    ColumnDef = cell.Definition,
-                };
-                
-                var item = SetItemDto(cellDto);
-
-                if (item != null)
-                {
-                    DefItemDtos.Add(item);
-                }
-            }
-        }
+        //     
+        //     StateHasChanged();
+        // }
+        // else
+        // {
+        //     foreach (var cell in cellValues)
+        //     {
+        //         var cellDto = new TableCellDto
+        //         {
+        //             ColumnId = cell.Definition!.Id,
+        //             // ColumnName = cell.Definition.Name,
+        //             ColumnDef = cell.Definition,
+        //         };
+        //         
+        //         var item = SetItemDto(cellDto);
+        //
+        //         if (item != null)
+        //         {
+        //             DefItemDtos.Add(item);
+        //         }
+        //     }
+        // }
     }
 
     private async Task HandleSubmitAsync()
@@ -218,68 +200,72 @@
             await _form.ValidateAsync();
             if (!_form.IsValid) return;
 
-            // 校验必填
-            // foreach (var col in ColumnDefs)
-            // {
-            //     if (col.IsRequired && _values[col.Id].IsEmpty())
-            //     {
-            //         Snackbar.Add($"{col.Name}不能为空", Severity.Warning);
-            //         return;
-            //     }
-            // }
+            await _nodeAttributeItemsSky.SubmitTableAsync();
+            
+            Message.Success("保存成功");
+            MudDialog?.Close(DialogResult.Ok(true));
 
-            // var dict = _values.ToDictionary(kv => kv.Key, kv => kv.Value.ToJsonElement());
-            var itemDict = DefItemDtos.ToDictionary(kv => kv.Id, kv => kv.ToJsonElement());
-            try
-            {
-                DateTimeOffset result = _dateOffset.HasValue && _timeSpan.HasValue
-                    ? new DateTimeOffset(
-                        _dateOffset.Value.Date + _timeSpan.Value, // 日期部分 + 时刻部分
-                        _dateOffset.Value.Offset) // 保留原时区
-                    : DateTimeOffset.UtcNow;
-
-                if (IsEdit)
-                {
-                    // DateTime combinedDateTime = _dateOffset.Value + _timeSpan.Value;
-
-
-                    var updateDto = new UpdateTableRowDto
-                    {
-                        NodeId = NodeId,
-                        DefinitionId = TableDefDto.Id,
-                        TableId = TableId,
-                        RowId = EditRow!.RowId,
-                        CreatedAt = result.LocalDateTime,
-                        Values = itemDict
-                    };
-
-                    await AttributeApiClient.UpdateRowAsync(updateDto);
-                }
-                else
-                {
-                    var addDto = new AddTableRowDto
-                    {
-                        NodeId = NodeId,
-                        DefinitionId = TableDefDto.Id,
-                        TableId = TableId,
-                        CreatedAt = result.LocalDateTime,
-                        Values = itemDict
-                    };
-
-                    await AttributeApiClient.AddRowAsync(addDto);
-                }
-
-                Snackbar.Add("保存成功", Severity.Success);
-                MudDialog?.Close(DialogResult.Ok(true));
-            }
-            catch (ArgumentException ex)
-            {
-                Message.Details("保存失败.", ex.Message);
-            }
-            catch (Exception ex)
-            {
-                Message.Details("保存失败.", ex.Message);
-            }
+        //     // 校验必填
+        //     // foreach (var col in ColumnDefs)
+        //     // {
+        //     //     if (col.IsRequired && _values[col.Id].IsEmpty())
+        //     //     {
+        //     //         Snackbar.Add($"{col.Name}不能为空", Severity.Warning);
+        //     //         return;
+        //     //     }
+        //     // }
+        //
+        //     // var dict = _values.ToDictionary(kv => kv.Key, kv => kv.Value.ToJsonElement());
+        //     var itemDict = DefItemDtos.ToDictionary(kv => kv.Id, kv => kv.ToJsonElement());
+        //     try
+        //     {
+        //         DateTimeOffset result = _dateOffset.HasValue && _timeSpan.HasValue
+        //             ? new DateTimeOffset(
+        //                 _dateOffset.Value.Date + _timeSpan.Value, // 日期部分 + 时刻部分
+        //                 _dateOffset.Value.Offset) // 保留原时区
+        //             : DateTimeOffset.UtcNow;
+        //
+        //         if (IsEdit)
+        //         {
+        //             // DateTime combinedDateTime = _dateOffset.Value + _timeSpan.Value;
+        //
+        //
+        //             var updateDto = new UpdateTableRowDto
+        //             {
+        //                 NodeId = NodeId,
+        //                 DefinitionId = TableDef.Id,
+        //                 TableId = TableId,
+        //                 RowId = EditRow!.RowId,
+        //                 CreatedAt = result.LocalDateTime,
+        //                 Values = itemDict
+        //             };
+        //
+        //             await AttributeApiClient.UpdateRowAsync(updateDto);
+        //         }
+        //         else
+        //         {
+        //             var addDto = new AddTableRowDto
+        //             {
+        //                 NodeId = NodeId,
+        //                 DefinitionId = TableDef.Id,
+        //                 TableId = TableId,
+        //                 CreatedAt = result.LocalDateTime,
+        //                 Values = itemDict
+        //             };
+        //
+        //             await AttributeApiClient.AddRowAsync(addDto);
+        //         }
+        //
+        //         Snackbar.Add("保存成功", Severity.Success);
+        //         MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (ArgumentException ex)
+        {
+            Message.Details("保存失败.", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Message.Details("保存失败.", ex.Message);
         }
         finally
         {
@@ -301,7 +287,7 @@
         };
 
         if (cell.Value is not JsonElement je) return item;
-        
+
         // var je = cell.Value;
         switch (cell.ColumnDef?.TypeEnum)
         {

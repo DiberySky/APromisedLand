@@ -1,5 +1,5 @@
 <MudStack Class="d-flex flex-grow-1" Spacing="0">
-    <MudTextField T="@string" 
+    <MudTextField T="@string"
                   @bind-Value="@DefItemDto?.TextValue"
                   Label="@DefItemDto?.Def?.Name"
                   Variant="Variant.Outlined"
@@ -32,6 +32,8 @@
 </MudStack>
 
 @code {
+    [Parameter] public required string? NodeId { get; set; }
+    
     [Parameter] public AttributeItemDto? DefItemDto { get; set; }
     [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
 

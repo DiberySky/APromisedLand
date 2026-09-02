@@ -66,7 +66,7 @@ public partial class TreeSky<TItem>
                 await HandleAttributeAsync(node);
                 break;
             case NodeAction.Sort:
-                // await HandleSortAsync(node);
+                 await HandleSortAsync(node);
                 break;
         }
     }
@@ -245,36 +245,36 @@ public partial class TreeSky<TItem>
         var formModel = await NodeDialogSvc.ShowNodeAttributesDialogAsync(node.Value!.Id);
     }
 
-    // private async Task HandleSortAsync(ITreeItemData<TItem> node)
-    // {
-    //     var sortResult = await NodeDialogSvc.ShowSortDialogAsync(node);
-    //
-    //     if (sortResult == null) return;
-    //
-    //     var nodeDto = new TreeNodeDto<TItem>
-    //     {
-    //         Id = node.Value!.Id,
-    //         Text = node.Value.Text(),
-    //         Icon = BlazorHelper.TreeItemIcons,
-    //         ParentId = node.Value.ParentId!,
-    //         Value = node.Value,
-    //         Children = sortResult.Select(i => new TreeNodeDto<TItem>
-    //         {
-    //             Id = i.Id,
-    //             Text = i.Text(),
-    //             Icon = BlazorHelper.TreeItemIcons,
-    //             ParentId = node.Value.Id,
-    //             Value = i,
-    //             SortOrder = i.SortOrder,
-    //         }).ToList()
-    //     };
-    //
-    //     await ApiClient.UpdateChildrenAsync(nodeDto);
-    //
-    //     await RefreshNodeChildrenAsync(node);
-    //
-    //     BlazorService.ShowSuccess($"排序成功");
-    // }
+    private async Task HandleSortAsync(ITreeItemData<TItem> node)
+    {
+        var sortResult = await NodeDialogSvc.ShowSortDialogAsync(node);
+    
+        if (sortResult == null) return;
+    
+        var nodeDto = new TreeNodeDto<TItem>
+        {
+            Id = node.Value!.Id,
+            Text = node.Value.Text(),
+            Icon = BlazorHelper.TreeItemIcons,
+            ParentId = node.Value.ParentId!,
+            Value = node.Value,
+            Children = sortResult.Select(i => new TreeNodeDto<TItem>
+            {
+                Id = i.Id,
+                Text = i.Text(),
+                Icon = BlazorHelper.TreeItemIcons,
+                ParentId = node.Value.Id,
+                Value = i,
+                SortOrder = i.SortOrder,
+            }).ToList()
+        };
+    
+        await ApiClient.UpdateChildrenAsync(nodeDto);
+    
+        await RefreshNodeChildrenAsync(node);
+    
+        Message.Success($"排序成功");
+    }
 
     #endregion
 

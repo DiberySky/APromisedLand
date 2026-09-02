@@ -5,6 +5,7 @@
 @inject MessageService Message
 
 <DialogSky Title="@TableName"
+           CancelButtonText="关闭"
            CancelButtonVisible="true"
            SubmitButtonVisible="false"
            OnCanceledClick="@(() => MudDialog?.Close(DialogResult.Cancel()))">
@@ -28,14 +29,19 @@
                     {
                         <MudTh>行号</MudTh>
                     }
-                    @if (TableDefinitionDto.HasDate)
-                    {
-                        <MudTh>日期</MudTh>
-                    }
+                    
                     @if (TableDefinitionDto.HasTime)
                     {
                         <MudTh>时间</MudTh>
                     }
+                    else
+                    {
+                        @if (TableDefinitionDto.HasDate)
+                        {
+                            <MudTh>日期</MudTh>
+                        }
+                    }
+
                     @foreach (var col in Columns)
                     {
                         <MudTh>@col.Name</MudTh>
@@ -55,16 +61,19 @@
                         <MudTd DataLabel="行号" Class="text-info">@context.RowNo</MudTd>
                     }
 
-                    @if (TableDefinitionDto.HasDate)
-                    {
-                        <MudTd DataLabel="日期" Class="text-info">@context.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</MudTd>
-                    }
-
                     @if (TableDefinitionDto.HasTime)
                     {
-                        <MudTd DataLabel="时间" Class="text-info">@context.CreatedAt.ToLocalTime().ToString("HH:mm")</MudTd>
+                        <MudTd DataLabel="时间" Class="text-info">@context.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
                     }
-
+                    else
+                    {
+                        @if (TableDefinitionDto.HasDate)
+                        {
+                            <MudTd DataLabel="日期" Class="text-info">@context.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</MudTd>
+                        }
+    
+                    }
+                    
                     @foreach (var col in Columns)
                     {
                         <MudTd DataLabel="@col.Name" Class="text-info">
@@ -181,7 +190,7 @@
 
     private static string FormatCell(TableRowDto row, string columnId)
     {
-        var cell = row.Values.FirstOrDefault(c => c.ColumnId == columnId);
+        var cell = row.CellValues.FirstOrDefault(c => c.ColumnId == columnId);
         return cell?.Value switch
         {
             null => "-",
@@ -205,7 +214,7 @@
             { x => x.NodeId, nodeId },
             { x => x.TableId, tableId },
             { x => x.TableName, tableName },
-            { x => x.TableDefDto, definitionDto },
+            { x => x.TableDef, definitionDto },
             { x => x.ColumnDefs, columns },
             { x => x.EditRow, editRow },
             { x => x.ReadOnly, readOnly },

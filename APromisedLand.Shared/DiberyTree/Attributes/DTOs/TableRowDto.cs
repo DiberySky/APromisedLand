@@ -5,9 +5,9 @@ namespace APromisedLand.Shared.DiberyTree.Attributes.DTOs;
 /// <summary>动态表行实例返回 DTO（含各列值）。</summary>
 public class TableRowDto
 {
-    public string RowId { get; set; } = null!;
+    public string RowId { get; set; } = Guid.NewGuid().ToString();
     public int RowNo { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
-    public List<TableCellDto> Values { get; set; } = new();
+    public List<TableCellDto> CellValues { get; set; } = new();
 }
 

@@ -13,12 +13,13 @@ public class AttributeDefinition
     {
         AttributeTypeId = AttributeTypeEnum.文本.ToAttributeTypeId();
     }
-    
+
     public AttributeDefinition(AttributeTypeEnum typeEnum)
     {
         AttributeTypeId = typeEnum.ToAttributeTypeId();
+        Name = typeEnum.ToString();
     }
-    
+
     public string Id { get; set; } = Guid.NewGuid().ToString(); // 由种子数据提供固定 GUID
     public string Name { get; set; } = "名称";
 
@@ -49,7 +50,7 @@ public class AttributeDefinition
     public bool HasDate { get; set; }
     public bool HasTime { get; set; }
     public bool HasRowNo { get; set; }
-    
+
     // 列在表内的显示顺序
     public int Order { get; set; }
 
@@ -61,10 +62,41 @@ public class AttributeDefinition
     public JsonElement? JsonValue { get; set; }
 
     public string TypeName
-        => AttributeTypeId.ToAttributeTypeEnum().ToString(); 
+        => AttributeTypeId.ToAttributeTypeEnum().ToString();
+
     public AttributeTypeEnum TypeEnum
-        => AttributeTypeId.ToAttributeTypeEnum(); 
+        => AttributeTypeId.ToAttributeTypeEnum();
+
+    public AttributeItemDto DefDateItemDto(DateTimeOffset date)
+    {
+        return new AttributeItemDto
+        {
+            ParentId = Id,
+            Def = new AttributeDefinition(AttributeTypeEnum.日期),
+            DateValue = date
+        };
+    }
+
+    public AttributeItemDto DefTimeItemDto(TimeSpan time)
+    {
+        return new AttributeItemDto
+        {
+            ParentId = Id,
+            Def = new AttributeDefinition(AttributeTypeEnum.时间),
+            TimeValue = time
+        };
+    }
     
+    public AttributeItemDto DefDateTimeItemDto(DateTimeOffset dateTime)
+    {
+        return new AttributeItemDto
+        {
+            ParentId = Id,
+            Def = new AttributeDefinition(AttributeTypeEnum.日期时间),
+            DateTimeValue = dateTime
+        };
+    }
+
 
     // ---------- 种子数据 ----------
     public static List<AttributeDefinition> SeedData()
@@ -124,7 +156,8 @@ public class AttributeDefinition
                 Id = "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b", Name = "数量", AttributeTypeId = intTypeId,
                 UnitId = UNIT_METER
             }, // 单位：米
-            new(AttributeTypeEnum.整数) { Id = "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c", Name = "等级", AttributeTypeId = intTypeId },
+            new(AttributeTypeEnum.整数)
+                { Id = "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c", Name = "等级", AttributeTypeId = intTypeId },
 
             // ---------- 小数类型 ----------
             new(AttributeTypeEnum.小数)
@@ -144,25 +177,37 @@ public class AttributeDefinition
             },
 
             // ---------- 日期类型（多个种子，满足你的需求） ----------
-            new(AttributeTypeEnum.日期) { Id = "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a", Name = "生产日期", AttributeTypeId = dateTypeId },
-            new(AttributeTypeEnum.日期) { Id = "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b", Name = "试验日期", AttributeTypeId = dateTypeId },
-            new(AttributeTypeEnum.日期) { Id = "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", Name = "出厂日期", AttributeTypeId = dateTypeId },
+            new(AttributeTypeEnum.日期)
+                { Id = "d9e0f1a2-b3c4-4d5e-6f7a-8b9c0d1e2f3a", Name = "生产日期", AttributeTypeId = dateTypeId },
+            new(AttributeTypeEnum.日期)
+                { Id = "e0f1a2b3-c4d5-4e6f-7a8b-9c0d1e2f3a4b", Name = "试验日期", AttributeTypeId = dateTypeId },
+            new(AttributeTypeEnum.日期)
+                { Id = "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", Name = "出厂日期", AttributeTypeId = dateTypeId },
 
             // ---------- 时间类型 ----------
-            new(AttributeTypeEnum.时间) { Id = "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", Name = "开始时间", AttributeTypeId = timeTypeId },
-            new(AttributeTypeEnum.时间) { Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", Name = "结束时间", AttributeTypeId = timeTypeId },
+            new(AttributeTypeEnum.时间)
+                { Id = "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", Name = "开始时间", AttributeTypeId = timeTypeId },
+            new(AttributeTypeEnum.时间)
+                { Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", Name = "结束时间", AttributeTypeId = timeTypeId },
 
             // ---------- 日期时间类型 ----------
-            new(AttributeTypeEnum.日期时间) { Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", Name = "创建时间", AttributeTypeId = dateTimeTypeId },
-            new(AttributeTypeEnum.日期时间) { Id = "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a", Name = "更新时间", AttributeTypeId = dateTimeTypeId },
+            new(AttributeTypeEnum.日期时间)
+                { Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", Name = "创建时间", AttributeTypeId = dateTimeTypeId },
+            new(AttributeTypeEnum.日期时间)
+                { Id = "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a", Name = "更新时间", AttributeTypeId = dateTimeTypeId },
 
             // ---------- 文件类型 ----------
-            new(AttributeTypeEnum.文件) { Id = "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b", Name = "附件", AttributeTypeId = fileTypeId },
-            new(AttributeTypeEnum.文件) { Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", Name = "图片", AttributeTypeId = fileTypeId },
+            new(AttributeTypeEnum.文件)
+                { Id = "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b", Name = "附件", AttributeTypeId = fileTypeId },
+            new(AttributeTypeEnum.文件)
+                { Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", Name = "图片", AttributeTypeId = fileTypeId },
 
             // ---------- 定位类型 ----------
-            new(AttributeTypeEnum.定位) { Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", Name = "位置坐标", 
-                AttributeTypeId = locationTypeId },
+            new(AttributeTypeEnum.定位)
+            {
+                Id = "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d", Name = "位置坐标",
+                AttributeTypeId = locationTypeId
+            },
 
             // ---------- 动态表类型 ----------
             // 表定义：规格表（ParentId = null，自身不存单值，仅作为"虚拟表"容器）
@@ -175,7 +220,7 @@ public class AttributeDefinition
             new(AttributeTypeEnum.文本)
             {
                 Id = "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6f", Name = "规格-材质",
-                AttributeTypeId = textTypeId, 
+                AttributeTypeId = textTypeId,
                 ParentId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
                 Lines = 1,
                 Order = 1, IsRequired = true, MaxLength = 50
@@ -186,7 +231,7 @@ public class AttributeDefinition
                 AttributeTypeId = decimalTypeId, ParentId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5e",
                 Order = 2, IsRequired = false, Precision = 8, Scale = 2, UnitId = UNIT_CENTIMETER
             },
-            
+
             // ---------- 动态记录类型 ----------
             // 表定义：规格表（ParentId = null，自身不存单值，仅作为"虚拟表"容器）
             new(AttributeTypeEnum.表格)

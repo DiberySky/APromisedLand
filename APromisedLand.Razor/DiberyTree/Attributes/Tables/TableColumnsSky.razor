@@ -157,7 +157,7 @@
             Def = x,
         }).ToList();
 
-        foreach (var cell in EditRow?.Values ?? [])
+        foreach (var cell in EditRow?.CellValues ?? [])
         {
             // if (!_values.TryGetValue(cell.ColumnId, out var v)) continue;
             
@@ -168,7 +168,7 @@
             // v.SetFrom(cell.Value, typeEnum);
         }
         
-        foreach (var cell in EditRow?.Values ?? [])
+        foreach (var cell in EditRow?.CellValues ?? [])
         {
             if (!_values.TryGetValue(cell.ColumnId, out var v)) continue;
             

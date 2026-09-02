@@ -1,14 +1,15 @@
 
-<MudTimePicker @Time="@DefItemDto?.TimeValue"
+<MudTimePicker @bind-Time="@DefItemDto?.TimeValue"
                Label="@DefItemDto?.Def?.Name"
                PickerVariant="PickerVariant.Inline"
                AmPm="false"
                Variant="Variant.Outlined"
                TimeFormat="HH:mm"
-               ReadOnly="@ReadOnly"
-               TimeChanged="@(OnTimeChanged)"/>
+               ReadOnly="@ReadOnly"/>
 
 @code {
+    [Parameter] public required string? NodeId { get; set; }
+    
     [Parameter] public AttributeItemDto? DefItemDto { get; set; }
     [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
 

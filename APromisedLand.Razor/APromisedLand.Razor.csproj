@@ -44,6 +44,33 @@
     <Compile Update="DiberyTree\Base\TreeSky.razor.Node.cs">
       <DependentUpon>TreeSky.razor</DependentUpon>
     </Compile>
+    <Compile Update="DiberyTree\Attributes\NodeAttributeItemsSky.razor.Table.cs">
+      <DependentUpon>NodeAttributeItemsSky.razor</DependentUpon>
+    </Compile>
+    <Compile Update="Services\BlazorService.About.cs">
+      <DependentUpon>BlazorService.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Services\BlazorService.CategoryTree.cs">
+      <DependentUpon>BlazorService.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Services\BlazorService.MessageBox.cs">
+      <DependentUpon>BlazorService.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Services\BlazorService.Snackbar.cs">
+      <DependentUpon>BlazorService.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Services\BlazorService.StartPage.cs">
+      <DependentUpon>BlazorService.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Services\BlazorService.UnitOfMeasure.cs">
+      <DependentUpon>BlazorService.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Services\BlazorService.UnitTree.cs">
+      <DependentUpon>BlazorService.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Services\BlazorService.Validation.cs">
+      <DependentUpon>BlazorService.cs</DependentUpon>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup>

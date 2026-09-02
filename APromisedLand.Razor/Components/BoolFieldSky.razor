@@ -25,7 +25,7 @@
     protected override void OnInitialized()
     {
         _trueColor = Value ? Color.Success : Color.Default;
-        _falseColor = Value ? Color.Default : Color.Error;
+        _falseColor = Value ? Color.Default : Color.Warning;
     }
 
     private void OnValueChanged(bool value)

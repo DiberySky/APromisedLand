@@ -7,6 +7,8 @@
                ReadOnly="@ReadOnly"/>
 
 @code {
+    [Parameter] public required string? NodeId { get; set; }
+
     [Parameter] public AttributeItemDto? DefItemDto { get; set; }
     [Parameter] public EventCallback<AttributeItemDto?> DefItemDtoChanged { get; set; }
 
@@ -16,7 +18,7 @@
 
     protected override void OnInitialized()
     {
-        _date = DefItemDto?.DateTimeValue?.ToLocalTime().DateTime;
+        _date = DefItemDto?.DateValue?.ToLocalTime().DateTime;
         
         StateHasChanged();
     }

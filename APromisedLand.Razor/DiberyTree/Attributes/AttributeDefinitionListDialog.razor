@@ -14,9 +14,10 @@
     <ToolBarContent>
         <MudText Color="Color.Inherit">附加属性</MudText>
         <MudSpacer/>
-        <MudSwitch T="bool"
-                   @bind-Value="@ReadOnly"
-                   Label="仅查看" Color="Color.Info"/>
+        <ReadOnlySky @bind-ReadOnly="@ReadOnly" />
+        @* <MudSwitch T="bool" *@
+        @*            @bind-Value="@ReadOnly" *@
+        @*            Label="仅查看" Color="Color.Info"/> *@
     </ToolBarContent>
     <DialogContent>
         <MudContainer>

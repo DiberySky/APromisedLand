@@ -42,7 +42,7 @@ else
 
     private async Task HandleAdornmentClick()
     {
-        var list = await AttributeApiClient.ListTableColumnsAsync(DefItemDto!.Id);
+        var list = await AttributeApiClient.ListTableColumnsAsync(DefItemDto!.Def!.Id!);
         List<AttributeDefinition> columns = [.. list];
 
         // await TreeNodeDialogService.

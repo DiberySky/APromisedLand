@@ -14,4 +14,19 @@
       <PackageReference Include="MudBlazor" Version="9.8.0" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Update="DiberyTree\Services\AttributeApiClient.Definition.cs">
+        <DependentUpon>AttributeApiClient.cs</DependentUpon>
+      </Compile>
+      <Compile Update="DiberyTree\Services\AttributeApiClient.Location.cs">
+        <DependentUpon>AttributeApiClient.cs</DependentUpon>
+      </Compile>
+      <Compile Update="DiberyTree\Services\AttributeApiClient.Table.cs">
+        <DependentUpon>AttributeApiClient.cs</DependentUpon>
+      </Compile>
+      <Compile Update="DiberyTree\Services\AttributeApiClient.Value.cs">
+        <DependentUpon>AttributeApiClient.cs</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
 </Project>

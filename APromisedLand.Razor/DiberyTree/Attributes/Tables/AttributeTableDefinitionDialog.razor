@@ -23,18 +23,28 @@
                                   MaxLength="50"
                                   Counter="50"/>
 
-                    <BoolFieldSky @bind-Value="_model.HasDate"
-                                  Label="包涵日期列"
-                                  TrueLabel="是"
-                                  FalseLabel="否"/>
-                    <BoolFieldSky @bind-Value="_model.HasTime"
-                                  Label="包涵时间列"
-                                  TrueLabel="是"
-                                  FalseLabel="否"/>
+                    <MudSelect T="string"
+                               @bind-Value="stringValue" Label="日期时间列" Dense
+                               Variant="Variant.Outlined"
+                               Placeholder="请选择日期时间列"
+                               SelectedValuesChanged="HandleSelectedValuesChanged">
+                        <MudSelectItem Value="@("无")">无</MudSelectItem>
+                        <MudSelectItem Value="@("日期")">日期</MudSelectItem>
+                        <MudSelectItem Value="@("日期时间")">日期时间</MudSelectItem>
+                    </MudSelect>
+
+                    @* <BoolFieldSky @bind-Value="_model.HasDate" *@
+                    @*               Label="包涵日期列" *@
+                    @*               TrueLabel="是" *@
+                    @*               FalseLabel="否"/> *@
+                    @* <BoolFieldSky @bind-Value="_model.HasTime" *@
+                    @*               Label="包涵时间列" *@
+                    @*               TrueLabel="是" *@
+                    @*               FalseLabel="否"/> *@
                     <BoolFieldSky @bind-Value="_model.HasRowNo"
-                                  Label="包涵行号列"
-                                  TrueLabel="是"
-                                  FalseLabel="否"/>
+                                  Label="行号列"
+                                  TrueLabel="有"
+                                  FalseLabel="没有"/>
 
                     <AttributeTableColumnsSky TableId="@TableDefinitionDto!.Id"
                                               @bind-Deletable="@_deletable"/>
@@ -62,6 +72,8 @@
     private AttributeTypeEnum _tableType;
     private bool _deletable;
 
+    private string stringValue { get; set; }
+
     private bool IsEdit => TableDefinitionDto != null;
 
     protected override void OnInitialized()
@@ -75,6 +87,8 @@
         _model.HasDate = TableDefinitionDto?.HasDate ?? false;
         _model.HasTime = TableDefinitionDto?.HasTime ?? false;
         _model.HasRowNo = TableDefinitionDto?.HasRowNo ?? false;
+        
+        stringValue = _model.HasTime ? "日期时间" : _model.HasDate ? "日期" : "无";
     }
 
     private async Task HandleSubmitAsync()
@@ -96,8 +110,8 @@
                 await AttributeApiClient.UpdateDefinitionAsync(TableDefinitionDto!.Id,
                     new AttributeDefinitionUpdateDto
                     {
-                        Name = _model.Name, 
-                        HasDate = _model.HasDate, 
+                        Name = _model.Name,
+                        HasDate = _model.HasDate,
                         HasTime = _model.HasTime,
                         HasRowNo = _model.HasRowNo
                     });
@@ -132,6 +146,32 @@
         public bool HasDate { get; set; } = false;
         public bool HasTime { get; set; } = false;
         public bool HasRowNo { get; set; } = false;
+    }
+
+    private void HandleSelectedValuesChanged(IReadOnlyCollection<string?>? values)
+    {
+        var value = values?.FirstOrDefault();
+        
+        if (value == "日期时间")
+        {
+            _model.HasDate = false;
+            _model.HasTime = true;
+            stringValue = "日期时间";
+        }
+        else if (value == "日期")
+        {
+            _model.HasDate = true;
+            _model.HasTime = false;
+            stringValue = "日期";
+        }
+        else
+        {
+            _model.HasDate = false;
+            _model.HasTime = false;
+            stringValue = "无";
+        }
+        
+        StateHasChanged();
     }
 
 }
