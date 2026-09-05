@@ -10,5 +10,11 @@ public enum AttributeTypeEnum
     日期时间,
     文件,
     定位,
-    表格
+    表格,
+    复合,
+    点,
+    标签,
+    边,
+    边类型,
+    属性
 }

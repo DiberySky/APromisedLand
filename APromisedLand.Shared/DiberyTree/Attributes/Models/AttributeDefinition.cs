@@ -111,6 +111,8 @@ public class AttributeDefinition
         var fileTypeId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c";
         var locationTypeId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d";
         var tableTypeId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e";
+        var compositeTypeId = "AFB7BC0B-9C8B-4CAE-AA11-79523DFB9EBF";
+        var edgeTypeId = "F1503044-E4E6-4780-B5DE-2050A9DFE1EE";
 
         // ===== 引用 UnitTree 中常用单位的固定 GUID（从 UnitTree.SeedData() 中提取） =====
         // 长度单位
@@ -253,6 +255,42 @@ public class AttributeDefinition
                 Id = "97868637-556F-433F-BD31-E9DED37A5FE8", Name = "高度",
                 AttributeTypeId = decimalTypeId, ParentId = "0C1E0FB8-B731-4F38-9379-A96B9F13FC1F",
                 Order = 2, IsRequired = false, Precision = 8, Scale = 2, UnitId = UNIT_CENTIMETER
+            },
+            
+            // ---------- 图类型 ----------
+            // 表定义：规格表（ParentId = null，自身不存单值，仅作为"虚拟表"容器）
+            new(AttributeTypeEnum.复合)
+            {
+                Id = "BE8AF270-7C95-4413-B550-552FBC92233C", Name = "电杆类型",
+                AttributeTypeId = compositeTypeId
+            },
+            new(AttributeTypeEnum.文本)
+            {
+                Id = "58713990-17B2-432C-8FD6-851CE3EC8E06", Name = "编号",
+                AttributeTypeId = textTypeId,
+                ParentId = "BE8AF270-7C95-4413-B550-552FBC92233C",
+                Lines = 1,
+                Order = 1, IsRequired = true, MaxLength = 50
+            },
+            new(AttributeTypeEnum.小数)
+            {
+                Id = "7BE3B850-3DEC-4139-8A4B-0ACDC3632BF2", Name = "高度",
+                AttributeTypeId = decimalTypeId, ParentId = "BE8AF270-7C95-4413-B550-552FBC92233C",
+                Order = 2, IsRequired = false, Precision = 8, Scale = 2, UnitId = UNIT_CENTIMETER
+            },
+            
+            new(AttributeTypeEnum.复合)
+            {
+                Id = "159C755F-E897-4DAC-BC0F-AD2A70A7EDE0", Name = "线路类型",
+                AttributeTypeId = compositeTypeId
+            },
+            
+            // ---------- 动态表类型 ----------
+            // 表定义：规格表（ParentId = null，自身不存单值，仅作为"虚拟表"容器）
+            new(AttributeTypeEnum.边)
+            {
+                Id = "D13531B3-4CF4-4F2F-9558-462634E0161D", Name = "线路",
+                AttributeTypeId = edgeTypeId
             },
         };
     }

@@ -161,15 +161,5 @@
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="Redis" uuid="abe92a20-2316-4f8c-be81-6e9dbd48b9d3">
-      <driver-ref>redis</driver-ref>
-      <synchronize>true</synchronize>
-      <jdbc-driver>jdbc.RedisDriver</jdbc-driver>
-      <jdbc-url>jdbc:redis://afZGb0DhJpbn1AEy9FH3yF@localhost:58533?ssl=true&amp;verifyServerCertificate=false</jdbc-url>
-      <jdbc-additional-properties>
-        <property name="aspireResourceId" value="Redis-ahudtuwg" />
-      </jdbc-additional-properties>
-      <working-dir>$ProjectFileDir$</working-dir>
-    </data-source>
   </component>
 </project>

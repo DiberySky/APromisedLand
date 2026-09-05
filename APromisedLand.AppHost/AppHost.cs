@@ -19,6 +19,7 @@ var context = new AppHostContext();
 // builder.AddKeycloak(context); // Keycloak
 builder.AddPostgres(context); // Postgres
 builder.AddRedis(context); // Redis
+builder.AddFoundry(context); // Foundry Local
 
 // builder.AddNebulaGraph(context); // NebulaGraph
 // builder.AddNebulaGraphApiService(context); // NebulaGraphApiService

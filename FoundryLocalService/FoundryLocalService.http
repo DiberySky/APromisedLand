@@ -1,0 +1,42 @@
+@FoundryLocalService_HostAddress = http://localhost:5183
+
+GET {{FoundryLocalService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+
+# curl http://localhost:5183/api/foundry/list
+GET http://localhost:5293/api/foundry/list
+
+###
+
+GET http://localhost:5183/FoundryLocal/list
+
+###
+
+# curl -X POST http://localhost:5183/api/foundry/chat 
+#  -H "Content-Type: application/json" 
+#  -d '{
+#    "ModelAlias": "qwen2.5-7b",
+#    "Messages": [
+#      { "Role": "user", "Content": "天空为什么是蓝色的？" }
+#    ]
+#  }'
+
+POST http://localhost:5183/FoundryLocal/chat
+Content-Type: application/json
+
+{
+  "ModelAlias": "qwen2.5-7b",
+  "Messages": [
+    {
+      "Role": "user",
+      "Content": "天空为什么是蓝色的？"
+    }
+  ]
+}
+
+###
+
+GET http://localhost:5183/FoundryLocal/health
