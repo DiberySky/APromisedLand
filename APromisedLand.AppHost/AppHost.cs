@@ -19,28 +19,31 @@ var context = new AppHostContext();
 // builder.AddKeycloak(context); // Keycloak
 builder.AddPostgres(context); // Postgres
 builder.AddRedis(context); // Redis
-builder.AddFoundry(context); // Foundry Local
+builder.AddOllama(context); // Ollama + embedding 
+builder.AddNebulaStudio(context); // NebulaStudio
+
+builder.AddMafAi(context); // MafAi
+builder.AddDiberyTreeService(context);
+builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
+
+// builder.AddFoundry(context); // Foundry Local
 
 // builder.AddNebulaGraph(context); // NebulaGraph
 // builder.AddNebulaGraphApiService(context); // NebulaGraphApiService
 // builder.AddNebulaGraphFastApiService(context); // AddNebulaGraphFastApiService
-builder.AddNebulaStudio(context); // NebulaStudio
 // builder.AddNebulaApiProxyService(context); // NebulaApiProxyService
 
 // builder.AddWeatherService(context); // WeatherApi
 
-builder.AddDiberyTreeService(context);
 
 // builder.AddYarp(context); // Yarp
 // builder.AddDevTunnel(context); // DevTunnel
 
 // builder.AddMauiApp(context); // Maui Blazor
-builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
 
 // builder.AddSemanticSearch(context);
 // builder.AddNats(context); // Nats
 // builder.AddTypesense(context); // Typesense
-// builder.AddOllama(context); // Ollama + embedding 
 // builder.AddElasticsearch(context); // Elasticsearch
 // builder.AddSeaweedFs(context); // SeaweedFS Service
 // builder.AddQuestionService(context); // QuestionService, WeatherApi

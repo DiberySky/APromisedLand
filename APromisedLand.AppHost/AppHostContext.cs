@@ -45,6 +45,7 @@ public class AppHostContext
     // AI (Ollama)
     public IResourceBuilder<OllamaResource>? Ollama { get; set; }
     public IResourceBuilder<OllamaModelResource>? Embedding { get; set; }
+    public IResourceBuilder<OllamaModelResource>? AIModel { get; set; }
 
     // Elasticsearch
     public IResourceBuilder<ElasticsearchResource>? Elasticsearch { get; set; }

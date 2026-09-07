@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations
 {
     [DbContext(typeof(DiberyDbContext))]
-    [Migration("20260830215448_Initial")]
+    [Migration("20260906120800_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -33,9 +33,6 @@ namespace APromisedLand.Api.Data.Migrations
 
                     b.Property<string>("AttributeTypeId")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DefaultValue")
                         .HasColumnType("text");
 
                     b.Property<bool>("HasDate")
@@ -382,6 +379,72 @@ namespace APromisedLand.Api.Data.Migrations
                             Precision = 8,
                             Scale = 2,
                             UnitId = "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
+                        },
+                        new
+                        {
+                            Id = "BE8AF270-7C95-4413-B550-552FBC92233C",
+                            AttributeTypeId = "AFB7BC0B-9C8B-4CAE-AA11-79523DFB9EBF",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
+                            IsRequired = false,
+                            MaxLength = 30,
+                            Name = "电杆类型",
+                            Order = 0
+                        },
+                        new
+                        {
+                            Id = "58713990-17B2-432C-8FD6-851CE3EC8E06",
+                            AttributeTypeId = "3f8f6d3a-9c2b-4d8f-9a6e-5b7c8d9e0f1a",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
+                            IsRequired = true,
+                            Lines = 1,
+                            MaxLength = 50,
+                            Name = "编号",
+                            Order = 1,
+                            ParentId = "BE8AF270-7C95-4413-B550-552FBC92233C"
+                        },
+                        new
+                        {
+                            Id = "7BE3B850-3DEC-4139-8A4B-0ACDC3632BF2",
+                            AttributeTypeId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
+                            IsRequired = false,
+                            MaxLength = 30,
+                            Name = "高度",
+                            Order = 2,
+                            ParentId = "BE8AF270-7C95-4413-B550-552FBC92233C",
+                            Precision = 8,
+                            Scale = 2,
+                            UnitId = "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
+                        },
+                        new
+                        {
+                            Id = "159C755F-E897-4DAC-BC0F-AD2A70A7EDE0",
+                            AttributeTypeId = "AFB7BC0B-9C8B-4CAE-AA11-79523DFB9EBF",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
+                            IsRequired = false,
+                            MaxLength = 30,
+                            Name = "线路类型",
+                            Order = 0
+                        },
+                        new
+                        {
+                            Id = "D13531B3-4CF4-4F2F-9558-462634E0161D",
+                            AttributeTypeId = "F1503044-E4E6-4780-B5DE-2050A9DFE1EE",
+                            HasDate = false,
+                            HasRowNo = false,
+                            HasTime = false,
+                            IsRequired = false,
+                            MaxLength = 30,
+                            Name = "线路",
+                            Order = 0
                         });
                 });
 

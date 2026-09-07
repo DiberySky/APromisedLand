@@ -1,10 +1,9 @@
-using APromisedLand.Api.Foundries.Models;
+using Betalgo.Ranul.OpenAI.ObjectModels.RequestModels;
+using FoundryLocalService.Models;
 using Microsoft.AI.Foundry.Local;
 using Microsoft.AspNetCore.Mvc;
-using Betalgo.Ranul.OpenAI.ObjectModels.RequestModels;
-using Microsoft.AspNetCore.Http;
 
-namespace APromisedLand.Api.Foundries;
+namespace FoundryLocalService.Controllers;
 
 public class FoundryLocalControllerBase : ControllerBase
 {

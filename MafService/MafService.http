@@ -1,0 +1,6 @@
+@MafService_HostAddress = http://localhost:5155
+
+GET {{MafService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

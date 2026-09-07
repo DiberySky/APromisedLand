@@ -8,7 +8,9 @@ public static class RedisExtension
     {
         // Redis
         context.Redis = builder.AddRedis("Redis")
-            .WithDataVolume("redis-data", isReadOnly: false);
+            .WithPersistence()
+            .WithDataVolume("redis-data", isReadOnly: false)
+            .WithOtlpExporter();
 
         return builder;
     }

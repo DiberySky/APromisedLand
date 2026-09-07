@@ -16,7 +16,9 @@ namespace APromisedLand.Shared.DiberyTree.Attributes.Models
                 { AttributeTypeEnum.日期时间, "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b" },
                 { AttributeTypeEnum.文件, "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c" },
                 { AttributeTypeEnum.定位, "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d" },
-                { AttributeTypeEnum.表格, "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e" }
+                { AttributeTypeEnum.表格, "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e" },
+                { AttributeTypeEnum.复合, "AFB7BC0B-9C8B-4CAE-AA11-79523DFB9EBF" },
+                { AttributeTypeEnum.边, "F1503044-E4E6-4780-B5DE-2050A9DFE1EE" },
             };
 
         // 反向映射（如果需要），可以直接基于上述字典反转

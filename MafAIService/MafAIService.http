@@ -1,0 +1,6 @@
+@MafAIService_HostAddress = http://localhost:5002
+
+GET {{MafAIService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

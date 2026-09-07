@@ -1,4 +1,4 @@
-namespace APromisedLand.Api.Foundries.Models;
+namespace FoundryLocalService.Models;
 public class ChatRequest
 {
     public string ModelAlias { get; set; } = string.Empty;

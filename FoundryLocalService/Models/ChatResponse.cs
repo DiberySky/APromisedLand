@@ -1,4 +1,4 @@
-namespace APromisedLand.Api.Foundries.Models;
+namespace FoundryLocalService.Models;
 public class ChatResponse
 {
     public string Content { get; }

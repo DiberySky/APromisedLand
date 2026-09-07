@@ -6,7 +6,7 @@ public static class OllamaExtension
         this IDistributedApplicationBuilder builder,
         AppHostContext context)
     {
-        context.Ollama = builder.AddOllama("Ollama", port: 11434)
+        context.Ollama = builder.AddOllama("Ollama")
             .WithDataVolume("ollama-data")
             .WithGPUSupport()
             .WithContainerRuntimeArgs("--gpus=all")
@@ -15,6 +15,9 @@ public static class OllamaExtension
 
         context.Embedding = context.Ollama.AddModel("bge-large");
         
+        // Add a model to Ollama (default: llama3.2:1b)
+        context.AIModel = context.Ollama.AddModel("chat-model", "qwen2.5:7b"); //llama3.2:1b
+
         // context.OllamaService = builder.AddProject<Projects.OllamaService>("Ollama-Service")
         //     .WithReference(context.Embedding)
         //     .WaitFor(context.Embedding)
