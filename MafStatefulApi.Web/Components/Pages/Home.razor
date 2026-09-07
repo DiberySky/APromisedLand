@@ -1,0 +1,142 @@
+﻿@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<div class="hero-section">
+    <div class="hero-content">
+        <h1>🤖 MAF Stateful Chat</h1>
+        <p class="lead">Experience intelligent conversations with persistent memory</p>
+        <p class="description">
+            This demo showcases the Microsoft Agent Framework (MAF) with session persistence,
+            allowing the AI assistant to remember your conversations across multiple interactions.
+        </p>
+        <a href="/chat" class="btn-hero">Start Chatting 💬</a>
+    </div>
+    
+    <div class="features">
+        <div class="feature-card">
+            <div class="feature-icon">💾</div>
+            <h3>Session Persistence</h3>
+            <p>Your conversations are saved and can be resumed at any time</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🔄</div>
+            <h3>Multiple Sessions</h3>
+            <p>Manage multiple conversation threads simultaneously</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🚀</div>
+            <h3>Powered by .NET Aspire</h3>
+            <p>Built with modern cloud-native architecture</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hero-section {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    .hero-content {
+        text-align: center;
+        padding: 60px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 20px;
+        color: white;
+        margin-bottom: 40px;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    }
+
+    .hero-content h1 {
+        font-size: 3rem;
+        margin: 0 0 20px 0;
+        font-weight: 700;
+    }
+
+    .lead {
+        font-size: 1.5rem;
+        margin: 0 0 20px 0;
+        font-weight: 300;
+    }
+
+    .description {
+        font-size: 1.1rem;
+        max-width: 700px;
+        margin: 0 auto 30px;
+        opacity: 0.9;
+        line-height: 1.6;
+    }
+
+    .btn-hero {
+        display: inline-block;
+        padding: 15px 40px;
+        background: white;
+        color: #667eea;
+        border-radius: 50px;
+        text-decoration: none;
+        font-size: 1.2rem;
+        font-weight: 600;
+        transition: all 0.3s;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-hero:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        color: #764ba2;
+    }
+
+    .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 30px;
+        margin-top: 40px;
+    }
+
+    .feature-card {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+    }
+
+    .feature-icon {
+        font-size: 3rem;
+        margin-bottom: 15px;
+    }
+
+    .feature-card h3 {
+        color: #667eea;
+        margin: 0 0 10px 0;
+        font-size: 1.3rem;
+    }
+
+    .feature-card p {
+        color: #666;
+        margin: 0;
+        line-height: 1.6;
+    }
+
+    @@media (max-width: 768px) {
+        .hero-content h1 {
+            font-size: 2rem;
+        }
+
+        .lead {
+            font-size: 1.2rem;
+        }
+
+        .description {
+            font-size: 1rem;
+        }
+    }
+</style>

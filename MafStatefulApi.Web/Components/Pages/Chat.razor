@@ -1,0 +1,494 @@
+@page "/chat"
+@using MafStatefulApi.Web.Services
+@inject ChatApiService ChatApi
+@rendermode InteractiveServer
+
+<PageTitle>AI Chat</PageTitle>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h1>🤖 老陳 AI</h1> @* AI Assistant *@
+        <div class="session-controls">
+            <select class="session-selector" @bind="selectedSessionId" @bind:after="OnSessionChanged">
+                <option value="">New Conversation</option>
+                @foreach (var session in sessions)
+                {
+                    <option value="@session">@session</option>
+                }
+            </select>
+            <button class="btn-refresh" @onclick="LoadSessionsAsync" disabled="@isLoading">
+                🔄 刷新
+            </button>
+            @if (!string.IsNullOrEmpty(selectedSessionId))
+            {
+                <button class="btn-reset" @onclick="ResetSessionAsync" disabled="@isLoading">
+                    🗑️ 重置
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="chat-messages" @ref="messagesContainer">
+        @if (messages.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-icon">💬</div>
+                <h2>Start a conversation</h2>
+                <p>Ask me anything! I'm here to help.</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var msg in messages)
+            {
+                <div class="message @msg.Role">
+                    <div class="message-avatar">
+                        @if (msg.Role == "user")
+                        {
+                            <span>👤</span>
+                        }
+                        else
+                        {
+                            <span>🤖</span>
+                        }
+                    </div>
+                    <div class="message-content">
+                        <div class="message-text">@msg.Text</div>
+                        <div class="message-time">@msg.Timestamp.ToString("HH:mm")</div>
+                    </div>
+                </div>
+            }
+        }
+        @if (isLoading && isSending)
+        {
+            <div class="message assistant">
+                <div class="message-avatar">
+                    <span>🤖</span>
+                </div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input-container">
+        <textarea class="chat-input" 
+                  @bind="userMessage" 
+                  @bind:event="oninput"
+                  @onkeydown="HandleKeyDown"
+                  placeholder="Type your message..." 
+                  rows="3"
+                  disabled="@isLoading"></textarea>
+        <button class="btn-send" @onclick="SendMessageAsync" disabled="@(isLoading || string.IsNullOrWhiteSpace(userMessage))">
+            问老陳 📨
+        </button>
+    </div>
+</div>
+
+@code {
+    private List<ChatMessage> messages = new();
+    private List<string> sessions = new();
+    private string userMessage = "";
+    private string selectedSessionId = "";
+    private bool isLoading = false;
+    private bool isSending = false;
+    private ElementReference messagesContainer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSessionsAsync();
+    }
+
+    private async Task LoadSessionsAsync()
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            sessions = await ChatApi.GetSessionsAsync();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnSessionChanged()
+    {
+        // Clear messages when switching sessions
+        messages.Clear();
+        
+        // Note: Full conversation history loading is not implemented yet.
+        // In a future enhancement, this would load all messages from the session.
+        
+        StateHasChanged();
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(userMessage) || isLoading)
+            return;
+
+        var message = userMessage.Trim();
+        userMessage = "";
+        
+        // Add user message to UI
+        messages.Add(new ChatMessage
+        {
+            Role = "user",
+            Text = message,
+            Timestamp = DateTime.Now
+        });
+
+        isLoading = true;
+        isSending = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await ChatApi.SendMessageAsync(message, 
+                string.IsNullOrEmpty(selectedSessionId) ? null : selectedSessionId);
+
+            if (response != null)
+            {
+                // Update session ID if it's a new conversation
+                if (string.IsNullOrEmpty(selectedSessionId))
+                {
+                    selectedSessionId = response.ConversationId;
+                    await LoadSessionsAsync();
+                }
+
+                // Add assistant response to UI
+                messages.Add(new ChatMessage
+                {
+                    Role = "assistant",
+                    Text = response.Answer,
+                    Timestamp = DateTime.Now
+                });
+            }
+            else
+            {
+                messages.Add(new ChatMessage
+                {
+                    Role = "error",
+                    Text = "Failed to get response from the API. Please try again.",
+                    Timestamp = DateTime.Now
+                });
+            }
+        }
+        finally
+        {
+            isLoading = false;
+            isSending = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ResetSessionAsync()
+    {
+        if (string.IsNullOrEmpty(selectedSessionId) || isLoading)
+            return;
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await ChatApi.ResetSessionAsync(selectedSessionId);
+            if (success)
+            {
+                messages.Clear();
+                selectedSessionId = "";
+                await LoadSessionsAsync();
+            }
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessageAsync();
+        }
+    }
+
+    private class ChatMessage
+    {
+        public required string Role { get; set; }
+        public required string Text { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+}
+
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 120px);
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+
+    .chat-header {
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .chat-header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+    }
+
+    .session-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .session-selector {
+        padding: 8px 12px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        min-width: 200px;
+    }
+
+    .session-selector option {
+        background: #764ba2;
+        color: white;
+    }
+
+    .btn-refresh, .btn-reset {
+        padding: 8px 15px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-refresh:hover, .btn-reset:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-refresh:disabled, .btn-reset:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: #f7f8fa;
+    }
+
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #999;
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+    }
+
+    .empty-state h2 {
+        font-size: 1.5rem;
+        margin: 0 0 10px 0;
+        color: #666;
+    }
+
+    .message {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        animation: fadeIn 0.3s;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .message.user {
+        flex-direction: row-reverse;
+    }
+
+    .message-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+
+    .message.user .message-avatar {
+        background: #667eea;
+    }
+
+    .message.assistant .message-avatar {
+        background: #764ba2;
+    }
+
+    .message-content {
+        max-width: 70%;
+    }
+
+    .message.user .message-content {
+        text-align: right;
+    }
+
+    .message-text {
+        padding: 12px 16px;
+        border-radius: 12px;
+        line-height: 1.5;
+        word-wrap: break-word;
+    }
+
+    .message.user .message-text {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant .message-text {
+        background: white;
+        color: #333;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .message.error .message-text {
+        background: #fee;
+        color: #c33;
+        border: 1px solid #fcc;
+    }
+
+    .message-time {
+        font-size: 0.75rem;
+        color: #999;
+        margin-top: 4px;
+        padding: 0 4px;
+    }
+
+    .typing-indicator {
+        display: flex;
+        gap: 4px;
+        padding: 12px 16px;
+        background: white;
+        border-radius: 12px;
+        border-bottom-left-radius: 4px;
+    }
+
+    .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #999;
+        animation: typing 1.4s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @@keyframes typing {
+        0%, 60%, 100% {
+            transform: translateY(0);
+        }
+        30% {
+            transform: translateY(-10px);
+        }
+    }
+
+    .chat-input-container {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        gap: 10px;
+    }
+
+    .chat-input {
+        flex: 1;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        resize: none;
+        font-family: inherit;
+        transition: border-color 0.3s;
+    }
+
+    .chat-input:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .btn-send {
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .btn-send:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-send:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+</style>

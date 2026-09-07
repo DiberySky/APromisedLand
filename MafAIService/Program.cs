@@ -18,8 +18,8 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi();
 
 // Redis 分布式缓存
-builder.AddRedisDistributedCache("cache");
-builder.AddRedisClient("cache");
+builder.AddRedisDistributedCache("Redis");
+builder.AddRedisClient("Redis");
 builder.Services.AddSingleton<IAgentSessionStore, RedisAgentSessionStore>();
 
 // Ollama 与 AI Agent

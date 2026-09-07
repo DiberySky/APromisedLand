@@ -4,3 +4,17 @@ GET {{MafAIService_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+# curl http://localhost:11618/api/chat -d '{
+#  "model": "你的模型名",
+#  "messages": [{"role": "user", "content": "你好"}]
+#}'
+POST http://localhost:11618/chat
+Content-Type: application/x-www-form-urlencoded
+
+{
+  "model": "chat-model",
+  "messages": [{"role": "user", "content": "你好"}]
+}
+
+###

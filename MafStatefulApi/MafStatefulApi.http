@@ -1,0 +1,6 @@
+@MafStatefulApi_HostAddress = http://localhost:5153
+
+GET {{MafStatefulApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
