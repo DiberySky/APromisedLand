@@ -4,3 +4,5 @@ GET {{MAFRagService_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+curl -s {{MAFRagService_HostAddress}}/v1/schema/Document | jq '{vectorizer, distance: .vectorIndexConfig.distance}'

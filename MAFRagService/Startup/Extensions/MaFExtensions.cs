@@ -1,6 +1,6 @@
 // MAF 服务注册扩展
 
-namespace MAFRagServer.RagService.Extensions;
+namespace MAFRagService.Startup.Extensions;
 
 public static class MaFExtensions
 {
