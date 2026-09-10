@@ -49,6 +49,7 @@ public class AppHostContext
     public IResourceBuilder<ContainerResource>? SeaweedMaster { get; set; }
     public IResourceBuilder<ContainerResource>? SeaweedVolume { get; set; }
     public IResourceBuilder<ContainerResource>? SeaweedFiler { get; set; }
+    public IResourceBuilder<ContainerResource>? SeaweedS3 { get; set; }
 
     // AI (Ollama)
     public IResourceBuilder<OllamaResource>? Ollama { get; set; }
