@@ -1,0 +1,6 @@
+@MAFRagService_HostAddress = http://localhost:5114
+
+GET {{MAFRagService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -14,6 +14,7 @@ public class AppHostContext
     public IResourceBuilder<PostgresDatabaseResource>? QuestionDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? FileTransDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? TreeDb { get; set; }
+    // public IResourceBuilder<PostgresDatabaseResource>? MafRagDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? HangfireDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? MetadataDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? VectorAdminDb { get; set; }
@@ -62,6 +63,7 @@ public class AppHostContext
     // Business Services
     public IResourceBuilder<ProjectResource>? DiberyTreeService { get; set; }
     public IResourceBuilder<ProjectResource>? QuestionService { get; set; }
+    public IResourceBuilder<ProjectResource>? MafRagService { get; set; }
     public IResourceBuilder<ProjectResource>? WeatherApi { get; set; }
     public IResourceBuilder<ProjectResource>? TypesenseService { get; set; }
     public IResourceBuilder<ProjectResource>? FileTransService { get; set; }

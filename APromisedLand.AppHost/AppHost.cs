@@ -17,6 +17,9 @@ void MafRag()
     builder.AddRedis(context);
     builder.AddNebulaGraph(context);
     builder.AddWeaviate(context);
+    builder.AddSeaweedFs(context);
+    
+    builder.AddMafRagService(context); 
 }
 
 void MafChat()

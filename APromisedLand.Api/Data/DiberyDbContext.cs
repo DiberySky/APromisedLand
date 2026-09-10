@@ -195,4 +195,5 @@ public partial class DiberyDbContext(DbContextOptions<DiberyDbContext> options) 
     /// 动态表相关的模型配置挂载点（实现在 partial 文件 DiberyDbContext.DynamicTable.cs）。
     /// </summary>
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+   
 }

@@ -1,4 +1,6 @@
+using System.Net.Sockets;
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;   // 需要 ProtocolType
 
 namespace APromisedLand.AppHost.Extensions;
 
@@ -11,6 +13,7 @@ public static class NebulaGraphExtension
         var tz = builder.Configuration["TZ"] ?? "UTC";
 
         // ========== Meta ==========
+        // 仅容器内端口，宿主机不暴露（仅集群内部通信）
         var nebulaMetad0 = builder.AddContainer("nebula-metad0", "docker.io/vesoft/nebula-metad", "v3.8.0")
             .WithEnvironment("USER", "root")
             .WithEnvironment("TZ", tz)
@@ -24,10 +27,20 @@ public static class NebulaGraphExtension
                 "--log_dir=/logs",
                 "--v=0",
                 "--minloglevel=0",
-                "--redirect_stdout=false", // 新增
-                "--logtostderr=true" // 新增
+                "--redirect_stdout=false",
+                "--logtostderr=true"
             )
-            // ... endpoints, mounts ...
+            .WithEndpoint("meta", e =>
+            {
+                e.TargetPort = 9559;
+                e.UriScheme = "thrift";
+                e.Protocol = ProtocolType.Tcp;
+            })
+            .WithEndpoint("meta-http", e =>
+            {
+                e.TargetPort = 19559;
+                e.UriScheme = "http";
+            })
             .WithContainerRuntimeArgs("--hostname", "nebula-metad0")
             .WithContainerRuntimeArgs("--memory", "1g");
 
@@ -48,13 +61,23 @@ public static class NebulaGraphExtension
                 "--redirect_stdout=false",
                 "--logtostderr=true"
             )
-            // ... endpoints, mounts ...
-            .WithContainerRuntimeArgs("--hostname", "nebula-storaged0") // 新增
-            .WithContainerRuntimeArgs("--memory", "1g") // 可选
-            // 如需健康检查可保留，但建议统一
+            .WithEndpoint("storage", e =>
+            {
+                e.TargetPort = 9779;
+                e.UriScheme = "thrift";
+                e.Protocol = ProtocolType.Tcp;
+            })
+            .WithEndpoint("storage-http", e =>
+            {
+                e.TargetPort = 19779;
+                e.UriScheme = "http";
+            })
+            .WithContainerRuntimeArgs("--hostname", "nebula-storaged0")
+            .WithContainerRuntimeArgs("--memory", "1g")
             .WaitFor(nebulaMetad0);
 
         // ========== Graphd ==========
+        // 业务侧（MafRagService）通过 "graph" 端点连 Thrift 9669
         var nebulaGraphd = builder.AddContainer("nebula-graphd", "docker.io/vesoft/nebula-graphd", "v3.8.0")
             .WithEnvironment("USER", "root")
             .WithEnvironment("TZ", tz)
@@ -70,9 +93,19 @@ public static class NebulaGraphExtension
                 "--redirect_stdout=false",
                 "--logtostderr=true"
             )
-            // ... endpoints, mounts ...
-            .WithContainerRuntimeArgs("--hostname", "nebula-graphd") // 新增
-            .WithContainerRuntimeArgs("--memory", "1g") // 可选
+            .WithEndpoint("graph", e =>
+            {
+                e.TargetPort = 9669;
+                e.UriScheme = "thrift";
+                e.Protocol = ProtocolType.Tcp;
+            })
+            .WithEndpoint("graph-http", e =>
+            {
+                e.TargetPort = 19669;
+                e.UriScheme = "http";
+            })
+            .WithContainerRuntimeArgs("--hostname", "nebula-graphd")
+            .WithContainerRuntimeArgs("--memory", "1g")
             .WaitFor(nebulaStoraged0);
 
         // ========== Console ==========
@@ -86,15 +119,14 @@ public static class NebulaGraphExtension
                 "done && tail -f /dev/null")
             .WaitFor(nebulaGraphd);
 
-        // ========== studio ==========
-        // builder.AddNebulaStudio(context);
-        // 添加 Studio 容器
+        // ========== Studio ==========
+        // ★ 宿主机端口 7001 → 17001，避开 WebLogic 等默认 7001
+        //   容器内仍是 7001，浏览器访问 http://localhost:17001
         var studio = builder.AddContainer("nebula-studio", "vesoft/nebula-graph-studio:v3.8.0")
-            .WithHttpEndpoint(port: 7001, targetPort: 7001, name: "studio-http")
-            .WithEnvironment("STUDIO_PORT", "7001") // 显式声明，默认即为 7001
+            .WithHttpEndpoint(port: 17001, targetPort: 7001, name: "studio-http")
+            .WithEnvironment("STUDIO_PORT", "7001")
             .WaitFor(nebulaGraphd);
 
-        // 直连 graphd Thrift 端口，无需 Gateway
         context.NebulaGraph = nebulaGraphd;
         context.NebulaGraphEndpoint = nebulaGraphd.GetEndpoint("graph");
         context.NebulaConsole = nebulaConsole;

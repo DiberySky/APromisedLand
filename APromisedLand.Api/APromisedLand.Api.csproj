@@ -58,4 +58,8 @@
       </Compile>
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="MafRag\" />
+    </ItemGroup>
+
 </Project>

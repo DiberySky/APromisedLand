@@ -31,6 +31,7 @@
         <ProjectReference Include="..\ElasticsearchService\ElasticsearchService.csproj" />
         <ProjectReference Include="..\FileTransService\FileTransService.csproj" />
         <ProjectReference Include="..\FoundryLocalService\FoundryLocalService.csproj" />
+        <ProjectReference Include="..\MAFRagService\MAFRagService.csproj" />
         <ProjectReference Include="..\MafStatefulApi.Client\MafStatefulApi.Client.csproj" />
         <ProjectReference Include="..\MafAIService\MafAIService.csproj" />
         <ProjectReference Include="..\MafStatefulApi.Web\MafStatefulApi.Web.csproj" />
