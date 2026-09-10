@@ -14,9 +14,16 @@ public class AppHostContext
     public IResourceBuilder<PostgresDatabaseResource>? QuestionDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? FileTransDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? TreeDb { get; set; }
+    public IResourceBuilder<PostgresDatabaseResource>? HangfireDb { get; set; }
+    public IResourceBuilder<PostgresDatabaseResource>? MetadataDb { get; set; }
+    public IResourceBuilder<PostgresDatabaseResource>? VectorAdminDb { get; set; }
+
+    
     public IResourceBuilder<RedisResource>? Redis { get; set; }
     public IResourceBuilder<RabbitMQServerResource>? RabbitMq { get; set; }
     public IResourceBuilder<NatsServerResource>? Nats { get; set; }
+    
+    public IResourceBuilder<ContainerResource>? Weaviate { get; set; }
 
     // Search (Typesense)
     public IResourceBuilder<ContainerResource>? Typesense { get; set; }

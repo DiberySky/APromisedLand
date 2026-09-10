@@ -85,32 +85,20 @@ public static class NebulaGraphExtension
                 "sleep 1; echo \"retry to add hosts.\"; " +
                 "done && tail -f /dev/null")
             .WaitFor(nebulaGraphd);
-        
+
+        // ========== studio ==========
+        // builder.AddNebulaStudio(context);
+        // 添加 Studio 容器
+        var studio = builder.AddContainer("nebula-studio", "vesoft/nebula-graph-studio:v3.8.0")
+            .WithHttpEndpoint(port: 7001, targetPort: 7001, name: "studio-http")
+            .WithEnvironment("STUDIO_PORT", "7001") // 显式声明，默认即为 7001
+            .WaitFor(nebulaGraphd);
+
         // 直连 graphd Thrift 端口，无需 Gateway
         context.NebulaGraph = nebulaGraphd;
         context.NebulaGraphEndpoint = nebulaGraphd.GetEndpoint("graph");
         context.NebulaConsole = nebulaConsole;
-        
-        var fastApi = builder.AddPythonApp(
-                name: "nebula-fastapi",
-                appDirectory: "../NebulaGraphFastApiService",
-                scriptPath: "run.py"
-                // app: "app.main:app"
-            )
-            .WithHttpEndpoint(port: 9339, targetPort: 9339, name: "http", isProxied: false)
-            .WithEnvironment("NEBULA_ENDPOINTS", "nebula-graphd:9669")
-            .WithEnvironment("API_HOST", "0.0.0.0")
-            .WithEnvironment("API_PORT", "9339") // ✅ 必须加上这一行
-            .WaitFor(nebulaGraphd)
-            .WaitFor(nebulaConsole);
-        
-
-        // 如果你需要将 FastAPI 的地址传递给其他服务，可以保存到 context
-        context.NebulaGraphFastApi = fastApi;
-        context.NebulaGraphFastApiEndpoint = fastApi.GetEndpoint("http");
-
-        // builder.AddNebulaGraphFastApiService(context);
-        builder.AddNebulaApiProxyService(context);
+        context.NebulaStudio = studio;
 
         return builder;
     }

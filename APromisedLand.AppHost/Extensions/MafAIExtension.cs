@@ -1,13 +1,13 @@
 namespace APromisedLand.AppHost.Extensions;
 
-public static class MafStatefulExtension
+public static class MafAiExtension
 {
-    public static IDistributedApplicationBuilder AddMafStateful(
+    public static IDistributedApplicationBuilder AddMafAi(
         this IDistributedApplicationBuilder builder,
         AppHostContext context) 
     {
         // Add the API project with Redis and Ollama references
-        var mafStateful = builder.AddProject<Projects.MafStatefulService>("MAF-Stateful");
+        var mafStateful = builder.AddProject<Projects.MafAIService>("MAF-Ai");
 
         if (context.Redis != null)
         {
@@ -15,10 +15,10 @@ public static class MafStatefulExtension
                 .WaitFor(context.Redis);
         }
 
-        if (context.AIModel != null)
+        if (context.ChatModel != null)
         {
-            mafStateful.WithReference(context.AIModel)
-                .WaitFor(context.AIModel);
+            mafStateful.WithReference(context.ChatModel)
+                .WaitFor(context.ChatModel);
         }
 
         // Add the Client project and reference the API

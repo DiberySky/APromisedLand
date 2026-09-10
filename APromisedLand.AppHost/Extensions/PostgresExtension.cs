@@ -16,6 +16,9 @@ public static class PostgresExtension
         context.QuestionDb = context.Postgres.AddDatabase("questionDb");
         context.FileTransDb = context.Postgres.AddDatabase("fileTransDb");
         context.TreeDb = context.Postgres.AddDatabase("TreeDb");
+        context.HangfireDb = context.Postgres.AddDatabase("HangfireDb");
+        context.MetadataDb = context.Postgres.AddDatabase("MetadataDb");
+        context.VectorAdminDb = context.Postgres.AddDatabase("vectorAdminDb");
         
         return builder;
     }
