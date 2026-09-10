@@ -100,6 +100,43 @@ if (string.IsNullOrEmpty(jwtSecret))
     jwtSecret = "DevSecretKey123!@#";
 }
 
+// ============================================================
+// Ollama 连接解析
+//   优先级：
+//     1. Aspire 注入的 ConnectionStrings:chat-model / :embedding / :Ollama
+//     2. appsettings 的 Ollama:Url / Ollama:Model / Ollama:EmbeddingModel
+//     3. 开发回退默认值
+// ============================================================
+var chatConn  = OllamaConfig.ParseConnection(
+    builder.Configuration.GetConnectionString("chat-model"));
+
+var embedConn = OllamaConfig.ParseConnection(
+    builder.Configuration.GetConnectionString("embedding"));
+
+var ollamaRootConn = OllamaConfig.ParseConnection(
+    builder.Configuration.GetConnectionString("Ollama"));
+
+var ollamaUrl = OllamaConfig.FirstNonEmptyOr(
+    "http://localhost:11434",
+    chatConn.Url,
+    embedConn.Url,
+    ollamaRootConn.Url,
+    builder.Configuration["Ollama:Url"]);
+
+var ollamaChatModel = OllamaConfig.FirstNonEmptyOr(
+    "qwen2.5:7b",
+    chatConn.Model,
+    builder.Configuration["Ollama:Model"]);
+
+var ollamaEmbeddingModel = OllamaConfig.FirstNonEmptyOr(
+    "bge-large",
+    embedConn.Model,
+    builder.Configuration["Ollama:EmbeddingModel"]);
+
+Console.WriteLine($"[OLLAMA] Url            = {ollamaUrl}");
+Console.WriteLine($"[OLLAMA] ChatModel      = {ollamaChatModel}");
+Console.WriteLine($"[OLLAMA] EmbeddingModel = {ollamaEmbeddingModel}");
+
 // ---------- 1. Hangfire ----------
 builder.Services.AddHangfire(config =>
     config.UsePostgreSqlStorage(options =>
@@ -177,15 +214,11 @@ builder.Services.AddHttpContextAccessor();
 
 // ============================================================
 // ★ MVC Controllers
-//   替代 Minimal API 的 app.MapPost / app.MapGet
-//   AddControllers 内部已包含 EndpointsApiExplorer，
-//   因此原 AddEndpointsApiExplorer 可以去掉（保留也无害）。
 // ============================================================
 builder.Services
     .AddControllers()
     .AddJsonOptions(opts =>
     {
-        // 保持 Minimal API 默认的 camelCase 序列化行为
         opts.JsonSerializerOptions.PropertyNamingPolicy =
             System.Text.Json.JsonNamingPolicy.CamelCase;
     });
@@ -206,11 +239,11 @@ builder.Services.AddAgentFramework();
 // ---------- 8.1 Ollama ----------
 const string OllamaClientName = "OllamaClient";
 
-builder.Services.AddHttpClient(OllamaClientName, (sp, client) =>
+builder.Services.AddHttpClient(OllamaClientName, (sp, http) =>
 {
-    var config = sp.GetRequiredService<IConfiguration>();
-    client.BaseAddress = new Uri(config["Ollama:Url"] ?? "http://localhost:11434");
-    client.Timeout = TimeSpan.FromSeconds(90);
+    http.BaseAddress = new Uri(ollamaUrl);
+    // 首次加载大模型可能远超 60s，给足时间
+    http.Timeout = TimeSpan.FromMinutes(5);
 })
 .AddPolicyHandler((sp, _) =>
 {
@@ -227,18 +260,19 @@ builder.Services.AddHttpClient(OllamaClientName, (sp, client) =>
                     .LogWarning("Ollama retry {Attempt} after {Delay}s",
                                 attempt, delay.TotalSeconds);
             });
-    var timeout = Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(60));
+    var timeout = Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromMinutes(3));
     return Policy.WrapAsync(retry, timeout);
 });
 
 builder.Services.AddSingleton<IAgentModel>(sp =>
 {
     var factory = sp.GetRequiredService<IHttpClientFactory>();
-    var client  = factory.CreateClient(OllamaClientName);
-    var config  = sp.GetRequiredService<IConfiguration>();
-    return new OllamaModelConnector(client,
-        config["Ollama:Url"] ?? "http://localhost:11434",
-        config["Ollama:Model"] ?? "llama2");
+    var http    = factory.CreateClient(OllamaClientName);
+    var logger  = sp.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation(
+        "Ollama 已配置：Url={Url}, ChatModel={Chat}, EmbeddingModel={Embed}",
+        ollamaUrl, ollamaChatModel, ollamaEmbeddingModel);
+    return new OllamaModelConnector(http, ollamaUrl, ollamaChatModel);
 });
 
 // ---------- 8.2 Weaviate ----------
@@ -317,6 +351,42 @@ using (var scope = app.Services.CreateScope())
         logger.LogInformation("开始初始化 NebulaGraph Schema...");
         await sp.GetRequiredService<GraphSchemaInitializer>().InitializeAsync(ct);
 
+        // ---------- Ollama 健康检查（只警告，不阻断启动） ----------
+        logger.LogInformation("开始校验 Ollama 模型...");
+        try
+        {
+            var httpFactory = sp.GetRequiredService<IHttpClientFactory>();
+            var ollamaHttp  = httpFactory.CreateClient(OllamaClientName);
+
+            using var resp = await ollamaHttp.GetAsync("/api/tags", ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Ollama /api/tags 返回 {Status}", resp.StatusCode);
+            }
+            else
+            {
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                bool hasChat  = json.Contains(ollamaChatModel, StringComparison.OrdinalIgnoreCase);
+                bool hasEmbed = json.Contains(ollamaEmbeddingModel, StringComparison.OrdinalIgnoreCase);
+
+                logger.LogInformation(
+                    "Ollama 模型检查：chat({Chat})={HasChat}, embed({Embed})={HasEmbed}",
+                    ollamaChatModel, hasChat, ollamaEmbeddingModel, hasEmbed);
+
+                if (!hasChat || !hasEmbed)
+                {
+                    logger.LogWarning(
+                        "Ollama 缺少模型：chat={Chat}({HasChat}), embed={Embed}({HasEmbed})。" +
+                        "请在容器内执行 `ollama pull`。",
+                        ollamaChatModel, hasChat, ollamaEmbeddingModel, hasEmbed);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Ollama 健康检查失败（不阻断启动）。");
+        }
+
         logger.LogInformation("全部初始化完成。");
     }
     catch (Exception ex)
@@ -344,8 +414,78 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 
 // ============================================================
 // ★ 挂载 Controller 路由
-//   替代原来的 4 个 app.MapPost / app.MapGet
 // ============================================================
 app.MapControllers();
 
 app.Run();
+
+// ============================================================
+// 辅助类型
+//   全部辅助方法集中到 file static class，避免与顶层本地函数冲突。
+// ============================================================
+file static class OllamaConfig
+{
+    /// <summary>
+    /// 解析 Aspire 注入的连接字符串或显式配置，得到 (Url, Model)。
+    /// 支持形式：
+    ///   - "http://host:port"
+    ///   - "Endpoint=http://host:port;Model=qwen2.5:7b"
+    ///   - null / 空
+    /// </summary>
+    public static (string Url, string? Model) ParseConnection(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return (string.Empty, null);
+
+        string url = string.Empty;
+        string? model = null;
+
+        foreach (var raw in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var segment = raw.Trim();
+            if (segment.Length == 0) continue;
+
+            // 先按 key=value 解析
+            var kv = segment.Split('=', 2);
+            if (kv.Length == 2)
+            {
+                var key = kv[0].Trim();
+                var val = kv[1].Trim();
+
+                if (key.Equals("Endpoint", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("Url",      StringComparison.OrdinalIgnoreCase))
+                {
+                    url = val.TrimEnd('/');
+                    continue;
+                }
+
+                if (key.Equals("Model", StringComparison.OrdinalIgnoreCase))
+                {
+                    model = val;
+                    continue;
+                }
+            }
+
+            // 否则尝试直接当 URL
+            if (Uri.TryCreate(segment, UriKind.Absolute, out var uri))
+            {
+                url = uri.ToString().TrimEnd('/');
+            }
+        }
+
+        return (url, model);
+    }
+
+    /// <summary>
+    /// 返回第一个非空白字符串；全部为空白时返回 <paramref name="fallback"/>。
+    /// 返回类型固定为 string，避免调用处产生可空推断或 AppendFormatted 重载歧义。
+    /// </summary>
+    public static string FirstNonEmptyOr(string fallback, params string?[] values)
+    {
+        foreach (var v in values)
+        {
+            if (!string.IsNullOrWhiteSpace(v)) return v!;
+        }
+        return fallback;
+    }
+}

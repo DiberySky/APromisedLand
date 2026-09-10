@@ -18,6 +18,7 @@ void MafRag()
     builder.AddNebulaGraph(context);
     builder.AddWeaviate(context);
     builder.AddSeaweedFs(context);
+    builder.AddOllama(context);
     
     builder.AddMafRagService(context); 
 }

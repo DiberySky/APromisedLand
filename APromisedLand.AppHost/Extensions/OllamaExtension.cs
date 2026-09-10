@@ -13,15 +13,12 @@ public static class OllamaExtension
             .WithLifetime(ContainerLifetime.Persistent)
             .WithOtlpExporter();
 
-        context.Embedding = context.Ollama.AddModel("bge-large");
-        
-        // Add a model to Ollama (default: llama3.2:1b)
-        context.ChatModel = context.Ollama.AddModel("chat-model", "qwen2.5:7b"); //llama3.2:1b
+        // 嵌入模型：资源名 = "embedding"，实际拉取的模型标签 = "bge-large"
+        context.Embedding = context.Ollama.AddModel("embedding", "bge-large");
 
-        // context.OllamaService = builder.AddProject<Projects.OllamaService>("Ollama-Service")
-        //     .WithReference(context.Embedding)
-        //     .WaitFor(context.Embedding)
-        //     .WithOtlpExporter();
+        // 聊天模型：资源名 = "chat-model"，实际拉取的模型标签 = "qwen2.5:7b"
+        // 备选：qwen2.5:0.5b / llama3.2:1b / qwen2.5:7b
+        context.ChatModel = context.Ollama.AddModel("chat-model", "qwen2.5:7b");
 
         return builder;
     }

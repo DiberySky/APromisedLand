@@ -20,6 +20,30 @@ public static class MafRagExtension
         if (context.Redis is not null)
             context.MafRagService.WithReference(context.Redis);
 
+        // Ollama 服务端：用于 /api/tags 健康探测
+        if (context.Ollama is not null)
+        {
+            context.MafRagService
+                .WithReference(context.Ollama)
+                .WaitFor(context.Ollama);
+        }
+
+        // 聊天模型：注入 ConnectionStrings__chat-model
+        if (context.ChatModel is not null)
+        {
+            context.MafRagService
+                .WithReference(context.ChatModel)
+                .WaitFor(context.ChatModel);
+        }
+
+        // 嵌入模型：注入 ConnectionStrings__embedding
+        if (context.Embedding is not null)
+        {
+            context.MafRagService
+                .WithReference(context.Embedding)
+                .WaitFor(context.Embedding);
+        }
+
         // ========== 外部资源：走显式连接字符串 ==========
 
         // NebulaGraph：Thrift RPC，9669 端口
@@ -38,10 +62,7 @@ public static class MafRagExtension
             connectionStringName: "weaviate",
             scheme: "http");
 
-        // ============================================================
-        // 【修复 #2】SeaweedFS：服务端使用 AmazonS3Client，必须连 S3 网关（8333）。
-        // 前提：AppHostContext 中新增 SeaweedS3 属性，并在 AppHost 中创建对应资源。
-        // ============================================================
+        // SeaweedFS：服务端使用 AmazonS3Client，必须连 S3 网关（8333）
         WireExternalService(
             context.MafRagService,
             context.SeaweedS3,
