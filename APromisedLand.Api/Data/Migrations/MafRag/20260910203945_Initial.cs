@@ -12,6 +12,24 @@ namespace APromisedLand.Api.Data.Migrations.MafRag
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "doc_audit",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    DocId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Tenant = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    Action = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    OldVersion = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    NewVersion = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    Operator = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_doc_audit", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "doc_metadata",
                 columns: table => new
                 {
@@ -32,7 +50,6 @@ namespace APromisedLand.Api.Data.Migrations.MafRag
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_doc_metadata", x => x.Id);
-                    table.UniqueConstraint("AK_doc_metadata_DocId", x => x.DocId);
                 });
 
             migrationBuilder.CreateTable(
@@ -71,34 +88,10 @@ namespace APromisedLand.Api.Data.Migrations.MafRag
                     table.PrimaryKey("PK_index_tasks", x => x.Id);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "doc_audit",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    DocId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Tenant = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Action = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    OldVersion = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
-                    NewVersion = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
-                    Operator = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_doc_audit", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_doc_audit_doc_metadata_DocId",
-                        column: x => x.DocId,
-                        principalTable: "doc_metadata",
-                        principalColumn: "DocId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
             migrationBuilder.CreateIndex(
-                name: "IX_doc_audit_DocId_Tenant",
+                name: "IX_doc_audit_DocId_Tenant_CreatedAt",
                 table: "doc_audit",
-                columns: new[] { "DocId", "Tenant" });
+                columns: new[] { "DocId", "Tenant", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_doc_metadata_DocId_Version_Tenant",
@@ -118,6 +111,11 @@ namespace APromisedLand.Api.Data.Migrations.MafRag
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_index_tasks_DocId_Tenant_Status",
+                table: "index_tasks",
+                columns: new[] { "DocId", "Tenant", "Status" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_index_tasks_Status_CreatedAt",
                 table: "index_tasks",
                 columns: new[] { "Status", "CreatedAt" });
@@ -130,13 +128,13 @@ namespace APromisedLand.Api.Data.Migrations.MafRag
                 name: "doc_audit");
 
             migrationBuilder.DropTable(
+                name: "doc_metadata");
+
+            migrationBuilder.DropTable(
                 name: "domain_events");
 
             migrationBuilder.DropTable(
                 name: "index_tasks");
-
-            migrationBuilder.DropTable(
-                name: "doc_metadata");
         }
     }
 }

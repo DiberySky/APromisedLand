@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace APromisedLand.AppHost.Extensions;
 
 public static class SeaweedFsExtension
@@ -5,6 +7,15 @@ public static class SeaweedFsExtension
     // 固定镜像版本，避免 :latest 漂移导致行为变化。
     // 4.46 已包含 S3 网关的 external URL 支持（S3_EXTERNAL_URL / -externalUrl）。
     private const string Image = "chrislusf/seaweedfs:4.46";
+
+    /// <summary>
+    /// 解析 Configs 目录下配置文件的绝对路径。
+    /// 基于 AppContext.BaseDirectory（编译输出目录，例如
+    /// D:\APromisedLand\APromisedLand.AppHost\bin\Debug\net10.0\），
+    /// 与当前工作目录无关，Aspire 从任何目录启动都能找到。
+    /// </summary>
+    private static string ConfigPath(string fileName)
+        => Path.Combine(AppContext.BaseDirectory, "Configs", fileName);
 
     public static IDistributedApplicationBuilder AddSeaweedFs(
         this IDistributedApplicationBuilder builder,
@@ -16,10 +27,10 @@ public static class SeaweedFsExtension
         context.SeaweedMaster = builder.AddContainer("seaweedfs-master", Image)
             .WithArgs(
                 "master",
-                "-ip=seaweedfs-master",     // 显式自注册名，避免容器重建后 IP 变化
-                "-port=9333",
+                "-ip=seaweedfs-master",
                 "-mdir=/data",
-                "-defaultReplication=000"   // 单节点：不复制
+                "-port=9333",
+                "-defaultReplication=000"
             )
             .WithHttpEndpoint(name: "http", targetPort: 9333)
             .WithVolume("seaweedfs-master-data", "/data")
@@ -35,7 +46,7 @@ public static class SeaweedFsExtension
                 "-ip=seaweedfs-volume",
                 "-port=8080",
                 "-dir=/data",
-                "-max=0"                    // 0 = 不限制磁盘用量（开发环境）
+                "-max=0"
             )
             .WithHttpEndpoint(name: "http", targetPort: 8080)
             .WithVolume("seaweedfs-volume-data", "/data")
@@ -62,43 +73,49 @@ public static class SeaweedFsExtension
         // ============================================================
         // 4. S3 网关 —— 对外暴露 S3 API（监听 8333）
         //
-        // 关键修复说明：
-        //
+        // 关键点：
         //   a) 固定宿主机端口 8333 且 isProxied: false，直连容器。
         //      Aspire DCP 反向代理会改写 Host / Authorization / x-amz-* 等头，
-        //      破坏 AWS SDK 的 SigV4 签名，触发 "ResponseEnded" 类错误。
+        //      破坏 AWS SDK 的 SigV4 签名。
         //
         //   b) 通过 S3_EXTERNAL_URL 环境变量告诉网关"客户端签名的外部地址"。
-        //      4.46 的正确参数名是 -externalUrl；环境变量形式更符合容器化习惯。
-        //      ★ 只用其中一种即可，不要同时设置，避免歧义。
         //
-        //   c) 网关通过 args 里的容器名 seaweedfs-filer:8888 直接寻址 filer，
-        //      不需要 WithReference。
+        //   c) 通过 -config 加载 S3 身份配置，否则 AWS SDK 带签名的请求会被拒：
+        //      "Signed request requires setting up SeaweedFS S3 authentication"
+        //
+        //   d) 配置文件路径从 AppContext.BaseDirectory 解析（编译输出目录），
+        //      与当前工作目录无关。
         // ============================================================
+        var s3ConfigPath = ConfigPath("seaweedfs-s3.json");
+
+        if (!File.Exists(s3ConfigPath))
+        {
+            throw new FileNotFoundException(
+                $"SeaweedFS S3 配置文件缺失：{s3ConfigPath}。" +
+                "请确认 APromisedLand.AppHost.csproj 中已配置 " +
+                "<Content Include=\"Configs\\**\\*\" /> 并执行 dotnet build。",
+                s3ConfigPath);
+        }
+
         context.SeaweedS3 = builder.AddContainer("seaweedfs-s3", Image)
             .WithArgs(
                 "s3",
                 "-filer=seaweedfs-filer:8888",
-                "-port=8333"
+                "-port=8333",
+                "-config=/etc/seaweedfs/s3.json"
             )
+            .WithBindMount(
+                source: s3ConfigPath,
+                target: "/etc/seaweedfs/s3.json",
+                isReadOnly: true)
             .WithEnvironment("S3_EXTERNAL_URL", "http://localhost:8333")
             .WithHttpEndpoint(
                 name: "s3",
                 targetPort: 8333,
-                port: 8333,             // 固定宿主机端口
-                isProxied: false)       // 关闭 Aspire DCP 反向代理
+                port: 8333,
+                isProxied: false)
             .WithOtlpExporter()
             .WaitFor(context.SeaweedFiler);
-
-        // ========== FileTrans Service（暂未启用） ==========
-        // context.FileTransService = builder.AddProject<Projects.FileTransService>("seaweedfs-service")
-        //     .WithReference(context.FileTransDb)
-        //     .WithEnvironment("SeaweedFS__BaseUrl",   context.SeaweedFiler.GetEndpoint("http"))
-        //     .WithEnvironment("SeaweedFS__MasterUrl", context.SeaweedMaster.GetEndpoint("http"))
-        //     .WithEnvironment("SeaweedFS__VolumeUrl", context.SeaweedVolume.GetEndpoint("http"))
-        //     .WaitFor(context.FileTransDb)
-        //     .WaitFor(context.SeaweedFiler)
-        //     .WithOtlpExporter();
 
         return builder;
     }

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APromisedLand.Api.Data.Migrations.MafRag
 {
     [DbContext(typeof(MafRagContext))]
-    [Migration("20260910041025_Initial")]
+    [Migration("20260910203945_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -63,7 +63,7 @@ namespace APromisedLand.Api.Data.Migrations.MafRag
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DocId", "Tenant");
+                    b.HasIndex("DocId", "Tenant", "CreatedAt");
 
                     b.ToTable("doc_audit");
                 });
@@ -216,24 +216,9 @@ namespace APromisedLand.Api.Data.Migrations.MafRag
 
                     b.HasIndex("Status", "CreatedAt");
 
+                    b.HasIndex("DocId", "Tenant", "Status");
+
                     b.ToTable("index_tasks");
-                });
-
-            modelBuilder.Entity("APromisedLand.Api.MafRag.Entities.DocumentAuditEntity", b =>
-                {
-                    b.HasOne("APromisedLand.Api.MafRag.Entities.DocumentMetadataEntity", "Document")
-                        .WithMany("Audits")
-                        .HasForeignKey("DocId")
-                        .HasPrincipalKey("DocId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Document");
-                });
-
-            modelBuilder.Entity("APromisedLand.Api.MafRag.Entities.DocumentMetadataEntity", b =>
-                {
-                    b.Navigation("Audits");
                 });
 #pragma warning restore 612, 618
         }

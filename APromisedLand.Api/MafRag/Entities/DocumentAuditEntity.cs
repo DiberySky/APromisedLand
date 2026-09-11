@@ -28,7 +28,4 @@ public class DocumentAuditEntity
     public string? Operator { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    [ForeignKey(nameof(DocId))]
-    public DocumentMetadataEntity? Document { get; set; }
 }

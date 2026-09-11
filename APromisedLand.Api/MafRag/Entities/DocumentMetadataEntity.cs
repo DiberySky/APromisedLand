@@ -33,13 +33,15 @@ public class DocumentMetadataEntity
     public string BlobName { get; set; } = string.Empty;
 
     [Column(TypeName = "jsonb")]
-    public string? ExtraMetadata { get; set; } // JSON
+    public string? ExtraMetadata { get; set; }
 
+    /// <summary>
+    /// 文档生命周期：active / inactive / archived。
+    /// ⚠️ 与索引状态（IndexTaskEntity.Status）职责分离，不要写入 Indexing/Completed。
+    /// </summary>
     [MaxLength(32)]
     public string Status { get; set; } = "active";
 
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
-    public ICollection<DocumentAuditEntity> Audits { get; set; } = new List<DocumentAuditEntity>();
 }

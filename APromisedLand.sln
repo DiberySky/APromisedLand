@@ -79,6 +79,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MafStatefulApi.Web", "MafSt
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MAFRagService", "MAFRagService\MAFRagService.csproj", "{2CC1503A-A5E5-4A00-884F-33981B994DA6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JwtTokenGenerator", "JwtTokenGenerator\JwtTokenGenerator.csproj", "{DAF53996-427C-42C7-AB09-7D5A5BB25A7C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -215,6 +217,10 @@ Global
 		{2CC1503A-A5E5-4A00-884F-33981B994DA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2CC1503A-A5E5-4A00-884F-33981B994DA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2CC1503A-A5E5-4A00-884F-33981B994DA6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DAF53996-427C-42C7-AB09-7D5A5BB25A7C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DAF53996-427C-42C7-AB09-7D5A5BB25A7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DAF53996-427C-42C7-AB09-7D5A5BB25A7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DAF53996-427C-42C7-AB09-7D5A5BB25A7C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -252,6 +258,7 @@ Global
 		{5D51E8F1-ACF1-47F8-B467-E344FA3816EC} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
 		{1ECCA18D-617D-48DB-BDCD-6212BCCBEFB4} = {3420F74F-5239-4214-8F65-ED90D8A5A5ED}
 		{2CC1503A-A5E5-4A00-884F-33981B994DA6} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
+		{DAF53996-427C-42C7-AB09-7D5A5BB25A7C} = {94403BB7-A165-404E-8674-5DC28867E92E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9647CF65-ABDB-4637-B56C-E0CDAC22FFFB}

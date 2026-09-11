@@ -1,4 +1,3 @@
-
 using MAFRagService.Models;
 using MAFRagService.Stubs.MAF;
 
@@ -11,7 +10,7 @@ public class QueryAnalyzerAgent : Agent
 
     public QueryAnalyzerAgent(IAgentModel model, ILogger<QueryAnalyzerAgent> logger)
     {
-        _model = model;
+        _model  = model;
         _logger = logger;
     }
 
@@ -34,10 +33,13 @@ public class QueryAnalyzerAgent : Agent
         var response = await _model.GenerateAsync(prompt, ct);
         try
         {
-            var result = System.Text.Json.JsonSerializer.Deserialize<QueryIntent>(response);
+            // ★ 修复 CS8602：Deserialize 可能返回 null，用 ?? 兜底
+            var result = System.Text.Json.JsonSerializer.Deserialize<QueryIntent>(response)
+                         ?? new QueryIntent { Query = question };
+
             result.OriginalQuestion = question;
             result.Tenant = tenant;
-            return result ?? new QueryIntent { Query = question };
+            return result;
         }
         catch
         {

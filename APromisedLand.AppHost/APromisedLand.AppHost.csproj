@@ -52,4 +52,10 @@
         </None>
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="Configs\**\*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
 </Project>

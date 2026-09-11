@@ -4,11 +4,20 @@ namespace APromisedLand.AppHost.Extensions;
 
 public static class MafRagExtension
 {
+    /// <summary>
+    /// MafRagService 固定的宿主机 HTTP 端口。
+    /// 便于本地开发 / curl / Postman 直接访问，无需每次从日志提取。
+    /// </summary>
+    private const int MafRagHttpPort = 5100;
+
     public static IDistributedApplicationBuilder AddMafRagService(
         this IDistributedApplicationBuilder builder,
         AppHostContext context)
     {
-        context.MafRagService = builder.AddProject<Projects.MAFRagService>("MafRagService");
+        // ★ 固定宿主机端口 5100
+        context.MafRagService = builder
+            .AddProject<Projects.MAFRagService>("MafRagService")
+            .WithHttpEndpoint(port: MafRagHttpPort, name: "http");
 
         // ========== 内部资源：走标准 WithReference ==========
         if (context.MetadataDb is not null)
@@ -46,7 +55,6 @@ public static class MafRagExtension
 
         // ========== 外部资源：走显式连接字符串 ==========
 
-        // NebulaGraph：Thrift RPC，9669 端口
         WireExternalService(
             context.MafRagService,
             context.NebulaGraph,
@@ -54,7 +62,6 @@ public static class MafRagExtension
             connectionStringName: "nebula",
             scheme: "thrift");
 
-        // Weaviate：HTTP REST，8080 端口
         WireExternalService(
             context.MafRagService,
             context.Weaviate,
@@ -62,7 +69,6 @@ public static class MafRagExtension
             connectionStringName: "weaviate",
             scheme: "http");
 
-        // SeaweedFS：服务端使用 AmazonS3Client，必须连 S3 网关（8333）
         WireExternalService(
             context.MafRagService,
             context.SeaweedS3,

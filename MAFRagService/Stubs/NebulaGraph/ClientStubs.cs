@@ -23,15 +23,23 @@ public class NebulaGraphClient
         _options = options;
     }
 
-    public Task<global::MAFRagService.Stubs.NebulaGraph.ResultSet> ExecuteAsync(string ngql)
+    public Task<ResultSet> ExecuteAsync(string ngql)
     {
         return ExecuteAsync(ngql, CancellationToken.None);
     }
 
-    public Task<global::MAFRagService.Stubs.NebulaGraph.ResultSet> ExecuteAsync(string ngql, CancellationToken ct)
+    public Task<ResultSet> ExecuteAsync(string ngql, CancellationToken ct)
     {
         // 桩实现：返回空成功结果
-        return Task.FromResult(new global::MAFRagService.Stubs.NebulaGraph.ResultSet());
+        // 桩实现：显式失败，避免误导性日志
+        // return Task.FromResult(new ResultSet
+        // {
+        //     IsSucceeded  = false,
+        //     ErrorMessage = "NebulaGraphClient 是桩实现，未连接真实 Nebula。"
+        // });
+        
+        return Task.FromResult(new ResultSet());
+        
     }
 
     public Task ChangeSpaceAsync(string space)

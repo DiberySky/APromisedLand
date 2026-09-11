@@ -1,5 +1,7 @@
 using MAFRagService.Services;
+using MAFRagService.Startup.Configuration;
 using MAFRagService.Stubs.MAF;
+using Microsoft.Extensions.Options;
 
 namespace MAFRagService.Memory;
 
@@ -26,12 +28,12 @@ public class NebulaGraphMemoryStore : INebulaGraphMemoryStore
 
     public NebulaGraphMemoryStore(
         NebulaGraphExecutor executor,
-        IConfiguration config,
+        IOptions<NebulaGraphAppOptions> options,
         ILogger<NebulaGraphMemoryStore> logger)
     {
         _executor = executor;
-        _space = config["NebulaGraph:Space"] ?? "rag_space";
-        _logger = logger;
+        _space    = options.Value.Space;
+        _logger   = logger;
     }
 
     public async Task SaveConversationAsync(ConversationMemory memory)
@@ -64,17 +66,9 @@ public class NebulaGraphMemoryStore : INebulaGraphMemoryStore
         _logger.LogInformation("Saved conversation memory: {ConvId}", convId);
     }
 
-    /// <summary>
-    /// 占位实现：当前 RAG 链路不做记忆召回，始终返回空集合。
-    /// 若将来需要「查询历史对话」，在此实现 Nebula 的 MATCH / LOOKUP 查询。
-    /// </summary>
     public Task<IEnumerable<MemoryEntry>> QueryAsync(MemoryQuery query, CancellationToken ct)
         => Task.FromResult<IEnumerable<MemoryEntry>>(Array.Empty<MemoryEntry>());
 
-    /// <summary>
-    /// 明确不支持通用 MemoryEntry 写入。
-    /// NebulaGraphMemoryStore 只负责会话级记忆（SaveConversationAsync）。
-    /// </summary>
     public Task AddMemoryAsync(MemoryEntry entry, CancellationToken ct)
         => throw new NotSupportedException(
             "NebulaGraphMemoryStore 仅支持会话级记忆写入（SaveConversationAsync），" +

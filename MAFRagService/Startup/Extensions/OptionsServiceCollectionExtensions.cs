@@ -27,10 +27,13 @@ public static class OptionsServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services
-            .AddOptions<JwtOptions>()
-            .Bind(config.GetSection(JwtOptions.SectionName))
-            .ValidateOnStart();
+        // ★ 移除 JwtOptions 注册（开发阶段无身份验证）
+        // 生产恢复时加回：
+        // services
+        //     .AddOptions<JwtOptions>()
+        //     .Bind(config.GetSection(JwtOptions.SectionName))
+        //     .ValidateDataAnnotations()
+        //     .ValidateOnStart();
 
         services
             .AddOptions<FeatureFlags>()

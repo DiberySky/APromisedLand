@@ -2,20 +2,20 @@ using APromisedLand.Api.Data;
 using Hangfire;
 using MAFRagService.Models;
 using MAFRagService.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MAFRagService.Controllers;
 
 [ApiController]
 [Route("rag/docs")]
-[Authorize]
 public class DocsController : BaseApiController
 {
     private readonly IBackgroundJobClient    _hangfire;
     private readonly DocumentStorageService  _storage;
     private readonly DocumentMetadataService _metadataService;
+    private readonly DocumentAuditService    _auditService;
     private readonly EventStoreService       _eventStore;
+    private readonly IndexTaskService        _indexTasks;
     private readonly MafRagContext           _db;
     private readonly ILogger<DocsController> _logger;
 
@@ -23,7 +23,9 @@ public class DocsController : BaseApiController
         IBackgroundJobClient hangfire,
         DocumentStorageService storage,
         DocumentMetadataService metadataService,
+        DocumentAuditService auditService,
         EventStoreService eventStore,
+        IndexTaskService indexTasks,
         MafRagContext db,
         IConfiguration config,
         ILogger<DocsController> logger)
@@ -32,23 +34,24 @@ public class DocsController : BaseApiController
         _hangfire        = hangfire;
         _storage         = storage;
         _metadataService = metadataService;
+        _auditService    = auditService;
         _eventStore      = eventStore;
+        _indexTasks      = indexTasks;
         _db              = db;
         _logger          = logger;
     }
 
-    // ============================================================
-    // POST /rag/docs
-    // 上传文档：先落对象存储 → 元数据 + 事件同事务 → 入队索引任务
-    // ============================================================
     [HttpPost]
-    [RequestSizeLimit(512L * 1024 * 1024)] // 512MB，可按需调整
+    [RequestSizeLimit(512L * 1024 * 1024)]
     public async Task<IActionResult> Upload(
         [FromForm] IFormFile file,
         [FromForm] string docId,
         [FromForm] string? version,
         CancellationToken ct)
     {
+        if (!Features.Rag)      return ModuleDisabled("Rag");
+        if (!Features.Indexing) return ModuleDisabled("Indexing");
+
         if (file is null || string.IsNullOrWhiteSpace(docId))
             return BadRequest("Missing file or docId");
 
@@ -56,12 +59,12 @@ public class DocsController : BaseApiController
             version = $"v{DateTime.UtcNow:yyyyMMddHHmmss}";
 
         var tenant = ResolveTenant();
+        // ★ 开发阶段无身份验证，Operator 留空
+        string? @operator = null;
 
-        // 1) 先落对象存储（不可回滚的外部副作用）
         var blobInfo = await _storage.UploadAsync(
             file.OpenReadStream(), docId, version, file.FileName, tenant, ct);
 
-        // 2) 元数据 + 事件溯源，同事务
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         try
         {
@@ -77,15 +80,19 @@ public class DocsController : BaseApiController
                 BlobName = blobInfo.BlobName
             }, ct);
 
-            var evt = new
+            await _eventStore.AppendEventAsync(docId, new
             {
                 DocId     = docId,
                 FileName  = file.FileName,
                 Tenant    = tenant,
                 Version   = version,
                 Timestamp = DateTime.UtcNow
-            };
-            await _eventStore.AppendEventAsync(docId, evt, tenant, ct);
+            }, tenant, ct);
+
+            await _auditService.RecordAsync(
+                docId, tenant, action: "Upload",
+                oldVersion: null, newVersion: version,
+                @operator: @operator, ct);
 
             await tx.CommitAsync(ct);
         }
@@ -95,15 +102,27 @@ public class DocsController : BaseApiController
             _logger.LogError(ex,
                 "上传处理失败，事务已回滚。DocId={DocId}, Tenant={Tenant}, Version={Version}",
                 docId, tenant, version);
+
+            try
+            {
+                await _storage.DeleteAsync(blobInfo.BlobName, ct);
+                _logger.LogInformation("已补偿删除 blob: {Blob}", blobInfo.BlobName);
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger.LogWarning(cleanupEx,
+                    "补偿删除 blob 失败，需人工清理: {Blob}", blobInfo.BlobName);
+            }
+
             return Problem("Document metadata persistence failed.");
         }
 
-        // 3) 入队后台索引任务
         var jobId = _hangfire.Enqueue<IncrementalIndexer>(
-            x => x.IndexAsync(docId, version, tenant));
+            x => x.IndexAsync(docId, version, tenant, JobCancellationToken.Null));
 
         _logger.LogInformation(
-            "文档已上传并已入队索引。DocId={DocId}, HangfireJobId={JobId}", docId, jobId);
+            "文档已上传并已入队索引。DocId={DocId}, HangfireJobId={JobId}",
+            docId, jobId);
 
         return Accepted(
             $"/rag/docs/{docId}/status",
@@ -117,10 +136,27 @@ public class DocsController : BaseApiController
             });
     }
 
-    // ============================================================
-    // GET /rag/docs/{docId}/audit
-    // 强制按租户过滤
-    // ============================================================
+    [HttpGet("{docId}/status")]
+    public async Task<IActionResult> Status(string docId, CancellationToken ct)
+    {
+        if (!Features.Indexing) return ModuleDisabled("Indexing");
+
+        var tenant = ResolveTenant();
+        var tasks  = await _indexTasks.ListByDocAsync(docId, tenant, ct);
+
+        return Ok(new
+        {
+            DocId  = docId,
+            Tenant = tenant,
+            Tasks  = tasks.Select(t => new
+            {
+                t.Id, t.TaskType, t.Status,
+                t.ErrorMessage, t.RetryCount,
+                t.CreatedAt, t.CompletedAt
+            })
+        });
+    }
+
     [HttpGet("{docId}/audit")]
     public async Task<IActionResult> Audit(string docId, CancellationToken ct)
     {
@@ -128,15 +164,17 @@ public class DocsController : BaseApiController
         if (string.IsNullOrEmpty(tenant) || tenant == "default")
             return Forbid();
 
-        var events = await _eventStore.GetEventsAsync(docId, ct);
+        var audits = await _auditService.ListAsync(docId, tenant, ct);
+        return Ok(audits);
+    }
 
-        var filtered = events
-            .Where(e => string.Equals(
-                e.GetType().GetProperty("Tenant")?.GetValue(e)?.ToString(),
-                tenant,
-                StringComparison.Ordinal))
-            .ToList();
+    [HttpGet("{docId}/events")]
+    public async Task<IActionResult> Events(string docId, CancellationToken ct)
+    {
+        if (!Features.Indexing) return ModuleDisabled("Indexing");
 
-        return Ok(filtered);
+        var tenant = ResolveTenant();
+        var events = await _eventStore.GetEventsAsync(docId, tenant, ct);
+        return Ok(events);
     }
 }
