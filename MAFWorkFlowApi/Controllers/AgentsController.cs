@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace MAFWorkFlowApi.Controllers;
 
 /// <summary>
-/// 单 Agent 对话入口。
+/// 单 Agent 对话入口（支持持久化多轮会话）。
 /// 路由：POST /api/agents/chat
 /// </summary>
 [ApiController]
@@ -24,7 +24,11 @@ public sealed class AgentsController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>向通用助手发送一条消息，得到 Ollama 本地模型的回复。</summary>
+    /// <summary>
+    /// 向通用助手发送一条消息。
+    /// 首次请求不传 conversationId，服务端返回新的 ID；
+    /// 后续请求带上该 ID，Agent 将保留完整对话历史。
+    /// </summary>
     [HttpPost("chat")]
     [ProducesResponseType(typeof(AgentReply), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(HttpValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -33,9 +37,12 @@ public sealed class AgentsController : ControllerBase
         CancellationToken ct)
     {
         _logger.LogInformation(
-            "Received chat request, length = {Len}", request.Message.Length);
+            "Chat request, ConversationId={ConvId}, MessageLength={Len}",
+            request.ConversationId ?? "(new)", request.Message.Length);
 
-        var reply = await _agents.ChatAsync(request.Message, ct);
+        var reply = await _agents.ChatAsync(
+            request.ConversationId, request.Message, ct);
+
         return Ok(reply);
     }
 }

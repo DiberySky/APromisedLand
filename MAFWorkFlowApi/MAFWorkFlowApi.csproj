@@ -7,10 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.5.3" />
         <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.5.0" />
         <PackageReference Include="Microsoft.Agents.AI" Version="1.21.0" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.21.0-preview.260911.1" />
         <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.21.0" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.12" />
         <PackageReference Include="OllamaSharp" Version="5.4.30" />
     </ItemGroup>
 

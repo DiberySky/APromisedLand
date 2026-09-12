@@ -9,32 +9,20 @@ namespace MAFWorkFlowApi.HealthChecks;
 
 /// <summary>
 /// 就绪检查：验证 Ollama 服务可达，且目标模型已实际拉取到本地。
-///
-/// 设计要点：
-///   1. 静态 HttpClient —— 绕过 Aspire ServiceDefaults 注入的
-///      ServiceDiscovery / Polly / OTel 管道（节省约 120ms）。
-///   2. 内存缓存 —— Ollama /api/tags 在 Docker Desktop 环境下响应
-///      约 2 秒，通过 30 秒缓存将后续检查的耗时降至亚毫秒。
-///   3. 差异化 TTL —— Healthy 缓存 30s；Unhealthy 缓存 5s，
-///      保证模型拉取完成后能快速切换为 Healthy。
+/// 使用静态 HttpClient + 内存缓存，将稳态耗时降至毫秒级。
 /// </summary>
 public sealed class OllamaModelReadyHealthCheck : IHealthCheck
 {
-    // ─── 共享 HttpClient ────────────────────────────────────────────
     private static readonly HttpClient Http = new()
     {
-        Timeout = TimeSpan.FromSeconds(10)   // 容忍 Ollama 慢响应
+        Timeout = TimeSpan.FromSeconds(10)
     };
 
-    // ─── 共享缓存 ───────────────────────────────────────────────────
-    // 使用 MemoryCache 具体类 + Get/Set 方法，避免泛型扩展方法的
-    // 类型推断歧义（MemoryCache 自身的 TryGetValue 是非泛型的）。
     private static readonly MemoryCache Cache = new(new MemoryCacheOptions
     {
         SizeLimit = 16,
     });
 
-    // ─── 缓存 TTL 常量 ──────────────────────────────────────────────
     private static readonly TimeSpan HealthyTtl = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan UnhealthyTtl = TimeSpan.FromSeconds(5);
 
@@ -55,26 +43,19 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
     {
         var endpoint = ResolveEndpoint(_options);
         var modelId = _options.ModelId;
-
-        // ─── 缓存键：endpoint 或模型变化时自动失效 ───────────────────
         var cacheKey = $"{endpoint}|{modelId}";
 
-        // ⭐ 使用 Get + is 模式匹配：类型明确，无推断歧义
         if (Cache.Get(cacheKey) is HealthCheckResult cached)
         {
             _logger.LogDebug(
                 "Health check cache hit for {Model} @ {Endpoint}, status = {Status}",
                 modelId, endpoint, cached.Status);
-
             return cached;
         }
 
-        // ─── 缓存未命中：真正查询 Ollama ─────────────────────────────
         var result = await DoCheckAsync(endpoint, modelId, cancellationToken);
 
-        // ─── 差异化 TTL ─────────────────────────────────────────────
         var ttl = result.Status == HealthStatus.Healthy ? HealthyTtl : UnhealthyTtl;
-
         Cache.Set(cacheKey, result, new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = ttl,
@@ -85,22 +66,16 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
     }
 
     private async Task<HealthCheckResult> DoCheckAsync(
-        string endpoint,
-        string modelId,
-        CancellationToken cancellationToken)
+        string endpoint, string modelId, CancellationToken cancellationToken)
     {
         if (!Uri.TryCreate($"{endpoint}/api/tags", UriKind.Absolute, out var tagsUri))
         {
-            _logger.LogWarning(
-                "Ollama endpoint 解析失败，非绝对 URI: '{Endpoint}'", endpoint);
-
             return HealthCheckResult.Unhealthy(
                 $"Ollama endpoint 配置无效: '{endpoint}'",
                 data: new Dictionary<string, object>
                 {
                     ["resolvedEndpoint"] = endpoint,
-                    ["modelId"] = modelId,
-                    ["hint"] = "检查 ConnectionStrings__chat-model / services__* 是否注入"
+                    ["modelId"] = modelId
                 });
         }
 
@@ -202,12 +177,9 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
 
         foreach (var candidate in candidates)
         {
-            if (string.IsNullOrWhiteSpace(candidate))
-                continue;
-
+            if (string.IsNullOrWhiteSpace(candidate)) continue;
             var normalized = NormalizeEndpoint(candidate);
-            if (normalized is not null)
-                return normalized;
+            if (normalized is not null) return normalized;
         }
 
         return "http://localhost:11434";
@@ -216,8 +188,7 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
     private static string? NormalizeEndpoint(string raw)
     {
         var trimmed = raw.Trim();
-        if (trimmed.Length == 0)
-            return null;
+        if (trimmed.Length == 0) return null;
 
         if (trimmed.Contains('='))
         {
@@ -236,7 +207,6 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
             {
                 ConnectionString = connectionString
             };
-
             if (builder.TryGetValue("Endpoint", out var value)
                 && value is string endpointStr
                 && !string.IsNullOrWhiteSpace(endpointStr))
@@ -244,24 +214,16 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
                 return endpointStr.Trim();
             }
         }
-        catch (ArgumentException)
-        {
-            // 连接字符串语法非法，静默失败交由上层处理
-        }
-
+        catch (ArgumentException) { }
         return null;
     }
 
     private static string AddSchemeIfMissing(string url)
     {
         var trimmed = url.Trim().TrimEnd('/');
-
         if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
             return trimmed;
-        }
-
         return "http://" + trimmed;
     }
 }

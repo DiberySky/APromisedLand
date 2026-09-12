@@ -24,9 +24,6 @@ public sealed class WorkflowsController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// 跑 "Writer -> Critic" 顺序工作流。
-    /// </summary>
     [HttpPost("writer-critic")]
     [ProducesResponseType(typeof(WorkflowReply), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(HttpValidationProblemDetails), StatusCodes.Status400BadRequest)]

@@ -1,5 +1,6 @@
 using MAFWorkFlowApi.Models;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
@@ -8,13 +9,14 @@ namespace MAFWorkFlowApi.Agents;
 
 /// <summary>
 /// 对 MAF 的封装：负责构造 Ollama-backed ChatClientAgent、组装 Sequential Workflow，
-/// 并对外暴露两个业务动作：单轮问答、跑"写作→审校"工作流。
+/// 并通过 AgentSessionStore（Redis）实现持久化多轮会话。
 /// </summary>
 public sealed class MafAgentService
 {
     private readonly AIAgent _generalAssistant;
     private readonly AIAgent _writer;
     private readonly AIAgent _critic;
+    private readonly AgentSessionStore _sessionStore;
     private readonly ILogger<MafAgentService> _logger;
 
     private readonly SemaphoreSlim _initLock = new(1, 1);
@@ -22,10 +24,12 @@ public sealed class MafAgentService
 
     public MafAgentService(
         [FromKeyedServices("chat-model")] IChatClient chatClient,
+        AgentSessionStore sessionStore,
         IOptions<OllamaAgentOptions> options,
         ILoggerFactory loggerFactory)
     {
         var opt = options.Value;
+        _sessionStore = sessionStore;
         _logger = loggerFactory.CreateLogger<MafAgentService>();
 
         _logger.LogInformation(
@@ -44,31 +48,43 @@ public sealed class MafAgentService
             name: "Critic");
     }
 
-    /// <summary>单 Agent 问答。</summary>
-    public async Task<AgentReply> ChatAsync(string userMessage, CancellationToken ct)
+    /// <summary>
+    /// 多轮会话：加载 → 运行 → 保存。
+    /// </summary>
+    public async Task<AgentReply> ChatAsync(
+        string? conversationId,
+        string userMessage,
+        CancellationToken ct)
     {
-        // ✅ AgentSession 不实现 IAsyncDisposable，直接使用变量即可
-        var session = await _generalAssistant.CreateSessionAsync(
-            cancellationToken: ct);
+        // 1. 生成或沿用 conversationId
+        var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
 
+        // 2. 加载会话：如果不存在，则创建新会话
+        var session = await _sessionStore.GetSessionAsync(
+            _generalAssistant, currentConversationId, ct)
+            ?? await _generalAssistant.CreateSessionAsync(cancellationToken: ct);
+
+        // 3. 使用该会话运行
         var response = await _generalAssistant.RunAsync(
             userMessage, session, cancellationToken: ct);
 
+        // 4. 保存更新后的会话（包含最新对话历史）
+        await _sessionStore.SaveSessionAsync(
+            _generalAssistant, currentConversationId, session, ct);
+
         return new AgentReply(
-            // ✅ AIAgent.Name 可能为 null，提供回退值
+            ConversationId: currentConversationId,
             AgentName: _generalAssistant.Name ?? "assistant",
-            // ✅ AgentResponse.Text 非空，无需 ??
             Reply: response.Text,
             MessageCount: response.Messages.Count);
     }
 
-    /// <summary>跑 Sequential 工作流：Writer -> Critic。</summary>
+    /// <summary>跑 Sequential 工作流：Writer -> Critic（工作流暂不持久化）。</summary>
     public async Task<WorkflowReply> RunWriterCriticAsync(
         string topic, CancellationToken ct)
     {
         var workflowAgent = await GetWorkflowAgentAsync(ct);
 
-        // ✅ 同上，不使用 await using
         var session = await workflowAgent.CreateSessionAsync(
             cancellationToken: ct);
 
@@ -77,23 +93,16 @@ public sealed class MafAgentService
 
         var steps = response.Messages
             .Select(m => new WorkflowStep(
-                // ✅ ChatMessage.AuthorName 可能为 null，提供回退值
                 Agent: m.AuthorName ?? "unknown",
-                // ✅ ChatMessage.Text 非空，无需 ??
                 Text: m.Text))
             .ToList();
 
         return new WorkflowReply(
             Topic: topic,
-            // ✅ AgentResponse.Text 非空，无需 ??
             FinalAnswer: response.Text,
             Steps: steps);
     }
 
-    /// <summary>
-    /// 惰性初始化 WriterCritic 工作流。
-    /// 使用 SemaphoreSlim 而非 Lazy&lt;Task&gt;：允许失败后重试。
-    /// </summary>
     private async Task<AIAgent> GetWorkflowAgentAsync(CancellationToken ct)
     {
         if (_writerCriticWorkflow is not null)
@@ -113,7 +122,6 @@ public sealed class MafAgentService
                     .WithDescription("先由 Writer 出初稿，再由 Critic 直接产出终稿")
                     .Build();
 
-                // ✅ MAF 1.21：AsAIAgent 扩展方法
                 _writerCriticWorkflow = workflow.AsAIAgent(
                     id: "writer-critic-workflow",
                     name: "WriterCritic");
