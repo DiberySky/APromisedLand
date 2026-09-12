@@ -4,41 +4,41 @@ public static class YarpExtension
 {
     public static IDistributedApplicationBuilder AddYarp(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
-        // if (context.WeatherApi is null || context.QuestionService is null ||
-        //     context.TypesenseService is null || context.ElasticService is null ||
-        //     context.FileTransService is null) return builder;
+        // if (resourceContext.WeatherApi is null || resourceContext.QuestionService is null ||
+        //     resourceContext.TypesenseService is null || resourceContext.ElasticService is null ||
+        //     resourceContext.FileTransService is null) return builder;
 
-        context.YarpGateway = builder.AddYarp("Yarp")
+        resourceContext.YarpGateway = builder.AddYarp("Yarp")
             .WithConfiguration(yarp =>
             {
-                if (context.WeatherApi is not null) 
+                if (resourceContext.WeatherApi is not null) 
                 {
-                    yarp.AddRoute("/WeatherForecast/{**catch-all}", context.WeatherApi);
+                    yarp.AddRoute("/WeatherForecast/{**catch-all}", resourceContext.WeatherApi);
                 }
-                if (context.QuestionService is not null) 
+                if (resourceContext.QuestionService is not null) 
                 {
-                    yarp.AddRoute("/Questions/{**catch-all}", context.QuestionService);
-                    yarp.AddRoute("/tags/{**catch-all}", context.QuestionService);
+                    yarp.AddRoute("/Questions/{**catch-all}", resourceContext.QuestionService);
+                    yarp.AddRoute("/tags/{**catch-all}", resourceContext.QuestionService);
                 }
-                if (context.TypesenseService is not null) 
+                if (resourceContext.TypesenseService is not null) 
                 {
-                    yarp.AddRoute("/search-mini/{**catch-all}", context.TypesenseService);
-                    yarp.AddRoute("/typesense/{**catch-all}", context.TypesenseService);
+                    yarp.AddRoute("/search-mini/{**catch-all}", resourceContext.TypesenseService);
+                    yarp.AddRoute("/typesense/{**catch-all}", resourceContext.TypesenseService);
                 }
-                if (context.ElasticService is not null) 
+                if (resourceContext.ElasticService is not null) 
                 {
-                    yarp.AddRoute("/elastic/{**catch-all}", context.ElasticService); 
+                    yarp.AddRoute("/elastic/{**catch-all}", resourceContext.ElasticService); 
                 }
-                if (context.FileTransService is not null) 
+                if (resourceContext.FileTransService is not null) 
                 {
-                    yarp.AddRoute("/filetrans/{**catch-all}", context.FileTransService);
+                    yarp.AddRoute("/filetrans/{**catch-all}", resourceContext.FileTransService);
                 }
-                if (context.DiberyTreeService is not null) 
+                if (resourceContext.DiberyTreeService is not null) 
                 {
-                    yarp.AddRoute("/DiberyTree/{**catch-all}", context.DiberyTreeService);
-                    yarp.AddRoute("/CategoryTree/{**catch-all}", context.DiberyTreeService);
+                    yarp.AddRoute("/DiberyTree/{**catch-all}", resourceContext.DiberyTreeService);
+                    yarp.AddRoute("/CategoryTree/{**catch-all}", resourceContext.DiberyTreeService);
                 }
             })
             .WithHttpEndpoint(port: 8919, targetPort: 8919, name: "http")

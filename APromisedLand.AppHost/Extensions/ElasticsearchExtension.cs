@@ -4,10 +4,10 @@ public static class ElasticsearchExtension
 {
     public static IDistributedApplicationBuilder AddElasticsearch(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
         // Elasticsearch
-        context.Elasticsearch = builder.AddElasticsearch("Elasticsearch")
+        resourceContext.Elasticsearch = builder.AddElasticsearch("Elasticsearch")
             .WithImage("elasticsearch:9.4.3")
             .WithDockerfile("./Segmentation")
             .WithDataVolume("elasticsearch-data")

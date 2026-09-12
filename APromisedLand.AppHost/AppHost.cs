@@ -1,15 +1,26 @@
 using APromisedLand.AppHost;
 using APromisedLand.AppHost.Extensions;
-using Aspire.Hosting.DevTunnels;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var context = new AppHostContext();
+var context = new AppHostResourceContext();
 
-MafRag();
+MafWorkFlowService();
 
 builder.Build().Run();
 return;
+
+void MafWorkFlowService()
+{
+    builder.AddPostgres(context);
+    builder.AddRedis(context);
+    builder.AddNebulaGraph(context);
+    builder.AddWeaviate(context);
+    builder.AddSeaweedFs(context);
+    builder.AddOllama(context);
+    
+    builder.AddMafWorkFlowApi(context); 
+}
 
 void MafRag()
 {
@@ -77,7 +88,7 @@ void AddService()
     var compose = builder.AddDockerComposeEnvironment("production")
         .WithDashboard(dashboardOptions => dashboardOptions.WithHostPort(8090));
 
-    // var context = new AppHostContext();
+    // var context = new AppHostResourceContext();
 
     // builder.AddKeycloak(context); // Keycloak
     builder.AddPostgres(context); // Postgres

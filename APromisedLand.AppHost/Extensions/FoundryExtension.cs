@@ -6,7 +6,7 @@ public static class FoundryExtension
 {
     public static IDistributedApplicationBuilder AddFoundry(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
 
         builder.AddProject<Projects.FoundryLocalService>("AIFoundryLocal")

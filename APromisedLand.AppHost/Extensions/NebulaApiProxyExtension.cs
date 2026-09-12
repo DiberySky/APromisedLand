@@ -4,19 +4,19 @@ public static class NebulaApiProxyExtension
 {
     public static IDistributedApplicationBuilder AddNebulaApiProxyService(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
-        context.NebulaApiProxy = builder.AddProject<Projects.NebulaApi_Proxy>("NebulaApi-Proxy")
+        resourceContext.NebulaApiProxy = builder.AddProject<Projects.NebulaApi_Proxy>("NebulaApi-Proxy")
             .WithHttpEndpoint(port: 9119, targetPort: 9119, name: "http", isProxied: false);
         
-        if (context is { NebulaGraphFastApi: not null, NebulaGraphFastApiEndpoint: not null })
+        if (resourceContext is { NebulaGraphFastApi: not null, NebulaGraphFastApiEndpoint: not null })
         {
-            context.NebulaApiProxy.WithEnvironment("NebulaGraph-FastApi-Endpoint", context.NebulaGraphFastApiEndpoint);
-            context.NebulaApiProxy.WithReference(context.NebulaGraphFastApi);
-            context.NebulaApiProxy.WaitFor(context.NebulaGraphFastApi);
+            resourceContext.NebulaApiProxy.WithEnvironment("NebulaGraph-FastApi-Endpoint", resourceContext.NebulaGraphFastApiEndpoint);
+            resourceContext.NebulaApiProxy.WithReference(resourceContext.NebulaGraphFastApi);
+            resourceContext.NebulaApiProxy.WaitFor(resourceContext.NebulaGraphFastApi);
         }
         
-        context.NebulaApiProxy.WithOtlpExporter();
+        resourceContext.NebulaApiProxy.WithOtlpExporter();
 
         return builder;
     }

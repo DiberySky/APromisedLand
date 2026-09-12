@@ -19,12 +19,12 @@ public static class SeaweedFsExtension
 
     public static IDistributedApplicationBuilder AddSeaweedFs(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
         // ============================================================
         // 1. Master —— 集群拓扑，必须最先启动
         // ============================================================
-        context.SeaweedMaster = builder.AddContainer("seaweedfs-master", Image)
+        resourceContext.SeaweedMaster = builder.AddContainer("seaweedfs-master", Image)
             .WithArgs(
                 "master",
                 "-ip=seaweedfs-master",
@@ -39,7 +39,7 @@ public static class SeaweedFsExtension
         // ============================================================
         // 2. Volume —— 实际数据块存储
         // ============================================================
-        context.SeaweedVolume = builder.AddContainer("seaweedfs-volume", Image)
+        resourceContext.SeaweedVolume = builder.AddContainer("seaweedfs-volume", Image)
             .WithArgs(
                 "volume",
                 "-mserver=seaweedfs-master:9333",
@@ -51,12 +51,12 @@ public static class SeaweedFsExtension
             .WithHttpEndpoint(name: "http", targetPort: 8080)
             .WithVolume("seaweedfs-volume-data", "/data")
             .WithOtlpExporter()
-            .WaitFor(context.SeaweedMaster);
+            .WaitFor(resourceContext.SeaweedMaster);
 
         // ============================================================
         // 3. Filer —— POSIX 语义的文件系统层
         // ============================================================
-        context.SeaweedFiler = builder.AddContainer("seaweedfs-filer", Image)
+        resourceContext.SeaweedFiler = builder.AddContainer("seaweedfs-filer", Image)
             .WithArgs(
                 "filer",
                 "-master=seaweedfs-master:9333",
@@ -67,8 +67,8 @@ public static class SeaweedFsExtension
             .WithHttpEndpoint(name: "http", targetPort: 8888)
             .WithVolume("seaweedfs-filer-data", "/data")
             .WithOtlpExporter()
-            .WaitFor(context.SeaweedMaster)
-            .WaitFor(context.SeaweedVolume);
+            .WaitFor(resourceContext.SeaweedMaster)
+            .WaitFor(resourceContext.SeaweedVolume);
 
         // ============================================================
         // 4. S3 网关 —— 对外暴露 S3 API（监听 8333）
@@ -97,7 +97,7 @@ public static class SeaweedFsExtension
                 s3ConfigPath);
         }
 
-        context.SeaweedS3 = builder.AddContainer("seaweedfs-s3", Image)
+        resourceContext.SeaweedS3 = builder.AddContainer("seaweedfs-s3", Image)
             .WithArgs(
                 "s3",
                 "-filer=seaweedfs-filer:8888",
@@ -115,7 +115,7 @@ public static class SeaweedFsExtension
                 port: 8333,
                 isProxied: false)
             .WithOtlpExporter()
-            .WaitFor(context.SeaweedFiler);
+            .WaitFor(resourceContext.SeaweedFiler);
 
         return builder;
     }

@@ -5,18 +5,19 @@ using MAFRagService.Startup.Configuration;
 using MAFRagService.Startup.Extensions;
 using MAFRagService.Startup;
 using MAFRagService.Tools;
+using Microsoft.Agents.AI.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 var config  = builder.Configuration;
 var env     = builder.Environment;
 
 // ============================================================
-// 1) Options —— 绑定 + 校验
+// 1) Options
 // ============================================================
 builder.Services.AddRagOptions(config);
 
 // ============================================================
-// 2) 连接串 —— 集中解析 + 脱敏日志
+// 2) 连接串
 // ============================================================
 var conns = ConnectionStrings.Resolve(config, env, warn: Console.WriteLine);
 
@@ -39,11 +40,20 @@ Console.WriteLine(
     features.Rag, features.Graph, features.Entity, features.Agents, features.Indexing);
 
 // ============================================================
+// ★ 3.5) MAF 注册（Phase 1 最小引入）
+// ============================================================
+builder.AddOllamaApiClient("chat-model").AddChatClient();
+
+builder.AddAIAgent(
+    name: "RagTestAgent",
+    instructions: "你是测试 Agent，仅用于验证 MAF 包已正确引入。");
+
+// ============================================================
 // 4) 服务注册
 // ============================================================
 builder.Services
     .AddRagInfrastructure(conns, features)
-    .AddRagApi()                                  // ★ 开发阶段：无身份验证
+    .AddRagApi()
     .AddRagBusinessServices(features)
     .AddRagAiServices(config, conns, features)
     .AddRagObservability(config)
@@ -78,10 +88,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// ★ 开发阶段：不启用身份验证中间件
-// app.UseAuthentication();
-// app.UseAuthorization();
-
 // ---------- Hangfire Dashboard ----------
 app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
@@ -105,4 +111,21 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 
 app.MapHealthChecks("/health");
 
+// ============================================================
+// ★ 临时验证（Phase 1）
+//   仅日志，不引入额外 using / 属性，编译零风险。
+// ============================================================
+using (var scope = app.Services.CreateScope())
+{
+    var testAgent = scope.ServiceProvider
+        .GetKeyedService<Microsoft.Agents.AI.AIAgent>("RagTestAgent");
+
+    Console.WriteLine(
+        "[MAF-VERIFY] RagTestAgent resolved: {0}, Name: {1}",
+        testAgent is not null ? "OK" : "NULL",
+        testAgent?.Name ?? "<null>");
+}
+
 app.Run();
+
+public partial class Program;

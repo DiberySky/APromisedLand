@@ -4,10 +4,10 @@ public static class RedisExtension
 {
     public static IDistributedApplicationBuilder AddRedis(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
         // Redis
-        context.Redis = builder.AddRedis("Redis")
+        resourceContext.Redis = builder.AddRedis("Redis")
             .WithPersistence()
             .WithDataVolume("redis-data", isReadOnly: false)
             .WithOtlpExporter();

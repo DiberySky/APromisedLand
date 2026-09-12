@@ -4,30 +4,30 @@ public static class DiberyMauiExtension
 {
     public static IDistributedApplicationBuilder AddDiberyMauiSky(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
-        context.DiberyMauiSky = builder.AddMauiProject("DiberyMauiSky", 
+        resourceContext.DiberyMauiSky = builder.AddMauiProject("DiberyMauiSky", 
             "../DiberyMauiSky/DiberyMauiSky.csproj");
 
-        var winDevice = context.DiberyMauiSky.AddWindowsDevice();
+        var winDevice = resourceContext.DiberyMauiSky.AddWindowsDevice();
 
-        // if (context.Keycloak is not null && context.PublicDevTunnel is not null)
+        // if (resourceContext.Keycloak is not null && resourceContext.PublicDevTunnel is not null)
         // {
-        //     winDevice.WithReference(context.Keycloak, context.PublicDevTunnel);
+        //     winDevice.WithReference(resourceContext.Keycloak, resourceContext.PublicDevTunnel);
         // }
 
-        if (context.DiberyTreeService is not null)
+        if (resourceContext.DiberyTreeService is not null)
         {
-            winDevice.WithReference(context.DiberyTreeService);
+            winDevice.WithReference(resourceContext.DiberyTreeService);
         }
 
         winDevice.WithOtlpExporter();
 
         // 可选 Android 模拟器（注释部分）
-        // context.DiberySky.AddAndroidEmulator()
+        // resourceContext.DiberySky.AddAndroidEmulator()
         //     .WithOtlpDevTunnel()
-        //     .WithReference(context.WeatherApi, context.PublicDevTunnel)
-        //     .WithReference(context.Keycloak, context.PublicDevTunnel);
+        //     .WithReference(resourceContext.WeatherApi, resourceContext.PublicDevTunnel)
+        //     .WithReference(resourceContext.Keycloak, resourceContext.PublicDevTunnel);
 
         return builder;
     }

@@ -8,7 +8,7 @@ public static class NebulaGraphExtension
 {
     public static IDistributedApplicationBuilder AddNebulaGraph(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
         var tz = builder.Configuration["TZ"] ?? "UTC";
 
@@ -127,10 +127,10 @@ public static class NebulaGraphExtension
             .WithEnvironment("STUDIO_PORT", "7001")
             .WaitFor(nebulaGraphd);
 
-        context.NebulaGraph = nebulaGraphd;
-        context.NebulaGraphEndpoint = nebulaGraphd.GetEndpoint("graph");
-        context.NebulaConsole = nebulaConsole;
-        context.NebulaStudio = studio;
+        resourceContext.NebulaGraph = nebulaGraphd;
+        resourceContext.NebulaGraphEndpoint = nebulaGraphd.GetEndpoint("graph");
+        resourceContext.NebulaConsole = nebulaConsole;
+        resourceContext.NebulaStudio = studio;
 
         return builder;
     }

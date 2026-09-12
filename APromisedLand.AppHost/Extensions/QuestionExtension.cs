@@ -4,90 +4,90 @@ public static class QuestionExtension
 {
     public static IDistributedApplicationBuilder AddQuestionService(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
-        context.QuestionService = builder.AddProject<Projects.QuestionService>("Question-Service");
+        resourceContext.QuestionService = builder.AddProject<Projects.QuestionService>("Question-Service");
         
-        if (context.QuestionDb != null )
+        if (resourceContext.QuestionDb != null )
         {
-            context.QuestionService.WithReference(context.QuestionDb);
-            context.QuestionService.WaitFor(context.QuestionDb);
+            resourceContext.QuestionService.WithReference(resourceContext.QuestionDb);
+            resourceContext.QuestionService.WaitFor(resourceContext.QuestionDb);
         }
         
-        if (context.Keycloak != null )
+        if (resourceContext.Keycloak != null )
         {
-            context.QuestionService.WithReference(context.Keycloak);
-            context.QuestionService.WaitFor(context.Keycloak);
+            resourceContext.QuestionService.WithReference(resourceContext.Keycloak);
+            resourceContext.QuestionService.WaitFor(resourceContext.Keycloak);
         }
         
-        if (context.Redis != null )
+        if (resourceContext.Redis != null )
         {
-            context.QuestionService.WithReference(context.Redis);
-            context.QuestionService.WaitFor(context.Redis);
+            resourceContext.QuestionService.WithReference(resourceContext.Redis);
+            resourceContext.QuestionService.WaitFor(resourceContext.Redis);
         }
         
-        if (context.Ollama != null )
+        if (resourceContext.Ollama != null )
         {
-            context.QuestionService.WithReference(context.Ollama);
-            context.QuestionService.WaitFor(context.Ollama);
+            resourceContext.QuestionService.WithReference(resourceContext.Ollama);
+            resourceContext.QuestionService.WaitFor(resourceContext.Ollama);
         }
         
-        if (context.Nats != null )
+        if (resourceContext.Nats != null )
         {
-            context.QuestionService.WithReference(context.Nats);
-            context.QuestionService.WaitFor(context.Nats);
+            resourceContext.QuestionService.WithReference(resourceContext.Nats);
+            resourceContext.QuestionService.WaitFor(resourceContext.Nats);
         }
         
-        if (context.Elasticsearch != null )
+        if (resourceContext.Elasticsearch != null )
         {
-            context.QuestionService.WithReference(context.Elasticsearch);
-            context.QuestionService.WaitFor(context.Elasticsearch);
+            resourceContext.QuestionService.WithReference(resourceContext.Elasticsearch);
+            resourceContext.QuestionService.WaitFor(resourceContext.Elasticsearch);
         }
         
-        if (context.TypesenseEndpoint != null )
+        if (resourceContext.TypesenseEndpoint != null )
         {
-            context.QuestionService.WithReference(context.TypesenseEndpoint)
-                .WithEnvironment("typesense-api-key", context.TypesenseApiKey)
-                .WithReference(context.TypesenseEndpoint);
+            resourceContext.QuestionService.WithReference(resourceContext.TypesenseEndpoint)
+                .WithEnvironment("typesense-api-key", resourceContext.TypesenseApiKey)
+                .WithReference(resourceContext.TypesenseEndpoint);
         }
         
-        if (context.RabbitMq != null )
+        if (resourceContext.RabbitMq != null )
         {
-            context.QuestionService.WithReference(context.RabbitMq);
-            context.QuestionService.WaitFor(context.RabbitMq);
+            resourceContext.QuestionService.WithReference(resourceContext.RabbitMq);
+            resourceContext.QuestionService.WaitFor(resourceContext.RabbitMq);
         }
         
-        // if (context.QuestionDb is null || context.Keycloak is null ||
-        //     context.Redis is null || context.Ollama is null ||
-        //     context.Nats is null || context.Elasticsearch is null ||
-        //     context.TypesenseEndpoint is null) return builder;
+        // if (resourceContext.QuestionDb is null || resourceContext.Keycloak is null ||
+        //     resourceContext.Redis is null || resourceContext.Ollama is null ||
+        //     resourceContext.Nats is null || resourceContext.Elasticsearch is null ||
+        //     resourceContext.TypesenseEndpoint is null) return builder;
         //
         // // QuestionService
-        // context.QuestionService = builder.AddProject<Projects.QuestionService>("Question-Service")
-        //     .WithEnvironment("typesense-api-key", context.TypesenseApiKey)
-        //     .WithReference(context.TypesenseEndpoint)
-        //     .WithReference(context.Keycloak)
-        //     .WithReference(context.QuestionDb)
-        //     .WithReference(context.RabbitMq)
-        //     .WithReference(context.Redis)
-        //     .WithReference(context.Elasticsearch)
-        //     .WithReference(context.Ollama)
-        //     .WithReference(context.Nats)
-        //     .WaitFor(context.Keycloak)
-        //     .WaitFor(context.QuestionDb)
-        //     .WaitFor(context.RabbitMq)
-        //     .WaitFor(context.Elasticsearch)
-        //     .WaitFor(context.Ollama)
-        //     .WaitFor(context.Nats)
-        //     .WaitFor(context.Redis);
+        // resourceContext.QuestionService = builder.AddProject<Projects.QuestionService>("Question-Service")
+        //     .WithEnvironment("typesense-api-key", resourceContext.TypesenseApiKey)
+        //     .WithReference(resourceContext.TypesenseEndpoint)
+        //     .WithReference(resourceContext.Keycloak)
+        //     .WithReference(resourceContext.QuestionDb)
+        //     .WithReference(resourceContext.RabbitMq)
+        //     .WithReference(resourceContext.Redis)
+        //     .WithReference(resourceContext.Elasticsearch)
+        //     .WithReference(resourceContext.Ollama)
+        //     .WithReference(resourceContext.Nats)
+        //     .WaitFor(resourceContext.Keycloak)
+        //     .WaitFor(resourceContext.QuestionDb)
+        //     .WaitFor(resourceContext.RabbitMq)
+        //     .WaitFor(resourceContext.Elasticsearch)
+        //     .WaitFor(resourceContext.Ollama)
+        //     .WaitFor(resourceContext.Nats)
+        //     .WaitFor(resourceContext.Redis);
 
         // WeatherApi
-        // context.WeatherApi = builder.AddProject<Projects.WeatherApi>("Weather-Api");
+        // resourceContext.WeatherApi = builder.AddProject<Projects.WeatherApi>("Weather-Api");
         //
-        // if (context.Keycloak is not null)
+        // if (resourceContext.Keycloak is not null)
         // {
-        //     context.QuestionService.WithReference(context.Keycloak)
-        //     .WaitFor(context.Keycloak);
+        //     resourceContext.QuestionService.WithReference(resourceContext.Keycloak)
+        //     .WaitFor(resourceContext.Keycloak);
         // }
 
         return builder;

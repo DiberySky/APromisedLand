@@ -6,29 +6,29 @@ public static class DevTunnelExtension
 {
     public static IDistributedApplicationBuilder AddDevTunnel(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
-        // if (context.YarpGateway is null || context.Keycloak is null) return builder;
+        // if (resourceContext.YarpGateway is null || resourceContext.Keycloak is null) return builder;
 
-        context.PublicDevTunnel = builder.AddDevTunnel("DevTunnel-public")
+        resourceContext.PublicDevTunnel = builder.AddDevTunnel("DevTunnel-public")
             .WithAnonymousAccess()
             .WithEnvironment("TUNNEL_ACCESS", "anonymous");
 
-        if (context.Keycloak is not null)
+        if (resourceContext.Keycloak is not null)
         {
-            context.PublicDevTunnel
-                .WithReference(context.Keycloak.GetEndpoint("http"), new DevTunnelPortOptions
+            resourceContext.PublicDevTunnel
+                .WithReference(resourceContext.Keycloak.GetEndpoint("http"), new DevTunnelPortOptions
                 {
                     Protocol = "https"
                 });
         }
 
-        if (context.YarpGateway is not null)
+        if (resourceContext.YarpGateway is not null)
         {
-            context.PublicDevTunnel.WithReference(context.YarpGateway.GetEndpoint("http"));
+            resourceContext.PublicDevTunnel.WithReference(resourceContext.YarpGateway.GetEndpoint("http"));
         }
 
-        context.PublicDevTunnel.WithOtlpExporter();
+        resourceContext.PublicDevTunnel.WithOtlpExporter();
 
         return builder;
     }

@@ -4,9 +4,9 @@ public static class KeycloakExtension
 {
     public static IDistributedApplicationBuilder AddKeycloak(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
-        context.Keycloak = builder.AddKeycloak("Keycloak", 8323)
+        resourceContext.Keycloak = builder.AddKeycloak("Keycloak", 8323)
             .WithDataVolume("keycloak-data")
             .WithOtlpExporter();
 

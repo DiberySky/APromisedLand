@@ -4,28 +4,28 @@ public static class QuestionTypesenseExtension
 {
     public static IDistributedApplicationBuilder AddQustionTypesense(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
-        if (context.RabbitMq is null || context.TypesenseEndpoint is null ||
-            context.Typesense is null || context.TypesenseApiKey is null) return builder;
+        if (resourceContext.RabbitMq is null || resourceContext.TypesenseEndpoint is null ||
+            resourceContext.Typesense is null || resourceContext.TypesenseApiKey is null) return builder;
 
         // Typesense-Service
-        context.TypesenseService = builder.AddProject<Projects.SearchService>("Typesense-question")
-            .WithEnvironment("typesense-api-key", context.TypesenseApiKey)
-            .WithReference(context.TypesenseEndpoint)
-            .WithReference(context.RabbitMq)
-            .WaitFor(context.Typesense)
-            .WaitFor(context.RabbitMq);
+        resourceContext.TypesenseService = builder.AddProject<Projects.SearchService>("Typesense-question")
+            .WithEnvironment("typesense-api-key", resourceContext.TypesenseApiKey)
+            .WithReference(resourceContext.TypesenseEndpoint)
+            .WithReference(resourceContext.RabbitMq)
+            .WaitFor(resourceContext.Typesense)
+            .WaitFor(resourceContext.RabbitMq);
 
-        // if (context.TypesenseEndpoint is null || context.Typesense is null || 
-        //     context.TypesenseApiKey is null || context.Nats is null) return builder;
+        // if (resourceContext.TypesenseEndpoint is null || resourceContext.Typesense is null || 
+        //     resourceContext.TypesenseApiKey is null || resourceContext.Nats is null) return builder;
         //
-        // context.TypesenseService = builder.AddProject<Projects.QuestionTypesenseService>("Typesense-question")
-        //     .WithEnvironment("typesense-api-key", context.TypesenseApiKey)
-        //     .WithReference(context.TypesenseEndpoint)
-        //     .WithReference(context.Nats)
-        //     .WaitFor(context.Typesense)
-        //     .WaitFor(context.Nats);
+        // resourceContext.TypesenseService = builder.AddProject<Projects.QuestionTypesenseService>("Typesense-question")
+        //     .WithEnvironment("typesense-api-key", resourceContext.TypesenseApiKey)
+        //     .WithReference(resourceContext.TypesenseEndpoint)
+        //     .WithReference(resourceContext.Nats)
+        //     .WaitFor(resourceContext.Typesense)
+        //     .WaitFor(resourceContext.Nats);
         
         return builder;
     }

@@ -1,0 +1,8 @@
+@MAFWorkFlowApi_HostAddress = http://localhost:5111
+
+GET {{MAFWorkFlowApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+# 检查 API 是否在监听（端口 5323，从 AppHost 固定）
+http://localhost:5323/health

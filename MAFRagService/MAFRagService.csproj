@@ -8,18 +8,24 @@
 
     <ItemGroup>
         <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.5.3" />
+        <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.5.3" />
         <PackageReference Include="AWSSDK.S3" Version="4.0.103.1" />
         <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.5.0" />
         <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
         <PackageReference Include="Hangfire.Core" Version="1.8.25" />
         <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
         <PackageReference Include="Microsoft.Agents.AI" Version="1.20.0" />
+        <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.20.0" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.20.0-preview.260831.1" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.20.0-alpha.260831.1" />
+        <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.20.0" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.0" />
         <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.12" />
         <PackageReference Include="Npgsql.OpenTelemetry" Version="10.0.3" />

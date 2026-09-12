@@ -4,21 +4,21 @@ public static class MafAiExtension
 {
     public static IDistributedApplicationBuilder AddMafAi(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context) 
+        AppHostResourceContext resourceContext) 
     {
         // Add the API project with Redis and Ollama references
         var mafStateful = builder.AddProject<Projects.MafAIService>("MAF-Ai");
 
-        if (context.Redis != null)
+        if (resourceContext.Redis != null)
         {
-            mafStateful.WithReference(context.Redis)
-                .WaitFor(context.Redis);
+            mafStateful.WithReference(resourceContext.Redis)
+                .WaitFor(resourceContext.Redis);
         }
 
-        if (context.ChatModel != null)
+        if (resourceContext.ChatModel != null)
         {
-            mafStateful.WithReference(context.ChatModel)
-                .WaitFor(context.ChatModel);
+            mafStateful.WithReference(resourceContext.ChatModel)
+                .WaitFor(resourceContext.ChatModel);
         }
 
         // Add the Client project and reference the API

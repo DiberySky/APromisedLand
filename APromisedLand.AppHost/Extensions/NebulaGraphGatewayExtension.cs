@@ -6,7 +6,7 @@ public static class NebulaGraphGatewayExtension
 {
     public static IDistributedApplicationBuilder AddNebulaGraphGateway(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
         var tz = builder.Configuration["TZ"] ?? "UTC";
 
@@ -112,9 +112,9 @@ public static class NebulaGraphGatewayExtension
             .WaitFor(nebulaGraphd);
 
         // API Service 应等待 Gateway 就绪（而不是直接等 graphd）
-        context.NebulaGraph = nebulaGraphd;
-        context.NebulaGraphEndpoint = nebulaGateway.GetEndpoint("gateway");
-        context.NebulaConsole = nebulaConsole;
+        resourceContext.NebulaGraph = nebulaGraphd;
+        resourceContext.NebulaGraphEndpoint = nebulaGateway.GetEndpoint("gateway");
+        resourceContext.NebulaConsole = nebulaConsole;
 
         return builder;
     }

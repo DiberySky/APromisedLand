@@ -4,12 +4,12 @@ public static class WeaviateExtension
 {
     public static IDistributedApplicationBuilder AddWeaviate(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
         // ★ 去掉宿主机端口 8080，仅保留容器内 targetPort
         //   宿主机端口由 Aspire 动态分配，避免和本机 Tomcat/Jenkins/代理等冲突
         //   MafRagService 通过容器网络访问 weaviate:8080，不受影响
-        context.Weaviate = builder.AddContainer("weaviate", "semitechnologies/weaviate:1.26.0")
+        resourceContext.Weaviate = builder.AddContainer("weaviate", "semitechnologies/weaviate:1.26.0")
             .WithHttpEndpoint(name: "http", targetPort: 8080)
             .WithVolume("weaviate-data", "/var/lib/weaviate")
 
@@ -73,17 +73,17 @@ public static class WeaviateExtension
 
         // VectorAdmin：从浏览器访问，保留固定宿主机端口 3131
         // WEAVIATE_URL 使用端点表达式，端口改动时自动跟随
-        if (context.VectorAdminDb != null && context.Postgres != null)
+        if (resourceContext.VectorAdminDb != null && resourceContext.Postgres != null)
         {
             var vectorDbManager = builder.AddContainer("vectordbmanager", "mintplexlabs/vectoradmin:latest")
                 .WithHttpEndpoint(port: 3131, targetPort: 3001, name: "http")
-                .WithEnvironment("WEAVIATE_URL", context.Weaviate.GetEndpoint("http"))
-                .WithEnvironment("DATABASE_CONNECTION_STRING", context.VectorAdminDb.Resource.UriExpression)
+                .WithEnvironment("WEAVIATE_URL", resourceContext.Weaviate.GetEndpoint("http"))
+                .WithEnvironment("DATABASE_CONNECTION_STRING", resourceContext.VectorAdminDb.Resource.UriExpression)
                 .WithEnvironment("JWT_SECRET", "aVeryLongRandomStringAtLeast32CharactersLong")
                 .WithEnvironment("SYS_EMAIL", "admin@vectoradmin.com")
                 .WithEnvironment("SYS_PASSWORD", "Dibery#@#919")
-                .WaitFor(context.Postgres)
-                .WaitFor(context.Weaviate)
+                .WaitFor(resourceContext.Postgres)
+                .WaitFor(resourceContext.Weaviate)
                 .WithOtlpExporter();
         }
 

@@ -4,23 +4,23 @@ public static class DiberyTreeExtension
 {
     public static IDistributedApplicationBuilder AddDiberyTreeService(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
-        // if (context.QuestionDb is null || context.Keycloak is null ||
-        //     context.Redis is null || context.Ollama is null ||
-        //     context.Nats is null || context.Elasticsearch is null ||
-        //     context.TypesenseEndpoint is null) return builder;
+        // if (resourceContext.QuestionDb is null || resourceContext.Keycloak is null ||
+        //     resourceContext.Redis is null || resourceContext.Ollama is null ||
+        //     resourceContext.Nats is null || resourceContext.Elasticsearch is null ||
+        //     resourceContext.TypesenseEndpoint is null) return builder;
         
         // QuestionService
-        context.DiberyTreeService = builder.AddProject<Projects.DiberyTreeService>("DiberyTree-Service");
+        resourceContext.DiberyTreeService = builder.AddProject<Projects.DiberyTreeService>("DiberyTree-Service");
         
-        if (context.TreeDb != null )
+        if (resourceContext.TreeDb != null )
         {
-            context.DiberyTreeService.WithReference(context.TreeDb);
-            context.DiberyTreeService.WaitFor(context.TreeDb);
+            resourceContext.DiberyTreeService.WithReference(resourceContext.TreeDb);
+            resourceContext.DiberyTreeService.WaitFor(resourceContext.TreeDb);
         }
         
-        context.DiberyTreeService.WithOtlpExporter();
+        resourceContext.DiberyTreeService.WithOtlpExporter();
 
         return builder;
     }

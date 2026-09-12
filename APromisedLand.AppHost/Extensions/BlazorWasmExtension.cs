@@ -5,15 +5,15 @@ public static class BlazorWasmExtension
 {
     public static IDistributedApplicationBuilder AddBlazorWasm(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
 
         // var blazorApp = builder.AddBlazorWasmProject<Projects.DiberyBlazorSky>("app")
         //     .WithOtlpExporter();
         
-        // if (context.DiberyTreeService != null)
+        // if (resourceContext.DiberyTreeService != null)
         // {
-        //     blazorApp.WithReference(context.DiberyTreeService);
+        //     blazorApp.WithReference(resourceContext.DiberyTreeService);
         // }
         //
         // builder.AddBlazorGateway("gateway")

@@ -4,7 +4,7 @@ using Aspire.Hosting.Python;
 
 namespace APromisedLand.AppHost;
 
-public class AppHostContext
+public class AppHostResourceContext
 {
     // Keycloak
     public IResourceBuilder<KeycloakResource>? Keycloak { get; set; }
@@ -65,6 +65,8 @@ public class AppHostContext
     public IResourceBuilder<ProjectResource>? DiberyTreeService { get; set; }
     public IResourceBuilder<ProjectResource>? QuestionService { get; set; }
     public IResourceBuilder<ProjectResource>? MafRagService { get; set; }
+    public IResourceBuilder<ProjectResource>? MafWorkFlowApi { get; set; }
+
     public IResourceBuilder<ProjectResource>? WeatherApi { get; set; }
     public IResourceBuilder<ProjectResource>? TypesenseService { get; set; }
     public IResourceBuilder<ProjectResource>? FileTransService { get; set; }

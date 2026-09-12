@@ -12,71 +12,71 @@ public static class MafRagExtension
 
     public static IDistributedApplicationBuilder AddMafRagService(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
         // ★ 固定宿主机端口 5100
-        context.MafRagService = builder
+        resourceContext.MafRagService = builder
             .AddProject<Projects.MAFRagService>("MafRagService")
             .WithHttpEndpoint(port: MafRagHttpPort, name: "http");
 
         // ========== 内部资源：走标准 WithReference ==========
-        if (context.MetadataDb is not null)
-            context.MafRagService.WithReference(context.MetadataDb);
+        if (resourceContext.MetadataDb is not null)
+            resourceContext.MafRagService.WithReference(resourceContext.MetadataDb);
 
-        if (context.HangfireDb is not null)
-            context.MafRagService.WithReference(context.HangfireDb);
+        if (resourceContext.HangfireDb is not null)
+            resourceContext.MafRagService.WithReference(resourceContext.HangfireDb);
 
-        if (context.Redis is not null)
-            context.MafRagService.WithReference(context.Redis);
+        if (resourceContext.Redis is not null)
+            resourceContext.MafRagService.WithReference(resourceContext.Redis);
 
         // Ollama 服务端：用于 /api/tags 健康探测
-        if (context.Ollama is not null)
+        if (resourceContext.Ollama is not null)
         {
-            context.MafRagService
-                .WithReference(context.Ollama)
-                .WaitFor(context.Ollama);
+            resourceContext.MafRagService
+                .WithReference(resourceContext.Ollama)
+                .WaitFor(resourceContext.Ollama);
         }
 
         // 聊天模型：注入 ConnectionStrings__chat-model
-        if (context.ChatModel is not null)
+        if (resourceContext.ChatModel is not null)
         {
-            context.MafRagService
-                .WithReference(context.ChatModel)
-                .WaitFor(context.ChatModel);
+            resourceContext.MafRagService
+                .WithReference(resourceContext.ChatModel)
+                .WaitFor(resourceContext.ChatModel);
         }
 
         // 嵌入模型：注入 ConnectionStrings__embedding
-        if (context.Embedding is not null)
+        if (resourceContext.Embedding is not null)
         {
-            context.MafRagService
-                .WithReference(context.Embedding)
-                .WaitFor(context.Embedding);
+            resourceContext.MafRagService
+                .WithReference(resourceContext.Embedding)
+                .WaitFor(resourceContext.Embedding);
         }
 
         // ========== 外部资源：走显式连接字符串 ==========
 
         WireExternalService(
-            context.MafRagService,
-            context.NebulaGraph,
+            resourceContext.MafRagService,
+            resourceContext.NebulaGraph,
             endpointName: "graph",
             connectionStringName: "nebula",
             scheme: "thrift");
 
         WireExternalService(
-            context.MafRagService,
-            context.Weaviate,
+            resourceContext.MafRagService,
+            resourceContext.Weaviate,
             endpointName: "http",
             connectionStringName: "weaviate",
             scheme: "http");
 
         WireExternalService(
-            context.MafRagService,
-            context.SeaweedS3,
+            resourceContext.MafRagService,
+            resourceContext.SeaweedS3,
             endpointName: "s3",
             connectionStringName: "seaweedfs",
             scheme: "http");
 
-        context.MafRagService.WithOtlpExporter();
+        resourceContext.MafRagService.WithOtlpExporter();
 
         return builder;
     }

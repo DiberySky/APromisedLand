@@ -4,10 +4,10 @@ public static class RabbitMqExtension
 {
     public static IDistributedApplicationBuilder AddRabbitMq(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
         // RabbitMQ
-        context.RabbitMq = builder.AddRabbitMQ("RabbitMQ")
+        resourceContext.RabbitMq = builder.AddRabbitMQ("RabbitMQ")
             .WithDataVolume("rabbitmq-data")
             .WithManagementPlugin(port: 15672);
 

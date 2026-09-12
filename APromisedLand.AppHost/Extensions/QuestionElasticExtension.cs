@@ -4,19 +4,19 @@ public static class QuestionElasticExtension
 {
         public static IDistributedApplicationBuilder AddQuestionElastic(
         this IDistributedApplicationBuilder builder,
-        AppHostContext context)
+        AppHostResourceContext resourceContext)
     {
-        if (context.Elasticsearch is null || context.RabbitMq is null ||
-            context.Ollama is null) return builder;
+        if (resourceContext.Elasticsearch is null || resourceContext.RabbitMq is null ||
+            resourceContext.Ollama is null) return builder;
         
         // Elastic-Service（业务服务）
-        context.ElasticService = builder.AddProject<Projects.ElasticsearchService>("Elastic-question")
-            .WithReference(context.RabbitMq)
-            .WithReference(context.Elasticsearch)
-            .WithReference(context.Ollama)
-            .WaitFor(context.RabbitMq)
-            .WaitFor(context.Elasticsearch)
-            .WaitFor(context.Ollama);
+        resourceContext.ElasticService = builder.AddProject<Projects.ElasticsearchService>("Elastic-question")
+            .WithReference(resourceContext.RabbitMq)
+            .WithReference(resourceContext.Elasticsearch)
+            .WithReference(resourceContext.Ollama)
+            .WaitFor(resourceContext.RabbitMq)
+            .WaitFor(resourceContext.Elasticsearch)
+            .WaitFor(resourceContext.Ollama);
 
         return builder;
     }
