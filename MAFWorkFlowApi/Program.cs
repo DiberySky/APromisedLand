@@ -1,6 +1,6 @@
 using MAFWorkFlowApi.Agents;
 using MAFWorkFlowApi.HealthChecks;
-using Microsoft.Agents.AI.Hosting; 
+using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 #pragma warning disable EXTEXP0001
@@ -8,28 +8,39 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------------------------------------------------------------------------
-// 1. Aspire 默认：OpenTelemetry、健康检查、服务发现、HTTP 容错
+// 1. Aspire 默认
 // ---------------------------------------------------------------------------
 builder.AddServiceDefaults();
 
 // ---------------------------------------------------------------------------
-// 2. Redis 分布式缓存（用于 AgentSession 持久化）
-//    资源名 "Redis" 与 AppHost 中 RedisExtension.cs 的声明一致
+// 2. Redis 分布式缓存
 // ---------------------------------------------------------------------------
 builder.AddRedisDistributedCache("Redis");
 
 // ---------------------------------------------------------------------------
-// 3. 全局配置 HttpClient：移除 Polly 弹性管道，设置长超时
-//    Ollama 推理是长事务，默认 30s 超时会截断请求
+// 3. 全局 HttpClient 配置
+//    - 移除 Aspire 默认弹性管道（AttemptTimeout=10s 会截断 Ollama 长推理）
+//    - 全局超时放宽到 10 分钟
 // ---------------------------------------------------------------------------
 builder.Services.ConfigureHttpClientDefaults(http =>
 {
     http.RemoveAllResilienceHandlers();
-    http.ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5));
+    http.ConfigureHttpClient(client =>
+        client.Timeout = TimeSpan.FromMinutes(10));
 });
 
+// 健康检查专用：短超时，避免拖慢 /health
+builder.Services.AddHttpClient(OllamaModelReadyHealthCheck.HttpClientName)
+    .ConfigureHttpClient(client =>
+        client.Timeout = TimeSpan.FromSeconds(10));
+
+// 预热专用：长超时，用于启动时加载模型
+builder.Services.AddHttpClient(OllamaWarmupService.HttpClientName)
+    .ConfigureHttpClient(client =>
+        client.Timeout = TimeSpan.FromMinutes(10));
+
 // ---------------------------------------------------------------------------
-// 4. OllamaSharp 客户端集成
+// 4. OllamaSharp 客户端
 // ---------------------------------------------------------------------------
 builder.AddOllamaApiClient("chat-model")
     .AddKeyedChatClient("chat-model");
@@ -38,7 +49,7 @@ builder.AddOllamaApiClient("embedding")
     .AddKeyedEmbeddingGenerator("embedding");
 
 // ---------------------------------------------------------------------------
-// 5. Controller 风格 MVC + OpenAPI
+// 5. MVC + OpenAPI
 // ---------------------------------------------------------------------------
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
@@ -46,7 +57,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
 // ---------------------------------------------------------------------------
-// 6. 绑定 Agent 配置
+// 6. Agent 配置绑定
 // ---------------------------------------------------------------------------
 builder.Services
     .AddOptions<OllamaAgentOptions>()
@@ -55,13 +66,22 @@ builder.Services
     .ValidateOnStart();
 
 // ---------------------------------------------------------------------------
-// 7. 注册会话存储（Redis 实现）与 MAF 封装服务
+// 7. 会话存储与 MAF 服务
 // ---------------------------------------------------------------------------
-builder.Services.AddSingleton<AgentSessionStore, RedisAgentSessionStore>();
+builder.Services.AddSingleton<RedisAgentSessionStore>();
+builder.Services.AddSingleton<AgentSessionStore>(
+    sp => sp.GetRequiredService<RedisAgentSessionStore>());
+builder.Services.AddSingleton<IConversationCatalog>(
+    sp => sp.GetRequiredService<RedisAgentSessionStore>());
 builder.Services.AddSingleton<MafAgentService>();
 
 // ---------------------------------------------------------------------------
-// 8. 健康检查
+// 8. 启动时预热 Ollama 模型
+// ---------------------------------------------------------------------------
+builder.Services.AddHostedService<OllamaWarmupService>();
+
+// ---------------------------------------------------------------------------
+// 9. 健康检查
 // ---------------------------------------------------------------------------
 builder.Services.AddHealthChecks()
     .AddCheck<OllamaModelReadyHealthCheck>(
@@ -72,7 +92,7 @@ builder.Services.AddHealthChecks()
 var app = builder.Build();
 
 // ---------------------------------------------------------------------------
-// 9. 中间件管线
+// 10. 中间件管线
 // ---------------------------------------------------------------------------
 if (app.Environment.IsDevelopment())
 {

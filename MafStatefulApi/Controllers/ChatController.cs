@@ -29,17 +29,15 @@ public class ChatController : ControllerBase
     /// <summary>
     /// Send a message to the agent and receive a response.
     /// </summary>
-    /// <param name="request">Chat request containing message and optional conversation ID.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The agent's response with conversation ID.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(ChatResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ChatResponse>> PostChat(
         [FromBody] ChatRequest request,
         CancellationToken cancellationToken = default)
     {
-        var conversationId = request.ConversationId ?? $"{DateTime.Now:HH:mm:ss}-{Guid.NewGuid()}";
+        var conversationId = ResolveConversationId(request.ConversationId);
 
         _logger.LogInformation(
             "Chat request received for conversation {ConversationId}",
@@ -58,6 +56,17 @@ public class ChatController : ControllerBase
                 Answer = answer
             });
         }
+        catch (TimeoutException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Timeout acquiring lock for conversation {ConversationId}",
+                conversationId);
+
+            return Problem(
+                detail: "The conversation is busy, please retry.",
+                statusCode: StatusCodes.Status409Conflict);
+        }
         catch (Exception ex)
         {
             _logger.LogError(
@@ -74,9 +83,6 @@ public class ChatController : ControllerBase
     /// <summary>
     /// Reset a conversation by deleting its session state.
     /// </summary>
-    /// <param name="conversationId">The conversation ID to reset.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Confirmation message.</returns>
     [HttpPost("reset/{conversationId}")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public async Task<ActionResult> ResetConversation(
@@ -95,8 +101,6 @@ public class ChatController : ControllerBase
     /// <summary>
     /// List all active conversation sessions.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>List of active session IDs.</returns>
     [HttpGet("sessions")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public async Task<ActionResult> ListSessions(CancellationToken cancellationToken = default)
@@ -106,5 +110,36 @@ public class ChatController : ControllerBase
         var sessions = await _sessionStore.ListSessionsAsync(cancellationToken);
 
         return Ok(new { sessions });
+    }
+
+    /// <summary>
+    /// 规范化 conversationId：
+    ///  - 未提供时生成无冒号的 URL 安全 ID（yyyyMMddHHmmss-{Guid:N}）
+    ///  - 提供了则替换 URL 路径不安全字符，保证 /reset/{conversationId} 能原样往返
+    /// </summary>
+    private string ResolveConversationId(string? supplied)
+    {
+        if (string.IsNullOrWhiteSpace(supplied))
+        {
+            return $"{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}";
+        }
+
+        var sanitized = supplied
+            .Replace(':', '-')
+            .Replace('/', '-')
+            .Replace('\\', '-')
+            .Replace('?', '-')
+            .Replace('#', '-')
+            .Replace(' ', '-');
+
+        if (!string.Equals(sanitized, supplied, StringComparison.Ordinal))
+        {
+            _logger.LogWarning(
+                "Supplied conversationId '{Original}' contained URL-unsafe characters; sanitized to '{Sanitized}'",
+                supplied,
+                sanitized);
+        }
+
+        return sanitized;
     }
 }

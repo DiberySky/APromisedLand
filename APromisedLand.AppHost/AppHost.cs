@@ -18,114 +18,116 @@ void MafWorkFlowService()
     builder.AddWeaviate(context);
     builder.AddSeaweedFs(context);
     builder.AddOllama(context);
-    
-    builder.AddMafWorkFlowApi(context); 
+
+    builder.AddMafWorkFlowApi(context);
+
+    builder.AddBlazorWeb(context);
 }
 
 void MafRag()
 {
-    builder.AddPostgres(context);
-    builder.AddRedis(context);
-    builder.AddNebulaGraph(context);
-    builder.AddWeaviate(context);
-    builder.AddSeaweedFs(context);
-    builder.AddOllama(context);
-    
-    builder.AddMafRagService(context); 
+    // builder.AddPostgres(context);
+    // builder.AddRedis(context);
+    // builder.AddNebulaGraph(context);
+    // builder.AddWeaviate(context);
+    // builder.AddSeaweedFs(context);
+    // builder.AddOllama(context);
+    //
+    // builder.AddMafRagService(context); 
 }
 
 void MafChat()
 {
-// Add Redis cache resource for session persistence
-    var cache = builder.AddRedis("cache");
-//.WithPersistence()
-//.WithDataVolume();
-
-// Add Ollama container with persistent volume for model caching
-    var ollama = builder.AddOllama("ollama")
-        .WithDataVolume();
-
-// Add a model to Ollama (default: llama3.2:1b)
-    var ollamaModel = ollama.AddModel("chat-model", "qwen2.5:7b"); //llama3.2:1b phi4-mini qwen2.5-7b
-
-// Task.Delay(1000).Wait();
-
-// Add the API project with Redis and Ollama references
-    var api = builder.AddProject<Projects.MafStatefulApi>("api")
-        .WithReference(cache)
-        .WaitFor(cache)
-        .WithReference(ollamaModel)
-        .WaitFor(ollamaModel);
-
-// Add the Web project and reference the API
-    var web = builder.AddProject<Projects.MafStatefulApi_Web>("web")
-        .WaitFor(cache)
-        .WaitFor(ollama)
-        .WaitFor(ollamaModel)
-        .WithReference(api)
-        .WaitFor(api);
-
-
-// Add the Client project and reference the API
-    var client = builder.AddProject<Projects.MafStatefulApi_Client>("client")
-        .WaitFor(cache)
-        .WaitFor(ollama)
-        .WaitFor(ollamaModel)
-        .WaitFor(web)
-        .WithReference(api)
-        .WaitFor(api);
+// // Add Redis cache resource for session persistence
+//     var cache = builder.AddRedis("cache");
+// //.WithPersistence()
+// //.WithDataVolume();
+//
+// // Add Ollama container with persistent volume for model caching
+//     var ollama = builder.AddOllama("ollama")
+//         .WithDataVolume();
+//
+// // Add a model to Ollama (default: llama3.2:1b)
+//     var ollamaModel = ollama.AddModel("chat-model", "qwen2.5:7b"); //llama3.2:1b phi4-mini qwen2.5-7b
+//
+// // Task.Delay(1000).Wait();
+//
+// // Add the API project with Redis and Ollama references
+//     var api = builder.AddProject<Projects.MafStatefulApi>("api")
+//         .WithReference(cache)
+//         .WaitFor(cache)
+//         .WithReference(ollamaModel)
+//         .WaitFor(ollamaModel);
+//
+// // Add the Web project and reference the API
+//     var web = builder.AddProject<Projects.MafStatefulApi_Web>("web")
+//         .WaitFor(cache)
+//         .WaitFor(ollama)
+//         .WaitFor(ollamaModel)
+//         .WithReference(api)
+//         .WaitFor(api);
+//
+//
+// // Add the Client project and reference the API
+//     var client = builder.AddProject<Projects.MafStatefulApi_Client>("client")
+//         .WaitFor(cache)
+//         .WaitFor(ollama)
+//         .WaitFor(ollamaModel)
+//         .WaitFor(web)
+//         .WithReference(api)
+//         .WaitFor(api);
 }
 
 void AddService()
 {
-    // 添加 Qwen3-ASR 容器，暴露 ASR 服务端口（假设是 8000）
-    // 使用 FunASR 官方镜像（CPU 版本，若需 GPU 加速可换 funasr-runtime-sdk-gpu:latest）
-    // var asrService = builder.AddDockerfile("qwen3-asr", "../FunAsrService")
-    //     .WithHttpEndpoint(port: 8000, targetPort: 8000, name: "asr-http")
-    //     .WithBindMount(@"D:\DiberyModelSky\Qwen--Qwen3-ASR-1.7B", "/app/model")
-    //     .WithBuildArg("BUILDKIT_PROGRESS", "plain");  // 显示完整构建日志
-
-    var compose = builder.AddDockerComposeEnvironment("production")
-        .WithDashboard(dashboardOptions => dashboardOptions.WithHostPort(8090));
-
-    // var context = new AppHostResourceContext();
-
-    // builder.AddKeycloak(context); // Keycloak
-    builder.AddPostgres(context); // Postgres
-    builder.AddRedis(context); // Redis
-    builder.AddOllama(context); // Ollama + embedding 
-    builder.AddNebulaStudio(context); // NebulaStudio
-
-    builder.AddMafStateful(context); // MafStateful
-// builder.AddMafAi(context); // MafAi
-
-    builder.AddDiberyTreeService(context);
-    builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
-
-    // builder.AddFoundry(context); // Foundry Local
-
-    // builder.AddNebulaGraph(context); // NebulaGraph
-    // builder.AddNebulaGraphApiService(context); // NebulaGraphApiService
-    // builder.AddNebulaGraphFastApiService(context); // AddNebulaGraphFastApiService
-    // builder.AddNebulaApiProxyService(context); // NebulaApiProxyService
-
-    // builder.AddWeatherService(context); // WeatherApi
-
-
-    // builder.AddYarp(context); // Yarp
-    // builder.AddDevTunnel(context); // DevTunnel
-
-    // builder.AddMauiApp(context); // Maui Blazor
-
-    // builder.AddSemanticSearch(context);
-    // builder.AddNats(context); // Nats
-    // builder.AddTypesense(context); // Typesense
-    // builder.AddElasticsearch(context); // Elasticsearch
-    // builder.AddSeaweedFs(context); // SeaweedFS Service
-    // builder.AddQuestionService(context); // QuestionService, WeatherApi
-    // builder.AddQuestionElastic(context); // Elastic-Service
-    // builder.AddQustionTypesense(context); // SearchService
-    // builder.AddElasticKibana(context); // Kibana
-    // builder.AddRabbitMq(context); // RabbitMQ
-    // builder.AddBlazorWasm(context); // Blazor, BlazorGateway, BlazorWasmAppResource
+//     // 添加 Qwen3-ASR 容器，暴露 ASR 服务端口（假设是 8000）
+//     // 使用 FunASR 官方镜像（CPU 版本，若需 GPU 加速可换 funasr-runtime-sdk-gpu:latest）
+//     // var asrService = builder.AddDockerfile("qwen3-asr", "../FunAsrService")
+//     //     .WithHttpEndpoint(port: 8000, targetPort: 8000, name: "asr-http")
+//     //     .WithBindMount(@"D:\DiberyModelSky\Qwen--Qwen3-ASR-1.7B", "/app/model")
+//     //     .WithBuildArg("BUILDKIT_PROGRESS", "plain");  // 显示完整构建日志
+//
+//     var compose = builder.AddDockerComposeEnvironment("production")
+//         .WithDashboard(dashboardOptions => dashboardOptions.WithHostPort(8090));
+//
+//     // var context = new AppHostResourceContext();
+//
+//     // builder.AddKeycloak(context); // Keycloak
+//     builder.AddPostgres(context); // Postgres
+//     builder.AddRedis(context); // Redis
+//     builder.AddOllama(context); // Ollama + embedding 
+//     builder.AddNebulaStudio(context); // NebulaStudio
+//
+//     builder.AddMafStateful(context); // MafStateful
+// // builder.AddMafAi(context); // MafAi
+//
+//     builder.AddDiberyTreeService(context);
+//     builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
+//
+//     // builder.AddFoundry(context); // Foundry Local
+//
+//     // builder.AddNebulaGraph(context); // NebulaGraph
+//     // builder.AddNebulaGraphApiService(context); // NebulaGraphApiService
+//     // builder.AddNebulaGraphFastApiService(context); // AddNebulaGraphFastApiService
+//     // builder.AddNebulaApiProxyService(context); // NebulaApiProxyService
+//
+//     // builder.AddWeatherService(context); // WeatherApi
+//
+//
+//     // builder.AddYarp(context); // Yarp
+//     // builder.AddDevTunnel(context); // DevTunnel
+//
+//     // builder.AddMauiApp(context); // Maui Blazor
+//
+//     // builder.AddSemanticSearch(context);
+//     // builder.AddNats(context); // Nats
+//     // builder.AddTypesense(context); // Typesense
+//     // builder.AddElasticsearch(context); // Elasticsearch
+//     // builder.AddSeaweedFs(context); // SeaweedFS Service
+//     // builder.AddQuestionService(context); // QuestionService, WeatherApi
+//     // builder.AddQuestionElastic(context); // Elastic-Service
+//     // builder.AddQustionTypesense(context); // SearchService
+//     // builder.AddElasticKibana(context); // Kibana
+//     // builder.AddRabbitMq(context); // RabbitMQ
+//     // builder.AddBlazorWasm(context); // Blazor, BlazorGateway, BlazorWasmAppResource
 }

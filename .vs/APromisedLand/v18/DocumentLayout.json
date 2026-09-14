@@ -1,7 +1,12 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "D:\\APromisedLand\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{E8AC872C-C5B5-DC4B-498C-52E66E2CA6A2}|DiberyBlazorSky\\DiberyBlazorSky.csproj|d:\\apromisedland\\diberyblazorsky\\diberyblazorsky.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{E8AC872C-C5B5-DC4B-498C-52E66E2CA6A2}|DiberyBlazorSky\\DiberyBlazorSky.csproj|solutionrelative:diberyblazorsky\\diberyblazorsky.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -9,8 +14,21 @@
       "DocumentGroups": [
         {
           "DockedWidth": 428,
-          "SelectedChildIndex": -1,
+          "SelectedChildIndex": 0,
           "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "DiberyBlazorSky",
+              "DocumentMoniker": "D:\\APromisedLand\\DiberyBlazorSky\\DiberyBlazorSky.csproj",
+              "RelativeDocumentMoniker": "DiberyBlazorSky\\DiberyBlazorSky.csproj",
+              "ToolTip": "D:\\APromisedLand\\DiberyBlazorSky\\DiberyBlazorSky.csproj*",
+              "RelativeToolTip": "DiberyBlazorSky\\DiberyBlazorSky.csproj*",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-09-14T06:02:01.575Z",
+              "EditorCaption": ""
+            },
             {
               "$type": "Bookmark",
               "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"

@@ -5,9 +5,7 @@ namespace MAFWorkFlowApi.Models;
 /// <summary>POST /api/agents/chat 的请求体。</summary>
 public sealed class ChatRequest
 {
-    /// <summary>
-    /// 会话 ID。首次请求时为空，后续请求需带上服务端返回的 conversationId。
-    /// </summary>
+    /// <summary>会话 ID。首次请求时为空，后续请求需带上服务端返回的 conversationId。</summary>
     public string? ConversationId { get; set; }
 
     /// <summary>用户输入。必填。</summary>
@@ -22,6 +20,20 @@ public sealed record AgentReply(
     string AgentName,
     string Reply,
     int MessageCount);
+
+/// <summary>GET /api/agents/sessions 的响应体。</summary>
+public sealed record SessionsReply(IReadOnlyList<string> Sessions);
+
+/// <summary>会话中的单条消息。</summary>
+public sealed record SessionMessage(
+    string Role,
+    string Text,
+    string? AuthorName);
+
+/// <summary>GET /api/agents/sessions/{id}/messages 的响应体。</summary>
+public sealed record SessionMessagesReply(
+    string ConversationId,
+    IReadOnlyList<SessionMessage> Messages);
 
 /// <summary>POST /api/workflows/writer-critic 的请求体。</summary>
 public sealed class WorkflowRunRequest
@@ -39,3 +51,9 @@ public sealed record WorkflowReply(
     string Topic,
     string FinalAnswer,
     IReadOnlyList<WorkflowStep> Steps);
+
+/// <summary>SSE 流式事件：单个增量文本块。</summary>
+public sealed record WorkflowStreamEvent(
+    string Agent,
+    string Delta,
+    bool IsFinal);

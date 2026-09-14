@@ -9,14 +9,12 @@ namespace MAFWorkFlowApi.HealthChecks;
 
 /// <summary>
 /// 就绪检查：验证 Ollama 服务可达，且目标模型已实际拉取到本地。
-/// 使用静态 HttpClient + 内存缓存，将稳态耗时降至毫秒级。
+/// 通过 IHttpClientFactory 创建命名客户端，模型名精确匹配，结果缓存 30/5 秒。
 /// </summary>
 public sealed class OllamaModelReadyHealthCheck : IHealthCheck
 {
-    private static readonly HttpClient Http = new()
-    {
-        Timeout = TimeSpan.FromSeconds(10)
-    };
+    /// <summary>健康检查专用 HttpClient 名称（在 Program.cs 注册）。</summary>
+    public const string HttpClientName = "ollama-health";
 
     private static readonly MemoryCache Cache = new(new MemoryCacheOptions
     {
@@ -27,13 +25,16 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
     private static readonly TimeSpan UnhealthyTtl = TimeSpan.FromSeconds(5);
 
     private readonly OllamaAgentOptions _options;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<OllamaModelReadyHealthCheck> _logger;
 
     public OllamaModelReadyHealthCheck(
         IOptions<OllamaAgentOptions> options,
+        IHttpClientFactory httpClientFactory,
         ILogger<OllamaModelReadyHealthCheck> logger)
     {
         _options = options.Value;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
@@ -71,7 +72,7 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
         if (!Uri.TryCreate($"{endpoint}/api/tags", UriKind.Absolute, out var tagsUri))
         {
             return HealthCheckResult.Unhealthy(
-                $"Ollama endpoint 配置无效: '{endpoint}'",
+                $"Ollama endpoint 配置无效：'{endpoint}'",
                 data: new Dictionary<string, object>
                 {
                     ["resolvedEndpoint"] = endpoint,
@@ -79,9 +80,11 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
                 });
         }
 
+        var client = _httpClientFactory.CreateClient(HttpClientName);
+
         try
         {
-            using var response = await Http.GetAsync(
+            using var response = await client.GetAsync(
                 tagsUri,
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
@@ -99,23 +102,14 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
 
             await using var stream = await response.Content
                 .ReadAsStreamAsync(cancellationToken);
-            using var doc = await JsonDocument.ParseAsync(
-                stream, cancellationToken: cancellationToken);
 
-            var installedModels = doc.RootElement
-                .GetProperty("models")
-                .EnumerateArray()
-                .Select(m => m.GetProperty("name").GetString())
-                .Where(n => n is not null)
-                .ToList();
+            var installedModels = await ParseInstalledModelsAsync(
+                stream, cancellationToken);
 
-            var isModelReady = installedModels.Any(m =>
-                m!.StartsWith(modelId, StringComparison.OrdinalIgnoreCase));
-
-            if (!isModelReady)
+            if (!IsModelInstalled(installedModels, modelId))
             {
                 _logger.LogWarning(
-                    "Ollama 可达但目标模型 {Model} 尚未拉取完成。已安装模型：{Models}",
+                    "Ollama 可达但目标模型 {Model} 尚未拉取。已安装：{Models}",
                     modelId, string.Join(", ", installedModels));
 
                 return HealthCheckResult.Unhealthy(
@@ -143,19 +137,87 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "无法连接 Ollama: {Endpoint}", endpoint);
+            _logger.LogWarning(ex, "无法连接 Ollama：{Endpoint}", endpoint);
             return HealthCheckResult.Unhealthy(
-                $"无法连接 Ollama: {ex.Message}",
-                exception: ex,
-                data: new Dictionary<string, object> { ["endpoint"] = endpoint });
+                $"无法连接 Ollama：{ex.Message}",
+                data: new Dictionary<string, object>
+                {
+                    ["endpoint"] = endpoint,
+                    ["exceptionType"] = ex.GetType().Name
+                });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ollama 健康检查异常");
             return HealthCheckResult.Unhealthy(
-                $"Ollama 健康检查异常: {ex.Message}",
-                exception: ex);
+                $"Ollama 健康检查异常：{ex.Message}",
+                data: new Dictionary<string, object>
+                {
+                    ["exceptionType"] = ex.GetType().Name
+                });
         }
+    }
+
+    private static async Task<List<string>> ParseInstalledModelsAsync(
+        Stream stream, CancellationToken cancellationToken)
+    {
+        var result = new List<string>();
+        try
+        {
+            using var doc = await JsonDocument.ParseAsync(
+                stream, cancellationToken: cancellationToken);
+
+            if (!doc.RootElement.TryGetProperty("models", out var modelsEl) ||
+                modelsEl.ValueKind != JsonValueKind.Array)
+            {
+                return result;
+            }
+
+            foreach (var m in modelsEl.EnumerateArray())
+            {
+                if (m.TryGetProperty("name", out var nameEl) &&
+                    nameEl.ValueKind == JsonValueKind.String)
+                {
+                    var name = nameEl.GetString();
+                    if (!string.IsNullOrWhiteSpace(name))
+                        result.Add(name);
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // 结构异常时返回空列表，由调用方按「未就绪」处理
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 模型名精确匹配；若目标未指定标签，则额外允许匹配 "{target}:latest"。
+    /// </summary>
+    private static bool IsModelInstalled(
+        IReadOnlyList<string> installed, string target)
+    {
+        if (installed.Count == 0 || string.IsNullOrWhiteSpace(target))
+            return false;
+
+        foreach (var name in installed)
+        {
+            if (string.Equals(name, target, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        if (!target.Contains(':'))
+        {
+            var withLatest = $"{target}:latest";
+            foreach (var name in installed)
+            {
+                if (string.Equals(name, withLatest, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static string ResolveEndpoint(OllamaAgentOptions options)

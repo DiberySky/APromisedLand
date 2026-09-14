@@ -1,24 +1,28 @@
 using MafStatefulApi.Agents;
 using MafStatefulApi.State;
 using Microsoft.Agents.AI.Hosting;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
 builder.AddServiceDefaults();
-
-// Add OpenAPI support
 builder.Services.AddOpenApi();
 
-// Configure Redis distributed cache for session persistence
-builder.AddRedisDistributedCache("cache");
+// 资源名统一为 "Redis"，与 AppHost 中 builder.AddRedis("Redis") 一致
+builder.AddRedisDistributedCache("Redis");
 
-// Also register IConnectionMultiplexer for advanced Redis operations
-builder.AddRedisClient("cache");
+// 清空 InstanceName，保证 IDistributedCache 的 key 前缀与
+// RedisAgentSessionStore.ListSessionsAsync 的 SCAN pattern "maf:sessions:*" 一致
+builder.Services.PostConfigure<RedisCacheOptions>(options =>
+{
+    options.InstanceName = string.Empty;
+});
+
+// 注册非 keyed IConnectionMultiplexer，
+// 与 AgentRunner 的构造函数参数 IConnectionMultiplexer redis 匹配
+builder.AddRedisClient("Redis");
 
 builder.Services.AddSingleton<IAgentSessionStore, RedisAgentSessionStore>();
-builder.Services.AddLogging(logging => logging.AddConsole());
-Console.WriteLine("Using Redis for session storage");
 
 builder.Services.ConfigureHttpClientDefaults(httpBuilder =>
 {
@@ -30,10 +34,7 @@ builder.Services.ConfigureHttpClientDefaults(httpBuilder =>
     });
 });
 
-// Configure Microsoft Agent Framework with Ollama
 builder.AddOllamaApiClient("chat-model").AddChatClient();
-
-Console.WriteLine("Using Ollama for AI model");
 
 builder.AddAIAgent(
     name: "AssistantAgent",
@@ -47,29 +48,21 @@ builder.AddAIAgent(
             -如果你不知道什么，老实说
         ");
 
-// Register AgentRunner
 builder.Services.AddScoped<AgentRunner>();
-
-// ===== 添加 API Controller 支持 =====
 builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// Map Aspire default endpoints (health checks)
 app.MapDefaultEndpoints();
 
-// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-// ===== 使用 API Controller 路由 =====
 app.MapControllers();
-
 app.Run();
 
-// Make Program accessible for testing
-public partial class Program
-{
-}
+#pragma warning disable CA1812
+public partial class Program;
+#pragma warning restore CA1812

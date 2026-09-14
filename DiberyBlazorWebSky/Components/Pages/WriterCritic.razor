@@ -1,0 +1,360 @@
+@page "/writer-critic"
+
+@inject WorkflowApiClient WorkflowApi
+@inject IJSRuntime Js
+@inject ILogger<WriterCritic> Logger
+@implements IDisposable
+@rendermode InteractiveServer
+
+<PageTitle>写作-评审工作流</PageTitle>
+
+<div class="workflow-container">
+    <div class="workflow-header">
+        <h1>✍️ 写作-评审工作流</h1>
+        <p class="subtitle">
+            输入一个主题，写作者先产出初稿，评审再给出润色后的终稿。输出实时流式更新。
+        </p>
+    </div>
+
+    <div class="workflow-input">
+        <input type="text"
+               class="topic-input"
+               @bind="_topic"
+               @bind:event="oninput"
+               @onkeydown="HandleKeyDown"
+               placeholder="例如：微服务架构下的分布式追踪"
+               disabled="@_isRunning" />
+        <button class="btn-run"
+                @onclick="RunStreamAsync"
+                disabled="@(_isRunning || string.IsNullOrWhiteSpace(_topic))">
+            @(_isRunning ? "运行中…" : "运行 🚀")
+        </button>
+        @if (_isRunning)
+        {
+            <button class="btn-cancel" @onclick="CancelAsync">取消 ✋</button>
+        }
+    </div>
+
+    @if (_isRunning)
+    {
+        <div class="workflow-progress">
+            <div class="spinner"></div>
+            <span>@GetProgressText()</span>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="workflow-error">⚠️ @_errorMessage</div>
+    }
+
+    @if (_reply is not null)
+    {
+        <div class="workflow-result">
+            <div class="final-answer">
+                <div class="answer-header">
+                    <h2>✅ 最终结果</h2>
+                    <div class="answer-actions">
+                        <button class="btn-copy" @onclick="CopyFinalAnswerAsync">
+                            @(_copySucceeded ? "✅ 已复制" : "📋 复制终稿")
+                        </button>
+                        <button class="btn-download" @onclick="DownloadFinalAnswerAsync">
+                            💾 另存为文件
+                        </button>
+                    </div>
+                </div>
+                <div class="answer-text">@_reply.FinalAnswer</div>
+            </div>
+
+            @if (_reply.Steps.Count > 0)
+            {
+                <div class="workflow-steps">
+                    <h2>📋 执行步骤</h2>
+                    @{
+                        var idx = 0;
+                    }
+                    @foreach (var step in _reply.Steps)
+                    {
+                        idx++;
+                        <div class="step">
+                            <div class="step-header">
+                                <span class="step-index">#@idx</span>
+                                <span class="step-agent">@TranslateAgentName(step.Agent)</span>
+                            </div>
+                            <div class="step-text">@step.Text</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string _topic = string.Empty;
+    private WorkflowReply? _reply;
+    private string? _errorMessage;
+    private bool _isRunning;
+    private bool _copySucceeded;
+    private int _elapsedSeconds;
+
+    private CancellationTokenSource? _runCts;
+    private Timer? _elapsedTimer;
+    private DateTime _startedAt;
+
+    private string GetProgressText()
+    {
+        if (_elapsedSeconds <= 5)
+            return "工作流运行中…（" + _elapsedSeconds + " 秒）";
+        return "模型正在推理，已等待 " + _elapsedSeconds + " 秒…";
+    }
+
+    /// <summary>把后端返回的英文 Agent 名映射为中文显示名。</summary>
+    private static string TranslateAgentName(string agent)
+    {
+        if (string.IsNullOrEmpty(agent))
+            return "未知";
+
+        if (agent.Contains("Writer", StringComparison.OrdinalIgnoreCase))
+            return "写作者";
+        if (agent.Contains("Critic", StringComparison.OrdinalIgnoreCase))
+            return "评审";
+        if (agent.Contains("Assistant", StringComparison.OrdinalIgnoreCase))
+            return "助手";
+
+        return agent;
+    }
+
+    private async Task RunStreamAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_topic) || _isRunning)
+            return;
+
+        var currentTopic = _topic.Trim();
+        _reply = null;
+        _errorMessage = null;
+        _copySucceeded = false;
+        _isRunning = true;
+        _startedAt = DateTime.Now;
+        _elapsedSeconds = 0;
+
+        var writerText = new StringBuilder();
+        var criticText = new StringBuilder();
+
+        _elapsedTimer = new Timer(OnElapsedTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+        _runCts = new CancellationTokenSource();
+        StateHasChanged();
+
+        try
+        {
+            await foreach (var evt in WorkflowApi
+                .RunWriterCriticStreamAsync(currentTopic, _runCts.Token))
+            {
+                var agent = evt.Agent;
+
+                if (agent.Contains("Writer", StringComparison.OrdinalIgnoreCase))
+                {
+                    writerText.Append(evt.Delta);
+                }
+                else if (agent.Contains("Critic", StringComparison.OrdinalIgnoreCase))
+                {
+                    criticText.Append(evt.Delta);
+                }
+                else
+                {
+                    if (criticText.Length > 0)
+                        criticText.Append(evt.Delta);
+                    else
+                        writerText.Append(evt.Delta);
+                }
+
+                _reply = BuildReply(currentTopic, writerText, criticText);
+                await InvokeAsync(StateHasChanged);
+            }
+
+            _reply = BuildReply(currentTopic, writerText, criticText);
+        }
+        catch (OperationCanceledException)
+        {
+            _errorMessage = "已取消。";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "RunWriterCriticStreamAsync failed");
+            _errorMessage = "运行失败：" + ex.Message;
+        }
+        finally
+        {
+            DisposeElapsedTimer();
+            DisposeRunCts();
+
+            _isRunning = false;
+            _elapsedSeconds = 0;
+            StateHasChanged();
+        }
+    }
+
+    private void OnElapsedTick(object? state)
+    {
+        _elapsedSeconds = (int)(DateTime.Now - _startedAt).TotalSeconds;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private static WorkflowReply BuildReply(
+        string topicValue,
+        StringBuilder writerText,
+        StringBuilder criticText)
+    {
+        var finalAnswer = criticText.Length > 0
+            ? criticText.ToString()
+            : writerText.ToString();
+
+        var steps = new List<WorkflowStep>();
+        if (writerText.Length > 0)
+        {
+            steps.Add(new WorkflowStep
+            {
+                Agent = "Writer",
+                Text = writerText.ToString(),
+            });
+        }
+        if (criticText.Length > 0)
+        {
+            steps.Add(new WorkflowStep
+            {
+                Agent = "Critic",
+                Text = criticText.ToString(),
+            });
+        }
+
+        return new WorkflowReply
+        {
+            Topic = topicValue,
+            FinalAnswer = finalAnswer,
+            Steps = steps,
+        };
+    }
+
+    private void CancelAsync()
+    {
+        _runCts?.Cancel();
+    }
+
+    private async Task CopyFinalAnswerAsync()
+    {
+        if (_reply is null)
+            return;
+
+        try
+        {
+            _copySucceeded = await Js.InvokeAsync<bool>(
+                "copyToClipboard", _reply.FinalAnswer);
+
+            if (_copySucceeded)
+                await ResetCopyStatusAfterDelayAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "复制终稿失败");
+            _errorMessage = "复制失败，请手动选择文本复制。";
+        }
+    }
+
+    private async Task ResetCopyStatusAfterDelayAsync()
+    {
+        await Task.Delay(2000);
+        _copySucceeded = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task DownloadFinalAnswerAsync()
+    {
+        if (_reply is null)
+            return;
+
+        var safeTopic = SanitizeFileName(_reply.Topic);
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var fileName = "写作-评审_" + safeTopic + "_" + timestamp + ".txt";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("主题：" + _reply.Topic);
+        sb.AppendLine("生成时间：" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        sb.AppendLine();
+        sb.AppendLine("===== 最终结果 =====");
+        sb.AppendLine(_reply.FinalAnswer);
+        sb.AppendLine();
+        sb.AppendLine("===== 执行步骤 =====");
+        foreach (var step in _reply.Steps)
+        {
+            sb.AppendLine("[" + TranslateAgentName(step.Agent) + "]");
+            sb.AppendLine(step.Text);
+            sb.AppendLine();
+        }
+
+        try
+        {
+            await Js.InvokeVoidAsync("downloadTextFile", fileName, sb.ToString());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "另存为文件失败");
+            _errorMessage = "另存为文件失败：" + ex.Message;
+        }
+    }
+
+    private static string SanitizeFileName(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return "输出";
+
+        var invalid = Path.GetInvalidFileNameChars();
+        var sb = new StringBuilder(input.Length);
+        foreach (var ch in input)
+        {
+            var bad = false;
+            foreach (var ic in invalid)
+            {
+                if (ch == ic)
+                {
+                    bad = true;
+                    break;
+                }
+            }
+            sb.Append(bad ? '_' : ch);
+        }
+
+        var result = sb.ToString().Trim();
+        return result.Length == 0 ? "输出" : result;
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await RunStreamAsync();
+    }
+
+    private void DisposeElapsedTimer()
+    {
+        if (_elapsedTimer is null)
+            return;
+
+        _elapsedTimer.Dispose();
+        _elapsedTimer = null;
+    }
+
+    private void DisposeRunCts()
+    {
+        if (_runCts is null)
+            return;
+
+        _runCts.Cancel();
+        _runCts.Dispose();
+        _runCts = null;
+    }
+
+    public void Dispose()
+    {
+        DisposeElapsedTimer();
+        DisposeRunCts();
+    }
+}

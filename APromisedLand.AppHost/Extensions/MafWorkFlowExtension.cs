@@ -6,9 +6,7 @@ namespace APromisedLand.AppHost.Extensions;
 
 public static class MafWorkFlowExtension
 {
-    /// <summary>
-    /// MafWorkFlowApi 固定的宿主机 HTTP 端口。
-    /// </summary>
+    /// <summary>MAFWorkFlowApi 固定的宿主机 HTTP 端口。</summary>
     private const int MafWorkFlowHttpPort = 5323;
 
     public static void AddMafWorkFlowApi(
@@ -17,31 +15,26 @@ public static class MafWorkFlowExtension
     {
         // ─── 项目声明与固定端口 ────────────────────────────────────
         context.MafWorkFlowApi = builder
-            .AddProject<Projects.MAFWorkFlowApi>("MafWorkFlowApi")
+            .AddProject<Projects.MAFWorkFlowApi>("MAFWorkFlowApi")
             .WithHttpEndpoint(port: MafWorkFlowHttpPort, name: "http");
 
-        // ===================================================================
-        // 内部资源：链式 WireIfPresent
-        //   - Redis：多轮会话持久化存储（新增关键依赖）
-        //   - 数据层：强等待，确保存储就绪再启动 API
-        //   - Ollama 容器：强等待
-        //   - 模型资源：只注入引用、不 WaitFor，由 API 层健康检查兜底
-        // ===================================================================
+        // ─── 内部资源：链式 WireIfPresent ──────────────────────────
         context.MafWorkFlowApi
-            .WireIfPresent(context.Redis)              // ⭐ 会话持久化
+            .WireIfPresent(context.Redis)
             .WireIfPresent(context.MetadataDb)
             .WireIfPresent(context.HangfireDb)
             .WireIfPresent(context.Ollama)
             .WireIfPresent(context.ChatModel, waitFor: false)
             .WireIfPresent(context.Embedding, waitFor: false);
 
-        // ===================================================================
-        // 外部资源：清单式声明
-        // ===================================================================
-        var logger = builder.Services
-            .BuildServiceProvider()
-            .GetRequiredService<ILoggerFactory>()
-            .CreateLogger("MafWorkFlowExtension");
+        // ─── 外部资源：清单式声明 ─────────────────────────────────
+        // 不再使用 builder.Services.BuildServiceProvider()，避免额外容器。
+        using var loggerFactory = LoggerFactory.Create(logging =>
+        {
+            logging.AddSimpleConsole(o => o.SingleLine = true);
+            logging.SetMinimumLevel(LogLevel.Information);
+        });
+        var logger = loggerFactory.CreateLogger("MafWorkFlowExtension");
 
         ExternalServiceBinding[] externalBindings =
         [
@@ -61,9 +54,7 @@ public static class MafWorkFlowExtension
         foreach (var binding in externalBindings)
             binding.Apply(builder, context.MafWorkFlowApi, logger);
 
-        // ===================================================================
-        // 将 API 的 /health 端点接入 Aspire 资源健康状态
-        // ===================================================================
+        // ─── 健康检查接入 Aspire ──────────────────────────────────
         context.MafWorkFlowApi
             .WithHttpHealthCheck(
                 path: "/health",

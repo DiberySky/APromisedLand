@@ -6,18 +6,16 @@ public static class OllamaExtension
         this IDistributedApplicationBuilder builder,
         AppHostResourceContext resourceContext)
     {
+        // WithGPUSupport() 内部已包含 --gpus=all，无需重复传递。
         resourceContext.Ollama = builder.AddOllama("Ollama")
             .WithDataVolume("ollama-data")
             .WithGPUSupport()
-            .WithContainerRuntimeArgs("--gpus=all")
-            .WithLifetime(ContainerLifetime.Persistent)
-            .WithOtlpExporter();
+            .WithLifetime(ContainerLifetime.Persistent);
 
         // 嵌入模型：资源名 = "embedding"，实际拉取的模型标签 = "bge-large"
         resourceContext.Embedding = resourceContext.Ollama.AddModel("embedding", "bge-large");
 
         // 聊天模型：资源名 = "chat-model"，实际拉取的模型标签 = "qwen2.5:7b"
-        // 备选：qwen2.5:0.5b / llama3.2:1b / qwen2.5:7b
         resourceContext.ChatModel = resourceContext.Ollama.AddModel("chat-model", "qwen2.5:7b");
 
         return builder;
