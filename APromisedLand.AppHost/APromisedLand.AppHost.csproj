@@ -30,6 +30,7 @@
         <ProjectReference Include="..\DiberyBlazorWebSky\DiberyBlazorWebSky.csproj" />
         <ProjectReference Include="..\DiberyTreeService\DiberyTreeService.csproj" />
         <ProjectReference Include="..\ElasticsearchService\ElasticsearchService.csproj" />
+        <ProjectReference Include="..\FileStorageApi\FileStorageApi.csproj" />
         <ProjectReference Include="..\FileTransService\FileTransService.csproj" />
         <ProjectReference Include="..\FoundryLocalService\FoundryLocalService.csproj" />
         <ProjectReference Include="..\MAFRagService\MAFRagService.csproj" />

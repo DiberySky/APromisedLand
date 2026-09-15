@@ -13,7 +13,7 @@ public sealed class OllamaOptions
     public string Url { get; set; } = "";
 
     [Required, MinLength(1)]
-    public string ChatModel { get; set; } = "qwen2.5:7b";
+    public string ChatModel { get; set; } = "qwen2.5:7b"; //qwen2.5:7b 、qwen3.8:27b
 
     [Required, MinLength(1)]
     public string EmbeddingModel { get; set; } = "bge-large";

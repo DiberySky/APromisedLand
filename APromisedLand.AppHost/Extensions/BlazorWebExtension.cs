@@ -23,6 +23,8 @@ public static class BlazorWebExtension
                 .WaitFor(resourceContext.MafWorkFlowApi);
         }
 
+        resourceContext.BlazorWeb = blazorApp;
+        
         return builder;
     }
 }

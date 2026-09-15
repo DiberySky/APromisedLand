@@ -19,6 +19,8 @@ void MafWorkFlowService()
     builder.AddSeaweedFs(context);
     builder.AddOllama(context);
 
+    builder.AddFileStorageApi(context);
+    
     builder.AddMafWorkFlowApi(context);
 
     builder.AddBlazorWeb(context);

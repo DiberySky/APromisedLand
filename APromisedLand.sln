@@ -87,6 +87,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BlazorWebApp", "BlazorWebAp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiberyBlazorWebSky", "DiberyBlazorWebSky\DiberyBlazorWebSky.csproj", "{7D81B19A-E49B-45C1-AA71-A3FA90915A8C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileStorageApi", "FileStorageApi\FileStorageApi.csproj", "{97FC032B-5F86-4C6E-A652-39F045D9E036}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -235,6 +237,10 @@ Global
 		{7D81B19A-E49B-45C1-AA71-A3FA90915A8C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D81B19A-E49B-45C1-AA71-A3FA90915A8C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D81B19A-E49B-45C1-AA71-A3FA90915A8C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{97FC032B-5F86-4C6E-A652-39F045D9E036}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97FC032B-5F86-4C6E-A652-39F045D9E036}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{97FC032B-5F86-4C6E-A652-39F045D9E036}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{97FC032B-5F86-4C6E-A652-39F045D9E036}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -276,6 +282,7 @@ Global
 		{6F3BABA3-29D1-4A64-BB74-E3DABF841C5A} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
 		{7FE54680-F616-4864-A8F6-8E07813C378A} = {94403BB7-A165-404E-8674-5DC28867E92E}
 		{7D81B19A-E49B-45C1-AA71-A3FA90915A8C} = {7FE54680-F616-4864-A8F6-8E07813C378A}
+		{97FC032B-5F86-4C6E-A652-39F045D9E036} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9647CF65-ABDB-4637-B56C-E0CDAC22FFFB}

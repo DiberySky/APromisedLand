@@ -21,7 +21,7 @@ public static class MafWorkFlowExtension
         // ─── 内部资源：链式 WireIfPresent ──────────────────────────
         context.MafWorkFlowApi
             .WireIfPresent(context.Redis)
-            .WireIfPresent(context.MetadataDb)
+            .WireIfPresent(context.FileMetadataDb)
             .WireIfPresent(context.HangfireDb)
             .WireIfPresent(context.Ollama)
             .WireIfPresent(context.ChatModel, waitFor: false)

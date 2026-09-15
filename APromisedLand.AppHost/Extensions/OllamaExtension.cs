@@ -15,7 +15,7 @@ public static class OllamaExtension
         // 嵌入模型：资源名 = "embedding"，实际拉取的模型标签 = "bge-large"
         resourceContext.Embedding = resourceContext.Ollama.AddModel("embedding", "bge-large");
 
-        // 聊天模型：资源名 = "chat-model"，实际拉取的模型标签 = "qwen2.5:7b"
+        // 聊天模型：资源名 = "chat-model"，实际拉取的模型标签 = "qwen2.5:7b" qwen3.8:27b
         resourceContext.ChatModel = resourceContext.Ollama.AddModel("chat-model", "qwen2.5:7b");
 
         return builder;
