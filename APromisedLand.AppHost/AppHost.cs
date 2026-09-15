@@ -14,12 +14,14 @@ void MafWorkFlowService()
 {
     builder.AddPostgres(context);
     builder.AddRedis(context);
-    builder.AddNebulaGraph(context);
+    // builder.AddNebulaGraph(context);
     builder.AddWeaviate(context);
     builder.AddSeaweedFs(context);
     builder.AddOllama(context);
 
     builder.AddFileStorageApi(context);
+
+    builder.AddNornicDb(context); 
     
     builder.AddMafWorkFlowApi(context);
 

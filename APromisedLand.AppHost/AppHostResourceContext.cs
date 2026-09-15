@@ -11,6 +11,8 @@ public class AppHostResourceContext
     
     // ── 基础设施 ──
     public IResourceBuilder<PostgresServerResource>? Postgres { get; set; }
+    
+    public IResourceBuilder<ContainerResource>? NornicDb { get; set; }
     public IResourceBuilder<RedisResource>? Redis { get; set; }
     public IResourceBuilder<ContainerResource>? NebulaGraph { get; set; }
     public IResourceBuilder<ContainerResource>? Weaviate { get; set; }

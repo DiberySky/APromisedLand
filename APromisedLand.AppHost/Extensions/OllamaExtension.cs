@@ -7,7 +7,7 @@ public static class OllamaExtension
         AppHostResourceContext resourceContext)
     {
         // WithGPUSupport() 内部已包含 --gpus=all，无需重复传递。
-        resourceContext.Ollama = builder.AddOllama("Ollama")
+        resourceContext.Ollama = builder.AddOllama("ollama")
             .WithDataVolume("ollama-data")
             .WithGPUSupport()
             .WithLifetime(ContainerLifetime.Persistent);

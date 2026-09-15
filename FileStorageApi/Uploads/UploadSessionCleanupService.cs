@@ -31,6 +31,12 @@ namespace FileStorageApi.Uploads;
 ///   - 清理逻辑本身通过 ExecuteUpdate/ExecuteDelete 与
 ///     单事务完成，多实例部署时同一行只会被删一次
 ///
+/// 取消语义（重要）：
+///   - 本服务在任何路径下都不向 BackgroundService 抛出异常。
+///   - RunOnceAsync 内部对"关闭取消"仅返回 false，不 rethrow，
+///     避免 VS 调试器在 System.Diagnostics.Debugger.BreakForUserUnhandledException
+///     断下（该断点判定基于方法内是否出现 throw，而非最终是否被上层接住）。
+///
 /// 配置项（appsettings.json → "UploadCleanup"）：
 ///   - Enabled                   是否启用（默认 true）
 ///   - IntervalMinutes           执行间隔分钟数（默认 60，最小 1）
@@ -74,42 +80,44 @@ public sealed class UploadSessionCleanupService : BackgroundService
             "上传会话清理服务已启动：启动延迟 {StartupDelay}，执行间隔 {Interval}。",
             startupDelay, interval);
 
-        // ── 启动延迟 ──
-        if (startupDelay > TimeSpan.Zero)
+        try
         {
-            try
+            // ── 启动延迟 ──
+            if (startupDelay > TimeSpan.Zero)
             {
                 await Task.Delay(startupDelay, stoppingToken);
             }
-            catch (OperationCanceledException)
-            {
-                _logger.LogInformation("上传会话清理服务在启动延迟期间被取消。");
-                return;
-            }
-        }
 
-        // ── 主循环 ──
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            await RunOnceAsync(stoppingToken);
-
-            try
+            // ── 主循环 ──
+            while (!stoppingToken.IsCancellationRequested)
             {
+                // RunOnceAsync 永不抛异常：
+                //   true  → 本轮结束，继续下一轮
+                //   false → 关闭中，退出循环
+                if (!await RunOnceAsync(stoppingToken))
+                    break;
+
                 await Task.Delay(interval, stoppingToken);
             }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
         }
-
-        _logger.LogInformation("上传会话清理服务已停止。");
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // 关闭：Task.Delay 抛出时走到这里，静默退出。
+        }
+        finally
+        {
+            _logger.LogInformation("上传会话清理服务已停止。");
+        }
     }
 
     /// <summary>
-    /// 执行一次清理。除取消外的所有异常都被捕获，不影响循环继续。
+    /// 执行一次清理。**本方法不抛出任何异常**。
+    ///
+    /// 返回值：
+    ///   true  —— 本轮已结束（无论成功或失败），主循环应继续下一轮；
+    ///   false —— 关闭取消，主循环应立即退出。
     /// </summary>
-    private async Task RunOnceAsync(CancellationToken stoppingToken)
+    private async Task<bool> RunOnceAsync(CancellationToken stoppingToken)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -137,11 +145,13 @@ public sealed class UploadSessionCleanupService : BackgroundService
                     "清理完成：无可清理会话，耗时 {ElapsedMs} ms。",
                     sw.ElapsedMilliseconds);
             }
+
+            return true;
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // 应用正在关闭，直接抛出由 ExecuteAsync 处理
-            throw;
+            // 关闭中：不 rethrow、不记 Error，返回 false 让主循环退出。
+            return false;
         }
         catch (Exception ex)
         {
@@ -149,7 +159,7 @@ public sealed class UploadSessionCleanupService : BackgroundService
             _logger.LogError(ex,
                 "清理过期上传会话失败（已运行 {ElapsedMs} ms），将在下一轮重试。",
                 sw.ElapsedMilliseconds);
-            // 不 rethrow，保证主循环继续
+            return true; // 继续下一轮
         }
     }
 }
