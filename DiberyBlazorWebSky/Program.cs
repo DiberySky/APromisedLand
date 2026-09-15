@@ -1,56 +1,65 @@
 using DiberyBlazorWebSky.Components;
+using DiberyBlazorWebSky.Endpoints;
 using DiberyBlazorWebSky.Services;
+using Microsoft.Extensions.Http.Resilience;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ---------------------------------------------------------------------------
-// 1. Aspire 默认
-// ---------------------------------------------------------------------------
 builder.AddServiceDefaults();
 
-// ★ 全局移除 Aspire 默认弹性管道，避免 AttemptTimeout=10s 截断 Ollama 长推理
-#pragma warning disable EXTEXP0001
-builder.Services.ConfigureHttpClientDefaults(http => { http.RemoveAllResilienceHandlers(); });
-#pragma warning restore EXTEXP0001
-
-// ---------------------------------------------------------------------------
-// 2. Blazor Server
-// ---------------------------------------------------------------------------
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// ---------------------------------------------------------------------------
-// 3. API 客户端注册
-//    - 统一基地址：https+http://MAFWorkFlowApi
-//    - 统一超时：10 分钟，覆盖 Ollama 冷启动与长生成
-// ---------------------------------------------------------------------------
+// ── MAFWorkFlowApi ──
 builder.Services.AddHttpClient<ChatApiClient>(client =>
 {
-    client.BaseAddress = new Uri("https+http://MAFWorkFlowApi");
-    client.Timeout = TimeSpan.FromMinutes(10);
+    client.BaseAddress = new("https+http://MAFWorkFlowApi");
 });
 
 builder.Services.AddHttpClient<WorkflowApiClient>(client =>
 {
-    client.BaseAddress = new Uri("https+http://MAFWorkFlowApi");
-    client.Timeout = TimeSpan.FromMinutes(10);
+    client.BaseAddress = new("https+http://MAFWorkFlowApi");
 });
+
+// ── FileStorageApi ──
+// ★ 修复：
+//   1) RemoveAllResilienceHandlers() 移除 AddServiceDefaults() 由
+//      ConfigureHttpClientDefaults 注入的默认 Standard Resilience Handler
+//      （默认 AttemptTimeout = 10s，对大文件上传远远不够）。
+//   2) 挂自定义 Handler：禁用非幂等重试、放宽超时。
+//   3) AttemptTimeout 覆盖单次请求最长耗时（含 S3 multipart 合并）。
+//   4) CircuitBreaker.SamplingDuration ≥ 2 × AttemptTimeout（Polly 硬性校验）。
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers 是实验性 API
+builder.Services.AddHttpClient<FileStorageApiClient>(client =>
+    {
+        client.BaseAddress = new("https+http://FileStorageApi");
+        client.Timeout     = TimeSpan.FromMinutes(60);
+    })
+    .RemoveAllResilienceHandlers()
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.DisableForUnsafeHttpMethods();
+
+        options.AttemptTimeout.Timeout          = TimeSpan.FromMinutes(15);
+        options.TotalRequestTimeout.Timeout     = TimeSpan.FromMinutes(60);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(30);
+    });
 
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", true);
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
 app.UseAntiforgery();
-
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapDefaultEndpoints();
+app.MapDownloadEndpoints();   // ★ 新增
 
 app.Run();

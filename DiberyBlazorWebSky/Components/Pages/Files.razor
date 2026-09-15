@@ -1,0 +1,148 @@
+@page "/files"
+@inject FileStorageApiClient FileApi
+@inject ILogger<Files> Logger
+@rendermode InteractiveServer
+
+<PageTitle>文件管理</PageTitle>
+
+<div class="files-container">
+    <div class="files-header">
+        <h1>📁 文件管理</h1>
+        <div class="files-actions">
+            <button class="btn-refresh" @onclick="LoadAsync" disabled="@_loading">
+                🔄 刷新
+            </button>
+            <a class="btn-upload" href="/upload">📤 上传</a>
+        </div>
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="error-box">⚠️ @_error</div>
+    }
+
+    @if (_loading)
+    {
+        <div class="loading">加载中…</div>
+    }
+    else if (_files.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <h2>暂无文件</h2>
+            <p>点击右上角"上传"开始。</p>
+        </div>
+    }
+    else
+    {
+        <table class="files-table">
+            <thead>
+                <tr>
+                    <th>文件名</th>
+                    <th>大小</th>
+                    <th>类型</th>
+                    <th>版本</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in _files)
+                {
+                    <tr>
+                        <td class="file-name" title="@f.ObjectKey">@f.FileName</td>
+                        <td>@FormatSize(f.Size)</td>
+                        <td>@f.ContentType</td>
+                        <td>v@f.Version</td>
+                        <td>
+                            <span class="status status-@f.Status">@f.Status</span>
+                        </td>
+                        <td>@f.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="actions">
+                            @* ★ 关键修复：用浏览器原生下载，不再走 JS interop *@
+                            <a class="btn-icon"
+                               href="@($"/download/{f.Id}")"
+                               download="@f.FileName"
+                               title="下载">⬇️</a>
+                            <button class="btn-icon danger"
+                                    @onclick="() => DeleteAsync(f)"
+                                    disabled="@_busyIds.Contains(f.Id)"
+                                    title="删除">🗑️</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<FileMetadataDto> _files = new();
+    private readonly HashSet<Guid> _busyIds = new();
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var list = await FileApi.ListAsync(take: 200);
+            _files = list.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "加载文件列表失败");
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteAsync(FileMetadataDto f)
+    {
+        if (!_busyIds.Add(f.Id)) return;
+        StateHasChanged();
+
+        try
+        {
+            var ok = await FileApi.DeleteAsync(f.Id);
+            if (!ok)
+                _error = "删除失败：文件不存在。";
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "删除文件失败：{Id}", f.Id);
+            _error = "删除失败：" + ex.Message;
+        }
+        finally
+        {
+            _busyIds.Remove(f.Id);
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        double size = bytes;
+        int i = 0;
+        while (size >= 1024 && i < units.Length - 1)
+        {
+            size /= 1024;
+            i++;
+        }
+        return $"{size:0.##} {units[i]}";
+    }
+}

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using FileStorageApi.Data;
@@ -6,6 +7,7 @@ using FileStorageApi.Security;
 using FileStorageApi.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace FileStorageApi.Uploads;
 
@@ -18,9 +20,17 @@ public sealed class FileUploadService : IFileUploadService
     private const int MaxVersionRetries = 5;
     private static readonly TimeSpan SessionTtl = TimeSpan.FromHours(24);
 
+    // ★ S3 合并阶段的独立超时（与客户端 HTTP 请求的 CT 解耦）
+    private static readonly TimeSpan MergeTimeout = TimeSpan.FromMinutes(10);
+
+    // ★ 分片删除批次：每批 20 个（1 GB 文件 = 127 片，约 7 批）
+    //   避免单条 DELETE 在 30s+ 上超时。
+    private const int ChunkDeleteBatchSize = 20;
+
     private readonly FileStorageContext _db;
     private readonly IObjectStorage _storage;
     private readonly ICallerContext _caller;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptions<UploadCleanupOptions> _cleanupOptions;
     private readonly ILogger<FileUploadService> _logger;
 
@@ -28,14 +38,16 @@ public sealed class FileUploadService : IFileUploadService
         FileStorageContext db,
         IObjectStorage storage,
         ICallerContext caller,
+        IServiceScopeFactory scopeFactory,
         IOptions<UploadCleanupOptions> cleanupOptions,
         ILogger<FileUploadService> logger)
     {
-        _db = db;
-        _storage = storage;
-        _caller = caller;
+        _db             = db;
+        _storage        = storage;
+        _caller         = caller;
+        _scopeFactory   = scopeFactory;
         _cleanupOptions = cleanupOptions;
-        _logger = logger;
+        _logger         = logger;
     }
 
     // ───────────────────────────────────────────────────────────
@@ -310,6 +322,10 @@ public sealed class FileUploadService : IFileUploadService
             }
         }
 
+        // ★ 合并阶段使用独立 CT，与客户端请求解耦。
+        using var mergeCts = new CancellationTokenSource(MergeTimeout);
+        var mergeCt = mergeCts.Token;
+
         try
         {
             // ── 4.6 单遍：ChunkedReadStream → HashingReadStream → S3 ──
@@ -331,12 +347,12 @@ public sealed class FileUploadService : IFileUploadService
             await using var hashing = new HashingReadStream(chunked);
 
             await _storage.PutAsync(
-                objectKey, hashing, session.TotalSize, session.ContentType, ct);
+                objectKey, hashing, session.TotalSize, session.ContentType, mergeCt);
 
             if (hashing.Hash is null)
             {
                 var drain = new byte[8192];
-                while (await hashing.ReadAsync(drain, ct) > 0) { }
+                while (await hashing.ReadAsync(drain, mergeCt) > 0) { }
             }
 
             var computed = hashing.Hash
@@ -356,7 +372,7 @@ public sealed class FileUploadService : IFileUploadService
             session.Sha256 = request.Sha256 ?? computed;
 
             // ── 4.7 第二阶段事务 ──
-            await using var tx = await _db.Database.BeginTransactionAsync(ct);
+            await using var tx = await _db.Database.BeginTransactionAsync(mergeCt);
 
             metadata.Status    = "active";
             metadata.Sha256    = session.Sha256;
@@ -391,12 +407,12 @@ public sealed class FileUploadService : IFileUploadService
             session.CompletedAt = DateTimeOffset.UtcNow;
             session.UpdatedAt   = DateTimeOffset.UtcNow;
 
-            await _db.UploadChunks
-                .Where(c => c.UploadId == uploadId)
-                .ExecuteDeleteAsync(ct);
+            // ★ 分批删除分片，避免 1GB+ 数据触发单条 DELETE 30s 超时。
+            //   每批 20 个（≈160 MB），约 7 批删除 1 GB。
+            await DeleteChunksInBatchesAsync(uploadId, mergeCt);
 
-            await _db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+            await _db.SaveChangesAsync(mergeCt);
+            await tx.CommitAsync(mergeCt);
 
             _logger.LogInformation(
                 "上传完成 {UploadId}：docId={DocId}, version={Version}, key={Key}",
@@ -450,9 +466,8 @@ public sealed class FileUploadService : IFileUploadService
         if (session is null || session.Tenant != _caller.Tenant) return false;
         if (session.Status is "completed" or "merging") return false;
 
-        await _db.UploadChunks
-            .Where(c => c.UploadId == uploadId)
-            .ExecuteDeleteAsync(ct);
+        // ★ 分批删除，与 CompleteAsync 一致
+        await DeleteChunksInBatchesAsync(uploadId, ct);
 
         session.Status = "expired";
         session.UpdatedAt = DateTimeOffset.UtcNow;
@@ -470,7 +485,7 @@ public sealed class FileUploadService : IFileUploadService
         var batchSize = opts.EffectiveBatchSize;
         var removed = 0;
 
-        // 7.1 过期会话
+        // 7.1 过期会话（pending/uploading/failed/expired）
         while (true)
         {
             var batch = await _db.UploadSessions
@@ -484,9 +499,9 @@ public sealed class FileUploadService : IFileUploadService
 
             if (batch.Count == 0) break;
 
-            await _db.UploadChunks
-                .Where(c => batch.Contains(c.UploadId))
-                .ExecuteDeleteAsync(ct);
+            // ★ 每个会话内部再分批删除
+            foreach (var id in batch)
+                await DeleteChunksInBatchesAsync(id, ct);
 
             await _db.UploadSessions
                 .Where(s => batch.Contains(s.Id))
@@ -494,6 +509,33 @@ public sealed class FileUploadService : IFileUploadService
 
             removed += batch.Count;
             if (batch.Count < batchSize) break;
+        }
+
+        // ★ 7.1.1 completed 会话保留期清理
+        var completedRetention = opts.EffectiveCompletedRetention;
+        if (completedRetention > TimeSpan.Zero)
+        {
+            var completedBefore = now - completedRetention;
+
+            while (true)
+            {
+                var batch = await _db.UploadSessions
+                    .Where(s => s.Status == "completed" &&
+                                s.CompletedAt != null &&
+                                s.CompletedAt < completedBefore)
+                    .OrderBy(s => s.CompletedAt)
+                    .Select(s => s.Id)
+                    .Take(batchSize)
+                    .ToListAsync(ct);
+
+                if (batch.Count == 0) break;
+
+                await _db.UploadSessions
+                    .Where(s => batch.Contains(s.Id))
+                    .ExecuteDeleteAsync(ct);
+
+                if (batch.Count < batchSize) break;
+            }
         }
 
         // 7.2 stale merging
@@ -506,9 +548,8 @@ public sealed class FileUploadService : IFileUploadService
                 .SetProperty(x => x.UpdatedAt, now), ct);
 
         var stalePendingBefore = now - opts.EffectiveStalePending;
-        var semaphore = new SemaphoreSlim(opts.EffectiveOrphanDeleteConcurrency);
 
-        // 7.3 stale pending_upload
+        // ★ 7.3 stale pending_upload：S3 删除失败时保留元数据，延后重试
         while (true)
         {
             var orphans = await _db.DocumentMetadata
@@ -520,23 +561,47 @@ public sealed class FileUploadService : IFileUploadService
 
             if (orphans.Count == 0) break;
 
-            var tasks = orphans.Select(async o =>
-            {
-                await semaphore.WaitAsync(ct);
-                try
-                {
-                    await _storage.DeleteAsync(o.ObjectKey, ct);
-                    _logger.LogWarning("清理孤儿对象：{Key}", o.ObjectKey);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "清理孤儿对象失败：{Key}", o.ObjectKey);
-                }
-                finally { semaphore.Release(); }
-            });
-            await Task.WhenAll(tasks);
+            var failedKeys = new ConcurrentBag<string>();
 
-            _db.DocumentMetadata.RemoveRange(orphans);
+            await Parallel.ForEachAsync(
+                orphans,
+                new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = opts.EffectiveOrphanDeleteConcurrency,
+                    CancellationToken = ct,
+                },
+                async (orphan, innerCt) =>
+                {
+                    try
+                    {
+                        await _storage.DeleteAsync(orphan.ObjectKey, innerCt);
+                        _logger.LogWarning("清理孤儿对象：{Key}", orphan.ObjectKey);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "清理孤儿对象失败：{Key}", orphan.ObjectKey);
+                        failedKeys.Add(orphan.ObjectKey);
+                    }
+                });
+
+            var failedSet = new HashSet<string>(failedKeys, StringComparer.Ordinal);
+            var toDelete = new List<DocumentMetadataEntity>();
+
+            foreach (var orphan in orphans)
+            {
+                if (failedSet.Contains(orphan.ObjectKey))
+                {
+                    orphan.UpdatedAt = now;
+                }
+                else
+                {
+                    toDelete.Add(orphan);
+                }
+            }
+
+            if (toDelete.Count > 0)
+                _db.DocumentMetadata.RemoveRange(toDelete);
+
             await _db.SaveChangesAsync(ct);
 
             if (orphans.Count < batchSize) break;
@@ -568,7 +633,7 @@ public sealed class FileUploadService : IFileUploadService
             if (pendings.Count < batchSize) break;
         }
 
-        // ★ P1-1：stale failed 分块清理——保留会话行（供状态查询），但释放分块空间
+        // ★ 7.5 stale failed 分块清理
         while (true)
         {
             var failedIds = await _db.UploadSessions
@@ -580,21 +645,61 @@ public sealed class FileUploadService : IFileUploadService
 
             if (failedIds.Count == 0) break;
 
-            // 只删还有分块的
-            await _db.UploadChunks
-                .Where(c => failedIds.Contains(c.UploadId))
-                .ExecuteDeleteAsync(ct);
+            foreach (var id in failedIds)
+                await DeleteChunksInBatchesAsync(id, ct);
+
+            await _db.UploadSessions
+                .Where(s => failedIds.Contains(s.Id))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.Status, "cleaned")
+                    .SetProperty(x => x.UpdatedAt, now), ct);
 
             if (failedIds.Count < batchSize) break;
         }
 
-        semaphore.Dispose();
         return removed;
     }
 
     // ───────────────────────────────────────────────────────────
     // 私有辅助
     // ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// ★ 分批删除指定会话的全部分片。
+    ///
+    /// 为什么要分批：
+    ///   1 GB 文件 = 127 个 8 MB 分片，单条 DELETE 涉及约 1 GB 的 bytea，
+    ///   会触发 Npgsql 30s 命令超时（即使调高到 300s 也可能在更大文件上超）。
+    ///   每批 20 片（≈160 MB），单条 DELETE 通常在数秒内完成。
+    ///
+    /// 用原始 SQL 是因为 EF Core 的 ExecuteDeleteAsync 不支持 Take/Limit。
+    /// </summary>
+    private async Task DeleteChunksInBatchesAsync(
+        Guid uploadId, CancellationToken ct)
+    {
+        const string sql = """
+            DELETE FROM "UploadChunks"
+            WHERE "Id" IN (
+                SELECT "Id" FROM "UploadChunks"
+                WHERE "UploadId" = @uploadId
+                LIMIT @batch
+            )
+            """;
+
+        while (true)
+        {
+            var deleted = await _db.Database.ExecuteSqlRawAsync(
+                sql,
+                new object[]
+                {
+                    new NpgsqlParameter("uploadId", uploadId),
+                    new NpgsqlParameter("batch", ChunkDeleteBatchSize),
+                },
+                ct);
+
+            if (deleted == 0) break;
+        }
+    }
 
     private async Task<UploadSessionEntity> GetActiveSessionAsync(
         Guid uploadId, CancellationToken ct)
@@ -628,7 +733,11 @@ public sealed class FileUploadService : IFileUploadService
     {
         try
         {
-            await _db.UploadSessions
+            // ★ 独立 Scope：请求 CT 取消后当前 DbContext 可能不可用
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<FileStorageContext>();
+
+            await db.UploadSessions
                 .Where(s => s.Id == uploadId &&
                             (s.Status == "merging" || s.Status == "uploading"))
                 .ExecuteUpdateAsync(s => s

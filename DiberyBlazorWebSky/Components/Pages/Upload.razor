@@ -1,0 +1,187 @@
+@page "/upload"
+@inject FileStorageApiClient FileApi
+@inject ILogger<Upload> Logger
+@implements IDisposable
+@rendermode InteractiveServer
+
+<PageTitle>上传文件</PageTitle>
+
+<div class="upload-container">
+    <h1>📤 上传文件</h1>
+
+    <div class="upload-drop-zone">
+        <InputFile OnChange="OnFileSelectedAsync" />
+        <p>点击选择文件，或拖拽到此区域。</p>
+
+        @if (_selectedFile is not null)
+        {
+            <p class="selected-file">
+                已选择：<strong>@_selectedFile.Name</strong>
+                （@FormatSize(_selectedFile.Size)）
+            </p>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-box">⚠️ @_error</div>
+    }
+
+    @if (_uploading)
+    {
+        <div class="progress-wrap">
+            <div class="progress-bar" style="width: @(_progressPercent.ToString("0.##"))%"></div>
+            <div class="progress-text">
+                @FormatSize(_uploaded) / @FormatSize(_totalSize)
+                （@_progressPercent.ToString("0.#")%）
+            </div>
+        </div>
+        <button class="btn-cancel" @onclick="CancelAsync">取消 ✋</button>
+    }
+    else if (_selectedFile is not null)
+    {
+        <button class="btn-upload" @onclick="UploadAsync" disabled="@(!_canUpload)">
+            🚀 开始上传
+        </button>
+    }
+
+    @if (_result is not null)
+    {
+        <div class="result-box">
+            <div class="result-title">✅ 上传成功</div>
+            <ul>
+                <li>DocId: <code>@_result.DocId</code></li>
+                <li>版本：v@_result.Version</li>
+                <li>对象键：<code>@_result.ObjectKey</code></li>
+                <li>大小：@FormatSize(_result.Size)</li>
+                @if (!string.IsNullOrEmpty(_result.Sha256))
+                {
+                    <li>SHA256: <code>@_result.Sha256</code></li>
+                }
+            </ul>
+            <a href="/files" class="link">→ 前往文件管理</a>
+        </div>
+    }
+</div>
+
+@code {
+    private const long MaxFileSize = 2L * 1024 * 1024 * 1024;
+
+    private IBrowserFile? _selectedFile;
+    private Stream? _fileStream;
+    private bool _uploading;
+    private bool _canUpload;
+    private string? _error;
+    private CompleteUploadResponse? _result;
+
+    private long _uploaded;
+    private long _totalSize;
+    private double _progressPercent;
+
+    private CancellationTokenSource? _cts;
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        _result = null;
+
+        var file = e.File;
+        if (file is null) return;
+
+        if (file.Size > MaxFileSize)
+        {
+            _error = $"文件过大，最大 {FormatSize(MaxFileSize)}。";
+            _selectedFile = null;
+            _canUpload = false;
+            return;
+        }
+
+        _selectedFile = file;
+        _canUpload = true;
+
+        await Task.CompletedTask;
+    }
+
+    private async Task UploadAsync()
+    {
+        if (_selectedFile is null || _uploading) return;
+
+        _uploading = true;
+        _error = null;
+        _result = null;
+        _uploaded = 0;
+        _totalSize = _selectedFile.Size;
+        _progressPercent = 0;
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            // ★ 单次读缓冲上限设成 MaxFileSize，否则 Blazor 会限制默认 500 KB
+            _fileStream = _selectedFile.OpenReadStream(MaxFileSize);
+
+            var progress = new Progress<(long uploaded, long total)>(p =>
+            {
+                _uploaded = p.uploaded;
+                _totalSize = p.total;
+                _progressPercent = p.total > 0
+                    ? (double)p.uploaded / p.total * 100.0
+                    : 0;
+                _ = InvokeAsync(StateHasChanged);
+            });
+
+            _result = await FileApi.UploadFileAsync(
+                _selectedFile.Name,
+                _selectedFile.ContentType,
+                _fileStream,
+                _selectedFile.Size,
+                progress: progress,
+                ct: _cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            _error = "已取消上传。";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "上传文件失败");
+            _error = "上传失败：" + ex.Message;
+        }
+        finally
+        {
+            if (_fileStream is not null)
+            {
+                await _fileStream.DisposeAsync();
+                _fileStream = null;
+            }
+
+            _uploading = false;
+            _selectedFile = null;
+            _canUpload = false;
+            _cts?.Dispose();
+            _cts = null;
+            StateHasChanged();
+        }
+    }
+
+    private void CancelAsync() => _cts?.Cancel();
+
+    private static string FormatSize(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        double size = bytes;
+        int i = 0;
+        while (size >= 1024 && i < units.Length - 1)
+        {
+            size /= 1024;
+            i++;
+        }
+        return $"{size:0.##} {units[i]}";
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _fileStream?.Dispose();
+    }
+}

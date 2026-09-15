@@ -16,10 +16,23 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICallerContext, HttpCallerContext>();
 
 // ── 数据库 ──
-builder.AddNpgsqlDbContext<FileStorageContext>("FileMetadataDb");
+// ★ 方案 A：禁用 Aspire 默认的 NpgsqlRetryingExecutionStrategy。
+//   CompleteAsync 4.7 节使用显式事务（BeginTransactionAsync），
+//   与 EF Core 的 RetryingExecutionStrategy 冲突。
+//
+// ★ 命令超时提高到 5 分钟：
+//   1 GB 文件 ≈ 127 个 8 MB 分片，DELETE/INSERT 涉及大量 bytea。
+//   默认 30s 会触发 Npgsql 超时，被误判为瞬时故障。
+//   （分批删除已在 FileUploadService 中进一步缓解）
+builder.AddNpgsqlDbContext<FileStorageContext>(
+    "FileMetadataDb",
+    configureSettings: settings =>
+    {
+        settings.DisableRetry  = true;
+        settings.CommandTimeout = 300;   // 秒
+    });
 
 // ── SeaweedFS S3 ──
-// ★ P2-11：启用配置校验，拼写错误立即 FailFast 而不是等第一次上传
 builder.Services
     .AddOptions<ObjectStorageOptions>()
     .Bind(builder.Configuration.GetSection(ObjectStorageOptions.SectionName))
@@ -35,6 +48,11 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
         ForcePathStyle       = o.ForcePathStyle,
         UseHttp              = o.UseHttp,
         AuthenticationRegion = o.Region,
+
+        // ★ multipart 上传单片可能数十秒，AWS SDK 默认 100s 不够。
+        //   v4 中 ReadWriteTimeout 已移除，Timeout 是唯一的请求超时。
+        Timeout       = TimeSpan.FromMinutes(10),
+        MaxErrorRetry = 3,
     };
     return new AmazonS3Client(o.AccessKey, o.SecretKey, cfg);
 });
@@ -46,12 +64,10 @@ builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IFileMetadataService, FileMetadataService>();
 
 // ★ 审计队列 + 后台写入（替代 FileMetadataService 中无界 Task.Run）
-//   AuditQueue 单例：多请求线程写入，单一后台读者消费
-//   AuditWriterService：批量落库，应用关闭时最多等待 5 秒排空
 builder.Services.AddSingleton<AuditQueue>();
 builder.Services.AddHostedService<AuditWriterService>();
 
-// ★ P0-1：绑定 UploadCleanup 配置节，FileUploadService 依赖它读取阈值
+// ★ UploadCleanup 配置校验，拼写错误 FailFast
 builder.Services
     .AddOptions<UploadCleanupOptions>()
     .Bind(builder.Configuration.GetSection(UploadCleanupOptions.SectionName))
