@@ -17,6 +17,14 @@ public class AppHostResourceContext
     public IResourceBuilder<ContainerResource>? NebulaGraph { get; set; }
     public IResourceBuilder<ContainerResource>? Weaviate { get; set; }
 
+    // ── LiteGraph ──
+    public IResourceBuilder<PostgresDatabaseResource>? LiteGraphDb { get; set; }
+    public IResourceBuilder<LiteGraphResource>? LiteGraph { get; set; }
+    public IResourceBuilder<ContainerResource>? LiteGraphMcp { get; set; }
+    public IResourceBuilder<ContainerResource>? LiteGraphUi { get; set; }
+    public IResourceBuilder<ContainerResource>? Prometheus { get; set; }
+    public IResourceBuilder<ContainerResource>? Grafana { get; set; }
+    
     // ── SeaweedFS 组件 ──
     public IResourceBuilder<ContainerResource>? SeaweedMaster { get; set; }
     public IResourceBuilder<ContainerResource>? SeaweedVolume { get; set; }
