@@ -1,0 +1,128 @@
+@using Blazor.Diagrams
+@using Blazor.Diagrams.Components
+@using Blazor.Diagrams.Components.Widgets
+@using Blazor.Diagrams.Core.Anchors
+@using Blazor.Diagrams.Core.Geometry
+@using Blazor.Diagrams.Core.Models
+@using Blazor.Diagrams.Core.PathGenerators
+@using Blazor.Diagrams.Core.Routers
+@using Blazor.Diagrams.Options
+@using DiberyBlazorWebSky.Models.Graph
+
+<div class="diagram-wrapper">
+    <CascadingValue Value="Diagram" IsFixed="true">
+        <DiagramCanvas>
+            <Widgets>
+                <GridWidget Size="20" Mode="GridMode.Line" BackgroundColor="#f8fafc"/>
+                <NavigatorWidget Width="180" Height="120"
+                                 Style="position: absolute; bottom: 12px; right: 12px;"/>
+            </Widgets>
+        </DiagramCanvas>
+    </CascadingValue>
+</div>
+
+@code {
+    [Parameter] public List<NodeDto> Nodes { get; set; } = [];
+    [Parameter] public List<EdgeDto> Edges { get; set; } = [];
+
+    private BlazorDiagram Diagram { get; set; } = null!;
+    private readonly Dictionary<Guid, GraphNodeModel> _nodeMap = new();
+
+    protected override void OnInitialized()
+    {
+        var options = new BlazorDiagramOptions
+        {
+            Links =
+            {
+                DefaultRouter = new NormalRouter(),
+                DefaultPathGenerator = new SmoothPathGenerator()
+            },
+            Zoom = { Enabled = true }
+        };
+
+        Diagram = new BlazorDiagram(options);
+        Diagram.RegisterComponent<GraphNodeModel, GraphNodeWidget>();
+
+        BuildDiagram();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // OnParametersSet 在 OnInitialized 之后触发，Diagram 必然已初始化，
+        // 无需 null 检查。
+
+        _nodeMap.Clear();
+        Diagram.Nodes.Clear();
+        Diagram.Links.Clear();
+        BuildDiagram();
+    }
+
+    private void BuildDiagram()
+    {
+        if (Nodes.Count == 0) return;
+
+        // ── 环形布局 ──
+        var radius = Math.Max(200, Nodes.Count * 60);
+        var centerX = 400;
+        var centerY = 350;
+
+        for (int i = 0; i < Nodes.Count; i++)
+        {
+            var node = Nodes[i];
+            var angle = 2 * Math.PI * i / Nodes.Count;
+
+            var x = centerX + radius * Math.Cos(angle);
+            var y = centerY + radius * Math.Sin(angle);
+
+            var model = new GraphNodeModel(
+                node.Guid.ToString(),
+                node.Name,
+                node.Labels,
+                new Point(x, y));
+
+            model.AddPort(PortAlignment.Right);
+            model.AddPort(PortAlignment.Left);
+
+            Diagram.Nodes.Add(model);
+            _nodeMap[node.Guid] = model;
+        }
+
+        // ── 创建连接线 ──
+        foreach (var edge in Edges)
+        {
+            if (!_nodeMap.TryGetValue(edge.From, out var fromNode)) continue;
+            if (!_nodeMap.TryGetValue(edge.To, out var toNode)) continue;
+
+            var sourcePort = fromNode.Ports.FirstOrDefault(p => p.Alignment == PortAlignment.Right);
+            var targetPort = toNode.Ports.FirstOrDefault(p => p.Alignment == PortAlignment.Left);
+
+            if (sourcePort is null || targetPort is null) continue;
+
+            var link = new LinkModel(
+                new SinglePortAnchor(sourcePort),
+                new SinglePortAnchor(targetPort));
+
+            // ★ Labels 是 List<LinkLabelModel>，需要构造 LinkLabelModel
+            // if (!string.IsNullOrWhiteSpace(edge.Name))
+            //     link.Labels.Add(new LinkLabelModel(link, edge.Name));
+
+            // ★ 用箭头符号表示边方向（from → to）
+            // if (!string.IsNullOrWhiteSpace(edge.Name))
+            //     link.Labels.Add(new LinkLabelModel(link, $"→ {edge.Name}"));
+
+            // 检查边的 directed 标签
+            var isDirected = edge.Tags?.TryGetValue("directed", out var directed) != true
+                             || !string.Equals(directed, "false", StringComparison.OrdinalIgnoreCase);
+            
+            var prefix = isDirected ? "→ " : "↔ ";
+            link.Labels.Add(new LinkLabelModel(link, $"{prefix}{edge.Name}"));
+
+            // link.Labels.Add(new LinkLabelModel(link, $"▶ {edge.Name}"));    // 实心三角
+            // link.Labels.Add(new LinkLabelModel(link, $"➤ {edge.Name}"));    // 粗箭头
+            // link.Labels.Add(new LinkLabelModel(link, $"⟶ {edge.Name}"));    // 长箭头
+
+            Diagram.Links.Add(link);
+        }
+    }
+
+}

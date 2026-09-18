@@ -34,6 +34,10 @@ public static class LiteGraphExtension
             .WithEnvironment("LITEGRAPH_OLLAMA_BASE_URL", "http://ollama:11434")
             .WithEnvironment("LITEGRAPH_OLLAMA_CHAT_MODEL", "qwen2.5:7b")
             .WithEnvironment("LITEGRAPH_OLLAMA_EMBEDDING_MODEL", "bge-large")
+            .WithBindMount(
+                source: Path.Combine(AppContext.BaseDirectory, "litegraph.json"),
+                target: "/app/litegraph.json",
+                isReadOnly: true)
             .WaitFor(resourceContext.LiteGraphDb!);
 
         // ─── 3. LiteGraph MCP Server ────────────────────────────────

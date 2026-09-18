@@ -9,6 +9,7 @@
     <ItemGroup>
         <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.5.3" />
         <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.5.0" />
+        <PackageReference Include="LiteGraph.Sdk" Version="8.1.0" />
         <PackageReference Include="Microsoft.Agents.AI" Version="1.21.0" />
         <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.21.0-preview.260911.1" />
         <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.21.0" />

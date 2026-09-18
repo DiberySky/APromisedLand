@@ -1,0 +1,123 @@
+/* ══════════════════════════════════════════════════════ */
+/* 说明：                                                */
+/*   .detail-panel 主容器（position/尺寸/transform/动画） */
+/*   由 GraphExplorer.razor.css 通过 ::deep 定义。       */
+/*   本文件只负责内部子元素的排版。                       */
+/* ══════════════════════════════════════════════════════ */
+
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    flex-shrink: 0;
+}
+
+.detail-header h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #1e293b;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    color: #94a3b8;
+    padding: 4px;
+    line-height: 1;
+}
+
+.btn-close:hover {
+    color: #475569;
+}
+
+.detail-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.detail-field {
+    margin-bottom: 14px;
+}
+
+.detail-field label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+}
+
+.detail-field span {
+    font-size: 0.88rem;
+    color: #1e293b;
+    word-break: break-word;
+}
+
+.detail-code {
+    display: block;
+    font-size: 0.75rem;
+    color: #475569;
+    background: #f1f5f9;
+    padding: 4px 8px;
+    border-radius: 4px;
+    word-break: break-all;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.detail-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.pill {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.tag-item {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #f1f5f9;
+    color: #475569;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+.detail-json {
+    font-size: 0.72rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px;
+    overflow-x: auto;
+    color: #334155;
+    max-height: 200px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.detail-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+
+.muted {
+    color: #cbd5e1;
+}

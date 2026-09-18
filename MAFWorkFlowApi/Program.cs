@@ -1,5 +1,6 @@
 using MAFWorkFlowApi.Agents;
 using MAFWorkFlowApi.HealthChecks;
+using MAFWorkFlowApi.Infrastructure;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -51,7 +52,12 @@ builder.AddOllamaApiClient("embedding")
 // ---------------------------------------------------------------------------
 // 5. MVC + OpenAPI
 // ---------------------------------------------------------------------------
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(
+            new NameValueCollectionConverter());
+    });
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
@@ -89,10 +95,16 @@ builder.Services.AddHealthChecks()
         failureStatus: HealthStatus.Unhealthy,
         tags: ["ready"]);
 
+// ---------------------------------------------------------------------------
+// 10. LiteGraph SDK + 图数据服务
+//     注意：扩展方法接收者是 IServiceCollection，因此用 builder.Services
+// ---------------------------------------------------------------------------
+builder.Services.AddLiteGraph(builder.Configuration);
+
 var app = builder.Build();
 
 // ---------------------------------------------------------------------------
-// 10. 中间件管线
+// 11. 中间件管线
 // ---------------------------------------------------------------------------
 if (app.Environment.IsDevelopment())
 {
@@ -103,6 +115,9 @@ else
 {
     app.UseExceptionHandler();
 }
+
+// 在 app.UseRouting() 之前添加异常中间件：
+app.UseMiddleware<LiteGraphExceptionMiddleware>();
 
 app.UseRouting();
 app.MapControllers();

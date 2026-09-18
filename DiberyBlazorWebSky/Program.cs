@@ -21,6 +21,13 @@ builder.Services.AddHttpClient<WorkflowApiClient>(client =>
     client.BaseAddress = new("https+http://MAFWorkFlowApi");
 });
 
+// ── MAFWorkFlowApi：Graph 页面 ──
+builder.Services.AddHttpClient<GraphApiClient>(client =>
+{
+    client.BaseAddress = new("https+http://MAFWorkFlowApi");
+    client.Timeout     = TimeSpan.FromMinutes(5);
+});
+
 // ── FileStorageApi ──
 // ★ 修复：
 //   1) RemoveAllResilienceHandlers() 移除 AddServiceDefaults() 由

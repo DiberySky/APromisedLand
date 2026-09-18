@@ -1,0 +1,560 @@
+@page "/graph-chat"
+@using DiberyBlazorWebSky.Models.Graph
+@inject ChatApiClient ChatApi
+@inject GraphApiClient GraphApi
+@inject IJSRuntime JS
+@inject ILogger<GraphChat> Logger
+@implements IDisposable
+@rendermode InteractiveServer
+
+<PageTitle>图对话</PageTitle>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h1>🤖 图对话助手</h1>
+        <p class="page-subtitle">
+            @if (useGraphContext && !string.IsNullOrEmpty(selectedGraphGuid))
+            {
+                <span>已启用图上下文 —— 回答将基于所选图的真实数据</span>
+            }
+            else
+            {
+                <span>提示：勾选"使用图上下文"可让 AI 基于图数据回答</span>
+            }
+        </p>
+        <div class="session-controls">
+            <select class="session-selector"
+                    value="@selectedSessionId"
+                    @onchange="OnSessionChangedAsync"
+                    disabled="@isSending">
+                <option value="">New Conversation</option>
+                @foreach (var session in sessions)
+                {
+                    <option value="@session">@session</option>
+                }
+            </select>
+            <button class="btn-refresh"
+                    @onclick="LoadSessionsAsync"
+                    disabled="@(isSending || isLoadingSessions)">
+                🔄 Refresh
+            </button>
+            @if (!string.IsNullOrEmpty(selectedSessionId))
+            {
+                <button class="btn-reset"
+                        @onclick="ResetSessionAsync"
+                        disabled="@isSending">
+                    🗑️ Reset
+                </button>
+            }
+        </div>
+    </div>
+
+    @* ══════════════════════════════════════════════════════ *@
+    @* ★ 图上下文工具栏                                    *@
+    @* ══════════════════════════════════════════════════════ *@
+    <div class="graph-context-bar">
+        <label class="graph-toggle">
+            <input type="checkbox"
+                   @bind="useGraphContext"
+                   @bind:after="LoadGraphContextSummaryAsync"
+                   disabled="@(isSending || graphs.Count == 0)" />
+            <span>📊 使用图上下文</span>
+        </label>
+
+        <select class="graph-selector"
+                value="@selectedGraphGuid"
+                @onchange="OnGraphContextChangedAsync"
+                disabled="@(isSending || !useGraphContext || graphs.Count == 0)">
+            @if (graphs.Count == 0)
+            {
+                <option value="">（没有可用的图）</option>
+            }
+            else
+            {
+                @foreach (var g in graphs)
+                {
+                    <option value="@g.Guid">@g.Name (@g.Guid.ToString("N")[..8])</option>
+                }
+            }
+        </select>
+
+        @if (useGraphContext && graphContextNodeCount >= 0)
+        {
+            <span class="graph-context-info">
+                已加载：@graphContextNodeCount 节点 / @graphContextEdgeCount 边
+            </span>
+        }
+    </div>
+
+    <div class="chat-messages" @ref="messagesContainer">
+        @if (messages.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-icon">💬</div>
+                <h2>Start a conversation</h2>
+                <p>Ask me anything! I'm here to help.</p>
+                @if (useGraphContext && !string.IsNullOrEmpty(selectedGraphGuid))
+                {
+                    <p class="context-hint">
+                        💡 当前已启用图上下文，问题会基于所选图的数据回答
+                    </p>
+                }
+            </div>
+        }
+        else
+        {
+            @foreach (var msg in messages)
+            {
+                <div class="message @msg.Role">
+                    <div class="message-avatar">
+                        <span>@GetAvatar(msg.Role)</span>
+                    </div>
+                    <div class="message-content">
+                        <div class="message-text">@msg.Text</div>
+                        @if (!string.IsNullOrEmpty(msg.GraphContextLabel))
+                        {
+                            <div class="message-context-badge">
+                                📊 @msg.GraphContextLabel
+                            </div>
+                        }
+                        <div class="message-time">@msg.Timestamp.ToString("HH:mm:ss")</div>
+                    </div>
+                </div>
+            }
+        }
+
+        @if (isSending)
+        {
+            <div class="message assistant">
+                <div class="message-avatar">
+                    <span>🤖</span>
+                </div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    @if (elapsedSeconds > 0)
+                    {
+                        <div class="elapsed">
+                            @(elapsedSeconds <= 5
+                                ? $"Thinking for {elapsedSeconds} s…"
+                                : $"模型正在推理或加载，已等待 {elapsedSeconds} s…")
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input-container">
+        <textarea class="chat-input"
+                  @bind="userMessage"
+                  @bind:event="oninput"
+                  @onkeydown="HandleKeyDown"
+                  placeholder="Type your message... (Enter to send, Shift+Enter for newline)"
+                  rows="3"
+                  disabled="@isSending"></textarea>
+
+        @if (isSending)
+        {
+            <button class="btn-cancel" @onclick="CancelAsync">Cancel ✋</button>
+        }
+        else
+        {
+            <button class="btn-send"
+                    @onclick="SendMessageAsync"
+                    disabled="@(string.IsNullOrWhiteSpace(userMessage))">
+                Send 📨
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly List<GraphChatMessage> messages = new();
+    private List<string> sessions = new();
+    private string userMessage = "";
+    private string selectedSessionId = "";
+    private bool isSending;
+    private bool isLoadingSessions;
+    private bool isLoadingHistory;
+    private int elapsedSeconds;
+    private ElementReference messagesContainer;
+
+    // ★ 图上下文状态
+    private List<GraphDto> graphs = [];
+    private string selectedGraphGuid = "";
+    private bool useGraphContext;
+    private int graphContextNodeCount = -1;
+    private int graphContextEdgeCount = -1;
+
+    private CancellationTokenSource? sendCts;
+    private Timer? elapsedTimer;
+    private DateTime sendStartedAt;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(
+            LoadSessionsAsync(),
+            LoadGraphsAsync());
+    }
+
+    private async Task LoadGraphsAsync()
+    {
+        try
+        {
+            graphs = (await GraphApi.ListGraphsAsync()).ToList();
+
+            // 若已有 selection 且图列表里还有它，保留；
+            // 否则选第一个图
+            if (graphs.Count > 0 &&
+                string.IsNullOrEmpty(selectedGraphGuid) ||
+                !graphs.Any(g => g.Guid.ToString() == selectedGraphGuid))
+            {
+                selectedGraphGuid = graphs[0].Guid.ToString();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "加载图列表失败");
+        }
+    }
+
+    private async Task LoadSessionsAsync()
+    {
+        if (isLoadingSessions) return;
+
+        isLoadingSessions = true;
+        StateHasChanged();
+
+        try
+        {
+            var list = await ChatApi.ListSessionsAsync();
+            sessions = list.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load sessions");
+        }
+        finally
+        {
+            isLoadingSessions = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnGraphContextChangedAsync(ChangeEventArgs e)
+    {
+        selectedGraphGuid = e.Value?.ToString() ?? "";
+        await LoadGraphContextSummaryAsync();
+    }
+
+    /// <summary>
+    /// 加载/刷新图上下文摘要（节点数/边数）。
+    /// 勾选复选框或切换下拉框时触发。
+    /// </summary>
+    private async Task LoadGraphContextSummaryAsync()
+    {
+        if (useGraphContext && !string.IsNullOrEmpty(selectedGraphGuid))
+        {
+            try
+            {
+                var guid = Guid.Parse(selectedGraphGuid);
+                var (nodes, edges) = await LoadGraphDataAsync(guid);
+                graphContextNodeCount = nodes.Count;
+                graphContextEdgeCount = edges.Count;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "预加载图数据失败");
+                graphContextNodeCount = -1;
+                graphContextEdgeCount = -1;
+            }
+        }
+        else
+        {
+            // 未启用或未选择图时，重置状态
+            graphContextNodeCount = -1;
+            graphContextEdgeCount = -1;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task<(List<NodeDto> nodes, List<EdgeDto> edges)> LoadGraphDataAsync(Guid graphGuid)
+    {
+        var nodeTask = GraphApi.ListNodesAsync(graphGuid);
+        var edgeTask = GraphApi.ListEdgesAsync(graphGuid);
+        await Task.WhenAll(nodeTask, edgeTask);
+
+        return (
+            nodeTask.Result.ToList(),
+            edgeTask.Result.ToList()
+        );
+    }
+
+    private async Task OnSessionChangedAsync(ChangeEventArgs e)
+    {
+        var newId = e.Value?.ToString() ?? "";
+        if (newId == selectedSessionId) return;
+
+        selectedSessionId = newId;
+        messages.Clear();
+        userMessage = "";
+
+        if (!string.IsNullOrEmpty(newId))
+        {
+            isLoadingHistory = true;
+            StateHasChanged();
+
+            try
+            {
+                var history = await ChatApi.GetSessionMessagesAsync(newId);
+                foreach (var msg in history)
+                {
+                    messages.Add(new GraphChatMessage
+                    {
+                        Role = NormalizeRole(msg.Role),
+                        Text = msg.Text,
+                        Timestamp = DateTime.Now
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "加载会话历史失败：{ConversationId}", newId);
+                messages.Add(new GraphChatMessage
+                {
+                    Role = "error",
+                    Text = "加载历史消息失败，请重试。",
+                    Timestamp = DateTime.Now
+                });
+            }
+            finally
+            {
+                isLoadingHistory = false;
+            }
+        }
+
+        await ScrollToBottomAsync();
+        StateHasChanged();
+    }
+
+    private static string NormalizeRole(string role)
+    {
+        return role.ToLowerInvariant() switch
+        {
+            "user" => "user",
+            "assistant" => "assistant",
+            "system" => "system",
+            _ => "assistant"
+        };
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(userMessage) || isSending) return;
+
+        var originalText = userMessage.Trim();
+        userMessage = "";
+
+        // ★ 组装最终 prompt + 上下文标签
+        var textToSend = originalText;
+        string? contextLabel = null;
+
+        if (useGraphContext && !string.IsNullOrEmpty(selectedGraphGuid))
+        {
+            try
+            {
+                var graphGuid = Guid.Parse(selectedGraphGuid);
+                var (nodes, edges) = await LoadGraphDataAsync(graphGuid);
+                var graphName = graphs.FirstOrDefault(g => g.Guid == graphGuid)?.Name ?? "Graph";
+
+                if (nodes.Count > GraphContextBuilder.MaxNodeCount)
+                {
+                    messages.Add(new GraphChatMessage
+                    {
+                        Role = "error",
+                        Text = $"图 {graphName} 有 {nodes.Count} 个节点，超过上下文上限 "
+                             + $"({GraphContextBuilder.MaxNodeCount})。请关闭图上下文或使用 LiteGraph 内置 Chat。",
+                        Timestamp = DateTime.Now
+                    });
+                    return;
+                }
+
+                textToSend = GraphContextBuilder.BuildPrompt(
+                    graphName, nodes, edges, originalText);
+
+                contextLabel = $"{graphName}（{nodes.Count} 节点 / {edges.Count} 边）";
+                graphContextNodeCount = nodes.Count;
+                graphContextEdgeCount = edges.Count;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "构造图上下文失败，降级为普通消息");
+                contextLabel = null;
+            }
+        }
+
+        messages.Add(new GraphChatMessage
+        {
+            Role = "user",
+            Text = originalText,                     // ★ 只显示用户原文
+            Timestamp = DateTime.Now,
+            GraphContextLabel = contextLabel
+        });
+
+        isSending = true;
+        sendStartedAt = DateTime.Now;
+        elapsedSeconds = 0;
+
+        elapsedTimer = new Timer(_ =>
+        {
+            elapsedSeconds = (int)(DateTime.Now - sendStartedAt).TotalSeconds;
+            _ = InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+
+        sendCts = new CancellationTokenSource();
+
+        await ScrollToBottomAsync();
+        StateHasChanged();
+
+        try
+        {
+            var response = await ChatApi.SendAsync(
+                textToSend,
+                string.IsNullOrEmpty(selectedSessionId) ? null : selectedSessionId,
+                sendCts.Token);
+
+            if (response is null)
+            {
+                messages.Add(new GraphChatMessage
+                {
+                    Role = "error",
+                    Text = "API 返回空响应，请查看服务端日志后重试。",
+                    Timestamp = DateTime.Now
+                });
+                return;
+            }
+
+            if (string.IsNullOrEmpty(selectedSessionId))
+            {
+                selectedSessionId = response.ConversationId;
+                await LoadSessionsAsync();
+            }
+
+            messages.Add(new GraphChatMessage
+            {
+                Role = "assistant",
+                Text = response.Reply,
+                Timestamp = DateTime.Now
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            messages.Add(new GraphChatMessage
+            {
+                Role = "error",
+                Text = "已取消。",
+                Timestamp = DateTime.Now
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "SendMessageAsync failed");
+            messages.Add(new GraphChatMessage
+            {
+                Role = "error",
+                Text = ex.Message,
+                Timestamp = DateTime.Now
+            });
+        }
+        finally
+        {
+            elapsedTimer?.Dispose();
+            elapsedTimer = null;
+
+            sendCts?.Dispose();
+            sendCts = null;
+
+            isSending = false;
+            elapsedSeconds = 0;
+
+            await ScrollToBottomAsync();
+            StateHasChanged();
+        }
+    }
+
+    private void CancelAsync()
+    {
+        sendCts?.Cancel();
+    }
+
+    private async Task ResetSessionAsync()
+    {
+        if (string.IsNullOrEmpty(selectedSessionId) || isSending) return;
+
+        try
+        {
+            await ChatApi.ResetAsync(selectedSessionId);
+
+            messages.Clear();
+            selectedSessionId = "";
+            await LoadSessionsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Reset failed for {ConversationId}", selectedSessionId);
+            messages.Add(new GraphChatMessage
+            {
+                Role = "error",
+                Text = ex.Message,
+                Timestamp = DateTime.Now
+            });
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessageAsync();
+        }
+    }
+
+    private async Task ScrollToBottomAsync()
+    {
+        try
+        {
+            await Task.Yield();
+            await JS.InvokeVoidAsync("scrollToBottom", messagesContainer);
+        }
+        catch
+        {
+            // 预渲染阶段 JS interop 不可用，忽略
+        }
+    }
+
+    private static string GetAvatar(string role)
+    {
+        return role switch
+        {
+            "user" => "👤",
+            "error" => "⚠️",
+            _ => "🤖"
+        };
+    }
+
+    public void Dispose()
+    {
+        elapsedTimer?.Dispose();
+        sendCts?.Cancel();
+        sendCts?.Dispose();
+    }
+}

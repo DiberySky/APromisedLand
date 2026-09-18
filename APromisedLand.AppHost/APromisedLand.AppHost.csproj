@@ -6,6 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <UserSecretsId>023ca44c-b24a-4776-82f6-1c5c6d30ef4f</UserSecretsId>
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     </PropertyGroup>
 
     <ItemGroup>
@@ -59,6 +60,13 @@
         <Content Include="Configs\**\*">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+    </ItemGroup>
+
+    <!-- ★ 新增：把 litegraph.json 复制到 bin/Debug/net10.0/ -->
+    <ItemGroup>
+        <None Update="litegraph.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 </Project>

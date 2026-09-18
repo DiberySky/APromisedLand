@@ -1,0 +1,289 @@
+/* ══════════════════════════════════════════════════════ */
+/* 容器与工具栏                                          */
+/* ══════════════════════════════════════════════════════ */
+
+.graph-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.graph-toolbar h1 {
+    margin: 0 0 16px 0;
+    font-size: 1.5rem;
+}
+
+.toolbar-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.toolbar-row label {
+    font-weight: 500;
+    color: #475569;
+}
+
+.toolbar-row select,
+.toolbar-row input[type="text"] {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    outline: none;
+    background: #fff;
+    min-width: 200px;
+}
+
+.toolbar-row select:focus,
+.toolbar-row input[type="text"]:focus {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+.graph-info {
+    display: flex;
+    gap: 24px;
+    font-size: 0.85rem;
+    color: #64748b;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-radius: 6px;
+}
+
+.graph-info code {
+    font-size: 0.8rem;
+    color: #334155;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* 图可视化区域（关键：定位参考容器）                     */
+/* ══════════════════════════════════════════════════════ */
+
+.graph-visual-area {
+    position: relative !important;
+    overflow: hidden !important;
+    /* 高度由内部 GraphDiagram 决定，此处不设高度 */
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* 节点详情面板（::deep 强制穿透到子组件内部）            */
+/* ══════════════════════════════════════════════════════ */
+
+.graph-visual-area ::deep .detail-panel {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 360px !important;
+    height: 100% !important;
+    background: #ffffff !important;
+    border-left: 1px solid #e2e8f0 !important;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.06) !important;
+    transform: translateX(100%) !important;
+    transition: transform 0.25s ease !important;
+    display: flex !important;
+    flex-direction: column !important;
+    z-index: 10 !important;
+    overflow-y: auto !important;
+}
+
+.graph-visual-area ::deep .detail-panel.open {
+    transform: translateX(0) !important;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* 节点 / 边 表格面板                                    */
+/* ══════════════════════════════════════════════════════ */
+
+.graph-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 1000px) {
+    .graph-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+.graph-panel {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.graph-panel header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.graph-panel h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #1e293b;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* 表单与表格                                            */
+/* ══════════════════════════════════════════════════════ */
+
+.create-form {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.create-form input,
+.create-form select {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    outline: none;
+    flex: 1;
+    min-width: 120px;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.data-table th,
+.data-table td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.data-table th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.data-table tr:hover td {
+    background: #fafbfc;
+}
+
+tr.row-selected td {
+    background: #eff6ff !important;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* 通用元素                                              */
+/* ══════════════════════════════════════════════════════ */
+
+.pill {
+    display: inline-block;
+    padding: 2px 8px;
+    margin-right: 4px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.muted {
+    color: #cbd5e1;
+}
+
+code.small {
+    font-size: 0.75rem;
+    color: #475569;
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* 按钮                                                  */
+/* ══════════════════════════════════════════════════════ */
+
+.btn {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+    background: #f1f5f9;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: #4a90e2;
+    color: #fff;
+    border-color: #4a90e2;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #3a7bc8;
+}
+
+.btn-danger {
+    background: #fff;
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #fef2f2;
+}
+
+.btn-xs {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* 状态提示                                              */
+/* ══════════════════════════════════════════════════════ */
+
+.empty {
+    text-align: center;
+    color: #94a3b8;
+    padding: 24px 12px;
+    font-size: 0.9rem;
+}
+
+.error-banner {
+    padding: 12px 16px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    color: #991b1b;
+    font-size: 0.9rem;
+}
+
+.loading-banner {
+    padding: 8px 16px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    color: #1d4ed8;
+    font-size: 0.85rem;
+}

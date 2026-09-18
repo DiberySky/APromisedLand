@@ -1,0 +1,39 @@
+.graph-node {
+    background: #fff;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 14px;
+    min-width: 160px;
+    cursor: move;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.graph-node.selected {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.25);
+}
+
+.node-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.node-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.node-label {
+    display: inline-block;
+    padding: 1px 6px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 4px;
+    font-size: 0.7rem;
+}

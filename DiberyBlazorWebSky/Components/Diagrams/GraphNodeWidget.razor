@@ -1,0 +1,23 @@
+@using Blazor.Diagrams.Components.Renderers
+@using DiberyBlazorWebSky.Models.Graph
+
+<div class="graph-node @(Node.Selected ? "selected" : "")">
+    <div class="node-name">@Node.Name</div>
+    @if (Node.Labels.Count > 0)
+    {
+        <div class="node-labels">
+            @foreach (var label in Node.Labels)
+            {
+                <span class="node-label">@label</span>
+            }
+        </div>
+    }
+    @foreach (var port in Node.Ports)
+    {
+        <PortRenderer @key="port" Port="port" />
+    }
+</div>
+
+@code {
+    [Parameter] public GraphNodeModel Node { get; set; } = null!;
+}

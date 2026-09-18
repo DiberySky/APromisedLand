@@ -1,0 +1,477 @@
+@page "/graph"
+@using DiberyBlazorWebSky.Models.Graph
+@inject GraphApiClient GraphApi
+@inject ILogger<GraphExplorer> Logger
+
+@* ★ 关闭预渲染 *@
+@rendermode @(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode(prerender: false))
+
+
+<PageTitle>图浏览器</PageTitle>
+
+<div class="graph-container">
+
+    @* ── 顶部工具栏（保持不变）── *@
+    <div class="graph-toolbar">
+        <h1>🕸️ LiteGraph 图浏览器</h1>
+        <div class="toolbar-row">
+            <label>图：</label>
+            <select value="@selectedGraphGuid"
+                    @onchange="OnGraphChangedAsync"
+                    disabled="@isBusy">
+                <option value="">— 选择一个图 —</option>
+                @foreach (var g in graphs)
+                {
+                    <option value="@g.Guid">@g.Name (@ShortGuid(g.Guid))</option>
+                }
+            </select>
+            <button class="btn" @onclick="RefreshAllAsync" disabled="@isBusy">
+                🔄 刷新
+            </button>
+            <input type="text" placeholder="新图名称"
+                   @bind="newGraphName" @bind:event="oninput"
+                   disabled="@isBusy" />
+            <button class="btn btn-primary"
+                    @onclick="CreateGraphAsync"
+                    disabled="@(isBusy || string.IsNullOrWhiteSpace(newGraphName))">
+                ➕ 新建图
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="error-banner">⚠️ @errorMessage</div>
+    }
+
+    @if (SelectedGraph is not null)
+    {
+        <div class="graph-info">
+            <span>GUID: <code>@SelectedGraph.Guid</code></span>
+            <span>节点: @nodes.Count · 边: @edges.Count</span>
+        </div>
+
+        @* ── 图可视化 + 详情面板 ── *@
+        <div class="graph-visual-area" 
+             style="position: relative; min-height: 600px; overflow: hidden;">
+            <GraphDiagram Nodes="nodes" Edges="edges" />
+            <NodeDetailPanel Node="selectedNode"
+                             IsOpen="isDetailOpen"
+                             OnClose="CloseDetail" />
+        </div>
+
+        @* ── 操作区（创建节点/边）── *@
+        <div class="graph-columns">
+            <section class="graph-panel">
+                <header><h2>节点 (@nodes.Count)</h2></header>
+                <div class="create-form">
+                    <input type="text" placeholder="显示名称"
+                           @bind="newNodeName" @bind:event="oninput"
+                           disabled="@isBusy" />
+                    <input type="text" placeholder="类型"
+                           @bind="newNodeType" @bind:event="oninput"
+                           disabled="@isBusy" />
+                    <button class="btn btn-primary"
+                            @onclick="CreateNodeAsync"
+                            disabled="@(isBusy || string.IsNullOrWhiteSpace(newNodeName)
+                                       || string.IsNullOrWhiteSpace(newNodeType))">
+                        ➕ 添加节点
+                    </button>
+                </div>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>名称</th>
+                            <th>标签</th>
+                            <th>GUID</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var n in nodes)
+                        {
+                            <tr @onclick="() => SelectNode(n)"
+                                style="cursor: pointer;"
+                                class="@(selectedNode?.Guid == n.Guid ? "row-selected" : "")">
+                                <td>@n.Name</td>
+                                <td>
+                                    @if (n.Labels is { Count: > 0 })
+                                    {
+                                        @foreach (var l in n.Labels)
+                                        {
+                                            <span class="pill">@l</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                </td>
+                                <td><code class="small">@ShortGuid(n.Guid)</code></td>
+                                <td>
+                                    <button class="btn btn-danger btn-xs"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => DeleteNodeAsync(n)"
+                                            disabled="@isBusy">
+                                        🗑️
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="graph-panel">
+                <header><h2>边 (@edges.Count)</h2></header>
+                <div class="create-form">
+                    <select @bind="newEdgeFrom" disabled="@(isBusy || nodes.Count == 0)">
+                        <option value="">— 起点 —</option>
+                        @foreach (var n in nodes)
+                        {
+                            <option value="@n.Guid">@n.Name</option>
+                        }
+                    </select>
+                    <select @bind="newEdgeTo" disabled="@(isBusy || nodes.Count == 0)">
+                        <option value="">— 终点 —</option>
+                        @foreach (var n in nodes)
+                        {
+                            <option value="@n.Guid">@n.Name</option>
+                        }
+                    </select>
+                    <input type="text" placeholder="类型"
+                           @bind="newEdgeType" @bind:event="oninput"
+                           disabled="@isBusy" />
+                    <button class="btn btn-primary"
+                            @onclick="CreateEdgeAsync"
+                            disabled="@(isBusy
+                                || string.IsNullOrEmpty(newEdgeFrom)
+                                || string.IsNullOrEmpty(newEdgeTo)
+                                || string.IsNullOrWhiteSpace(newEdgeType))">
+                        ➕ 添加边
+                    </button>
+                </div>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>类型</th>
+                            <th>From → To</th>
+                            <th>GUID</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in edges)
+                        {
+                            <tr>
+                                <td><span class="pill">@e.Name</span></td>
+                                <td>
+                                    <code class="small">
+                                        @NodeName(e.From) → @NodeName(e.To)
+                                    </code>
+                                </td>
+                                <td><code class="small">@ShortGuid(e.Guid)</code></td>
+                                <td>
+                                    <button class="btn btn-danger btn-xs"
+                                            @onclick="() => DeleteEdgeAsync(e)"
+                                            disabled="@isBusy">
+                                        🗑️
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    private List<GraphDto> graphs = [];
+    private List<NodeDto> nodes = [];
+    private List<EdgeDto> edges = [];
+
+    private string? selectedGraphGuid;
+    private string newGraphName = string.Empty;
+
+    private string newNodeName = string.Empty;
+    private string newNodeType = "Default";
+
+    private string newEdgeFrom = string.Empty;
+    private string newEdgeTo = string.Empty;
+    private string newEdgeType = "RELATED_TO";
+
+    private bool isBusy;
+    private string? errorMessage;
+
+    private GraphDto? SelectedGraph =>
+        graphs.FirstOrDefault(g =>
+            string.Equals(g.Guid.ToString(), selectedGraphGuid,
+                StringComparison.OrdinalIgnoreCase));
+
+    private NodeDto? selectedNode;
+    private bool isDetailOpen;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAllAsync();
+    }
+
+    // ─── 刷新 ─────────────────────────────────────────────
+
+    private async Task RefreshAllAsync()
+    {
+        isBusy = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            graphs = (await GraphApi.ListGraphsAsync()).ToList();
+
+            if (string.IsNullOrEmpty(selectedGraphGuid) && graphs.Count > 0)
+                selectedGraphGuid = graphs[0].Guid.ToString();
+
+            if (SelectedGraph is not null)
+                await LoadGraphDataAsync(SelectedGraph.Guid);
+            else
+            {
+                nodes.Clear();
+                edges.Clear();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "RefreshAllAsync failed");
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadGraphDataAsync(Guid graphGuid)
+    {
+        nodes = (await GraphApi.ListNodesAsync(graphGuid)).ToList();
+        edges = (await GraphApi.ListEdgesAsync(graphGuid)).ToList();
+    }
+
+    // ─── 事件处理 ─────────────────────────────────────────
+
+    private async Task OnGraphChangedAsync(ChangeEventArgs e)
+    {
+        selectedGraphGuid = e.Value?.ToString();
+        errorMessage = null;
+
+        if (SelectedGraph is null) return;
+
+        isBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            await LoadGraphDataAsync(SelectedGraph.Guid);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "OnGraphChangedAsync failed");
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateGraphAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newGraphName)) return;
+
+        isBusy = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var created = await GraphApi.CreateGraphAsync(newGraphName.Trim());
+            if (created is not null)
+                selectedGraphGuid = created.Guid.ToString();
+
+            newGraphName = string.Empty;
+            await RefreshAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "CreateGraphAsync failed");
+            errorMessage = ex.Message;
+            isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateNodeAsync()
+    {
+        if (SelectedGraph is null
+            || string.IsNullOrWhiteSpace(newNodeName)
+            || string.IsNullOrWhiteSpace(newNodeType)) return;
+
+        isBusy = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await GraphApi.UpsertNodeAsync(
+                SelectedGraph.Guid,
+                new NodeUpsertRequest
+                {
+                    DisplayName = newNodeName.Trim(),
+                    Type        = newNodeType.Trim(),
+                });
+
+            if (!result.Success)
+            {
+                errorMessage = $"[{result.ErrorCode}] {result.ErrorMessage}";
+            }
+            else
+            {
+                newNodeName = string.Empty;
+                await LoadGraphDataAsync(SelectedGraph.Guid);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "CreateNodeAsync failed");
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteNodeAsync(NodeDto node)
+    {
+        if (SelectedGraph is null) return;
+
+        isBusy = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await GraphApi.DeleteNodeAsync(SelectedGraph.Guid, node.Guid);
+            await LoadGraphDataAsync(SelectedGraph.Guid);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "DeleteNodeAsync failed");
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+            StateHasChanged();
+        }
+        
+        if (selectedNode?.Guid == node.Guid)
+        {
+            selectedNode = null;
+            isDetailOpen = false;
+        }
+    }
+
+    private async Task CreateEdgeAsync()
+    {
+        if (SelectedGraph is null
+            || !Guid.TryParse(newEdgeFrom, out var from)
+            || !Guid.TryParse(newEdgeTo, out var to)
+            || string.IsNullOrWhiteSpace(newEdgeType)) return;
+
+        isBusy = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await GraphApi.UpsertEdgeAsync(
+                SelectedGraph.Guid,
+                new EdgeUpsertRequest
+                {
+                    From = from,
+                    To   = to,
+                    Type = newEdgeType.Trim(),
+                });
+
+            if (!result.Success)
+                errorMessage = $"[{result.ErrorCode}] {result.ErrorMessage}";
+            else
+                await LoadGraphDataAsync(SelectedGraph.Guid);
+
+            newEdgeFrom = string.Empty;
+            newEdgeTo = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "CreateEdgeAsync failed");
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteEdgeAsync(EdgeDto edge)
+    {
+        if (SelectedGraph is null) return;
+
+        isBusy = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await GraphApi.DeleteEdgeAsync(SelectedGraph.Guid, edge.Guid);
+            await LoadGraphDataAsync(SelectedGraph.Guid);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "DeleteEdgeAsync failed");
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    // ─── 辅助 ─────────────────────────────────────────────
+
+    private string NodeName(Guid guid) =>
+        nodes.FirstOrDefault(n => n.Guid == guid)?.Name
+        ?? ShortGuid(guid);
+
+    private static string ShortGuid(Guid guid) =>
+        guid.ToString("N")[..8];
+    
+    private void SelectNode(NodeDto node)
+    {
+        selectedNode = node;
+        isDetailOpen = true;
+    }
+
+    private void CloseDetail()
+    {
+        isDetailOpen = false;
+    }
+}

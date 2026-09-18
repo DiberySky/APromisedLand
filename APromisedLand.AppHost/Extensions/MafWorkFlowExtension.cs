@@ -25,7 +25,8 @@ public static class MafWorkFlowExtension
             .WireIfPresent(context.HangfireDb)
             .WireIfPresent(context.Ollama)
             .WireIfPresent(context.ChatModel, waitFor: false)
-            .WireIfPresent(context.Embedding, waitFor: false);
+            .WireIfPresent(context.Embedding, waitFor: false)
+            .WireIfPresent(context.LiteGraph);
 
         // ─── 外部资源：清单式声明 ─────────────────────────────────
         // 不再使用 builder.Services.BuildServiceProvider()，避免额外容器。

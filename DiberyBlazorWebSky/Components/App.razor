@@ -7,15 +7,22 @@
     <base href="/"/>
     <link rel="stylesheet" href="app.css"/>
     <link rel="stylesheet" href="DiberyBlazorWebSky.styles.css"/>
+
+    @* ★ 前缀改为 ModelingEvolution.Blazor.Diagrams *@
+    <link href="_content/ModelingEvolution.Blazor.Diagrams/style.min.css" rel="stylesheet" />
+    <link href="_content/ModelingEvolution.Blazor.Diagrams/default.styles.min.css" rel="stylesheet" />
+
     <HeadOutlet/>
 </head>
 
 <body>
 <Routes/>
 
-@* ★ 自定义 JS 必须放在 blazor.web.js 之前或之后，只要在调用前加载即可 *@
 <script src="js/site.js"></script>
 <script src="js/file-download.js"></script>
+
+@* ★ 前缀改为 ModelingEvolution.Blazor.Diagrams *@
+<script src="_content/ModelingEvolution.Blazor.Diagrams/script.min.js"></script>
 <script src="_framework/blazor.web.js"></script>
 </body>
 

@@ -69,41 +69,37 @@ public sealed class UploadSessionCleanupService : BackgroundService
 
         if (!opts.Enabled)
         {
-            _logger.LogInformation("上传会话清理服务已禁用（UploadCleanup:Enabled = false）。");
+            _logger.LogInformation("上传会话清理服务已禁用。");
             return;
         }
 
-        var interval     = opts.EffectiveInterval;
-        var startupDelay = opts.EffectiveStartupDelay;
+        // ★ 保底：不管配置怎么读，至少延迟 2 分钟启动
+        //    避开启动期健康检查、EF 迁移的连接争抢
+        var configuredDelay = opts.EffectiveStartupDelay;
+        var effectiveDelay = configuredDelay < TimeSpan.FromMinutes(2)
+            ? TimeSpan.FromMinutes(2)
+            : configuredDelay;
+
+        var interval = opts.EffectiveInterval;
 
         _logger.LogInformation(
-            "上传会话清理服务已启动：启动延迟 {StartupDelay}，执行间隔 {Interval}。",
-            startupDelay, interval);
+            "上传会话清理服务已启动：启动延迟 {StartupDelay}（配置值 {Configured}），执行间隔 {Interval}。",
+            effectiveDelay, configuredDelay, interval);
 
         try
         {
-            // ── 启动延迟 ──
-            if (startupDelay > TimeSpan.Zero)
-            {
-                await Task.Delay(startupDelay, stoppingToken);
-            }
+            if (effectiveDelay > TimeSpan.Zero)
+                await Task.Delay(effectiveDelay, stoppingToken);
 
-            // ── 主循环 ──
             while (!stoppingToken.IsCancellationRequested)
             {
-                // RunOnceAsync 永不抛异常：
-                //   true  → 本轮结束，继续下一轮
-                //   false → 关闭中，退出循环
                 if (!await RunOnceAsync(stoppingToken))
                     break;
 
                 await Task.Delay(interval, stoppingToken);
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-            // 关闭：Task.Delay 抛出时走到这里，静默退出。
-        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
         finally
         {
             _logger.LogInformation("上传会话清理服务已停止。");
