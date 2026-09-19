@@ -39,6 +39,8 @@ builder.Services.AddSingleton<LiteGraphSdk>(sp =>
     return new LiteGraphSdk("http://localhost:8701", "default");
 });
 
+builder.Services.AddScoped<GraphImportExportService>();
+
 builder.Services.AddScoped<GraphDynamicContextService>();
 
 // ── FileStorageApi ──

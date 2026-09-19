@@ -1,7 +1,10 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using DiberyBlazorWebSky.Models.Graph;
+using DiberyBlazorWebSky.Services;
 using LiteGraph.Sdk;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 
 namespace DiberyBlazorWebSky.Components.Pages;
@@ -11,8 +14,9 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
     // ─── 注入 ─────────────────────────────────────────
     [Inject] private IJSRuntime Js { get; set; } = default!;
     [Inject] private IHttpClientFactory HttpClientFactory { get; set; } = default!;
+    [Inject] private GraphImportExportService ImportExport { get; set; } = default!;
 
-    // ─── 状态字段 ─────────────────────────────────────
+    // ─── 图 / 节点 / 边状态 ──────────────────────────
     private List<Graph> _graphs = new();
     private List<Node> _nodes = new();
     private List<Edge> _edges = new();
@@ -36,8 +40,6 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
     private bool _edgeHasNext;
 
     private const int PageSize = 20;
-
-    /// <summary>LiteGraph SDK 限制：MaxResults 最大 1000。</summary>
     private const int MaxEnumerationResults = 1000;
 
     // CRUD 输入
@@ -52,11 +54,25 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
     private List<VectorSearchDisplayResult> _vectorResults = new();
     private string _vectorProgress = "";
 
-    // ★ P2: 拓扑图状态
+    // 拓扑图
     private List<Node> _topologyNodes = new();
     private List<Edge> _topologyEdges = new();
     private Node? _selectedTopologyNode;
     private readonly Dictionary<Guid, (double X, double Y)> _nodePositions = new();
+
+    // ★ 导入 / 导出状态
+    private string? _selectedJsonFileName;
+    private string? _selectedJsonContent;
+    private string? _selectedNodesCsvName;
+    private string? _selectedNodesCsvContent;
+    private string? _selectedEdgesCsvName;
+    private string? _selectedEdgesCsvContent;
+    private bool _clearBeforeImport;
+    private ImportResult? _importResult;
+
+    private bool HasAnyImportFile =>
+        !string.IsNullOrEmpty(_selectedJsonContent) ||
+        !string.IsNullOrEmpty(_selectedNodesCsvContent);
 
     // 常量
     private static readonly Guid DefaultTenant = Guid.Empty;
@@ -113,11 +129,21 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         _vectorResults.Clear();
         _vectorProgress = "";
 
-        // ★ P2：清空拓扑状态
+        // 清空拓扑
         _topologyNodes.Clear();
         _topologyEdges.Clear();
         _nodePositions.Clear();
         _selectedTopologyNode = null;
+
+        // 清空导入 / 导出状态
+        _selectedJsonFileName = null;
+        _selectedJsonContent = null;
+        _selectedNodesCsvName = null;
+        _selectedNodesCsvContent = null;
+        _selectedEdgesCsvName = null;
+        _selectedEdgesCsvContent = null;
+        _clearBeforeImport = false;
+        _importResult = null;
 
         await Task.WhenAll(LoadNodesAsync(), LoadEdgesAsync());
     }
@@ -392,9 +418,6 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
 
     // ─── 向量搜索 ─────────────────────────────────────
 
-    /// <summary>
-    /// 调用 Ollama 生成 embedding。
-    /// </summary>
     private async Task<List<float>?> GetEmbeddingAsync(string text)
     {
         try
@@ -430,9 +453,6 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 余弦相似度计算。
-    /// </summary>
     private static float CosineSimilarity(List<float> a, List<float> b)
     {
         if (a.Count != b.Count || a.Count == 0) return 0f;
@@ -449,9 +469,6 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         return dot / (MathF.Sqrt(na) * MathF.Sqrt(nb));
     }
 
-    /// <summary>
-    /// 语义搜索：文本 → embedding → 手动遍历所有向量计算相似度。
-    /// </summary>
     private async Task SearchVectorAsync()
     {
         if (string.IsNullOrWhiteSpace(_vectorQueryText) ||
@@ -529,9 +546,6 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 为当前图所有节点生成并保存向量。
-    /// </summary>
     private async Task GenerateVectorsForAllNodesAsync()
     {
         if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
@@ -618,9 +632,6 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
 
     // ─── 拓扑图 ──────────────────────────────────────
 
-    /// <summary>
-    /// 加载当前图的所有节点和边，用于拓扑渲染。
-    /// </summary>
     private async Task LoadTopologyAsync()
     {
         if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
@@ -672,9 +683,6 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 圆形布局：所有节点均匀分布在一个圆周上。
-    /// </summary>
     private void ComputeCircularLayout()
     {
         _nodePositions.Clear();
@@ -686,7 +694,6 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
 
         for (int i = 0; i < n; i++)
         {
-            // 从正上方开始顺时针分布
             double angle = 2 * Math.PI * i / n - Math.PI / 2;
             double x = cx + radius * Math.Cos(angle);
             double y = cy + radius * Math.Sin(angle);
@@ -694,21 +701,280 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 查询节点坐标；若节点不在图中返回 null。
-    /// </summary>
     private (double X, double Y)? GetPosition(Guid nodeGuid)
     {
         return _nodePositions.TryGetValue(nodeGuid, out var p) ? p : null;
     }
 
-    /// <summary>
-    /// 点击节点：切换高亮状态。
-    /// </summary>
     private void SelectTopologyNode(Node node)
     {
         _selectedTopologyNode = _selectedTopologyNode?.GUID == node.GUID ? null : node;
         StateHasChanged();
+    }
+
+    // ══════════════════════════════════════════════════════
+    // 导入 / 导出
+    // ══════════════════════════════════════════════════════
+
+    private async Task ExportJsonAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
+
+        _isBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+            var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
+            var json = await ImportExport.ExportToJsonAsync(graphGuid, graphName);
+
+            var safeName = SanitizeFileName(graphName);
+            var fileName = $"{safeName}-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+
+            await Js.InvokeVoidAsync("downloadTextFile", fileName, json, "application/json");
+            Logger.LogInformation("导出 JSON 成功：{FileName}", fileName);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "导出 JSON 失败");
+            _errorMessage = $"导出失败：{ex.Message}";
+        }
+        finally
+        {
+            _isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExportNodesCsvAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
+
+        _isBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+            var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
+            var csv = await ImportExport.ExportNodesToCsvAsync(graphGuid);
+
+            var safeName = SanitizeFileName(graphName);
+            var fileName = $"{safeName}-nodes-{DateTime.Now:yyyyMMdd-HHmmss}.csv";
+
+            await Js.InvokeVoidAsync("downloadTextFile", fileName, csv, "text/csv;charset=utf-8");
+            Logger.LogInformation("导出节点 CSV 成功：{FileName}", fileName);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "导出节点 CSV 失败");
+            _errorMessage = $"导出失败：{ex.Message}";
+        }
+        finally
+        {
+            _isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExportEdgesCsvAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
+
+        _isBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+            var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
+            var csv = await ImportExport.ExportEdgesToCsvAsync(graphGuid);
+
+            var safeName = SanitizeFileName(graphName);
+            var fileName = $"{safeName}-edges-{DateTime.Now:yyyyMMdd-HHmmss}.csv";
+
+            await Js.InvokeVoidAsync("downloadTextFile", fileName, csv, "text/csv;charset=utf-8");
+            Logger.LogInformation("导出边 CSV 成功：{FileName}", fileName);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "导出边 CSV 失败");
+            _errorMessage = $"导出失败：{ex.Message}";
+        }
+        finally
+        {
+            _isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    // ─── 文件选择处理器 ─────────────────────────────
+
+    private async Task OnJsonFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            _selectedJsonContent = await reader.ReadToEndAsync();
+            _selectedJsonFileName = $"{file.Name} ({file.Size / 1024} KB)";
+            _importResult = null;
+
+            // 选 JSON 时清空 CSV 选择
+            _selectedNodesCsvContent = null;
+            _selectedNodesCsvName = null;
+            _selectedEdgesCsvContent = null;
+            _selectedEdgesCsvName = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "读取 JSON 文件失败");
+            _errorMessage = $"读取文件失败：{ex.Message}";
+            _selectedJsonFileName = null;
+            _selectedJsonContent = null;
+        }
+
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private async Task OnNodesCsvSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            _selectedNodesCsvContent = await reader.ReadToEndAsync();
+            _selectedNodesCsvName = $"{file.Name} ({file.Size / 1024} KB)";
+            _importResult = null;
+
+            // 选 CSV 时清空 JSON 选择
+            _selectedJsonContent = null;
+            _selectedJsonFileName = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "读取节点 CSV 失败");
+            _errorMessage = $"读取文件失败：{ex.Message}";
+            _selectedNodesCsvName = null;
+            _selectedNodesCsvContent = null;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task OnEdgesCsvSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            _selectedEdgesCsvContent = await reader.ReadToEndAsync();
+            _selectedEdgesCsvName = $"{file.Name} ({file.Size / 1024} KB)";
+            _importResult = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "读取边 CSV 失败");
+            _errorMessage = $"读取文件失败：{ex.Message}";
+            _selectedEdgesCsvName = null;
+            _selectedEdgesCsvContent = null;
+        }
+
+        StateHasChanged();
+    }
+
+    // ─── 执行导入 ────────────────────────────────────
+
+    private async Task StartImportAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
+        if (!HasAnyImportFile) return;
+
+        var clearWarning = _clearBeforeImport
+            ? "⚠️ 将先清空图中现有节点和边！此操作不可撤销。\n\n"
+            : "";
+        if (!await ConfirmAsync($"{clearWarning}确定导入？"))
+            return;
+
+        _isBusy = true;
+        _errorMessage = null;
+        _importResult = null;
+        _vectorProgress = "解析文件中...";
+        StateHasChanged();
+
+        try
+        {
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+
+            if (!string.IsNullOrEmpty(_selectedJsonContent))
+            {
+                _importResult = await ImportExport.ImportFromJsonAsync(
+                    graphGuid, _selectedJsonContent, _clearBeforeImport);
+            }
+            else if (!string.IsNullOrEmpty(_selectedNodesCsvContent))
+            {
+                _importResult = await ImportExport.ImportFromCsvAsync(
+                    graphGuid,
+                    _selectedNodesCsvContent,
+                    _selectedEdgesCsvContent,
+                    _clearBeforeImport);
+            }
+
+            // 导入完成后刷新节点/边列表
+            await LoadNodesAsync();
+            await LoadEdgesAsync();
+
+            // 清空拓扑缓存，下次进入重新加载
+            _topologyNodes.Clear();
+            _topologyEdges.Clear();
+            _nodePositions.Clear();
+
+            Logger.LogInformation("导入完成");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "导入失败");
+            _errorMessage = $"导入失败：{ex.Message}";
+        }
+        finally
+        {
+            _isBusy = false;
+            _vectorProgress = "";
+            StateHasChanged();
+        }
+    }
+
+    private void ResetImportState()
+    {
+        _selectedJsonFileName = null;
+        _selectedJsonContent = null;
+        _selectedNodesCsvName = null;
+        _selectedNodesCsvContent = null;
+        _selectedEdgesCsvName = null;
+        _selectedEdgesCsvContent = null;
+        _importResult = null;
+        _clearBeforeImport = false;
+        StateHasChanged();
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var sb = new System.Text.StringBuilder(name.Length);
+        foreach (var c in name)
+            sb.Append(Array.IndexOf(invalid, c) >= 0 ? '_' : c);
+        return sb.ToString();
     }
 
     // ─── UI 辅助 ─────────────────────────────────────
@@ -716,12 +982,16 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
     {
         _activeTab = tab;
 
-        // 切到拓扑图且尚未加载时，自动加载
         if (tab == "topology" &&
             _topologyNodes.Count == 0 &&
             !string.IsNullOrEmpty(_selectedGraphGuid))
         {
             await LoadTopologyAsync();
+        }
+        else if (tab == "import-export")
+        {
+            _importResult = null;
+            StateHasChanged();
         }
         else
         {

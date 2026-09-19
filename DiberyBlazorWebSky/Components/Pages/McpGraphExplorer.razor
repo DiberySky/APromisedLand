@@ -2,6 +2,7 @@
 @using System.Linq
 @using System.Text.Json
 @using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Components.Forms
 @using LiteGraph.Sdk
 @inject LiteGraphSdk LiteGraph
 @inject ILogger<McpGraphExplorer> Logger
@@ -12,7 +13,7 @@
 <div class="explorer-container">
     <div class="explorer-header">
         <h1>🔍 MCP 图数据 Explorer</h1>
-        <p class="page-subtitle">节点 / 边 CRUD + 向量语义搜索 + 拓扑可视化 —— 基于 LiteGraph SDK</p>
+        <p class="page-subtitle">节点 / 边 CRUD + 向量语义搜索 + 拓扑可视化 + 导入导出 —— 基于 LiteGraph SDK</p>
     </div>
 
     <!-- 图选择 -->
@@ -39,6 +40,8 @@
                     @onclick='() => SwitchTabAsync("vector")'>🧠 向量搜索</button>
             <button class="tab @(_activeTab == "topology" ? "active" : "")"
                     @onclick='() => SwitchTabAsync("topology")'>🕸️ 拓扑图</button>
+            <button class="tab @(_activeTab == "import-export" ? "active" : "")"
+                    @onclick='() => SwitchTabAsync("import-export")'>💾 导入/导出</button>
         </div>
 
         <!-- 节点面板 -->
@@ -214,7 +217,7 @@
                 {
                     <div class="svg-wrap">
                         <svg viewBox="0 0 800 600" class="graph-svg">
-                            <!-- 边：注意这里用 svg:text 而非 text -->
+                            <!-- 边 -->
                             @foreach (var edge in _topologyEdges)
                             {
                                 var fromPos = GetPosition(edge.From);
@@ -230,7 +233,7 @@
                                 }
                             }
 
-                            <!-- 节点：同样用 svg:text -->
+                            <!-- 节点 -->
                             @foreach (var node in _topologyNodes)
                             {
                                 var pos = GetPosition(node.GUID);
@@ -250,6 +253,100 @@
                             }
                         </svg>
                     </div>
+                }
+            </div>
+        }
+
+        <!-- 导入 / 导出 -->
+        @if (_activeTab == "import-export")
+        {
+            <div class="panel">
+                <div class="crud-bar">
+                    <strong>📤 导出当前图</strong>
+                    <button class="btn-primary"
+                            @onclick="ExportJsonAsync"
+                            disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">
+                        📥 导出 JSON
+                    </button>
+                    <button class="btn-secondary"
+                            @onclick="ExportNodesCsvAsync"
+                            disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">
+                        📥 导出节点 CSV
+                    </button>
+                    <button class="btn-secondary"
+                            @onclick="ExportEdgesCsvAsync"
+                            disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">
+                        📥 导出边 CSV
+                    </button>
+                </div>
+
+                <div class="crud-bar">
+                    <strong>📥 导入 JSON</strong>
+                    <InputFile OnChange="OnJsonFileSelected" accept=".json" class="file-input" />
+                    <span class="file-status">@_selectedJsonFileName</span>
+                </div>
+
+                <div class="crud-bar">
+                    <strong>📥 从 CSV 导入</strong>
+                    <InputFile OnChange="OnNodesCsvSelected" accept=".csv" class="file-input" />
+                    <span class="file-status">@_selectedNodesCsvName</span>
+                    <InputFile OnChange="OnEdgesCsvSelected" accept=".csv" class="file-input" />
+                    <span class="file-status">@_selectedEdgesCsvName</span>
+                </div>
+
+                <div class="crud-bar">
+                    <label class="import-option">
+                        <input type="checkbox" @bind="_clearBeforeImport" />
+                        <span>导入前清空图中所有节点和边（⚠️ 不可撤销）</span>
+                    </label>
+                    <button class="btn-primary"
+                            @onclick="StartImportAsync"
+                            disabled="@(_isBusy || !HasAnyImportFile)">
+                        🚀 开始导入
+                    </button>
+                    <button class="btn-danger"
+                            @onclick="ResetImportState"
+                            disabled="@_isBusy">
+                        ✕ 清空选择
+                    </button>
+                </div>
+
+                @if (_isBusy)
+                {
+                    <p class="hint">处理中... @_vectorProgress</p>
+                }
+
+                @if (_importResult != null)
+                {
+                    <div class="response-box">
+                        <strong>导入结果：</strong>
+                        <ul style="margin: 8px 0 0 0;">
+                            <li>✅ 新增节点：@_importResult.NodesCreated</li>
+                            <li>⏭️ 跳过重复节点：@_importResult.NodesSkipped</li>
+                            <li>✅ 新增边：@_importResult.EdgesCreated</li>
+                            <li>⏭️ 跳过边：@_importResult.EdgesSkipped</li>
+                        </ul>
+                        @if (_importResult.Errors.Count > 0)
+                        {
+                            <div style="margin-top: 12px;">
+                                <strong>⚠️ 错误清单（前 20 条）：</strong>
+                                <ul style="margin: 6px 0 0 0; color: #991b1b;">
+                                    @foreach (var err in _importResult.Errors.Take(20))
+                                    {
+                                        <li>@err</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (_importResult == null && !_isBusy)
+                {
+                    <p class="hint">
+                        💡 支持 JSON（含 Nodes + Edges）或 CSV（Nodes + Edges 分开）导入。<br />
+                        导出的 JSON 可直接用于其他环境的导入，节点以名称引用，跨环境安全。
+                    </p>
                 }
             </div>
         }
