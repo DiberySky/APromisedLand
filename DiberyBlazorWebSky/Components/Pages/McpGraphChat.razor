@@ -1,0 +1,165 @@
+@page "/mcp-graph-chat"
+@using DiberyBlazorWebSky.Models.Graph
+@rendermode InteractiveServer
+
+<PageTitle>图对话（动态）</PageTitle>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h1>🧠 MCP 图对话助手</h1>
+        <p class="page-subtitle">
+            @if (_useGraphContext && !string.IsNullOrEmpty(_selectedGraphGuid))
+            {
+                <span>已启用图上下文 —— 基于意图识别 + LiteGraph SDK 动态查询</span>
+            }
+            else
+            {
+                <span>提示：勾选"使用图上下文"可让 AI 基于图数据回答</span>
+            }
+        </p>
+        <div class="session-controls">
+            <select class="session-selector"
+                    value="@_selectedSessionId"
+                    @onchange="OnSessionChangedAsync"
+                    disabled="@_isSending">
+                <option value="">New Conversation</option>
+                @foreach (var session in _sessions)
+                {
+                    <option value="@session">@session</option>
+                }
+            </select>
+            <button class="btn-refresh"
+                    @onclick="LoadSessionsAsync"
+                    disabled="@(_isSending || _isLoadingSessions)">
+                🔄 Refresh
+            </button>
+            @if (!string.IsNullOrEmpty(_selectedSessionId))
+            {
+                <button class="btn-reset"
+                        @onclick="ResetSessionAsync"
+                        disabled="@_isSending">
+                    🗑️ Reset
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="graph-context-bar">
+        <label class="graph-toggle">
+            <input type="checkbox"
+                   @bind="_useGraphContext"
+                   @bind:after="LoadGraphContextSummaryAsync"
+                   disabled="@(_isSending || _graphs.Count == 0)" />
+            <span>🧠 使用动态图上下文</span>
+        </label>
+
+        <select class="graph-selector"
+                value="@_selectedGraphGuid"
+                @onchange="OnGraphContextChangedAsync"
+                disabled="@(_isSending || !_useGraphContext || _graphs.Count == 0)">
+            @if (_graphs.Count == 0)
+            {
+                <option value="">（没有可用的图）</option>
+            }
+            else
+            {
+                @foreach (var g in _graphs)
+                {
+                    <option value="@g.Guid">@g.Name (@g.Guid.ToString("N")[..8])</option>
+                }
+            }
+        </select>
+
+        @if (_useGraphContext && _graphContextNodeCount >= 0)
+        {
+            <span class="graph-context-info">
+                已加载：@_graphContextNodeCount 节点 / @_graphContextEdgeCount 边
+            </span>
+        }
+    </div>
+
+    <div class="chat-messages" @ref="_messagesContainer">
+        @if (_messages.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-icon">🧠</div>
+                <h2>Start a conversation</h2>
+                <p>Ask me anything about your graph!</p>
+                @if (_useGraphContext && !string.IsNullOrEmpty(_selectedGraphGuid))
+                {
+                    <p class="context-hint">
+                        💡 已启用动态图上下文 —— 会自动识别你的问题意图（列表 / 关系 / 邻居 / 全量）并从 SDK 实时查询。
+                    </p>
+                }
+            </div>
+        }
+        else
+        {
+            @foreach (var msg in _messages)
+            {
+                <div class="message @msg.Role">
+                    <div class="message-avatar">
+                        <span>@GetAvatar(msg.Role)</span>
+                    </div>
+                    <div class="message-content">
+                        <div class="message-text">@msg.Text</div>
+                        @if (!string.IsNullOrEmpty(msg.GraphContextLabel))
+                        {
+                            <div class="message-context-badge">
+                                🧠 @msg.GraphContextLabel
+                            </div>
+                        }
+                        <div class="message-time">@msg.Timestamp.ToString("HH:mm:ss")</div>
+                    </div>
+                </div>
+            }
+        }
+
+        @if (_isSending)
+        {
+            <div class="message assistant">
+                <div class="message-avatar">
+                    <span>🤖</span>
+                </div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    @if (_elapsedSeconds > 0)
+                    {
+                        <div class="elapsed">
+                            @(_elapsedSeconds <= 5
+                                ? $"Thinking for {_elapsedSeconds} s…"
+                                : $"模型正在推理或加载，已等待 {_elapsedSeconds} s…")
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input-container">
+        <textarea class="chat-input"
+                  @bind="_userMessage"
+                  @bind:event="oninput"
+                  @onkeydown="HandleKeyDown"
+                  placeholder="Type your message... (Enter to send, Shift+Enter for newline)"
+                  rows="3"
+                  disabled="@_isSending"></textarea>
+
+        @if (_isSending)
+        {
+            <button class="btn-cancel" @onclick="CancelAsync">Cancel ✋</button>
+        }
+        else
+        {
+            <button class="btn-send"
+                    @onclick="SendMessageAsync"
+                    disabled="@(string.IsNullOrWhiteSpace(_userMessage))">
+                Send 📨
+            </button>
+        }
+    </div>
+</div>

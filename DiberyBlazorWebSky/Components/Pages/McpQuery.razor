@@ -1,0 +1,290 @@
+@page "/mcp-query"
+@using System.Text.Encodings.Web
+@using System.Text.Json
+@using DiberyBlazorWebSky.Models.Graph
+@inject GraphApiClient GraphApi
+@inject IJSRuntime JS
+@inject ILogger<McpChat> Logger
+@rendermode InteractiveServer
+
+<PageTitle>图数据浏览器</PageTitle>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h1>🔎 图数据浏览器</h1>
+        <p class="page-subtitle">直接浏览 LiteGraph 中的节点、边与邻居关系</p>
+
+        <div class="session-controls">
+            <select class="session-selector"
+                    value="@selectedGraphGuid"
+                    @onchange="OnGraphChangedAsync"
+                    disabled="@isLoading">
+                @if (graphs.Count == 0)
+                {
+                    <option value="">（没有可用的图）</option>
+                }
+                else
+                {
+                    @foreach (var g in graphs)
+                    {
+                        <option value="@g.Guid">@g.Name (@g.Guid.ToString("N")[..8])</option>
+                    }
+                }
+            </select>
+            <button class="btn-refresh"
+                    @onclick="LoadGraphsAsync"
+                    disabled="@isLoading">
+                @(isLoading ? "加载中…" : "🔄 Refresh")
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-hint">正在加载图数据…</div>
+    }
+    else if (string.IsNullOrEmpty(selectedGraphGuid))
+    {
+        <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <h2>请选择一个图</h2>
+            <p>从上方下拉框中选择要浏览的图。</p>
+        </div>
+    }
+    else
+    {
+        <div class="graph-stats">
+            <span class="graph-context-info">@selectedGraphName：@nodes.Count 节点 / @edges.Count 边</span>
+        </div>
+
+        <div class="mcp-layout">
+            @* ── 左栏：节点列表 ──────────────────────────── *@
+            <div class="mcp-panel">
+                <div class="panel-title">节点 (@nodes.Count)</div>
+                <div class="panel-body">
+                    @if (nodes.Count == 0)
+                    {
+                        <p class="muted">（无节点）</p>
+                    }
+                    else
+                    {
+                        @foreach (var n in nodes)
+                        {
+                            <button class="node-item @(selectedNode?.Guid == n.Guid ? "active" : "")"
+                                    @onclick="() => SelectNodeAsync(n)">
+                                <span class="node-name">@n.Name</span>
+                                @if (n.Labels is { Count: > 0 })
+                                {
+                                    <span class="node-labels">@string.Join(", ", n.Labels)</span>
+                                }
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+
+            @* ── 中栏：选中节点的邻居关系 ────────────────── *@
+            <div class="mcp-panel">
+                <div class="panel-title">
+                    @(selectedNode == null ? "邻居关系" : $"「{selectedNode.Name}」的关系")
+                </div>
+                <div class="panel-body">
+                    @if (selectedNode == null)
+                    {
+                        <p class="muted">从左侧选择一个节点以查看它的关联边。</p>
+                    }
+                    else
+                    {
+                        var (incoming, outgoing) = GetNeighbors(selectedNode.Guid);
+
+                        <div class="relation-block">
+                            <div class="relation-title">⬅ 指向它 (@incoming.Count)</div>
+                            @if (incoming.Count == 0)
+                            {
+                                <p class="muted">无</p>
+                            }
+                            else
+                            {
+                                @foreach (var e in incoming)
+                                {
+                                    <div class="edge-row">
+                                        <span class="edge-from">@NameOf(e.From)</span>
+                                        <span class="edge-label">--[@e.Name]--></span>
+                                        <span class="edge-to">@NameOf(e.To)</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="relation-block">
+                            <div class="relation-title">➡ 它指向 (@outgoing.Count)</div>
+                            @if (outgoing.Count == 0)
+                            {
+                                <p class="muted">无</p>
+                            }
+                            else
+                            {
+                                @foreach (var e in outgoing)
+                                {
+                                    <div class="edge-row">
+                                        <span class="edge-from">@NameOf(e.From)</span>
+                                        <span class="edge-label">--[@e.Name]--></span>
+                                        <span class="edge-to">@NameOf(e.To)</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* ── 右栏：选中节点的原始 JSON ───────────────── *@
+            <div class="mcp-panel">
+                <div class="panel-title">原始数据</div>
+                <div class="panel-body">
+                    @if (selectedNode == null)
+                    {
+                        <p class="muted">从左侧选择节点查看原始 JSON。</p>
+                    }
+                    else
+                    {
+                        <pre class="json-view">@JsonSerializer.Serialize(selectedNode, PrettyJsonOptions)</pre>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorText))
+    {
+        <div class="response-box error">
+            <pre>@errorText</pre>
+        </div>
+    }
+</div>
+
+@code {
+    private List<GraphDto> graphs = new();
+    private List<NodeDto> nodes = new();
+    private List<EdgeDto> edges = new();
+
+    private string selectedGraphGuid = "";
+    private string selectedGraphName = "";
+    private NodeDto? selectedNode;
+
+    private bool isLoading;
+    private string errorText = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGraphsAsync();
+    }
+
+    private async Task LoadGraphsAsync()
+    {
+        isLoading = true;
+        errorText = "";
+        StateHasChanged();
+
+        try
+        {
+            graphs = (await GraphApi.ListGraphsAsync()).ToList();
+
+            // 如果已选图仍存在，保留；否则选第一个
+            if (graphs.Count > 0 &&
+                (string.IsNullOrEmpty(selectedGraphGuid) ||
+                 !graphs.Any(g => g.Guid.ToString() == selectedGraphGuid)))
+            {
+                selectedGraphGuid = graphs[0].Guid.ToString();
+            }
+
+            if (!string.IsNullOrEmpty(selectedGraphGuid))
+            {
+                await LoadGraphDataAsync(Guid.Parse(selectedGraphGuid));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "加载图列表失败");
+            errorText = $"加载图列表失败：{ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnGraphChangedAsync(ChangeEventArgs e)
+    {
+        selectedGraphGuid = e.Value?.ToString() ?? "";
+        selectedNode = null;
+
+        if (!string.IsNullOrEmpty(selectedGraphGuid))
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            try
+            {
+                await LoadGraphDataAsync(Guid.Parse(selectedGraphGuid));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "加载图数据失败");
+                errorText = $"加载图数据失败：{ex.Message}";
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task LoadGraphDataAsync(Guid graphGuid)
+    {
+        var nodeTask = GraphApi.ListNodesAsync(graphGuid);
+        var edgeTask = GraphApi.ListEdgesAsync(graphGuid);
+        await Task.WhenAll(nodeTask, edgeTask);
+
+        nodes = nodeTask.Result.ToList();
+        edges = edgeTask.Result.ToList();
+
+        selectedGraphName = graphs.FirstOrDefault(g => g.Guid == graphGuid)?.Name ?? "Graph";
+
+        Logger.LogInformation(
+            "图 {GraphName} 加载完成：{NodeCount} 节点 / {EdgeCount} 边",
+            selectedGraphName, nodes.Count, edges.Count);
+    }
+
+    private void SelectNodeAsync(NodeDto node)
+    {
+        selectedNode = node;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// 返回选中节点的（入边, 出边）。
+    /// 根据 EdgeDto 的 From/To 字段判断方向。
+    /// </summary>
+    private (List<EdgeDto> incoming, List<EdgeDto> outgoing) GetNeighbors(Guid nodeGuid)
+    {
+        var incoming = edges.Where(e => e.To == nodeGuid).ToList();
+        var outgoing = edges.Where(e => e.From == nodeGuid).ToList();
+        return (incoming, outgoing);
+    }
+
+    private string NameOf(Guid guid)
+    {
+        return nodes.FirstOrDefault(n => n.Guid == guid)?.Name ?? guid.ToString("N")[..8];
+    }
+    
+    // ★ 新增：允许中文直接输出，不转义为 \uXXXX
+    private static readonly JsonSerializerOptions PrettyJsonOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
+}

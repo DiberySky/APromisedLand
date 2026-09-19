@@ -1,6 +1,8 @@
 using DiberyBlazorWebSky.Components;
 using DiberyBlazorWebSky.Endpoints;
 using DiberyBlazorWebSky.Services;
+using LiteGraph;
+using LiteGraph.Sdk;
 using Microsoft.Extensions.Http.Resilience;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +11,8 @@ builder.AddServiceDefaults();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddHttpClient();
 
 // ── MAFWorkFlowApi ──
 builder.Services.AddHttpClient<ChatApiClient>(client =>
@@ -27,6 +31,15 @@ builder.Services.AddHttpClient<GraphApiClient>(client =>
     client.BaseAddress = new("https+http://MAFWorkFlowApi");
     client.Timeout     = TimeSpan.FromMinutes(5);
 });
+
+builder.Services.AddSingleton<LiteGraphSdk>(sp =>
+{
+    // LiteGraph REST Server 运行在 8701 端口
+    // "default" 是默认租户标识
+    return new LiteGraphSdk("http://localhost:8701", "default");
+});
+
+builder.Services.AddScoped<GraphDynamicContextService>();
 
 // ── FileStorageApi ──
 // ★ 修复：
