@@ -1,0 +1,397 @@
+@page "/graph-explorer-force"
+@using System.Linq
+@using System.Text.Json
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Components.Forms
+@using LiteGraph.Sdk
+@inject LiteGraphSdk LiteGraph
+@inject ILogger<McpGraphExplorerForce> Logger
+@rendermode InteractiveServer
+
+<PageTitle>图数据查询（力导向）</PageTitle>
+
+<div class="explorer-container">
+    <div class="explorer-header">
+        <h1>🌐 MCP 图数据 Explorer（力导向）</h1>
+        <p class="page-subtitle">节点 / 边 CRUD + 向量语义搜索 + 力导向拓扑 + 导入导出 —— 基于 LiteGraph SDK</p>
+    </div>
+
+    <!-- 图选择 -->
+    <div class="toolbar">
+        <select @bind="_selectedGraphGuid" @bind:after="OnGraphChangedAsync" class="graph-selector">
+            <option value="">-- 选择图 --</option>
+            @foreach (var g in _graphs)
+            {
+                <option value="@g.GUID">@g.Name</option>
+            }
+        </select>
+        <button class="btn-refresh" @onclick="LoadGraphsAsync" disabled="@_isLoading">🔄 刷新图列表</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_selectedGraphGuid))
+    {
+        <!-- Tab -->
+        <div class="tab-bar">
+            <button class="tab @(_activeTab == "nodes" ? "active" : "")"
+                    @onclick='() => SwitchTabAsync("nodes")'>📦 节点 (@_nodeTotal)</button>
+            <button class="tab @(_activeTab == "edges" ? "active" : "")"
+                    @onclick='() => SwitchTabAsync("edges")'>🔗 边 (@_edgeTotal)</button>
+            <button class="tab @(_activeTab == "vector" ? "active" : "")"
+                    @onclick='() => SwitchTabAsync("vector")'>🧠 向量搜索</button>
+            <button class="tab @(_activeTab == "topology" ? "active" : "")"
+                    @onclick='() => SwitchTabAsync("topology")'>🌐 拓扑图</button>
+            <button class="tab @(_activeTab == "import-export" ? "active" : "")"
+                    @onclick='() => SwitchTabAsync("import-export")'>💾 导入/导出</button>
+        </div>
+
+        <!-- 节点面板 -->
+        @if (_activeTab == "nodes")
+        {
+            <div class="panel">
+                <div class="crud-bar">
+                    <input type="text" @bind="_newNodeName" placeholder="新节点名称" class="input-sm" />
+                    <button class="btn-primary" @onclick="CreateNodeAsync" disabled="@_isBusy">+ 新建节点</button>
+                    <button class="btn-danger"
+                            @onclick="DeleteSelectedNodesAsync"
+                            disabled="@(_selectedNodeGuids.Count == 0 || _isBusy)">
+                        🗑️ 删除选中 (@_selectedNodeGuids.Count)
+                    </button>
+                </div>
+
+                <div class="list-container">
+                    @foreach (var node in _nodes)
+                    {
+                        <div class="list-item @(_selectedNodeGuids.Contains(node.GUID) ? "selected" : "")">
+                            <input type="checkbox"
+                                   checked="@_selectedNodeGuids.Contains(node.GUID)"
+                                   @onchange="(e) => ToggleNodeSelection(node.GUID, (bool)e.Value!)" />
+                            <div class="item-info">
+                                <strong>@node.Name</strong>
+                                <span class="guid">@node.GUID.ToString("N")[..8]</span>
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn-icon" @onclick="() => ShowNodeJson(node)">👁️</button>
+                                <button class="btn-icon danger"
+                                        @onclick="() => DeleteNodeAsync(node.GUID)"
+                                        disabled="@_isBusy">🗑️</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="pagination">
+                    <button class="btn-page"
+                            @onclick="PrevNodePageAsync"
+                            disabled="@(!_nodeHasPrev || _isBusy)">⬅️ 上一页</button>
+                    <span class="page-info">已加载 @_nodes.Count / 共 @_nodeTotal 条</span>
+                    <button class="btn-page"
+                            @onclick="NextNodePageAsync"
+                            disabled="@(!_nodeHasNext || _isBusy)">下一页 ➡️</button>
+                </div>
+            </div>
+        }
+
+        <!-- 边面板 -->
+        @if (_activeTab == "edges")
+        {
+            <div class="panel">
+                <div class="crud-bar">
+                    <select @bind="_newEdgeFrom" class="input-sm">
+                        <option value="">起点</option>
+                        @foreach (var n in _nodes)
+                        {
+                            <option value="@n.GUID">@n.Name</option>
+                        }
+                    </select>
+                    <select @bind="_newEdgeTo" class="input-sm">
+                        <option value="">终点</option>
+                        @foreach (var n in _nodes)
+                        {
+                            <option value="@n.GUID">@n.Name</option>
+                        }
+                    </select>
+                    <input type="text" @bind="_newEdgeName" placeholder="边名称 (如 PARENT_OF)" class="input-sm" />
+                    <button class="btn-primary" @onclick="CreateEdgeAsync" disabled="@_isBusy">+ 新建边</button>
+                </div>
+
+                <div class="list-container">
+                    @foreach (var edge in _edges)
+                    {
+                        <div class="list-item">
+                            <div class="item-info">
+                                <strong>@edge.Name</strong>
+                                <span class="guid">@edge.From.ToString("N")[..8] → @edge.To.ToString("N")[..8]</span>
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn-icon" @onclick="() => ShowEdgeJson(edge)">👁️</button>
+                                <button class="btn-icon danger"
+                                        @onclick="() => DeleteEdgeAsync(edge.GUID)"
+                                        disabled="@_isBusy">🗑️</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="pagination">
+                    <button class="btn-page"
+                            @onclick="PrevEdgePageAsync"
+                            disabled="@(!_edgeHasPrev || _isBusy)">⬅️ 上一页</button>
+                    <span class="page-info">已加载 @_edges.Count / 共 @_edgeTotal 条</span>
+                    <button class="btn-page"
+                            @onclick="NextEdgePageAsync"
+                            disabled="@(!_edgeHasNext || _isBusy)">下一页 ➡️</button>
+                </div>
+            </div>
+        }
+
+        <!-- 向量搜索 -->
+        @if (_activeTab == "vector")
+        {
+            <div class="panel">
+                <div class="crud-bar">
+                    <input type="text" @bind="_vectorQueryText"
+                           placeholder="输入语义查询文本 (如: 父亲)"
+                           class="input-lg" />
+                    <button class="btn-primary"
+                            @onclick="SearchVectorAsync"
+                            disabled="@(_isBusy || string.IsNullOrWhiteSpace(_vectorQueryText))">
+                        🧠 语义搜索
+                    </button>
+                    <button class="btn-secondary"
+                            @onclick="GenerateVectorsForAllNodesAsync"
+                            disabled="@_isBusy">
+                        ⚡ 为所有节点生成向量
+                    </button>
+                </div>
+
+                @if (_vectorResults.Any())
+                {
+                    <div class="list-container">
+                        @foreach (var r in _vectorResults)
+                        {
+                            <div class="list-item">
+                                <div class="item-info">
+                                    <strong>@r.NodeName</strong>
+                                    <span class="guid">
+                                        @if (r.KeywordMatched)
+                                        {
+                                            <span style="color: #d97706;">⭐ 综合评分: @r.Score.ToString("F4")</span>
+                                        }
+                                        else
+                                        {
+                                            <span>相似度: @r.Score.ToString("F4")</span>
+                                        }
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (_isBusy)
+                {
+                    <p class="hint">处理中... @_vectorProgress</p>
+                }
+                else
+                {
+                    <p class="hint">输入文本进行语义搜索。若图中节点尚无向量，请先点"⚡ 为所有节点生成向量"。</p>
+                }
+            </div>
+        }
+
+        <!-- 拓扑图（力导向） -->
+        @if (_activeTab == "topology")
+        {
+            <div class="panel">
+                <div class="crud-bar">
+                    <button class="btn-primary" @onclick="LoadTopologyAsync" disabled="@_isBusy">
+                        🔄 重新加载拓扑
+                    </button>
+                    <button class="btn-secondary"
+                            @onclick='() => SwitchLayout("force")'
+                            disabled="@(_isBusy || _layoutMode == "force")">
+                        🌐 力导向
+                    </button>
+                    <button class="btn-secondary"
+                            @onclick='() => SwitchLayout("circular")'
+                            disabled="@(_isBusy || _layoutMode == "circular")">
+                        ⭕ 圆形
+                    </button>
+                    <button class="btn-secondary"
+                            @onclick="ShuffleLayout"
+                            disabled="@_isBusy">
+                        🎲 重新布局
+                    </button>
+                    @if (_selectedTopologyNode != null)
+                    {
+                        <span class="topology-selected">
+                            🎯 已选：<strong>@_selectedTopologyNode.Name</strong>
+                        </span>
+                    }
+                </div>
+
+                @if (_isBusy)
+                {
+                    <p class="hint">加载中...</p>
+                }
+                else if (_topologyNodes.Count == 0)
+                {
+                    <p class="hint">点击"重新加载拓扑"以渲染当前图的节点关系图。</p>
+                }
+                else
+                {
+                    <div class="svg-wrap">
+                        <svg viewBox="0 0 800 600" class="graph-svg">
+                            <!-- 边 -->
+                            @foreach (var edge in _topologyEdges)
+                            {
+                                var fromPos = GetPosition(edge.From);
+                                var toPos = GetPosition(edge.To);
+                                @if (fromPos.HasValue && toPos.HasValue)
+                                {
+                                    var midX = (fromPos.Value.X + toPos.Value.X) / 2;
+                                    var midY = (fromPos.Value.Y + toPos.Value.Y) / 2;
+                                    <line x1="@fromPos.Value.X" y1="@fromPos.Value.Y"
+                                          x2="@toPos.Value.X" y2="@toPos.Value.Y"
+                                          stroke="#94a3b8" stroke-width="1.5" />
+                                    <svg:text x="@midX" y="@midY" class="edge-label">@edge.Name</svg:text>
+                                }
+                            }
+
+                            <!-- 节点 -->
+                            @foreach (var node in _topologyNodes)
+                            {
+                                var pos = GetPosition(node.GUID);
+                                @if (pos.HasValue)
+                                {
+                                    var isSelected = _selectedTopologyNode?.GUID == node.GUID;
+                                    <g class="node-group" @onclick="() => SelectTopologyNode(node)">
+                                        <circle cx="@pos.Value.X" cy="@pos.Value.Y" r="28"
+                                                fill="@(isSelected ? "#f59e0b" : "#4a90e2")"
+                                                stroke="#fff" stroke-width="2"
+                                                class="node-circle" />
+                                        <svg:text x="@pos.Value.X" y="@pos.Value.Y"
+                                                  text-anchor="middle" dy="5"
+                                                  class="node-label">@node.Name</svg:text>
+                                    </g>
+                                }
+                            }
+                        </svg>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- 导入 / 导出 -->
+        @if (_activeTab == "import-export")
+        {
+            <div class="panel">
+                <div class="crud-bar">
+                    <strong>📤 导出当前图</strong>
+                    <button class="btn-primary"
+                            @onclick="ExportJsonAsync"
+                            disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">
+                        📥 导出 JSON
+                    </button>
+                    <button class="btn-secondary"
+                            @onclick="ExportNodesCsvAsync"
+                            disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">
+                        📥 导出节点 CSV
+                    </button>
+                    <button class="btn-secondary"
+                            @onclick="ExportEdgesCsvAsync"
+                            disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">
+                        📥 导出边 CSV
+                    </button>
+                </div>
+
+                <div class="crud-bar">
+                    <strong>📥 导入 JSON</strong>
+                    <InputFile OnChange="OnJsonFileSelected" accept=".json" class="file-input" />
+                    <span class="file-status">@_selectedJsonFileName</span>
+                </div>
+
+                <div class="crud-bar">
+                    <strong>📥 从 CSV 导入</strong>
+                    <InputFile OnChange="OnNodesCsvSelected" accept=".csv" class="file-input" />
+                    <span class="file-status">@_selectedNodesCsvName</span>
+                    <InputFile OnChange="OnEdgesCsvSelected" accept=".csv" class="file-input" />
+                    <span class="file-status">@_selectedEdgesCsvName</span>
+                </div>
+
+                <div class="crud-bar">
+                    <label class="import-option">
+                        <input type="checkbox" @bind="_clearBeforeImport" />
+                        <span>导入前清空图中所有节点和边（⚠️ 不可撤销）</span>
+                    </label>
+                    <button class="btn-primary"
+                            @onclick="StartImportAsync"
+                            disabled="@(_isBusy || !HasAnyImportFile)">
+                        🚀 开始导入
+                    </button>
+                    <button class="btn-danger"
+                            @onclick="ResetImportState"
+                            disabled="@_isBusy">
+                        ✕ 清空选择
+                    </button>
+                </div>
+
+                @if (_isBusy)
+                {
+                    <p class="hint">处理中... @_vectorProgress</p>
+                }
+
+                @if (_importResult != null)
+                {
+                    <div class="response-box">
+                        <strong>导入结果：</strong>
+                        <ul style="margin: 8px 0 0 0;">
+                            <li>✅ 新增节点：@_importResult.NodesCreated</li>
+                            <li>⏭️ 跳过重复节点：@_importResult.NodesSkipped</li>
+                            <li>✅ 新增边：@_importResult.EdgesCreated</li>
+                            <li>⏭️ 跳过边：@_importResult.EdgesSkipped</li>
+                        </ul>
+                        @if (_importResult.Errors.Count > 0)
+                        {
+                            <div style="margin-top: 12px;">
+                                <strong>⚠️ 错误清单（前 20 条）：</strong>
+                                <ul style="margin: 6px 0 0 0; color: #991b1b;">
+                                    @foreach (var err in _importResult.Errors.Take(20))
+                                    {
+                                        <li>@err</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (_importResult == null && !_isBusy)
+                {
+                    <p class="hint">
+                        💡 支持 JSON（含 Nodes + Edges）或 CSV（Nodes + Edges 分开）导入。<br />
+                        导出的 JSON 可直接用于其他环境的导入，节点以名称引用，跨环境安全。
+                    </p>
+                }
+            </div>
+        }
+    }
+
+    <!-- JSON 详情弹窗 -->
+    @if (_detailJson != null)
+    {
+        <div class="modal-overlay" @onclick="CloseDetailModal">
+            <div class="modal-content" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <strong>详情</strong>
+                    <button class="btn-close" @onclick="CloseDetailModal">✕</button>
+                </div>
+                <pre>@_detailJson</pre>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="error-bar">@_errorMessage</div>
+    }
+</div>

@@ -1,0 +1,33 @@
+{
+  "GraphName": "BigTestGraph",
+  "Nodes": [
+    { "Name": "AI" }, { "Name": "机器学习" }, { "Name": "深度学习" },
+    { "Name": "神经网络" }, { "Name": "CNN" }, { "Name": "RNN" },
+    { "Name": "Transformer" }, { "Name": "BERT" }, { "Name": "GPT" },
+    { "Name": "自然语言处理" }, { "Name": "计算机视觉" }, { "Name": "语音识别" },
+    { "Name": "强化学习" }, { "Name": "AlphaGo" }, { "Name": "Q-Learning" },
+    { "Name": "Python" }, { "Name": "PyTorch" }, { "Name": "TensorFlow" },
+    { "Name": "数据科学" }, { "Name": "Pandas" }, { "Name": "NumPy" },
+    { "Name": "云计算" }, { "Name": "Docker" }, { "Name": "Kubernetes" },
+    { "Name": "数据库" }, { "Name": "PostgreSQL" }, { "Name": "MongoDB" },
+    { "Name": "Web开发" }, { "Name": "React" }, { "Name": "Vue" }
+  ],
+  "Edges": [
+    { "From": "AI", "To": "机器学习", "Name": "SUBFIELD" },
+    { "From": "机器学习", "To": "深度学习", "Name": "SUBFIELD" },
+    { "From": "深度学习", "To": "神经网络", "Name": "USES" },
+    { "From": "神经网络", "To": "CNN", "Name": "VARIANT" },
+    { "From": "神经网络", "To": "RNN", "Name": "VARIANT" },
+    { "From": "神经网络", "To": "Transformer", "Name": "VARIANT" },
+    { "From": "Transformer", "To": "BERT", "Name": "BASED_ON" },
+    { "From": "Transformer", "To": "GPT", "Name": "BASED_ON" },
+    { "From": "深度学习", "To": "自然语言处理", "Name": "APPLIED_TO" },
+    { "From": "深度学习", "To": "计算机视觉", "Name": "APPLIED_TO" },
+    { "From": "机器学习", "To": "强化学习", "Name": "SUBFIELD" },
+    { "From": "强化学习", "To": "AlphaGo", "Name": "EXAMPLE" },
+    { "From": "强化学习", "To": "Q-Learning", "Name": "METHOD" },
+    { "From": "AI", "To": "Python", "Name": "IMPLEMENTED_IN" },
+    { "From": "深度学习", "To": "PyTorch", "Name": "FRAMEWORK" },
+    { "From": "深度学习", "To": "TensorFlow", "Name": "FRAMEWORK" }
+  ]
+}

@@ -9,7 +9,7 @@ using Microsoft.JSInterop;
 
 namespace DiberyBlazorWebSky.Components.Pages;
 
-public partial class McpGraphExplorer : ComponentBase, IDisposable
+public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 {
     // ─── 注入 ─────────────────────────────────────────
     [Inject] private IJSRuntime Js { get; set; } = default!;
@@ -60,6 +60,12 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
     private Node? _selectedTopologyNode;
     private readonly Dictionary<Guid, (double X, double Y)> _nodePositions = new();
 
+    // 布局模式：默认力导向
+    private string _layoutMode = "force";  // "force" | "circular"
+
+    // 随机种子
+    private int _layoutSeed = 42;
+
     // 导入 / 导出状态
     private string? _selectedJsonFileName;
     private string? _selectedJsonContent;
@@ -83,6 +89,10 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
     // SVG 画布尺寸
     private const double CanvasWidth = 800;
     private const double CanvasHeight = 600;
+
+    // ★ 混合搜索权重（向量 + 关键词）
+    private const float VectorWeight = 0.7f;
+    private const float KeywordWeight = 0.3f;
 
     private static readonly JsonSerializerOptions PrettyJson = new()
     {
@@ -413,7 +423,7 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
     }
 
     // ══════════════════════════════════════════════════════
-    // 向量搜索
+    // 向量搜索（混合：语义 + 关键词）
     // ══════════════════════════════════════════════════════
 
     private async Task<List<float>?> GetEmbeddingAsync(string text)
@@ -468,7 +478,32 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
     }
 
     /// <summary>
-    /// 语义搜索：文本 → embedding → 遍历所有向量 → 按节点去重 → 排序。
+    /// ★ 关键词匹配分：
+    /// - 完全相等（忽略大小写与首尾空白）：1.0
+    /// - 相互包含（节点名 ⊂ 查询 或 查询 ⊂ 节点名）：0.7
+    /// - 否则：0.0
+    /// </summary>
+    private static float KeywordMatchScore(string query, string nodeName)
+    {
+        if (string.IsNullOrWhiteSpace(query) || string.IsNullOrWhiteSpace(nodeName))
+            return 0f;
+
+        var q = query.Trim();
+        var n = nodeName.Trim();
+
+        if (q.Equals(n, StringComparison.OrdinalIgnoreCase))
+            return 1.0f;
+
+        if (n.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+            q.Contains(n, StringComparison.OrdinalIgnoreCase))
+            return 0.7f;
+
+        return 0.0f;
+    }
+
+    /// <summary>
+    /// 混合搜索：向量相似度（0.7 权重）+ 关键词匹配（0.3 权重）。
+    /// 按 NodeGUID 去重，每个节点只保留最高向量分。
     /// </summary>
     private async Task SearchVectorAsync()
     {
@@ -484,7 +519,9 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
 
         try
         {
-            var queryEmbedding = await GetEmbeddingAsync(_vectorQueryText);
+            var queryText = _vectorQueryText.Trim();
+
+            var queryEmbedding = await GetEmbeddingAsync(queryText);
             if (queryEmbedding == null || queryEmbedding.Count == 0) return;
 
             Logger.LogInformation("查询 embedding 维度：{Dim}", queryEmbedding.Count);
@@ -509,11 +546,11 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
             var allVectors = vectorResult.Objects ?? new List<VectorMetadata>();
 
             Logger.LogInformation("加载到 {Count} 条向量记录", allVectors.Count);
-            _vectorProgress = $"计算相似度（{allVectors.Count} 条向量）...";
+            _vectorProgress = $"混合评分（{allVectors.Count} 条向量）...";
             StateHasChanged();
 
-            // ★ 按 NodeGUID 去重：同节点只保留最高相似度
-            var bestByNode = new Dictionary<Guid, float>();
+            // ─── 1. 按 NodeGUID 去重，保留最高向量分 ───
+            var bestVectorByNode = new Dictionary<Guid, float>();
 
             foreach (var v in allVectors)
             {
@@ -523,30 +560,53 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
                 var nodeGuid = v.NodeGUID.Value;
                 var score = CosineSimilarity(queryEmbedding, v.Vectors);
 
-                if (!bestByNode.TryGetValue(nodeGuid, out var existing) || score > existing)
+                if (!bestVectorByNode.TryGetValue(nodeGuid, out var existing) || score > existing)
                 {
-                    bestByNode[nodeGuid] = score;
+                    bestVectorByNode[nodeGuid] = score;
                 }
             }
 
             Logger.LogInformation(
                 "去重后：{Count} 个独立节点（原始 {Raw} 条向量）",
-                bestByNode.Count, allVectors.Count);
+                bestVectorByNode.Count, allVectors.Count);
 
-            _vectorResults = bestByNode
-                .Select(kv => new VectorSearchDisplayResult
-                {
-                    NodeName = nameLookup.TryGetValue(kv.Key, out var name)
+            // ─── 2. 混合评分：向量 + 关键词 ───
+            var results = new List<VectorSearchDisplayResult>();
+
+            foreach (var kv in bestVectorByNode)
+            {
+                var nodeGuid = kv.Key;
+                var vectorScore = kv.Value;
+
+                var nodeName = nameLookup.TryGetValue(nodeGuid, out var name)
                                ? name
-                               : $"[未知节点 {kv.Key.ToString("N")[..8]}]",
-                    Score = kv.Value
-                })
+                               : $"[未知节点 {nodeGuid.ToString("N")[..8]}]";
+
+                var keywordScore = KeywordMatchScore(queryText, nodeName);
+                var keywordMatched = keywordScore > 0f;
+
+                var finalScore = VectorWeight * vectorScore + KeywordWeight * keywordScore;
+
+                results.Add(new VectorSearchDisplayResult
+                {
+                    NodeName = nodeName,
+                    Score = finalScore,
+                    VectorScore = vectorScore,
+                    KeywordMatched = keywordMatched
+                });
+            }
+
+            _vectorResults = results
                 .OrderByDescending(r => r.Score)
                 .Take(20)
                 .ToList();
 
+            var matchedCount = _vectorResults.Count(r => r.KeywordMatched);
+            Logger.LogInformation(
+                "混合搜索完成：返回 {Count} 条结果（其中 {Matched} 条含关键词匹配）",
+                _vectorResults.Count, matchedCount);
+
             _vectorProgress = $"返回 {_vectorResults.Count} 条结果";
-            Logger.LogInformation("向量搜索完成，返回 {Count} 条结果", _vectorResults.Count);
         }
         catch (Exception ex)
         {
@@ -583,13 +643,13 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
 
     /// <summary>
     /// 为当前图所有节点生成并保存向量。
-    /// 生成前会先清理该图的所有旧向量，避免重复累积。
+    /// 生成前先清理旧向量；文本用"节点名 + 邻居名"增强语义。
     /// </summary>
     private async Task GenerateVectorsForAllNodesAsync()
     {
         if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
 
-        if (!await ConfirmAsync("将为当前图的所有节点生成向量（可能需要几分钟），继续？"))
+        if (!await ConfirmAsync("将为当前图的所有节点生成向量（用节点名+邻居名增强语义），继续？"))
             return;
 
         _isBusy = true;
@@ -601,7 +661,7 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         {
             var graphGuid = Guid.Parse(_selectedGraphGuid);
 
-            // ★ 生成前先删除该图的所有旧向量
+            // ─── 1. 清理旧向量 ───
             _vectorProgress = "清理旧向量...";
             StateHasChanged();
 
@@ -628,16 +688,54 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
 
             Logger.LogInformation("已清理 {Count} 条旧向量", toDelete.Count);
 
-            // 加载所有节点
-            var query = new EnumerationRequest
+            // ─── 2. 加载所有节点和边，构建邻居映射 ───
+            _vectorProgress = "加载节点和边...";
+            StateHasChanged();
+
+            var nodeQuery = new EnumerationRequest
             {
                 TenantGUID = DefaultTenant,
                 GraphGUID = graphGuid,
                 MaxResults = MaxEnumerationResults
             };
-            var result = await LiteGraph.Node.Enumerate(query);
-            var allNodes = result.Objects ?? new List<Node>();
+            var nodeResult = await LiteGraph.Node.Enumerate(nodeQuery);
+            var allNodes = nodeResult.Objects ?? new List<Node>();
 
+            var edgeQuery = new EnumerationRequest
+            {
+                TenantGUID = DefaultTenant,
+                GraphGUID = graphGuid,
+                MaxResults = MaxEnumerationResults
+            };
+            var edgeResult = await LiteGraph.Edge.Enumerate(edgeQuery);
+            var allEdges = edgeResult.Objects ?? new List<Edge>();
+
+            var guidToName = allNodes
+                .Where(n => !string.IsNullOrWhiteSpace(n.Name))
+                .GroupBy(n => n.GUID)
+                .ToDictionary(g => g.Key, g => g.First().Name);
+
+            var neighborMap = allNodes.ToDictionary(
+                n => n.GUID,
+                _ => new List<string>());
+
+            foreach (var e in allEdges)
+            {
+                if (guidToName.TryGetValue(e.From, out var fromName) &&
+                    guidToName.TryGetValue(e.To, out var toName))
+                {
+                    if (neighborMap.TryGetValue(e.From, out var fromList))
+                        fromList.Add(toName);
+                    if (neighborMap.TryGetValue(e.To, out var toList))
+                        toList.Add(fromName);
+                }
+            }
+
+            Logger.LogInformation(
+                "已构建邻接表：{Nodes} 节点 / {Edges} 边",
+                allNodes.Count, allEdges.Count);
+
+            // ─── 3. 逐个节点生成向量 ───
             int success = 0, fail = 0;
             int total = allNodes.Count;
             int i = 0;
@@ -654,7 +752,12 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
                     continue;
                 }
 
-                var embedding = await GetEmbeddingAsync(node.Name);
+                // ★ 用"节点名+邻居"构建增强文本
+                var embeddingText = BuildEmbeddingText(node, neighborMap);
+                Logger.LogInformation("节点 {Name} embedding 文本: {Text}",
+                    node.Name, embeddingText);
+
+                var embedding = await GetEmbeddingAsync(embeddingText);
                 if (embedding == null)
                 {
                     fail++;
@@ -697,8 +800,36 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// 构建节点的 embedding 文本：节点名 + 邻居名列表。
+    /// 邻居为空时只用节点名；邻居超过上限时截断，避免超出模型 token 限制。
+    /// </summary>
+    private static string BuildEmbeddingText(
+        Node node,
+        Dictionary<Guid, List<string>> neighborMap)
+    {
+        const int MaxNeighbors = 5;
+
+        if (!neighborMap.TryGetValue(node.GUID, out var neighbors) ||
+            neighbors.Count == 0)
+        {
+            return node.Name;
+        }
+
+        var uniqueNeighbors = neighbors
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct()
+            .Take(MaxNeighbors)
+            .ToList();
+
+        if (uniqueNeighbors.Count == 0)
+            return node.Name;
+
+        return $"{node.Name} 相关：{string.Join("、", uniqueNeighbors)}";
+    }
+
     // ══════════════════════════════════════════════════════
-    // 拓扑图（圆形布局）
+    // 拓扑图
     // ══════════════════════════════════════════════════════
 
     private async Task LoadTopologyAsync()
@@ -734,11 +865,11 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
             var edgeResult = await LiteGraph.Edge.Enumerate(edgeQuery);
             _topologyEdges = edgeResult.Objects ?? new List<Edge>();
 
-            ComputeCircularLayout();
+            RecomputeLayout();
 
             Logger.LogInformation(
-                "拓扑图加载：{N} 个节点 / {E} 条边",
-                _topologyNodes.Count, _topologyEdges.Count);
+                "拓扑图加载：{N} 个节点 / {E} 条边（布局：{Mode}）",
+                _topologyNodes.Count, _topologyEdges.Count, _layoutMode);
         }
         catch (Exception ex)
         {
@@ -752,6 +883,39 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         }
     }
 
+    private void RecomputeLayout()
+    {
+        try
+        {
+            if (_layoutMode == "circular")
+                ComputeCircularLayout();
+            else
+                ComputeForceDirectedLayout();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "布局计算失败，回退到圆形布局");
+            ComputeCircularLayout();
+        }
+    }
+
+    private void SwitchLayout(string mode)
+    {
+        if (_layoutMode == mode) return;
+        _layoutMode = mode;
+        RecomputeLayout();
+        StateHasChanged();
+    }
+
+    private void ShuffleLayout()
+    {
+        _layoutSeed = Random.Shared.Next(1, 1_000_000);
+        if (_layoutMode == "force")
+            ComputeForceDirectedLayout();
+        StateHasChanged();
+    }
+
+    // ─── 布局 1：圆形 ─────────────────────────────────
     private void ComputeCircularLayout()
     {
         _nodePositions.Clear();
@@ -768,6 +932,194 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
             double x = cx + radius * Math.Cos(angle);
             double y = cy + radius * Math.Sin(angle);
             _nodePositions[_topologyNodes[i].GUID] = (x, y);
+        }
+    }
+
+    // ─── 布局 2：力导向（改进版）─────────────────────
+    private void ComputeForceDirectedLayout()
+    {
+        _nodePositions.Clear();
+        int n = _topologyNodes.Count;
+
+        if (n == 0) return;
+        if (n == 1)
+        {
+            _nodePositions[_topologyNodes[0].GUID] = (CanvasWidth / 2, CanvasHeight / 2);
+            return;
+        }
+
+        const double cx = CanvasWidth / 2;
+        const double cy = CanvasHeight / 2;
+
+        // ─── 参数 ───
+        const double desiredEdgeLength = 180;
+        const double minSeparation = 130;
+        const double edgeStiffness = 0.10;
+        const double centerCoef = 0.04;
+        const double centerCoefIsolated = 0.10;
+
+        // ─── 1. 初始位置：中心附近的小圆上 ───
+        var positions = new Dictionary<Guid, (double X, double Y)>();
+        var rng = new Random(_layoutSeed);
+        double initRadius = Math.Min(80, 30 + n * 4);
+
+        for (int i = 0; i < n; i++)
+        {
+            double angle = 2 * Math.PI * i / n;
+            double jitter = (rng.NextDouble() - 0.5) * 20;
+            double x = cx + (initRadius + jitter) * Math.Cos(angle);
+            double y = cy + (initRadius + jitter) * Math.Sin(angle);
+            positions[_topologyNodes[i].GUID] = (x, y);
+        }
+
+        // ─── 2. 邻接表 ───
+        var adjacency = _topologyNodes.ToDictionary(
+            node => node.GUID,
+            _ => new HashSet<Guid>());
+        foreach (var e in _topologyEdges)
+        {
+            if (adjacency.ContainsKey(e.From) && adjacency.ContainsKey(e.To))
+            {
+                adjacency[e.From].Add(e.To);
+                adjacency[e.To].Add(e.From);
+            }
+        }
+
+        // ─── 3. 迭代 ───
+        int iterations = Math.Clamp(n * 40, 150, 500);
+        double temperature = 80.0;
+        double cooling = temperature / (iterations + 1);
+
+        for (int iter = 0; iter < iterations; iter++)
+        {
+            var disp = _topologyNodes.ToDictionary(
+                node => node.GUID,
+                _ => (Dx: 0.0, Dy: 0.0));
+
+            // 3a. 短距离斥力
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = i + 1; j < n; j++)
+                {
+                    var a = _topologyNodes[i].GUID;
+                    var b = _topologyNodes[j].GUID;
+
+                    double dx = positions[a].X - positions[b].X;
+                    double dy = positions[a].Y - positions[b].Y;
+                    double dist = Math.Sqrt(dx * dx + dy * dy);
+
+                    if (dist < 0.1)
+                    {
+                        dx = rng.NextDouble() - 0.5;
+                        dy = rng.NextDouble() - 0.5;
+                        dist = Math.Sqrt(dx * dx + dy * dy);
+                        if (dist < 0.01) { dx = 1; dy = 0; dist = 1; }
+                    }
+
+                    if (dist >= minSeparation) continue;
+
+                    double overlap = (minSeparation - dist) / minSeparation;
+                    double force = overlap * overlap * 60;
+
+                    double fx = (dx / dist) * force;
+                    double fy = (dy / dist) * force;
+
+                    disp[a] = (disp[a].Dx + fx, disp[a].Dy + fy);
+                    disp[b] = (disp[b].Dx - fx, disp[b].Dy - fy);
+                }
+            }
+
+            // 3b. 边引力：目标长度模式
+            foreach (var edge in _topologyEdges)
+            {
+                if (edge.From == edge.To) continue;
+                if (!positions.ContainsKey(edge.From) || !positions.ContainsKey(edge.To)) continue;
+
+                double dx = positions[edge.From].X - positions[edge.To].X;
+                double dy = positions[edge.From].Y - positions[edge.To].Y;
+                double dist = Math.Sqrt(dx * dx + dy * dy);
+                if (dist < 0.1) continue;
+
+                double deviation = dist - desiredEdgeLength;
+                double force = deviation * edgeStiffness;
+
+                double fx = (dx / dist) * force;
+                double fy = (dy / dist) * force;
+
+                disp[edge.From] = (disp[edge.From].Dx - fx, disp[edge.From].Dy - fy);
+                disp[edge.To] = (disp[edge.To].Dx + fx, disp[edge.To].Dy + fy);
+            }
+
+            // 3c. 中心引力
+            foreach (var node in _topologyNodes)
+            {
+                double dx = cx - positions[node.GUID].X;
+                double dy = cy - positions[node.GUID].Y;
+                double dist = Math.Sqrt(dx * dx + dy * dy);
+                if (dist < 1) continue;
+
+                bool isolated = adjacency[node.GUID].Count == 0;
+                double coef = isolated ? centerCoefIsolated : centerCoef;
+                double force = coef * dist;
+
+                double fx = (dx / dist) * force;
+                double fy = (dy / dist) * force;
+
+                disp[node.GUID] = (disp[node.GUID].Dx + fx, disp[node.GUID].Dy + fy);
+            }
+
+            // 3d. 应用位移
+            foreach (var node in _topologyNodes)
+            {
+                var d = disp[node.GUID];
+                double len = Math.Sqrt(d.Dx * d.Dx + d.Dy * d.Dy);
+                if (len < 0.001) continue;
+
+                double limited = Math.Min(len, temperature);
+                double newX = positions[node.GUID].X + (d.Dx / len) * limited;
+                double newY = positions[node.GUID].Y + (d.Dy / len) * limited;
+
+                newX = Math.Clamp(newX, 60, CanvasWidth - 60);
+                newY = Math.Clamp(newY, 60, CanvasHeight - 60);
+
+                positions[node.GUID] = (newX, newY);
+            }
+
+            // 3e. 降温
+            temperature = Math.Max(temperature - cooling, 0.5);
+        }
+
+        // ─── 4. 平移居中 ───
+        CenterWithoutScaling(positions);
+
+        // ─── 5. 保存 ───
+        foreach (var kv in positions)
+        {
+            _nodePositions[kv.Key] = kv.Value;
+        }
+    }
+
+    /// <summary>只平移不缩放：把整体图形平移到画布中心。</summary>
+    private static void CenterWithoutScaling(
+        Dictionary<Guid, (double X, double Y)> positions)
+    {
+        if (positions.Count == 0) return;
+
+        double minX = positions.Values.Min(p => p.X);
+        double maxX = positions.Values.Max(p => p.X);
+        double minY = positions.Values.Min(p => p.Y);
+        double maxY = positions.Values.Max(p => p.Y);
+
+        double currentCenterX = (minX + maxX) / 2;
+        double currentCenterY = (minY + maxY) / 2;
+
+        double offsetX = CanvasWidth / 2 - currentCenterX;
+        double offsetY = CanvasHeight / 2 - currentCenterY;
+
+        foreach (var key in positions.Keys.ToList())
+        {
+            var p = positions[key];
+            positions[key] = (p.X + offsetX, p.Y + offsetY);
         }
     }
 
@@ -1102,6 +1454,8 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
     private sealed class VectorSearchDisplayResult
     {
         public string NodeName { get; set; } = "";
-        public float Score { get; set; }
+        public float Score { get; set; }          // 混合分数（用于排序和主显示）
+        public float VectorScore { get; set; }    // 纯向量分（调试用）
+        public bool KeywordMatched { get; set; }  // 是否命中关键词
     }
 }
