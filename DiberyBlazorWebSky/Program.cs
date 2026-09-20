@@ -12,7 +12,21 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// 在 builder 创建后追加
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers 是实验性 API
+builder.Services.ConfigureHttpClientDefaults(http =>
+{
+    http.RemoveAllResilienceHandlers();
+});
+
 builder.Services.AddHttpClient();
+
+// 在 DiberyBlazorWebSky/Program.cs 中
+builder.Services.AddSignalR(options =>
+{
+    options.ClientTimeoutInterval = TimeSpan.FromMinutes(5);
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+});
 
 // ── MAFWorkFlowApi ──
 builder.Services.AddHttpClient<ChatApiClient>(client =>
@@ -66,6 +80,16 @@ builder.Services.AddHttpClient<FileStorageApiClient>(client =>
         options.TotalRequestTimeout.Timeout     = TimeSpan.FromMinutes(60);
         options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(30);
     });
+
+// ══════════════════════════════════════════════════════════
+// ★ 新增：GraphAgent API 客户端
+// ══════════════════════════════════════════════════════════
+builder.Services.AddHttpClient<GraphAgentApiClient>(client =>
+{
+    client.BaseAddress = new Uri("https+http://mafworkflowapi");
+    client.Timeout = TimeSpan.FromMinutes(5);   // LLM + 工具调用可能较慢
+})
+.RemoveAllResilienceHandlers();   // ★ 清除 Aspire 默认的 30s TotalRequestTimeout
 
 var app = builder.Build();
 

@@ -1,0 +1,120 @@
+@page "/graph-agent-chat"
+@using DiberyBlazorWebSky.Models.Graph
+@using DiberyBlazorWebSky.Services
+@rendermode InteractiveServer
+
+<PageTitle>图 Agent 对话</PageTitle>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h1>🤖 图 Agent 对话（Function Calling）</h1>
+        <p class="page-subtitle">
+            由 LLM 自主决定调用哪个图工具查询 —— 支持任意复杂问题
+        </p>
+        <div class="session-controls">
+            <select class="session-selector"
+                    value="@_selectedSessionId"
+                    @onchange="OnSessionChangedAsync"
+                    disabled="@_isSending">
+                <option value="">New Conversation</option>
+                @foreach (var s in _sessions)
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+            <button class="btn-refresh"
+                    @onclick="LoadSessionsAsync"
+                    disabled="@(_isSending || _isLoadingSessions)">
+                🔄 Refresh
+            </button>
+            @if (!string.IsNullOrEmpty(_selectedSessionId))
+            {
+                <button class="btn-reset"
+                        @onclick="ResetSessionAsync"
+                        disabled="@_isSending">
+                    🗑️ Reset
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="chat-messages" @ref="_messagesContainer">
+        @if (_messages.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-icon">🤖</div>
+                <h2>Start a conversation</h2>
+                <p>LLM 会自动调用合适的图工具来回答</p>
+                <div class="example-questions">
+                    <p>试试这些问题：</p>
+                    <ul>
+                        <li>TestGraph 根节点C 有哪些邻居？</li>
+                        <li>TestGraph 根节点C 和 根节点B 是什么关系？</li>
+                        <li>TestGraph 列出所有节点</li>
+                        <li>TestGraph 这个图有多大？</li>
+                    </ul>
+                    <p class="tip">💡 建议在问题开头加上图名（如 "TestGraph"），让 LLM 知道查哪个图。</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            @foreach (var m in _messages)
+            {
+                <div class="message @m.Role">
+                    <div class="message-avatar"><span>@GetAvatar(m.Role)</span></div>
+                    <div class="message-content">
+                        <div class="message-text">@m.Text</div>
+                        @if (m.ToolsInvoked.Count > 0)
+                        {
+                            <div class="tools-badge">
+                                🔧 @string.Join(" → ", m.ToolsInvoked)
+                            </div>
+                        }
+                        <div class="message-time">@m.Timestamp.ToString("HH:mm:ss")</div>
+                    </div>
+                </div>
+            }
+        }
+
+        @if (_isSending)
+        {
+            <div class="message assistant">
+                <div class="message-avatar"><span>🤖</span></div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <div class="elapsed">
+                        @(_elapsedSeconds <= 5
+                            ? $"LLM 正在思考... {_elapsedSeconds}s"
+                            : $"正在调用工具或推理... 已等待 {_elapsedSeconds}s")
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input-container">
+        <textarea class="chat-input"
+                  @bind="_userMessage"
+                  @bind:event="oninput"
+                  @onkeydown="HandleKeyDown"
+                  placeholder="输入问题... (Enter 发送, Shift+Enter 换行)"
+                  rows="3"
+                  disabled="@_isSending"></textarea>
+
+        @if (_isSending)
+        {
+            <button class="btn-cancel" @onclick="CancelAsync">Cancel ✋</button>
+        }
+        else
+        {
+            <button class="btn-send"
+                    @onclick="SendMessageAsync"
+                    disabled="@(string.IsNullOrWhiteSpace(_userMessage))">
+                Send 📨
+            </button>
+        }
+    </div>
+</div>

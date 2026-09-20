@@ -19,7 +19,8 @@ public sealed record AgentReply(
     string ConversationId,
     string AgentName,
     string Reply,
-    int MessageCount);
+    int MessageCount,
+    IReadOnlyList<string>? ToolsInvoked = null);
 
 /// <summary>GET /api/agents/sessions 的响应体。</summary>
 public sealed record SessionsReply(IReadOnlyList<string> Sessions);

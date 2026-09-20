@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using MAFWorkFlowApi.Models;
 using Microsoft.Agents.AI;
@@ -98,8 +99,13 @@ public sealed class RedisAgentSessionStore : AgentSessionStore, IConversationCat
 
         var cacheKey = GetCacheKey(conversationId);
 
+        // ★ 关键：把 session 里的 functionCall / functionResult 消息剔除，
+        //    只保留 user + assistant 纯文本，避免"上下文污染"。
+        var sanitizedSession = await SanitizeSessionAsync(
+            agent, session, cancellationToken);
+
         var jsonElement = await agent.SerializeSessionAsync(
-            session, cancellationToken: cancellationToken);
+            sanitizedSession, cancellationToken: cancellationToken);
         var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(jsonElement);
 
         var options = new DistributedCacheEntryOptions
@@ -122,6 +128,151 @@ public sealed class RedisAgentSessionStore : AgentSessionStore, IConversationCat
             throw new InvalidOperationException(
                 $"保存会话到 Redis 失败：{conversationId}", ex);
         }
+    }
+
+    /// <summary>
+    /// 把 session 序列化后的 JSON 中的 functionCall / functionResult 消息剔除，
+    /// 只保留 user + assistant text 消息，然后反序列化回新的 session。
+    /// 这样下一轮 LLM 看到的上下文是干净的，不会被历史工具调用污染。
+    /// </summary>
+    private static async ValueTask<AgentSession> SanitizeSessionAsync(
+        AIAgent agent,
+        AgentSession originalSession,
+        CancellationToken ct)
+    {
+        // 1. 序列化原始 session
+        var json = await agent.SerializeSessionAsync(originalSession, cancellationToken: ct);
+
+        // 2. 找到 messages 数组并过滤
+        var filtered = FilterMessagesInJson(json);
+
+        // 3. 反序列化回 session
+        return await agent.DeserializeSessionAsync(filtered, cancellationToken: ct);
+    }
+
+    /// <summary>
+    /// 递归查找 messages 数组，剔除含 functionCall / functionResult 的消息。
+    /// 返回新的 JsonElement（原 JSON 已被改写）。
+    /// </summary>
+    private static JsonElement FilterMessagesInJson(JsonElement root)
+    {
+        // 转成可变 JSON 对象
+        var jsonString = root.GetRawText();
+        using var doc = JsonDocument.Parse(jsonString);
+
+        // 使用 Utf8JsonWriter 重建 JSON，过滤 messages
+        using var ms = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(ms))
+        {
+            WriteFilteredElement(writer, doc.RootElement);
+        }
+
+        ms.Position = 0;
+        using var result = JsonDocument.Parse(ms);
+        // 拷贝一份返回（JsonDocument 释放后元素会失效，所以先 clone）
+        return result.RootElement.Clone();
+    }
+
+    /// <summary>
+    /// 递归写 JSON：当遇到名为 "messages" 的数组时，过滤掉含 functionCall /
+    /// functionResult 的消息；其余内容原样写出。
+    /// </summary>
+    private static void WriteFilteredElement(Utf8JsonWriter writer, JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                writer.WriteStartObject();
+                foreach (var prop in element.EnumerateObject())
+                {
+                    writer.WritePropertyName(prop.Name);
+                    if (string.Equals(prop.Name, "messages", StringComparison.OrdinalIgnoreCase) &&
+                        prop.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        WriteFilteredMessages(writer, prop.Value);
+                    }
+                    else
+                    {
+                        WriteFilteredElement(writer, prop.Value);
+                    }
+                }
+                writer.WriteEndObject();
+                break;
+
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (var item in element.EnumerateArray())
+                    WriteFilteredElement(writer, item);
+                writer.WriteEndArray();
+                break;
+
+            case JsonValueKind.String:
+                writer.WriteStringValue(element.GetString());
+                break;
+            case JsonValueKind.Number:
+                element.WriteTo(writer);
+                break;
+            case JsonValueKind.True:
+                writer.WriteBooleanValue(true);
+                break;
+            case JsonValueKind.False:
+                writer.WriteBooleanValue(false);
+                break;
+            case JsonValueKind.Null:
+                writer.WriteNullValue();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 过滤 messages 数组：跳过含 functionCall 或 functionResult 的消息。
+    /// </summary>
+    private static void WriteFilteredMessages(Utf8JsonWriter writer, JsonElement messagesArray)
+    {
+        writer.WriteStartArray();
+
+        foreach (var msg in messagesArray.EnumerateArray())
+        {
+            if (ShouldKeepMessage(msg))
+                WriteFilteredElement(writer, msg);
+        }
+
+        writer.WriteEndArray();
+    }
+
+    /// <summary>
+    /// 判断消息是否应保留：只保留 user 和 assistant + 纯文本的消息。
+    /// 剔除：
+    ///   - role=tool（工具结果）
+    ///   - contents 中含 functionCall / functionResult 的消息
+    /// </summary>
+    private static bool ShouldKeepMessage(JsonElement msg)
+    {
+        if (msg.ValueKind != JsonValueKind.Object)
+            return false;
+
+        // 剔除 role=tool
+        var role = ExtractRole(msg);
+        if (string.Equals(role, "tool", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // 剔除 contents 里含 functionCall / functionResult 的消息
+        if (TryGetPropertyIgnoreCase(msg, "contents", out var contents) &&
+            contents.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var c in contents.EnumerateArray())
+            {
+                if (c.ValueKind != JsonValueKind.Object) continue;
+                var type = TryGetStringIgnoreCase(c, "$type");
+                if (string.Equals(type, "functionCall", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(type, "functionResult", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     public override async ValueTask DeleteSessionAsync(
@@ -203,7 +354,26 @@ public sealed class RedisAgentSessionStore : AgentSessionStore, IConversationCat
 
     /// <summary>
     /// 从已持久化的会话 JSON 中提取消息列表（用于历史回放）。
-    /// 兼容 MAF 序列化格式的常见字段命名，缺失时返回空列表。
+    /// 
+    /// MAF 实际序列化结构（已通过日志确认）：
+    /// {
+    ///   "stateBag": {
+    ///     "InMemoryChatHistoryProvider": {
+    ///       "messages": [
+    ///         { "role": "user", "contents": [{"$type":"text","text":"..."}] },
+    ///         { "role": "assistant", "contents": [{"$type":"functionCall","name":"...","arguments":{...}}] },
+    ///         { "role": "tool", "contents": [{"$type":"functionResult","result":"...","callId":"..."}] },
+    ///         { "role": "assistant", "contents": [{"$type":"text","text":"..."}] }
+    ///       ]
+    ///     }
+    ///   }
+    /// }
+    /// 
+    /// 策略：
+    /// - 递归查找第一个名为 "messages" 的数组（不管嵌套多深）
+    /// - 跳过 role=tool 的消息（工具结果）
+    /// - 从 contents 里提取 $type=text 的文本
+    /// - 跳过纯 functionCall 消息（无 text 内容）
     /// </summary>
     public async ValueTask<IReadOnlyList<SessionMessage>> GetSessionMessagesAsync(
         string conversationId,
@@ -231,28 +401,50 @@ public sealed class RedisAgentSessionStore : AgentSessionStore, IConversationCat
         try
         {
             using var document = JsonDocument.Parse(jsonBytes);
-            var root = document.RootElement;
 
-            // 兼容大小写：找 "messages" 或 "Messages"
-            if (!TryGetPropertyIgnoreCase(root, "messages", out var messagesEl) ||
-                messagesEl.ValueKind != JsonValueKind.Array)
+            // ★ 递归查找 messages 数组
+            var messagesElement = FindMessagesArray(document.RootElement);
+            if (messagesElement is null ||
+                messagesElement.Value.ValueKind != JsonValueKind.Array)
+            {
+                _logger.LogWarning(
+                    "会话 {ConvId} 中未找到 messages 数组", conversationId);
                 return [];
+            }
 
             var result = new List<SessionMessage>();
-            foreach (var msg in messagesEl.EnumerateArray())
+
+            foreach (var msg in messagesElement.Value.EnumerateArray())
             {
-                var role = TryGetStringIgnoreCase(msg, "role") ?? "unknown";
-                var text = TryGetStringIgnoreCase(msg, "text") ?? string.Empty;
+                // 跳过 tool 角色（工具执行结果，不属于对话历史）
+                var role = ExtractRole(msg);
+                if (string.Equals(role, "tool", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var text = ExtractMessageText(msg);
+                if (string.IsNullOrWhiteSpace(text))
+                    continue;   // 纯 functionCall 消息会被跳过
+
+                // ★ 新增：跳过含 tool_call 标记的 assistant 消息（旧版本遗留的脏数据）
+                if (string.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase)
+                    && ReplySanitizer.ContainsToolCallMarkers(text))
+                {
+                    _logger.LogDebug(
+                        "跳过含 tool_call 标记的历史消息：{ConvId}", conversationId);
+                    continue;
+                }
+
                 var author = TryGetStringIgnoreCase(msg, "authorName");
 
-                if (!string.IsNullOrWhiteSpace(text))
-                {
-                    result.Add(new SessionMessage(
-                        Role: role,
-                        Text: text,
-                        AuthorName: author));
-                }
+                result.Add(new SessionMessage(
+                    Role: role,
+                    Text: text,
+                    AuthorName: author));
             }
+
+            _logger.LogInformation(
+                "会话 {ConvId} 解析出 {Count} 条用户可见消息",
+                conversationId, result.Count);
 
             return result;
         }
@@ -266,8 +458,131 @@ public sealed class RedisAgentSessionStore : AgentSessionStore, IConversationCat
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 私有辅助
+    // 私有辅助：JSON 提取
     // ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 递归查找 JSON 树中第一个名为 "messages" 的数组。
+    /// 无论它嵌套多深都能找到。
+    /// </summary>
+    private static JsonElement? FindMessagesArray(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object &&
+            element.ValueKind != JsonValueKind.Array)
+            return null;
+
+        // 优先匹配当前层
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var prop in element.EnumerateObject())
+            {
+                if (string.Equals(prop.Name, "messages", StringComparison.OrdinalIgnoreCase) &&
+                    prop.Value.ValueKind == JsonValueKind.Array)
+                {
+                    return prop.Value;
+                }
+            }
+
+            // 递归子对象
+            foreach (var prop in element.EnumerateObject())
+            {
+                var found = FindMessagesArray(prop.Value);
+                if (found is not null)
+                    return found;
+            }
+        }
+
+        // 递归数组元素
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                var found = FindMessagesArray(item);
+                if (found is not null)
+                    return found;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 提取消息的文本内容。
+    /// 优先从 contents 数组里找 $type=text 的内容；
+    /// 兼容顶层 text 字段的旧格式。
+    /// </summary>
+    private static string? ExtractMessageText(JsonElement msg)
+    {
+        // 1. 兼容旧格式：顶层 text 字段
+        var directText = TryGetStringIgnoreCase(msg, "text");
+        if (!string.IsNullOrWhiteSpace(directText))
+            return directText;
+
+        // 2. MAF 实际格式：contents[] 里找 $type=text
+        if (TryGetPropertyIgnoreCase(msg, "contents", out var contentsEl) &&
+            contentsEl.ValueKind == JsonValueKind.Array)
+        {
+            var sb = new StringBuilder();
+
+            foreach (var c in contentsEl.EnumerateArray())
+            {
+                if (c.ValueKind == JsonValueKind.String)
+                {
+                    sb.Append(c.GetString());
+                    continue;
+                }
+
+                if (c.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                // 只提取 $type=text 的内容
+                var type = TryGetStringIgnoreCase(c, "$type");
+                if (!string.Equals(type, "text", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var t = TryGetStringIgnoreCase(c, "text");
+                if (!string.IsNullOrWhiteSpace(t))
+                    sb.Append(t);
+            }
+
+            if (sb.Length > 0)
+                return sb.ToString();
+        }
+
+        // 3. 兼容 content 单数字段
+        if (TryGetPropertyIgnoreCase(msg, "content", out var contentEl))
+        {
+            if (contentEl.ValueKind == JsonValueKind.String)
+                return contentEl.GetString();
+
+            var t = TryGetStringIgnoreCase(contentEl, "text");
+            if (!string.IsNullOrWhiteSpace(t))
+                return t;
+        }
+
+        return null;
+    }
+
+    /// <summary>提取消息的 role，兼容字符串/对象两种形式。</summary>
+    private static string ExtractRole(JsonElement msg)
+    {
+        if (!TryGetPropertyIgnoreCase(msg, "role", out var roleEl))
+            return "unknown";
+
+        if (roleEl.ValueKind == JsonValueKind.String)
+            return roleEl.GetString() ?? "unknown";
+
+        if (roleEl.ValueKind == JsonValueKind.Object)
+        {
+            var label = TryGetStringIgnoreCase(roleEl, "label")
+                ?? TryGetStringIgnoreCase(roleEl, "name")
+                ?? TryGetStringIgnoreCase(roleEl, "value");
+            if (!string.IsNullOrWhiteSpace(label))
+                return label;
+        }
+
+        return "unknown";
+    }
 
     private async Task TryRemoveAsync(string cacheKey, CancellationToken ct)
     {

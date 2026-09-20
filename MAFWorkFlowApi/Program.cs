@@ -2,7 +2,9 @@ using MAFWorkFlowApi.Agents;
 using MAFWorkFlowApi.HealthChecks;
 using MAFWorkFlowApi.Infrastructure;
 using Microsoft.Agents.AI.Hosting;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using OllamaSharp;
 
 #pragma warning disable EXTEXP0001
 
@@ -42,12 +44,19 @@ builder.Services.AddHttpClient(OllamaWarmupService.HttpClientName)
 
 // ---------------------------------------------------------------------------
 // 4. OllamaSharp 客户端
+//    CommunityToolkit 扩展内部会注册 keyed IChatClient / IEmbeddingGenerator
 // ---------------------------------------------------------------------------
 builder.AddOllamaApiClient("chat-model")
     .AddKeyedChatClient("chat-model");
 
 builder.AddOllamaApiClient("embedding")
     .AddKeyedEmbeddingGenerator("embedding");
+
+// ★ 桥接：keyed → non-keyed
+//    MafAgentService / GraphAgentService 使用 [FromKeyedServices("chat-model")]
+//    DI 验证阶段会尝试按 non-keyed 解析一次，因此必须提供 non-keyed 版本。
+builder.Services.AddSingleton<IChatClient>(sp =>
+    sp.GetRequiredKeyedService<IChatClient>("chat-model"));
 
 // ---------------------------------------------------------------------------
 // 5. MVC + OpenAPI
@@ -100,6 +109,13 @@ builder.Services.AddHealthChecks()
 //     注意：扩展方法接收者是 IServiceCollection，因此用 builder.Services
 // ---------------------------------------------------------------------------
 builder.Services.AddLiteGraph(builder.Configuration);
+
+// ══════════════════════════════════════════════════════════
+// ★ Graph Function Calling Agent（Scoped：工具调用上下文按请求隔离）
+// ══════════════════════════════════════════════════════════
+builder.Services.AddScoped<MAFWorkFlowApi.Agents.ToolCallContext>();
+builder.Services.AddScoped<MAFWorkFlowApi.Agents.GraphTools>();
+builder.Services.AddScoped<MAFWorkFlowApi.Agents.GraphAgentService>();
 
 var app = builder.Build();
 
