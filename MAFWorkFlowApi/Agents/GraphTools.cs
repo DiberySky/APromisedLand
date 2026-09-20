@@ -9,21 +9,24 @@ namespace MAFWorkFlowApi.Agents;
 /// 图查询工具集。所有方法都被 GraphAgentService 用 AIFunctionFactory 包装成
 /// AITool 交给 LLM，由 LLM 自主决定调用哪个。
 /// 每个方法都通过 TrackAsync 记录调用详情（参数、结果、耗时）。
+/// 节点名解析采用宽松策略（ResolveNode），容忍 LLM 提取参数时的小抖动。
 /// </summary>
 public sealed class GraphTools
 {
+    private const int MaxResults = 1000;
+
     private readonly LiteGraphRestClient _rest;
     private readonly ILogger<GraphTools> _logger;
     private readonly ToolCallContext _toolCtx;
-    private readonly IMemoryCache _cache;   // ★ 新增
+    private readonly IMemoryCache _cache;
 
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);   // ★ 新增
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
     public GraphTools(
         LiteGraphRestClient rest,
         ILogger<GraphTools> logger,
         ToolCallContext toolCtx,
-        IMemoryCache cache)   // ★ 新增参数
+        IMemoryCache cache)
     {
         _rest = rest;
         _logger = logger;
@@ -32,20 +35,15 @@ public sealed class GraphTools
     }
 
     // ══════════════════════════════════════════════════════
-    // Track 包装器：统一记录调用详情
+    // Track 包装器：统一记录调用详情 + 缓存
     // ══════════════════════════════════════════════════════
 
-    /// <summary>
-    /// 包装器：负责缓存 + 记录调用详情。
-    /// - 缓存命中：直接返回缓存结果，耗时 0ms，标记 FromCache = true
-    /// - 缓存未命中：执行实际逻辑，结果写入缓存（TTL 60 秒）
-    /// </summary>
     private async Task<string> TrackAsync(
         string toolName, string arguments, Func<Task<string>> body)
     {
         var cacheKey = $"{toolName}|{arguments}";
 
-        // ★ 1. 尝试缓存命中
+        // 1. 尝试缓存命中
         if (_cache.TryGetValue(cacheKey, out string? cached) && cached is not null)
         {
             var hitRecord = _toolCtx.BeginCall(toolName, arguments);
@@ -54,14 +52,13 @@ public sealed class GraphTools
             return cached;
         }
 
-        // ★ 2. 缓存未命中：执行实际逻辑
+        // 2. 缓存未命中：执行
         var record = _toolCtx.BeginCall(toolName, arguments);
         try
         {
             var result = await body();
             record.Complete(result, fromCache: false);
 
-            // ★ 3. 写入缓存
             _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
             {
                 AbsoluteExpirationRelativeToNow = CacheTtl,
@@ -96,8 +93,8 @@ public sealed class GraphTools
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
         if (graph is null) return $"未找到图 '{graphName}'。";
 
-        var target = nodes.FirstOrDefault(n =>
-            n.Name.Equals(nodeName, StringComparison.OrdinalIgnoreCase));
+        // ★ 宽松解析
+        var target = ResolveNode(nodes, nodeName, _logger);
         if (target is null) return $"在图 '{graphName}' 中未找到节点 '{nodeName}'。";
 
         var nodeMap = nodes.ToDictionary(n => n.Guid, n => n.Name);
@@ -112,8 +109,8 @@ public sealed class GraphTools
         }
 
         return lines.Count == 0
-            ? $"'{nodeName}' 没有邻居节点。"
-            : $"'{nodeName}' 的邻居：\n{string.Join("\n", lines)}";
+            ? $"'{target.Name}' 没有邻居节点。"
+            : $"'{target.Name}' 的邻居：\n{string.Join("\n", lines)}";
     }
 
     // ══════════════════════════════════════════════════════
@@ -134,25 +131,24 @@ public sealed class GraphTools
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
         if (graph is null) return $"未找到图 '{graphName}'。";
 
-        var nameToNode = nodes
-            .GroupBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-        if (!nameToNode.TryGetValue(nodeA, out var a)) return $"未找到节点 '{nodeA}'。";
-        if (!nameToNode.TryGetValue(nodeB, out var b)) return $"未找到节点 '{nodeB}'。";
+        // ★ 宽松解析
+        var a = ResolveNode(nodes, nodeA, _logger);
+        if (a is null) return $"未找到节点 '{nodeA}'。";
+        var b = ResolveNode(nodes, nodeB, _logger);
+        if (b is null) return $"未找到节点 '{nodeB}'。";
 
         var lines = new List<string>();
         foreach (var e in edges)
         {
             if (e.From == a.Guid && e.To == b.Guid)
-                lines.Add($"- {nodeA} --[{e.Name}]--> {nodeB}（{nodeA} 是 {nodeB} 的 {e.Name}）");
+                lines.Add($"- {a.Name} --[{e.Name}]--> {b.Name}（{a.Name} 是 {b.Name} 的 {e.Name}）");
             if (e.From == b.Guid && e.To == a.Guid)
-                lines.Add($"- {nodeB} --[{e.Name}]--> {nodeA}（{nodeB} 是 {nodeA} 的 {e.Name}）");
+                lines.Add($"- {b.Name} --[{e.Name}]--> {a.Name}（{b.Name} 是 {a.Name} 的 {e.Name}）");
         }
 
         return lines.Count == 0
-            ? $"'{nodeA}' 和 '{nodeB}' 之间没有直接关系。"
-            : $"'{nodeA}' 和 '{nodeB}' 的关系：\n{string.Join("\n", lines)}";
+            ? $"'{a.Name}' 和 '{b.Name}' 之间没有直接关系。"
+            : $"'{a.Name}' 和 '{b.Name}' 的关系：\n{string.Join("\n", lines)}";
     }
 
     // ══════════════════════════════════════════════════════
@@ -228,12 +224,11 @@ public sealed class GraphTools
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
         if (graph is null) return $"未找到图 '{graphName}'。";
 
-        var nameToNode = nodes
-            .GroupBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-        if (!nameToNode.TryGetValue(fromNode, out var start)) return $"未找到起始节点 '{fromNode}'。";
-        if (!nameToNode.TryGetValue(toNode, out var end)) return $"未找到目标节点 '{toNode}'。";
+        // ★ 宽松解析
+        var start = ResolveNode(nodes, fromNode, _logger);
+        if (start is null) return $"未找到起始节点 '{fromNode}'。";
+        var end = ResolveNode(nodes, toNode, _logger);
+        if (end is null) return $"未找到目标节点 '{toNode}'。";
 
         var adjacency = nodes.ToDictionary(n => n.Guid, _ => new List<Guid>());
         foreach (var e in edges)
@@ -255,7 +250,7 @@ public sealed class GraphTools
             if (last == end.Guid)
             {
                 var names = path.Select(g => guidToName[g]);
-                return $"'{fromNode}' 到 '{toNode}' 的最短路径（{path.Count - 1} 步）：\n" +
+                return $"'{start.Name}' 到 '{end.Name}' 的最短路径（{path.Count - 1} 步）：\n" +
                        string.Join(" → ", names);
             }
 
@@ -265,7 +260,7 @@ public sealed class GraphTools
                     queue.Enqueue(new List<Guid>(path) { next });
             }
         }
-        return $"'{fromNode}' 和 '{toNode}' 之间不存在路径。";
+        return $"'{start.Name}' 和 '{end.Name}' 之间不存在路径。";
     }
 
     // ══════════════════════════════════════════════════════
@@ -341,12 +336,9 @@ public sealed class GraphTools
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
         if (graph is null) return $"未找到图 '{graphName}'。";
 
-        var nameToNode = nodes
-            .GroupBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-        if (!nameToNode.TryGetValue(startNode, out var start))
-            return $"未找到起始节点 '{startNode}'。";
+        // ★ 宽松解析
+        var start = ResolveNode(nodes, startNode, _logger);
+        if (start is null) return $"未找到起始节点 '{startNode}'。";
 
         var adjacency = nodes.ToDictionary(n => n.Guid, _ => new List<Guid>());
         foreach (var e in edges)
@@ -378,7 +370,7 @@ public sealed class GraphTools
             .Where(e => visited.Contains(e.From) && visited.Contains(e.To)).ToList();
 
         var sb = new StringBuilder();
-        sb.AppendLine($"从 '{startNode}' 出发 {safeHops} 跳内的子图：");
+        sb.AppendLine($"从 '{start.Name}' 出发 {safeHops} 跳内的子图：");
         sb.AppendLine($"共 {subgraphNodes.Count} 个节点、{subgraphEdges.Count} 条边。");
         sb.AppendLine("节点：");
         foreach (var n in subgraphNodes)
@@ -418,8 +410,8 @@ public sealed class GraphTools
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
         if (graph is null) return $"未找到图 '{graphName}'。";
 
-        var target = nodes.FirstOrDefault(n =>
-            n.Name.Equals(nodeName, StringComparison.OrdinalIgnoreCase));
+        // ★ 宽松解析
+        var target = ResolveNode(nodes, nodeName, _logger);
         if (target is null) return $"在图 '{graphName}' 中未找到节点 '{nodeName}'。";
 
         var nodeMap = nodes.ToDictionary(n => n.Guid, n => n.Name);
@@ -429,13 +421,13 @@ public sealed class GraphTools
         foreach (var e in edges)
         {
             if (e.From == target.Guid && nodeMap.TryGetValue(e.To, out var toName))
-                outEdges.Add($"- {nodeName} --[{e.Name}]--> {toName}");
+                outEdges.Add($"- {target.Name} --[{e.Name}]--> {toName}");
             if (e.To == target.Guid && nodeMap.TryGetValue(e.From, out var fromName))
-                inEdges.Add($"- {fromName} --[{e.Name}]--> {nodeName}");
+                inEdges.Add($"- {fromName} --[{e.Name}]--> {target.Name}");
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine($"节点 '{nodeName}' 的出边和入边：");
+        sb.AppendLine($"节点 '{target.Name}' 的出边和入边：");
 
         if (outEdges.Count > 0)
         {
@@ -452,6 +444,98 @@ public sealed class GraphTools
         else sb.AppendLine("入边：无");
 
         return sb.ToString();
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ★ 节点名宽松解析（核心新增）
+    // ══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 宽松解析节点名：容忍 LLM 提取参数时的小抖动。
+    /// 优先级：
+    ///   1. 精确匹配（忽略大小写）
+    ///   2. 去掉空格后精确匹配
+    ///   3. 去掉常见前缀（根节点、子节点、节点等）后匹配
+    ///   4. 加回常见前缀后匹配
+    ///   5. 包含匹配（取最长的）
+    /// </summary>
+    private static NodeMeta? ResolveNode(
+        List<NodeMeta> nodes, string inputName, ILogger logger)
+    {
+        if (string.IsNullOrWhiteSpace(inputName) || nodes.Count == 0)
+            return null;
+
+        var trimmed = inputName.Trim();
+
+        // 1. 精确匹配
+        var exact = nodes.FirstOrDefault(n =>
+            n.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null) return exact;
+
+        // 2. 去掉空格后精确匹配（半角 + 全角）
+        var noSpace = trimmed.Replace(" ", "").Replace("　", "");
+        var noSpaceMatch = nodes.FirstOrDefault(n =>
+            n.Name.Replace(" ", "").Replace("　", "")
+                .Equals(noSpace, StringComparison.OrdinalIgnoreCase));
+        if (noSpaceMatch is not null)
+        {
+            logger.LogInformation("节点名宽松解析（空格）：'{Input}' → '{Actual}'",
+                trimmed, noSpaceMatch.Name);
+            return noSpaceMatch;
+        }
+
+        // 3. 去掉常见前缀后重试（长的放前面）
+        var prefixes = new[] { "根节点", "子节点", "父节点", "节点", "Node ", "Node" };
+        foreach (var prefix in prefixes)
+        {
+            if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var stripped = trimmed[prefix.Length..].Trim();
+                if (!string.IsNullOrEmpty(stripped))
+                {
+                    var match = nodes.FirstOrDefault(n =>
+                        n.Name.Equals(stripped, StringComparison.OrdinalIgnoreCase));
+                    if (match is not null)
+                    {
+                        logger.LogInformation("节点名宽松解析（去前缀）：'{Input}' → '{Actual}'",
+                            trimmed, match.Name);
+                        return match;
+                    }
+                }
+            }
+        }
+
+        // 4. 加回常见前缀后重试
+        foreach (var prefix in prefixes)
+        {
+            var candidate = prefix + trimmed;
+            var match = nodes.FirstOrDefault(n =>
+                n.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+            {
+                logger.LogInformation("节点名宽松解析（加前缀）：'{Input}' → '{Actual}'",
+                    trimmed, match.Name);
+                return match;
+            }
+        }
+
+        // 5. 包含匹配（取最长匹配，避免歧义）
+        var containsMatches = nodes
+            .Where(n => n.Name.Contains(trimmed, StringComparison.OrdinalIgnoreCase)
+                     || trimmed.Contains(n.Name, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(n => n.Name.Length)
+            .ToList();
+
+        if (containsMatches.Count > 0)
+        {
+            var best = containsMatches[0];
+            logger.LogInformation("节点名宽松解析（包含）：'{Input}' → '{Actual}'",
+                trimmed, best.Name);
+            return best;
+        }
+
+        logger.LogWarning("节点名宽松解析失败：'{Input}' 无法匹配到图中任何节点", trimmed);
+        return null;
     }
 
     // ══════════════════════════════════════════════════════

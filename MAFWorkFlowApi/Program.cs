@@ -120,10 +120,17 @@ builder.Services.AddLiteGraph(builder.Configuration);
 // ══════════════════════════════════════════════════════════
 // ★ Graph Function Calling Agent（Scoped：工具调用上下文按请求隔离）
 // ══════════════════════════════════════════════════════════
-builder.Services.AddScoped<MAFWorkFlowApi.Agents.ToolCallContext>();
-builder.Services.AddScoped<MAFWorkFlowApi.Agents.GraphTools>();
-builder.Services.AddScoped<MAFWorkFlowApi.Agents.GraphAgentService>();
-builder.Services.AddScoped<MAFWorkFlowApi.Agents.AssistantAgentService>();
+builder.Services.AddScoped<ToolCallContext>();
+builder.Services.AddScoped<GraphTools>();
+builder.Services.AddScoped<GraphAgentService>();
+builder.Services.AddScoped<AssistantAgentService>();
+// ══════════════════════════════════════════════════════════
+// ★ MCP Server：把 GraphTools 暴露给外部 AI 客户端
+// ══════════════════════════════════════════════════════════
+builder.Services
+    .AddMcpServer()
+    .WithHttpTransport()
+    .WithTools<McpGraphTools>();
 
 var app = builder.Build();
 
@@ -146,6 +153,9 @@ app.UseMiddleware<LiteGraphExceptionMiddleware>();
 app.UseRouting();
 app.MapControllers();
 app.MapDefaultEndpoints();
+
+// ★ 映射 MCP 端点（外部 AI 客户端连接此地址）
+app.MapMcp("/mcp");
 
 app.Run();
 
