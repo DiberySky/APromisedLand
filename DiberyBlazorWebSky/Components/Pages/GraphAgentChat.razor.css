@@ -586,3 +586,61 @@
     border-radius: 6px;
     margin: 6px 0;
 }
+
+/* ══════════════════════════════════════════════════════════ */
+/* 消息底部：复制按钮 + 时间戳                                */
+/* ══════════════════════════════════════════════════════════ */
+
+.message-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.message.user .message-footer {
+    flex-direction: row-reverse;
+}
+
+.btn-copy {
+    background: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    padding: 2px 8px;
+    border-radius: 6px;
+    transition: all 0.15s;
+    opacity: 0;
+    font-family: inherit;
+}
+
+.message:hover .btn-copy,
+.btn-copy:focus {
+    opacity: 1;
+}
+
+.btn-copy:hover {
+    background: #e2e8f0;
+    color: #475569;
+    border-color: #cbd5e1;
+}
+
+.btn-copy:active {
+    background: #cbd5e1;
+    transform: scale(0.96);
+}
+
+/* 移动端：始终显示 */
+@media (max-width: 768px) {
+    .btn-copy {
+        opacity: 1;
+    }
+}
+
+/* 保持原有 message-time 样式 */
+.message-time {
+    font-size: 0.7rem;
+    color: #94a3b8;
+}

@@ -23,7 +23,10 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
     private CancellationTokenSource? _sendCts;
     private Timer? _elapsedTimer;
     private DateTime _sendStartedAt;
-    private bool _useStreaming = true; // ★ 默认开启流式
+    private bool _useStreaming = true;
+
+    // ★ 复制反馈：记录最近复制的消息 ID
+    private string? _lastCopiedMessageId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -126,18 +129,52 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         StateHasChanged();
     }
 
+    // ══════════════════════════════════════════════════════
+    // ★ 复制消息
+    // ══════════════════════════════════════════════════════
+
+    private async Task CopyMessageAsync(ChatMsg msg)
+    {
+        if (string.IsNullOrEmpty(msg.Text)) return;
+
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", msg.Text);
+
+            // 显示"已复制"反馈
+            _lastCopiedMessageId = msg.Id;
+            StateHasChanged();
+
+            // 2 秒后恢复
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000);
+                if (_lastCopiedMessageId == msg.Id)
+                {
+                    _lastCopiedMessageId = null;
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "复制消息失败（可能浏览器不支持 clipboard API）");
+        }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // 发送消息
+    // ══════════════════════════════════════════════════════
+
     private async Task SendMessageAsync()
     {
         if (string.IsNullOrWhiteSpace(_userMessage) || _isSending) return;
 
-        // ★ 分流：按开关选择流式或非流式
         if (_useStreaming)
         {
             await SendMessageStreamAsync();
             return;
         }
-
-        if (string.IsNullOrWhiteSpace(_userMessage) || _isSending) return;
 
         var userText = _userMessage.Trim();
         _userMessage = "";
@@ -184,7 +221,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
                 Text = response.Reply,
                 Timestamp = DateTime.Now,
                 ToolCallDetails = response.ToolCallDetails,
-                AgentName = response.AgentName 
+                AgentName = response.AgentName
             });
         }
         catch (OperationCanceledException)
@@ -222,7 +259,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
             Timestamp = DateTime.Now
         });
 
-        // 预先插入一条空的 AI 消息，用于实时追加
         var aiMsg = new ChatMsg
         {
             Role = "assistant",
@@ -250,14 +286,12 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
             await GraphAgentApi.SendStreamAsync(
                 userText,
                 string.IsNullOrEmpty(_selectedSessionId) ? null : _selectedSessionId,
-                // 增量回调
                 async delta =>
                 {
                     aiMsg.Text += delta;
                     await InvokeAsync(StateHasChanged);
                     await ScrollToBottomAsync();
                 },
-                // 完成回调
                 async reply =>
                 {
                     aiMsg.Text = reply.Reply;
@@ -329,8 +363,8 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
         return agentName switch
         {
-            "Assistant" => "💬",           // 通用助手：对话气泡
-            "GraphAssistant" => "🔧",      // 图助手：扳手
+            "Assistant" => "💬",
+            "GraphAssistant" => "🔧",
             _ => "🤖"
         };
     }
@@ -344,10 +378,13 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
     private sealed class ChatMsg
     {
+        // ★ 消息唯一 ID（用于复制反馈定位）
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
         public string Role { get; set; } = "assistant";
         public string Text { get; set; } = "";
         public DateTime Timestamp { get; set; }
         public List<GraphAgentToolCallDetail> ToolCallDetails { get; set; } = new();
-        public string? AgentName { get; set; } 
+        public string? AgentName { get; set; }
     }
 }

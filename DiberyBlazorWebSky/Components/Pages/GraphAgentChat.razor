@@ -73,6 +73,8 @@
                         {
                             <div class="agent-name">@m.AgentName</div>
                         }
+
+                        @* ★ Assistant 消息用 Markdown 渲染；User / Error 消息保持纯文本 *@
                         @if (m.Role == "assistant" && !string.IsNullOrEmpty(m.Text))
                         {
                             <div class="message-text markdown-body">
@@ -130,7 +132,22 @@
                             </details>
                         }
 
-                        <div class="message-time">@m.Timestamp.ToString("HH:mm:ss")</div>
+                        @* ★ 底部：复制按钮 + 时间戳 *@
+                        <div class="message-footer">
+                            <button class="btn-copy"
+                                    @onclick="() => CopyMessageAsync(m)"
+                                    title="复制消息内容">
+                                @if (_lastCopiedMessageId == m.Id)
+                                {
+                                    <text>✓ 已复制</text>
+                                }
+                                else
+                                {
+                                    <text>📋 复制</text>
+                                }
+                            </button>
+                            <div class="message-time">@m.Timestamp.ToString("HH:mm:ss")</div>
+                        </div>
                     </div>
                 </div>
             }
