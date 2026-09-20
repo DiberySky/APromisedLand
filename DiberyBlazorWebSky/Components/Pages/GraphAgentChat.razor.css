@@ -440,3 +440,11 @@
     cursor: pointer;
     accent-color: #fff;
 }
+
+.agent-name {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-family: 'Consolas', monospace;
+}

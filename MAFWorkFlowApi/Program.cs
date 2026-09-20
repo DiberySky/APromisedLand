@@ -123,6 +123,7 @@ builder.Services.AddLiteGraph(builder.Configuration);
 builder.Services.AddScoped<MAFWorkFlowApi.Agents.ToolCallContext>();
 builder.Services.AddScoped<MAFWorkFlowApi.Agents.GraphTools>();
 builder.Services.AddScoped<MAFWorkFlowApi.Agents.GraphAgentService>();
+builder.Services.AddScoped<MAFWorkFlowApi.Agents.AssistantAgentService>();
 
 var app = builder.Build();
 

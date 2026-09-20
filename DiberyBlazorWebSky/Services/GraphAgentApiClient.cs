@@ -207,6 +207,10 @@ public class GraphAgentApiClient
                     var convId = root.TryGetProperty("conversationId", out var cid) && cid.ValueKind == JsonValueKind.String
                         ? cid.GetString() : null;
 
+                    // ★ 新增：解析 AgentName
+                    var agentName = root.TryGetProperty("agentName", out var an) && an.ValueKind == JsonValueKind.String
+                        ? an.GetString() : null;
+
                     var tools = new List<string>();
                     if (root.TryGetProperty("toolsInvoked", out var ti) && ti.ValueKind == JsonValueKind.Array)
                     {
@@ -220,7 +224,7 @@ public class GraphAgentApiClient
                         tcd.ValueKind == JsonValueKind.Array)
                     {
                         details = tcd.Deserialize<List<GraphAgentToolCallDetail>>(JsonOpts)
-                            ?? new List<GraphAgentToolCallDetail>();
+                                  ?? new List<GraphAgentToolCallDetail>();
                     }
 
                     finalReply = new GraphAgentReply
@@ -228,7 +232,8 @@ public class GraphAgentApiClient
                         ConversationId = convId ?? "",
                         Reply = replyText ?? accumulated.ToString(),
                         ToolsInvoked = tools,
-                        ToolCallDetails = details
+                        ToolCallDetails = details,
+                        AgentName = agentName ?? ""   // ★ 新增
                     };
                 }
                 else if (string.Equals(type, "error", StringComparison.OrdinalIgnoreCase))

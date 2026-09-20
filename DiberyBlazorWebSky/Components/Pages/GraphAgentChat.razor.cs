@@ -183,7 +183,8 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
                 Role = "assistant",
                 Text = response.Reply,
                 Timestamp = DateTime.Now,
-                ToolCallDetails = response.ToolCallDetails
+                ToolCallDetails = response.ToolCallDetails,
+                AgentName = response.AgentName 
             });
         }
         catch (OperationCanceledException)
@@ -261,6 +262,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
                 {
                     aiMsg.Text = reply.Reply;
                     aiMsg.ToolCallDetails = reply.ToolCallDetails;
+                    aiMsg.AgentName = reply.AgentName;
 
                     if (string.IsNullOrEmpty(_selectedSessionId) &&
                         !string.IsNullOrEmpty(reply.ConversationId))
@@ -320,12 +322,18 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         }
     }
 
-    private static string GetAvatar(string role) => role switch
+    private static string GetAvatar(string role, string? agentName)
     {
-        "user" => "👤",
-        "error" => "⚠️",
-        _ => "🤖"
-    };
+        if (role == "user") return "👤";
+        if (role == "error") return "⚠️";
+
+        return agentName switch
+        {
+            "Assistant" => "💬",           // 通用助手：对话气泡
+            "GraphAssistant" => "🔧",      // 图助手：扳手
+            _ => "🤖"
+        };
+    }
 
     public void Dispose()
     {
@@ -340,5 +348,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         public string Text { get; set; } = "";
         public DateTime Timestamp { get; set; }
         public List<GraphAgentToolCallDetail> ToolCallDetails { get; set; } = new();
+        public string? AgentName { get; set; } 
     }
 }

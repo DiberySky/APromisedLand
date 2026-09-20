@@ -16,6 +16,7 @@ public sealed class GraphAgentService
     private readonly AgentSessionStore _sessionStore;
     private readonly IConversationCatalog _catalog;
     private readonly ToolCallContext _toolCtx;
+    private readonly AssistantAgentService _assistant;   // ★ 新增
     private readonly ILogger<GraphAgentService> _logger;
 
     public GraphAgentService(
@@ -24,15 +25,16 @@ public sealed class GraphAgentService
         AgentSessionStore sessionStore,
         IConversationCatalog catalog,
         ToolCallContext toolCtx,
+        AssistantAgentService assistant,   // ★ 新增
         ILoggerFactory loggerFactory)
     {
         _sessionStore = sessionStore;
         _catalog = catalog;
         _toolCtx = toolCtx;
+        _assistant = assistant;
         _logger = loggerFactory.CreateLogger<GraphAgentService>();
 
         var tools = BuildTools(graphTools);
-
         _graphAgent = chatClient.AsAIAgent(
             instructions: BuildInstructions(),
             name: "GraphAssistant",
@@ -46,6 +48,13 @@ public sealed class GraphAgentService
         string userMessage,
         CancellationToken ct)
     {
+        // ★ 路由：元问题交给 AssistantAgent
+        if (AgentRouter.ShouldRouteToAssistant(userMessage))
+        {
+            _logger.LogInformation("[Router] 路由到 AssistantAgent: {Msg}", userMessage);
+            return await _assistant.ChatAsync(conversationId, userMessage, ct);
+        }
+        
         var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
 
         _toolCtx.Reset();
@@ -93,6 +102,36 @@ public sealed class GraphAgentService
         string userMessage,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        // ★ 路由：元问题走 AssistantAgent（非流式，包装成流式返回）
+        if (AgentRouter.ShouldRouteToAssistant(userMessage))
+        {
+            _logger.LogInformation("[Router-Stream] 路由到 AssistantAgent: {Msg}", userMessage);
+
+            var reply = await _assistant.ChatAsync(conversationId, userMessage, ct);
+
+            yield return new StreamChunk(
+                Type: StreamChunkType.Start,
+                Text: null,
+                ConversationId: reply.ConversationId,
+                AgentName: reply.AgentName);   // ★
+
+            yield return new StreamChunk(
+                Type: StreamChunkType.Delta,
+                Text: reply.Reply,
+                ConversationId: null,
+                AgentName: reply.AgentName);   // ★
+
+            yield return new StreamChunk(
+                Type: StreamChunkType.Done,
+                Text: reply.Reply,
+                ConversationId: reply.ConversationId,
+                ToolsInvoked: new List<string>(),
+                ToolCallDetails: new List<ToolCallDetailDto>(),
+                AgentName: reply.AgentName);   // ★
+
+            yield break;
+        }
+        
         var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
         _toolCtx.Reset();
 
@@ -153,7 +192,8 @@ public sealed class GraphAgentService
             Text: finalText,
             ConversationId: currentConversationId,
             ToolsInvoked: toolsInvoked,
-            ToolCallDetails: toolCallDetails);
+            ToolCallDetails: toolCallDetails,
+            AgentName: _graphAgent.Name ?? "GraphAssistant");   // ★
     }
 
     private static string? TruncateForUi(string? text, int maxLen)
@@ -296,4 +336,5 @@ public sealed record StreamChunk(
     string? Text,
     string? ConversationId,
     IReadOnlyList<string>? ToolsInvoked = null,
-    IReadOnlyList<ToolCallDetailDto>? ToolCallDetails = null);
+    IReadOnlyList<ToolCallDetailDto>? ToolCallDetails = null,
+    string? AgentName = null);

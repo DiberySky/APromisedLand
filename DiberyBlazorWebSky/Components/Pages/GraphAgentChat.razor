@@ -65,8 +65,14 @@
             @foreach (var m in _messages)
             {
                 <div class="message @m.Role">
-                    <div class="message-avatar"><span>@GetAvatar(m.Role)</span></div>
+                    <div class="message-avatar">
+                        <span>@GetAvatar(m.Role, m.AgentName)</span>
+                    </div>
                     <div class="message-content">
+                        @if (!string.IsNullOrEmpty(m.AgentName) && m.Role == "assistant")
+                        {
+                            <div class="agent-name">@m.AgentName</div>
+                        }
                         <div class="message-text">@m.Text</div>
 
                         @* ★ 工具调用详情：可展开 *@
@@ -89,7 +95,8 @@
                                                     }
                                                     else
                                                     {
-                                                        @detail.ElapsedMs <text>ms</text>
+                                                        @detail.ElapsedMs
+                                                        <text>ms</text>
                                                     }
                                                     @if (!detail.Success)
                                                     {
