@@ -7,7 +7,7 @@ namespace MAFWorkFlowApi.Agents;
 /// <summary>
 /// 图查询工具集。所有方法都被 GraphAgentService 用 AIFunctionFactory 包装成
 /// AITool 交给 LLM，由 LLM 自主决定调用哪个。
-/// 依赖现有的 LiteGraphRestClient（复用其 BaseAddress + Auth）。
+/// 每个方法都通过 TrackAsync 记录调用详情（参数、结果、耗时）。
 /// </summary>
 public sealed class GraphTools
 {
@@ -28,25 +28,47 @@ public sealed class GraphTools
     }
 
     // ══════════════════════════════════════════════════════
+    // Track 包装器：统一记录调用详情
+    // ══════════════════════════════════════════════════════
+
+    private async Task<string> TrackAsync(
+        string toolName, string arguments, Func<Task<string>> body)
+    {
+        var record = _toolCtx.BeginCall(toolName, arguments);
+        try
+        {
+            var result = await body();
+            record.Complete(result);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            record.Fail(ex.Message);
+            throw;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════
     // 工具 1：邻居查询
     // ══════════════════════════════════════════════════════
 
-    public async Task<string> GetNeighborsAsync(
+    public Task<string> GetNeighborsAsync(
         string nodeName, string graphName, CancellationToken ct = default)
-    {
-        _toolCtx.Record("GetNeighbors");
+        => TrackAsync("GetNeighbors", $"nodeName={nodeName}, graphName={graphName}",
+            () => GetNeighborsCoreAsync(nodeName, graphName, ct));
 
+    private async Task<string> GetNeighborsCoreAsync(
+        string nodeName, string graphName, CancellationToken ct)
+    {
         _logger.LogInformation(
             "[Tool] GetNeighbors(node={Node}, graph={Graph})", nodeName, graphName);
 
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
-        if (graph is null)
-            return $"未找到图 '{graphName}'。";
+        if (graph is null) return $"未找到图 '{graphName}'。";
 
         var target = nodes.FirstOrDefault(n =>
             n.Name.Equals(nodeName, StringComparison.OrdinalIgnoreCase));
-        if (target is null)
-            return $"在图 '{graphName}' 中未找到节点 '{nodeName}'。";
+        if (target is null) return $"在图 '{graphName}' 中未找到节点 '{nodeName}'。";
 
         var nodeMap = nodes.ToDictionary(n => n.Guid, n => n.Name);
         var lines = new List<string>();
@@ -68,26 +90,26 @@ public sealed class GraphTools
     // 工具 2：两节点关系
     // ══════════════════════════════════════════════════════
 
-    public async Task<string> GetRelationsAsync(
+    public Task<string> GetRelationsAsync(
         string nodeA, string nodeB, string graphName, CancellationToken ct = default)
-    {
-        _toolCtx.Record("GetRelations");
+        => TrackAsync("GetRelations", $"nodeA={nodeA}, nodeB={nodeB}, graphName={graphName}",
+            () => GetRelationsCoreAsync(nodeA, nodeB, graphName, ct));
 
+    private async Task<string> GetRelationsCoreAsync(
+        string nodeA, string nodeB, string graphName, CancellationToken ct)
+    {
         _logger.LogInformation(
             "[Tool] GetRelations(a={A}, b={B}, graph={Graph})", nodeA, nodeB, graphName);
 
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
-        if (graph is null)
-            return $"未找到图 '{graphName}'。";
+        if (graph is null) return $"未找到图 '{graphName}'。";
 
         var nameToNode = nodes
             .GroupBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-        if (!nameToNode.TryGetValue(nodeA, out var a))
-            return $"未找到节点 '{nodeA}'。";
-        if (!nameToNode.TryGetValue(nodeB, out var b))
-            return $"未找到节点 '{nodeB}'。";
+        if (!nameToNode.TryGetValue(nodeA, out var a)) return $"未找到节点 '{nodeA}'。";
+        if (!nameToNode.TryGetValue(nodeB, out var b)) return $"未找到节点 '{nodeB}'。";
 
         var lines = new List<string>();
         foreach (var e in edges)
@@ -107,26 +129,24 @@ public sealed class GraphTools
     // 工具 3：列出所有节点
     // ══════════════════════════════════════════════════════
 
-    public async Task<string> ListAllNodesAsync(
+    public Task<string> ListAllNodesAsync(
         string graphName, CancellationToken ct = default)
-    {
-        _toolCtx.Record("ListAllNodes");
+        => TrackAsync("ListAllNodes", $"graphName={graphName}",
+            () => ListAllNodesCoreAsync(graphName, ct));
 
+    private async Task<string> ListAllNodesCoreAsync(string graphName, CancellationToken ct)
+    {
         _logger.LogInformation("[Tool] ListAllNodes(graph={Graph})", graphName);
 
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
-        if (graph is null)
-            return $"未找到图 '{graphName}'。";
-
-        if (nodes.Count == 0)
-            return $"图 '{graphName}' 没有节点。";
+        if (graph is null) return $"未找到图 '{graphName}'。";
+        if (nodes.Count == 0) return $"图 '{graphName}' 没有节点。";
 
         var nodeMap = nodes.ToDictionary(n => n.Guid, n => n.Name);
         var sb = new StringBuilder();
         sb.AppendLine($"图 '{graphName}' 共 {nodes.Count} 个节点、{edges.Count} 条边。");
         sb.AppendLine("节点列表：");
-        foreach (var n in nodes)
-            sb.AppendLine($"- {n.Name}");
+        foreach (var n in nodes) sb.AppendLine($"- {n.Name}");
 
         if (edges.Count > 0)
         {
@@ -138,7 +158,6 @@ public sealed class GraphTools
                 sb.AppendLine($"- {f} --[{e.Name}]--> {t}");
             }
         }
-
         return sb.ToString();
     }
 
@@ -146,16 +165,17 @@ public sealed class GraphTools
     // 工具 4：图规模
     // ══════════════════════════════════════════════════════
 
-    public async Task<string> GetGraphSizeAsync(
+    public Task<string> GetGraphSizeAsync(
         string graphName, CancellationToken ct = default)
-    {
-        _toolCtx.Record("GetGraphSize");
+        => TrackAsync("GetGraphSize", $"graphName={graphName}",
+            () => GetGraphSizeCoreAsync(graphName, ct));
 
+    private async Task<string> GetGraphSizeCoreAsync(string graphName, CancellationToken ct)
+    {
         _logger.LogInformation("[Tool] GetGraphSize(graph={Graph})", graphName);
 
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
-        if (graph is null)
-            return $"未找到图 '{graphName}'。";
+        if (graph is null) return $"未找到图 '{graphName}'。";
 
         return $"图 '{graphName}' 共 {nodes.Count} 个节点、{edges.Count} 条边。";
     }
@@ -164,26 +184,26 @@ public sealed class GraphTools
     // 工具 5：最短路径
     // ══════════════════════════════════════════════════════
 
-    public async Task<string> FindPathAsync(
+    public Task<string> FindPathAsync(
         string fromNode, string toNode, string graphName, CancellationToken ct = default)
-    {
-        _toolCtx.Record("FindPath");
+        => TrackAsync("FindPath", $"fromNode={fromNode}, toNode={toNode}, graphName={graphName}",
+            () => FindPathCoreAsync(fromNode, toNode, graphName, ct));
 
+    private async Task<string> FindPathCoreAsync(
+        string fromNode, string toNode, string graphName, CancellationToken ct)
+    {
         _logger.LogInformation(
             "[Tool] FindPath(from={From}, to={To}, graph={Graph})", fromNode, toNode, graphName);
 
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
-        if (graph is null)
-            return $"未找到图 '{graphName}'。";
+        if (graph is null) return $"未找到图 '{graphName}'。";
 
         var nameToNode = nodes
             .GroupBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-        if (!nameToNode.TryGetValue(fromNode, out var start))
-            return $"未找到起始节点 '{fromNode}'。";
-        if (!nameToNode.TryGetValue(toNode, out var end))
-            return $"未找到目标节点 '{toNode}'。";
+        if (!nameToNode.TryGetValue(fromNode, out var start)) return $"未找到起始节点 '{fromNode}'。";
+        if (!nameToNode.TryGetValue(toNode, out var end)) return $"未找到目标节点 '{toNode}'。";
 
         var adjacency = nodes.ToDictionary(n => n.Guid, _ => new List<Guid>());
         foreach (var e in edges)
@@ -215,28 +235,27 @@ public sealed class GraphTools
                     queue.Enqueue(new List<Guid>(path) { next });
             }
         }
-
         return $"'{fromNode}' 和 '{toNode}' 之间不存在路径。";
     }
 
     // ══════════════════════════════════════════════════════
-    // 工具 6：★ 新增 — 关键词搜索节点
+    // 工具 6：关键词搜索节点
     // ══════════════════════════════════════════════════════
 
-    public async Task<string> SearchNodesAsync(
+    public Task<string> SearchNodesAsync(
         string keyword, string graphName, CancellationToken ct = default)
-    {
-        _toolCtx.Record("SearchNodes");
+        => TrackAsync("SearchNodes", $"keyword={keyword}, graphName={graphName}",
+            () => SearchNodesCoreAsync(keyword, graphName, ct));
 
+    private async Task<string> SearchNodesCoreAsync(
+        string keyword, string graphName, CancellationToken ct)
+    {
         _logger.LogInformation(
             "[Tool] SearchNodes(keyword={Keyword}, graph={Graph})", keyword, graphName);
 
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
-        if (graph is null)
-            return $"未找到图 '{graphName}'。";
-
-        if (string.IsNullOrWhiteSpace(keyword))
-            return "关键词不能为空。";
+        if (graph is null) return $"未找到图 '{graphName}'。";
+        if (string.IsNullOrWhiteSpace(keyword)) return "关键词不能为空。";
 
         var trimmed = keyword.Trim();
         var matches = nodes
@@ -252,10 +271,8 @@ public sealed class GraphTools
         var sb = new StringBuilder();
         sb.AppendLine($"在图 '{graphName}' 中找到 {matches.Count} 个名称包含 '{trimmed}' 的节点：");
         sb.AppendLine("节点：");
-        foreach (var m in matches)
-            sb.AppendLine($"- {m.Name}");
+        foreach (var m in matches) sb.AppendLine($"- {m.Name}");
 
-        // 顺手给出这些节点之间的相互关系（不含跨节点的边，避免信息过载）
         var internalEdges = edges
             .Where(e => matchGuids.Contains(e.From) && matchGuids.Contains(e.To))
             .ToList();
@@ -270,20 +287,21 @@ public sealed class GraphTools
                 sb.AppendLine($"- {f} --[{e.Name}]--> {t}");
             }
         }
-
         return sb.ToString();
     }
 
     // ══════════════════════════════════════════════════════
-    // 工具 7：★ 新增 — N 跳子图探索
+    // 工具 7：N 跳子图探索
     // ══════════════════════════════════════════════════════
 
-    public async Task<string> GetSubgraphAsync(
+    public Task<string> GetSubgraphAsync(
         string startNode, int hops, string graphName, CancellationToken ct = default)
-    {
-        _toolCtx.Record("GetSubgraph");
+        => TrackAsync("GetSubgraph", $"startNode={startNode}, hops={hops}, graphName={graphName}",
+            () => GetSubgraphCoreAsync(startNode, hops, graphName, ct));
 
-        // 限制跳数 1-3，避免 LLM 传超大值
+    private async Task<string> GetSubgraphCoreAsync(
+        string startNode, int hops, string graphName, CancellationToken ct)
+    {
         var safeHops = Math.Clamp(hops, 1, 3);
 
         _logger.LogInformation(
@@ -291,8 +309,7 @@ public sealed class GraphTools
             startNode, safeHops, graphName);
 
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
-        if (graph is null)
-            return $"未找到图 '{graphName}'。";
+        if (graph is null) return $"未找到图 '{graphName}'。";
 
         var nameToNode = nodes
             .GroupBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
@@ -301,7 +318,6 @@ public sealed class GraphTools
         if (!nameToNode.TryGetValue(startNode, out var start))
             return $"未找到起始节点 '{startNode}'。";
 
-        // 构建无向邻接表
         var adjacency = nodes.ToDictionary(n => n.Guid, _ => new List<Guid>());
         foreach (var e in edges)
         {
@@ -309,7 +325,6 @@ public sealed class GraphTools
             if (adjacency.ContainsKey(e.To)) adjacency[e.To].Add(e.From);
         }
 
-        // BFS 限定跳数
         var visited = new HashSet<Guid> { start.Guid };
         var currentLevel = new List<Guid> { start.Guid };
 
@@ -320,8 +335,7 @@ public sealed class GraphTools
             {
                 foreach (var next in adjacency[guid])
                 {
-                    if (visited.Add(next))
-                        nextLevel.Add(next);
+                    if (visited.Add(next)) nextLevel.Add(next);
                 }
             }
             currentLevel = nextLevel;
@@ -331,8 +345,7 @@ public sealed class GraphTools
         var nodeMap = nodes.ToDictionary(n => n.Guid, n => n.Name);
         var subgraphNodes = nodes.Where(n => visited.Contains(n.Guid)).ToList();
         var subgraphEdges = edges
-            .Where(e => visited.Contains(e.From) && visited.Contains(e.To))
-            .ToList();
+            .Where(e => visited.Contains(e.From) && visited.Contains(e.To)).ToList();
 
         var sb = new StringBuilder();
         sb.AppendLine($"从 '{startNode}' 出发 {safeHops} 跳内的子图：");
@@ -354,30 +367,30 @@ public sealed class GraphTools
                 sb.AppendLine($"- {f} --[{e.Name}]--> {t}");
             }
         }
-
         return sb.ToString();
     }
 
     // ══════════════════════════════════════════════════════
-    // 工具 8：★ 新增 — 节点的出边和入边（区分方向）
+    // 工具 8：节点的出边和入边
     // ══════════════════════════════════════════════════════
 
-    public async Task<string> GetEdgesOfNodeAsync(
+    public Task<string> GetEdgesOfNodeAsync(
         string nodeName, string graphName, CancellationToken ct = default)
-    {
-        _toolCtx.Record("GetEdgesOfNode");
+        => TrackAsync("GetEdgesOfNode", $"nodeName={nodeName}, graphName={graphName}",
+            () => GetEdgesOfNodeCoreAsync(nodeName, graphName, ct));
 
+    private async Task<string> GetEdgesOfNodeCoreAsync(
+        string nodeName, string graphName, CancellationToken ct)
+    {
         _logger.LogInformation(
             "[Tool] GetEdgesOfNode(node={Node}, graph={Graph})", nodeName, graphName);
 
         var (graph, nodes, edges) = await LoadGraphAsync(graphName, ct);
-        if (graph is null)
-            return $"未找到图 '{graphName}'。";
+        if (graph is null) return $"未找到图 '{graphName}'。";
 
         var target = nodes.FirstOrDefault(n =>
             n.Name.Equals(nodeName, StringComparison.OrdinalIgnoreCase));
-        if (target is null)
-            return $"在图 '{graphName}' 中未找到节点 '{nodeName}'。";
+        if (target is null) return $"在图 '{graphName}' 中未找到节点 '{nodeName}'。";
 
         var nodeMap = nodes.ToDictionary(n => n.Guid, n => n.Name);
         var outEdges = new List<string>();
@@ -397,24 +410,16 @@ public sealed class GraphTools
         if (outEdges.Count > 0)
         {
             sb.AppendLine($"出边（{outEdges.Count} 条）：");
-            foreach (var line in outEdges)
-                sb.AppendLine(line);
+            foreach (var line in outEdges) sb.AppendLine(line);
         }
-        else
-        {
-            sb.AppendLine("出边：无");
-        }
+        else sb.AppendLine("出边：无");
 
         if (inEdges.Count > 0)
         {
             sb.AppendLine($"入边（{inEdges.Count} 条）：");
-            foreach (var line in inEdges)
-                sb.AppendLine(line);
+            foreach (var line in inEdges) sb.AppendLine(line);
         }
-        else
-        {
-            sb.AppendLine("入边：无");
-        }
+        else sb.AppendLine("入边：无");
 
         return sb.ToString();
     }
@@ -454,8 +459,7 @@ public sealed class GraphTools
         if (json is null) return null;
 
         var root = json.Value;
-        if (!root.TryGetProperty("Objects", out var objs) ||
-            objs.ValueKind != JsonValueKind.Array)
+        if (!root.TryGetProperty("Objects", out var objs) || objs.ValueKind != JsonValueKind.Array)
             return null;
 
         foreach (var g in objs.EnumerateArray())
@@ -473,9 +477,7 @@ public sealed class GraphTools
         var json = await _rest.GetAsync(path, ct);
         var list = new List<NodeMeta>();
         if (json is null) return list;
-
-        if (!json.Value.TryGetProperty("Objects", out var objs) ||
-            objs.ValueKind != JsonValueKind.Array)
+        if (!json.Value.TryGetProperty("Objects", out var objs) || objs.ValueKind != JsonValueKind.Array)
             return list;
 
         foreach (var n in objs.EnumerateArray())
@@ -494,9 +496,7 @@ public sealed class GraphTools
         var json = await _rest.GetAsync(path, ct);
         var list = new List<EdgeMeta>();
         if (json is null) return list;
-
-        if (!json.Value.TryGetProperty("Objects", out var objs) ||
-            objs.ValueKind != JsonValueKind.Array)
+        if (!json.Value.TryGetProperty("Objects", out var objs) || objs.ValueKind != JsonValueKind.Array)
             return list;
 
         foreach (var e in objs.EnumerateArray())

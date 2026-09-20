@@ -13,6 +13,24 @@ public class GraphAgentRequest
     public string Message { get; set; } = "";
 }
 
+public class GraphAgentToolCallDetail
+{
+    [JsonPropertyName("toolName")]
+    public string ToolName { get; set; } = "";
+
+    [JsonPropertyName("arguments")]
+    public string Arguments { get; set; } = "";
+
+    [JsonPropertyName("result")]
+    public string? Result { get; set; }
+
+    [JsonPropertyName("elapsedMs")]
+    public long ElapsedMs { get; set; }
+
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+}
+
 public class GraphAgentReply
 {
     [JsonPropertyName("conversationId")]
@@ -29,16 +47,17 @@ public class GraphAgentReply
 
     [JsonPropertyName("toolsInvoked")]
     public List<string> ToolsInvoked { get; set; } = new();
+
+    [JsonPropertyName("toolCallDetails")]
+    public List<GraphAgentToolCallDetail> ToolCallDetails { get; set; } = new();
 }
 
-/// <summary>GET /api/graph-agent/sessions 响应。</summary>
 public class GraphAgentSessionsReply
 {
     [JsonPropertyName("sessions")]
     public List<string> Sessions { get; set; } = new();
 }
 
-/// <summary>GET /api/graph-agent/sessions/{id}/messages 响应。</summary>
 public class GraphAgentSessionMessagesReply
 {
     [JsonPropertyName("conversationId")]
@@ -60,7 +79,6 @@ public class GraphAgentSessionMessage
     public string? AuthorName { get; set; }
 }
 
-/// <summary>调用 MAFWorkFlowApi 的 GraphAgent 端点。</summary>
 public class GraphAgentApiClient
 {
     private readonly HttpClient _http;
@@ -78,8 +96,6 @@ public class GraphAgentApiClient
         _logger = logger;
     }
 
-    // ─── 发消息 ───────────────────────────────────────
-
     public async Task<GraphAgentReply> SendAsync(
         string message,
         string? conversationId = null,
@@ -87,30 +103,19 @@ public class GraphAgentApiClient
     {
         try
         {
-            var request = new GraphAgentRequest
-            {
-                Message = message,
-                ConversationId = conversationId
-            };
-
+            var request = new GraphAgentRequest { Message = message, ConversationId = conversationId };
             var response = await _http.PostAsJsonAsync(
-                "/api/graph-agent/chat",
-                request,
-                JsonOpts,
-                cancellationToken);
+                "/api/graph-agent/chat", request, JsonOpts, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogWarning(
-                    "GraphAgent 返回 {Status}: {Body}", response.StatusCode, body);
-
+                _logger.LogWarning("GraphAgent 返回 {Status}: {Body}", response.StatusCode, body);
                 return new GraphAgentReply { Reply = "服务返回异常，请稍后重试。" };
             }
 
             var result = await response.Content.ReadFromJsonAsync<GraphAgentReply>(
                 JsonOpts, cancellationToken);
-
             return result ?? new GraphAgentReply { Reply = "（服务返回空响应）" };
         }
         catch (Exception ex)
@@ -120,16 +125,12 @@ public class GraphAgentApiClient
         }
     }
 
-    // ─── 会话列表 ─────────────────────────────────────
-
-    public async Task<List<string>> ListSessionsAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<List<string>> ListSessionsAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             var result = await _http.GetFromJsonAsync<GraphAgentSessionsReply>(
                 "/api/graph-agent/sessions", JsonOpts, cancellationToken);
-
             return result?.Sessions ?? new List<string>();
         }
         catch (Exception ex)
@@ -139,19 +140,14 @@ public class GraphAgentApiClient
         }
     }
 
-    // ─── 会话消息历史 ────────────────────────────────
-
     public async Task<List<GraphAgentSessionMessage>> GetMessagesAsync(
-        string conversationId,
-        CancellationToken cancellationToken = default)
+        string conversationId, CancellationToken cancellationToken = default)
     {
         try
         {
             var result = await _http.GetFromJsonAsync<GraphAgentSessionMessagesReply>(
                 $"/api/graph-agent/sessions/{Uri.EscapeDataString(conversationId)}/messages",
-                JsonOpts,
-                cancellationToken);
-
+                JsonOpts, cancellationToken);
             return result?.Messages ?? new List<GraphAgentSessionMessage>();
         }
         catch (Exception ex)
@@ -161,19 +157,14 @@ public class GraphAgentApiClient
         }
     }
 
-    // ─── 删除会话 ─────────────────────────────────────
-
     public async Task<bool> ResetSessionAsync(
-        string conversationId,
-        CancellationToken cancellationToken = default)
+        string conversationId, CancellationToken cancellationToken = default)
     {
         try
         {
             var response = await _http.PostAsync(
                 $"/api/graph-agent/reset/{Uri.EscapeDataString(conversationId)}",
-                content: null,
-                cancellationToken);
-
+                content: null, cancellationToken);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)

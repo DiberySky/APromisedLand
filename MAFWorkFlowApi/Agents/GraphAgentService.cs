@@ -5,14 +5,6 @@ using Microsoft.Extensions.AI;
 
 namespace MAFWorkFlowApi.Agents;
 
-/// <summary>
-/// 用 MAF 封装的图 Agent：
-/// - chatClient.AsAIAgent 创建单个 AIAgent
-/// - 通过 tools 传入 AIFunction 列表（LLM 自主调用）
-/// - 通过 AgentSessionStore (Redis) 持久化多轮会话
-/// - 通过 Scoped ToolCallContext 记录工具调用
-/// - 输出 sanitize：剥除 LLM 偶尔泄漏的 tool_call 标记
-/// </summary>
 public sealed class GraphAgentService
 {
     private readonly AIAgent _graphAgent;
@@ -43,8 +35,6 @@ public sealed class GraphAgentService
     }
 
     // ══════════════════════════════════════════════════════
-    // 对外：单轮/多轮对话
-    // ══════════════════════════════════════════════════════
 
     public async Task<AgentReply> ChatAsync(
         string? conversationId,
@@ -53,7 +43,6 @@ public sealed class GraphAgentService
     {
         var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
 
-        // ★ 重置工具调用记录
         _toolCtx.Reset();
 
         var session = await _sessionStore.GetSessionAsync(
@@ -66,10 +55,17 @@ public sealed class GraphAgentService
         await _sessionStore.SaveSessionAsync(
             _graphAgent, currentConversationId, session, ct);
 
-        // ★ 读取本次调用的工具列表
-        var toolsInvoked = _toolCtx.InvokedTools.ToList();
+        // ★ 读取工具调用详情列表
+        var toolsInvoked = _toolCtx.Records.Select(r => r.ToolName).ToList();
+        var toolCallDetails = _toolCtx.Records
+            .Select(r => new ToolCallDetailDto(
+                ToolName: r.ToolName,
+                Arguments: r.Arguments,
+                Result: TruncateForUi(r.Result, 800),
+                ElapsedMs: r.ElapsedMs,
+                Success: r.Success))
+            .ToList();
 
-        // ★ 输出 sanitize
         var finalReply = SanitizeReply(response, toolsInvoked);
 
         return new AgentReply(
@@ -77,8 +73,14 @@ public sealed class GraphAgentService
             AgentName: _graphAgent.Name ?? "GraphAssistant",
             Reply: finalReply,
             MessageCount: response.Messages.Count,
-            ToolsInvoked: toolsInvoked);
+            ToolsInvoked: toolsInvoked,
+            ToolCallDetails: toolCallDetails);
     }
+
+    private static string? TruncateForUi(string? text, int maxLen)
+        => string.IsNullOrEmpty(text)
+            ? text
+            : (text.Length > maxLen ? text[..maxLen] + "…" : text);
 
     public ValueTask<IReadOnlyList<string>> ListConversationsAsync(CancellationToken ct)
         => _catalog.ListConversationIdsAsync(ct);
@@ -91,8 +93,6 @@ public sealed class GraphAgentService
         => _catalog.GetSessionMessagesAsync(conversationId, ct);
 
     // ══════════════════════════════════════════════════════
-    // 输出清理
-    // ══════════════════════════════════════════════════════
 
     private string SanitizeReply(AgentResponse response, List<string> toolsInvoked)
     {
@@ -101,8 +101,7 @@ public sealed class GraphAgentService
         if (!string.IsNullOrEmpty(rawText) && !ReplySanitizer.ContainsToolCallMarkers(rawText))
             return rawText.Trim();
 
-        _logger.LogWarning(
-            "检测到 tool_call 残留标记或无文本，尝试从消息历史提取最终回答");
+        _logger.LogWarning("检测到 tool_call 残留标记或无文本，尝试从消息历史提取最终回答");
 
         var fallback = response.Messages
             .Where(m => m.Role == ChatRole.Assistant)
@@ -110,34 +109,21 @@ public sealed class GraphAgentService
             .Where(t => !string.IsNullOrWhiteSpace(t) && !ReplySanitizer.ContainsToolCallMarkers(t))
             .LastOrDefault();
 
-        if (!string.IsNullOrWhiteSpace(fallback))
-        {
-            _logger.LogInformation("成功从消息历史提取最终回答");
-            return fallback.Trim();
-        }
+        if (!string.IsNullOrWhiteSpace(fallback)) return fallback.Trim();
 
         if (toolsInvoked.Count > 0)
-        {
-            _logger.LogWarning(
-                "LLM 未生成最终回答，已调用工具：{Tools}",
-                string.Join(", ", toolsInvoked));
-
-            return $"抱歉，我在调用工具 {string.Join("、", toolsInvoked)} 后" +
-                   "没能生成最终回答。请换一种问法，或者稍后重试。";
-        }
+            return $"抱歉，我在调用工具 {string.Join("、", toolsInvoked)} 后没能生成最终回答。" +
+                   "请换一种问法，或者稍后重试。";
 
         return "抱歉，我无法完成这个请求。请换个方式提问，或者确认图名是否正确。";
     }
 
-    // ══════════════════════════════════════════════════════
-    // 私有：构建工具列表
     // ══════════════════════════════════════════════════════
 
     private static IList<AITool> BuildTools(GraphTools t)
     {
         return new List<AITool>
         {
-            // ─── 原有 5 个工具 ───────────────────────────
             AIFunctionFactory.Create(
                 (Func<string, string, CancellationToken, Task<string>>)
                 ((nodeName, graphName, ct) => t.GetNeighborsAsync(nodeName, graphName, ct)),
@@ -168,7 +154,6 @@ public sealed class GraphAgentService
                 name: "FindPath",
                 description: "查找两个节点之间的最短路径。当用户问'从 A 到 B 怎么走'、'A 到 B 的路径'时使用。"),
 
-            // ─── ★ 新增 3 个工具 ──────────────────────────
             AIFunctionFactory.Create(
                 (Func<string, string, CancellationToken, Task<string>>)
                 ((keyword, graphName, ct) => t.SearchNodesAsync(keyword, graphName, ct)),
@@ -193,10 +178,6 @@ public sealed class GraphAgentService
                              "当用户问'X 指向谁'、'谁指向 X'、'X 的出边/入边有哪些'时使用。"),
         };
     }
-
-    // ══════════════════════════════════════════════════════
-    // 私有：系统提示
-    // ══════════════════════════════════════════════════════
 
     private static string BuildInstructions() => """
                                                  你是一个专业的图数据库助手。你可以调用以下工具函数查询真实数据：

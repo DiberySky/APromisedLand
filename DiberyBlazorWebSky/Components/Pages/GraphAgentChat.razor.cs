@@ -29,8 +29,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         await LoadSessionsAsync();
     }
 
-    // ─── 会话列表 ─────────────────────────────────────
-
     private async Task LoadSessionsAsync()
     {
         if (_isLoadingSessions) return;
@@ -49,8 +47,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
             StateHasChanged();
         }
     }
-
-    // ─── 切换会话：加载历史消息 ──────────────────────
 
     private async Task OnSessionChangedAsync(ChangeEventArgs e)
     {
@@ -72,11 +68,10 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
                 {
                     Role = NormalizeRole(m.Role),
                     Text = m.Text,
-                    Timestamp = DateTime.Now  // 历史消息没有时间戳，用当前时间
+                    Timestamp = DateTime.Now
                 });
             }
-            Logger.LogInformation("加载会话 {ConvId} 的 {Count} 条历史消息",
-                newId, history.Count);
+            Logger.LogInformation("加载会话 {ConvId} 的 {Count} 条历史消息", newId, history.Count);
         }
         catch (Exception ex)
         {
@@ -101,8 +96,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
             "error" => "error",
             _ => "assistant"
         };
-
-    // ─── 重置会话 ─────────────────────────────────────
 
     private async Task ResetSessionAsync()
     {
@@ -130,8 +123,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
         StateHasChanged();
     }
-
-    // ─── 发送消息 ─────────────────────────────────────
 
     private async Task SendMessageAsync()
     {
@@ -168,7 +159,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
                 string.IsNullOrEmpty(_selectedSessionId) ? null : _selectedSessionId,
                 _sendCts.Token);
 
-            // ★ 首次发消息：把新会话 ID 加入列表并选中
             if (string.IsNullOrEmpty(_selectedSessionId) &&
                 !string.IsNullOrEmpty(response.ConversationId))
             {
@@ -182,27 +172,17 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
                 Role = "assistant",
                 Text = response.Reply,
                 Timestamp = DateTime.Now,
-                ToolsInvoked = response.ToolsInvoked
+                ToolCallDetails = response.ToolCallDetails
             });
         }
         catch (OperationCanceledException)
         {
-            _messages.Add(new ChatMsg
-            {
-                Role = "error",
-                Text = "已取消。",
-                Timestamp = DateTime.Now
-            });
+            _messages.Add(new ChatMsg { Role = "error", Text = "已取消。", Timestamp = DateTime.Now });
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "SendMessageAsync failed");
-            _messages.Add(new ChatMsg
-            {
-                Role = "error",
-                Text = ex.Message,
-                Timestamp = DateTime.Now
-            });
+            _messages.Add(new ChatMsg { Role = "error", Text = ex.Message, Timestamp = DateTime.Now });
         }
         finally
         {
@@ -255,6 +235,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         public string Role { get; set; } = "assistant";
         public string Text { get; set; } = "";
         public DateTime Timestamp { get; set; }
-        public List<string> ToolsInvoked { get; set; } = new();
+        public List<GraphAgentToolCallDetail> ToolCallDetails { get; set; } = new();
     }
 }

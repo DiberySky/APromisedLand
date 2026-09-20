@@ -1,5 +1,4 @@
 @page "/graph-agent-chat"
-@using DiberyBlazorWebSky.Models.Graph
 @using DiberyBlazorWebSky.Services
 @rendermode InteractiveServer
 
@@ -49,9 +48,9 @@
                     <p>试试这些问题：</p>
                     <ul>
                         <li>TestGraph 根节点C 有哪些邻居？</li>
-                        <li>TestGraph 根节点C 和 根节点B 是什么关系？</li>
-                        <li>TestGraph 列出所有节点</li>
-                        <li>TestGraph 这个图有多大？</li>
+                        <li>TestGraph 从 Transformer 出发 2 跳能到哪些节点？</li>
+                        <li>TestGraph PostgreSQL 的出边有哪些？</li>
+                        <li>TestGraph 有没有和 docker 相关的节点？</li>
                     </ul>
                     <p class="tip">💡 建议在问题开头加上图名（如 "TestGraph"），让 LLM 知道查哪个图。</p>
                 </div>
@@ -65,12 +64,45 @@
                     <div class="message-avatar"><span>@GetAvatar(m.Role)</span></div>
                     <div class="message-content">
                         <div class="message-text">@m.Text</div>
-                        @if (m.ToolsInvoked.Count > 0)
+
+                        @* ★ 工具调用详情：可展开 *@
+                        @if (m.ToolCallDetails.Count > 0)
                         {
-                            <div class="tools-badge">
-                                🔧 @string.Join(" → ", m.ToolsInvoked)
-                            </div>
+                            <details class="tool-details">
+                                <summary class="tools-badge">
+                                    🔧 @string.Join(" → ", m.ToolCallDetails.Select(d => d.ToolName))
+                                </summary>
+                                <div class="tool-details-body">
+                                    @foreach (var detail in m.ToolCallDetails)
+                                    {
+                                        <div class="tool-detail-item">
+                                            <div class="tool-detail-header">
+                                                <span class="tool-name">🔧 @detail.ToolName</span>
+                                                <span class="tool-meta">
+                                                    @detail.ElapsedMs ms
+                                                    @if (!detail.Success)
+                                                    {
+                                                        <span class="tool-failed">失败</span>
+                                                    }
+                                                </span>
+                                            </div>
+                                            <div class="tool-detail-section">
+                                                <span class="tool-detail-label">参数：</span>
+                                                <code class="tool-detail-code">@detail.Arguments</code>
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(detail.Result))
+                                            {
+                                                <div class="tool-detail-section">
+                                                    <span class="tool-detail-label">结果：</span>
+                                                    <pre class="tool-detail-result">@detail.Result</pre>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </details>
                         }
+
                         <div class="message-time">@m.Timestamp.ToString("HH:mm:ss")</div>
                     </div>
                 </div>

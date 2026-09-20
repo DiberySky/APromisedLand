@@ -280,3 +280,129 @@
     font-weight: 500;
     align-self: flex-end;
 }
+
+/* ══════════════════════════════════════════════════════════ */
+/* 工具调用详情（可展开）                                     */
+/* ══════════════════════════════════════════════════════════ */
+
+.tool-details {
+    margin-top: 8px;
+}
+
+.tool-details summary.tools-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    font-family: 'Consolas', monospace;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    transition: background 0.2s;
+}
+
+.tool-details summary.tools-badge::-webkit-details-marker {
+    display: none;
+}
+
+.tool-details summary.tools-badge:hover {
+    background: #bfdbfe;
+}
+
+.tool-details[open] summary.tools-badge {
+    background: #93c5fd;
+}
+
+.tool-details-body {
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.78rem;
+}
+
+.tool-detail-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.tool-detail-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.tool-detail-item:first-child {
+    padding-top: 0;
+}
+
+.tool-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.tool-name {
+    font-weight: 600;
+    color: #1e40af;
+    font-family: 'Consolas', monospace;
+    font-size: 0.8rem;
+}
+
+.tool-meta {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-family: 'Consolas', monospace;
+}
+
+.tool-failed {
+    margin-left: 6px;
+    padding: 1px 6px;
+    background: #fef2f2;
+    color: #dc2626;
+    border-radius: 6px;
+    font-size: 0.65rem;
+}
+
+.tool-detail-section {
+    margin: 4px 0;
+}
+
+.tool-detail-label {
+    display: inline-block;
+    font-size: 0.72rem;
+    color: #64748b;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.tool-detail-code {
+    display: inline-block;
+    padding: 2px 6px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-family: 'Consolas', monospace;
+    font-size: 0.72rem;
+    color: #334155;
+    word-break: break-all;
+}
+
+.tool-detail-result {
+    margin: 2px 0 0 0;
+    padding: 6px 10px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-family: 'Consolas', monospace;
+    font-size: 0.72rem;
+    color: #334155;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 220px;
+    overflow-y: auto;
+}

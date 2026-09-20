@@ -41,7 +41,8 @@ public sealed class GraphAgentController : ControllerBase
             AgentName: reply.AgentName,
             Reply: reply.Reply,
             MessageCount: reply.MessageCount,
-            ToolsInvoked: reply.ToolsInvoked ?? new List<string>()));
+            ToolsInvoked: reply.ToolsInvoked ?? new List<string>(),
+            ToolCallDetails: reply.ToolCallDetails ?? new List<ToolCallDetailDto>()));
     }
 
     [HttpGet("sessions")]
