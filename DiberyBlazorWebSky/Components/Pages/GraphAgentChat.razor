@@ -73,7 +73,16 @@
                         {
                             <div class="agent-name">@m.AgentName</div>
                         }
-                        <div class="message-text">@m.Text</div>
+                        @if (m.Role == "assistant" && !string.IsNullOrEmpty(m.Text))
+                        {
+                            <div class="message-text markdown-body">
+                                @((MarkupString)MarkdownRenderer.ToHtml(m.Text))
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="message-text">@m.Text</div>
+                        }
 
                         @* ★ 工具调用详情：可展开 *@
                         @if (m.ToolCallDetails.Count > 0)
