@@ -16,7 +16,8 @@ public sealed class GraphAgentService
     private readonly AgentSessionStore _sessionStore;
     private readonly IConversationCatalog _catalog;
     private readonly ToolCallContext _toolCtx;
-    private readonly AssistantAgentService _assistant;   // ★ 新增
+    private readonly AssistantAgentService _assistant;
+    private readonly LlmAgentRouter _router;   // ★ 新增
     private readonly ILogger<GraphAgentService> _logger;
 
     public GraphAgentService(
@@ -25,13 +26,15 @@ public sealed class GraphAgentService
         AgentSessionStore sessionStore,
         IConversationCatalog catalog,
         ToolCallContext toolCtx,
-        AssistantAgentService assistant,   // ★ 新增
+        AssistantAgentService assistant,
+        LlmAgentRouter router,   // ★ 新增
         ILoggerFactory loggerFactory)
     {
         _sessionStore = sessionStore;
         _catalog = catalog;
         _toolCtx = toolCtx;
         _assistant = assistant;
+        _router = router;
         _logger = loggerFactory.CreateLogger<GraphAgentService>();
 
         var tools = BuildTools(graphTools);
@@ -48,8 +51,9 @@ public sealed class GraphAgentService
         string userMessage,
         CancellationToken ct)
     {
-        // ★ 路由：元问题交给 AssistantAgent
-        if (AgentRouter.ShouldRouteToAssistant(userMessage))
+        // ★ LLM 路由：元问题交给 AssistantAgent
+        var route = await _router.RouteAsync(userMessage, ct);
+        if (route == "assistant")
         {
             _logger.LogInformation("[Router] 路由到 AssistantAgent: {Msg}", userMessage);
             return await _assistant.ChatAsync(conversationId, userMessage, ct);
@@ -102,8 +106,9 @@ public sealed class GraphAgentService
         string userMessage,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        // ★ 路由：元问题走 AssistantAgent（非流式，包装成流式返回）
-        if (AgentRouter.ShouldRouteToAssistant(userMessage))
+        // ★ LLM 路由：元问题走 AssistantAgent（非流式，包装成流式返回）
+        var route = await _router.RouteAsync(userMessage, ct);
+        if (route == "assistant")
         {
             _logger.LogInformation("[Router-Stream] 路由到 AssistantAgent: {Msg}", userMessage);
 

@@ -124,6 +124,8 @@ builder.Services.AddScoped<ToolCallContext>();
 builder.Services.AddScoped<GraphTools>();
 builder.Services.AddScoped<GraphAgentService>();
 builder.Services.AddScoped<AssistantAgentService>();
+builder.Services.AddScoped<LlmAgentRouter>();
+
 // ══════════════════════════════════════════════════════════
 // ★ MCP Server：把 GraphTools 暴露给外部 AI 客户端
 // ══════════════════════════════════════════════════════════

@@ -181,13 +181,13 @@
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="Redis" uuid="1e6780cb-c376-4503-bf12-1c047b19e70a">
+    <data-source source="LOCAL" name="Redis" uuid="60a428fe-36bb-4ecd-bf8b-c1a3cf8b22cf">
       <driver-ref>redis</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>jdbc.RedisDriver</jdbc-driver>
-      <jdbc-url>jdbc:redis://afZGb0DhJpbn1AEy9FH3yF@localhost:58460?ssl=true&amp;verifyServerCertificate=false</jdbc-url>
+      <jdbc-url>jdbc:redis://afZGb0DhJpbn1AEy9FH3yF@localhost:64588?ssl=true&amp;verifyServerCertificate=false</jdbc-url>
       <jdbc-additional-properties>
-        <property name="aspireResourceId" value="Redis-dmpzczeq" />
+        <property name="aspireResourceId" value="Redis-mcyptdga" />
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
