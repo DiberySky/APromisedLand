@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using MAFWorkFlowApi.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -78,6 +79,79 @@ public sealed class GraphAgentService
             AgentName: _graphAgent.Name ?? "GraphAssistant",
             Reply: finalReply,
             MessageCount: response.Messages.Count,
+            ToolsInvoked: toolsInvoked,
+            ToolCallDetails: toolCallDetails);
+    }
+    
+        /// <summary>
+    /// 流式版本的对话：逐块产出增量文本。
+    /// 工具调用期间不产出内容（LLM 先决定调用哪些工具），
+    /// 只流式化最终的自然语言回答。
+    /// </summary>
+    public async IAsyncEnumerable<StreamChunk> ChatStreamAsync(
+        string? conversationId,
+        string userMessage,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
+        _toolCtx.Reset();
+
+        var session = await _sessionStore.GetSessionAsync(
+            _graphAgent, currentConversationId, ct)
+            ?? await _graphAgent.CreateSessionAsync(cancellationToken: ct);
+
+        // 先产出会话 ID，前端立即显示
+        yield return new StreamChunk(
+            Type: StreamChunkType.Start,
+            Text: null,
+            ConversationId: currentConversationId);
+
+        var accumulated = new System.Text.StringBuilder();
+
+        await foreach (var update in _graphAgent
+            .RunStreamingAsync(userMessage, session, cancellationToken: ct)
+            .WithCancellation(ct))
+        {
+            // 提取增量文本（只取最终回答的文本，跳过 functionCall / functionResult）
+            var delta = update.Text;
+
+            if (string.IsNullOrEmpty(delta) && update.Contents is { Count: > 0 })
+            {
+                delta = string.Concat(update.Contents
+                    .OfType<TextContent>()
+                    .Select(c => c.Text));
+            }
+
+            if (string.IsNullOrEmpty(delta))
+                continue;
+
+            accumulated.Append(delta);
+
+            yield return new StreamChunk(
+                Type: StreamChunkType.Delta,
+                Text: delta,
+                ConversationId: null);
+        }
+
+        await _sessionStore.SaveSessionAsync(
+            _graphAgent, currentConversationId, session, ct);
+
+        // 最终事件：包含完整文本 + 工具调用详情
+        var toolsInvoked = _toolCtx.Records.Select(r => r.ToolName).ToList();
+        var toolCallDetails = _toolCtx.Records
+            .Select(r => new ToolCallDetailDto(
+                r.ToolName, r.Arguments, TruncateForUi(r.Result, 800),
+                r.ElapsedMs, r.Success, r.FromCache))
+            .ToList();
+
+        var finalText = accumulated.Length > 0
+            ? accumulated.ToString()
+            : "（模型未返回内容）";
+
+        yield return new StreamChunk(
+            Type: StreamChunkType.Done,
+            Text: finalText,
+            ConversationId: currentConversationId,
             ToolsInvoked: toolsInvoked,
             ToolCallDetails: toolCallDetails);
     }
@@ -209,3 +283,17 @@ public sealed class GraphAgentService
                                                  - 用户问"有哪些/全部" → ListAllNodes 或 SearchNodes
                                                  """;
 }
+
+public enum StreamChunkType
+{
+    Start,
+    Delta,
+    Done
+}
+
+public sealed record StreamChunk(
+    StreamChunkType Type,
+    string? Text,
+    string? ConversationId,
+    IReadOnlyList<string>? ToolsInvoked = null,
+    IReadOnlyList<ToolCallDetailDto>? ToolCallDetails = null);

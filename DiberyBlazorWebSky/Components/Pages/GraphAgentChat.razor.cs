@@ -23,6 +23,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
     private CancellationTokenSource? _sendCts;
     private Timer? _elapsedTimer;
     private DateTime _sendStartedAt;
+    private bool _useStreaming = true; // ★ 默认开启流式
 
     protected override async Task OnInitializedAsync()
     {
@@ -71,6 +72,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
                     Timestamp = DateTime.Now
                 });
             }
+
             Logger.LogInformation("加载会话 {ConvId} 的 {Count} 条历史消息", newId, history.Count);
         }
         catch (Exception ex)
@@ -126,6 +128,15 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
     private async Task SendMessageAsync()
     {
+        if (string.IsNullOrWhiteSpace(_userMessage) || _isSending) return;
+
+        // ★ 分流：按开关选择流式或非流式
+        if (_useStreaming)
+        {
+            await SendMessageStreamAsync();
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_userMessage) || _isSending) return;
 
         var userText = _userMessage.Trim();
@@ -198,6 +209,97 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         }
     }
 
+    private async Task SendMessageStreamAsync()
+    {
+        var userText = _userMessage.Trim();
+        _userMessage = "";
+
+        _messages.Add(new ChatMsg
+        {
+            Role = "user",
+            Text = userText,
+            Timestamp = DateTime.Now
+        });
+
+        // 预先插入一条空的 AI 消息，用于实时追加
+        var aiMsg = new ChatMsg
+        {
+            Role = "assistant",
+            Text = "",
+            Timestamp = DateTime.Now
+        };
+        _messages.Add(aiMsg);
+
+        _isSending = true;
+        _sendStartedAt = DateTime.Now;
+        _elapsedSeconds = 0;
+
+        _elapsedTimer = new Timer(_ =>
+        {
+            _elapsedSeconds = (int)(DateTime.Now - _sendStartedAt).TotalSeconds;
+            _ = InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+
+        _sendCts = new CancellationTokenSource();
+        await ScrollToBottomAsync();
+        StateHasChanged();
+
+        try
+        {
+            await GraphAgentApi.SendStreamAsync(
+                userText,
+                string.IsNullOrEmpty(_selectedSessionId) ? null : _selectedSessionId,
+                // 增量回调
+                async delta =>
+                {
+                    aiMsg.Text += delta;
+                    await InvokeAsync(StateHasChanged);
+                    await ScrollToBottomAsync();
+                },
+                // 完成回调
+                async reply =>
+                {
+                    aiMsg.Text = reply.Reply;
+                    aiMsg.ToolCallDetails = reply.ToolCallDetails;
+
+                    if (string.IsNullOrEmpty(_selectedSessionId) &&
+                        !string.IsNullOrEmpty(reply.ConversationId))
+                    {
+                        _selectedSessionId = reply.ConversationId;
+                        if (!_sessions.Contains(reply.ConversationId))
+                            _sessions.Add(reply.ConversationId);
+                    }
+
+                    await InvokeAsync(StateHasChanged);
+                },
+                _sendCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            if (string.IsNullOrEmpty(aiMsg.Text))
+                aiMsg.Text = "已取消。";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "SendMessageStreamAsync failed");
+            aiMsg.Text = string.IsNullOrEmpty(aiMsg.Text)
+                ? $"请求失败：{ex.Message}"
+                : aiMsg.Text + $"\n\n【错误】{ex.Message}";
+        }
+        finally
+        {
+            _elapsedTimer?.Dispose();
+            _elapsedTimer = null;
+            _sendCts?.Dispose();
+            _sendCts = null;
+            _isSending = false;
+            _elapsedSeconds = 0;
+
+            await ScrollToBottomAsync();
+            StateHasChanged();
+        }
+    }
+
     private void CancelAsync() => _sendCts?.Cancel();
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
@@ -213,7 +315,9 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
             await Task.Yield();
             await Js.InvokeVoidAsync("scrollToBottom", _messagesContainer);
         }
-        catch { }
+        catch
+        {
+        }
     }
 
     private static string GetAvatar(string role) => role switch

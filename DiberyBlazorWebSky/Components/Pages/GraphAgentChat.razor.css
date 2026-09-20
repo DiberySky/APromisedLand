@@ -421,3 +421,22 @@
     font-weight: 600;
     font-family: system-ui, -apple-system, sans-serif;
 }
+
+.stream-toggle {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 0.82rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.stream-toggle input {
+    cursor: pointer;
+    accent-color: #fff;
+}

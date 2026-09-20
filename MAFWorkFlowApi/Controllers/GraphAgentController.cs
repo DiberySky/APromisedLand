@@ -45,6 +45,56 @@ public sealed class GraphAgentController : ControllerBase
             ToolCallDetails: reply.ToolCallDetails ?? new List<ToolCallDetailDto>()));
     }
 
+    /// <summary>
+    /// SSE 流式端点：逐字返回最终回答。
+    /// 事件格式：data: {"type":"delta","text":"..."}\n\n
+    /// 结束：data: {"type":"done","conversationId":"...","toolsInvoked":[...]}\n\n
+    /// </summary>
+    [HttpPost("chat/stream")]
+    [Produces("text/event-stream")]
+    public async Task StreamChat(
+        [FromBody] GraphAgentRequest request,
+        CancellationToken ct)
+    {
+        Response.Headers["Content-Type"] = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
+        Response.Headers["X-Accel-Buffering"] = "no";
+        await Response.Body.FlushAsync(ct);
+
+        var sseOpts = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+            // ★ 关键：把枚举序列化为字符串（"delta" / "done" / "start"）
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        };
+
+        try
+        {
+            await foreach (var chunk in _agents.ChatStreamAsync(
+                               request.ConversationId, request.Message, ct))
+            {
+                var payload = System.Text.Json.JsonSerializer.Serialize(chunk, sseOpts);
+                await Response.WriteAsync($"data: {payload}\n\n", ct);
+                await Response.Body.FlushAsync(ct);
+            }
+        }
+        catch (OperationCanceledException) { /* 客户端断开 */ }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "流式对话失败");
+            try
+            {
+                var err = System.Text.Json.JsonSerializer.Serialize(
+                    new { type = "error", message = ex.Message }, sseOpts);
+                await Response.WriteAsync($"data: {err}\n\n",
+                    CancellationToken.None);
+                await Response.Body.FlushAsync(CancellationToken.None);
+            }
+            catch { }
+        }
+    }
+    
     [HttpGet("sessions")]
     public async Task<ActionResult<SessionsReply>> ListSessions(CancellationToken ct)
     {

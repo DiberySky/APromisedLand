@@ -127,6 +127,126 @@ public class GraphAgentApiClient
             return new GraphAgentReply { Reply = $"请求失败：{ex.Message}" };
         }
     }
+    
+        /// <summary>
+    /// 流式对话：通过回调逐块接收增量文本和最终事件。
+    /// onDelta：收到增量文本时触发
+    /// onDone：收到最终事件时触发（含工具调用详情）
+    /// </summary>
+    public async Task SendStreamAsync(
+        string message,
+        string? conversationId,
+        Func<string, Task> onDelta,
+        Func<GraphAgentReply, Task> onDone,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new GraphAgentRequest { Message = message, ConversationId = conversationId };
+
+        using var httpRequest = new HttpRequestMessage(
+            HttpMethod.Post, "/api/graph-agent/chat/stream")
+        {
+            Content = JsonContent.Create(request, options: JsonOpts)
+        };
+
+        using var response = await _http.SendAsync(
+            httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning("流式失败 {Status}: {Body}", response.StatusCode, body);
+            await onDone(new GraphAgentReply { Reply = "服务异常，请稍后重试。" });
+            return;
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream);
+
+        var accumulated = new System.Text.StringBuilder();
+        GraphAgentReply? finalReply = null;
+
+        string? line;
+        while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
+        {
+            if (!line.StartsWith("data: ")) continue;
+            var json = line[6..].Trim();
+            if (string.IsNullOrEmpty(json)) continue;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // 兼容字符串 / 数字两种 type 格式
+                string? type = null;
+                if (root.TryGetProperty("type", out var typeEl))
+                {
+                    if (typeEl.ValueKind == JsonValueKind.String)
+                        type = typeEl.GetString();
+                    else if (typeEl.ValueKind == JsonValueKind.Number)
+                        type = typeEl.GetInt32() switch
+                        {
+                            0 => "start", 1 => "delta", 2 => "done", _ => null
+                        };
+                }
+
+                if (string.Equals(type, "delta", StringComparison.OrdinalIgnoreCase))
+                {
+                    var text = root.TryGetProperty("text", out var txt) && txt.ValueKind == JsonValueKind.String
+                        ? txt.GetString() : null;
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        accumulated.Append(text);
+                        await onDelta(text);
+                    }
+                }
+                else if (string.Equals(type, "done", StringComparison.OrdinalIgnoreCase))
+                {
+                    var replyText = root.TryGetProperty("text", out var txt) && txt.ValueKind == JsonValueKind.String
+                        ? txt.GetString() : null;
+                    var convId = root.TryGetProperty("conversationId", out var cid) && cid.ValueKind == JsonValueKind.String
+                        ? cid.GetString() : null;
+
+                    var tools = new List<string>();
+                    if (root.TryGetProperty("toolsInvoked", out var ti) && ti.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var x in ti.EnumerateArray())
+                            if (x.ValueKind == JsonValueKind.String)
+                                tools.Add(x.GetString() ?? "");
+                    }
+
+                    var details = new List<GraphAgentToolCallDetail>();
+                    if (root.TryGetProperty("toolCallDetails", out var tcd) &&
+                        tcd.ValueKind == JsonValueKind.Array)
+                    {
+                        details = tcd.Deserialize<List<GraphAgentToolCallDetail>>(JsonOpts)
+                            ?? new List<GraphAgentToolCallDetail>();
+                    }
+
+                    finalReply = new GraphAgentReply
+                    {
+                        ConversationId = convId ?? "",
+                        Reply = replyText ?? accumulated.ToString(),
+                        ToolsInvoked = tools,
+                        ToolCallDetails = details
+                    };
+                }
+                else if (string.Equals(type, "error", StringComparison.OrdinalIgnoreCase))
+                {
+                    var msg = root.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String
+                        ? m.GetString() : "未知错误";
+                    finalReply = new GraphAgentReply { Reply = $"流式错误：{msg}" };
+                }
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "解析 SSE 事件失败：{Line}", line);
+            }
+        }
+
+        if (finalReply is not null)
+            await onDone(finalReply);
+    }
 
     public async Task<List<string>> ListSessionsAsync(CancellationToken cancellationToken = default)
     {
