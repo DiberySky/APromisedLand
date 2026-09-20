@@ -17,9 +17,9 @@ public sealed record ToolCallDetailDto(
     string Arguments,
     string? Result,
     long ElapsedMs,
-    bool Success);
+    bool Success,
+    bool FromCache);   // ★ 新增
 
-/// <summary>POST /api/agents/chat 的响应体。</summary>
 public sealed record AgentReply(
     string ConversationId,
     string AgentName,

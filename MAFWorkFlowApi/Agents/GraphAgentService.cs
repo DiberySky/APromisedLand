@@ -1,9 +1,13 @@
 using MAFWorkFlowApi.Models;
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.AI;
 
+// AgentSessionStore 已迁移至 Abstractions 包
+using AgentSessionStore = Microsoft.Agents.AI.Hosting.AgentSessionStore;
+
 namespace MAFWorkFlowApi.Agents;
+
+#pragma warning disable MAAI001
 
 public sealed class GraphAgentService
 {
@@ -63,7 +67,8 @@ public sealed class GraphAgentService
                 Arguments: r.Arguments,
                 Result: TruncateForUi(r.Result, 800),
                 ElapsedMs: r.ElapsedMs,
-                Success: r.Success))
+                Success: r.Success,
+                FromCache: r.FromCache))   // ★ 新增
             .ToList();
 
         var finalReply = SanitizeReply(response, toolsInvoked);

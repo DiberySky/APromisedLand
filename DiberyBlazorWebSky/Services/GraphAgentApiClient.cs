@@ -29,6 +29,9 @@ public class GraphAgentToolCallDetail
 
     [JsonPropertyName("success")]
     public bool Success { get; set; }
+
+    [JsonPropertyName("fromCache")]
+    public bool FromCache { get; set; }   // ★ 新增
 }
 
 public class GraphAgentReply

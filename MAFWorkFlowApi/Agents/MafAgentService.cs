@@ -5,6 +5,7 @@ using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
+using AgentSessionStore = Microsoft.Agents.AI.Hosting.AgentSessionStore;
 
 namespace MAFWorkFlowApi.Agents;
 

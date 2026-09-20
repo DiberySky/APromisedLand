@@ -79,7 +79,14 @@
                                             <div class="tool-detail-header">
                                                 <span class="tool-name">🔧 @detail.ToolName</span>
                                                 <span class="tool-meta">
-                                                    @detail.ElapsedMs ms
+                                                    @if (detail.FromCache)
+                                                    {
+                                                        <span class="tool-cached">⚡ 缓存</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        @detail.ElapsedMs <text>ms</text>
+                                                    }
                                                     @if (!detail.Success)
                                                     {
                                                         <span class="tool-failed">失败</span>

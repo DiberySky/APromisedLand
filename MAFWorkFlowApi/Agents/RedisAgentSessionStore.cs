@@ -5,6 +5,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.Caching.Distributed;
 using StackExchange.Redis;
+using AgentSessionStore = Microsoft.Agents.AI.Hosting.AgentSessionStore;
 
 namespace MAFWorkFlowApi.Agents;
 

@@ -13,7 +13,6 @@ public sealed class ToolCallContext
 
     public void Reset() => _records.Clear();
 
-    /// <summary>开始一次工具调用记录，返回可写的 record。</summary>
     public ToolCallRecord BeginCall(string toolName, string arguments)
     {
         var record = new ToolCallRecord
@@ -37,14 +36,17 @@ public sealed class ToolCallRecord
     public long ElapsedMs { get; set; }
     public DateTime StartTime { get; set; }
     public bool Success { get; set; }
+    /// <summary>★ 新增：是否来自缓存。</summary>
+    public bool FromCache { get; set; }
 
     internal Stopwatch? Stopwatch { get; set; }
 
-    public void Complete(string result)
+    public void Complete(string result, bool fromCache = false)
     {
         Result = result;
         Success = true;
-        ElapsedMs = Stopwatch?.ElapsedMilliseconds ?? 0;
+        FromCache = fromCache;
+        ElapsedMs = fromCache ? 0 : (Stopwatch?.ElapsedMilliseconds ?? 0);
         Stopwatch?.Stop();
     }
 

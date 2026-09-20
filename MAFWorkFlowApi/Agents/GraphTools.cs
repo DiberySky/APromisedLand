@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using MAFWorkFlowApi.Infrastructure;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace MAFWorkFlowApi.Agents;
 
@@ -11,34 +12,63 @@ namespace MAFWorkFlowApi.Agents;
 /// </summary>
 public sealed class GraphTools
 {
-    private const int MaxResults = 1000;
-
     private readonly LiteGraphRestClient _rest;
     private readonly ILogger<GraphTools> _logger;
     private readonly ToolCallContext _toolCtx;
+    private readonly IMemoryCache _cache;   // ★ 新增
+
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);   // ★ 新增
 
     public GraphTools(
         LiteGraphRestClient rest,
         ILogger<GraphTools> logger,
-        ToolCallContext toolCtx)
+        ToolCallContext toolCtx,
+        IMemoryCache cache)   // ★ 新增参数
     {
         _rest = rest;
         _logger = logger;
         _toolCtx = toolCtx;
+        _cache = cache;
     }
 
     // ══════════════════════════════════════════════════════
     // Track 包装器：统一记录调用详情
     // ══════════════════════════════════════════════════════
 
+    /// <summary>
+    /// 包装器：负责缓存 + 记录调用详情。
+    /// - 缓存命中：直接返回缓存结果，耗时 0ms，标记 FromCache = true
+    /// - 缓存未命中：执行实际逻辑，结果写入缓存（TTL 60 秒）
+    /// </summary>
     private async Task<string> TrackAsync(
         string toolName, string arguments, Func<Task<string>> body)
     {
+        var cacheKey = $"{toolName}|{arguments}";
+
+        // ★ 1. 尝试缓存命中
+        if (_cache.TryGetValue(cacheKey, out string? cached) && cached is not null)
+        {
+            var hitRecord = _toolCtx.BeginCall(toolName, arguments);
+            hitRecord.Complete(cached, fromCache: true);
+            _logger.LogDebug("[Cache HIT] {Key}", cacheKey);
+            return cached;
+        }
+
+        // ★ 2. 缓存未命中：执行实际逻辑
         var record = _toolCtx.BeginCall(toolName, arguments);
         try
         {
             var result = await body();
-            record.Complete(result);
+            record.Complete(result, fromCache: false);
+
+            // ★ 3. 写入缓存
+            _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = CacheTtl,
+                Size = 1
+            });
+
+            _logger.LogDebug("[Cache MISS→SET] {Key}", cacheKey);
             return result;
         }
         catch (Exception ex)

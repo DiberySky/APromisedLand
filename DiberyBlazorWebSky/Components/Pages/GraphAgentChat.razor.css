@@ -406,3 +406,18 @@
     max-height: 220px;
     overflow-y: auto;
 }
+
+/* ══════════════════════════════════════════════════════════ */
+/* 缓存命中标记                                               */
+/* ══════════════════════════════════════════════════════════ */
+
+.tool-cached {
+    margin-right: 4px;
+    padding: 1px 6px;
+    background: #fef3c7;
+    color: #b45309;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    font-family: system-ui, -apple-system, sans-serif;
+}

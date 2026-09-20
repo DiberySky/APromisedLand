@@ -1,10 +1,12 @@
 using MAFWorkFlowApi.Agents;
 using MAFWorkFlowApi.HealthChecks;
 using MAFWorkFlowApi.Infrastructure;
+using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using OllamaSharp;
+using AgentSessionStore = Microsoft.Agents.AI.Hosting.AgentSessionStore;
 
 #pragma warning disable EXTEXP0001
 
@@ -14,6 +16,11 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. Aspire 默认
 // ---------------------------------------------------------------------------
 builder.AddServiceDefaults();
+
+// ══════════════════════════════════════════════════════════
+// ★ 工具调用缓存（相同参数 60 秒内复用结果）
+// ══════════════════════════════════════════════════════════
+builder.Services.AddMemoryCache();
 
 // ---------------------------------------------------------------------------
 // 2. Redis 分布式缓存
