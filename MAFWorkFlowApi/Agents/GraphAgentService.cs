@@ -57,8 +57,8 @@ public sealed class GraphAgentService
         _toolCtx.Reset();
 
         var session = await _sessionStore.GetSessionAsync(
-            _graphAgent, currentConversationId, ct)
-            ?? await _graphAgent.CreateSessionAsync(cancellationToken: ct);
+                          _graphAgent, currentConversationId, ct)
+                      ?? await _graphAgent.CreateSessionAsync(cancellationToken: ct);
 
         var response = await _graphAgent.RunAsync(
             userMessage, session, cancellationToken: ct);
@@ -174,7 +174,9 @@ public sealed class GraphAgentService
                 ((keyword, graphName, ct) => t.SearchNodesAsync(keyword, graphName, ct)),
                 name: "SearchNodes",
                 description: "按关键词搜索名称包含该关键词的节点（不区分大小写、部分匹配）。" +
-                             "当用户不确定节点的完整名称，或想找'和 XX 相关的节点'、'有哪些 XX'时使用。"),
+                             "【强制使用场景】当用户问'和 XX 相关的节点'、'有哪些 XX'、" +
+                             "'有没有 XX'、'XX 类型的东西'时，必须先调用此工具确认图中实际节点，" +
+                             "严禁凭记忆列出常见概念（如 MySQL、Redis 等图中可能不存在的节点）。"),
 
             AIFunctionFactory.Create(
                 (Func<string, int, string, CancellationToken, Task<string>>)
@@ -197,25 +199,27 @@ public sealed class GraphAgentService
     // ══════════════════════════════════════════════════════
 
     private static string BuildInstructions() => """
-你是一个专业的图数据库助手。你可以调用以下工具函数查询真实数据：
-- GetNeighbors：查询节点的邻居（出边+入边）
-- GetRelations：查询两节点之间的直接关系
-- ListAllNodes：列出所有节点和关系
-- GetGraphSize：获取图规模（节点数+边数）
-- FindPath：查找两节点之间的最短路径
-- SearchNodes：按关键词搜索节点名（部分匹配）
-- GetSubgraph：从起始节点出发 N 跳内的子图（1-3 跳）
-- GetEdgesOfNode：查询节点的出边和入边（区分方向）
+                                                 你是一个专业的图数据库助手。你可以调用以下工具函数查询真实数据：
+                                                 - GetNeighbors：查询节点的邻居（出边+入边）
+                                                 - GetRelations：查询两节点之间的直接关系
+                                                 - ListAllNodes：列出所有节点和关系
+                                                 - GetGraphSize：获取图规模（节点数+边数）
+                                                 - FindPath：查找两节点之间的最短路径
+                                                 - SearchNodes：按关键词搜索节点名（部分匹配）
+                                                 - GetSubgraph：从起始节点出发 N 跳内的子图（1-3 跳）
+                                                 - GetEdgesOfNode：查询节点的出边和入边（区分方向）
 
-工作规则：
-1. 回答任何与图数据相关的问题前，必须先调用合适的工具函数获取真实数据。
-2. 调用工具后，必须用自然语言总结结果回答用户。不要输出工具的原始调用格式。
-3. 不要编造数据。如果工具返回"未找到"，如实告知用户。
-4. 调用工具时，graphName 参数使用用户消息中提到的图名；如果用户没提，使用会话上下文。
-5. 选择最合适的工具：
-   - 用户给出了完整节点名 → 用 GetNeighbors / GetRelations / GetEdgesOfNode
-   - 用户给出关键词但不确定节点名 → 用 SearchNodes
-   - 用户想探索周边结构 → 用 GetSubgraph
-6. 回答要简洁、准确、使用中文。
-""";
+                                                 【绝对规则】
+                                                 1. 你必须先调用工具函数获取真实数据，才能回答任何与图数据相关的问题。
+                                                 2. 严禁凭常识或记忆编造节点名、关系名。图中的节点名是权威数据。
+                                                 3. 即使用户问的是"常见的概念"（如"数据库"、"机器学习"），也必须先调用 SearchNodes 或 ListAllNodes 确认图中实际存在哪些节点。
+                                                 4. 工具返回"未找到"时，如实告知用户"图中没有该节点"，不要补充想象中的节点。
+                                                 5. 调用工具后，用自然语言总结结果回答用户，不要输出工具的原始调用格式。
+
+                                                 【工具选择指南】
+                                                 - 用户给了完整节点名 → GetNeighbors / GetRelations / GetEdgesOfNode
+                                                 - 用户给了关键词但不确定节点名 → SearchNodes
+                                                 - 用户想探索周边 → GetSubgraph
+                                                 - 用户问"有哪些/全部" → ListAllNodes 或 SearchNodes
+                                                 """;
 }
