@@ -26,6 +26,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
     private bool _useStreaming = true;
     // ★ 一键复制整段对话：反馈状态
     private bool _allCopied;
+    private string _sessionFilter = "";
     
     // ★ 复制反馈：记录最近复制的消息 ID
     private string? _lastCopiedMessageId;
@@ -33,6 +34,44 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
     protected override async Task OnInitializedAsync()
     {
         await LoadSessionsAsync();
+    }
+    
+    /// <summary>
+    /// 过滤后的会话列表。
+    /// 保证当前选中的会话即使被过滤也始终显示（避免选中的 option 消失）。
+    /// </summary>
+    private IEnumerable<string> FilteredSessions
+    {
+        get
+        {
+            IEnumerable<string> filtered = string.IsNullOrWhiteSpace(_sessionFilter)
+                ? _sessions
+                : _sessions.Where(s =>
+                    s.Contains(_sessionFilter, StringComparison.OrdinalIgnoreCase));
+
+            var list = filtered.ToList();
+
+            // 保证当前选中的会话始终出现在列表里
+            if (!string.IsNullOrEmpty(_selectedSessionId) &&
+                !list.Contains(_selectedSessionId))
+            {
+                list.Insert(0, _selectedSessionId);
+            }
+
+            return list;
+        }
+    }
+
+    /// <summary>
+    /// 会话 ID 截短显示（前 12 位 + …）。
+    /// 32 位十六进制太长，下拉框里显示会溢出。
+    /// </summary>
+    private static string GetSessionDisplay(string sessionId)
+    {
+        if (string.IsNullOrEmpty(sessionId)) return "";
+        return sessionId.Length > 14
+            ? sessionId[..12] + "…"
+            : sessionId;
     }
 
     private async Task LoadSessionsAsync()
@@ -56,6 +95,9 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
     private async Task OnSessionChangedAsync(ChangeEventArgs e)
     {
+        // ★ 切换会话时清空搜索框（避免下次切换时列表仍是过滤的）
+        _sessionFilter = "";
+        
         var newId = e.Value?.ToString() ?? "";
         if (newId == _selectedSessionId) return;
 
@@ -115,6 +157,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         {
             _sessions.Remove(convId);
             _selectedSessionId = "";
+            _sessionFilter = "";
             _messages.Clear();
             Logger.LogInformation("已删除会话 {ConvId}", convId);
         }

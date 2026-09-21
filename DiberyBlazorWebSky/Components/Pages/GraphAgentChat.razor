@@ -11,16 +11,25 @@
             由 LLM 自主决定调用哪个图工具查询 —— 支持任意复杂问题
         </p>
         <div class="session-controls">
+            @* ★ 新增：会话搜索框 *@
+            <input type="text"
+                   class="session-search"
+                   placeholder="🔍 搜索会话..."
+                   @bind="_sessionFilter"
+                   @bind:event="oninput"
+                   disabled="@_isSending" />
+
             <select class="session-selector"
                     value="@_selectedSessionId"
                     @onchange="OnSessionChangedAsync"
                     disabled="@_isSending">
                 <option value="">New Conversation</option>
-                @foreach (var s in _sessions)
+                @foreach (var s in FilteredSessions)
                 {
-                    <option value="@s">@s</option>
+                    <option value="@s">@GetSessionDisplay(s)</option>
                 }
             </select>
+
             <button class="btn-refresh"
                     @onclick="LoadSessionsAsync"
                     disabled="@(_isSending || _isLoadingSessions)">
@@ -41,7 +50,7 @@
                         <text>📋 复制全部</text>
                     }
                 </button>
-                
+
                 <button class="btn-export"
                         @onclick="ExportConversationAsync"
                         disabled="@_isSending"
@@ -57,7 +66,7 @@
                     🗑️ Reset
                 </button>
                 <label class="stream-toggle">
-                    <input type="checkbox" @bind="_useStreaming" />
+                    <input type="checkbox" @bind="_useStreaming"/>
                     <span>⚡ 流式</span>
                 </label>
             }

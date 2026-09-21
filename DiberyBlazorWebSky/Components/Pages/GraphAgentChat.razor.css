@@ -702,3 +702,42 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* ══════════════════════════════════════════════════════════ */
+/* 会话搜索框                                                 */
+/* ══════════════════════════════════════════════════════════ */
+
+.session-search {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    min-width: 140px;
+    max-width: 200px;
+    outline: none;
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.95);
+    color: #0f172a;
+    transition: box-shadow 0.15s;
+}
+
+.session-search::placeholder {
+    color: #94a3b8;
+    font-size: 0.82rem;
+}
+
+.session-search:focus {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4);
+}
+
+.session-search:disabled {
+    background: rgba(255, 255, 255, 0.5);
+    cursor: not-allowed;
+}
+
+/* 下拉框宽度适当放宽，配合截短后的 ID */
+.session-selector {
+    min-width: 180px;
+    max-width: 240px;
+}
+
