@@ -1,5 +1,6 @@
 @page "/graph-agent-chat"
 @using DiberyBlazorWebSky.Services
+@using Microsoft.AspNetCore.Components.Forms
 @rendermode InteractiveServer
 
 <PageTitle>图 Agent 对话</PageTitle>
@@ -11,7 +12,6 @@
             由 LLM 自主决定调用哪个图工具查询 —— 支持任意复杂问题
         </p>
         <div class="session-controls">
-            @* ★ 新增：会话搜索框 *@
             <input type="text"
                    class="session-search"
                    placeholder="🔍 搜索会话..."
@@ -29,12 +29,19 @@
                     <option value="@s">@GetSessionDisplay(s)</option>
                 }
             </select>
-
             <button class="btn-refresh"
                     @onclick="LoadSessionsAsync"
                     disabled="@(_isSending || _isLoadingSessions)">
                 🔄 Refresh
             </button>
+            @if (!string.IsNullOrEmpty(_selectedSessionId))
+            {
+                <button class="btn-reset"
+                        @onclick="ResetSessionAsync"
+                        disabled="@_isSending">
+                    🗑️ Reset
+                </button>
+            }
             @if (_messages.Count > 0)
             {
                 <button class="btn-copy-all"
@@ -50,7 +57,6 @@
                         <text>📋 复制全部</text>
                     }
                 </button>
-
                 <button class="btn-export"
                         @onclick="ExportConversationAsync"
                         disabled="@_isSending"
@@ -58,18 +64,10 @@
                     ⬇️ 导出
                 </button>
             }
-            @if (!string.IsNullOrEmpty(_selectedSessionId))
-            {
-                <button class="btn-reset"
-                        @onclick="ResetSessionAsync"
-                        disabled="@_isSending">
-                    🗑️ Reset
-                </button>
-                <label class="stream-toggle">
-                    <input type="checkbox" @bind="_useStreaming"/>
-                    <span>⚡ 流式</span>
-                </label>
-            }
+            <label class="stream-toggle">
+                <input type="checkbox" @bind="_useStreaming" />
+                <span>⚡ 流式</span>
+            </label>
         </div>
     </div>
 
@@ -106,19 +104,28 @@
                             <div class="agent-name">@m.AgentName</div>
                         }
 
-                        @* ★ Assistant 消息用 Markdown 渲染；User / Error 消息保持纯文本 *@
+                        @* ★ 新增：图片展示 *@
+                        @if (!string.IsNullOrEmpty(m.ImageDataUrl))
+                        {
+                            <div class="message-image">
+                                <img src="@m.ImageDataUrl" alt="用户上传的图片" />
+                                <div class="image-hint">📷 图片仅本地展示，不参与 AI 分析</div>
+                            </div>
+                        }
+
+                        @* Assistant 消息用 Markdown 渲染；User / Error 消息保持纯文本 *@
                         @if (m.Role == "assistant" && !string.IsNullOrEmpty(m.Text))
                         {
                             <div class="message-text markdown-body">
                                 @((MarkupString)MarkdownRenderer.ToHtml(m.Text))
                             </div>
                         }
-                        else
+                        else if (!string.IsNullOrEmpty(m.Text))
                         {
                             <div class="message-text">@m.Text</div>
                         }
 
-                        @* ★ 工具调用详情：可展开 *@
+                        @* 工具调用详情：可展开 *@
                         @if (m.ToolCallDetails.Count > 0)
                         {
                             <details class="tool-details">
@@ -164,7 +171,6 @@
                             </details>
                         }
 
-                        @* ★ 底部：复制按钮 + 时间戳 *@
                         <div class="message-footer">
                             <button class="btn-copy"
                                     @onclick="() => CopyMessageAsync(m)"
@@ -203,26 +209,52 @@
         }
     </div>
 
-    <div class="chat-input-container">
-        <textarea class="chat-input"
-                  @bind="_userMessage"
-                  @bind:event="oninput"
-                  @onkeydown="HandleKeyDown"
-                  placeholder="输入问题... (Enter 发送, Shift+Enter 换行)"
-                  rows="3"
-                  disabled="@_isSending"></textarea>
+    <div class="chat-input-wrapper">
+        @* ★ 新增：待发送图片预览 *@
+        @if (!string.IsNullOrEmpty(_pendingImageDataUrl))
+        {
+            <div class="pending-image-preview">
+                <img src="@_pendingImageDataUrl" alt="待发送图片" />
+                <div class="pending-image-info">
+                    <div class="pending-image-name">@_pendingImageName</div>
+                    <div class="pending-image-hint">📷 图片仅本地展示，不参与 AI 分析</div>
+                </div>
+                <button class="pending-image-remove"
+                        @onclick="ClearPendingImage"
+                        title="移除图片">
+                    ✕
+                </button>
+            </div>
+        }
 
-        @if (_isSending)
-        {
-            <button class="btn-cancel" @onclick="CancelAsync">Cancel ✋</button>
-        }
-        else
-        {
-            <button class="btn-send"
-                    @onclick="SendMessageAsync"
-                    disabled="@(string.IsNullOrWhiteSpace(_userMessage))">
-                Send 📨
-            </button>
-        }
+        <div class="chat-input-row">
+            <label class="btn-attach" title="上传图片（仅展示）">
+                📎
+                <InputFile OnChange="OnImageSelected"
+                           accept="image/png,image/jpeg,image/gif,image/webp"
+                           style="display:none;" />
+            </label>
+
+            <textarea class="chat-input"
+                      @bind="_userMessage"
+                      @bind:event="oninput"
+                      @onkeydown="HandleKeyDown"
+                      placeholder="输入问题... (Enter 发送, Shift+Enter 换行)"
+                      rows="3"
+                      disabled="@_isSending"></textarea>
+
+            @if (_isSending)
+            {
+                <button class="btn-cancel" @onclick="CancelAsync">Cancel ✋</button>
+            }
+            else
+            {
+                <button class="btn-send"
+                        @onclick="SendMessageAsync"
+                        disabled="@(string.IsNullOrWhiteSpace(_userMessage) && string.IsNullOrEmpty(_pendingImageDataUrl))">
+                    Send 📨
+                </button>
+            }
+        </div>
     </div>
 </div>

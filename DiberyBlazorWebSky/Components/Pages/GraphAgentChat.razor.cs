@@ -1,5 +1,6 @@
 using DiberyBlazorWebSky.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
@@ -24,55 +25,80 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
     private Timer? _elapsedTimer;
     private DateTime _sendStartedAt;
     private bool _useStreaming = true;
-    // ★ 一键复制整段对话：反馈状态
-    private bool _allCopied;
-    private string _sessionFilter = "";
-    
-    // ★ 复制反馈：记录最近复制的消息 ID
+
+    // 复制反馈
     private string? _lastCopiedMessageId;
+    private bool _allCopied;
+
+    // 会话搜索
+    private string _sessionFilter = "";
+
+    // ★ 新增：待发送图片
+    private string? _pendingImageDataUrl;
+    private string? _pendingImageName;
+    private const long MaxImageSizeBytes = 2 * 1024 * 1024;  // 2 MB
 
     protected override async Task OnInitializedAsync()
     {
         await LoadSessionsAsync();
     }
-    
-    /// <summary>
-    /// 过滤后的会话列表。
-    /// 保证当前选中的会话即使被过滤也始终显示（避免选中的 option 消失）。
-    /// </summary>
-    private IEnumerable<string> FilteredSessions
+
+    // ══════════════════════════════════════════════════════
+    // 图片上传
+    // ══════════════════════════════════════════════════════
+
+    private async Task OnImageSelected(InputFileChangeEventArgs e)
     {
-        get
+        var file = e.File;
+        if (file == null) return;
+
+        // 检查大小
+        if (file.Size > MaxImageSizeBytes)
         {
-            IEnumerable<string> filtered = string.IsNullOrWhiteSpace(_sessionFilter)
-                ? _sessions
-                : _sessions.Where(s =>
-                    s.Contains(_sessionFilter, StringComparison.OrdinalIgnoreCase));
-
-            var list = filtered.ToList();
-
-            // 保证当前选中的会话始终出现在列表里
-            if (!string.IsNullOrEmpty(_selectedSessionId) &&
-                !list.Contains(_selectedSessionId))
+            _messages.Add(new ChatMsg
             {
-                list.Insert(0, _selectedSessionId);
-            }
-
-            return list;
+                Role = "error",
+                Text = $"图片过大（{file.Size / 1024} KB），请选择小于 2 MB 的图片。",
+                Timestamp = DateTime.Now
+            });
+            StateHasChanged();
+            return;
         }
+
+        try
+        {
+            using var stream = file.OpenReadStream(MaxImageSizeBytes);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var base64 = Convert.ToBase64String(ms.ToArray());
+
+            _pendingImageDataUrl = $"data:{file.ContentType};base64,{base64}";
+            _pendingImageName = file.Name;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "读取图片失败");
+            _messages.Add(new ChatMsg
+            {
+                Role = "error",
+                Text = $"读取图片失败：{ex.Message}",
+                Timestamp = DateTime.Now
+            });
+        }
+
+        StateHasChanged();
     }
 
-    /// <summary>
-    /// 会话 ID 截短显示（前 12 位 + …）。
-    /// 32 位十六进制太长，下拉框里显示会溢出。
-    /// </summary>
-    private static string GetSessionDisplay(string sessionId)
+    private void ClearPendingImage()
     {
-        if (string.IsNullOrEmpty(sessionId)) return "";
-        return sessionId.Length > 14
-            ? sessionId[..12] + "…"
-            : sessionId;
+        _pendingImageDataUrl = null;
+        _pendingImageName = null;
+        StateHasChanged();
     }
+
+    // ══════════════════════════════════════════════════════
+    // 会话列表
+    // ══════════════════════════════════════════════════════
 
     private async Task LoadSessionsAsync()
     {
@@ -93,11 +119,39 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         }
     }
 
+    private IEnumerable<string> FilteredSessions
+    {
+        get
+        {
+            IEnumerable<string> filtered = string.IsNullOrWhiteSpace(_sessionFilter)
+                ? _sessions
+                : _sessions.Where(s =>
+                    s.Contains(_sessionFilter, StringComparison.OrdinalIgnoreCase));
+
+            var list = filtered.ToList();
+
+            if (!string.IsNullOrEmpty(_selectedSessionId) &&
+                !list.Contains(_selectedSessionId))
+            {
+                list.Insert(0, _selectedSessionId);
+            }
+
+            return list;
+        }
+    }
+
+    private static string GetSessionDisplay(string sessionId)
+    {
+        if (string.IsNullOrEmpty(sessionId)) return "";
+        return sessionId.Length > 14
+            ? sessionId[..12] + "…"
+            : sessionId;
+    }
+
     private async Task OnSessionChangedAsync(ChangeEventArgs e)
     {
-        // ★ 切换会话时清空搜索框（避免下次切换时列表仍是过滤的）
         _sessionFilter = "";
-        
+
         var newId = e.Value?.ToString() ?? "";
         if (newId == _selectedSessionId) return;
 
@@ -175,7 +229,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
     }
 
     // ══════════════════════════════════════════════════════
-    // ★ 复制消息
+    // 复制 / 导出
     // ══════════════════════════════════════════════════════
 
     private async Task CopyMessageAsync(ChatMsg msg)
@@ -186,11 +240,9 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         {
             await Js.InvokeVoidAsync("navigator.clipboard.writeText", msg.Text);
 
-            // 显示"已复制"反馈
             _lastCopiedMessageId = msg.Id;
             StateHasChanged();
 
-            // 2 秒后恢复
             _ = Task.Run(async () =>
             {
                 await Task.Delay(2000);
@@ -203,19 +255,14 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "复制消息失败（可能浏览器不支持 clipboard API）");
+            Logger.LogWarning(ex, "复制消息失败");
         }
     }
 
-    /// <summary>
-    /// 构建整段对话的 Markdown 文本。
-    /// 被"复制全部"和"导出为文件"复用。
-    /// </summary>
     private string BuildConversationMarkdown()
     {
         var sb = new System.Text.StringBuilder();
 
-        // 头部元信息
         sb.AppendLine("# 图 Agent 对话");
         sb.AppendLine();
         if (!string.IsNullOrEmpty(_selectedSessionId))
@@ -226,10 +273,8 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         sb.AppendLine("---");
         sb.AppendLine();
 
-        // 逐条消息
         foreach (var m in _messages)
         {
-            // 角色 + Agent 名（★ 修复图标：Assistant 用 💬，GraphAssistant 用 🔧）
             var roleLabel = m.Role switch
             {
                 "user" => "👤 用户",
@@ -248,6 +293,13 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
             sb.AppendLine($"## {roleLabel}");
             sb.AppendLine($"*{m.Timestamp:HH:mm:ss}*");
             sb.AppendLine();
+
+            if (!string.IsNullOrEmpty(m.ImageDataUrl))
+            {
+                sb.AppendLine("> 📷 （用户上传了图片，Markdown 导出不包含图片内容）");
+                sb.AppendLine();
+            }
+
             sb.AppendLine(m.Text);
             sb.AppendLine();
 
@@ -277,7 +329,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         return sb.ToString();
     }
 
-    /// <summary>复制整段对话到剪贴板。</summary>
     private async Task CopyAllMessagesAsync()
     {
         if (_messages.Count == 0) return;
@@ -303,7 +354,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         }
     }
 
-    /// <summary>导出整段对话为 .md 文件。</summary>
     private async Task ExportConversationAsync()
     {
         if (_messages.Count == 0) return;
@@ -312,13 +362,11 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         {
             var markdown = BuildConversationMarkdown();
 
-            // 文件名：会话ID前 8 位 + 时间戳
             var sessionTag = string.IsNullOrEmpty(_selectedSessionId)
                 ? "new"
                 : _selectedSessionId[..Math.Min(8, _selectedSessionId.Length)];
             var fileName = $"graph-chat-{sessionTag}-{DateTime.Now:yyyyMMdd-HHmmss}.md";
 
-            // 复用已有的 fileDownload.js
             await Js.InvokeVoidAsync(
                 "downloadTextFile", fileName, markdown, "text/markdown;charset=utf-8");
 
@@ -329,14 +377,17 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
             Logger.LogWarning(ex, "导出对话失败");
         }
     }
-    
+
     // ══════════════════════════════════════════════════════
     // 发送消息
     // ══════════════════════════════════════════════════════
 
     private async Task SendMessageAsync()
     {
-        if (string.IsNullOrWhiteSpace(_userMessage) || _isSending) return;
+        // ★ 允许"仅有图片"的消息
+        if ((string.IsNullOrWhiteSpace(_userMessage) && string.IsNullOrEmpty(_pendingImageDataUrl))
+            || _isSending)
+            return;
 
         if (_useStreaming)
         {
@@ -344,13 +395,25 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
             return;
         }
 
-        var userText = _userMessage.Trim();
+        await SendMessageNonStreamAsync();
+    }
+
+    private async Task SendMessageNonStreamAsync()
+    {
+        var userText = string.IsNullOrWhiteSpace(_userMessage)
+            ? "（我上传了一张图片）"
+            : _userMessage.Trim();
         _userMessage = "";
+
+        var imageDataUrl = _pendingImageDataUrl;
+        _pendingImageDataUrl = null;
+        _pendingImageName = null;
 
         _messages.Add(new ChatMsg
         {
             Role = "user",
             Text = userText,
+            ImageDataUrl = imageDataUrl,
             Timestamp = DateTime.Now
         });
 
@@ -370,6 +433,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
         try
         {
+            // ★ 只发文本给后端，图片不上传
             var response = await GraphAgentApi.SendAsync(
                 userText,
                 string.IsNullOrEmpty(_selectedSessionId) ? null : _selectedSessionId,
@@ -398,7 +462,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "SendMessageAsync failed");
+            Logger.LogError(ex, "SendMessageNonStreamAsync failed");
             _messages.Add(new ChatMsg { Role = "error", Text = ex.Message, Timestamp = DateTime.Now });
         }
         finally
@@ -417,13 +481,20 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
     private async Task SendMessageStreamAsync()
     {
-        var userText = _userMessage.Trim();
+        var userText = string.IsNullOrWhiteSpace(_userMessage)
+            ? "（我上传了一张图片）"
+            : _userMessage.Trim();
         _userMessage = "";
+
+        var imageDataUrl = _pendingImageDataUrl;
+        _pendingImageDataUrl = null;
+        _pendingImageName = null;
 
         _messages.Add(new ChatMsg
         {
             Role = "user",
             Text = userText,
+            ImageDataUrl = imageDataUrl,
             Timestamp = DateTime.Now
         });
 
@@ -451,6 +522,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
         try
         {
+            // ★ 只发文本给后端
             await GraphAgentApi.SendStreamAsync(
                 userText,
                 string.IsNullOrEmpty(_selectedSessionId) ? null : _selectedSessionId,
@@ -546,13 +618,14 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
     private sealed class ChatMsg
     {
-        // ★ 消息唯一 ID（用于复制反馈定位）
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
-
         public string Role { get; set; } = "assistant";
         public string Text { get; set; } = "";
         public DateTime Timestamp { get; set; }
         public List<GraphAgentToolCallDetail> ToolCallDetails { get; set; } = new();
         public string? AgentName { get; set; }
+
+        /// <summary>★ 新增：图片 data URL（仅前端展示，不持久化）</summary>
+        public string? ImageDataUrl { get; set; }
     }
 }
