@@ -105,9 +105,9 @@ builder.Services.AddOpenApi();
 // ══════════════════════════════════════════════════════════
 builder.Services.Configure<HealthCheckPublisherOptions>(options =>
 {
-    options.Delay   = TimeSpan.FromSeconds(15);   // 启动后 15 秒才开始检查
+    options.Delay   = TimeSpan.FromSeconds(30);   // 启动后 30 秒再检查（避开清理服务启动和EF迁移）
     options.Period  = TimeSpan.FromSeconds(30);   // 每 30 秒一次
-    options.Timeout = TimeSpan.FromSeconds(10);   // 单次检查 10 秒超时
+    options.Timeout = TimeSpan.FromSeconds(30);   // 单次检查放宽到 30 秒超时
 });
 
 var app = builder.Build();

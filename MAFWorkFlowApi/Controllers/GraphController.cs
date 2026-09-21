@@ -187,6 +187,73 @@ public sealed class GraphController(
             ct);
         return Ok(result);
     }
+    
+        // ─── 更新图（重命名）────────────────────────────
+
+    [HttpPut("{graphGuid}")]
+    public async Task<IActionResult> UpdateGraph(
+        [FromRoute] Guid graphGuid,
+        [FromBody] UpdateGraphRequest request,
+        CancellationToken ct)
+    {
+        var result = await _liteGraph.PutAsync(
+            $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}",
+            new { Name = request.Name, Data = request.Data ?? new() },
+            ct);
+        return Ok(result);
+    }
+
+    // ─── 删除图（级联清空节点和边）───────────────────
+
+    [HttpDelete("{graphGuid}")]
+    public async Task<IActionResult> DeleteGraph(
+        [FromRoute] Guid graphGuid,
+        CancellationToken ct)
+    {
+        var tenant = _liteGraph.TenantGuid;
+
+        // 1. 先删除所有边
+        var edgesJson = await _liteGraph.GetAsync(
+            $"/v1.0/tenants/{tenant}/graphs/{graphGuid}/edges", ct);
+        if (edgesJson.HasValue &&
+            edgesJson.Value.TryGetProperty("Objects", out var edgesObj) &&
+            edgesObj.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var e in edgesObj.EnumerateArray())
+            {
+                if (e.TryGetProperty("GUID", out var eg))
+                {
+                    await _liteGraph.DeleteAsync(
+                        $"/v1.0/tenants/{tenant}/graphs/{graphGuid}/edges/{eg.GetGuid()}",
+                        ct);
+                }
+            }
+        }
+
+        // 2. 再删除所有节点
+        var nodesJson = await _liteGraph.GetAsync(
+            $"/v1.0/tenants/{tenant}/graphs/{graphGuid}/nodes", ct);
+        if (nodesJson.HasValue &&
+            nodesJson.Value.TryGetProperty("Objects", out var nodesObj) &&
+            nodesObj.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var n in nodesObj.EnumerateArray())
+            {
+                if (n.TryGetProperty("GUID", out var ng))
+                {
+                    await _liteGraph.DeleteAsync(
+                        $"/v1.0/tenants/{tenant}/graphs/{graphGuid}/nodes/{ng.GetGuid()}",
+                        ct);
+                }
+            }
+        }
+
+        // 3. 最后删除图本身
+        await _liteGraph.DeleteAsync(
+            $"/v1.0/tenants/{tenant}/graphs/{graphGuid}", ct);
+
+        return NoContent();
+    }
 }
 
 // ─── 请求 DTO ─────────────────────────────────────────
@@ -207,5 +274,9 @@ public sealed class VectorSearchRequest
 }
 
 public sealed record CreateGraphRequest(
+    string Name,
+    Dictionary<string, object?>? Data = null);
+    
+public sealed record UpdateGraphRequest(
     string Name,
     Dictionary<string, object?>? Data = null);

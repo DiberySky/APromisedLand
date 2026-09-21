@@ -5,6 +5,7 @@ using DiberyBlazorWebSky.Services;
 using LiteGraph.Sdk;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace DiberyBlazorWebSky.Components.Pages;
@@ -76,6 +77,20 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     private bool _clearBeforeImport;
     private ImportResult? _importResult;
 
+    // ★ 行内编辑状态
+    private Guid? _editingNodeGuid;
+    private string _editingNodeName = "";
+    private Guid? _editingEdgeGuid;
+    private string _editingEdgeName = "";
+    
+    // ★ 图管理状态
+    private bool _showManageDialog;
+    private bool _isManaging;
+    private string _newGraphName = "";
+    private bool _isCreatingGraph;
+    private Guid? _renamingGraphGuid;
+    private string _renamingGraphName = "";
+    
     private bool HasAnyImportFile =>
         !string.IsNullOrEmpty(_selectedJsonContent) ||
         !string.IsNullOrEmpty(_selectedNodesCsvContent);
@@ -140,6 +155,10 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         _nodeHasPrev = _edgeHasPrev = false;
         _nodeHasNext = _edgeHasNext = false;
         _selectedNodeGuids.Clear();
+        _editingNodeGuid = null;
+        _editingNodeName = "";
+        _editingEdgeGuid = null;
+        _editingEdgeName = "";
         _vectorResults.Clear();
         _vectorProgress = "";
 
@@ -1398,6 +1417,12 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     // ─── UI 辅助 ─────────────────────────────────────
     private async Task SwitchTabAsync(string tab)
     {
+        // ★ 切 Tab 时清空编辑状态
+        _editingNodeGuid = null;
+        _editingNodeName = "";
+        _editingEdgeGuid = null;
+        _editingEdgeName = "";
+        
         _activeTab = tab;
 
         if (tab == "topology" &&
@@ -1434,7 +1459,300 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         _detailJson = null;
         StateHasChanged();
     }
+    
+        // ══════════════════════════════════════════════════════
+    // ★ 图管理（CRUD）
+    // ══════════════════════════════════════════════════════
 
+    private void OpenManageDialog()
+    {
+        _showManageDialog = true;
+        _newGraphName = "";
+        _renamingGraphGuid = null;
+        _renamingGraphName = "";
+        _errorMessage = null;
+        StateHasChanged();
+    }
+
+    private void CloseManageDialog()
+    {
+        _showManageDialog = false;
+        StateHasChanged();
+    }
+
+    private async Task CreateGraphAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newGraphName)) return;
+
+        _isCreatingGraph = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var graph = new Graph
+            {
+                TenantGUID = DefaultTenant,
+                Name = _newGraphName.Trim()
+            };
+            var created = await LiteGraph.Graph.Create(graph);
+            Logger.LogInformation("已创建图：{Name} ({Guid})",
+                created.Name, created.GUID);
+            _newGraphName = "";
+            await LoadGraphsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "创建图失败");
+            _errorMessage = $"创建图失败：{ex.Message}";
+        }
+        finally
+        {
+            _isCreatingGraph = false;
+            StateHasChanged();
+        }
+    }
+
+    private void StartRename(Graph g)
+    {
+        _renamingGraphGuid = g.GUID;
+        _renamingGraphName = g.Name;
+        StateHasChanged();
+    }
+
+    private void CancelRename()
+    {
+        _renamingGraphGuid = null;
+        _renamingGraphName = "";
+        StateHasChanged();
+    }
+
+    private async Task ConfirmRenameAsync()
+    {
+        if (_renamingGraphGuid is null || string.IsNullOrWhiteSpace(_renamingGraphName))
+            return;
+
+        var newName = _renamingGraphName.Trim();
+        var existing = _graphs.FirstOrDefault(g => g.GUID == _renamingGraphGuid.Value);
+
+        if (existing is null || existing.Name == newName)
+        {
+            CancelRename();
+            return;
+        }
+
+        _isManaging = true;
+        StateHasChanged();
+
+        try
+        {
+            existing.Name = newName;
+            await LiteGraph.Graph.Update(existing);
+            Logger.LogInformation("图已重命名：{Guid} → {Name}", existing.GUID, newName);
+            CancelRename();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "重命名失败");
+            _errorMessage = $"重命名失败：{ex.Message}";
+        }
+        finally
+        {
+            _isManaging = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// 删除图：先删所有边和节点（级联），再删图本身。
+    /// 由于 LiteGraph 不保证级联，需手动遍历删除。
+    /// </summary>
+    private async Task DeleteGraphAsync(Graph g)
+    {
+        var confirmed = await Js.InvokeAsync<bool>("confirm",
+            $"删除图 '{g.Name}' 将同时删除其所有节点和边，此操作不可撤销。\n\n确定删除？");
+        if (!confirmed) return;
+
+        _isManaging = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            // 1. 删除所有边
+            var edgeQuery = new EnumerationRequest
+            {
+                TenantGUID = DefaultTenant,
+                GraphGUID = g.GUID,
+                MaxResults = MaxEnumerationResults
+            };
+            var edgesResult = await LiteGraph.Edge.Enumerate(edgeQuery);
+            var edgesToDelete = edgesResult.Objects ?? new List<Edge>();
+            foreach (var e in edgesToDelete)
+            {
+                try { await LiteGraph.Edge.DeleteByGuid(DefaultTenant, g.GUID, e.GUID); }
+                catch (Exception ex) { Logger.LogWarning(ex, "删除边 {Guid} 失败", e.GUID); }
+            }
+
+            // 2. 删除所有节点
+            var nodeQuery = new EnumerationRequest
+            {
+                TenantGUID = DefaultTenant,
+                GraphGUID = g.GUID,
+                MaxResults = MaxEnumerationResults
+            };
+            var nodesResult = await LiteGraph.Node.Enumerate(nodeQuery);
+            var nodesToDelete = nodesResult.Objects ?? new List<Node>();
+            foreach (var n in nodesToDelete)
+            {
+                try { await LiteGraph.Node.DeleteByGuid(DefaultTenant, g.GUID, n.GUID); }
+                catch (Exception ex) { Logger.LogWarning(ex, "删除节点 {Guid} 失败", n.GUID); }
+            }
+
+            // 3. 删除图本身
+            await LiteGraph.Graph.DeleteByGuid(DefaultTenant, g.GUID);
+
+            // 4. 更新本地状态
+            _graphs.RemoveAll(x => x.GUID == g.GUID);
+            if (_selectedGraphGuid == g.GUID.ToString())
+            {
+                _selectedGraphGuid = "";
+                _nodes.Clear();
+                _edges.Clear();
+                _topologyNodes.Clear();
+                _topologyEdges.Clear();
+                _nodePositions.Clear();
+                _selectedTopologyNode = null;
+            }
+
+            Logger.LogInformation("已删除图：{Name} ({Guid})", g.Name, g.GUID);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "删除图失败");
+            _errorMessage = $"删除失败：{ex.Message}";
+        }
+        finally
+        {
+            _isManaging = false;
+            StateHasChanged();
+        }
+    }
+
+        // ══════════════════════════════════════════════════════
+    // ★ 节点/边行内编辑
+    // ══════════════════════════════════════════════════════
+
+    private void StartEditNode(Node node)
+    {
+        _editingNodeGuid = node.GUID;
+        _editingNodeName = node.Name;
+        StateHasChanged();
+    }
+
+    private void CancelEditNode()
+    {
+        _editingNodeGuid = null;
+        _editingNodeName = "";
+        StateHasChanged();
+    }
+
+    private async Task SaveNodeNameAsync(Node node)
+    {
+        if (_editingNodeGuid != node.GUID) return;
+
+        var newName = _editingNodeName.Trim();
+        if (string.IsNullOrWhiteSpace(newName) || newName == node.Name)
+        {
+            CancelEditNode();
+            return;
+        }
+
+        _isBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            node.Name = newName;
+            await LiteGraph.Node.Update(node);
+            Logger.LogInformation("节点已重命名：{Guid} → {Name}", node.GUID, newName);
+            CancelEditNode();
+            await LoadNodesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "重命名节点失败");
+            _errorMessage = $"重命名节点失败：{ex.Message}";
+        }
+        finally
+        {
+            _isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private void StartEditEdge(Edge edge)
+    {
+        _editingEdgeGuid = edge.GUID;
+        _editingEdgeName = edge.Name;
+        StateHasChanged();
+    }
+
+    private void CancelEditEdge()
+    {
+        _editingEdgeGuid = null;
+        _editingEdgeName = "";
+        StateHasChanged();
+    }
+
+    private async Task SaveEdgeNameAsync(Edge edge)
+    {
+        if (_editingEdgeGuid != edge.GUID) return;
+
+        var newName = _editingEdgeName.Trim();
+        if (string.IsNullOrWhiteSpace(newName) || newName == edge.Name)
+        {
+            CancelEditEdge();
+            return;
+        }
+
+        _isBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            edge.Name = newName;
+            await LiteGraph.Edge.Update(edge);
+            Logger.LogInformation("边已重命名：{Guid} → {Name}", edge.GUID, newName);
+            CancelEditEdge();
+            await LoadEdgesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "重命名边失败");
+            _errorMessage = $"重命名边失败：{ex.Message}";
+        }
+        finally
+        {
+            _isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>编辑输入框里按 Enter 提交，Esc 取消。</summary>
+    private async Task HandleEditKeyDown(KeyboardEventArgs e, Func<Task> onSave)
+    {
+        if (e.Key == "Enter")
+        {
+            await onSave();
+        }
+        else if (e.Key == "Escape")
+        {
+            CancelEditNode();
+            CancelEditEdge();
+        }
+    }
+    
     private async Task<bool> ConfirmAsync(string message)
     {
         try

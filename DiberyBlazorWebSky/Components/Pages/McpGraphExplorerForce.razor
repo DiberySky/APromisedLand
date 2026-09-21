@@ -26,6 +26,11 @@
             }
         </select>
         <button class="btn-refresh" @onclick="LoadGraphsAsync" disabled="@_isLoading">🔄 刷新图列表</button>
+
+        @* ★ 新增：图管理 *@
+        <button class="btn-manage" @onclick="OpenManageDialog" disabled="@_isLoading">
+            ⚙️ 图管理
+        </button>
     </div>
 
     @if (!string.IsNullOrEmpty(_selectedGraphGuid))
@@ -58,23 +63,47 @@
                     </button>
                 </div>
 
-                <div class="list-container">
+                                <div class="list-container">
                     @foreach (var node in _nodes)
                     {
                         <div class="list-item @(_selectedNodeGuids.Contains(node.GUID) ? "selected" : "")">
-                            <input type="checkbox"
-                                   checked="@_selectedNodeGuids.Contains(node.GUID)"
-                                   @onchange="(e) => ToggleNodeSelection(node.GUID, (bool)e.Value!)" />
-                            <div class="item-info">
-                                <strong>@node.Name</strong>
-                                <span class="guid">@node.GUID.ToString("N")[..8]</span>
-                            </div>
-                            <div class="item-actions">
-                                <button class="btn-icon" @onclick="() => ShowNodeJson(node)">👁️</button>
-                                <button class="btn-icon danger"
-                                        @onclick="() => DeleteNodeAsync(node.GUID)"
-                                        disabled="@_isBusy">🗑️</button>
-                            </div>
+                            @if (_editingNodeGuid == node.GUID)
+                            {
+                                @* 编辑模式 *@
+                                <input type="text"
+                                       @bind="_editingNodeName"
+                                       @bind:event="oninput"
+                                       class="inline-edit-input"
+                                       @onkeydown="e => HandleEditKeyDown(e, () => SaveNodeNameAsync(node))" />
+                                <div class="item-actions">
+                                    <button class="btn-sm btn-primary"
+                                            @onclick="() => SaveNodeNameAsync(node)"
+                                            disabled="@_isBusy"
+                                            title="保存">✓</button>
+                                    <button class="btn-sm"
+                                            @onclick="CancelEditNode"
+                                            disabled="@_isBusy"
+                                            title="取消">✕</button>
+                                </div>
+                            }
+                            else
+                            {
+                                @* 正常模式 *@
+                                <input type="checkbox"
+                                       checked="@_selectedNodeGuids.Contains(node.GUID)"
+                                       @onchange="(e) => ToggleNodeSelection(node.GUID, (bool)e.Value!)" />
+                                <div class="item-info">
+                                    <strong>@node.Name</strong>
+                                    <span class="guid">@node.GUID.ToString("N")[..8]</span>
+                                </div>
+                                <div class="item-actions">
+                                    <button class="btn-icon" @onclick="() => ShowNodeJson(node)" title="查看 JSON">👁️</button>
+                                    <button class="btn-icon" @onclick="() => StartEditNode(node)" title="重命名">✏️</button>
+                                    <button class="btn-icon danger"
+                                            @onclick="() => DeleteNodeAsync(node.GUID)"
+                                            disabled="@_isBusy" title="删除">🗑️</button>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
@@ -114,20 +143,44 @@
                     <button class="btn-primary" @onclick="CreateEdgeAsync" disabled="@_isBusy">+ 新建边</button>
                 </div>
 
-                <div class="list-container">
+                                <div class="list-container">
                     @foreach (var edge in _edges)
                     {
                         <div class="list-item">
-                            <div class="item-info">
-                                <strong>@edge.Name</strong>
-                                <span class="guid">@edge.From.ToString("N")[..8] → @edge.To.ToString("N")[..8]</span>
-                            </div>
-                            <div class="item-actions">
-                                <button class="btn-icon" @onclick="() => ShowEdgeJson(edge)">👁️</button>
-                                <button class="btn-icon danger"
-                                        @onclick="() => DeleteEdgeAsync(edge.GUID)"
-                                        disabled="@_isBusy">🗑️</button>
-                            </div>
+                            @if (_editingEdgeGuid == edge.GUID)
+                            {
+                                @* 编辑模式 *@
+                                <input type="text"
+                                       @bind="_editingEdgeName"
+                                       @bind:event="oninput"
+                                       class="inline-edit-input"
+                                       @onkeydown="e => HandleEditKeyDown(e, () => SaveEdgeNameAsync(edge))" />
+                                <div class="item-actions">
+                                    <button class="btn-sm btn-primary"
+                                            @onclick="() => SaveEdgeNameAsync(edge)"
+                                            disabled="@_isBusy"
+                                            title="保存">✓</button>
+                                    <button class="btn-sm"
+                                            @onclick="CancelEditEdge"
+                                            disabled="@_isBusy"
+                                            title="取消">✕</button>
+                                </div>
+                            }
+                            else
+                            {
+                                @* 正常模式 *@
+                                <div class="item-info">
+                                    <strong>@edge.Name</strong>
+                                    <span class="guid">@edge.From.ToString("N")[..8] → @edge.To.ToString("N")[..8]</span>
+                                </div>
+                                <div class="item-actions">
+                                    <button class="btn-icon" @onclick="() => ShowEdgeJson(edge)" title="查看 JSON">👁️</button>
+                                    <button class="btn-icon" @onclick="() => StartEditEdge(edge)" title="重命名">✏️</button>
+                                    <button class="btn-icon danger"
+                                            @onclick="() => DeleteEdgeAsync(edge.GUID)"
+                                            disabled="@_isBusy" title="删除">🗑️</button>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
@@ -386,6 +439,94 @@
                     <button class="btn-close" @onclick="CloseDetailModal">✕</button>
                 </div>
                 <pre>@_detailJson</pre>
+            </div>
+        </div>
+    }
+
+    @* ══════════════════════════════════════════════════════ *@
+    @* ★ 图管理弹窗                                        *@
+    @* ══════════════════════════════════════════════════════ *@
+    @if (_showManageDialog)
+    {
+        <div class="modal-overlay" @onclick="CloseManageDialog">
+            <div class="manage-dialog" @onclick:stopPropagation="true">
+                <div class="manage-header">
+                    <strong>⚙️ 图管理</strong>
+                    <button class="btn-close" @onclick="CloseManageDialog">✕</button>
+                </div>
+
+                <div class="manage-body">
+                    @* 创建区 *@
+                    <div class="create-section">
+                        <div class="section-title">➕ 新建图</div>
+                        <div class="create-row">
+                            <input type="text"
+                                   @bind="_newGraphName"
+                                   @bind:event="oninput"
+                                   placeholder="输入图名称..."
+                                   class="create-input" />
+                            <button class="btn-primary"
+                                    @onclick="CreateGraphAsync"
+                                    disabled="@(_isCreatingGraph || string.IsNullOrWhiteSpace(_newGraphName))">
+                                @(_isCreatingGraph ? "创建中..." : "创建")
+                            </button>
+                        </div>
+                    </div>
+
+                    @* 列表区 *@
+                    <div class="list-section">
+                        <div class="section-title">📋 已有图（@_graphs.Count）</div>
+
+                        @if (_graphs.Count == 0)
+                        {
+                            <p class="hint">暂无图。请先创建一个。</p>
+                        }
+                        else
+                        {
+                            <div class="graph-manage-list">
+                                @foreach (var g in _graphs)
+                                {
+                                    <div class="graph-manage-item">
+                                        @if (_renamingGraphGuid == g.GUID)
+                                        {
+                                            @* 重命名模式 *@
+                                            <input type="text"
+                                                   @bind="_renamingGraphName"
+                                                   @bind:event="oninput"
+                                                   class="rename-input" />
+                                            <div class="item-actions">
+                                                <button class="btn-sm btn-primary"
+                                                        @onclick="ConfirmRenameAsync"
+                                                        disabled="@_isManaging">✓</button>
+                                                <button class="btn-sm"
+                                                        @onclick="CancelRename"
+                                                        disabled="@_isManaging">✕</button>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            @* 正常模式 *@
+                                            <div class="item-info">
+                                                <div class="item-name">@g.Name</div>
+                                                <div class="item-guid">@g.GUID</div>
+                                            </div>
+                                            <div class="item-actions">
+                                                <button class="btn-sm"
+                                                        @onclick="() => StartRename(g)"
+                                                        disabled="@_isManaging"
+                                                        title="重命名">✏️</button>
+                                                <button class="btn-sm btn-danger"
+                                                        @onclick="() => DeleteGraphAsync(g)"
+                                                        disabled="@_isManaging"
+                                                        title="删除">🗑️</button>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
             </div>
         </div>
     }
