@@ -41,6 +41,13 @@
                         <text>📋 复制全部</text>
                     }
                 </button>
+                
+                <button class="btn-export"
+                        @onclick="ExportConversationAsync"
+                        disabled="@_isSending"
+                        title="下载对话为 Markdown 文件">
+                    ⬇️ 导出
+                </button>
             }
             @if (!string.IsNullOrEmpty(_selectedSessionId))
             {
