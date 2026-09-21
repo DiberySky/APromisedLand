@@ -165,6 +165,9 @@ else
 // 在 app.UseRouting() 之前添加异常中间件：
 app.UseMiddleware<LiteGraphExceptionMiddleware>();
 
+// ★ MCP API Key 认证（仅对 /mcp 路径生效，未配置 key 时跳过）
+app.UseMiddleware<MAFWorkFlowApi.Infrastructure.McpApiKeyMiddleware>();
+
 app.UseRouting();
 app.MapControllers();
 app.MapDefaultEndpoints();
