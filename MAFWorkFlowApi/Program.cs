@@ -18,7 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // ══════════════════════════════════════════════════════════
-// ★ 工具调用缓存（相同参数 60 秒内复用结果）
+// ★ 工具调用缓存（相同参数 5 分钟内复用结果）
 // ══════════════════════════════════════════════════════════
 builder.Services.AddMemoryCache();
 
@@ -110,6 +110,19 @@ builder.Services.AddHealthChecks()
         name: "ollama-model-ready",
         failureStatus: HealthStatus.Unhealthy,
         tags: ["ready"]);
+
+// ══════════════════════════════════════════════════════════
+// ★ 健康检查：延迟启动 + 降低频率
+//   Ollama 模型首次加载需要 30-60 秒（qwen3:8b 加载到显存），
+//   过早检查会被 startup probe 取消，导致误报 Unhealthy。
+//   延迟 30 秒后再开始检查，配合 WarmupService 让模型充分就绪。
+// ══════════════════════════════════════════════════════════
+builder.Services.Configure<HealthCheckPublisherOptions>(options =>
+{
+    options.Delay   = TimeSpan.FromSeconds(30);   // 启动后 30 秒才开始检查
+    options.Period  = TimeSpan.FromSeconds(30);   // 每 30 秒一次
+    options.Timeout = TimeSpan.FromSeconds(10);   // 单次检查 10 秒超时
+});
 
 // ---------------------------------------------------------------------------
 // 10. LiteGraph SDK + 图数据服务

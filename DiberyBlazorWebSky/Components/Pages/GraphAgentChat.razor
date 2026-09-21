@@ -26,6 +26,22 @@
                     disabled="@(_isSending || _isLoadingSessions)">
                 🔄 Refresh
             </button>
+            @if (_messages.Count > 0)
+            {
+                <button class="btn-copy-all"
+                        @onclick="CopyAllMessagesAsync"
+                        disabled="@_isSending"
+                        title="复制整段对话为 Markdown 格式">
+                    @if (_allCopied)
+                    {
+                        <text>✓ 已复制</text>
+                    }
+                    else
+                    {
+                        <text>📋 复制全部</text>
+                    }
+                </button>
+            }
             @if (!string.IsNullOrEmpty(_selectedSessionId))
             {
                 <button class="btn-reset"

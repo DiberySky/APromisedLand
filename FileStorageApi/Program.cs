@@ -5,6 +5,7 @@ using FileStorageApi.Security;
 using FileStorageApi.Storage;
 using FileStorageApi.Uploads;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -96,6 +97,18 @@ builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
+
+// ══════════════════════════════════════════════════════════
+// ★ 健康检查：延迟启动 + 降低频率
+//   避免应用启动期间 DB 还没就绪时被 startup probe 取消，
+//   导致 FileStorageContext 健康检查误报 Unhealthy。
+// ══════════════════════════════════════════════════════════
+builder.Services.Configure<HealthCheckPublisherOptions>(options =>
+{
+    options.Delay   = TimeSpan.FromSeconds(15);   // 启动后 15 秒才开始检查
+    options.Period  = TimeSpan.FromSeconds(30);   // 每 30 秒一次
+    options.Timeout = TimeSpan.FromSeconds(10);   // 单次检查 10 秒超时
+});
 
 var app = builder.Build();
 

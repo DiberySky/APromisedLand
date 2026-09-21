@@ -24,7 +24,9 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
     private Timer? _elapsedTimer;
     private DateTime _sendStartedAt;
     private bool _useStreaming = true;
-
+    // ★ 一键复制整段对话：反馈状态
+    private bool _allCopied;
+    
     // ★ 复制反馈：记录最近复制的消息 ID
     private string? _lastCopiedMessageId;
 
@@ -162,6 +164,109 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         }
     }
 
+        /// <summary>
+    /// 一键复制整段对话为 Markdown 格式。
+    /// 格式：
+    ///   # 图 Agent 对话
+    ///   **会话 ID**: xxx
+    ///   **导出时间**: yyyy-MM-dd HH:mm:ss
+    ///   ---
+    ///   ## 👤 用户
+    ///   内容
+    ///   ## 🔧 GraphAssistant
+    ///   内容
+    ///   **工具调用**：
+    ///   - ToolName (耗时)
+    /// </summary>
+    private async Task CopyAllMessagesAsync()
+    {
+        if (_messages.Count == 0) return;
+
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+
+            // 头部元信息
+            sb.AppendLine("# 图 Agent 对话");
+            sb.AppendLine();
+            if (!string.IsNullOrEmpty(_selectedSessionId))
+                sb.AppendLine($"- **会话 ID**: `{_selectedSessionId}`");
+            sb.AppendLine($"- **导出时间**: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"- **消息数**: {_messages.Count}");
+            sb.AppendLine();
+            sb.AppendLine("---");
+            sb.AppendLine();
+
+            // 逐条消息
+            foreach (var m in _messages)
+            {
+                // 角色 + Agent 名
+                var roleLabel = m.Role switch
+                {
+                    "user" => "👤 用户",
+                    "assistant" => m.AgentName switch
+                    {
+                        "Assistant" => "💬 Assistant",
+                        "GraphAssistant" => "🔧 GraphAssistant",
+                        _ => string.IsNullOrEmpty(m.AgentName)
+                            ? "🤖 助手"
+                            : $"🤖 {m.AgentName}"
+                    },
+                    "error" => "⚠️ 错误",
+                    _ => "❓ 未知"
+                };
+
+                sb.AppendLine($"## {roleLabel}");
+                sb.AppendLine($"*{m.Timestamp:HH:mm:ss}*");
+                sb.AppendLine();
+                sb.AppendLine(m.Text);
+                sb.AppendLine();
+
+                // 工具调用详情
+                if (m.ToolCallDetails.Count > 0)
+                {
+                    sb.AppendLine("**工具调用**：");
+                    foreach (var detail in m.ToolCallDetails)
+                    {
+                        var cacheTag = detail.FromCache ? " ⚡缓存" : $" {detail.ElapsedMs}ms";
+                        sb.AppendLine($"- `{detail.ToolName}`{cacheTag}");
+                        sb.AppendLine($"  - 参数: `{detail.Arguments}`");
+                        if (!string.IsNullOrEmpty(detail.Result))
+                        {
+                            // 折叠长结果
+                            var resultPreview = detail.Result.Length > 300
+                                ? detail.Result[..300] + "…"
+                                : detail.Result;
+                            sb.AppendLine($"  - 结果: {resultPreview.Replace("\n", " ")}");
+                        }
+                    }
+                    sb.AppendLine();
+                }
+
+                sb.AppendLine("---");
+                sb.AppendLine();
+            }
+
+            var markdown = sb.ToString();
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", markdown);
+
+            // 显示反馈
+            _allCopied = true;
+            StateHasChanged();
+
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000);
+                _allCopied = false;
+                await InvokeAsync(StateHasChanged);
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "复制全部对话失败");
+        }
+    }
+    
     // ══════════════════════════════════════════════════════
     // 发送消息
     // ══════════════════════════════════════════════════════

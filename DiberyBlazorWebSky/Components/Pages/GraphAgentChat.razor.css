@@ -644,3 +644,32 @@
     font-size: 0.7rem;
     color: #94a3b8;
 }
+
+/* ══════════════════════════════════════════════════════════ */
+/* 顶部"复制全部"按钮                                         */
+/* ══════════════════════════════════════════════════════════ */
+
+.btn-copy-all {
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.btn-copy-all:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.btn-copy-all:active:not(:disabled) {
+    transform: scale(0.96);
+}
+
+.btn-copy-all:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

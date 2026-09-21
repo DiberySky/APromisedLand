@@ -39,13 +39,13 @@ public static class MafWorkFlowExtension
 
         ExternalServiceBinding[] externalBindings =
         [
-            ExternalServiceBinding.From(
-                context.NebulaGraph, endpointName: "graph",
-                connectionStringName: "nebula", schemeOverride: "thrift"),
-
-            ExternalServiceBinding.From(
-                context.Weaviate, endpointName: "http",
-                connectionStringName: "weaviate"),
+            // ExternalServiceBinding.From(
+            //     context.NebulaGraph, endpointName: "graph",
+            //     connectionStringName: "nebula", schemeOverride: "thrift"),
+            //
+            // ExternalServiceBinding.From(
+            //     context.Weaviate, endpointName: "http",
+            //     connectionStringName: "weaviate"),
 
             ExternalServiceBinding.From(
                 context.SeaweedS3, endpointName: "s3",
