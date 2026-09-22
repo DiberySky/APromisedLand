@@ -1,15 +1,33 @@
 using System.Text.Json;
 using MAFWorkFlowApi.Models.Graph;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace MAFWorkFlowApi.Services;
 
+/// <summary>
+/// LLM 意图解析 + L1(内存) / L2(Redis) 两级缓存。
+/// 设计原则：
+///   1. L1 命中 → 最快（< 1ms）
+///   2. L2 命中 → 回填 L1（跨实例共享）
+///   3. 都未命中 → 走 LLM + 规则兜底
+///   4. 写入时 L1 和 L2 双写
+/// </summary>
 public sealed class IntentParserService
 {
-    // ★ 删掉了没用的 JsonOpts
+    // ── 缓存 TTL ──
+    private static readonly TimeSpan L1Ttl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan L2Ttl = TimeSpan.FromMinutes(30);
 
-    // 规则兜底（与前端 EdgeNameZh 保持）
+    // ── JSON 序列化配置（用于 L2 存 Redis） ──
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
+    // ── 规则兜底映射 ──
     private static readonly Dictionary<string, (string Rel, string Dir)> RuleMap = new()
     {
         ["父亲"] = ("PARENT_OF", "in"), ["父节点"] = ("PARENT_OF", "in"),
@@ -24,16 +42,19 @@ public sealed class IntentParserService
 
     private readonly IChatClient _chat;
     private readonly ILogger<IntentParserService> _logger;
-    private readonly IMemoryCache _cache;
+    private readonly IMemoryCache _l1;
+    private readonly IDistributedCache _l2;
 
     public IntentParserService(
         IChatClient chat,
         ILogger<IntentParserService> logger,
-        IMemoryCache cache)
+        IMemoryCache l1,
+        IDistributedCache l2)
     {
         _chat = chat;
         _logger = logger;
-        _cache = cache;
+        _l1 = l1;
+        _l2 = l2;
     }
 
     public async Task<IntentResult> ParseAsync(
@@ -44,12 +65,45 @@ public sealed class IntentParserService
         if (string.IsNullOrWhiteSpace(query))
             return new IntentResult { Strategy = "none" };
 
-        var cacheKey = $"intent:{query}:{string.Join(",", relations.OrderBy(x => x))}";
-        if (_cache.TryGetValue(cacheKey, out IntentResult? cached) && cached is not null)
-            return cached;
+        var cacheKey = BuildCacheKey(query, relations);
 
+        // ══════════════════════════════════════════════════════
+        // L1 命中
+        // ══════════════════════════════════════════════════════
+        if (_l1.TryGetValue(cacheKey, out IntentResult? l1Hit) && l1Hit is not null)
+        {
+            _logger.LogDebug("意图 L1 命中：{Query}", query);
+            return l1Hit;
+        }
+
+        // ══════════════════════════════════════════════════════
+        // L2 命中
+        // ══════════════════════════════════════════════════════
+        try
+        {
+            var l2Bytes = await _l2.GetAsync(cacheKey, ct);
+            if (l2Bytes is { Length: > 0 })
+            {
+                var l2Hit = JsonSerializer.Deserialize<IntentResult>(l2Bytes, JsonOpts);
+                if (l2Hit is not null)
+                {
+                    _logger.LogDebug("意图 L2 命中：{Query}", query);
+                    // 回填 L1
+                    _l1.Set(cacheKey, l2Hit, L1Ttl);
+                    return l2Hit;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Redis 挂了不影响主流程
+            _logger.LogWarning(ex, "L2 读取失败，降级到 LLM");
+        }
+
+        // ══════════════════════════════════════════════════════
+        // 都未命中：走 LLM
+        // ══════════════════════════════════════════════════════
         IntentResult? result = null;
-
         try
         {
             result = await ParseByLlmAsync(query, relations, ct);
@@ -60,15 +114,57 @@ public sealed class IntentParserService
         }
 
         if (result is null || result.Confidence < 0.5)
-            result = ParseByRule(query, relations) ?? result ?? new IntentResult { Strategy = "none" };
+        {
+            var ruleResult = ParseByRule(query, relations);
+            result = ruleResult ?? result ?? new IntentResult { Strategy = "none" };
+        }
 
-        _cache.Set(cacheKey, result, TimeSpan.FromMinutes(30));
+        // ══════════════════════════════════════════════════════
+        // 双写 L1 + L2
+        // ══════════════════════════════════════════════════════
+        _l1.Set(cacheKey, result, L1Ttl);
+
+        try
+        {
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(result, JsonOpts);
+            await _l2.SetAsync(
+                cacheKey,
+                bytes,
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = L2Ttl
+                },
+                ct);
+        }
+        catch (Exception ex)
+        {
+            // 写失败不影响主流程
+            _logger.LogWarning(ex, "L2 写入失败（不影响主流程）");
+        }
+
         return result;
     }
 
-    // ══════════════════════════════════════════════════════
-    // LLM 路径
-    // ══════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
+    // 缓存 Key 构建
+    // ══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 缓存 Key 格式：intent:v1:{query}:{relations sorted}
+    /// 加 v1 前缀方便将来 schema 变更时无痛失效。
+    /// </summary>
+    private static string BuildCacheKey(
+        string query,
+        IReadOnlyCollection<string> relations)
+    {
+        var relKey = string.Join(",", relations.OrderBy(x => x, StringComparer.Ordinal));
+        // 用 | 分隔避免 query 里含冒号导致歧义
+        return $"intent:v1:{query}|{relKey}";
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // LLM 路径（不变）
+    // ══════════════════════════════════════════════════════════
 
     private async Task<IntentResult?> ParseByLlmAsync(
         string query,
@@ -77,7 +173,6 @@ public sealed class IntentParserService
     {
         var relList = string.Join(", ", relations);
 
-        // ★ 改用 $$""" 语法：插值 {{relList}}，JSON 花括号直接写
         var system =
             $$"""
             你是图数据库查询意图解析器。把自然语言转为 JSON。
@@ -146,9 +241,9 @@ public sealed class IntentParserService
         };
     }
 
-    // ══════════════════════════════════════════════════════
-    // 规则兜底
-    // ══════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
+    // 规则兜底（不变）
+    // ══════════════════════════════════════════════════════════
 
     private static IntentResult? ParseByRule(
         string query,
@@ -171,11 +266,10 @@ public sealed class IntentParserService
         return null;
     }
 
-    // ══════════════════════════════════════════════════════
-    // 辅助
-    // ══════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
+    // 辅助（不变）
+    // ══════════════════════════════════════════════════════════
 
-    /// <summary>从可能含 thinking 的响应里抠 JSON。</summary>
     private static string ExtractJson(string raw)
     {
         var start = raw.IndexOf('{');

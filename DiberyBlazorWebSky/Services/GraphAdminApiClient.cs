@@ -713,12 +713,14 @@ public sealed class IntentResultDto
 
 public sealed class SemanticSearchHitDto
 {
-    [JsonPropertyName("nodeGuid")] public Guid NodeGuid { get; set; }
-    [JsonPropertyName("nodeName")] public string NodeName { get; set; } = "";
-    [JsonPropertyName("score")] public double Score { get; set; }
-    [JsonPropertyName("viaEdgeName")] public string? ViaEdgeName { get; set; }
-    [JsonPropertyName("direction")] public string? Direction { get; set; }
-    [JsonPropertyName("matchedContent")] public string? MatchedContent { get; set; }
+    [JsonPropertyName("nodeGuid")]        public Guid NodeGuid { get; set; }
+    [JsonPropertyName("nodeName")]        public string NodeName { get; set; } = "";
+    [JsonPropertyName("score")]           public double Score { get; set; }
+    [JsonPropertyName("vectorScore")]     public double? VectorScore { get; set; }   // ★
+    [JsonPropertyName("bm25Score")]       public double? Bm25Score   { get; set; }   // ★
+    [JsonPropertyName("viaEdgeName")]     public string? ViaEdgeName { get; set; }
+    [JsonPropertyName("direction")]       public string? Direction { get; set; }
+    [JsonPropertyName("matchedContent")]  public string? MatchedContent { get; set; }
 }
 
 public sealed class SemanticSearchResponseDto

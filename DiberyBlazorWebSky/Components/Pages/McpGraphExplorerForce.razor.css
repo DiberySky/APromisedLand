@@ -755,3 +755,11 @@
     border-left: 2px solid #cbd5e1;
 }
 
+/* ★ 分量明细（向量/BM25） */
+.component-scores {
+    color: #6366f1;
+    font-size: 0.72rem;
+    font-family: monospace;
+    margin-left: 4px;
+}
+

@@ -204,17 +204,20 @@
                                 <div class="item-info">
                                     <strong>@r.NodeName</strong>
                                     <span class="guid">
-                                        相似度: @r.Score.ToString("F4")
+                                        综合: @r.Score.ToString("F4")
+                                        @if (r.VectorScore.HasValue && r.Bm25Score.HasValue)
+                                        {
+                                            <span class="component-scores">
+                                                （向量 @r.VectorScore.Value.ToString("F4")
+                                                · BM25 @r.Bm25Score.Value.ToString("F4")）
+                                            </span>
+                                        }
                                         @if (!string.IsNullOrEmpty(r.ViaEdge))
                                         {
-                                            <span class="via-edge">· 通过 <b>@r.ViaEdge</b> 关系</span>
-                                        }
-                                        else if (!string.IsNullOrEmpty(r.MatchedContent))
-                                        {
-                                            <span class="via-edge">· 命中节点向量</span>
+                                            <span class="via-edge">· 通过 <b>@r.ViaEdge</b></span>
                                         }
                                     </span>
-                                    @if (!string.IsNullOrEmpty(r.MatchedContent) && !string.IsNullOrEmpty(r.ViaEdge))
+                                    @if (!string.IsNullOrEmpty(r.MatchedContent))
                                     {
                                         <div class="content-snippet">@r.MatchedContent</div>
                                     }

@@ -590,11 +590,13 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
             _vectorResults = resp.Hits.Select(h => new VectorSearchDisplayResult
             {
-                NodeName = h.NodeName,
-                Score = (float)h.Score,
-                ViaEdge = h.ViaEdgeName,
-                Direction = h.Direction,
-                MatchedContent = h.MatchedContent
+                NodeName       = h.NodeName,
+                Score          = (float)h.Score,
+                ViaEdge        = h.ViaEdgeName,
+                Direction      = h.Direction,
+                MatchedContent = h.MatchedContent,
+                VectorScore    = h.VectorScore.HasValue ? (float)h.VectorScore.Value : null,
+                Bm25Score      = h.Bm25Score.HasValue   ? (float)h.Bm25Score.Value   : null
             }).ToList();
 
             _vectorProgress = $"返回 {_vectorResults.Count} 条结果";
@@ -1563,8 +1565,12 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     {
         public string NodeName { get; set; } = "";
         public float Score { get; set; }
-        public string? ViaEdge { get; set; }          // ★ 通过哪条关系命中
-        public string? Direction { get; set; }        // "in" / "out"
-        public string? MatchedContent { get; set; }   // 命中的原文
+        public string? ViaEdge { get; set; }
+        public string? Direction { get; set; }
+        public string? MatchedContent { get; set; }
+
+        // ★ 新增：分量明细
+        public float? VectorScore { get; set; }
+        public float? Bm25Score { get; set; }
     }
 }

@@ -524,13 +524,19 @@ public sealed class GraphController(
 // ★ 语义搜索：意图解析 + 边向量搜索 + 方向过滤（核心）
 // ══════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════
+// ★ 语义搜索：意图解析 + 混合检索（向量 + BM25）+ 方向过滤
+// ══════════════════════════════════════════════════════════
+
     [HttpPost("{graphGuid}/semantic-search")]
     public async Task<ActionResult<SemanticSearchResponseDto>> SemanticSearch(
         [FromRoute] Guid graphGuid,
         [FromBody] SemanticSearchRequest request,
         CancellationToken ct)
     {
+        // ══════════════════════════════════════════════════════
         // ① 意图解析
+        // ══════════════════════════════════════════════════════
         var relations = await LoadGraphRelationsAsync(graphGuid, ct);
         var intent = await intentParser.ParseAsync(request.Query, relations, ct);
 
@@ -538,41 +544,71 @@ public sealed class GraphController(
             "语义搜索：Query={Q}, Rel={R}, Dir={D}, Subj={S}",
             request.Query, intent.Relation, intent.Direction, intent.SubjectName);
 
+        // ══════════════════════════════════════════════════════
         // ② 生成查询向量
+        // ══════════════════════════════════════════════════════
         var queryVec = await GenerateQueryEmbeddingAsync(request.Query, ct);
         if (queryVec is null || queryVec.Count == 0)
             return BadRequest("无法生成查询向量");
 
-        // ③ 加载所有边向量
-        // ── ③ 加载所有边向量（自动分页）──
-        var edgeVecs = await LoadAllEdgeVectorsAsync(graphGuid, ct);
+    // ══════════════════════════════════════════════════════
+    // ③ 加载所有边向量（分页拉取，LiteGraph 单次上限 1000）
+    // ══════════════════════════════════════════════════════
+        var allVectors = await EnumerateAllVectorsAsync(graphGuid, ct: ct);
 
-        if (edgeVecs.Count == 0)
-        {
-            return Ok(new SemanticSearchResponseDto
-            {
-                Intent = intent,
-                Stats = new { Note = "图中无边向量，请先重建向量" }
-            });
-        }
-
-        if (edgeVecs.Count == 0)
-        {
-            return Ok(new SemanticSearchResponseDto
-            {
-                Intent = intent,
-                Stats = new { Note = "图中无边向量，请先为所有节点生成向量" }
-            });
-        }
-
-        // ④ 余弦相似度排序
-        var scored = edgeVecs
-            .Select(v => (Vector: v, Score: Cosine(v.Vectors!, queryVec)))
-            .Where(x => request.MinScore is null || x.Score >= request.MinScore)
-            .OrderByDescending(x => x.Score)
+        var edgeVecs = allVectors
+            .Where(v => v.EdgeGUID.HasValue && v.Vectors is { Count: > 0 })
             .ToList();
 
+        if (edgeVecs.Count == 0)
+        {
+            return Ok(new SemanticSearchResponseDto
+            {
+                Intent = intent,
+                Stats = new { Note = "图中无边向量，请先重建所有向量" }
+            });
+        }
+
+        // ══════════════════════════════════════════════════════
+        // ④ 混合检索：向量 + BM25
+        // ══════════════════════════════════════════════════════
+        var docs = edgeVecs.Select(v => v.Content ?? "").ToList();
+        var bm25 = new Bm25Scorer(docs);
+        var bm25Scores = bm25.ScoreAllNormalized(request.Query);
+
+        var alpha = request.VectorWeight;
+        var beta = request.Bm25Weight;
+
+        var scored = edgeVecs
+            .Select((v, i) => new
+            {
+                Vector = v,
+                VectorScore = Cosine(v.Vectors!, queryVec),
+                Bm25Score = bm25Scores[i]
+            })
+            .Select(x => new
+            {
+                x.Vector,
+                x.VectorScore,
+                x.Bm25Score,
+                FinalScore = alpha * x.VectorScore + beta * x.Bm25Score
+            })
+            .Where(x => request.MinScore is null || x.FinalScore >= request.MinScore)
+            .OrderByDescending(x => x.FinalScore)
+            .ToList();
+
+        // 日志：可观测性
+        if (scored.Count > 0)
+        {
+            _logger.LogInformation(
+                "混合检索 Top1: V={V:F4}, B={B:F4}, Final={F:F4}, Content={C}",
+                scored[0].VectorScore, scored[0].Bm25Score, scored[0].FinalScore,
+                scored[0].Vector.Content);
+        }
+
+        // ══════════════════════════════════════════════════════
         // ⑤ 边方向过滤 + 反查节点
+        // ══════════════════════════════════════════════════════
         var hits = new List<SemanticSearchHitDto>();
         var seen = new HashSet<Guid>();
 
@@ -580,18 +616,15 @@ public sealed class GraphController(
         var nodeCache = new Dictionary<Guid, Node>();
         Guid? subjectGuid = null;
 
-        // 预解析 subject
         if (!string.IsNullOrWhiteSpace(intent.SubjectName))
-            subjectGuid = await FindNodeByNameAsync(graphGuid, intent.SubjectName, nodeCache, ct);
+            subjectGuid = await FindNodeByNameAsync(
+                graphGuid, intent.SubjectName, nodeCache, ct);
 
-        // ════════════════════════════════════════════════════
-// ★ 关键修复：Subject 优先 + 方向自动纠偏
-// ════════════════════════════════════════════════════
-        foreach (var (vec, score) in scored)
+        foreach (var item in scored)
         {
             if (hits.Count >= request.TopK) break;
 
-            var edgeGuid = vec.EdgeGUID!.Value;
+            var edgeGuid = item.Vector.EdgeGUID!.Value;
             if (!edgeCache.TryGetValue(edgeGuid, out var edge))
             {
                 edge = await FetchEdgeAsync(graphGuid, edgeGuid, ct);
@@ -599,30 +632,23 @@ public sealed class GraphController(
                 edgeCache[edgeGuid] = edge;
             }
 
-            // ① 关系名过滤
+            // 关系名过滤
             if (intent.Relation is not null &&
                 !string.Equals(edge.Name, intent.Relation, StringComparison.Ordinal))
                 continue;
 
-            // ② 定位目标节点
+            // ── 方向过滤（subject 优先 + 自动纠偏）──
             Guid targetGuid;
             string effectiveDir;
 
             if (subjectGuid is not null)
             {
-                // ══════════════════════════════════════════════
-                // ★ 有 subject：以 subject 为准，自动纠偏方向
-                //   不管 LLM 说 in 还是 out，都按"边相对 subject 的方向"决定
-                // ══════════════════════════════════════════════
                 bool subjectIsFrom = edge.From == subjectGuid;
                 bool subjectIsTo = edge.To == subjectGuid;
 
                 if (!subjectIsFrom && !subjectIsTo)
-                    continue; // 这条边跟 subject 无关，跳过
+                    continue; // 与 subject 无关
 
-                // LLM 说 in  → 期望 subject 是 To（入边）→ 目标 = From
-                // LLM 说 out → 期望 subject 是 From（出边）→ 目标 = To
-                // 若不匹配，自动按"边本身的方向"取远端
                 if (intent.Direction == "in")
                 {
                     if (subjectIsTo)
@@ -632,12 +658,11 @@ public sealed class GraphController(
                     }
                     else
                     {
-                        // ★ LLM 说 in 但 subject 实际是 From → 反转
                         targetGuid = edge.To;
                         effectiveDir = "out";
                         _logger.LogWarning(
-                            "方向纠偏：LLM={Llm}, 实际=out, Subject={Subj}, Edge={Edge}",
-                            intent.Direction, intent.SubjectName, edgeGuid);
+                            "方向纠偏：LLM=in, 实际=out, Subject={Subj}, Edge={Edge}",
+                            intent.SubjectName, edgeGuid);
                     }
                 }
                 else if (intent.Direction == "out")
@@ -649,26 +674,21 @@ public sealed class GraphController(
                     }
                     else
                     {
-                        // ★ LLM 说 out 但 subject 实际是 To → 反转
                         targetGuid = edge.From;
                         effectiveDir = "in";
                         _logger.LogWarning(
-                            "方向纠偏：LLM={Llm}, 实际=in, Subject={Subj}, Edge={Edge}",
-                            intent.Direction, intent.SubjectName, edgeGuid);
+                            "方向纠偏：LLM=out, 实际=in, Subject={Subj}, Edge={Edge}",
+                            intent.SubjectName, edgeGuid);
                     }
                 }
                 else
                 {
-                    // 无方向 → 按边的起点/终点任选（不推荐，但兜底）
                     targetGuid = subjectIsFrom ? edge.To : edge.From;
                     effectiveDir = subjectIsFrom ? "out" : "in";
                 }
             }
             else
             {
-                // ══════════════════════════════════════════════
-                // 无 subject：按 LLM 给的方向选远端
-                // ══════════════════════════════════════════════
                 targetGuid = intent.Direction switch
                 {
                     "out" => edge.To,
@@ -683,7 +703,7 @@ public sealed class GraphController(
             if (seen.Contains(targetGuid)) continue;
             seen.Add(targetGuid);
 
-            // ③ 反查目标节点
+            // 反查目标节点
             if (!nodeCache.TryGetValue(targetGuid, out var target))
             {
                 target = await FetchNodeAsync(graphGuid, targetGuid, ct);
@@ -695,10 +715,12 @@ public sealed class GraphController(
             {
                 NodeGuid = target.GUID,
                 NodeName = target.Name,
-                Score = score,
+                Score = item.FinalScore,
+                VectorScore = item.VectorScore, // ★ 分量
+                Bm25Score = item.Bm25Score, // ★ 分量
                 ViaEdgeName = edge.Name,
-                Direction = effectiveDir, // ★ 返回纠偏后的方向
-                MatchedContent = vec.Content
+                Direction = effectiveDir,
+                MatchedContent = item.Vector.Content
             });
         }
 
@@ -709,12 +731,82 @@ public sealed class GraphController(
             Stats = new
             {
                 TotalEdgeVectors = edgeVecs.Count,
-                Scanned = scored.Count,
-                Returned = hits.Count
+                Recalled = scored.Count,
+                Returned = hits.Count,
+                VectorWeight = alpha,
+                Bm25Weight = beta
             }
         });
     }
 
+    // ══════════════════════════════════════════════════════════
+    // ★ 辅助：分页枚举全量向量
+    //   LiteGraph 的 EnumerationRequest.MaxResults 硬上限 = 1000，
+    //   超过会抛 ArgumentException，所以必须分页循环。
+    // ══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 分页拉取一个图的全部向量。
+    /// </summary>
+    /// <param name="graphGuid">图 GUID</param>
+    /// <param name="maxTotal">最多拉多少条，防止无限循环（默认 10 万）</param>
+    private async Task<List<VectorMetadata>> EnumerateAllVectorsAsync(
+        Guid graphGuid,
+        int maxTotal = 100_000,
+        CancellationToken ct = default)
+    {
+        const int PageSize = 1000;   // ★ LiteGraph 硬上限
+
+        var result = new List<VectorMetadata>();
+        Guid? token = null;
+        int guard = 0;
+
+        while (result.Count < maxTotal)
+        {
+            // 防御性：最多 1000 页
+            if (++guard > 1000)
+            {
+                _logger.LogWarning(
+                    "EnumerateAllVectorsAsync 达到 1000 页上限，已拉取 {Count} 条，提前退出",
+                    result.Count);
+                break;
+            }
+
+            var query = new EnumerationRequest
+            {
+                TenantGUID = Guid.Empty,
+                GraphGUID = graphGuid,
+                Ordering = EnumerationOrderEnum.CreatedDescending,
+                MaxResults = PageSize,
+                ContinuationToken = token
+            };
+
+            var page = await _sdk.Vector.Enumerate(query, ct);
+
+            if (page.Objects is { Count: > 0 })
+                result.AddRange(page.Objects);
+
+            // 没有下一页就退出
+            if (page.ContinuationToken is null)
+                break;
+
+            // 防止 token 死循环
+            if (page.ContinuationToken == token)
+            {
+                _logger.LogWarning("ContinuationToken 未推进，提前退出");
+                break;
+            }
+
+            token = page.ContinuationToken;
+        }
+
+        _logger.LogDebug(
+            "EnumerateAllVectorsAsync: Graph={Graph}, Total={Count}",
+            graphGuid, result.Count);
+
+        return result;
+    }
+    
     // ══════════════════════════════════════════════════════════
     // ★ 辅助：分页加载全图所有边向量（每页 1000，自动翻页）
     // ══════════════════════════════════════════════════════════

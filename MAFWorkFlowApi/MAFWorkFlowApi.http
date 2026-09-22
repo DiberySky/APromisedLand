@@ -8,3 +8,7 @@ Accept: application/json
 http://localhost:5323/health
 
 ###
+POST http://localhost:5323/api/graph/17f42996-55c4-4795-9e21-47b1d15a9635/vectors/enumerate
+Content-Type: application/json
+
+{ "MaxResults": 3 }
