@@ -55,7 +55,13 @@ public sealed class UpdateEdgePayload
 public sealed class CreateVectorPayload
 {
     public Guid NodeGuid { get; set; }
-    public string Model { get; set; } = "bge-large";
+
+    /// <summary>
+    /// ★ 保留字段以兼容旧调用方。服务端会忽略此字段，
+    ///   使用服务端配置的 Embedding:Model。
+    /// </summary>
+    public string? Model { get; set; }
+
     public List<float> Vector { get; set; } = new();
 }
 
@@ -113,10 +119,6 @@ public sealed class VectorMetadataDto
 // 客户端
 // ══════════════════════════════════════════════════════════
 
-/// <summary>
-/// Explorer 专用图 API 客户端：所有操作走后端 /api/graph 和 /api/graph-admin。
-/// 前端不再直接依赖 LiteGraph.Sdk。
-/// </summary>
 public class GraphAdminApiClient
 {
     private readonly HttpClient _http;
@@ -209,7 +211,6 @@ public class GraphAdminApiClient
     {
         try
         {
-            // ★ 直接用已验证可用的 GET 端点，一次拿全部
             var raw = await _http.GetFromJsonAsync<JsonElement>(
                 $"/api/graph/{graphGuid}/nodes", JsonOpts, ct);
 
@@ -220,7 +221,6 @@ public class GraphAdminApiClient
                     objs.GetRawText(), JsonOpts) ?? new();
             }
 
-            // ★ 本地分页
             int startIndex = 0;
             if (continuationToken.HasValue)
             {
@@ -251,7 +251,7 @@ public class GraphAdminApiClient
             return new EnumerateResult<NodeDto>();
         }
     }
-    
+
     public async Task<List<NodeDto>> ListAllNodesAsync(Guid graphGuid, CancellationToken ct = default)
     {
         var result = await EnumerateNodesAsync(graphGuid, 1000, null, ct);
@@ -435,8 +435,13 @@ public class GraphAdminApiClient
         }
     }
 
+    /// <summary>
+    /// ★ 创建向量。model 参数已废弃，服务端会忽略它并使用服务端配置的模型名。
+    ///   保留参数只是为了不破坏现有调用方。
+    /// </summary>
     public async Task<bool> CreateVectorAsync(
-        Guid graphGuid, Guid nodeGuid, string model, List<float> vector, CancellationToken ct = default)
+        Guid graphGuid, Guid nodeGuid, string? model, List<float> vector,
+        CancellationToken ct = default)
     {
         try
         {
@@ -586,6 +591,37 @@ public class GraphAdminApiClient
         {
             _logger.LogWarning(ex, "导入为新图失败");
             return new ImportAsNewGraphResponseDto();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // Embedding
+    // ══════════════════════════════════════════════════════
+
+    /// <summary>把文本转为向量。失败返回 null。</summary>
+    public async Task<List<float>?> GetEmbeddingAsync(string text, CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync(
+                "/api/embedding/embed",
+                new { Text = text },
+                JsonOpts, ct);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("Embedding 返回 {Status}: {Body}", resp.StatusCode, body);
+                return null;
+            }
+
+            var result = await resp.Content.ReadFromJsonAsync<EmbedResponseDto>(JsonOpts, ct);
+            return result?.Vector;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "调用后端 embedding 失败");
+            return null;
         }
     }
 }

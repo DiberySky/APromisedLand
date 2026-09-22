@@ -74,6 +74,10 @@ public class AppHostResourceContext
     public IResourceBuilder<OllamaModelResource>? Embedding { get; set; }
     public IResourceBuilder<OllamaModelResource>? ChatModel { get; set; }
     
+    // ★ 新增：模型名元数据，供后续注入使用
+    public string? EmbeddingModelName { get; set; }
+    public string? ChatModelName { get; set; }
+    
     // Elasticsearch
     public IResourceBuilder<ElasticsearchResource>? Elasticsearch { get; set; }
     public IResourceBuilder<ContainerResource>? Elasticvue { get; set; }

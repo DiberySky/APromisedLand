@@ -29,8 +29,6 @@ builder.AddRedisDistributedCache("Redis");
 
 // ---------------------------------------------------------------------------
 // 3. 全局 HttpClient 配置
-//    - 移除 Aspire 默认弹性管道（AttemptTimeout=10s 会截断 Ollama 长推理）
-//    - 全局超时放宽到 10 分钟
 // ---------------------------------------------------------------------------
 builder.Services.ConfigureHttpClientDefaults(http =>
 {
@@ -39,29 +37,57 @@ builder.Services.ConfigureHttpClientDefaults(http =>
         client.Timeout = TimeSpan.FromMinutes(10));
 });
 
-// 健康检查专用：短超时，避免拖慢 /health
 builder.Services.AddHttpClient(OllamaModelReadyHealthCheck.HttpClientName)
     .ConfigureHttpClient(client =>
         client.Timeout = TimeSpan.FromSeconds(10));
 
-// 预热专用：长超时，用于启动时加载模型
 builder.Services.AddHttpClient(OllamaWarmupService.HttpClientName)
     .ConfigureHttpClient(client =>
         client.Timeout = TimeSpan.FromMinutes(10));
 
 // ---------------------------------------------------------------------------
 // 4. OllamaSharp 客户端
-//    CommunityToolkit 扩展内部会注册 keyed IChatClient / IEmbeddingGenerator
-// ---------------------------------------------------------------------------
+// ══════════════════════════════════════════════════════════
+// ★ 从配置读取模型名（由 AppHost 通过 WithEnvironment 注入）
+//    - 环境变量：Embedding__Model / Chat__Model
+//    - 启动时日志打印，方便确认
+// ══════════════════════════════════════════════════════════
+var embeddingModelName = builder.Configuration["Embedding:Model"] ?? "bge-large";
+var chatModelName      = builder.Configuration["Chat:Model"]      ?? "qwen3:8b";
+
+// 早日志（用 Console，因为 ILogger 还没建好）
+Console.WriteLine($"[Config] Embedding Model = {embeddingModelName}");
+Console.WriteLine($"[Config] Chat Model      = {chatModelName}");
+
 builder.AddOllamaApiClient("chat-model")
     .AddKeyedChatClient("chat-model");
 
 builder.AddOllamaApiClient("embedding")
     .AddKeyedEmbeddingGenerator("embedding");
 
+// ★ 覆盖 keyed embedding generator：确保用配置里的模型名
+//   （覆盖 AddKeyedEmbeddingGenerator 的默认注册）
+builder.Services.AddKeyedSingleton<IEmbeddingGenerator<string, Embedding<float>>>(
+    "embedding",
+    (sp, _) =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var connectionString = config.GetConnectionString("embedding")
+                               ?? throw new InvalidOperationException(
+                                   "ConnectionStrings:embedding 未配置。" +
+                                   "检查 AppHost 中是否 .WithReference(context.Embedding)。");
+
+        var uri   = ParseOllamaEndpoint(connectionString);
+        var model = config["Embedding:Model"] ?? "bge-large";
+
+        Console.WriteLine($"[Embedding] endpoint={uri}, model={model}");
+
+        // ★ 修正：OllamaSharp 没有 OllamaEmbeddingGenerator，
+        //   OllamaApiClient 同时实现 IChatClient + IEmbeddingGenerator
+        return new OllamaApiClient(uri, model);
+    });
+
 // ★ 桥接：keyed → non-keyed
-//    MafAgentService / GraphAgentService 使用 [FromKeyedServices("chat-model")]
-//    DI 验证阶段会尝试按 non-keyed 解析一次，因此必须提供 non-keyed 版本。
 builder.Services.AddSingleton<IChatClient>(sp =>
     sp.GetRequiredKeyedService<IChatClient>("chat-model"));
 
@@ -111,48 +137,37 @@ builder.Services.AddHealthChecks()
         failureStatus: HealthStatus.Unhealthy,
         tags: ["ready"]);
 
-// ══════════════════════════════════════════════════════════
-// ★ 健康检查：延迟启动 + 降低频率
-//   Ollama 模型首次加载需要 30-60 秒（qwen3:8b 加载到显存），
-//   过早检查会被 startup probe 取消，导致误报 Unhealthy。
-//   延迟 30 秒后再开始检查，配合 WarmupService 让模型充分就绪。
-// ══════════════════════════════════════════════════════════
 builder.Services.Configure<HealthCheckPublisherOptions>(options =>
 {
-    options.Delay   = TimeSpan.FromSeconds(30);   // 启动后 30 秒才开始检查
-    options.Period  = TimeSpan.FromSeconds(30);   // 每 30 秒一次
-    options.Timeout = TimeSpan.FromSeconds(10);   // 单次检查 10 秒超时
+    options.Delay   = TimeSpan.FromSeconds(30);
+    options.Period  = TimeSpan.FromSeconds(30);
+    options.Timeout = TimeSpan.FromSeconds(10);
 });
 
 // ---------------------------------------------------------------------------
 // 10. LiteGraph SDK + 图数据服务
-//     注意：扩展方法接收者是 IServiceCollection，因此用 builder.Services
 // ---------------------------------------------------------------------------
 builder.Services.AddLiteGraph(builder.Configuration);
 
-// ══════════════════════════════════════════════════════════
-// ★ LiteGraphSdk（用于 GraphExportService）
-// ══════════════════════════════════════════════════════════
 builder.Services.AddSingleton<LiteGraph.Sdk.LiteGraphSdk>(sp =>
 {
-    // 与 LiteGraphRestClient 使用相同的 endpoint 和 tenant
     var config = sp.GetRequiredService<IConfiguration>();
     var endpoint = config["LiteGraph:Endpoint"] ?? "http://localhost:8701";
     return new LiteGraph.Sdk.LiteGraphSdk(endpoint, "default");
 });
 
-// ══════════════════════════════════════════════════════════
-// ★ Graph Function Calling Agent（Scoped：工具调用上下文按请求隔离）
-// ══════════════════════════════════════════════════════════
+// ---------------------------------------------------------------------------
+// 11. Graph Function Calling Agent（Scoped）
+// ---------------------------------------------------------------------------
 builder.Services.AddScoped<ToolCallContext>();
 builder.Services.AddScoped<GraphTools>();
 builder.Services.AddScoped<GraphAgentService>();
 builder.Services.AddScoped<AssistantAgentService>();
 builder.Services.AddScoped<LlmAgentRouter>();
 
-// ══════════════════════════════════════════════════════════
-// ★ MCP Server：把 GraphTools 暴露给外部 AI 客户端
-// ══════════════════════════════════════════════════════════
+// ---------------------------------------------------------------------------
+// 12. MCP Server
+// ---------------------------------------------------------------------------
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()
@@ -163,7 +178,7 @@ builder.Services.AddScoped<MAFWorkFlowApi.Services.GraphExportService>();
 var app = builder.Build();
 
 // ---------------------------------------------------------------------------
-// 11. 中间件管线
+// 13. 中间件管线
 // ---------------------------------------------------------------------------
 if (app.Environment.IsDevelopment())
 {
@@ -175,19 +190,39 @@ else
     app.UseExceptionHandler();
 }
 
-// 在 app.UseRouting() 之前添加异常中间件：
 app.UseMiddleware<LiteGraphExceptionMiddleware>();
-
-// ★ MCP API Key 认证（仅对 /mcp 路径生效，未配置 key 时跳过）
 app.UseMiddleware<McpApiKeyMiddleware>();
-
 app.UseRouting();
 app.MapControllers();
 app.MapDefaultEndpoints();
-
-// ★ 映射 MCP 端点（外部 AI 客户端连接此地址）
 app.MapMcp("/mcp");
 
 app.Run();
+
+// ══════════════════════════════════════════════════════════
+// 辅助：解析 Ollama 连接字符串为 Uri
+//   可能格式：
+//     - "http://host:port"
+//     - "Endpoint=http://host:port;Model=xxx"
+// ══════════════════════════════════════════════════════════
+static Uri ParseOllamaEndpoint(string connectionString)
+{
+    var parts = connectionString.Split(
+        ';',
+        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    foreach (var part in parts)
+    {
+        var eq = part.IndexOf('=');
+        if (eq > 0)
+        {
+            var key = part[..eq].Trim();
+            var value = part[(eq + 1)..].Trim();
+            if (key.Equals("Endpoint", StringComparison.OrdinalIgnoreCase))
+                return new Uri(value);
+        }
+    }
+    return new Uri(connectionString);
+}
 
 #pragma warning restore EXTEXP0001

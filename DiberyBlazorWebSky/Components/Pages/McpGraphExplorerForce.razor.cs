@@ -14,7 +14,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 {
     // ─── 注入 ─────────────────────────────────────────
     [Inject] private IJSRuntime Js { get; set; } = default!;
-    [Inject] private IHttpClientFactory HttpClientFactory { get; set; } = default!;
     [Inject] private GraphAdminApiClient GraphApi { get; set; } = default!;
 
     // ─── 图 / 节点 / 边状态 ──────────────────────────
@@ -97,10 +96,8 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
     // 常量
     private static readonly Guid DefaultTenant = Guid.Empty;
-
-    private const string OllamaEmbeddingUrl = "http://localhost:11618/api/embeddings";
-    private const string EmbeddingModel = "bge-large";
-
+    private const string EmbeddingModelName = "bge-large";
+    
     // SVG 画布尺寸
     private const double CanvasWidth = 800;
     private const double CanvasHeight = 600;
@@ -580,37 +577,15 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     }
 
     // ★ GetEmbeddingAsync 保留（前端直连 Ollama），因为 embedding 服务不在后端
+    /// <summary>把文本转为向量。走后端 /api/embedding/embed。</summary>
     private async Task<List<float>?> GetEmbeddingAsync(string text)
     {
-        try
+        var vector = await GraphApi.GetEmbeddingAsync(text);
+        if (vector == null)
         {
-            var http = HttpClientFactory.CreateClient();
-            var response = await http.PostAsJsonAsync(
-                OllamaEmbeddingUrl,
-                new { model = EmbeddingModel, prompt = text });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var body = await response.Content.ReadAsStringAsync();
-                _errorMessage = $"Ollama 返回 {response.StatusCode}: {body}";
-                return null;
-            }
-
-            var json = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("embedding", out var arr))
-            {
-                _errorMessage = "Ollama 响应中没有 embedding 字段";
-                return null;
-            }
-            return arr.EnumerateArray().Select(x => x.GetSingle()).ToList();
+            _errorMessage = "生成 embedding 失败，请查看后端日志。";
         }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "调用 Ollama embedding 失败");
-            _errorMessage = $"生成 embedding 失败: {ex.Message}";
-            return null;
-        }
+        return vector;
     }
 
     // SearchVectorAsync 里的向量加载改成 GraphApi.ListAllVectorsAsync
@@ -738,22 +713,27 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 .GroupBy(n => n.Guid)
                 .ToDictionary(g => g.Key, g => g.First().Name);
 
-            var neighborMap = allNodes.ToDictionary(
+            // ★ 构建 edgeMap：GUID → [(EdgeName, OtherName, IsOut)]
+            var edgeMap = allNodes.ToDictionary(
                 n => n.Guid,
-                _ => new List<string>());
+                _ => new List<(string EdgeName, string OtherName, bool IsOut)>());
 
             foreach (var e in allEdges)
             {
                 if (guidToName.TryGetValue(e.From, out var fromName) &&
                     guidToName.TryGetValue(e.To, out var toName))
                 {
-                    if (neighborMap.TryGetValue(e.From, out var fromList)) fromList.Add(toName);
-                    if (neighborMap.TryGetValue(e.To, out var toList)) toList.Add(fromName);
+                    if (edgeMap.TryGetValue(e.From, out var fromList))
+                        fromList.Add((e.Name, toName, true));    // 出边
+
+                    if (edgeMap.TryGetValue(e.To, out var toList))
+                        toList.Add((e.Name, fromName, false));   // 入边
                 }
             }
 
             // 3. 逐个生成向量
             int success = 0, fail = 0;
+            int consecutiveFails = 0;   // ★ 新增
             int total = allNodes.Count;
             int i = 0;
 
@@ -765,21 +745,42 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
                 if (string.IsNullOrWhiteSpace(node.Name)) { fail++; continue; }
 
-                var embeddingText = BuildEmbeddingText(node.Guid, node.Name, neighborMap);
+                var embeddingText = BuildEmbeddingText(node.Guid, node.Name, edgeMap);
+
+                // ★ 诊断：确认用了什么文本
+                Logger.LogInformation("节点 {Name} embedding 文本: {Text}",
+                    node.Name, embeddingText);
+
                 var embedding = await GetEmbeddingAsync(embeddingText);
                 if (embedding == null) { fail++; continue; }
 
                 try
                 {
                     var ok = await GraphApi.CreateVectorAsync(
-                        graphGuid, node.Guid, EmbeddingModel, embedding);
-                    if (ok) success++;
-                    else fail++;
+                        graphGuid, node.Guid, EmbeddingModelName, embedding);
+                    if (ok)
+                    {
+                        success++;
+                        consecutiveFails = 0;   // ★ 重置
+                    }
+                    else
+                    {
+                        fail++;
+                        consecutiveFails++;
+                    }
                 }
                 catch (Exception ex)
                 {
                     Logger.LogWarning(ex, "为节点 {Name} 创建向量失败", node.Name);
                     fail++;
+                    consecutiveFails++;
+                }
+
+                // ★ 连续失败 3 次，说明系统性错误，提前退出
+                if (consecutiveFails >= 3)
+                {
+                    _errorMessage = "向量创建连续失败 3 次，已中止。请检查后端日志和 LiteGraph 向量端点。";
+                    break;
                 }
             }
 
@@ -798,56 +799,68 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     }
 
     // ★ BuildEmbeddingText 改成接收 Guid 而不是 Node
-    private static string BuildEmbeddingText(
-        Guid nodeGuid,
-        string nodeName,
-        Dictionary<Guid, List<string>> neighborMap)
-    {
-        const int MaxNeighbors = 5;
-
-        if (!neighborMap.TryGetValue(nodeGuid, out var neighbors) || neighbors.Count == 0)
-            return nodeName;
-
-        var uniqueNeighbors = neighbors
-            .Where(n => !string.IsNullOrWhiteSpace(n))
-            .Distinct()
-            .Take(MaxNeighbors)
-            .ToList();
-
-        if (uniqueNeighbors.Count == 0) return nodeName;
-
-        return $"{nodeName} 相关：{string.Join("、", uniqueNeighbors)}";
-    }
+    // private static string BuildEmbeddingText(
+    //     Guid nodeGuid,
+    //     string nodeName,
+    //     Dictionary<Guid, List<string>> neighborMap)
+    // {
+    //     const int MaxNeighbors = 5;
+    //
+    //     if (!neighborMap.TryGetValue(nodeGuid, out var neighbors) || neighbors.Count == 0)
+    //         return nodeName;
+    //
+    //     var uniqueNeighbors = neighbors
+    //         .Where(n => !string.IsNullOrWhiteSpace(n))
+    //         .Distinct()
+    //         .Take(MaxNeighbors)
+    //         .ToList();
+    //
+    //     if (uniqueNeighbors.Count == 0) return nodeName;
+    //
+    //     return $"{nodeName} 相关：{string.Join("、", uniqueNeighbors)}";
+    // }
     
 
     /// <summary>
     /// 构建节点的 embedding 文本：节点名 + 邻居名列表。
     /// 邻居为空时只用节点名；邻居超过上限时截断，避免超出模型 token 限制。
     /// </summary>
+    /// <summary>
+    /// 构建节点的 embedding 文本：节点名 + 边关系。
+    /// 文本形如："根节点C 关系：PARENT_OF→根节点B"
+    /// 让搜索"父亲"能匹配到"PARENT_OF"。
+    /// </summary>
+    /// <summary>
+    /// 构建节点的 embedding 文本：节点名 + 边关系。
+    /// 文本形如："根节点C 关系：PARENT_OF→根节点B"
+    /// 让搜索"父亲"能匹配到"PARENT_OF"。
+    /// </summary>
     private static string BuildEmbeddingText(
-        Node node,
-        Dictionary<Guid, List<string>> neighborMap)
+        Guid nodeGuid,
+        string nodeName,
+        Dictionary<Guid, List<(string EdgeName, string OtherName, bool IsOut)>> edgeMap)
     {
-        const int MaxNeighbors = 5;
+        const int MaxEdges = 5;
 
-        if (!neighborMap.TryGetValue(node.GUID, out var neighbors) ||
-            neighbors.Count == 0)
-        {
-            return node.Name;
-        }
+        if (!edgeMap.TryGetValue(nodeGuid, out var edges) || edges.Count == 0)
+            return nodeName;
 
-        var uniqueNeighbors = neighbors
-            .Where(n => !string.IsNullOrWhiteSpace(n))
+        var parts = edges
+            .Where(e => !string.IsNullOrWhiteSpace(e.OtherName)
+                        && !string.IsNullOrWhiteSpace(e.EdgeName))
+            .Take(MaxEdges)
+            .Select(e => e.IsOut
+                ? $"{e.EdgeName}→{e.OtherName}"    // 出边：C --PARENT_OF--> B
+                : $"{e.OtherName}→{e.EdgeName}")   // 入边：B --PARENT_OF--> C
             .Distinct()
-            .Take(MaxNeighbors)
             .ToList();
 
-        if (uniqueNeighbors.Count == 0)
-            return node.Name;
+        if (parts.Count == 0)
+            return nodeName;
 
-        return $"{node.Name} 相关：{string.Join("、", uniqueNeighbors)}";
+        return $"{nodeName} 关系：{string.Join("，", parts)}";
     }
-
+    
     // ══════════════════════════════════════════════════════
     // 拓扑图
     // ══════════════════════════════════════════════════════

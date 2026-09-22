@@ -16,11 +16,17 @@ namespace MAFWorkFlowApi.Controllers;
 public sealed class GraphController(
     NodeAuthoringService nodeService,
     EdgeAuthoringService edgeService,
-    LiteGraphRestClient liteGraph) : ControllerBase
+    LiteGraphRestClient liteGraph,
+    LiteGraphSdk sdk,
+    IConfiguration configuration,          // ★ 新增
+    ILogger<GraphController> logger) : ControllerBase
 {
     private readonly NodeAuthoringService _nodeService = nodeService;
     private readonly EdgeAuthoringService _edgeService = edgeService;
     private readonly LiteGraphRestClient _liteGraph = liteGraph;
+    private readonly LiteGraphSdk _sdk = sdk;
+    private readonly IConfiguration _configuration = configuration;  // ★ 新增
+    private readonly ILogger<GraphController> _logger = logger;
 
     // ─── 顶点单条 ──────────────────────────────────────
 
@@ -215,7 +221,6 @@ public sealed class GraphController(
     {
         var tenant = _liteGraph.TenantGuid;
 
-        // 先删边
         var edgesJson = await _liteGraph.GetAsync(
             $"/v1.0/tenants/{tenant}/graphs/{graphGuid}/edges", ct);
         if (edgesJson.HasValue &&
@@ -230,7 +235,6 @@ public sealed class GraphController(
             }
         }
 
-        // 再删节点
         var nodesJson = await _liteGraph.GetAsync(
             $"/v1.0/tenants/{tenant}/graphs/{graphGuid}/nodes", ct);
         if (nodesJson.HasValue &&
@@ -245,7 +249,6 @@ public sealed class GraphController(
             }
         }
 
-        // 最后删图
         await _liteGraph.DeleteAsync(
             $"/v1.0/tenants/{tenant}/graphs/{graphGuid}", ct);
 
@@ -253,7 +256,7 @@ public sealed class GraphController(
     }
 
     // ══════════════════════════════════════════════════════
-    // ★ 修复：节点 / 边更新 —— 用 JsonNode 快照避免僵尸引用
+    // 节点 / 边更新 —— 用 JsonNode 快照避免僵尸引用
     // ══════════════════════════════════════════════════════
 
     [HttpPut("{graphGuid}/nodes/{nodeGuid}")]
@@ -271,11 +274,9 @@ public sealed class GraphController(
 
         var node = existingJson.Value;
 
-        // ★ 关键：立即从 JsonElement 抽出独立 JsonNode 快照，
-        //   之后即使父 JsonDocument 被回收，这些节点数据仍安全
         var labelsNode = GetNodeSnapshot(node, "Labels");
-        var tagsNode = GetNodeSnapshot(node, "Tags");
-        var dataNode = GetNodeSnapshot(node, "Data");
+        var tagsNode   = GetNodeSnapshot(node, "Tags");
+        var dataNode   = GetNodeSnapshot(node, "Data");
 
         var result = await _liteGraph.PutAsync(
             $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/nodes/{nodeGuid}",
@@ -285,9 +286,9 @@ public sealed class GraphController(
                 TenantGUID = _liteGraph.TenantGuid,
                 GraphGUID = graphGuid,
                 Name = request.Name,
-                Labels = labelsNode,   // JsonNode?
-                Tags = tagsNode,       // JsonNode?
-                Data = dataNode        // JsonNode?
+                Labels = labelsNode,
+                Tags = tagsNode,
+                Data = dataNode
             },
             ct);
 
@@ -309,19 +310,19 @@ public sealed class GraphController(
 
         var edge = existingJson.Value;
 
-        // ★ 同上：抽出独立快照
         var labelsNode = GetNodeSnapshot(edge, "Labels");
-        var tagsNode = GetNodeSnapshot(edge, "Tags");
-        var dataNode = GetNodeSnapshot(edge, "Data");
+        var tagsNode   = GetNodeSnapshot(edge, "Tags");
+        var dataNode   = GetNodeSnapshot(edge, "Data");
 
-        // From / To 直接读 Guid（立即使用，无跨方法引用问题）
         var fromGuid = edge.TryGetProperty("From", out var f)
-            && f.ValueKind == JsonValueKind.String
-            ? f.GetGuid() : Guid.Empty;
+                       && f.ValueKind == JsonValueKind.String
+            ? f.GetGuid()
+            : Guid.Empty;
 
         var toGuid = edge.TryGetProperty("To", out var t)
-            && t.ValueKind == JsonValueKind.String
-            ? t.GetGuid() : Guid.Empty;
+                     && t.ValueKind == JsonValueKind.String
+            ? t.GetGuid()
+            : Guid.Empty;
 
         var result = await _liteGraph.PutAsync(
             $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/edges/{edgeGuid}",
@@ -390,31 +391,28 @@ public sealed class GraphController(
         return Ok(result);
     }
 
+    // ══════════════════════════════════════════════════════
+    // ★ 向量 CRUD —— 走 LiteGraphSdk
+    // ══════════════════════════════════════════════════════
+
     [HttpPost("{graphGuid}/vectors/enumerate")]
     public async Task<IActionResult> EnumerateVectors(
         [FromRoute] Guid graphGuid,
         [FromBody] EnumerateRequest request,
         CancellationToken ct)
     {
-        var body = new Dictionary<string, object?>
+        var query = new EnumerationRequest
         {
-            ["TenantGUID"] = _liteGraph.TenantGuid,
-            ["GraphGUID"] = graphGuid,
-            ["Ordering"] = "CreatedDescending",
-            ["MaxResults"] = Math.Clamp(request.MaxResults, 1, 1000)
+            TenantGUID = _sdk.TenantGuid ?? Guid.Empty,
+            GraphGUID = graphGuid,
+            Ordering = EnumerationOrderEnum.CreatedDescending,
+            MaxResults = Math.Clamp(request.MaxResults, 1, 1000),
+            ContinuationToken = request.ContinuationToken
         };
-        if (request.ContinuationToken.HasValue)
-            body["ContinuationToken"] = request.ContinuationToken.Value;
 
-        var result = await _liteGraph.PostAsync(
-            $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/vectors/enumerate",
-            body, ct);
+        var result = await _sdk.Vector.Enumerate(query, ct);
         return Ok(result);
     }
-
-    // ══════════════════════════════════════════════════════
-    // 向量 CRUD
-    // ══════════════════════════════════════════════════════
 
     [HttpPost("{graphGuid}/vectors")]
     public async Task<IActionResult> CreateVector(
@@ -422,20 +420,31 @@ public sealed class GraphController(
         [FromBody] CreateVectorRequest request,
         CancellationToken ct)
     {
-        var body = new
+        // ══════════════════════════════════════════════════════
+        // ★ 用服务端配置的模型名，忽略 request.Model
+        //   前端不应持有模型名，服务端才是真相源
+        // ══════════════════════════════════════════════════════
+        var modelName = _configuration["Embedding:Model"] ?? "bge-large";
+
+        var metadata = new VectorMetadata
         {
-            TenantGUID = _liteGraph.TenantGuid,
+            TenantGUID = Guid.Empty,
             GraphGUID = graphGuid,
             NodeGUID = request.NodeGuid,
-            Model = request.Model,
+            Model = modelName,
             Dimensionality = request.Vector.Count,
             Vectors = request.Vector
         };
 
-        var result = await _liteGraph.PutAsync(
-            $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/vectors",
-            body, ct);
-        return Ok(result);
+        _logger.LogInformation(
+            "创建向量：Graph={Graph}, Node={Node}, Model={Model}, Dim={Dim}",
+            graphGuid, request.NodeGuid, modelName, request.Vector.Count);
+
+        var created = await _sdk.Vector.Create(metadata, ct);
+
+        _logger.LogInformation("向量创建成功：GUID={Guid}", created.GUID);
+
+        return Ok(created);
     }
 
     [HttpDelete("{graphGuid}/vectors/{vectorGuid}")]
@@ -444,22 +453,14 @@ public sealed class GraphController(
         [FromRoute] Guid vectorGuid,
         CancellationToken ct)
     {
-        await _liteGraph.DeleteAsync(
-            $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/vectors/{vectorGuid}",
-            ct);
+        await _sdk.Vector.DeleteByGuid(_sdk.TenantGuid ?? Guid.Empty, vectorGuid, ct);
         return NoContent();
     }
 
     // ══════════════════════════════════════════════════════
-    // ★ 辅助：从 JsonElement 抽取独立 JsonNode 快照
+    // 辅助：从 JsonElement 抽取独立 JsonNode 快照
     // ══════════════════════════════════════════════════════
 
-    /// <summary>
-    /// 从 JsonElement 里安全提取一个字段，转为独立的 JsonNode。
-    /// - 字段不存在 → null
-    /// - 字段为 null/undefined → null
-    /// - 其它 → JsonNode.Parse 一个独立副本，不依赖父 JsonDocument
-    /// </summary>
     private static JsonNode? GetNodeSnapshot(JsonElement element, string propertyName)
     {
         if (element.ValueKind != JsonValueKind.Object) return null;
@@ -470,9 +471,26 @@ public sealed class GraphController(
         if (prop.ValueKind == JsonValueKind.Null || prop.ValueKind == JsonValueKind.Undefined)
             return null;
 
-        // ★ GetRawText() 从父 JsonDocument 的底层字节读出原文，
-        //   然后 Parse 成完全独立的 JsonNode
         return JsonNode.Parse(prop.GetRawText());
+    }
+    
+    [HttpGet("debug/vector-metadata-schema")]
+    public IActionResult DebugVectorMetadataSchema()
+    {
+        var t = typeof(VectorMetadata);
+        var props = t.GetProperties()
+            .Select(p => new
+            {
+                Name = p.Name,
+                Type = p.PropertyType.Name,
+                Nullable = Nullable.GetUnderlyingType(p.PropertyType) is not null
+            })
+            .OrderBy(x => x.Name)
+            .ToList();
+
+        var e = new Edge();
+        
+        return Ok(props);
     }
 }
 
@@ -480,17 +498,14 @@ public sealed class GraphController(
 
 public sealed class VectorSearchRequest
 {
-    [Required]
-    public List<float> QueryVector { get; set; } = [];
+    [Required] public List<float> QueryVector { get; set; } = [];
 
-    [Required]
-    public string Model { get; set; } = "bge-large";
+    /// <summary>★ 保留字段但服务端会忽略，用配置里的 Embedding:Model。</summary>
+    [Required] public string Model { get; set; } = "bge-large";
 
-    [Range(1, 100)]
-    public int TopK { get; set; } = 10;
+    [Range(1, 100)] public int TopK { get; set; } = 10;
 
-    [Range(0.0, 1.0)]
-    public double? MinScore { get; set; } = 0.5;
+    [Range(0.0, 1.0)] public double? MinScore { get; set; } = 0.5;
 }
 
 public sealed record CreateGraphRequest(

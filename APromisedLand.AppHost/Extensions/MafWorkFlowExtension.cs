@@ -1,3 +1,4 @@
+using Aspire.Hosting;                    // ★ WithEnvironment 在此命名空间
 using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -28,8 +29,24 @@ public static class MafWorkFlowExtension
             .WireIfPresent(context.Embedding, waitFor: false)
             .WireIfPresent(context.LiteGraph);
 
+        // ══════════════════════════════════════════════════════════
+        // ★ 显式注入模型名
+        //   "__" 是 ASP.NET Core 配置的层级分隔符，
+        //   "Embedding__Model" 会映射到 Configuration["Embedding:Model"]
+        // ══════════════════════════════════════════════════════════
+        if (!string.IsNullOrWhiteSpace(context.EmbeddingModelName))
+        {
+            context.MafWorkFlowApi
+                .WithEnvironment("Embedding__Model", context.EmbeddingModelName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.ChatModelName))
+        {
+            context.MafWorkFlowApi
+                .WithEnvironment("Chat__Model", context.ChatModelName);
+        }
+
         // ─── 外部资源：清单式声明 ─────────────────────────────────
-        // 不再使用 builder.Services.BuildServiceProvider()，避免额外容器。
         using var loggerFactory = LoggerFactory.Create(logging =>
         {
             logging.AddSimpleConsole(o => o.SingleLine = true);
