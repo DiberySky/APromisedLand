@@ -1,6 +1,7 @@
 using MAFWorkFlowApi.Agents;
 using MAFWorkFlowApi.HealthChecks;
 using MAFWorkFlowApi.Infrastructure;
+using MAFWorkFlowApi.Services;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.AI;
@@ -173,7 +174,9 @@ builder.Services
     .WithHttpTransport()
     .WithTools<McpGraphTools>();
 
-builder.Services.AddScoped<MAFWorkFlowApi.Services.GraphExportService>();
+builder.Services.AddScoped<GraphExportService>();
+
+builder.Services.AddScoped<IntentParserService>();
 
 var app = builder.Build();
 

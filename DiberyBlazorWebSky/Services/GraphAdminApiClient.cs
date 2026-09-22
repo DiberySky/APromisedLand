@@ -102,7 +102,10 @@ public sealed class ImportAsNewGraphResponseDto
 public sealed class EnumerateResult<T>
 {
     [JsonPropertyName("objects")] public List<T> Objects { get; set; } = new();
-    [JsonPropertyName("continuationToken")] public Guid? ContinuationToken { get; set; }
+
+    [JsonPropertyName("continuationToken")]
+    public Guid? ContinuationToken { get; set; }
+
     [JsonPropertyName("totalRecords")] public long TotalRecords { get; set; }
 }
 
@@ -149,6 +152,7 @@ public class GraphAdminApiClient
             {
                 return JsonSerializer.Deserialize<List<GraphDto>>(objs.GetRawText(), JsonOpts) ?? new();
             }
+
             return new List<GraphDto>();
         }
         catch (Exception ex)
@@ -275,7 +279,8 @@ public class GraphAdminApiClient
         }
     }
 
-    public async Task<bool> UpdateNodeAsync(Guid graphGuid, Guid nodeGuid, string newName, CancellationToken ct = default)
+    public async Task<bool> UpdateNodeAsync(Guid graphGuid, Guid nodeGuid, string newName,
+        CancellationToken ct = default)
     {
         try
         {
@@ -362,7 +367,8 @@ public class GraphAdminApiClient
         return result.Objects;
     }
 
-    public async Task<bool> CreateEdgeAsync(Guid graphGuid, Guid from, Guid to, string name, CancellationToken ct = default)
+    public async Task<bool> CreateEdgeAsync(Guid graphGuid, Guid from, Guid to, string name,
+        CancellationToken ct = default)
     {
         try
         {
@@ -379,7 +385,8 @@ public class GraphAdminApiClient
         }
     }
 
-    public async Task<bool> UpdateEdgeAsync(Guid graphGuid, Guid edgeGuid, string newName, CancellationToken ct = default)
+    public async Task<bool> UpdateEdgeAsync(Guid graphGuid, Guid edgeGuid, string newName,
+        CancellationToken ct = default)
     {
         try
         {
@@ -624,4 +631,98 @@ public class GraphAdminApiClient
             return null;
         }
     }
+
+    // ══════════════════════════════════════════════════════
+    // 边向量
+    // ══════════════════════════════════════════════════════
+
+    public async Task<bool> CreateEdgeVectorAsync(
+        Guid graphGuid, Guid edgeGuid, string content, List<float> vector,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync(
+                $"/api/graph/{graphGuid}/edge-vectors",
+                new CreateEdgeVectorPayload
+                {
+                    EdgeGuid = edgeGuid, Content = content, Vector = vector
+                },
+                JsonOpts, ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "创建边向量失败");
+            return false;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // 语义搜索（一站式）
+    // ══════════════════════════════════════════════════════
+
+    public async Task<SemanticSearchResponseDto?> SemanticSearchAsync(
+        Guid graphGuid, string query, int topK = 10,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync(
+                $"/api/graph/{graphGuid}/semantic-search",
+                new { Query = query, TopK = topK },
+                JsonOpts, ct);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("语义搜索失败 {Status}: {Body}", resp.StatusCode, body);
+                return null;
+            }
+
+            return await resp.Content.ReadFromJsonAsync<SemanticSearchResponseDto>(JsonOpts, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "语义搜索异常");
+            return null;
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════
+// ★ 边向量 + 语义搜索 DTO
+// ══════════════════════════════════════════════════════
+
+public sealed class CreateEdgeVectorPayload
+{
+    public Guid EdgeGuid { get; set; }
+    public string Content { get; set; } = "";
+    public List<float> Vector { get; set; } = [];
+}
+
+public sealed class IntentResultDto
+{
+    [JsonPropertyName("relation")] public string? Relation { get; set; }
+    [JsonPropertyName("direction")] public string? Direction { get; set; }
+    [JsonPropertyName("subjectName")] public string? SubjectName { get; set; }
+    [JsonPropertyName("confidence")] public double Confidence { get; set; }
+    [JsonPropertyName("reason")] public string? Reason { get; set; }
+    [JsonPropertyName("strategy")] public string Strategy { get; set; } = "none";
+}
+
+public sealed class SemanticSearchHitDto
+{
+    [JsonPropertyName("nodeGuid")] public Guid NodeGuid { get; set; }
+    [JsonPropertyName("nodeName")] public string NodeName { get; set; } = "";
+    [JsonPropertyName("score")] public double Score { get; set; }
+    [JsonPropertyName("viaEdgeName")] public string? ViaEdgeName { get; set; }
+    [JsonPropertyName("direction")] public string? Direction { get; set; }
+    [JsonPropertyName("matchedContent")] public string? MatchedContent { get; set; }
+}
+
+public sealed class SemanticSearchResponseDto
+{
+    [JsonPropertyName("hits")] public List<SemanticSearchHitDto> Hits { get; set; } = new();
+    [JsonPropertyName("intent")] public IntentResultDto Intent { get; set; } = new();
 }

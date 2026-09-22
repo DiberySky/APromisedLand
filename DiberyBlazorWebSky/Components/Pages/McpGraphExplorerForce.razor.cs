@@ -49,10 +49,13 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     private string _newEdgeTo = "";
     private string _newEdgeName = "";
 
-    // 向量搜索
+    // ══════════════════════════════════════════════════════
+    // ★ 向量搜索（重构：一站式后端语义搜索）
+    // ══════════════════════════════════════════════════════
     private string _vectorQueryText = "";
     private List<VectorSearchDisplayResult> _vectorResults = new();
     private string _vectorProgress = "";
+    private IntentResultDto? _lastIntent;   // ★ 最近一次的意图解析结果
 
     // 拓扑图
     private List<Node> _topologyNodes = new();
@@ -60,10 +63,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     private Node? _selectedTopologyNode;
     private readonly Dictionary<Guid, (double X, double Y)> _nodePositions = new();
 
-    // 布局模式：默认力导向
-    private string _layoutMode = "force";  // "force" | "circular"
-
-    // 随机种子
+    private string _layoutMode = "force";
     private int _layoutSeed = 42;
 
     // 导入 / 导出状态
@@ -76,35 +76,49 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     private bool _clearBeforeImport;
     private ImportResult? _importResult;
 
-    // ★ 行内编辑状态
+    // 行内编辑状态
     private Guid? _editingNodeGuid;
     private string _editingNodeName = "";
     private Guid? _editingEdgeGuid;
     private string _editingEdgeName = "";
-    
-    // ★ 图管理状态
+
+    // 图管理状态
     private bool _showManageDialog;
     private bool _isManaging;
     private string _newGraphName = "";
     private bool _isCreatingGraph;
     private Guid? _renamingGraphGuid;
     private string _renamingGraphName = "";
-    
+
     private bool HasAnyImportFile =>
         !string.IsNullOrEmpty(_selectedJsonContent) ||
         !string.IsNullOrEmpty(_selectedNodesCsvContent);
 
     // 常量
     private static readonly Guid DefaultTenant = Guid.Empty;
-    private const string EmbeddingModelName = "bge-large";
-    
+
     // SVG 画布尺寸
     private const double CanvasWidth = 800;
     private const double CanvasHeight = 600;
 
-    // ★ 混合搜索权重（向量 + 关键词）
-    private const float VectorWeight = 0.7f;
-    private const float KeywordWeight = 0.3f;
+    // ══════════════════════════════════════════════════════
+    // ★ 边名 → 中文映射（供生成边向量使用）
+    // ══════════════════════════════════════════════════════
+    private static readonly Dictionary<string, string> EdgeNameZh = new()
+    {
+        ["PARENT_OF"]      = "父亲/父节点",
+        ["CHILD_OF"]       = "子节点",
+        ["SUBFIELD"]       = "子领域",
+        ["BASED_ON"]       = "基于",
+        ["USES"]           = "使用",
+        ["APPLIED_TO"]     = "应用于",
+        ["IMPLEMENTED_IN"] = "实现于",
+        ["VARIANT"]        = "变体",
+        ["FRAMEWORK"]      = "框架",
+        ["EXAMPLE"]        = "例子",
+        ["METHOD"]         = "方法",
+        ["RELATED_TO"]     = "相关",
+    };
 
     private static readonly JsonSerializerOptions PrettyJson = new()
     {
@@ -163,6 +177,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         _editingEdgeName = "";
         _vectorResults.Clear();
         _vectorProgress = "";
+        _lastIntent = null;
 
         _topologyNodes.Clear();
         _topologyEdges.Clear();
@@ -371,7 +386,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         }
     }
 
-    // ★ 新增：编辑节点名称
     private async Task SaveNodeNameAsync(Node node)
     {
         if (_editingNodeGuid != node.GUID) return;
@@ -520,63 +534,9 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     }
 
     // ══════════════════════════════════════════════════════
-    // 向量搜索（混合：语义 + 关键词）
+    // ★ 向量搜索（重构：调用后端 /semantic-search）
     // ══════════════════════════════════════════════════════
 
-    private static float CosineSimilarity(List<float> a, List<float> b)
-    {
-        if (a.Count != b.Count || a.Count == 0) return 0f;
-
-        float dot = 0f, na = 0f, nb = 0f;
-        for (int i = 0; i < a.Count; i++)
-        {
-            dot += a[i] * b[i];
-            na += a[i] * a[i];
-            nb += b[i] * b[i];
-        }
-
-        if (na == 0f || nb == 0f) return 0f;
-        return dot / (MathF.Sqrt(na) * MathF.Sqrt(nb));
-    }
-
-    /// <summary>
-    /// ★ 关键词匹配分：
-    /// - 完全相等（忽略大小写与首尾空白）：1.0
-    /// - 相互包含（节点名 ⊂ 查询 或 查询 ⊂ 节点名）：0.7
-    /// - 否则：0.0
-    /// </summary>
-    private static float KeywordMatchScore(string query, string nodeName)
-    {
-        if (string.IsNullOrWhiteSpace(query) || string.IsNullOrWhiteSpace(nodeName))
-            return 0f;
-
-        var q = query.Trim();
-        var n = nodeName.Trim();
-
-        if (q.Equals(n, StringComparison.OrdinalIgnoreCase))
-            return 1.0f;
-
-        if (n.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-            q.Contains(n, StringComparison.OrdinalIgnoreCase))
-            return 0.7f;
-
-        return 0.0f;
-    }
-
-    /// <summary>加载图中所有节点，返回 GUID → Name 字典。</summary>
-        private async Task<Dictionary<Guid, string>> LoadAllNodeNamesAsync(Guid graphGuid)
-    {
-        var nodes = await GraphApi.ListAllNodesAsync(graphGuid);
-        var map = new Dictionary<Guid, string>();
-        foreach (var n in nodes)
-        {
-            if (!map.ContainsKey(n.Guid))
-                map[n.Guid] = string.IsNullOrWhiteSpace(n.Name) ? "[无名]" : n.Name;
-        }
-        return map;
-    }
-
-    // ★ GetEmbeddingAsync 保留（前端直连 Ollama），因为 embedding 服务不在后端
     /// <summary>把文本转为向量。走后端 /api/embedding/embed。</summary>
     private async Task<List<float>?> GetEmbeddingAsync(string text)
     {
@@ -588,79 +548,65 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         return vector;
     }
 
-    // SearchVectorAsync 里的向量加载改成 GraphApi.ListAllVectorsAsync
+    /// <summary>搜索框里按 Enter 触发搜索。</summary>
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !_isBusy)
+        {
+            await SearchVectorAsync();
+        }
+    }
+
     /// <summary>
-    /// 混合搜索：向量相似度（0.7 权重）+ 关键词匹配（0.3 权重）。
-    /// 按 NodeGUID 去重，每个节点只保留最高向量分。
+    /// ★ 语义搜索：调用后端 /semantic-search，一站式完成
+    ///   意图解析 → 边向量匹配 → 方向过滤 → 反查节点。
     /// </summary>
     private async Task SearchVectorAsync()
     {
-        if (string.IsNullOrWhiteSpace(_vectorQueryText) ||
-            string.IsNullOrEmpty(_selectedGraphGuid))
+        if (string.IsNullOrWhiteSpace(_vectorQueryText) || string.IsNullOrEmpty(_selectedGraphGuid))
             return;
 
         _isBusy = true;
         _errorMessage = null;
         _vectorResults.Clear();
-        _vectorProgress = "生成 embedding...";
+        _lastIntent = null;
+        _vectorProgress = "解析意图 + 语义搜索...";
         StateHasChanged();
 
         try
         {
-            var queryText = _vectorQueryText.Trim();
-            var queryEmbedding = await GetEmbeddingAsync(queryText);
-            if (queryEmbedding == null || queryEmbedding.Count == 0) return;
-
-            _vectorProgress = "加载所有节点和向量...";
-            StateHasChanged();
-
             var graphGuid = Guid.Parse(_selectedGraphGuid);
-            var nameLookup = await LoadAllNodeNamesAsync(graphGuid);
-            var allVectors = await GraphApi.ListAllVectorsAsync(graphGuid);
+            var query = _vectorQueryText.Trim();
 
-            _vectorProgress = $"混合评分（{allVectors.Count} 条向量）...";
-            StateHasChanged();
+            var resp = await GraphApi.SemanticSearchAsync(graphGuid, query, topK: 20);
 
-            var bestVectorByNode = new Dictionary<Guid, float>();
-            foreach (var v in allVectors)
+            if (resp is null)
             {
-                if (v.Vectors == null || v.Vectors.Count == 0) continue;
-                if (v.NodeGuid == null) continue;
-
-                var nodeGuid = v.NodeGuid.Value;
-                var score = CosineSimilarity(queryEmbedding, v.Vectors);
-                if (!bestVectorByNode.TryGetValue(nodeGuid, out var existing) || score > existing)
-                {
-                    bestVectorByNode[nodeGuid] = score;
-                }
+                _errorMessage = "语义搜索失败，请查看后端日志。";
+                return;
             }
 
-            var results = new List<VectorSearchDisplayResult>();
-            foreach (var kv in bestVectorByNode)
+            _lastIntent = resp.Intent;
+
+            _vectorResults = resp.Hits.Select(h => new VectorSearchDisplayResult
             {
-                var nodeName = nameLookup.TryGetValue(kv.Key, out var name)
-                    ? name
-                    : $"[未知节点 {kv.Key.ToString("N")[..8]}]";
+                NodeName = h.NodeName,
+                Score = (float)h.Score,
+                ViaEdge = h.ViaEdgeName,
+                Direction = h.Direction,
+                MatchedContent = h.MatchedContent
+            }).ToList();
 
-                var keywordScore = KeywordMatchScore(queryText, nodeName);
-                var keywordMatched = keywordScore > 0f;
-                var finalScore = VectorWeight * kv.Value + KeywordWeight * keywordScore;
-
-                results.Add(new VectorSearchDisplayResult
-                {
-                    NodeName = nodeName,
-                    Score = finalScore,
-                    VectorScore = kv.Value,
-                    KeywordMatched = keywordMatched
-                });
-            }
-
-            _vectorResults = results.OrderByDescending(r => r.Score).Take(20).ToList();
             _vectorProgress = $"返回 {_vectorResults.Count} 条结果";
+
+            Logger.LogInformation(
+                "语义搜索完成：Query={Q}, Hits={N}, Intent={R}/{D}, Strategy={S}",
+                query, _vectorResults.Count,
+                resp.Intent.Relation, resp.Intent.Direction, resp.Intent.Strategy);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "向量搜索失败");
+            Logger.LogError(ex, "语义搜索失败");
             _errorMessage = $"搜索失败：{ex.Message}";
         }
         finally
@@ -671,14 +617,19 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     }
 
     /// <summary>
-    /// 为当前图所有节点生成并保存向量。
-    /// 生成前先清理旧向量；文本用"节点名 + 邻居名"增强语义。
+    /// ★ 重建所有向量：清空旧向量 → 生成节点向量 → 生成边向量。
+    ///   节点向量：只存节点名（用于找节点）
+    ///   边向量：存"from --REL(中文)--> to"（用于找关系）
     /// </summary>
-    private async Task GenerateVectorsForAllNodesAsync()
+    private async Task GenerateAllVectorsAsync()
     {
         if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
 
-        if (!await ConfirmAsync("将为当前图的所有节点生成向量（用节点名+邻居名增强语义），继续？"))
+        if (!await ConfirmAsync(
+            "将重建当前图的所有向量：\n" +
+            "  · 节点向量（纯节点名）\n" +
+            "  · 边向量（from --REL(中文)--> to）\n\n" +
+            "旧的向量会先被清空。继续？"))
             return;
 
         _isBusy = true;
@@ -690,105 +641,112 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         {
             var graphGuid = Guid.Parse(_selectedGraphGuid);
 
-            // 1. 清理旧向量
+            // ══════════════════════════════════════════════
+            // 1. 清空旧向量
+            // ══════════════════════════════════════════════
             _vectorProgress = "清理旧向量...";
             StateHasChanged();
 
             var existingVectors = await GraphApi.ListAllVectorsAsync(graphGuid);
+            Logger.LogInformation("开始清空 {Count} 条旧向量", existingVectors.Count);
+
             foreach (var v in existingVectors)
             {
                 try { await GraphApi.DeleteVectorAsync(graphGuid, v.Guid); }
                 catch (Exception ex) { Logger.LogWarning(ex, "删除旧向量 {Guid} 失败", v.Guid); }
             }
 
+            // ══════════════════════════════════════════════
             // 2. 加载节点和边
+            // ══════════════════════════════════════════════
             _vectorProgress = "加载节点和边...";
             StateHasChanged();
 
             var allNodes = await GraphApi.ListAllNodesAsync(graphGuid);
             var allEdges = await GraphApi.ListAllEdgesAsync(graphGuid);
 
-            var guidToName = allNodes
+            var nodeMap = allNodes
                 .Where(n => !string.IsNullOrWhiteSpace(n.Name))
                 .GroupBy(n => n.Guid)
                 .ToDictionary(g => g.Key, g => g.First().Name);
 
-            // ★ 构建 edgeMap：GUID → [(EdgeName, OtherName, IsOut)]
-            var edgeMap = allNodes.ToDictionary(
-                n => n.Guid,
-                _ => new List<(string EdgeName, string OtherName, bool IsOut)>());
+            int total = allNodes.Count + allEdges.Count;
+            int done = 0;
+            int nodeOk = 0, edgeOk = 0, fail = 0;
 
-            foreach (var e in allEdges)
-            {
-                if (guidToName.TryGetValue(e.From, out var fromName) &&
-                    guidToName.TryGetValue(e.To, out var toName))
-                {
-                    if (edgeMap.TryGetValue(e.From, out var fromList))
-                        fromList.Add((e.Name, toName, true));    // 出边
-
-                    if (edgeMap.TryGetValue(e.To, out var toList))
-                        toList.Add((e.Name, fromName, false));   // 入边
-                }
-            }
-
-            // 3. 逐个生成向量
-            int success = 0, fail = 0;
-            int consecutiveFails = 0;   // ★ 新增
-            int total = allNodes.Count;
-            int i = 0;
-
+            // ══════════════════════════════════════════════
+            // 3. 生成节点向量（只存节点名）
+            // ══════════════════════════════════════════════
             foreach (var node in allNodes)
             {
-                i++;
-                _vectorProgress = $"({i}/{total}) {node.Name}";
+                done++;
+                _vectorProgress = $"({done}/{total}) 节点 {node.Name}";
                 StateHasChanged();
 
                 if (string.IsNullOrWhiteSpace(node.Name)) { fail++; continue; }
 
-                var embeddingText = BuildEmbeddingText(node.Guid, node.Name, edgeMap);
+                Logger.LogInformation("节点 embedding 文本: {Text}", node.Name);
 
-                // ★ 诊断：确认用了什么文本
-                Logger.LogInformation("节点 {Name} embedding 文本: {Text}",
-                    node.Name, embeddingText);
-
-                var embedding = await GetEmbeddingAsync(embeddingText);
-                if (embedding == null) { fail++; continue; }
+                var vec = await GetEmbeddingAsync(node.Name);
+                if (vec is null) { fail++; continue; }
 
                 try
                 {
                     var ok = await GraphApi.CreateVectorAsync(
-                        graphGuid, node.Guid, EmbeddingModelName, embedding);
-                    if (ok)
-                    {
-                        success++;
-                        consecutiveFails = 0;   // ★ 重置
-                    }
-                    else
-                    {
-                        fail++;
-                        consecutiveFails++;
-                    }
+                        graphGuid, node.Guid, model: null, vec);
+                    if (ok) nodeOk++; else fail++;
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogWarning(ex, "为节点 {Name} 创建向量失败", node.Name);
+                    Logger.LogWarning(ex, "创建节点向量失败：{Name}", node.Name);
                     fail++;
-                    consecutiveFails++;
-                }
-
-                // ★ 连续失败 3 次，说明系统性错误，提前退出
-                if (consecutiveFails >= 3)
-                {
-                    _errorMessage = "向量创建连续失败 3 次，已中止。请检查后端日志和 LiteGraph 向量端点。";
-                    break;
                 }
             }
 
-            _vectorProgress = $"完成：成功 {success} / 失败 {fail}";
+            // ══════════════════════════════════════════════
+            // 4. 生成边向量
+            // ══════════════════════════════════════════════
+            foreach (var edge in allEdges)
+            {
+                done++;
+                var rel = string.IsNullOrWhiteSpace(edge.Name) ? "RELATED_TO" : edge.Name;
+                _vectorProgress = $"({done}/{total}) 边 {rel}";
+                StateHasChanged();
+
+                var fromName = nodeMap.TryGetValue(edge.From, out var f)
+                    ? f : edge.From.ToString("N")[..8];
+                var toName = nodeMap.TryGetValue(edge.To, out var t)
+                    ? t : edge.To.ToString("N")[..8];
+
+                var zh = EdgeNameZh.TryGetValue(rel, out var z) ? z : null;
+                var relLabel = string.IsNullOrEmpty(zh) ? rel : $"{rel}({zh})";
+
+                var content = $"{fromName} --{relLabel}--> {toName}";
+
+                Logger.LogInformation("边 embedding 文本: {Content}", content);
+
+                var vec = await GetEmbeddingAsync(content);
+                if (vec is null) { fail++; continue; }
+
+                try
+                {
+                    var ok = await GraphApi.CreateEdgeVectorAsync(
+                        graphGuid, edge.Guid, content, vec);
+                    if (ok) edgeOk++; else fail++;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "创建边向量失败：{Content}", content);
+                    fail++;
+                }
+            }
+
+            _vectorProgress = $"✅ 完成：节点 {nodeOk} + 边 {edgeOk} = {nodeOk + edgeOk}，失败 {fail}";
+            Logger.LogInformation("向量生成完成：{Msg}", _vectorProgress);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "批量生成向量失败");
+            Logger.LogError(ex, "生成向量失败");
             _errorMessage = $"生成向量失败：{ex.Message}";
         }
         finally
@@ -798,71 +756,8 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         }
     }
 
-    // ★ BuildEmbeddingText 改成接收 Guid 而不是 Node
-    // private static string BuildEmbeddingText(
-    //     Guid nodeGuid,
-    //     string nodeName,
-    //     Dictionary<Guid, List<string>> neighborMap)
-    // {
-    //     const int MaxNeighbors = 5;
-    //
-    //     if (!neighborMap.TryGetValue(nodeGuid, out var neighbors) || neighbors.Count == 0)
-    //         return nodeName;
-    //
-    //     var uniqueNeighbors = neighbors
-    //         .Where(n => !string.IsNullOrWhiteSpace(n))
-    //         .Distinct()
-    //         .Take(MaxNeighbors)
-    //         .ToList();
-    //
-    //     if (uniqueNeighbors.Count == 0) return nodeName;
-    //
-    //     return $"{nodeName} 相关：{string.Join("、", uniqueNeighbors)}";
-    // }
-    
-
-    /// <summary>
-    /// 构建节点的 embedding 文本：节点名 + 邻居名列表。
-    /// 邻居为空时只用节点名；邻居超过上限时截断，避免超出模型 token 限制。
-    /// </summary>
-    /// <summary>
-    /// 构建节点的 embedding 文本：节点名 + 边关系。
-    /// 文本形如："根节点C 关系：PARENT_OF→根节点B"
-    /// 让搜索"父亲"能匹配到"PARENT_OF"。
-    /// </summary>
-    /// <summary>
-    /// 构建节点的 embedding 文本：节点名 + 边关系。
-    /// 文本形如："根节点C 关系：PARENT_OF→根节点B"
-    /// 让搜索"父亲"能匹配到"PARENT_OF"。
-    /// </summary>
-    private static string BuildEmbeddingText(
-        Guid nodeGuid,
-        string nodeName,
-        Dictionary<Guid, List<(string EdgeName, string OtherName, bool IsOut)>> edgeMap)
-    {
-        const int MaxEdges = 5;
-
-        if (!edgeMap.TryGetValue(nodeGuid, out var edges) || edges.Count == 0)
-            return nodeName;
-
-        var parts = edges
-            .Where(e => !string.IsNullOrWhiteSpace(e.OtherName)
-                        && !string.IsNullOrWhiteSpace(e.EdgeName))
-            .Take(MaxEdges)
-            .Select(e => e.IsOut
-                ? $"{e.EdgeName}→{e.OtherName}"    // 出边：C --PARENT_OF--> B
-                : $"{e.OtherName}→{e.EdgeName}")   // 入边：B --PARENT_OF--> C
-            .Distinct()
-            .ToList();
-
-        if (parts.Count == 0)
-            return nodeName;
-
-        return $"{nodeName} 关系：{string.Join("，", parts)}";
-    }
-    
     // ══════════════════════════════════════════════════════
-    // 拓扑图
+    // 拓扑图（不变）
     // ══════════════════════════════════════════════════════
 
     private async Task LoadTopologyAsync()
@@ -943,7 +838,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         StateHasChanged();
     }
 
-    // ─── 布局 1：圆形 ─────────────────────────────────
     private void ComputeCircularLayout()
     {
         _nodePositions.Clear();
@@ -963,7 +857,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         }
     }
 
-    // ─── 布局 2：力导向（改进版）─────────────────────
     private void ComputeForceDirectedLayout()
     {
         _nodePositions.Clear();
@@ -979,14 +872,12 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         const double cx = CanvasWidth / 2;
         const double cy = CanvasHeight / 2;
 
-        // ─── 参数 ───
         const double desiredEdgeLength = 180;
         const double minSeparation = 130;
         const double edgeStiffness = 0.10;
         const double centerCoef = 0.04;
         const double centerCoefIsolated = 0.10;
 
-        // ─── 1. 初始位置：中心附近的小圆上 ───
         var positions = new Dictionary<Guid, (double X, double Y)>();
         var rng = new Random(_layoutSeed);
         double initRadius = Math.Min(80, 30 + n * 4);
@@ -1000,7 +891,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             positions[_topologyNodes[i].GUID] = (x, y);
         }
 
-        // ─── 2. 邻接表 ───
         var adjacency = _topologyNodes.ToDictionary(
             node => node.GUID,
             _ => new HashSet<Guid>());
@@ -1013,7 +903,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             }
         }
 
-        // ─── 3. 迭代 ───
         int iterations = Math.Clamp(n * 40, 150, 500);
         double temperature = 80.0;
         double cooling = temperature / (iterations + 1);
@@ -1024,7 +913,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 node => node.GUID,
                 _ => (Dx: 0.0, Dy: 0.0));
 
-            // 3a. 短距离斥力
+            // 斥力
             for (int i = 0; i < n; i++)
             {
                 for (int j = i + 1; j < n; j++)
@@ -1057,7 +946,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 }
             }
 
-            // 3b. 边引力：目标长度模式
+            // 边引力
             foreach (var edge in _topologyEdges)
             {
                 if (edge.From == edge.To) continue;
@@ -1078,7 +967,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 disp[edge.To] = (disp[edge.To].Dx + fx, disp[edge.To].Dy + fy);
             }
 
-            // 3c. 中心引力
+            // 中心引力
             foreach (var node in _topologyNodes)
             {
                 double dx = cx - positions[node.GUID].X;
@@ -1096,7 +985,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 disp[node.GUID] = (disp[node.GUID].Dx + fx, disp[node.GUID].Dy + fy);
             }
 
-            // 3d. 应用位移
+            // 应用位移
             foreach (var node in _topologyNodes)
             {
                 var d = disp[node.GUID];
@@ -1113,21 +1002,17 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 positions[node.GUID] = (newX, newY);
             }
 
-            // 3e. 降温
             temperature = Math.Max(temperature - cooling, 0.5);
         }
 
-        // ─── 4. 平移居中 ───
         CenterWithoutScaling(positions);
 
-        // ─── 5. 保存 ───
         foreach (var kv in positions)
         {
             _nodePositions[kv.Key] = kv.Value;
         }
     }
 
-    /// <summary>只平移不缩放：把整体图形平移到画布中心。</summary>
     private static void CenterWithoutScaling(
         Dictionary<Guid, (double X, double Y)> positions)
     {
@@ -1163,7 +1048,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     }
 
     // ══════════════════════════════════════════════════════
-    // 导入 / 导出
+    // 导入 / 导出（不变）
     // ══════════════════════════════════════════════════════
 
     private async Task ExportJsonAsync()
@@ -1179,11 +1064,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
             var json = await GraphApi.ExportGraphJsonAsync(graphGuid);
 
-            if (string.IsNullOrEmpty(json))
-            {
-                _errorMessage = "导出失败";
-                return;
-            }
+            if (string.IsNullOrEmpty(json)) { _errorMessage = "导出失败"; return; }
 
             var safeName = SanitizeFileName(graphName);
             var fileName = $"{safeName}-{DateTime.Now:yyyyMMdd-HHmmss}.json";
@@ -1295,7 +1176,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                     graphGuid, _selectedNodesCsvContent!, _selectedEdgesCsvContent, _clearBeforeImport);
             }
 
-            // 把 DTO 转回原 ImportResult 类型（保持 UI 层不变）
             _importResult = new ImportResult
             {
                 NodesCreated = dto.NodesCreated,
@@ -1324,8 +1204,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             StateHasChanged();
         }
     }
-
-    // ─── 文件选择 ─────────────────────────────────────
 
     private async Task OnJsonFileSelected(InputFileChangeEventArgs e)
     {
@@ -1356,13 +1234,11 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         StateHasChanged();
         await Task.CompletedTask;
     }
-    
+
     private static string FormatFileSize(long bytes)
     {
-        if (bytes < 1024)
-            return $"{bytes} B";
-        if (bytes < 1024 * 1024)
-            return $"{bytes / 1024.0:F1} KB";
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
         return $"{bytes / (1024.0 * 1024):F1} MB";
     }
 
@@ -1417,8 +1293,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         StateHasChanged();
     }
 
-    // ─── 执行导入 ────────────────────────────────────
-
     private void ResetImportState()
     {
         _selectedJsonFileName = null;
@@ -1444,12 +1318,11 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     // ─── UI 辅助 ─────────────────────────────────────
     private async Task SwitchTabAsync(string tab)
     {
-        // ★ 切 Tab 时清空编辑状态
         _editingNodeGuid = null;
         _editingNodeName = "";
         _editingEdgeGuid = null;
         _editingEdgeName = "";
-        
+
         _activeTab = tab;
 
         if (tab == "topology" &&
@@ -1486,9 +1359,9 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         _detailJson = null;
         StateHasChanged();
     }
-    
-        // ══════════════════════════════════════════════════════
-    // ★ 图管理（CRUD）
+
+    // ══════════════════════════════════════════════════════
+    // 图管理（CRUD，不变）
     // ══════════════════════════════════════════════════════
 
     private void OpenManageDialog()
@@ -1610,7 +1483,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             StateHasChanged();
         }
     }
-    
+
     private void StartRename(Graph g)
     {
         _renamingGraphGuid = g.GUID;
@@ -1626,7 +1499,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     }
 
     // ══════════════════════════════════════════════════════
-    // ★ 节点/边行内编辑
+    // 节点/边行内编辑（不变）
     // ══════════════════════════════════════════════════════
 
     private void StartEditNode(Node node)
@@ -1657,7 +1530,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         StateHasChanged();
     }
 
-    /// <summary>编辑输入框里按 Enter 提交，Esc 取消。</summary>
     private async Task HandleEditKeyDown(KeyboardEventArgs e, Func<Task> onSave)
     {
         if (e.Key == "Enter")
@@ -1670,7 +1542,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             CancelEditEdge();
         }
     }
-    
+
     private async Task<bool> ConfirmAsync(string message)
     {
         try
@@ -1686,12 +1558,13 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
     public void Dispose() { }
 
-    // ─── 向量搜索显示 DTO ────────────────────────────
+    // ─── 向量搜索显示 DTO（重构）────────────────────
     private sealed class VectorSearchDisplayResult
     {
         public string NodeName { get; set; } = "";
-        public float Score { get; set; }          // 混合分数（用于排序和主显示）
-        public float VectorScore { get; set; }    // 纯向量分（调试用）
-        public bool KeywordMatched { get; set; }  // 是否命中关键词
+        public float Score { get; set; }
+        public string? ViaEdge { get; set; }          // ★ 通过哪条关系命中
+        public string? Direction { get; set; }        // "in" / "out"
+        public string? MatchedContent { get; set; }   // 命中的原文
     }
 }

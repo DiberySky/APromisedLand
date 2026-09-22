@@ -17,15 +17,16 @@ public sealed class GraphController(
     NodeAuthoringService nodeService,
     EdgeAuthoringService edgeService,
     LiteGraphRestClient liteGraph,
+    IntentParserService intentParser,
     LiteGraphSdk sdk,
-    IConfiguration configuration,          // ★ 新增
+    IConfiguration configuration, // ★ 新增
     ILogger<GraphController> logger) : ControllerBase
 {
     private readonly NodeAuthoringService _nodeService = nodeService;
     private readonly EdgeAuthoringService _edgeService = edgeService;
     private readonly LiteGraphRestClient _liteGraph = liteGraph;
     private readonly LiteGraphSdk _sdk = sdk;
-    private readonly IConfiguration _configuration = configuration;  // ★ 新增
+    private readonly IConfiguration _configuration = configuration; // ★ 新增
     private readonly ILogger<GraphController> _logger = logger;
 
     // ─── 顶点单条 ──────────────────────────────────────
@@ -275,8 +276,8 @@ public sealed class GraphController(
         var node = existingJson.Value;
 
         var labelsNode = GetNodeSnapshot(node, "Labels");
-        var tagsNode   = GetNodeSnapshot(node, "Tags");
-        var dataNode   = GetNodeSnapshot(node, "Data");
+        var tagsNode = GetNodeSnapshot(node, "Tags");
+        var dataNode = GetNodeSnapshot(node, "Data");
 
         var result = await _liteGraph.PutAsync(
             $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/nodes/{nodeGuid}",
@@ -311,8 +312,8 @@ public sealed class GraphController(
         var edge = existingJson.Value;
 
         var labelsNode = GetNodeSnapshot(edge, "Labels");
-        var tagsNode   = GetNodeSnapshot(edge, "Tags");
-        var dataNode   = GetNodeSnapshot(edge, "Data");
+        var tagsNode = GetNodeSnapshot(edge, "Tags");
+        var dataNode = GetNodeSnapshot(edge, "Data");
 
         var fromGuid = edge.TryGetProperty("From", out var f)
                        && f.ValueKind == JsonValueKind.String
@@ -457,6 +458,432 @@ public sealed class GraphController(
         return NoContent();
     }
 
+    // ══════════════════════════════════════════════════════════
+// ★ 边向量：附着到 EdgeGUID，方向由 From/To 保证
+// ══════════════════════════════════════════════════════════
+
+    [HttpPost("{graphGuid}/edge-vectors")]
+    public async Task<IActionResult> CreateEdgeVector(
+        [FromRoute] Guid graphGuid,
+        [FromBody] CreateEdgeVectorRequest request,
+        CancellationToken ct)
+    {
+        var modelName = _configuration["Embedding:Model"] ?? "bge-large";
+
+        var metadata = new VectorMetadata
+        {
+            // ★ 必须显式设置！SDK 默认是 Guid.NewGuid()，会存到随机租户
+            TenantGUID = Guid.Empty,
+            GraphGUID = graphGuid,
+            NodeGUID = null,
+            EdgeGUID = request.EdgeGuid, // ★ 附着到边
+            Model = modelName,
+            Dimensionality = request.Vector.Count,
+            Content = request.Content, // ★ 保存原文
+            Vectors = request.Vector
+        };
+
+        _logger.LogInformation(
+            "创建边向量：Edge={Edge}, Model={Model}, Dim={Dim}, Content={Content}",
+            request.EdgeGuid, modelName, request.Vector.Count, request.Content);
+
+        var created = await _sdk.Vector.Create(metadata, ct);
+        _logger.LogInformation("边向量创建成功：GUID={Guid}", created.GUID);
+
+        return Ok(created);
+    }
+
+// ══════════════════════════════════════════════════════════
+// ★ 意图解析端点
+// ══════════════════════════════════════════════════════════
+
+    [HttpPost("{graphGuid}/parse-intent")]
+    public async Task<ActionResult<IntentResult>> ParseIntent(
+        [FromRoute] Guid graphGuid,
+        [FromBody] ParseIntentRequest request,
+        CancellationToken ct)
+    {
+        var relations = request.AvailableRelations is { Count: > 0 }
+            ? request.AvailableRelations
+            : await LoadGraphRelationsAsync(graphGuid, ct);
+
+        if (relations.Count == 0)
+            return Ok(new IntentResult { Strategy = "none" });
+
+        var result = await intentParser.ParseAsync(request.Query, relations, ct);
+
+        _logger.LogInformation(
+            "意图解析：Query={Q}, Rel={R}, Dir={D}, Subj={S}, Conf={C:F2}, Strategy={St}",
+            request.Query, result.Relation, result.Direction,
+            result.SubjectName, result.Confidence, result.Strategy);
+
+        return Ok(result);
+    }
+
+// ══════════════════════════════════════════════════════════
+// ★ 语义搜索：意图解析 + 边向量搜索 + 方向过滤（核心）
+// ══════════════════════════════════════════════════════════
+
+    [HttpPost("{graphGuid}/semantic-search")]
+    public async Task<ActionResult<SemanticSearchResponseDto>> SemanticSearch(
+        [FromRoute] Guid graphGuid,
+        [FromBody] SemanticSearchRequest request,
+        CancellationToken ct)
+    {
+        // ① 意图解析
+        var relations = await LoadGraphRelationsAsync(graphGuid, ct);
+        var intent = await intentParser.ParseAsync(request.Query, relations, ct);
+
+        _logger.LogInformation(
+            "语义搜索：Query={Q}, Rel={R}, Dir={D}, Subj={S}",
+            request.Query, intent.Relation, intent.Direction, intent.SubjectName);
+
+        // ② 生成查询向量
+        var queryVec = await GenerateQueryEmbeddingAsync(request.Query, ct);
+        if (queryVec is null || queryVec.Count == 0)
+            return BadRequest("无法生成查询向量");
+
+        // ③ 加载所有边向量
+        // ── ③ 加载所有边向量（自动分页）──
+        var edgeVecs = await LoadAllEdgeVectorsAsync(graphGuid, ct);
+
+        if (edgeVecs.Count == 0)
+        {
+            return Ok(new SemanticSearchResponseDto
+            {
+                Intent = intent,
+                Stats = new { Note = "图中无边向量，请先重建向量" }
+            });
+        }
+
+        if (edgeVecs.Count == 0)
+        {
+            return Ok(new SemanticSearchResponseDto
+            {
+                Intent = intent,
+                Stats = new { Note = "图中无边向量，请先为所有节点生成向量" }
+            });
+        }
+
+        // ④ 余弦相似度排序
+        var scored = edgeVecs
+            .Select(v => (Vector: v, Score: Cosine(v.Vectors!, queryVec)))
+            .Where(x => request.MinScore is null || x.Score >= request.MinScore)
+            .OrderByDescending(x => x.Score)
+            .ToList();
+
+        // ⑤ 边方向过滤 + 反查节点
+        var hits = new List<SemanticSearchHitDto>();
+        var seen = new HashSet<Guid>();
+
+        var edgeCache = new Dictionary<Guid, Edge>();
+        var nodeCache = new Dictionary<Guid, Node>();
+        Guid? subjectGuid = null;
+
+        // 预解析 subject
+        if (!string.IsNullOrWhiteSpace(intent.SubjectName))
+            subjectGuid = await FindNodeByNameAsync(graphGuid, intent.SubjectName, nodeCache, ct);
+
+        // ════════════════════════════════════════════════════
+// ★ 关键修复：Subject 优先 + 方向自动纠偏
+// ════════════════════════════════════════════════════
+        foreach (var (vec, score) in scored)
+        {
+            if (hits.Count >= request.TopK) break;
+
+            var edgeGuid = vec.EdgeGUID!.Value;
+            if (!edgeCache.TryGetValue(edgeGuid, out var edge))
+            {
+                edge = await FetchEdgeAsync(graphGuid, edgeGuid, ct);
+                if (edge is null) continue;
+                edgeCache[edgeGuid] = edge;
+            }
+
+            // ① 关系名过滤
+            if (intent.Relation is not null &&
+                !string.Equals(edge.Name, intent.Relation, StringComparison.Ordinal))
+                continue;
+
+            // ② 定位目标节点
+            Guid targetGuid;
+            string effectiveDir;
+
+            if (subjectGuid is not null)
+            {
+                // ══════════════════════════════════════════════
+                // ★ 有 subject：以 subject 为准，自动纠偏方向
+                //   不管 LLM 说 in 还是 out，都按"边相对 subject 的方向"决定
+                // ══════════════════════════════════════════════
+                bool subjectIsFrom = edge.From == subjectGuid;
+                bool subjectIsTo = edge.To == subjectGuid;
+
+                if (!subjectIsFrom && !subjectIsTo)
+                    continue; // 这条边跟 subject 无关，跳过
+
+                // LLM 说 in  → 期望 subject 是 To（入边）→ 目标 = From
+                // LLM 说 out → 期望 subject 是 From（出边）→ 目标 = To
+                // 若不匹配，自动按"边本身的方向"取远端
+                if (intent.Direction == "in")
+                {
+                    if (subjectIsTo)
+                    {
+                        targetGuid = edge.From;
+                        effectiveDir = "in";
+                    }
+                    else
+                    {
+                        // ★ LLM 说 in 但 subject 实际是 From → 反转
+                        targetGuid = edge.To;
+                        effectiveDir = "out";
+                        _logger.LogWarning(
+                            "方向纠偏：LLM={Llm}, 实际=out, Subject={Subj}, Edge={Edge}",
+                            intent.Direction, intent.SubjectName, edgeGuid);
+                    }
+                }
+                else if (intent.Direction == "out")
+                {
+                    if (subjectIsFrom)
+                    {
+                        targetGuid = edge.To;
+                        effectiveDir = "out";
+                    }
+                    else
+                    {
+                        // ★ LLM 说 out 但 subject 实际是 To → 反转
+                        targetGuid = edge.From;
+                        effectiveDir = "in";
+                        _logger.LogWarning(
+                            "方向纠偏：LLM={Llm}, 实际=in, Subject={Subj}, Edge={Edge}",
+                            intent.Direction, intent.SubjectName, edgeGuid);
+                    }
+                }
+                else
+                {
+                    // 无方向 → 按边的起点/终点任选（不推荐，但兜底）
+                    targetGuid = subjectIsFrom ? edge.To : edge.From;
+                    effectiveDir = subjectIsFrom ? "out" : "in";
+                }
+            }
+            else
+            {
+                // ══════════════════════════════════════════════
+                // 无 subject：按 LLM 给的方向选远端
+                // ══════════════════════════════════════════════
+                targetGuid = intent.Direction switch
+                {
+                    "out" => edge.To,
+                    "in" => edge.From,
+                    _ => Guid.Empty
+                };
+                effectiveDir = intent.Direction ?? "out";
+
+                if (targetGuid == Guid.Empty) continue;
+            }
+
+            if (seen.Contains(targetGuid)) continue;
+            seen.Add(targetGuid);
+
+            // ③ 反查目标节点
+            if (!nodeCache.TryGetValue(targetGuid, out var target))
+            {
+                target = await FetchNodeAsync(graphGuid, targetGuid, ct);
+                if (target is null) continue;
+                nodeCache[targetGuid] = target;
+            }
+
+            hits.Add(new SemanticSearchHitDto
+            {
+                NodeGuid = target.GUID,
+                NodeName = target.Name,
+                Score = score,
+                ViaEdgeName = edge.Name,
+                Direction = effectiveDir, // ★ 返回纠偏后的方向
+                MatchedContent = vec.Content
+            });
+        }
+
+        return Ok(new SemanticSearchResponseDto
+        {
+            Hits = hits,
+            Intent = intent,
+            Stats = new
+            {
+                TotalEdgeVectors = edgeVecs.Count,
+                Scanned = scored.Count,
+                Returned = hits.Count
+            }
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ★ 辅助：分页加载全图所有边向量（每页 1000，自动翻页）
+    // ══════════════════════════════════════════════════════════
+    private async Task<List<VectorMetadata>> LoadAllEdgeVectorsAsync(
+        Guid graphGuid, CancellationToken ct)
+    {
+        var all = new List<VectorMetadata>();
+        Guid? continuationToken = null;
+        int pageNo = 0;
+
+        while (true)
+        {
+            pageNo++;
+            var query = new EnumerationRequest
+            {
+                TenantGUID = Guid.Empty,
+                GraphGUID = graphGuid,
+                MaxResults = 1000, // SDK 上限
+                ContinuationToken = continuationToken
+            };
+
+            var page = await _sdk.Vector.Enumerate(query, ct);
+            if (page?.Objects is null || page.Objects.Count == 0) break;
+
+            // 只收集边向量
+            all.AddRange(page.Objects.Where(v =>
+                v.EdgeGUID.HasValue && v.Vectors is { Count: > 0 }));
+
+            continuationToken = page.ContinuationToken;
+            if (continuationToken is null) break;
+
+            _logger.LogDebug("加载向量第 {Page} 页，累计 {Count} 条", pageNo, all.Count);
+
+            // 防御：避免死循环
+            if (pageNo > 100) break;
+        }
+
+        _logger.LogInformation(
+            "图 {Graph} 共加载 {Count} 条边向量（{Pages} 页）",
+            graphGuid, all.Count, pageNo);
+
+        return all;
+    }
+
+// ══════════════════════════════════════════════════════════
+// 辅助方法
+// ══════════════════════════════════════════════════════════
+
+    private async Task<List<string>> LoadGraphRelationsAsync(Guid graphGuid, CancellationToken ct)
+    {
+        var json = await _liteGraph.GetAsync(
+            $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/edges", ct);
+
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        if (json.HasValue &&
+            json.Value.TryGetProperty("Objects", out var objs) &&
+            objs.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var e in objs.EnumerateArray())
+            {
+                if (e.TryGetProperty("Name", out var n) && n.ValueKind == JsonValueKind.String)
+                {
+                    var v = n.GetString();
+                    if (!string.IsNullOrWhiteSpace(v)) set.Add(v);
+                }
+            }
+        }
+
+        return set.ToList();
+    }
+
+    private async Task<List<float>?> GenerateQueryEmbeddingAsync(string text, CancellationToken ct)
+    {
+        var gen = HttpContext.RequestServices.GetRequiredKeyedService<
+            Microsoft.Extensions.AI.IEmbeddingGenerator<string,
+                Microsoft.Extensions.AI.Embedding<float>>>("embedding");
+
+        var r = await gen.GenerateAsync(new[] { text }, cancellationToken: ct);
+        return r.Count > 0 ? r[0].Vector.ToArray().ToList() : null;
+    }
+
+    private async Task<Edge?> FetchEdgeAsync(Guid graphGuid, Guid edgeGuid, CancellationToken ct)
+    {
+        var json = await _liteGraph.GetAsync(
+            $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/edges/{edgeGuid}", ct);
+        if (json is null) return null;
+
+        var e = json.Value;
+        if (e.TryGetProperty("Objects", out var objs) && objs.ValueKind == JsonValueKind.Array)
+            foreach (var o in objs.EnumerateArray())
+            {
+                e = o;
+                break;
+            }
+
+        return new Edge
+        {
+            GUID = e.TryGetProperty("GUID", out var g) ? g.GetGuid() : Guid.Empty,
+            Name = e.TryGetProperty("Name", out var n) ? n.GetString() ?? "" : "",
+            From = e.TryGetProperty("From", out var f) ? f.GetGuid() : Guid.Empty,
+            To = e.TryGetProperty("To", out var t) ? t.GetGuid() : Guid.Empty
+        };
+    }
+
+    private async Task<Node?> FetchNodeAsync(Guid graphGuid, Guid nodeGuid, CancellationToken ct)
+    {
+        var json = await _liteGraph.GetAsync(
+            $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/nodes/{nodeGuid}", ct);
+        if (json is null) return null;
+
+        var n = json.Value;
+        if (n.TryGetProperty("Objects", out var objs) && objs.ValueKind == JsonValueKind.Array)
+            foreach (var o in objs.EnumerateArray())
+            {
+                n = o;
+                break;
+            }
+
+        return new Node
+        {
+            GUID = n.TryGetProperty("GUID", out var g) ? g.GetGuid() : Guid.Empty,
+            Name = n.TryGetProperty("Name", out var nm) ? nm.GetString() ?? "" : ""
+        };
+    }
+
+    private async Task<Guid?> FindNodeByNameAsync(
+        Guid graphGuid, string name,
+        Dictionary<Guid, Node> cache, CancellationToken ct)
+    {
+        if (cache.Count == 0)
+        {
+            var json = await _liteGraph.GetAsync(
+                $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/nodes", ct);
+
+            if (json.HasValue &&
+                json.Value.TryGetProperty("Objects", out var objs) &&
+                objs.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var o in objs.EnumerateArray())
+                {
+                    var g = o.TryGetProperty("GUID", out var gg) ? gg.GetGuid() : Guid.Empty;
+                    var nm = o.TryGetProperty("Name", out var nn) ? nn.GetString() ?? "" : "";
+                    if (g != Guid.Empty) cache[g] = new Node { GUID = g, Name = nm };
+                }
+            }
+        }
+
+        var exact = cache.Values.FirstOrDefault(n =>
+            string.Equals(n.Name, name, StringComparison.Ordinal));
+        if (exact is not null) return exact.GUID;
+
+        return cache.Values.FirstOrDefault(n =>
+            n.Name.Contains(name, StringComparison.Ordinal))?.GUID;
+    }
+
+    private static double Cosine(List<float> a, List<float> b)
+    {
+        if (a.Count != b.Count) return 0;
+        double dot = 0, na = 0, nb = 0;
+        for (int i = 0; i < a.Count; i++)
+        {
+            dot += (double)a[i] * b[i];
+            na += (double)a[i] * a[i];
+            nb += (double)b[i] * b[i];
+        }
+
+        return na > 0 && nb > 0 ? dot / (Math.Sqrt(na) * Math.Sqrt(nb)) : 0;
+    }
+
     // ══════════════════════════════════════════════════════
     // 辅助：从 JsonElement 抽取独立 JsonNode 快照
     // ══════════════════════════════════════════════════════
@@ -473,25 +900,6 @@ public sealed class GraphController(
 
         return JsonNode.Parse(prop.GetRawText());
     }
-    
-    [HttpGet("debug/vector-metadata-schema")]
-    public IActionResult DebugVectorMetadataSchema()
-    {
-        var t = typeof(VectorMetadata);
-        var props = t.GetProperties()
-            .Select(p => new
-            {
-                Name = p.Name,
-                Type = p.PropertyType.Name,
-                Nullable = Nullable.GetUnderlyingType(p.PropertyType) is not null
-            })
-            .OrderBy(x => x.Name)
-            .ToList();
-
-        var e = new Edge();
-        
-        return Ok(props);
-    }
 }
 
 // ─── 请求 DTO ─────────────────────────────────────────
@@ -501,7 +909,8 @@ public sealed class VectorSearchRequest
     [Required] public List<float> QueryVector { get; set; } = [];
 
     /// <summary>★ 保留字段但服务端会忽略，用配置里的 Embedding:Model。</summary>
-    [Required] public string Model { get; set; } = "bge-large";
+    [Required]
+    public string Model { get; set; } = "bge-large";
 
     [Range(1, 100)] public int TopK { get; set; } = 10;
 
