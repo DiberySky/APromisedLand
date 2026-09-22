@@ -32,11 +32,21 @@
     @if (!string.IsNullOrEmpty(_selectedGraphGuid))
     {
         <div class="tab-bar">
-            <button class="tab @(_activeTab == "nodes" ? "active" : "")" @onclick='() => SwitchTabAsync("nodes")'>📦 节点 (@_nodeTotal)</button>
-            <button class="tab @(_activeTab == "edges" ? "active" : "")" @onclick='() => SwitchTabAsync("edges")'>🔗 边 (@_edgeTotal)</button>
-            <button class="tab @(_activeTab == "vector" ? "active" : "")" @onclick='() => SwitchTabAsync("vector")'>🧠 向量搜索</button>
-            <button class="tab @(_activeTab == "topology" ? "active" : "")" @onclick='() => SwitchTabAsync("topology")'>🌐 拓扑图</button>
-            <button class="tab @(_activeTab == "import-export" ? "active" : "")" @onclick='() => SwitchTabAsync("import-export")'>💾 导入/导出</button>
+            <button class="tab @(_activeTab == "nodes" ? "active" : "")" @onclick='() => SwitchTabAsync("nodes")'>📦 节点
+                (@_nodeTotal)
+            </button>
+            <button class="tab @(_activeTab == "edges" ? "active" : "")" @onclick='() => SwitchTabAsync("edges")'>🔗 边
+                (@_edgeTotal)
+            </button>
+            <button class="tab @(_activeTab == "vector" ? "active" : "")" @onclick='() => SwitchTabAsync("vector")'>🧠
+                向量搜索
+            </button>
+            <button class="tab @(_activeTab == "topology" ? "active" : "")" @onclick='() => SwitchTabAsync("topology")'>
+                🌐 拓扑图
+            </button>
+            <button class="tab @(_activeTab == "import-export" ? "active" : "")"
+                    @onclick='() => SwitchTabAsync("import-export")'>💾 导入/导出
+            </button>
         </div>
 
         <!-- 节点面板（不变） -->
@@ -44,9 +54,10 @@
         {
             <div class="panel">
                 <div class="crud-bar">
-                    <input type="text" @bind="_newNodeName" placeholder="新节点名称" class="input-sm" />
+                    <input type="text" @bind="_newNodeName" placeholder="新节点名称" class="input-sm"/>
                     <button class="btn-primary" @onclick="CreateNodeAsync" disabled="@_isBusy">+ 新建节点</button>
-                    <button class="btn-danger" @onclick="DeleteSelectedNodesAsync" disabled="@(_selectedNodeGuids.Count == 0 || _isBusy)">
+                    <button class="btn-danger" @onclick="DeleteSelectedNodesAsync"
+                            disabled="@(_selectedNodeGuids.Count == 0 || _isBusy)">
                         🗑️ 删除选中 (@_selectedNodeGuids.Count)
                     </button>
                 </div>
@@ -59,16 +70,18 @@
                             {
                                 <input type="text" @bind="_editingNodeName" @bind:event="oninput"
                                        class="inline-edit-input"
-                                       @onkeydown="e => HandleEditKeyDown(e, () => SaveNodeNameAsync(node))" />
+                                       @onkeydown="e => HandleEditKeyDown(e, () => SaveNodeNameAsync(node))"/>
                                 <div class="item-actions">
-                                    <button class="btn-sm btn-primary" @onclick="() => SaveNodeNameAsync(node)" disabled="@_isBusy">✓</button>
+                                    <button class="btn-sm btn-primary" @onclick="() => SaveNodeNameAsync(node)"
+                                            disabled="@_isBusy">✓
+                                    </button>
                                     <button class="btn-sm" @onclick="CancelEditNode" disabled="@_isBusy">✕</button>
                                 </div>
                             }
                             else
                             {
                                 <input type="checkbox" checked="@_selectedNodeGuids.Contains(node.GUID)"
-                                       @onchange="(e) => ToggleNodeSelection(node.GUID, (bool)e.Value!)" />
+                                       @onchange="(e) => ToggleNodeSelection(node.GUID, (bool)e.Value!)"/>
                                 <div class="item-info">
                                     <strong>@node.Name</strong>
                                     <span class="guid">@node.GUID.ToString("N")[..8]</span>
@@ -76,7 +89,9 @@
                                 <div class="item-actions">
                                     <button class="btn-icon" @onclick="() => ShowNodeJson(node)">👁️</button>
                                     <button class="btn-icon" @onclick="() => StartEditNode(node)">✏️</button>
-                                    <button class="btn-icon danger" @onclick="() => DeleteNodeAsync(node.GUID)" disabled="@_isBusy">🗑️</button>
+                                    <button class="btn-icon danger" @onclick="() => DeleteNodeAsync(node.GUID)"
+                                            disabled="@_isBusy">🗑️
+                                    </button>
                                 </div>
                             }
                         </div>
@@ -84,9 +99,13 @@
                 </div>
 
                 <div class="pagination">
-                    <button class="btn-page" @onclick="PrevNodePageAsync" disabled="@(!_nodeHasPrev || _isBusy)">⬅️ 上一页</button>
+                    <button class="btn-page" @onclick="PrevNodePageAsync" disabled="@(!_nodeHasPrev || _isBusy)">⬅️
+                        上一页
+                    </button>
                     <span class="page-info">已加载 @_nodes.Count / 共 @_nodeTotal 条</span>
-                    <button class="btn-page" @onclick="NextNodePageAsync" disabled="@(!_nodeHasNext || _isBusy)">下一页 ➡️</button>
+                    <button class="btn-page" @onclick="NextNodePageAsync" disabled="@(!_nodeHasNext || _isBusy)">下一页
+                        ➡️
+                    </button>
                 </div>
             </div>
         }
@@ -98,13 +117,19 @@
                 <div class="crud-bar">
                     <select @bind="_newEdgeFrom" class="input-sm">
                         <option value="">起点</option>
-                        @foreach (var n in _nodes) { <option value="@n.GUID">@n.Name</option> }
+                        @foreach (var n in _nodes)
+                        {
+                            <option value="@n.GUID">@n.Name</option>
+                        }
                     </select>
                     <select @bind="_newEdgeTo" class="input-sm">
                         <option value="">终点</option>
-                        @foreach (var n in _nodes) { <option value="@n.GUID">@n.Name</option> }
+                        @foreach (var n in _nodes)
+                        {
+                            <option value="@n.GUID">@n.Name</option>
+                        }
                     </select>
-                    <input type="text" @bind="_newEdgeName" placeholder="边名称 (如 PARENT_OF)" class="input-sm" />
+                    <input type="text" @bind="_newEdgeName" placeholder="边名称 (如 PARENT_OF)" class="input-sm"/>
                     <button class="btn-primary" @onclick="CreateEdgeAsync" disabled="@_isBusy">+ 新建边</button>
                 </div>
 
@@ -116,9 +141,11 @@
                             {
                                 <input type="text" @bind="_editingEdgeName" @bind:event="oninput"
                                        class="inline-edit-input"
-                                       @onkeydown="e => HandleEditKeyDown(e, () => SaveEdgeNameAsync(edge))" />
+                                       @onkeydown="e => HandleEditKeyDown(e, () => SaveEdgeNameAsync(edge))"/>
                                 <div class="item-actions">
-                                    <button class="btn-sm btn-primary" @onclick="() => SaveEdgeNameAsync(edge)" disabled="@_isBusy">✓</button>
+                                    <button class="btn-sm btn-primary" @onclick="() => SaveEdgeNameAsync(edge)"
+                                            disabled="@_isBusy">✓
+                                    </button>
                                     <button class="btn-sm" @onclick="CancelEditEdge" disabled="@_isBusy">✕</button>
                                 </div>
                             }
@@ -126,12 +153,15 @@
                             {
                                 <div class="item-info">
                                     <strong>@edge.Name</strong>
-                                    <span class="guid">@edge.From.ToString("N")[..8] → @edge.To.ToString("N")[..8]</span>
+                                    <span
+                                        class="guid">@edge.From.ToString("N")[..8] → @edge.To.ToString("N")[..8]</span>
                                 </div>
                                 <div class="item-actions">
                                     <button class="btn-icon" @onclick="() => ShowEdgeJson(edge)">👁️</button>
                                     <button class="btn-icon" @onclick="() => StartEditEdge(edge)">✏️</button>
-                                    <button class="btn-icon danger" @onclick="() => DeleteEdgeAsync(edge.GUID)" disabled="@_isBusy">🗑️</button>
+                                    <button class="btn-icon danger" @onclick="() => DeleteEdgeAsync(edge.GUID)"
+                                            disabled="@_isBusy">🗑️
+                                    </button>
                                 </div>
                             }
                         </div>
@@ -139,9 +169,13 @@
                 </div>
 
                 <div class="pagination">
-                    <button class="btn-page" @onclick="PrevEdgePageAsync" disabled="@(!_edgeHasPrev || _isBusy)">⬅️ 上一页</button>
+                    <button class="btn-page" @onclick="PrevEdgePageAsync" disabled="@(!_edgeHasPrev || _isBusy)">⬅️
+                        上一页
+                    </button>
                     <span class="page-info">已加载 @_edges.Count / 共 @_edgeTotal 条</span>
-                    <button class="btn-page" @onclick="NextEdgePageAsync" disabled="@(!_edgeHasNext || _isBusy)">下一页 ➡️</button>
+                    <button class="btn-page" @onclick="NextEdgePageAsync" disabled="@(!_edgeHasNext || _isBusy)">下一页
+                        ➡️
+                    </button>
                 </div>
             </div>
         }
@@ -156,7 +190,7 @@
                     <input type="text" @bind="_vectorQueryText"
                            placeholder="输入语义查询 (如: 根节点B的父亲 / 深度学习用到的框架)"
                            class="input-lg"
-                           @onkeydown="HandleSearchKeyDown" />
+                           @onkeydown="HandleSearchKeyDown"/>
                     <button class="btn-primary"
                             @onclick="SearchVectorAsync"
                             disabled="@(_isBusy || string.IsNullOrWhiteSpace(_vectorQueryText))">
@@ -190,9 +224,50 @@
                         {
                             <span class="intent-chip subject">主体: @_lastIntent.SubjectName</span>
                         }
+
+                        @* ★ 阶段 4：多跳标记 *@
+                        @if (!string.IsNullOrEmpty(_lastIntent.AggregationMode))
+                        {
+                            <span class="intent-chip multi-hop">
+                                @(_lastIntent.AggregationMode == "ancestors" ? "🔗 祖先链" : "🔗 后代链")
+                            </span>
+                            <span class="intent-chip hop-count">
+                                @(_lastIntent.HopCount <= 0 ? "∞ 跳" : $"{_lastIntent.HopCount} 跳")
+                            </span>
+                        }
+
                         <span class="intent-confidence">@_lastIntent.Confidence.ToString("P0")</span>
                         <span class="intent-strategy">[@_lastIntent.Strategy]</span>
                     </div>
+                    
+                    @* ★ 新增：Hint 提示 *@
+                    @* ★ Hint + 建议按钮 *@
+                    @if (!string.IsNullOrEmpty(_lastHint) || _lastSuggestions.Any())
+                    {
+                        <div class="hint-banner">
+                            @if (!string.IsNullOrEmpty(_lastHint))
+                            {
+                                <span class="hint-icon">💡</span>
+                                <span class="hint-text">@_lastHint</span>
+                            }
+
+                            @if (_lastSuggestions.Any())
+                            {
+                                <div class="suggestion-list">
+                                    @foreach (var s in _lastSuggestions)
+                                    {
+                                        <button class="suggestion-btn"
+                                                @onclick="() => RunSuggestionAsync(s)"
+                                                disabled="@_isBusy"
+                                                title="@(string.IsNullOrEmpty(s.Tooltip) ? s.Query : s.Tooltip)">
+                                            <span class="suggestion-label">@s.DisplayLabel</span>
+                                            <span class="suggestion-count">@s.Count</span>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
                 }
 
                 @if (_vectorResults.Any())
@@ -204,13 +279,21 @@
                                 <div class="item-info">
                                     <strong>@r.NodeName</strong>
                                     <span class="guid">
-                                        综合: @r.Score.ToString("F4")
-                                        @if (r.VectorScore.HasValue && r.Bm25Score.HasValue)
+                                        @if (r.IsMultiHop && r.HopDistance.HasValue)
                                         {
-                                            <span class="component-scores">
-                                                （向量 @r.VectorScore.Value.ToString("F4")
-                                                · BM25 @r.Bm25Score.Value.ToString("F4")）
-                                            </span>
+                                            <span class="hop-badge">距离 @r.HopDistance 跳</span>
+                                            <span>· 综合: @r.Score.ToString("F4")</span>
+                                        }
+                                        else
+                                        {
+                                            <span>综合: @r.Score.ToString("F4")</span>
+                                            @if (r.VectorScore.HasValue && r.Bm25Score.HasValue)
+                                            {
+                                                <span class="component-scores">
+                                                    （向量 @r.VectorScore.Value.ToString("F4")
+                                                    · BM25 @r.Bm25Score.Value.ToString("F4")）
+                                                </span>
+                                            }
                                         }
                                         @if (!string.IsNullOrEmpty(r.ViaEdge))
                                         {
@@ -233,7 +316,7 @@
                 else
                 {
                     <p class="hint">
-                        输入自然语言进行语义搜索。<br />
+                        输入自然语言进行语义搜索。<br/>
                         首次使用请点"⚡ 重建所有向量"（生成节点向量 + 边向量）。
                     </p>
                 }
@@ -246,8 +329,12 @@
             <div class="panel">
                 <div class="crud-bar">
                     <button class="btn-primary" @onclick="LoadTopologyAsync" disabled="@_isBusy">🔄 重新加载拓扑</button>
-                    <button class="btn-secondary" @onclick='() => SwitchLayout("force")' disabled="@(_isBusy || _layoutMode == "force")">🌐 力导向</button>
-                    <button class="btn-secondary" @onclick='() => SwitchLayout("circular")' disabled="@(_isBusy || _layoutMode == "circular")">⭕ 圆形</button>
+                    <button class="btn-secondary" @onclick='() => SwitchLayout("force")'
+                            disabled="@(_isBusy || _layoutMode == "force")">🌐 力导向
+                    </button>
+                    <button class="btn-secondary" @onclick='() => SwitchLayout("circular")'
+                            disabled="@(_isBusy || _layoutMode == "circular")">⭕ 圆形
+                    </button>
                     <button class="btn-secondary" @onclick="ShuffleLayout" disabled="@_isBusy">🎲 重新布局</button>
                     @if (_selectedTopologyNode != null)
                     {
@@ -277,7 +364,7 @@
                                     var midY = (fromPos.Value.Y + toPos.Value.Y) / 2;
                                     <line x1="@fromPos.Value.X" y1="@fromPos.Value.Y"
                                           x2="@toPos.Value.X" y2="@toPos.Value.Y"
-                                          stroke="#94a3b8" stroke-width="1.5" />
+                                          stroke="#94a3b8" stroke-width="1.5"/>
                                     <svg:text x="@midX" y="@midY" class="edge-label">@edge.Name</svg:text>
                                 }
                             }
@@ -291,8 +378,9 @@
                                         <circle cx="@pos.Value.X" cy="@pos.Value.Y" r="28"
                                                 fill="@(isSelected ? "#f59e0b" : "#4a90e2")"
                                                 stroke="#fff" stroke-width="2"
-                                                class="node-circle" />
-                                        <svg:text x="@pos.Value.X" y="@pos.Value.Y" text-anchor="middle" dy="5" class="node-label">@node.Name</svg:text>
+                                                class="node-circle"/>
+                                        <svg:text x="@pos.Value.X" y="@pos.Value.Y" text-anchor="middle" dy="5"
+                                                  class="node-label">@node.Name</svg:text>
                                     </g>
                                 }
                             }
@@ -308,35 +396,46 @@
             <div class="panel">
                 <div class="crud-bar">
                     <strong>📤 导出当前图</strong>
-                    <button class="btn-primary" @onclick="ExportJsonAsync" disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">📥 导出 JSON</button>
-                    <button class="btn-secondary" @onclick="ExportNodesCsvAsync" disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">📥 导出节点 CSV</button>
-                    <button class="btn-secondary" @onclick="ExportEdgesCsvAsync" disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">📥 导出边 CSV</button>
+                    <button class="btn-primary" @onclick="ExportJsonAsync"
+                            disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">📥 导出 JSON
+                    </button>
+                    <button class="btn-secondary" @onclick="ExportNodesCsvAsync"
+                            disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">📥 导出节点 CSV
+                    </button>
+                    <button class="btn-secondary" @onclick="ExportEdgesCsvAsync"
+                            disabled="@(_isBusy || string.IsNullOrEmpty(_selectedGraphGuid))">📥 导出边 CSV
+                    </button>
                 </div>
 
                 <div class="crud-bar">
                     <strong>📥 导入 JSON</strong>
-                    <InputFile OnChange="OnJsonFileSelected" accept=".json" class="file-input" />
+                    <InputFile OnChange="OnJsonFileSelected" accept=".json" class="file-input"/>
                     <span class="file-status">@_selectedJsonFileName</span>
                 </div>
 
                 <div class="crud-bar">
                     <strong>📥 从 CSV 导入</strong>
-                    <InputFile OnChange="OnNodesCsvSelected" accept=".csv" class="file-input" />
+                    <InputFile OnChange="OnNodesCsvSelected" accept=".csv" class="file-input"/>
                     <span class="file-status">@_selectedNodesCsvName</span>
-                    <InputFile OnChange="OnEdgesCsvSelected" accept=".csv" class="file-input" />
+                    <InputFile OnChange="OnEdgesCsvSelected" accept=".csv" class="file-input"/>
                     <span class="file-status">@_selectedEdgesCsvName</span>
                 </div>
 
                 <div class="crud-bar">
                     <label class="import-option">
-                        <input type="checkbox" @bind="_clearBeforeImport" />
+                        <input type="checkbox" @bind="_clearBeforeImport"/>
                         <span>导入前清空图中所有节点和边（⚠️ 不可撤销）</span>
                     </label>
-                    <button class="btn-primary" @onclick="StartImportAsync" disabled="@(_isBusy || !HasAnyImportFile)">🚀 开始导入</button>
+                    <button class="btn-primary" @onclick="StartImportAsync" disabled="@(_isBusy || !HasAnyImportFile)">
+                        🚀 开始导入
+                    </button>
                     <button class="btn-danger" @onclick="ResetImportState" disabled="@_isBusy">✕ 清空选择</button>
                 </div>
 
-                @if (_isBusy) { <p class="hint">处理中... @_vectorProgress</p> }
+                @if (_isBusy)
+                {
+                    <p class="hint">处理中... @_vectorProgress</p>
+                }
 
                 @if (_importResult != null)
                 {
@@ -353,7 +452,10 @@
                             <div style="margin-top: 12px;">
                                 <strong>⚠️ 错误清单（前 20 条）：</strong>
                                 <ul style="margin: 6px 0 0 0; color: #991b1b;">
-                                    @foreach (var err in _importResult.Errors.Take(20)) { <li>@err</li> }
+                                    @foreach (var err in _importResult.Errors.Take(20))
+                                    {
+                                        <li>@err</li>
+                                    }
                                 </ul>
                             </div>
                         }
@@ -363,7 +465,7 @@
                 @if (_importResult == null && !_isBusy)
                 {
                     <p class="hint">
-                        💡 支持 JSON（含 Nodes + Edges）或 CSV（Nodes + Edges 分开）导入。<br />
+                        💡 支持 JSON（含 Nodes + Edges）或 CSV（Nodes + Edges 分开）导入。<br/>
                         导出的 JSON 可直接用于其他环境的导入，节点以名称引用，跨环境安全。
                     </p>
                 }
@@ -400,7 +502,7 @@
                         <div class="section-title">➕ 新建图</div>
                         <div class="create-row">
                             <input type="text" @bind="_newGraphName" @bind:event="oninput"
-                                   placeholder="输入图名称..." class="create-input" />
+                                   placeholder="输入图名称..." class="create-input"/>
                             <button class="btn-primary" @onclick="CreateGraphAsync"
                                     disabled="@(_isCreatingGraph || string.IsNullOrWhiteSpace(_newGraphName))">
                                 @(_isCreatingGraph ? "创建中..." : "创建")
@@ -423,10 +525,15 @@
                                     <div class="graph-manage-item">
                                         @if (_renamingGraphGuid == g.GUID)
                                         {
-                                            <input type="text" @bind="_renamingGraphName" @bind:event="oninput" class="rename-input" />
+                                            <input type="text" @bind="_renamingGraphName" @bind:event="oninput"
+                                                   class="rename-input"/>
                                             <div class="item-actions">
-                                                <button class="btn-sm btn-primary" @onclick="ConfirmRenameAsync" disabled="@_isManaging">✓</button>
-                                                <button class="btn-sm" @onclick="CancelRename" disabled="@_isManaging">✕</button>
+                                                <button class="btn-sm btn-primary" @onclick="ConfirmRenameAsync"
+                                                        disabled="@_isManaging">✓
+                                                </button>
+                                                <button class="btn-sm" @onclick="CancelRename" disabled="@_isManaging">
+                                                    ✕
+                                                </button>
                                             </div>
                                         }
                                         else
@@ -436,8 +543,12 @@
                                                 <div class="item-guid">@g.GUID</div>
                                             </div>
                                             <div class="item-actions">
-                                                <button class="btn-sm" @onclick="() => StartRename(g)" disabled="@_isManaging">✏️</button>
-                                                <button class="btn-sm btn-danger" @onclick="() => DeleteGraphAsync(g)" disabled="@_isManaging">🗑️</button>
+                                                <button class="btn-sm" @onclick="() => StartRename(g)"
+                                                        disabled="@_isManaging">✏️
+                                                </button>
+                                                <button class="btn-sm btn-danger" @onclick="() => DeleteGraphAsync(g)"
+                                                        disabled="@_isManaging">🗑️
+                                                </button>
                                             </div>
                                         }
                                     </div>

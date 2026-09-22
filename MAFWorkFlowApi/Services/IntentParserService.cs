@@ -175,46 +175,88 @@ public sealed class IntentParserService
 
         var system =
             $$"""
-            你是图数据库查询意图解析器。把自然语言转为 JSON。
+              你是图数据库查询意图解析器。把自然语言转为 JSON。
 
-            图中关系名（必须从中选）：{{relList}}
+              图中关系名（必须从中选）：{{relList}}
 
-            ★ direction 的定义（关键！必须按这个判断）：
+              ═══════════════════════════════════════════════════
+              字段 1：relation（关系名）
+              ═══════════════════════════════════════════════════
+              从上面列表选；无法判断填 null。
+
+              ═══════════════════════════════════════════════════
+              字段 2：direction（方向）
+              ═══════════════════════════════════════════════════
               假设用户问 "X 的【某关系】"，direction 描述的是
               "这条关系相对于 X 的方向"：
 
               - "in"  = 边的终点是 X（即 其他节点 --关系--> X）
-                        例："X的父亲"、"X的父节点"、"X的上级" → in
-                        因为关系边是 父 --PARENT_OF--> X
+                        例："X的父亲"、"X的上级" → in
 
               - "out" = 边的起点是 X（即 X --关系--> 其他节点）
-                        例："X的儿子"、"X的子节点"、"X的框架" → out
-                        因为关系边是 X --PARENT_OF--> 子
+                        例："X的儿子"、"X的框架" → out
 
-            ★ 中文方向词速查：
+              中文方向词速查：
               - "父亲/父节点/上级/来源/被...引用" → in
               - "儿子/子节点/下级/目标/基于/使用/框架/例子/方法" → out
 
-            输出 JSON 字段：
-            - relation: 从列表选；无法判断填 null
-            - direction: "in" 或 "out"，按上面规则判断
-            - subjectName: 查询里的主体节点名（如"根节点B的父亲"中的"根节点B"）
-            - confidence: 0~1
-            - reason: 一句话理由
+              ═══════════════════════════════════════════════════
+              字段 3：aggregationMode（多跳聚合模式）
+              ═══════════════════════════════════════════════════
+              - null         = 单跳（默认）。例如："X的父亲"、"X的框架"
+              - "ancestors"  = 沿关系反向递归找所有祖先
+              - "descendants"= 沿关系正向递归找所有后代
 
-            只输出 JSON，不要 markdown。
+              触发词速查：
+              - "所有/全部/整条/递归 + 祖先/上级/父/来源" → ancestors
+              - "所有/全部/整条/递归 + 后代/下级/子/派生/子孙" → descendants
+              - 单独出现"祖先/后代/子孙" → ancestors/descendants
 
-            示例：
-            输入：根节点B的父亲
-            输出：{"relation":"PARENT_OF","direction":"in","subjectName":"根节点B","confidence":0.95,"reason":"父亲指 B 的父节点，父 --PARENT_OF--> B，所以是入边"}
+              ═══════════════════════════════════════════════════
+              字段 4：hopCount（跳数）
+              ═══════════════════════════════════════════════════
+              - 1  = 单跳（默认）
+              - 0  = 无限跳（遍历到尽头）
+              - 2~5 = 指定跳数
 
-            输入：深度学习用到的框架
-            输出：{"relation":"FRAMEWORK","direction":"out","subjectName":"深度学习","confidence":0.9,"reason":"深度学习 --FRAMEWORK--> 框架，所以是出边"}
-            """;
+              规则：aggregationMode 非 null 时，若用户没明确说"几跳"，默认 hopCount = 0。
+
+              ═══════════════════════════════════════════════════
+              字段 5：subjectName / confidence / reason
+              ═══════════════════════════════════════════════════
+              - subjectName: 主体节点名（如"根节点B的父亲"中的"根节点B"）
+              - confidence: 0~1
+              - reason: 一句话理由
+
+              只输出 JSON，不要 markdown。
+
+              ═══════════════════════════════════════════════════
+              示例
+              ═══════════════════════════════════════════════════
+              输入：根节点B的父亲
+              输出：{"relation":"PARENT_OF","direction":"in","subjectName":"根节点B","aggregationMode":null,"hopCount":1,"confidence":0.95,"reason":"单跳找父"}
+
+              输入：深度学习用到的框架
+              输出：{"relation":"FRAMEWORK","direction":"out","subjectName":"深度学习","aggregationMode":null,"hopCount":1,"confidence":0.9,"reason":"单跳找框架"}
+
+              输入：根节点B的所有祖先
+              输出：{"relation":"PARENT_OF","direction":"in","subjectName":"根节点B","aggregationMode":"ancestors","hopCount":0,"confidence":0.95,"reason":"所有祖先 → 沿 PARENT_OF 反向递归"}
+
+              输入：深度学习的后代
+              输出：{"relation":"SUBFIELD","direction":"out","subjectName":"深度学习","aggregationMode":"descendants","hopCount":0,"confidence":0.9,"reason":"后代 → 沿 SUBFIELD 正向递归"}
+
+              输入：根节点B往上 2 跳
+              输出：{"relation":"PARENT_OF","direction":"in","subjectName":"根节点B","aggregationMode":"ancestors","hopCount":2,"confidence":0.9,"reason":"明确 2 跳"}
+              """;
+
+        // ══════════════════════════════════════════════════════
+        // ★ 关键：以下代码不能省！
+        // ══════════════════════════════════════════════════════
 
         var messages = new List<ChatMessage>
         {
             new(ChatRole.System, system),
+            // qwen3 默认 thinking，/no_think 关掉
             new(ChatRole.User, $"/no_think\n用户查询：{query}")
         };
 
@@ -228,7 +270,7 @@ public sealed class IntentParserService
 
         var rel = ReadStr(root, "relation");
         if (rel is not null && !relations.Contains(rel, StringComparer.Ordinal))
-            rel = null;   // 白名单校验
+            rel = null; // 白名单校验
 
         return new IntentResult
         {
@@ -237,7 +279,34 @@ public sealed class IntentParserService
             SubjectName = ReadStr(root, "subjectName"),
             Confidence = ReadDbl(root, "confidence", 0.5),
             Reason = ReadStr(root, "reason"),
-            Strategy = "llm"
+            Strategy = "llm",
+
+            // ★ 阶段 4 新增
+            HopCount = Math.Clamp(ReadInt(root, "hopCount", 1), 0, 10),
+            AggregationMode = NormalizeAggregationMode(ReadStr(root, "aggregationMode"))
+        };
+    }
+
+    /// <summary>校验 aggregationMode 白名单。</summary>
+    private static string? NormalizeAggregationMode(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        return raw.Trim().ToLowerInvariant() switch
+        {
+            "ancestors" => "ancestors",
+            "descendants" => "descendants",
+            _ => null
+        };
+    }
+
+    private static int ReadInt(JsonElement root, string name, int dflt)
+    {
+        if (!root.TryGetProperty(name, out var p)) return dflt;
+        return p.ValueKind switch
+        {
+            JsonValueKind.Number => p.GetInt32(),
+            JsonValueKind.String => int.TryParse(p.GetString(), out var i) ? i : dflt,
+            _ => dflt
         };
     }
 
@@ -249,21 +318,66 @@ public sealed class IntentParserService
         string query,
         IReadOnlyCollection<string> relations)
     {
+        // ★ 先尝试多跳识别
+        var multiHop = ParseMultiHopByRule(query, relations);
+        if (multiHop is not null) return multiHop;
+
+        // 单跳（原有逻辑）
         foreach (var (kw, (rel, dir)) in RuleMap)
         {
             if (!query.Contains(kw) || !relations.Contains(rel, StringComparer.Ordinal))
                 continue;
-
             return new IntentResult
             {
-                Relation = rel,
-                Direction = dir,
-                Confidence = 0.6,
-                Reason = $"规则匹配 '{kw}'",
-                Strategy = "rule"
+                Relation = rel, Direction = dir, Confidence = 0.6,
+                Reason = $"规则匹配 '{kw}'", Strategy = "rule",
+                HopCount = 1, AggregationMode = null
             };
         }
+
         return null;
+    }
+
+    private static IntentResult? ParseMultiHopByRule(
+        string query,
+        IReadOnlyCollection<string> relations)
+    {
+        // 触发词
+        bool wantsAncestors =
+            query.Contains("所有祖先") || query.Contains("全部祖先") ||
+            query.Contains("所有上级") || query.Contains("所有父") ||
+            query.Contains("祖先");
+
+        bool wantsDescendants =
+            query.Contains("所有后代") || query.Contains("全部后代") ||
+            query.Contains("所有子孙") || query.Contains("所有子") ||
+            query.Contains("后代") || query.Contains("子孙");
+
+        if (!wantsAncestors && !wantsDescendants) return null;
+
+        // 猜关系：优先 PARENT_OF，其次 SUBFIELD
+        string rel = wantsAncestors || wantsDescendants
+            ? (relations.Contains("PARENT_OF") ? "PARENT_OF" : relations.FirstOrDefault() ?? "")
+            : "";
+        if (string.IsNullOrEmpty(rel)) return null;
+
+        // 抽跳数（简单正则）
+        int hop = 0;
+        var m = System.Text.RegularExpressions.Regex.Match(
+            query, @"(\d+)\s*跳");
+        if (m.Success && int.TryParse(m.Groups[1].Value, out var h))
+            hop = Math.Clamp(h, 2, 5);
+
+        return new IntentResult
+        {
+            Relation = rel,
+            Direction = wantsAncestors ? "in" : "out",
+            Confidence = 0.7,
+            Reason = $"规则匹配多跳：{(wantsAncestors ? "ancestors" : "descendants")}",
+            Strategy = "rule",
+            HopCount = hop,
+            AggregationMode = wantsAncestors ? "ancestors" : "descendants"
+        };
     }
 
     // ══════════════════════════════════════════════════════════

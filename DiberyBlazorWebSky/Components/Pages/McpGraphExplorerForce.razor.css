@@ -763,3 +763,142 @@
     margin-left: 4px;
 }
 
+/* ══════════════════════════════════════════════════════ */
+/* ★ 阶段 4：多跳样式                                     */
+/* ══════════════════════════════════════════════════════ */
+
+.intent-chip.multi-hop {
+    background: #8b5cf6;
+    color: #fff;
+}
+
+.intent-chip.hop-count {
+    background: #ec4899;
+    color: #fff;
+    font-family: monospace;
+}
+
+.hop-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    margin-right: 4px;
+    background: #8b5cf6;
+    color: #fff;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: monospace;
+}
+
+.hint-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #fef3c7;
+    border-bottom: 1px solid #fde68a;
+    color: #92400e;
+    font-size: 0.85rem;
+}
+
+.hint-icon {
+    font-size: 1.1rem;
+}
+
+/* ★ 建议列表 */
+.hint-banner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #fef3c7;
+    border-bottom: 1px solid #fde68a;
+    color: #92400e;
+    font-size: 0.85rem;
+}
+
+.hint-text {
+    flex-shrink: 0;
+}
+
+.suggestion-list {
+    display: inline-flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.suggestion-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    background: #fff;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-family: monospace;
+    font-weight: 600;
+    transition: all 0.15s;
+}
+
+.suggestion-btn:hover:not(:disabled) {
+    background: #f59e0b;
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.suggestion-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.suggestion-relation {
+    font-weight: 700;
+}
+
+.suggestion-dir {
+    font-size: 0.85rem;
+}
+
+.suggestion-count {
+    background: rgba(0,0,0,0.1);
+    padding: 0 5px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+}
+
+.suggestion-btn:hover:not(:disabled) .suggestion-count {
+    background: rgba(255,255,255,0.3);
+}
+
+.suggestion-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: #fff;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: all 0.15s;
+    /* ★ 长标签不换行 */
+    white-space: nowrap;
+}
+
+.suggestion-btn:hover:not(:disabled) {
+    background: #f59e0b;
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.suggestion-label {
+    font-family: inherit;
+}
+

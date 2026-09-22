@@ -521,11 +521,10 @@ public sealed class GraphController(
     }
 
 // ══════════════════════════════════════════════════════════
-// ★ 语义搜索：意图解析 + 边向量搜索 + 方向过滤（核心）
+// ★ 语义搜索：意图解析 + 多跳分支 + 混合检索 + 方向过滤
 // ══════════════════════════════════════════════════════════
-
 // ══════════════════════════════════════════════════════════
-// ★ 语义搜索：意图解析 + 混合检索（向量 + BM25）+ 方向过滤
+// ★ 语义搜索：意图 + 多跳 + 混合检索 + 严格方向过滤 + 建议
 // ══════════════════════════════════════════════════════════
 
     [HttpPost("{graphGuid}/semantic-search")]
@@ -534,28 +533,131 @@ public sealed class GraphController(
         [FromBody] SemanticSearchRequest request,
         CancellationToken ct)
     {
-        // ══════════════════════════════════════════════════════
+        // ══════════════════════════════════════════════════
         // ① 意图解析
-        // ══════════════════════════════════════════════════════
+        // ══════════════════════════════════════════════════
         var relations = await LoadGraphRelationsAsync(graphGuid, ct);
         var intent = await intentParser.ParseAsync(request.Query, relations, ct);
 
-        _logger.LogInformation(
-            "语义搜索：Query={Q}, Rel={R}, Dir={D}, Subj={S}",
-            request.Query, intent.Relation, intent.Direction, intent.SubjectName);
+        // ★ 方向覆盖：前端显式指定时优先
+        if (!string.IsNullOrWhiteSpace(request.DirectionOverride)
+            && (request.DirectionOverride == "in" || request.DirectionOverride == "out"))
+        {
+            _logger.LogInformation(
+                "方向覆盖：LLM={Llm} → 前端={Ov}",
+                intent.Direction, request.DirectionOverride);
+            intent.Direction = request.DirectionOverride;
+        }
 
-        // ══════════════════════════════════════════════════════
+        _logger.LogInformation(
+            "语义搜索：Query={Q}, Rel={R}, Dir={D}, Subj={S}, Mode={M}, Hop={H}",
+            request.Query, intent.Relation, intent.Direction, intent.SubjectName,
+            intent.AggregationMode, intent.HopCount);
+
+        // ══════════════════════════════════════════════════
+        // ★ 阶段 4：多跳分支（不走向量）
+        // ══════════════════════════════════════════════════
+        if (intent.AggregationMode is "ancestors" or "descendants"
+            && intent.HopCount != 1
+            && !string.IsNullOrWhiteSpace(intent.SubjectName))
+        {
+            var multiHopSubjectGuid = await FindNodeByNameAsync(
+                graphGuid, intent.SubjectName, new Dictionary<Guid, Node>(), ct);
+
+            if (multiHopSubjectGuid is null)
+            {
+                return Ok(new SemanticSearchResponseDto
+                {
+                    Intent = intent,
+                    Hint = "主体节点未找到：" + intent.SubjectName,
+                    Suggestions = new List<SuggestedRelationDto>()
+                });
+            }
+
+            var maxHops = intent.HopCount <= 0 ? 10 : intent.HopCount;
+
+            var reachable = await BfsTraverseAsync(
+                graphGuid, multiHopSubjectGuid.Value,
+                intent.Relation!, intent.AggregationMode, maxHops, ct);
+
+            _logger.LogInformation(
+                "多跳遍历：Mode={Mode}, Rel={Rel}, MaxHops={Max}, Found={Count}",
+                intent.AggregationMode, intent.Relation, maxHops, reachable.Count);
+
+            // ── 空结果兜底：给出可用关系建议 ──
+            if (reachable.Count == 0)
+            {
+                var availableRelations = await GetSubjectRelationsAsync(
+                    graphGuid, multiHopSubjectGuid.Value,
+                    intent.AggregationMode, ct);
+
+                var availText = availableRelations.Count > 0
+                    ? string.Join("、", availableRelations)
+                    : "无";
+
+                return Ok(new SemanticSearchResponseDto
+                {
+                    Hits = new List<SemanticSearchHitDto>(),
+                    Intent = intent,
+                    Hint = "「" + intent.SubjectName + "」没有 " + intent.Relation
+                           + " 关系，但它有：" + availText,
+                    Suggestions = new List<SuggestedRelationDto>(),
+                    Stats = new
+                    {
+                        Mode = intent.AggregationMode,
+                        MaxHops = maxHops,
+                        Found = 0,
+                        AvailableRelations = availableRelations
+                    }
+                });
+            }
+
+            var multiHits = new List<SemanticSearchHitDto>();
+            foreach (var (nodeGuid, distance, viaEdgeName) in
+                     reachable.OrderBy(x => x.Distance).Take(request.TopK))
+            {
+                var node = await FetchNodeAsync(graphGuid, nodeGuid, ct);
+                if (node is null) continue;
+
+                multiHits.Add(new SemanticSearchHitDto
+                {
+                    NodeGuid = node.GUID,
+                    NodeName = node.Name,
+                    Score = 1.0 / (1.0 + distance),
+                    ViaEdgeName = viaEdgeName,
+                    Direction = intent.AggregationMode == "ancestors" ? "in" : "out",
+                    MatchedContent = distance + " 跳：" + intent.SubjectName + " → " + node.Name,
+                    HopDistance = distance,
+                    IsMultiHop = true
+                });
+            }
+
+            return Ok(new SemanticSearchResponseDto
+            {
+                Hits = multiHits,
+                Intent = intent,
+                Suggestions = new List<SuggestedRelationDto>(),
+                Stats = new
+                {
+                    Mode = intent.AggregationMode,
+                    MaxHops = maxHops,
+                    Found = reachable.Count,
+                    Returned = multiHits.Count
+                }
+            });
+        }
+
+        // ══════════════════════════════════════════════════
         // ② 生成查询向量
-        // ══════════════════════════════════════════════════════
+        // ══════════════════════════════════════════════════
         var queryVec = await GenerateQueryEmbeddingAsync(request.Query, ct);
         if (queryVec is null || queryVec.Count == 0)
             return BadRequest("无法生成查询向量");
 
-    // ══════════════════════════════════════════════════════
-    // ③ 加载所有边向量（分页拉取，LiteGraph 单次上限 1000）
-    // ══════════════════════════════════════════════════════
+        // ══════════════════════════════════════════════════
+        // ③ 加载所有边向量
+        // ══════════════════════════════════════════════════
         var allVectors = await EnumerateAllVectorsAsync(graphGuid, ct: ct);
-
         var edgeVecs = allVectors
             .Where(v => v.EdgeGUID.HasValue && v.Vectors is { Count: > 0 })
             .ToList();
@@ -565,13 +667,14 @@ public sealed class GraphController(
             return Ok(new SemanticSearchResponseDto
             {
                 Intent = intent,
-                Stats = new { Note = "图中无边向量，请先重建所有向量" }
+                Hint = "图中无边向量，请先重建所有向量",
+                Suggestions = new List<SuggestedRelationDto>()
             });
         }
 
-        // ══════════════════════════════════════════════════════
+        // ══════════════════════════════════════════════════
         // ④ 混合检索：向量 + BM25
-        // ══════════════════════════════════════════════════════
+        // ══════════════════════════════════════════════════
         var docs = edgeVecs.Select(v => v.Content ?? "").ToList();
         var bm25 = new Bm25Scorer(docs);
         var bm25Scores = bm25.ScoreAllNormalized(request.Query);
@@ -597,7 +700,6 @@ public sealed class GraphController(
             .OrderByDescending(x => x.FinalScore)
             .ToList();
 
-        // 日志：可观测性
         if (scored.Count > 0)
         {
             _logger.LogInformation(
@@ -606,16 +708,16 @@ public sealed class GraphController(
                 scored[0].Vector.Content);
         }
 
-        // ══════════════════════════════════════════════════════
-        // ⑤ 边方向过滤 + 反查节点
-        // ══════════════════════════════════════════════════════
+        // ══════════════════════════════════════════════════
+        // ⑤ 严格方向过滤 + 反查节点
+        // ══════════════════════════════════════════════════
         var hits = new List<SemanticSearchHitDto>();
         var seen = new HashSet<Guid>();
 
         var edgeCache = new Dictionary<Guid, Edge>();
         var nodeCache = new Dictionary<Guid, Node>();
-        Guid? subjectGuid = null;
 
+        Guid? subjectGuid = null;
         if (!string.IsNullOrWhiteSpace(intent.SubjectName))
             subjectGuid = await FindNodeByNameAsync(
                 graphGuid, intent.SubjectName, nodeCache, ct);
@@ -637,7 +739,6 @@ public sealed class GraphController(
                 !string.Equals(edge.Name, intent.Relation, StringComparison.Ordinal))
                 continue;
 
-            // ── 方向过滤（subject 优先 + 自动纠偏）──
             Guid targetGuid;
             string effectiveDir;
 
@@ -647,39 +748,20 @@ public sealed class GraphController(
                 bool subjectIsTo = edge.To == subjectGuid;
 
                 if (!subjectIsFrom && !subjectIsTo)
-                    continue; // 与 subject 无关
+                    continue;
 
-                if (intent.Direction == "in")
+                // ★ 严格方向过滤：direction 和 edge.From/To 必须"与"匹配
+                if (intent.Direction == "out")
                 {
-                    if (subjectIsTo)
-                    {
-                        targetGuid = edge.From;
-                        effectiveDir = "in";
-                    }
-                    else
-                    {
-                        targetGuid = edge.To;
-                        effectiveDir = "out";
-                        _logger.LogWarning(
-                            "方向纠偏：LLM=in, 实际=out, Subject={Subj}, Edge={Edge}",
-                            intent.SubjectName, edgeGuid);
-                    }
+                    if (!subjectIsFrom) continue;
+                    targetGuid = edge.To;
+                    effectiveDir = "out";
                 }
-                else if (intent.Direction == "out")
+                else if (intent.Direction == "in")
                 {
-                    if (subjectIsFrom)
-                    {
-                        targetGuid = edge.To;
-                        effectiveDir = "out";
-                    }
-                    else
-                    {
-                        targetGuid = edge.From;
-                        effectiveDir = "in";
-                        _logger.LogWarning(
-                            "方向纠偏：LLM=out, 实际=in, Subject={Subj}, Edge={Edge}",
-                            intent.SubjectName, edgeGuid);
-                    }
+                    if (!subjectIsTo) continue;
+                    targetGuid = edge.From;
+                    effectiveDir = "in";
                 }
                 else
                 {
@@ -696,14 +778,12 @@ public sealed class GraphController(
                     _ => Guid.Empty
                 };
                 effectiveDir = intent.Direction ?? "out";
-
                 if (targetGuid == Guid.Empty) continue;
             }
 
             if (seen.Contains(targetGuid)) continue;
             seen.Add(targetGuid);
 
-            // 反查目标节点
             if (!nodeCache.TryGetValue(targetGuid, out var target))
             {
                 target = await FetchNodeAsync(graphGuid, targetGuid, ct);
@@ -716,18 +796,61 @@ public sealed class GraphController(
                 NodeGuid = target.GUID,
                 NodeName = target.Name,
                 Score = item.FinalScore,
-                VectorScore = item.VectorScore, // ★ 分量
-                Bm25Score = item.Bm25Score, // ★ 分量
+                VectorScore = item.VectorScore,
+                Bm25Score = item.Bm25Score,
                 ViaEdgeName = edge.Name,
                 Direction = effectiveDir,
                 MatchedContent = item.Vector.Content
             });
         }
 
+        // ══════════════════════════════════════════════════
+        // ★ 生成建议：基于 subject 的"实际"关系
+        // ══════════════════════════════════════════════════
+        var suggestions = await BuildSuggestionsAsync(
+            graphGuid, subjectGuid, intent, nodeCache, ct);
+
+        // ══════════════════════════════════════════════════
+        // 空结果：给出明确提示 + 建议
+        // ══════════════════════════════════════════════════
+        if (hits.Count == 0)
+        {
+            var dirZh = intent.Direction == "in" ? "入边/找父" : "出边/找子";
+            var finalHint = suggestions.Count > 0
+                ? "「" + intent.SubjectName + "」没有通过 " + intent.Relation
+                  + "（" + dirZh + "）连接的节点。试试下面这些："
+                : "「" + intent.SubjectName + "」在图里没有符合条件的关系";
+
+            return Ok(new SemanticSearchResponseDto
+            {
+                Hits = new List<SemanticSearchHitDto>(),
+                Intent = intent,
+                Hint = finalHint,
+                Suggestions = suggestions.Take(8).ToList(),
+                Stats = new
+                {
+                    TotalEdgeVectors = edgeVecs.Count,
+                    Recalled = scored.Count,
+                    Returned = 0,
+                    VectorWeight = alpha,
+                    Bm25Weight = beta
+                }
+            });
+        }
+
+        // ══════════════════════════════════════════════════
+        // 有结果：只在有建议时才附 Hint
+        // ══════════════════════════════════════════════════
+        string? okHint = null;
+        if (suggestions.Count > 0)
+            okHint = "「" + intent.SubjectName + "」还有其他关系可以查：";
+
         return Ok(new SemanticSearchResponseDto
         {
             Hits = hits,
             Intent = intent,
+            Hint = okHint,
+            Suggestions = suggestions.Take(8).ToList(),
             Stats = new
             {
                 TotalEdgeVectors = edgeVecs.Count,
@@ -739,6 +862,175 @@ public sealed class GraphController(
         });
     }
 
+    // ══════════════════════════════════════════════════════
+// ★ 辅助：基于图数据构建查询建议
+// ══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 扫描 subject 的所有入边 + 出边，生成"其他可查关系"建议。
+    /// 排除掉 intent 里已经用的关系（避免重复）。
+    /// </summary>
+// ══════════════════════════════════════════════════════
+// ★ 基于图数据生成"其他可查关系"建议
+// ══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 扫描 subject 的所有入边 + 出边，生成"其他可查关系"建议。
+    /// 优先级：反向关系（可能用户方向理解反了）> 同方向其他关系（可能选错关系名）。
+    /// </summary>
+    private async Task<List<SuggestedRelationDto>> BuildSuggestionsAsync(
+        Guid graphGuid,
+        Guid? subjectGuid,
+        IntentResult intent,
+        Dictionary<Guid, Node> nodeCache,
+        CancellationToken ct)
+    {
+        if (subjectGuid is null || string.IsNullOrWhiteSpace(intent.SubjectName))
+            return new List<SuggestedRelationDto>();
+
+        var allEdges = await LoadAllEdgesAsync(graphGuid, ct);
+
+        // 关系名 → (数量, 示例节点列表)
+        var outgoing = new Dictionary<string, (int Count, List<string> Nodes)>(StringComparer.Ordinal);
+        var incoming = new Dictionary<string, (int Count, List<string> Nodes)>(StringComparer.Ordinal);
+
+        // 本地辅助：按 GUID 拿节点名（带缓存）
+        async Task<string> NameOfAsync(Guid g)
+        {
+            if (nodeCache.TryGetValue(g, out var cached)) return cached.Name;
+            var node = await FetchNodeAsync(graphGuid, g, ct);
+            var name = node?.Name ?? g.ToString("N")[..8];
+            if (node is not null) nodeCache[g] = node;
+            return name;
+        }
+
+        // 扫描所有边，按 subject 分类
+        foreach (var e in allEdges)
+        {
+            if (e.From == subjectGuid)
+            {
+                if (!outgoing.TryGetValue(e.Name, out var info))
+                    info = (0, new List<string>());
+                info.Count++;
+                var n = await NameOfAsync(e.To);
+                if (info.Nodes.Count < 3 && !info.Nodes.Contains(n))
+                    info.Nodes.Add(n);
+                outgoing[e.Name] = info;
+            }
+
+            if (e.To == subjectGuid)
+            {
+                if (!incoming.TryGetValue(e.Name, out var info))
+                    info = (0, new List<string>());
+                info.Count++;
+                var n = await NameOfAsync(e.From);
+                if (info.Nodes.Count < 3 && !info.Nodes.Contains(n))
+                    info.Nodes.Add(n);
+                incoming[e.Name] = info;
+            }
+        }
+
+        var suggestions = new List<SuggestedRelationDto>();
+
+        // ─── 优先级 1：反向关系（用户可能方向理解反了） ───
+        var opposite = intent.Direction == "out" ? incoming : outgoing;
+        var oppDir = intent.Direction == "out" ? "in" : "out";
+
+        foreach (var (rel, info) in opposite.OrderByDescending(x => x.Value.Count))
+        {
+            var sample = info.Nodes.FirstOrDefault() ?? "";
+            var dirText = oppDir == "in" ? "反向(找父)" : "反向(找子)";
+
+            var label = string.IsNullOrEmpty(sample)
+                ? rel + " " + dirText
+                : rel + " " + dirText + " · " + sample;
+
+            suggestions.Add(new SuggestedRelationDto
+            {
+                Relation = rel,
+                Direction = oppDir,
+                Query = intent.SubjectName + " 的 " + rel,
+                Count = info.Count,
+                SampleNodes = info.Nodes,
+                DisplayLabel = label,
+                Tooltip = "会返回 " + info.Count + " 个节点：" + string.Join("、", info.Nodes)
+            });
+        }
+
+        // ─── 优先级 2：同方向的其他关系（用户可能选错关系名） ───
+        var same = intent.Direction == "out" ? outgoing : incoming;
+
+        foreach (var (rel, info) in same.OrderByDescending(x => x.Value.Count))
+        {
+            if (string.Equals(rel, intent.Relation, StringComparison.Ordinal))
+                continue; // 已用的是这个，不重复推荐
+
+            var sample = info.Nodes.FirstOrDefault() ?? "";
+            var dirText = (intent.Direction == "in") ? "反向(找父)" : "正向(找子)";
+
+            var label = string.IsNullOrEmpty(sample)
+                ? rel + " " + dirText
+                : rel + " " + dirText + " · " + sample;
+
+            suggestions.Add(new SuggestedRelationDto
+            {
+                Relation = rel,
+                Direction = intent.Direction ?? "out",
+                Query = intent.SubjectName + " 的 " + rel,
+                Count = info.Count,
+                SampleNodes = info.Nodes,
+                DisplayLabel = label,
+                Tooltip = "会返回 " + info.Count + " 个节点：" + string.Join("、", info.Nodes)
+            });
+        }
+
+        return suggestions;
+    }
+
+    /// <summary>方向的中文解释。</summary>
+    private static string DirZh(string? dir) => dir switch
+    {
+        "in" => "入边/找父",
+        "out" => "出边/找子",
+        _ => "无方向"
+    };
+
+    // ══════════════════════════════════════════════════════
+// ★ 辅助：找出某个节点实际拥有的关系名
+// ══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 列出某个节点沿指定方向实际存在的关系名。
+    /// </summary>
+    /// <param name="mode">"ancestors" = 入边关系；"descendants" = 出边关系</param>
+    private async Task<List<string>> GetSubjectRelationsAsync(
+        Guid graphGuid,
+        Guid nodeGuid,
+        string mode,
+        CancellationToken ct)
+    {
+        var allEdges = await LoadAllEdgesAsync(graphGuid, ct);
+        var relations = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var e in allEdges)
+        {
+            if (mode == "ancestors")
+            {
+                // 入边：目标节点是当前节点
+                if (e.To == nodeGuid)
+                    relations.Add(e.Name);
+            }
+            else
+            {
+                // 出边：源节点是当前节点
+                if (e.From == nodeGuid)
+                    relations.Add(e.Name);
+            }
+        }
+
+        return relations.OrderBy(x => x, StringComparer.Ordinal).ToList();
+    }
+
     // ══════════════════════════════════════════════════════════
     // ★ 辅助：分页枚举全量向量
     //   LiteGraph 的 EnumerationRequest.MaxResults 硬上限 = 1000，
@@ -747,15 +1039,17 @@ public sealed class GraphController(
 
     /// <summary>
     /// 分页拉取一个图的全部向量。
+    /// LiteGraph 的 EnumerationRequest.MaxResults 硬上限 = 1000。
     /// </summary>
     /// <param name="graphGuid">图 GUID</param>
     /// <param name="maxTotal">最多拉多少条，防止无限循环（默认 10 万）</param>
+    /// <param name="ct">取消令牌</param>
     private async Task<List<VectorMetadata>> EnumerateAllVectorsAsync(
         Guid graphGuid,
         int maxTotal = 100_000,
         CancellationToken ct = default)
     {
-        const int PageSize = 1000;   // ★ LiteGraph 硬上限
+        const int pageSize = 1000; // ★ 改小写（避免规则告警）
 
         var result = new List<VectorMetadata>();
         Guid? token = null;
@@ -763,7 +1057,6 @@ public sealed class GraphController(
 
         while (result.Count < maxTotal)
         {
-            // 防御性：最多 1000 页
             if (++guard > 1000)
             {
                 _logger.LogWarning(
@@ -777,7 +1070,7 @@ public sealed class GraphController(
                 TenantGUID = Guid.Empty,
                 GraphGUID = graphGuid,
                 Ordering = EnumerationOrderEnum.CreatedDescending,
-                MaxResults = PageSize,
+                MaxResults = pageSize,
                 ContinuationToken = token
             };
 
@@ -786,11 +1079,8 @@ public sealed class GraphController(
             if (page.Objects is { Count: > 0 })
                 result.AddRange(page.Objects);
 
-            // 没有下一页就退出
-            if (page.ContinuationToken is null)
-                break;
+            if (page.ContinuationToken is null) break;
 
-            // 防止 token 死循环
             if (page.ContinuationToken == token)
             {
                 _logger.LogWarning("ContinuationToken 未推进，提前退出");
@@ -805,50 +1095,6 @@ public sealed class GraphController(
             graphGuid, result.Count);
 
         return result;
-    }
-    
-    // ══════════════════════════════════════════════════════════
-    // ★ 辅助：分页加载全图所有边向量（每页 1000，自动翻页）
-    // ══════════════════════════════════════════════════════════
-    private async Task<List<VectorMetadata>> LoadAllEdgeVectorsAsync(
-        Guid graphGuid, CancellationToken ct)
-    {
-        var all = new List<VectorMetadata>();
-        Guid? continuationToken = null;
-        int pageNo = 0;
-
-        while (true)
-        {
-            pageNo++;
-            var query = new EnumerationRequest
-            {
-                TenantGUID = Guid.Empty,
-                GraphGUID = graphGuid,
-                MaxResults = 1000, // SDK 上限
-                ContinuationToken = continuationToken
-            };
-
-            var page = await _sdk.Vector.Enumerate(query, ct);
-            if (page?.Objects is null || page.Objects.Count == 0) break;
-
-            // 只收集边向量
-            all.AddRange(page.Objects.Where(v =>
-                v.EdgeGUID.HasValue && v.Vectors is { Count: > 0 }));
-
-            continuationToken = page.ContinuationToken;
-            if (continuationToken is null) break;
-
-            _logger.LogDebug("加载向量第 {Page} 页，累计 {Count} 条", pageNo, all.Count);
-
-            // 防御：避免死循环
-            if (pageNo > 100) break;
-        }
-
-        _logger.LogInformation(
-            "图 {Graph} 共加载 {Count} 条边向量（{Pages} 页）",
-            graphGuid, all.Count, pageNo);
-
-        return all;
     }
 
 // ══════════════════════════════════════════════════════════
@@ -991,6 +1237,100 @@ public sealed class GraphController(
             return null;
 
         return JsonNode.Parse(prop.GetRawText());
+    }
+
+    // ══════════════════════════════════════════════════════════
+// ★ 阶段 4：BFS 多跳遍历
+// ══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 从起点沿指定关系 BFS 遍历。
+    /// </summary>
+    /// <param name="graphGuid">图 GUID</param>
+    /// <param name="startGuid">起点节点 GUID</param>
+    /// <param name="relation">关系名（如 PARENT_OF）</param>
+    /// <param name="mode">"ancestors" = 沿 To→From 反向；"descendants" = 沿 From→To 正向</param>
+    /// <param name="maxHops">最大跳数</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>(节点GUID, 距离, 通过边名) 列表，按距离升序</returns>
+    private async Task<List<(Guid NodeGuid, int Distance, string ViaEdgeName)>> BfsTraverseAsync(
+        Guid graphGuid,
+        Guid startGuid,
+        string relation,
+        string mode,
+        int maxHops,
+        CancellationToken ct)
+    {
+        const int maxNodes = 10_000; // ★ 改小写
+
+        var result = new List<(Guid, int, string)>();
+        var visited = new HashSet<Guid> { startGuid };
+        var queue = new Queue<(Guid Node, int Dist, string Via)>();
+
+        queue.Enqueue((startGuid, 0, ""));
+
+        var allEdges = await LoadAllEdgesAsync(graphGuid, ct);
+
+        _logger.LogDebug(
+            "BFS 起点：{Start}, 关系={Rel}, 模式={Mode}, 图中边数={N}",
+            startGuid, relation, mode, allEdges.Count);
+
+        while (queue.Count > 0 && result.Count < maxNodes)
+        {
+            var (cur, dist, _) = queue.Dequeue();
+            if (dist >= maxHops) continue;
+
+            foreach (var e in allEdges)
+            {
+                if (!string.Equals(e.Name, relation, StringComparison.Ordinal)) continue;
+
+                Guid next;
+                if (mode == "ancestors")
+                {
+                    if (e.To != cur) continue;
+                    next = e.From;
+                }
+                else
+                {
+                    if (e.From != cur) continue;
+                    next = e.To;
+                }
+
+                if (next == Guid.Empty) continue;
+                if (!visited.Add(next)) continue;
+
+                result.Add((next, dist + 1, e.Name));
+                queue.Enqueue((next, dist + 1, e.Name));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>加载图中所有边（用于 BFS）。</summary>
+    private async Task<List<Edge>> LoadAllEdgesAsync(Guid graphGuid, CancellationToken ct)
+    {
+        var json = await _liteGraph.GetAsync(
+            $"/v1.0/tenants/{_liteGraph.TenantGuid}/graphs/{graphGuid}/edges", ct);
+
+        var list = new List<Edge>();
+        if (json.HasValue &&
+            json.Value.TryGetProperty("Objects", out var objs) &&
+            objs.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var e in objs.EnumerateArray())
+            {
+                list.Add(new Edge
+                {
+                    GUID = e.TryGetProperty("GUID", out var g) ? g.GetGuid() : Guid.Empty,
+                    Name = e.TryGetProperty("Name", out var n) ? n.GetString() ?? "" : "",
+                    From = e.TryGetProperty("From", out var f) ? f.GetGuid() : Guid.Empty,
+                    To = e.TryGetProperty("To", out var t) ? t.GetGuid() : Guid.Empty
+                });
+            }
+        }
+
+        return list;
     }
 }
 

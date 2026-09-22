@@ -55,7 +55,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     private string _vectorQueryText = "";
     private List<VectorSearchDisplayResult> _vectorResults = new();
     private string _vectorProgress = "";
-    private IntentResultDto? _lastIntent;   // ★ 最近一次的意图解析结果
+    private IntentResultDto? _lastIntent; // ★ 最近一次的意图解析结果
 
     // 拓扑图
     private List<Node> _topologyNodes = new();
@@ -90,12 +90,16 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     private Guid? _renamingGraphGuid;
     private string _renamingGraphName = "";
 
+    private string? _pendingDirectionOverride;
+
     private bool HasAnyImportFile =>
         !string.IsNullOrEmpty(_selectedJsonContent) ||
         !string.IsNullOrEmpty(_selectedNodesCsvContent);
 
     // 常量
     private static readonly Guid DefaultTenant = Guid.Empty;
+    private string? _lastHint;
+    private List<SuggestedRelationDto> _lastSuggestions = new();
 
     // SVG 画布尺寸
     private const double CanvasWidth = 800;
@@ -106,18 +110,18 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     // ══════════════════════════════════════════════════════
     private static readonly Dictionary<string, string> EdgeNameZh = new()
     {
-        ["PARENT_OF"]      = "父亲/父节点",
-        ["CHILD_OF"]       = "子节点",
-        ["SUBFIELD"]       = "子领域",
-        ["BASED_ON"]       = "基于",
-        ["USES"]           = "使用",
-        ["APPLIED_TO"]     = "应用于",
+        ["PARENT_OF"] = "父亲/父节点",
+        ["CHILD_OF"] = "子节点",
+        ["SUBFIELD"] = "子领域",
+        ["BASED_ON"] = "基于",
+        ["USES"] = "使用",
+        ["APPLIED_TO"] = "应用于",
         ["IMPLEMENTED_IN"] = "实现于",
-        ["VARIANT"]        = "变体",
-        ["FRAMEWORK"]      = "框架",
-        ["EXAMPLE"]        = "例子",
-        ["METHOD"]         = "方法",
-        ["RELATED_TO"]     = "相关",
+        ["VARIANT"] = "变体",
+        ["FRAMEWORK"] = "框架",
+        ["EXAMPLE"] = "例子",
+        ["METHOD"] = "方法",
+        ["RELATED_TO"] = "相关",
     };
 
     private static readonly JsonSerializerOptions PrettyJson = new()
@@ -371,6 +375,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             {
                 await GraphApi.DeleteNodeAsync(graphGuid, guid);
             }
+
             _selectedNodeGuids.Clear();
             await Task.WhenAll(LoadNodesAsync(), LoadEdgesAsync());
         }
@@ -545,6 +550,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         {
             _errorMessage = "生成 embedding 失败，请查看后端日志。";
         }
+
         return vector;
     }
 
@@ -563,22 +569,32 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     /// </summary>
     private async Task SearchVectorAsync()
     {
-        if (string.IsNullOrWhiteSpace(_vectorQueryText) || string.IsNullOrEmpty(_selectedGraphGuid))
+        if (string.IsNullOrWhiteSpace(_vectorQueryText) ||
+            string.IsNullOrEmpty(_selectedGraphGuid))
             return;
 
         _isBusy = true;
         _errorMessage = null;
         _vectorResults.Clear();
         _lastIntent = null;
+        _lastHint = null;
+        _lastSuggestions = new List<SuggestedRelationDto>();
         _vectorProgress = "解析意图 + 语义搜索...";
         StateHasChanged();
+
+        // 记录本次要用的 direction override，用完立即清空
+        var directionOverride = _pendingDirectionOverride;
+        _pendingDirectionOverride = null;
 
         try
         {
             var graphGuid = Guid.Parse(_selectedGraphGuid);
             var query = _vectorQueryText.Trim();
 
-            var resp = await GraphApi.SemanticSearchAsync(graphGuid, query, topK: 20);
+            var resp = await GraphApi.SemanticSearchAsync(
+                graphGuid, query,
+                topK: 20,
+                directionOverride: directionOverride); // ★ 传递
 
             if (resp is null)
             {
@@ -587,24 +603,29 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             }
 
             _lastIntent = resp.Intent;
+            _lastHint = resp.Hint;
+            _lastSuggestions = resp.Suggestions ?? new List<SuggestedRelationDto>();
 
             _vectorResults = resp.Hits.Select(h => new VectorSearchDisplayResult
             {
-                NodeName       = h.NodeName,
-                Score          = (float)h.Score,
-                ViaEdge        = h.ViaEdgeName,
-                Direction      = h.Direction,
+                NodeName = h.NodeName,
+                Score = (float)h.Score,
+                ViaEdge = h.ViaEdgeName,
+                Direction = h.Direction,
                 MatchedContent = h.MatchedContent,
-                VectorScore    = h.VectorScore.HasValue ? (float)h.VectorScore.Value : null,
-                Bm25Score      = h.Bm25Score.HasValue   ? (float)h.Bm25Score.Value   : null
+                VectorScore = h.VectorScore.HasValue ? (float)h.VectorScore.Value : null,
+                Bm25Score = h.Bm25Score.HasValue ? (float)h.Bm25Score.Value : null,
+                HopDistance = h.HopDistance,
+                IsMultiHop = h.IsMultiHop
             }).ToList();
 
             _vectorProgress = $"返回 {_vectorResults.Count} 条结果";
 
             Logger.LogInformation(
-                "语义搜索完成：Query={Q}, Hits={N}, Intent={R}/{D}, Strategy={S}",
+                "语义搜索完成：Query={Q}, Hits={N}, Intent={R}/{D}, Strategy={S}, Override={Ov}",
                 query, _vectorResults.Count,
-                resp.Intent.Relation, resp.Intent.Direction, resp.Intent.Strategy);
+                resp.Intent.Relation, resp.Intent.Direction, resp.Intent.Strategy,
+                directionOverride ?? "null");
         }
         catch (Exception ex)
         {
@@ -618,6 +639,20 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         }
     }
 
+    // ══════════════════════════════════════════════════════
+    // ★ 点击建议按钮：携带方向，自动重新搜索
+    // ══════════════════════════════════════════════════════
+    private async Task RunSuggestionAsync(SuggestedRelationDto s)
+    {
+        if (s is null || string.IsNullOrWhiteSpace(s.Query)) return;
+
+        _vectorQueryText = s.Query;
+        _pendingDirectionOverride = s.Direction; // ★ 记录方向覆盖
+        StateHasChanged();
+
+        await SearchVectorAsync();
+    }
+
     /// <summary>
     /// ★ 重建所有向量：清空旧向量 → 生成节点向量 → 生成边向量。
     ///   节点向量：只存节点名（用于找节点）
@@ -628,10 +663,10 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
 
         if (!await ConfirmAsync(
-            "将重建当前图的所有向量：\n" +
-            "  · 节点向量（纯节点名）\n" +
-            "  · 边向量（from --REL(中文)--> to）\n\n" +
-            "旧的向量会先被清空。继续？"))
+                "将重建当前图的所有向量：\n" +
+                "  · 节点向量（纯节点名）\n" +
+                "  · 边向量（from --REL(中文)--> to）\n\n" +
+                "旧的向量会先被清空。继续？"))
             return;
 
         _isBusy = true;
@@ -654,8 +689,14 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
             foreach (var v in existingVectors)
             {
-                try { await GraphApi.DeleteVectorAsync(graphGuid, v.Guid); }
-                catch (Exception ex) { Logger.LogWarning(ex, "删除旧向量 {Guid} 失败", v.Guid); }
+                try
+                {
+                    await GraphApi.DeleteVectorAsync(graphGuid, v.Guid);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "删除旧向量 {Guid} 失败", v.Guid);
+                }
             }
 
             // ══════════════════════════════════════════════
@@ -685,18 +726,27 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 _vectorProgress = $"({done}/{total}) 节点 {node.Name}";
                 StateHasChanged();
 
-                if (string.IsNullOrWhiteSpace(node.Name)) { fail++; continue; }
+                if (string.IsNullOrWhiteSpace(node.Name))
+                {
+                    fail++;
+                    continue;
+                }
 
                 Logger.LogInformation("节点 embedding 文本: {Text}", node.Name);
 
                 var vec = await GetEmbeddingAsync(node.Name);
-                if (vec is null) { fail++; continue; }
+                if (vec is null)
+                {
+                    fail++;
+                    continue;
+                }
 
                 try
                 {
                     var ok = await GraphApi.CreateVectorAsync(
                         graphGuid, node.Guid, model: null, vec);
-                    if (ok) nodeOk++; else fail++;
+                    if (ok) nodeOk++;
+                    else fail++;
                 }
                 catch (Exception ex)
                 {
@@ -716,9 +766,11 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 StateHasChanged();
 
                 var fromName = nodeMap.TryGetValue(edge.From, out var f)
-                    ? f : edge.From.ToString("N")[..8];
+                    ? f
+                    : edge.From.ToString("N")[..8];
                 var toName = nodeMap.TryGetValue(edge.To, out var t)
-                    ? t : edge.To.ToString("N")[..8];
+                    ? t
+                    : edge.To.ToString("N")[..8];
 
                 var zh = EdgeNameZh.TryGetValue(rel, out var z) ? z : null;
                 var relLabel = string.IsNullOrEmpty(zh) ? rel : $"{rel}({zh})";
@@ -728,13 +780,18 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 Logger.LogInformation("边 embedding 文本: {Content}", content);
 
                 var vec = await GetEmbeddingAsync(content);
-                if (vec is null) { fail++; continue; }
+                if (vec is null)
+                {
+                    fail++;
+                    continue;
+                }
 
                 try
                 {
                     var ok = await GraphApi.CreateEdgeVectorAsync(
                         graphGuid, edge.Guid, content, vec);
-                    if (ok) edgeOk++; else fail++;
+                    if (ok) edgeOk++;
+                    else fail++;
                 }
                 catch (Exception ex)
                 {
@@ -932,7 +989,12 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                         dx = rng.NextDouble() - 0.5;
                         dy = rng.NextDouble() - 0.5;
                         dist = Math.Sqrt(dx * dx + dy * dy);
-                        if (dist < 0.01) { dx = 1; dy = 0; dist = 1; }
+                        if (dist < 0.01)
+                        {
+                            dx = 1;
+                            dy = 0;
+                            dist = 1;
+                        }
                     }
 
                     if (dist >= minSeparation) continue;
@@ -1066,7 +1128,11 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
             var json = await GraphApi.ExportGraphJsonAsync(graphGuid);
 
-            if (string.IsNullOrEmpty(json)) { _errorMessage = "导出失败"; return; }
+            if (string.IsNullOrEmpty(json))
+            {
+                _errorMessage = "导出失败";
+                return;
+            }
 
             var safeName = SanitizeFileName(graphName);
             var fileName = $"{safeName}-{DateTime.Now:yyyyMMdd-HHmmss}.json";
@@ -1097,7 +1163,11 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
             var csv = await GraphApi.ExportNodesCsvAsync(graphGuid);
 
-            if (string.IsNullOrEmpty(csv)) { _errorMessage = "导出失败"; return; }
+            if (string.IsNullOrEmpty(csv))
+            {
+                _errorMessage = "导出失败";
+                return;
+            }
 
             var safeName = SanitizeFileName(graphName);
             var fileName = $"{safeName}-nodes-{DateTime.Now:yyyyMMdd-HHmmss}.csv";
@@ -1128,7 +1198,11 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
             var csv = await GraphApi.ExportEdgesCsvAsync(graphGuid);
 
-            if (string.IsNullOrEmpty(csv)) { _errorMessage = "导出失败"; return; }
+            if (string.IsNullOrEmpty(csv))
+            {
+                _errorMessage = "导出失败";
+                return;
+            }
 
             var safeName = SanitizeFileName(graphName);
             var fileName = $"{safeName}-edges-{DateTime.Now:yyyyMMdd-HHmmss}.csv";
@@ -1472,6 +1546,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                     _topologyEdges.Clear();
                     _nodePositions.Clear();
                 }
+
                 await LoadGraphsAsync();
             }
             else
@@ -1558,7 +1633,9 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         }
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+    }
 
     // ─── 向量搜索显示 DTO（重构）────────────────────
     private sealed class VectorSearchDisplayResult
@@ -1572,5 +1649,9 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         // ★ 新增：分量明细
         public float? VectorScore { get; set; }
         public float? Bm25Score { get; set; }
+
+        // ★ 阶段 4 新增
+        public int? HopDistance { get; set; }
+        public bool IsMultiHop { get; set; }
     }
 }

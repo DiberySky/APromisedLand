@@ -21,6 +21,15 @@ public sealed class IntentResult
     [JsonPropertyName("reason")]       public string? Reason { get; set; }
     [JsonPropertyName("strategy")]     public string Strategy { get; set; } = "none";
     [JsonPropertyName("fallbackUsed")] public bool FallbackUsed { get; set; }
+    
+    // ★ 阶段 4 新增
+    /// <summary>跳数：1=单跳（默认），0=无限跳，2~5=指定跳数。</summary>
+    [JsonPropertyName("hopCount")]
+    public int HopCount { get; set; } = 1;
+
+    /// <summary>"ancestors" / "descendants" / null（单跳）。</summary>
+    [JsonPropertyName("aggregationMode")]
+    public string? AggregationMode { get; set; }
 }
 
 // ─── 边向量 ───
@@ -44,6 +53,10 @@ public sealed class SemanticSearchRequest
 
     // ★ 阶段 1 预留（如果已经加了 Reranker，保留即可）
     public bool UseReranker { get; set; } = false;
+    
+    // ★ 新增：前端点击建议时，显式指定方向（覆盖 LLM 判断）
+    /// <summary>"in" / "out" / null。非空时强制覆盖 LLM 的 direction。</summary>
+    public string? DirectionOverride { get; set; }
 }
 
 public sealed class SemanticSearchHitDto
@@ -56,6 +69,10 @@ public sealed class SemanticSearchHitDto
     public string? ViaEdgeName { get; set; }
     public string? Direction { get; set; }
     public string? MatchedContent { get; set; }
+    
+    // ★ 阶段 4 新增
+    [JsonPropertyName("hopDistance")]     public int? HopDistance { get; set; }
+    [JsonPropertyName("isMultiHop")]      public bool IsMultiHop  { get; set; }
 }
 
 public sealed class SemanticSearchResponseDto
@@ -63,4 +80,30 @@ public sealed class SemanticSearchResponseDto
     public List<SemanticSearchHitDto> Hits { get; set; } = new();
     public IntentResult Intent { get; set; } = new();
     public object? Stats { get; set; }
+    public string? Hint { get; set; }   // ★ 新增：友好提示
+    // ★ 新增：基于图数据的建议
+    public List<SuggestedRelationDto> Suggestions { get; set; } = new();
+}
+
+/// <summary>基于图数据的查询建议。</summary>
+public sealed class SuggestedRelationDto
+{
+    /// <summary>关系名（如 SUBFIELD）。</summary>
+    public string Relation { get; set; } = "";
+
+    /// <summary>"in" / "out"。</summary>
+    public string Direction { get; set; } = "";
+
+    /// <summary>建议执行的查询文本（如"机器学习的SUBFIELD"）。</summary>
+    public string Query { get; set; } = "";
+
+    /// <summary>该关系下有几条边。</summary>
+    public int Count { get; set; }
+
+    /// <summary>示例节点名（最多 3 个）。</summary>
+    public List<string> SampleNodes { get; set; } = new();
+    
+    // ★ 新增：友好标签（后端生成）
+    public string DisplayLabel { get; set; } = "";    // 按钮上显示的文字
+    public string Tooltip { get; set; } = "";         // hover 提示
 }

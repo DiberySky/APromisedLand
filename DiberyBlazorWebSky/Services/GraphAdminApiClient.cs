@@ -663,14 +663,24 @@ public class GraphAdminApiClient
     // ══════════════════════════════════════════════════════
 
     public async Task<SemanticSearchResponseDto?> SemanticSearchAsync(
-        Guid graphGuid, string query, int topK = 10,
+        Guid graphGuid,
+        string query,
+        int topK = 10,
+        string? directionOverride = null,   // ★ 新增
         CancellationToken ct = default)
     {
         try
         {
+            var payload = new
+            {
+                Query = query,
+                TopK = topK,
+                DirectionOverride = directionOverride
+            };
+
             var resp = await _http.PostAsJsonAsync(
                 $"/api/graph/{graphGuid}/semantic-search",
-                new { Query = query, TopK = topK },
+                payload,
                 JsonOpts, ct);
 
             if (!resp.IsSuccessStatusCode)
@@ -679,7 +689,6 @@ public class GraphAdminApiClient
                 _logger.LogWarning("语义搜索失败 {Status}: {Body}", resp.StatusCode, body);
                 return null;
             }
-
             return await resp.Content.ReadFromJsonAsync<SemanticSearchResponseDto>(JsonOpts, ct);
         }
         catch (Exception ex)
@@ -709,6 +718,10 @@ public sealed class IntentResultDto
     [JsonPropertyName("confidence")] public double Confidence { get; set; }
     [JsonPropertyName("reason")] public string? Reason { get; set; }
     [JsonPropertyName("strategy")] public string Strategy { get; set; } = "none";
+    
+    // ★ 阶段 4 新增
+    [JsonPropertyName("hopCount")]        public int HopCount { get; set; } = 1;
+    [JsonPropertyName("aggregationMode")] public string? AggregationMode { get; set; }
 }
 
 public sealed class SemanticSearchHitDto
@@ -721,10 +734,29 @@ public sealed class SemanticSearchHitDto
     [JsonPropertyName("viaEdgeName")]     public string? ViaEdgeName { get; set; }
     [JsonPropertyName("direction")]       public string? Direction { get; set; }
     [JsonPropertyName("matchedContent")]  public string? MatchedContent { get; set; }
+    
+    // ★ 阶段 4 新增
+    public int? HopDistance { get; set; }   // 几跳（多跳结果才有值）
+    public bool IsMultiHop  { get; set; }   // 是否多跳结果
+}
+
+public sealed class SuggestedRelationDto
+{
+    [JsonPropertyName("relation")]    public string Relation { get; set; } = "";
+    [JsonPropertyName("direction")]   public string Direction { get; set; } = "";
+    [JsonPropertyName("query")]       public string Query { get; set; } = "";
+    [JsonPropertyName("count")]       public int Count { get; set; }
+    [JsonPropertyName("sampleNodes")] public List<string> SampleNodes { get; set; } = new();
+    
+    // ★ 新增
+    [JsonPropertyName("displayLabel")] public string DisplayLabel { get; set; } = "";
+    [JsonPropertyName("tooltip")]      public string Tooltip { get; set; } = "";
 }
 
 public sealed class SemanticSearchResponseDto
 {
-    [JsonPropertyName("hits")] public List<SemanticSearchHitDto> Hits { get; set; } = new();
-    [JsonPropertyName("intent")] public IntentResultDto Intent { get; set; } = new();
+    [JsonPropertyName("hits")]        public List<SemanticSearchHitDto> Hits { get; set; } = new();
+    [JsonPropertyName("intent")]      public IntentResultDto Intent { get; set; } = new();
+    [JsonPropertyName("hint")]        public string? Hint { get; set; }
+    [JsonPropertyName("suggestions")] public List<SuggestedRelationDto> Suggestions { get; set; } = new();
 }
