@@ -26,7 +26,7 @@
                 <option value="">New Conversation</option>
                 @foreach (var s in FilteredSessions)
                 {
-                    <option value="@s">@GetSessionDisplay(s)</option>
+                    <option value="@s.Id">@GetSessionLabel(s)</option>
                 }
             </select>
             <button class="btn-refresh"
@@ -36,6 +36,12 @@
             </button>
             @if (!string.IsNullOrEmpty(_selectedSessionId))
             {
+                <button class="btn-rename"
+                        @onclick="OpenRenameDialog"
+                        disabled="@_isSending"
+                        title="重命名当前会话">
+                    ✏️ 重命名
+                </button>
                 <button class="btn-reset"
                         @onclick="ResetSessionAsync"
                         disabled="@_isSending">
@@ -257,4 +263,46 @@
             }
         </div>
     </div>
+    @* ══════════════════════════════════════════════════════ *@
+    @* ★ 会话重命名弹窗                                    *@
+    @* ══════════════════════════════════════════════════════ *@
+    @if (_showRenameDialog)
+    {
+        <div class="modal-overlay" @onclick="CloseRenameDialog">
+            <div class="rename-dialog" @onclick:stopPropagation="true">
+                <div class="rename-header">
+                    <strong>✏️ 重命名会话</strong>
+                    <button class="btn-close" @onclick="CloseRenameDialog">✕</button>
+                </div>
+
+                <div class="rename-body">
+                    <label class="rename-label">显示名（最长 200 字符）</label>
+                    <input type="text"
+                           @bind="_renamingSessionName"
+                           @bind:event="oninput"
+                           maxlength="200"
+                           class="rename-input"
+                           placeholder="例如：图数据探索 - 9月22日"
+                           @onkeydown="HandleRenameKeyDown" />
+
+                    <p class="rename-hint">
+                        💡 留空则恢复为默认的 GUID 显示
+                    </p>
+                </div>
+
+                <div class="rename-footer">
+                    <button class="btn-secondary"
+                            @onclick="CloseRenameDialog"
+                            disabled="@_isRenamingSession">
+                        取消
+                    </button>
+                    <button class="btn-primary"
+                            @onclick="ConfirmRenameSessionAsync"
+                            disabled="@_isRenamingSession">
+                        @(_isRenamingSession ? "保存中..." : "保存")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 </div>

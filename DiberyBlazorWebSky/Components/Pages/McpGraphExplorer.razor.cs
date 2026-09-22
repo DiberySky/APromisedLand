@@ -891,7 +891,9 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
             using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
             using var reader = new StreamReader(stream);
             _selectedJsonContent = await reader.ReadToEndAsync();
-            _selectedJsonFileName = $"{file.Name} ({file.Size / 1024} KB)";
+            _selectedJsonFileName = file.Size < 1024
+                ? $"{file.Name} ({file.Size} B)"
+                : $"{file.Name} ({file.Size / 1024.0:F1} KB)";
             _importResult = null;
 
             _selectedNodesCsvContent = null;

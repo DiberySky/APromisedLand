@@ -907,3 +907,91 @@
     color: #94a3b8;
 }
 
+/* ══════════════════════════════════════════════════════════ */
+/* 会话重命名按钮 + 弹窗                                       */
+/* ══════════════════════════════════════════════════════════ */
+
+.btn-rename {
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.btn-rename:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.btn-rename:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.rename-dialog {
+    background: #fff;
+    border-radius: 10px;
+    width: 480px;
+    max-width: 90vw;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+}
+
+.rename-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 1.05rem;
+}
+
+.rename-body {
+    padding: 16px 20px;
+}
+
+.rename-label {
+    display: block;
+    font-size: 0.82rem;
+    color: #64748b;
+    margin-bottom: 6px;
+}
+
+.rename-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    outline: none;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.rename-input:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.rename-hint {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.rename-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+

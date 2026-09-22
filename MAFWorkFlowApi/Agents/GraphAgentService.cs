@@ -215,6 +215,17 @@ public sealed class GraphAgentService
     public ValueTask<IReadOnlyList<SessionMessage>> GetSessionMessagesAsync(
         string conversationId, CancellationToken ct)
         => _catalog.GetSessionMessagesAsync(conversationId, ct);
+    
+    // ★ 转发到 IConversationCatalog：显示名相关
+    public ValueTask<IReadOnlyDictionary<string, string>> GetAllDisplayNamesAsync(
+        CancellationToken ct)
+        => _catalog.GetAllDisplayNamesAsync(ct);
+
+    public ValueTask SetSessionDisplayNameAsync(
+        string conversationId,
+        string displayName,
+        CancellationToken ct)
+        => _catalog.SetDisplayNameAsync(conversationId, displayName, ct);
 
     // ══════════════════════════════════════════════════════
 

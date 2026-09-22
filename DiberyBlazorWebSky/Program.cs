@@ -46,6 +46,13 @@ builder.Services.AddHttpClient<GraphApiClient>(client =>
     client.Timeout     = TimeSpan.FromMinutes(5);
 });
 
+builder.Services.AddHttpClient<GraphAdminApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://mafworkflowapi");
+        client.Timeout = TimeSpan.FromMinutes(5);
+    })
+    .RemoveAllResilienceHandlers();
+
 builder.Services.AddSingleton<LiteGraphSdk>(sp =>
 {
     // LiteGraph REST Server 运行在 8701 端口

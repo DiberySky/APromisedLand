@@ -58,7 +58,16 @@ public class GraphAgentReply
 public class GraphAgentSessionsReply
 {
     [JsonPropertyName("sessions")]
-    public List<string> Sessions { get; set; } = new();
+    public List<GraphAgentSessionSummary> Sessions { get; set; } = new();
+}
+
+public class GraphAgentSessionSummary
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
+    [JsonPropertyName("displayName")]
+    public string? DisplayName { get; set; }
 }
 
 public class GraphAgentSessionMessagesReply
@@ -253,18 +262,19 @@ public class GraphAgentApiClient
             await onDone(finalReply);
     }
 
-    public async Task<List<string>> ListSessionsAsync(CancellationToken cancellationToken = default)
+    public async Task<List<GraphAgentSessionSummary>> ListSessionsAsync(
+        CancellationToken cancellationToken = default)
     {
         try
         {
             var result = await _http.GetFromJsonAsync<GraphAgentSessionsReply>(
                 "/api/graph-agent/sessions", JsonOpts, cancellationToken);
-            return result?.Sessions ?? new List<string>();
+            return result?.Sessions ?? new List<GraphAgentSessionSummary>();
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "加载会话列表失败");
-            return new List<string>();
+            return new List<GraphAgentSessionSummary>();
         }
     }
 
@@ -298,6 +308,28 @@ public class GraphAgentApiClient
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "删除会话失败：{ConvId}", conversationId);
+            return false;
+        }
+    }
+    
+    /// <summary>为会话设置显示名（空字符串表示恢复默认）。</summary>
+    public async Task<bool> RenameSessionAsync(
+        string conversationId,
+        string displayName,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync(
+                $"/api/graph-agent/sessions/{Uri.EscapeDataString(conversationId)}/rename",
+                new { DisplayName = displayName ?? "" },
+                JsonOpts,
+                cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "重命名会话失败：{ConvId}", conversationId);
             return false;
         }
     }

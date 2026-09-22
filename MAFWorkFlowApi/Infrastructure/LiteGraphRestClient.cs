@@ -54,7 +54,12 @@ public sealed class LiteGraphRestClient
         if (resp.StatusCode == HttpStatusCode.NotFound) return null;
         await EnsureSuccessAsync(resp, "GET", path, ct);
         var bytes = await resp.Content.ReadAsByteArrayAsync(ct);
-        return bytes.Length == 0 ? null : JsonSerializer.Deserialize<JsonElement>(bytes, JsonOpts);
+        if (bytes.Length == 0) return null;
+
+        // ★ 关键：Clone() 把 JsonElement 从临时 JsonDocument 里独立出来，
+        //    否则返回后引用失效，再次序列化时抛 InvalidOperationException。
+        var element = JsonSerializer.Deserialize<JsonElement>(bytes, JsonOpts);
+        return element.Clone();
     }
 
     public Task<JsonElement> PostAsync(string path, object body, CancellationToken ct = default)
@@ -84,7 +89,11 @@ public sealed class LiteGraphRestClient
         using var resp = await _http.SendAsync(req, ct);
         await EnsureSuccessAsync(resp, method.Method, path, ct);
         var bytes = await resp.Content.ReadAsByteArrayAsync(ct);
-        return bytes.Length == 0 ? default : JsonSerializer.Deserialize<JsonElement>(bytes, JsonOpts);
+        if (bytes.Length == 0) return default;
+
+        // ★ 同样 Clone
+        var element = JsonSerializer.Deserialize<JsonElement>(bytes, JsonOpts);
+        return element.Clone();
     }
 
     private static async Task EnsureSuccessAsync(

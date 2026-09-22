@@ -131,6 +131,17 @@ builder.Services.Configure<HealthCheckPublisherOptions>(options =>
 builder.Services.AddLiteGraph(builder.Configuration);
 
 // ══════════════════════════════════════════════════════════
+// ★ LiteGraphSdk（用于 GraphExportService）
+// ══════════════════════════════════════════════════════════
+builder.Services.AddSingleton<LiteGraph.Sdk.LiteGraphSdk>(sp =>
+{
+    // 与 LiteGraphRestClient 使用相同的 endpoint 和 tenant
+    var config = sp.GetRequiredService<IConfiguration>();
+    var endpoint = config["LiteGraph:Endpoint"] ?? "http://localhost:8701";
+    return new LiteGraph.Sdk.LiteGraphSdk(endpoint, "default");
+});
+
+// ══════════════════════════════════════════════════════════
 // ★ Graph Function Calling Agent（Scoped：工具调用上下文按请求隔离）
 // ══════════════════════════════════════════════════════════
 builder.Services.AddScoped<ToolCallContext>();
@@ -146,6 +157,8 @@ builder.Services
     .AddMcpServer()
     .WithHttpTransport()
     .WithTools<McpGraphTools>();
+
+builder.Services.AddScoped<MAFWorkFlowApi.Services.GraphExportService>();
 
 var app = builder.Build();
 

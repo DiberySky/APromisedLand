@@ -1,5 +1,7 @@
+using System.Text.Json;
 using MAFWorkFlowApi.Agents;
 using MAFWorkFlowApi.Models;
+using MAFWorkFlowApi.Models.Graph;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MAFWorkFlowApi.Controllers;
@@ -45,11 +47,6 @@ public sealed class GraphAgentController : ControllerBase
             ToolCallDetails: reply.ToolCallDetails ?? new List<ToolCallDetailDto>()));
     }
 
-    /// <summary>
-    /// SSE 流式端点：逐字返回最终回答。
-    /// 事件格式：data: {"type":"delta","text":"..."}\n\n
-    /// 结束：data: {"type":"done","conversationId":"...","toolsInvoked":[...]}\n\n
-    /// </summary>
     [HttpPost("chat/stream")]
     [Produces("text/event-stream")]
     public async Task StreamChat(
@@ -61,11 +58,10 @@ public sealed class GraphAgentController : ControllerBase
         Response.Headers["X-Accel-Buffering"] = "no";
         await Response.Body.FlushAsync(ct);
 
-        var sseOpts = new System.Text.Json.JsonSerializerOptions
+        var sseOpts = new JsonSerializerOptions
         {
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-            // ★ 关键：把枚举序列化为字符串（"delta" / "done" / "start"）
             Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
         };
 
@@ -74,7 +70,7 @@ public sealed class GraphAgentController : ControllerBase
             await foreach (var chunk in _agents.ChatStreamAsync(
                                request.ConversationId, request.Message, ct))
             {
-                var payload = System.Text.Json.JsonSerializer.Serialize(chunk, sseOpts);
+                var payload = JsonSerializer.Serialize(chunk, sseOpts);
                 await Response.WriteAsync($"data: {payload}\n\n", ct);
                 await Response.Body.FlushAsync(ct);
             }
@@ -85,21 +81,28 @@ public sealed class GraphAgentController : ControllerBase
             _logger.LogError(ex, "流式对话失败");
             try
             {
-                var err = System.Text.Json.JsonSerializer.Serialize(
+                var err = JsonSerializer.Serialize(
                     new { type = "error", message = ex.Message }, sseOpts);
-                await Response.WriteAsync($"data: {err}\n\n",
-                    CancellationToken.None);
+                await Response.WriteAsync($"data: {err}\n\n", CancellationToken.None);
                 await Response.Body.FlushAsync(CancellationToken.None);
             }
             catch { }
         }
     }
-    
+
     [HttpGet("sessions")]
-    public async Task<ActionResult<SessionsReply>> ListSessions(CancellationToken ct)
+    public async Task<ActionResult<GraphAgentSessionsReply>> ListSessions(CancellationToken ct)
     {
         var ids = await _agents.ListConversationsAsync(ct);
-        return Ok(new SessionsReply(ids));
+        var names = await _agents.GetAllDisplayNamesAsync(ct);
+
+        var summaries = ids
+            .Select(id => new SessionSummary(
+                Id: id,
+                DisplayName: names.TryGetValue(id, out var n) ? n : null))
+            .ToList();
+
+        return Ok(new GraphAgentSessionsReply(summaries));
     }
 
     [HttpGet("sessions/{conversationId}/messages")]
@@ -126,5 +129,25 @@ public sealed class GraphAgentController : ControllerBase
 
         var deleted = await _agents.ResetConversationAsync(conversationId, ct);
         return deleted ? NoContent() : NotFound();
+    }
+
+    /// <summary>为会话设置显示名（空字符串表示恢复为默认 GUID 显示）。</summary>
+    [HttpPost("sessions/{conversationId}/rename")]
+    public async Task<IActionResult> RenameSession(
+        [FromRoute] string conversationId,
+        [FromBody] RenameSessionRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(conversationId))
+            return BadRequest(new ProblemDetails
+            {
+                Title = "会话 ID 不能为空。",
+                Status = StatusCodes.Status400BadRequest
+            });
+
+        await _agents.SetSessionDisplayNameAsync(
+            conversationId, request.DisplayName ?? "", ct);
+
+        return NoContent();
     }
 }

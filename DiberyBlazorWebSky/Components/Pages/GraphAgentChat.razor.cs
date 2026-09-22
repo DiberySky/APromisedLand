@@ -13,7 +13,8 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
     [Inject] private ILogger<GraphAgentChat> Logger { get; set; } = default!;
 
     private readonly List<ChatMsg> _messages = new();
-    private List<string> _sessions = new();
+    private List<GraphAgentSessionSummary> _sessions = new();
+
     private string _selectedSessionId = "";
     private string _userMessage = "";
     private bool _isSending;
@@ -30,13 +31,18 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
     private string? _lastCopiedMessageId;
     private bool _allCopied;
 
+    // 会话重命名
+    private bool _showRenameDialog;
+    private string _renamingSessionName = "";
+    private bool _isRenamingSession;
+
     // 会话搜索
     private string _sessionFilter = "";
 
-    // ★ 新增：待发送图片
+    // 图片上传
     private string? _pendingImageDataUrl;
     private string? _pendingImageName;
-    private const long MaxImageSizeBytes = 2 * 1024 * 1024;  // 2 MB
+    private const long MaxImageSizeBytes = 2 * 1024 * 1024;
 
     protected override async Task OnInitializedAsync()
     {
@@ -52,7 +58,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         var file = e.File;
         if (file == null) return;
 
-        // 检查大小
         if (file.Size > MaxImageSizeBytes)
         {
             _messages.Add(new ChatMsg
@@ -109,7 +114,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         try
         {
             var list = await GraphAgentApi.ListSessionsAsync();
-            _sessions = list ?? new List<string>();
+            _sessions = list ?? new List<GraphAgentSessionSummary>();
             Logger.LogInformation("加载 {Count} 个会话", _sessions.Count);
         }
         finally
@@ -119,33 +124,37 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         }
     }
 
-    private IEnumerable<string> FilteredSessions
+    private IEnumerable<GraphAgentSessionSummary> FilteredSessions
     {
         get
         {
-            IEnumerable<string> filtered = string.IsNullOrWhiteSpace(_sessionFilter)
+            IEnumerable<GraphAgentSessionSummary> filtered = string.IsNullOrWhiteSpace(_sessionFilter)
                 ? _sessions
                 : _sessions.Where(s =>
-                    s.Contains(_sessionFilter, StringComparison.OrdinalIgnoreCase));
+                    s.Id.Contains(_sessionFilter, StringComparison.OrdinalIgnoreCase)
+                    || (s.DisplayName?.Contains(_sessionFilter, StringComparison.OrdinalIgnoreCase) ?? false));
 
             var list = filtered.ToList();
 
             if (!string.IsNullOrEmpty(_selectedSessionId) &&
-                !list.Contains(_selectedSessionId))
+                !list.Any(s => s.Id == _selectedSessionId))
             {
-                list.Insert(0, _selectedSessionId);
+                var current = _sessions.FirstOrDefault(s => s.Id == _selectedSessionId);
+                if (current is not null)
+                    list.Insert(0, current);
             }
 
             return list;
         }
     }
 
-    private static string GetSessionDisplay(string sessionId)
+    private static string GetSessionLabel(GraphAgentSessionSummary s)
     {
-        if (string.IsNullOrEmpty(sessionId)) return "";
-        return sessionId.Length > 14
-            ? sessionId[..12] + "…"
-            : sessionId;
+        if (!string.IsNullOrEmpty(s.DisplayName))
+            return s.DisplayName;
+
+        if (string.IsNullOrEmpty(s.Id)) return "";
+        return s.Id.Length > 14 ? s.Id[..12] + "…" : s.Id;
     }
 
     private async Task OnSessionChangedAsync(ChangeEventArgs e)
@@ -209,7 +218,7 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
         if (ok)
         {
-            _sessions.Remove(convId);
+            _sessions.RemoveAll(s => s.Id == convId);
             _selectedSessionId = "";
             _sessionFilter = "";
             _messages.Clear();
@@ -256,6 +265,73 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "复制消息失败");
+        }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // 会话重命名
+    // ══════════════════════════════════════════════════════
+
+    private void OpenRenameDialog()
+    {
+        if (string.IsNullOrEmpty(_selectedSessionId)) return;
+
+        var current = _sessions.FirstOrDefault(s => s.Id == _selectedSessionId);
+        _renamingSessionName = current?.DisplayName ?? "";
+        _showRenameDialog = true;
+        StateHasChanged();
+    }
+
+    private void CloseRenameDialog()
+    {
+        _showRenameDialog = false;
+        _renamingSessionName = "";
+        StateHasChanged();
+    }
+
+    private async Task ConfirmRenameSessionAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedSessionId)) return;
+
+        _isRenamingSession = true;
+        StateHasChanged();
+
+        try
+        {
+            var newName = _renamingSessionName?.Trim() ?? "";
+            var ok = await GraphAgentApi.RenameSessionAsync(_selectedSessionId, newName);
+
+            if (ok)
+            {
+                var target = _sessions.FirstOrDefault(s => s.Id == _selectedSessionId);
+                if (target is not null)
+                    target.DisplayName = string.IsNullOrEmpty(newName) ? null : newName;
+
+                Logger.LogInformation("会话已重命名：{ConvId} → {Name}",
+                    _selectedSessionId, newName);
+                CloseRenameDialog();
+            }
+            else
+            {
+                Logger.LogWarning("重命名会话失败");
+            }
+        }
+        finally
+        {
+            _isRenamingSession = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleRenameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ConfirmRenameSessionAsync();
+        }
+        else if (e.Key == "Escape")
+        {
+            CloseRenameDialog();
         }
     }
 
@@ -384,7 +460,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
     private async Task SendMessageAsync()
     {
-        // ★ 允许"仅有图片"的消息
         if ((string.IsNullOrWhiteSpace(_userMessage) && string.IsNullOrEmpty(_pendingImageDataUrl))
             || _isSending)
             return;
@@ -433,18 +508,24 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
         try
         {
-            // ★ 只发文本给后端，图片不上传
             var response = await GraphAgentApi.SendAsync(
                 userText,
                 string.IsNullOrEmpty(_selectedSessionId) ? null : _selectedSessionId,
                 _sendCts.Token);
 
+            // ★ 修复：用 FirstOrDefault 判重 + new SessionSummary 加入
             if (string.IsNullOrEmpty(_selectedSessionId) &&
                 !string.IsNullOrEmpty(response.ConversationId))
             {
                 _selectedSessionId = response.ConversationId;
-                if (!_sessions.Contains(response.ConversationId))
-                    _sessions.Add(response.ConversationId);
+                if (!_sessions.Any(s => s.Id == response.ConversationId))
+                {
+                    _sessions.Add(new GraphAgentSessionSummary
+                    {
+                        Id = response.ConversationId,
+                        DisplayName = null
+                    });
+                }
             }
 
             _messages.Add(new ChatMsg
@@ -522,7 +603,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
 
         try
         {
-            // ★ 只发文本给后端
             await GraphAgentApi.SendStreamAsync(
                 userText,
                 string.IsNullOrEmpty(_selectedSessionId) ? null : _selectedSessionId,
@@ -538,12 +618,19 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
                     aiMsg.ToolCallDetails = reply.ToolCallDetails;
                     aiMsg.AgentName = reply.AgentName;
 
+                    // ★ 修复：用 FirstOrDefault 判重 + new SessionSummary 加入
                     if (string.IsNullOrEmpty(_selectedSessionId) &&
                         !string.IsNullOrEmpty(reply.ConversationId))
                     {
                         _selectedSessionId = reply.ConversationId;
-                        if (!_sessions.Contains(reply.ConversationId))
-                            _sessions.Add(reply.ConversationId);
+                        if (!_sessions.Any(s => s.Id == reply.ConversationId))
+                        {
+                            _sessions.Add(new GraphAgentSessionSummary
+                            {
+                                Id = reply.ConversationId,
+                                DisplayName = null
+                            });
+                        }
                     }
 
                     await InvokeAsync(StateHasChanged);
@@ -624,8 +711,6 @@ public partial class GraphAgentChat : ComponentBase, IDisposable
         public DateTime Timestamp { get; set; }
         public List<GraphAgentToolCallDetail> ToolCallDetails { get; set; } = new();
         public string? AgentName { get; set; }
-
-        /// <summary>★ 新增：图片 data URL（仅前端展示，不持久化）</summary>
         public string? ImageDataUrl { get; set; }
     }
 }

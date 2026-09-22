@@ -15,7 +15,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     // ─── 注入 ─────────────────────────────────────────
     [Inject] private IJSRuntime Js { get; set; } = default!;
     [Inject] private IHttpClientFactory HttpClientFactory { get; set; } = default!;
-    [Inject] private GraphImportExportService ImportExport { get; set; } = default!;
+    [Inject] private GraphAdminApiClient GraphApi { get; set; } = default!;
 
     // ─── 图 / 节点 / 边状态 ──────────────────────────
     private List<Graph> _graphs = new();
@@ -130,8 +130,13 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            var result = await LiteGraph.Graph.ReadMany(DefaultTenant);
-            _graphs = result.Objects ?? new List<Graph>();
+            var list = await GraphApi.ListGraphsAsync();
+            _graphs = list.Select(g => new Graph
+            {
+                GUID = g.Guid,
+                Name = g.Name
+            }).ToList();
+
             Logger.LogInformation("加载 {Count} 个图", _graphs.Count);
         }
         catch (Exception ex)
@@ -193,17 +198,13 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            var query = new EnumerationRequest
+            var result = await GraphApi.EnumerateNodesAsync(graphGuid, PageSize, continuationToken);
+            _nodes = result.Objects.Select(n => new Node
             {
-                TenantGUID = DefaultTenant,
+                GUID = n.Guid,
                 GraphGUID = graphGuid,
-                Ordering = EnumerationOrderEnum.CreatedDescending,
-                MaxResults = PageSize,
-                ContinuationToken = continuationToken
-            };
-
-            var result = await LiteGraph.Node.Enumerate(query);
-            _nodes = result.Objects ?? new List<Node>();
+                Name = n.Name
+            }).ToList();
             _nodeTotal = result.TotalRecords;
             _nodeContinuationToken = result.ContinuationToken;
             _nodeHasPrev = continuationToken != null;
@@ -245,17 +246,15 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            var query = new EnumerationRequest
+            var result = await GraphApi.EnumerateEdgesAsync(graphGuid, PageSize, continuationToken);
+            _edges = result.Objects.Select(e => new Edge
             {
-                TenantGUID = DefaultTenant,
+                GUID = e.Guid,
                 GraphGUID = graphGuid,
-                Ordering = EnumerationOrderEnum.CreatedDescending,
-                MaxResults = PageSize,
-                ContinuationToken = continuationToken
-            };
-
-            var result = await LiteGraph.Edge.Enumerate(query);
-            _edges = result.Objects ?? new List<Edge>();
+                From = e.From,
+                To = e.To,
+                Name = e.Name
+            }).ToList();
             _edgeTotal = result.TotalRecords;
             _edgeContinuationToken = result.ContinuationToken;
             _edgeHasPrev = continuationToken != null;
@@ -295,15 +294,17 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            var node = new Node
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+            var ok = await GraphApi.CreateNodeAsync(graphGuid, _newNodeName.Trim());
+            if (ok)
             {
-                TenantGUID = DefaultTenant,
-                GraphGUID = Guid.Parse(_selectedGraphGuid),
-                Name = _newNodeName.Trim()
-            };
-            await LiteGraph.Node.Create(node);
-            _newNodeName = "";
-            await LoadNodesAsync();
+                _newNodeName = "";
+                await LoadNodesAsync();
+            }
+            else
+            {
+                _errorMessage = "创建节点失败";
+            }
         }
         catch (Exception ex)
         {
@@ -326,10 +327,8 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            await LiteGraph.Node.DeleteByGuid(
-                DefaultTenant,
-                Guid.Parse(_selectedGraphGuid),
-                nodeGuid);
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+            await GraphApi.DeleteNodeAsync(graphGuid, nodeGuid);
             _selectedNodeGuids.Remove(nodeGuid);
             await Task.WhenAll(LoadNodesAsync(), LoadEdgesAsync());
         }
@@ -355,12 +354,10 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
             foreach (var guid in _selectedNodeGuids)
             {
-                await LiteGraph.Node.DeleteByGuid(
-                    DefaultTenant,
-                    Guid.Parse(_selectedGraphGuid),
-                    guid);
+                await GraphApi.DeleteNodeAsync(graphGuid, guid);
             }
             _selectedNodeGuids.Clear();
             await Task.WhenAll(LoadNodesAsync(), LoadEdgesAsync());
@@ -368,6 +365,48 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "批量删除节点失败");
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    // ★ 新增：编辑节点名称
+    private async Task SaveNodeNameAsync(Node node)
+    {
+        if (_editingNodeGuid != node.GUID) return;
+
+        var newName = _editingNodeName.Trim();
+        if (string.IsNullOrWhiteSpace(newName) || newName == node.Name)
+        {
+            CancelEditNode();
+            return;
+        }
+
+        _isBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+            var ok = await GraphApi.UpdateNodeAsync(graphGuid, node.GUID, newName);
+            if (ok)
+            {
+                Logger.LogInformation("节点已重命名：{Guid} → {Name}", node.GUID, newName);
+                CancelEditNode();
+                await LoadNodesAsync();
+            }
+            else
+            {
+                _errorMessage = "重命名失败";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "重命名节点失败");
             _errorMessage = ex.Message;
         }
         finally
@@ -390,17 +429,21 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            var edge = new Edge
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+            var edgeName = string.IsNullOrWhiteSpace(_newEdgeName) ? "RELATED_TO" : _newEdgeName.Trim();
+
+            var ok = await GraphApi.CreateEdgeAsync(
+                graphGuid, Guid.Parse(_newEdgeFrom), Guid.Parse(_newEdgeTo), edgeName);
+
+            if (ok)
             {
-                TenantGUID = DefaultTenant,
-                GraphGUID = Guid.Parse(_selectedGraphGuid),
-                From = Guid.Parse(_newEdgeFrom),
-                To = Guid.Parse(_newEdgeTo),
-                Name = string.IsNullOrWhiteSpace(_newEdgeName) ? "RELATED_TO" : _newEdgeName.Trim()
-            };
-            await LiteGraph.Edge.Create(edge);
-            _newEdgeFrom = _newEdgeTo = _newEdgeName = "";
-            await LoadEdgesAsync();
+                _newEdgeFrom = _newEdgeTo = _newEdgeName = "";
+                await LoadEdgesAsync();
+            }
+            else
+            {
+                _errorMessage = "创建边失败";
+            }
         }
         catch (Exception ex)
         {
@@ -423,10 +466,8 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            await LiteGraph.Edge.DeleteByGuid(
-                DefaultTenant,
-                Guid.Parse(_selectedGraphGuid),
-                edgeGuid);
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+            await GraphApi.DeleteEdgeAsync(graphGuid, edgeGuid);
             await LoadEdgesAsync();
         }
         catch (Exception ex)
@@ -441,44 +482,49 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         }
     }
 
-    // ══════════════════════════════════════════════════════
-    // 向量搜索（混合：语义 + 关键词）
-    // ══════════════════════════════════════════════════════
-
-    private async Task<List<float>?> GetEmbeddingAsync(string text)
+    private async Task SaveEdgeNameAsync(Edge edge)
     {
+        if (_editingEdgeGuid != edge.GUID) return;
+
+        var newName = _editingEdgeName.Trim();
+        if (string.IsNullOrWhiteSpace(newName) || newName == edge.Name)
+        {
+            CancelEditEdge();
+            return;
+        }
+
+        _isBusy = true;
+        StateHasChanged();
+
         try
         {
-            var http = HttpClientFactory.CreateClient();
-            var response = await http.PostAsJsonAsync(
-                OllamaEmbeddingUrl,
-                new { model = EmbeddingModel, prompt = text });
-
-            if (!response.IsSuccessStatusCode)
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+            var ok = await GraphApi.UpdateEdgeAsync(graphGuid, edge.GUID, newName);
+            if (ok)
             {
-                var body = await response.Content.ReadAsStringAsync();
-                _errorMessage = $"Ollama 返回 {response.StatusCode}: {body}";
-                return null;
+                CancelEditEdge();
+                await LoadEdgesAsync();
             }
-
-            var json = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(json);
-
-            if (!doc.RootElement.TryGetProperty("embedding", out var arr))
+            else
             {
-                _errorMessage = "Ollama 响应中没有 embedding 字段";
-                return null;
+                _errorMessage = "重命名失败";
             }
-
-            return arr.EnumerateArray().Select(x => x.GetSingle()).ToList();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "调用 Ollama embedding 失败");
-            _errorMessage = $"生成 embedding 失败: {ex.Message}";
-            return null;
+            Logger.LogError(ex, "重命名边失败");
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isBusy = false;
+            StateHasChanged();
         }
     }
+
+    // ══════════════════════════════════════════════════════
+    // 向量搜索（混合：语义 + 关键词）
+    // ══════════════════════════════════════════════════════
 
     private static float CosineSimilarity(List<float> a, List<float> b)
     {
@@ -520,6 +566,54 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         return 0.0f;
     }
 
+    /// <summary>加载图中所有节点，返回 GUID → Name 字典。</summary>
+        private async Task<Dictionary<Guid, string>> LoadAllNodeNamesAsync(Guid graphGuid)
+    {
+        var nodes = await GraphApi.ListAllNodesAsync(graphGuid);
+        var map = new Dictionary<Guid, string>();
+        foreach (var n in nodes)
+        {
+            if (!map.ContainsKey(n.Guid))
+                map[n.Guid] = string.IsNullOrWhiteSpace(n.Name) ? "[无名]" : n.Name;
+        }
+        return map;
+    }
+
+    // ★ GetEmbeddingAsync 保留（前端直连 Ollama），因为 embedding 服务不在后端
+    private async Task<List<float>?> GetEmbeddingAsync(string text)
+    {
+        try
+        {
+            var http = HttpClientFactory.CreateClient();
+            var response = await http.PostAsJsonAsync(
+                OllamaEmbeddingUrl,
+                new { model = EmbeddingModel, prompt = text });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _errorMessage = $"Ollama 返回 {response.StatusCode}: {body}";
+                return null;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("embedding", out var arr))
+            {
+                _errorMessage = "Ollama 响应中没有 embedding 字段";
+                return null;
+            }
+            return arr.EnumerateArray().Select(x => x.GetSingle()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "调用 Ollama embedding 失败");
+            _errorMessage = $"生成 embedding 失败: {ex.Message}";
+            return null;
+        }
+    }
+
+    // SearchVectorAsync 里的向量加载改成 GraphApi.ListAllVectorsAsync
     /// <summary>
     /// 混合搜索：向量相似度（0.7 权重）+ 关键词匹配（0.3 权重）。
     /// 按 NodeGUID 去重，每个节点只保留最高向量分。
@@ -539,92 +633,54 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         try
         {
             var queryText = _vectorQueryText.Trim();
-
             var queryEmbedding = await GetEmbeddingAsync(queryText);
             if (queryEmbedding == null || queryEmbedding.Count == 0) return;
 
-            Logger.LogInformation("查询 embedding 维度：{Dim}", queryEmbedding.Count);
             _vectorProgress = "加载所有节点和向量...";
             StateHasChanged();
 
             var graphGuid = Guid.Parse(_selectedGraphGuid);
-
-            // 独立加载全量节点名（避免分页问题）
             var nameLookup = await LoadAllNodeNamesAsync(graphGuid);
+            var allVectors = await GraphApi.ListAllVectorsAsync(graphGuid);
 
-            // 加载所有向量
-            var vectorQuery = new EnumerationRequest
-            {
-                TenantGUID = DefaultTenant,
-                GraphGUID = graphGuid,
-                Ordering = EnumerationOrderEnum.CreatedDescending,
-                MaxResults = MaxEnumerationResults
-            };
-
-            var vectorResult = await LiteGraph.Vector.Enumerate(vectorQuery);
-            var allVectors = vectorResult.Objects ?? new List<VectorMetadata>();
-
-            Logger.LogInformation("加载到 {Count} 条向量记录", allVectors.Count);
             _vectorProgress = $"混合评分（{allVectors.Count} 条向量）...";
             StateHasChanged();
 
-            // ─── 1. 按 NodeGUID 去重，保留最高向量分 ───
             var bestVectorByNode = new Dictionary<Guid, float>();
-
             foreach (var v in allVectors)
             {
                 if (v.Vectors == null || v.Vectors.Count == 0) continue;
-                if (v.NodeGUID == null) continue;
+                if (v.NodeGuid == null) continue;
 
-                var nodeGuid = v.NodeGUID.Value;
+                var nodeGuid = v.NodeGuid.Value;
                 var score = CosineSimilarity(queryEmbedding, v.Vectors);
-
                 if (!bestVectorByNode.TryGetValue(nodeGuid, out var existing) || score > existing)
                 {
                     bestVectorByNode[nodeGuid] = score;
                 }
             }
 
-            Logger.LogInformation(
-                "去重后：{Count} 个独立节点（原始 {Raw} 条向量）",
-                bestVectorByNode.Count, allVectors.Count);
-
-            // ─── 2. 混合评分：向量 + 关键词 ───
             var results = new List<VectorSearchDisplayResult>();
-
             foreach (var kv in bestVectorByNode)
             {
-                var nodeGuid = kv.Key;
-                var vectorScore = kv.Value;
-
-                var nodeName = nameLookup.TryGetValue(nodeGuid, out var name)
-                               ? name
-                               : $"[未知节点 {nodeGuid.ToString("N")[..8]}]";
+                var nodeName = nameLookup.TryGetValue(kv.Key, out var name)
+                    ? name
+                    : $"[未知节点 {kv.Key.ToString("N")[..8]}]";
 
                 var keywordScore = KeywordMatchScore(queryText, nodeName);
                 var keywordMatched = keywordScore > 0f;
-
-                var finalScore = VectorWeight * vectorScore + KeywordWeight * keywordScore;
+                var finalScore = VectorWeight * kv.Value + KeywordWeight * keywordScore;
 
                 results.Add(new VectorSearchDisplayResult
                 {
                     NodeName = nodeName,
                     Score = finalScore,
-                    VectorScore = vectorScore,
+                    VectorScore = kv.Value,
                     KeywordMatched = keywordMatched
                 });
             }
 
-            _vectorResults = results
-                .OrderByDescending(r => r.Score)
-                .Take(20)
-                .ToList();
-
-            var matchedCount = _vectorResults.Count(r => r.KeywordMatched);
-            Logger.LogInformation(
-                "混合搜索完成：返回 {Count} 条结果（其中 {Matched} 条含关键词匹配）",
-                _vectorResults.Count, matchedCount);
-
+            _vectorResults = results.OrderByDescending(r => r.Score).Take(20).ToList();
             _vectorProgress = $"返回 {_vectorResults.Count} 条结果";
         }
         catch (Exception ex)
@@ -637,27 +693,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             _isBusy = false;
             StateHasChanged();
         }
-    }
-
-    /// <summary>加载图中所有节点，返回 GUID → Name 字典。</summary>
-    private async Task<Dictionary<Guid, string>> LoadAllNodeNamesAsync(Guid graphGuid)
-    {
-        var query = new EnumerationRequest
-        {
-            TenantGUID = DefaultTenant,
-            GraphGUID = graphGuid,
-            MaxResults = MaxEnumerationResults
-        };
-        var result = await LiteGraph.Node.Enumerate(query);
-        var nodes = result.Objects ?? new List<Node>();
-
-        var map = new Dictionary<Guid, string>();
-        foreach (var n in nodes)
-        {
-            if (!map.ContainsKey(n.GUID))
-                map[n.GUID] = string.IsNullOrWhiteSpace(n.Name) ? "[无名]" : n.Name;
-        }
-        return map;
     }
 
     /// <summary>
@@ -680,62 +715,31 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         {
             var graphGuid = Guid.Parse(_selectedGraphGuid);
 
-            // ─── 1. 清理旧向量 ───
+            // 1. 清理旧向量
             _vectorProgress = "清理旧向量...";
             StateHasChanged();
 
-            var deleteQuery = new EnumerationRequest
+            var existingVectors = await GraphApi.ListAllVectorsAsync(graphGuid);
+            foreach (var v in existingVectors)
             {
-                TenantGUID = DefaultTenant,
-                GraphGUID = graphGuid,
-                MaxResults = MaxEnumerationResults
-            };
-            var existingVectors = await LiteGraph.Vector.Enumerate(deleteQuery);
-            var toDelete = existingVectors.Objects ?? new List<VectorMetadata>();
-
-            foreach (var v in toDelete)
-            {
-                try
-                {
-                    await LiteGraph.Vector.DeleteByGuid(DefaultTenant, v.GUID);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "删除旧向量 {Guid} 失败", v.GUID);
-                }
+                try { await GraphApi.DeleteVectorAsync(graphGuid, v.Guid); }
+                catch (Exception ex) { Logger.LogWarning(ex, "删除旧向量 {Guid} 失败", v.Guid); }
             }
 
-            Logger.LogInformation("已清理 {Count} 条旧向量", toDelete.Count);
-
-            // ─── 2. 加载所有节点和边，构建邻居映射 ───
+            // 2. 加载节点和边
             _vectorProgress = "加载节点和边...";
             StateHasChanged();
 
-            var nodeQuery = new EnumerationRequest
-            {
-                TenantGUID = DefaultTenant,
-                GraphGUID = graphGuid,
-                MaxResults = MaxEnumerationResults
-            };
-            var nodeResult = await LiteGraph.Node.Enumerate(nodeQuery);
-            var allNodes = nodeResult.Objects ?? new List<Node>();
-
-            var edgeQuery = new EnumerationRequest
-            {
-                TenantGUID = DefaultTenant,
-                GraphGUID = graphGuid,
-                MaxResults = MaxEnumerationResults
-            };
-            var edgeResult = await LiteGraph.Edge.Enumerate(edgeQuery);
-            var allEdges = edgeResult.Objects ?? new List<Edge>();
+            var allNodes = await GraphApi.ListAllNodesAsync(graphGuid);
+            var allEdges = await GraphApi.ListAllEdgesAsync(graphGuid);
 
             var guidToName = allNodes
                 .Where(n => !string.IsNullOrWhiteSpace(n.Name))
-                .GroupBy(n => n.GUID)
+                .GroupBy(n => n.Guid)
                 .ToDictionary(g => g.Key, g => g.First().Name);
 
             var neighborMap = allNodes.ToDictionary(
-                n => n.GUID,
+                n => n.Guid,
                 _ => new List<string>());
 
             foreach (var e in allEdges)
@@ -743,18 +747,12 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 if (guidToName.TryGetValue(e.From, out var fromName) &&
                     guidToName.TryGetValue(e.To, out var toName))
                 {
-                    if (neighborMap.TryGetValue(e.From, out var fromList))
-                        fromList.Add(toName);
-                    if (neighborMap.TryGetValue(e.To, out var toList))
-                        toList.Add(fromName);
+                    if (neighborMap.TryGetValue(e.From, out var fromList)) fromList.Add(toName);
+                    if (neighborMap.TryGetValue(e.To, out var toList)) toList.Add(fromName);
                 }
             }
 
-            Logger.LogInformation(
-                "已构建邻接表：{Nodes} 节点 / {Edges} 边",
-                allNodes.Count, allEdges.Count);
-
-            // ─── 3. 逐个节点生成向量 ───
+            // 3. 逐个生成向量
             int success = 0, fail = 0;
             int total = allNodes.Count;
             int i = 0;
@@ -765,37 +763,18 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
                 _vectorProgress = $"({i}/{total}) {node.Name}";
                 StateHasChanged();
 
-                if (string.IsNullOrWhiteSpace(node.Name))
-                {
-                    fail++;
-                    continue;
-                }
+                if (string.IsNullOrWhiteSpace(node.Name)) { fail++; continue; }
 
-                // ★ 用"节点名+邻居"构建增强文本
-                var embeddingText = BuildEmbeddingText(node, neighborMap);
-                Logger.LogInformation("节点 {Name} embedding 文本: {Text}",
-                    node.Name, embeddingText);
-
+                var embeddingText = BuildEmbeddingText(node.Guid, node.Name, neighborMap);
                 var embedding = await GetEmbeddingAsync(embeddingText);
-                if (embedding == null)
-                {
-                    fail++;
-                    continue;
-                }
+                if (embedding == null) { fail++; continue; }
 
                 try
                 {
-                    var metadata = new VectorMetadata
-                    {
-                        TenantGUID = DefaultTenant,
-                        GraphGUID = graphGuid,
-                        NodeGUID = node.GUID,
-                        Model = EmbeddingModel,
-                        Dimensionality = embedding.Count,
-                        Vectors = embedding
-                    };
-                    await LiteGraph.Vector.Create(metadata);
-                    success++;
+                    var ok = await GraphApi.CreateVectorAsync(
+                        graphGuid, node.Guid, EmbeddingModel, embedding);
+                    if (ok) success++;
+                    else fail++;
                 }
                 catch (Exception ex)
                 {
@@ -805,7 +784,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             }
 
             _vectorProgress = $"完成：成功 {success} / 失败 {fail}";
-            Logger.LogInformation("向量生成完成: 成功 {S} / 失败 {F}", success, fail);
         }
         catch (Exception ex)
         {
@@ -818,6 +796,29 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             StateHasChanged();
         }
     }
+
+    // ★ BuildEmbeddingText 改成接收 Guid 而不是 Node
+    private static string BuildEmbeddingText(
+        Guid nodeGuid,
+        string nodeName,
+        Dictionary<Guid, List<string>> neighborMap)
+    {
+        const int MaxNeighbors = 5;
+
+        if (!neighborMap.TryGetValue(nodeGuid, out var neighbors) || neighbors.Count == 0)
+            return nodeName;
+
+        var uniqueNeighbors = neighbors
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct()
+            .Take(MaxNeighbors)
+            .ToList();
+
+        if (uniqueNeighbors.Count == 0) return nodeName;
+
+        return $"{nodeName} 相关：{string.Join("、", uniqueNeighbors)}";
+    }
+    
 
     /// <summary>
     /// 构建节点的 embedding 文本：节点名 + 邻居名列表。
@@ -864,31 +865,26 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         {
             var graphGuid = Guid.Parse(_selectedGraphGuid);
 
-            var nodeQuery = new EnumerationRequest
-            {
-                TenantGUID = DefaultTenant,
-                GraphGUID = graphGuid,
-                Ordering = EnumerationOrderEnum.CreatedDescending,
-                MaxResults = MaxEnumerationResults
-            };
-            var nodeResult = await LiteGraph.Node.Enumerate(nodeQuery);
-            _topologyNodes = nodeResult.Objects ?? new List<Node>();
+            var nodeDtos = await GraphApi.ListAllNodesAsync(graphGuid);
+            var edgeDtos = await GraphApi.ListAllEdgesAsync(graphGuid);
 
-            var edgeQuery = new EnumerationRequest
+            _topologyNodes = nodeDtos.Select(n => new Node
             {
-                TenantGUID = DefaultTenant,
+                GUID = n.Guid,
                 GraphGUID = graphGuid,
-                Ordering = EnumerationOrderEnum.CreatedDescending,
-                MaxResults = MaxEnumerationResults
-            };
-            var edgeResult = await LiteGraph.Edge.Enumerate(edgeQuery);
-            _topologyEdges = edgeResult.Objects ?? new List<Edge>();
+                Name = n.Name
+            }).ToList();
+
+            _topologyEdges = edgeDtos.Select(e => new Edge
+            {
+                GUID = e.Guid,
+                GraphGUID = graphGuid,
+                From = e.From,
+                To = e.To,
+                Name = e.Name
+            }).ToList();
 
             RecomputeLayout();
-
-            Logger.LogInformation(
-                "拓扑图加载：{N} 个节点 / {E} 条边（布局：{Mode}）",
-                _topologyNodes.Count, _topologyEdges.Count, _layoutMode);
         }
         catch (Exception ex)
         {
@@ -1168,13 +1164,17 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         {
             var graphGuid = Guid.Parse(_selectedGraphGuid);
             var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
-            var json = await ImportExport.ExportToJsonAsync(graphGuid, graphName);
+            var json = await GraphApi.ExportGraphJsonAsync(graphGuid);
+
+            if (string.IsNullOrEmpty(json))
+            {
+                _errorMessage = "导出失败";
+                return;
+            }
 
             var safeName = SanitizeFileName(graphName);
             var fileName = $"{safeName}-{DateTime.Now:yyyyMMdd-HHmmss}.json";
-
             await Js.InvokeVoidAsync("downloadTextFile", fileName, json, "application/json");
-            Logger.LogInformation("导出 JSON 成功：{FileName}", fileName);
         }
         catch (Exception ex)
         {
@@ -1199,13 +1199,13 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         {
             var graphGuid = Guid.Parse(_selectedGraphGuid);
             var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
-            var csv = await ImportExport.ExportNodesToCsvAsync(graphGuid);
+            var csv = await GraphApi.ExportNodesCsvAsync(graphGuid);
+
+            if (string.IsNullOrEmpty(csv)) { _errorMessage = "导出失败"; return; }
 
             var safeName = SanitizeFileName(graphName);
             var fileName = $"{safeName}-nodes-{DateTime.Now:yyyyMMdd-HHmmss}.csv";
-
             await Js.InvokeVoidAsync("downloadTextFile", fileName, csv, "text/csv;charset=utf-8");
-            Logger.LogInformation("导出节点 CSV 成功：{FileName}", fileName);
         }
         catch (Exception ex)
         {
@@ -1230,13 +1230,13 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         {
             var graphGuid = Guid.Parse(_selectedGraphGuid);
             var graphName = _graphs.FirstOrDefault(g => g.GUID == graphGuid)?.Name ?? "graph";
-            var csv = await ImportExport.ExportEdgesToCsvAsync(graphGuid);
+            var csv = await GraphApi.ExportEdgesCsvAsync(graphGuid);
+
+            if (string.IsNullOrEmpty(csv)) { _errorMessage = "导出失败"; return; }
 
             var safeName = SanitizeFileName(graphName);
             var fileName = $"{safeName}-edges-{DateTime.Now:yyyyMMdd-HHmmss}.csv";
-
             await Js.InvokeVoidAsync("downloadTextFile", fileName, csv, "text/csv;charset=utf-8");
-            Logger.LogInformation("导出边 CSV 成功：{FileName}", fileName);
         }
         catch (Exception ex)
         {
@@ -1246,6 +1246,68 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         finally
         {
             _isBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task StartImportAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
+        if (!HasAnyImportFile) return;
+
+        var clearWarning = _clearBeforeImport
+            ? "⚠️ 将先清空图中现有节点和边！此操作不可撤销。\n\n"
+            : "";
+        if (!await ConfirmAsync($"{clearWarning}确定导入？"))
+            return;
+
+        _isBusy = true;
+        _errorMessage = null;
+        _importResult = null;
+        _vectorProgress = "解析文件中...";
+        StateHasChanged();
+
+        try
+        {
+            var graphGuid = Guid.Parse(_selectedGraphGuid);
+
+            ImportResultDto dto;
+            if (!string.IsNullOrEmpty(_selectedJsonContent))
+            {
+                dto = await GraphApi.ImportJsonAsync(graphGuid, _selectedJsonContent, _clearBeforeImport);
+            }
+            else
+            {
+                dto = await GraphApi.ImportCsvAsync(
+                    graphGuid, _selectedNodesCsvContent!, _selectedEdgesCsvContent, _clearBeforeImport);
+            }
+
+            // 把 DTO 转回原 ImportResult 类型（保持 UI 层不变）
+            _importResult = new ImportResult
+            {
+                NodesCreated = dto.NodesCreated,
+                NodesSkipped = dto.NodesSkipped,
+                EdgesCreated = dto.EdgesCreated,
+                EdgesSkipped = dto.EdgesSkipped,
+                Errors = dto.Errors
+            };
+
+            await LoadNodesAsync();
+            await LoadEdgesAsync();
+
+            _topologyNodes.Clear();
+            _topologyEdges.Clear();
+            _nodePositions.Clear();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "导入失败");
+            _errorMessage = $"导入失败：{ex.Message}";
+        }
+        finally
+        {
+            _isBusy = false;
+            _vectorProgress = "";
             StateHasChanged();
         }
     }
@@ -1262,7 +1324,7 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
             using var reader = new StreamReader(stream);
             _selectedJsonContent = await reader.ReadToEndAsync();
-            _selectedJsonFileName = $"{file.Name} ({file.Size / 1024} KB)";
+            _selectedJsonFileName = $"{file.Name} ({FormatFileSize(file.Size)})";
             _importResult = null;
 
             _selectedNodesCsvContent = null;
@@ -1280,6 +1342,15 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         StateHasChanged();
         await Task.CompletedTask;
+    }
+    
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024)
+            return $"{bytes} B";
+        if (bytes < 1024 * 1024)
+            return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
     }
 
     private async Task OnNodesCsvSelected(InputFileChangeEventArgs e)
@@ -1334,63 +1405,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     }
 
     // ─── 执行导入 ────────────────────────────────────
-
-    private async Task StartImportAsync()
-    {
-        if (string.IsNullOrEmpty(_selectedGraphGuid)) return;
-        if (!HasAnyImportFile) return;
-
-        var clearWarning = _clearBeforeImport
-            ? "⚠️ 将先清空图中现有节点和边！此操作不可撤销。\n\n"
-            : "";
-        if (!await ConfirmAsync($"{clearWarning}确定导入？"))
-            return;
-
-        _isBusy = true;
-        _errorMessage = null;
-        _importResult = null;
-        _vectorProgress = "解析文件中...";
-        StateHasChanged();
-
-        try
-        {
-            var graphGuid = Guid.Parse(_selectedGraphGuid);
-
-            if (!string.IsNullOrEmpty(_selectedJsonContent))
-            {
-                _importResult = await ImportExport.ImportFromJsonAsync(
-                    graphGuid, _selectedJsonContent, _clearBeforeImport);
-            }
-            else if (!string.IsNullOrEmpty(_selectedNodesCsvContent))
-            {
-                _importResult = await ImportExport.ImportFromCsvAsync(
-                    graphGuid,
-                    _selectedNodesCsvContent,
-                    _selectedEdgesCsvContent,
-                    _clearBeforeImport);
-            }
-
-            await LoadNodesAsync();
-            await LoadEdgesAsync();
-
-            _topologyNodes.Clear();
-            _topologyEdges.Clear();
-            _nodePositions.Clear();
-
-            Logger.LogInformation("导入完成");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "导入失败");
-            _errorMessage = $"导入失败：{ex.Message}";
-        }
-        finally
-        {
-            _isBusy = false;
-            _vectorProgress = "";
-            StateHasChanged();
-        }
-    }
 
     private void ResetImportState()
     {
@@ -1490,41 +1504,22 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            var graph = new Graph
+            var ok = await GraphApi.CreateGraphAsync(_newGraphName.Trim());
+            if (ok)
             {
-                TenantGUID = DefaultTenant,
-                Name = _newGraphName.Trim()
-            };
-            var created = await LiteGraph.Graph.Create(graph);
-            Logger.LogInformation("已创建图：{Name} ({Guid})",
-                created.Name, created.GUID);
-            _newGraphName = "";
-            await LoadGraphsAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "创建图失败");
-            _errorMessage = $"创建图失败：{ex.Message}";
+                _newGraphName = "";
+                await LoadGraphsAsync();
+            }
+            else
+            {
+                _errorMessage = "创建图失败。";
+            }
         }
         finally
         {
             _isCreatingGraph = false;
             StateHasChanged();
         }
-    }
-
-    private void StartRename(Graph g)
-    {
-        _renamingGraphGuid = g.GUID;
-        _renamingGraphName = g.Name;
-        StateHasChanged();
-    }
-
-    private void CancelRename()
-    {
-        _renamingGraphGuid = null;
-        _renamingGraphName = "";
-        StateHasChanged();
     }
 
     private async Task ConfirmRenameAsync()
@@ -1546,15 +1541,16 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            existing.Name = newName;
-            await LiteGraph.Graph.Update(existing);
-            Logger.LogInformation("图已重命名：{Guid} → {Name}", existing.GUID, newName);
-            CancelRename();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "重命名失败");
-            _errorMessage = $"重命名失败：{ex.Message}";
+            var ok = await GraphApi.UpdateGraphAsync(existing.GUID, newName);
+            if (ok)
+            {
+                existing.Name = newName;
+                CancelRename();
+            }
+            else
+            {
+                _errorMessage = "重命名失败。";
+            }
         }
         finally
         {
@@ -1563,10 +1559,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 删除图：先删所有边和节点（级联），再删图本身。
-    /// 由于 LiteGraph 不保证级联，需手动遍历删除。
-    /// </summary>
     private async Task DeleteGraphAsync(Graph g)
     {
         var confirmed = await Js.InvokeAsync<bool>("confirm",
@@ -1579,58 +1571,25 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
 
         try
         {
-            // 1. 删除所有边
-            var edgeQuery = new EnumerationRequest
+            var ok = await GraphApi.DeleteGraphAsync(g.GUID);
+            if (ok)
             {
-                TenantGUID = DefaultTenant,
-                GraphGUID = g.GUID,
-                MaxResults = MaxEnumerationResults
-            };
-            var edgesResult = await LiteGraph.Edge.Enumerate(edgeQuery);
-            var edgesToDelete = edgesResult.Objects ?? new List<Edge>();
-            foreach (var e in edgesToDelete)
-            {
-                try { await LiteGraph.Edge.DeleteByGuid(DefaultTenant, g.GUID, e.GUID); }
-                catch (Exception ex) { Logger.LogWarning(ex, "删除边 {Guid} 失败", e.GUID); }
+                _graphs.RemoveAll(x => x.GUID == g.GUID);
+                if (_selectedGraphGuid == g.GUID.ToString())
+                {
+                    _selectedGraphGuid = "";
+                    _nodes.Clear();
+                    _edges.Clear();
+                    _topologyNodes.Clear();
+                    _topologyEdges.Clear();
+                    _nodePositions.Clear();
+                }
+                await LoadGraphsAsync();
             }
-
-            // 2. 删除所有节点
-            var nodeQuery = new EnumerationRequest
+            else
             {
-                TenantGUID = DefaultTenant,
-                GraphGUID = g.GUID,
-                MaxResults = MaxEnumerationResults
-            };
-            var nodesResult = await LiteGraph.Node.Enumerate(nodeQuery);
-            var nodesToDelete = nodesResult.Objects ?? new List<Node>();
-            foreach (var n in nodesToDelete)
-            {
-                try { await LiteGraph.Node.DeleteByGuid(DefaultTenant, g.GUID, n.GUID); }
-                catch (Exception ex) { Logger.LogWarning(ex, "删除节点 {Guid} 失败", n.GUID); }
+                _errorMessage = "删除失败。";
             }
-
-            // 3. 删除图本身
-            await LiteGraph.Graph.DeleteByGuid(DefaultTenant, g.GUID);
-
-            // 4. 更新本地状态
-            _graphs.RemoveAll(x => x.GUID == g.GUID);
-            if (_selectedGraphGuid == g.GUID.ToString())
-            {
-                _selectedGraphGuid = "";
-                _nodes.Clear();
-                _edges.Clear();
-                _topologyNodes.Clear();
-                _topologyEdges.Clear();
-                _nodePositions.Clear();
-                _selectedTopologyNode = null;
-            }
-
-            Logger.LogInformation("已删除图：{Name} ({Guid})", g.Name, g.GUID);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "删除图失败");
-            _errorMessage = $"删除失败：{ex.Message}";
         }
         finally
         {
@@ -1638,8 +1597,22 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             StateHasChanged();
         }
     }
+    
+    private void StartRename(Graph g)
+    {
+        _renamingGraphGuid = g.GUID;
+        _renamingGraphName = g.Name;
+        StateHasChanged();
+    }
 
-        // ══════════════════════════════════════════════════════
+    private void CancelRename()
+    {
+        _renamingGraphGuid = null;
+        _renamingGraphName = "";
+        StateHasChanged();
+    }
+
+    // ══════════════════════════════════════════════════════
     // ★ 节点/边行内编辑
     // ══════════════════════════════════════════════════════
 
@@ -1657,40 +1630,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         StateHasChanged();
     }
 
-    private async Task SaveNodeNameAsync(Node node)
-    {
-        if (_editingNodeGuid != node.GUID) return;
-
-        var newName = _editingNodeName.Trim();
-        if (string.IsNullOrWhiteSpace(newName) || newName == node.Name)
-        {
-            CancelEditNode();
-            return;
-        }
-
-        _isBusy = true;
-        StateHasChanged();
-
-        try
-        {
-            node.Name = newName;
-            await LiteGraph.Node.Update(node);
-            Logger.LogInformation("节点已重命名：{Guid} → {Name}", node.GUID, newName);
-            CancelEditNode();
-            await LoadNodesAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "重命名节点失败");
-            _errorMessage = $"重命名节点失败：{ex.Message}";
-        }
-        finally
-        {
-            _isBusy = false;
-            StateHasChanged();
-        }
-    }
-
     private void StartEditEdge(Edge edge)
     {
         _editingEdgeGuid = edge.GUID;
@@ -1703,40 +1642,6 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
         _editingEdgeGuid = null;
         _editingEdgeName = "";
         StateHasChanged();
-    }
-
-    private async Task SaveEdgeNameAsync(Edge edge)
-    {
-        if (_editingEdgeGuid != edge.GUID) return;
-
-        var newName = _editingEdgeName.Trim();
-        if (string.IsNullOrWhiteSpace(newName) || newName == edge.Name)
-        {
-            CancelEditEdge();
-            return;
-        }
-
-        _isBusy = true;
-        StateHasChanged();
-
-        try
-        {
-            edge.Name = newName;
-            await LiteGraph.Edge.Update(edge);
-            Logger.LogInformation("边已重命名：{Guid} → {Name}", edge.GUID, newName);
-            CancelEditEdge();
-            await LoadEdgesAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "重命名边失败");
-            _errorMessage = $"重命名边失败：{ex.Message}";
-        }
-        finally
-        {
-            _isBusy = false;
-            StateHasChanged();
-        }
     }
 
     /// <summary>编辑输入框里按 Enter 提交，Esc 取消。</summary>

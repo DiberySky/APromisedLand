@@ -391,7 +391,9 @@
     font-size: 0.75rem;
     color: #64748b;
     font-family: monospace;
-    max-width: 220px;
+    /* ★ 放宽最大宽度，允许显示较长的文件名 + 大小 */
+    max-width: 480px;
+    /* ★ 保留省略号作为最后防线（极端长文件时仍截断） */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

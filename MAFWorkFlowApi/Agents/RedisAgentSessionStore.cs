@@ -17,6 +17,7 @@ public sealed class RedisAgentSessionStore : AgentSessionStore, IConversationCat
 {
     private const int MaxConversationIdLength = 128;
     private const string CacheKeyPrefix = "maf:session:";
+    private const string DisplayNameKeyPrefix = "maf:session-name:";
 
     private static readonly TimeSpan SessionTtl = TimeSpan.FromHours(24);
     private static readonly TimeSpan SlidingTtl = TimeSpan.FromHours(4);
@@ -337,11 +338,13 @@ public sealed class RedisAgentSessionStore : AgentSessionStore, IConversationCat
     {
         ValidateConversationId(conversationId);
         var cacheKey = GetCacheKey(conversationId);
+        var nameKey = DisplayNameKeyPrefix + conversationId;   // ★
 
         try
         {
             var existed = await _cache.GetAsync(cacheKey, cancellationToken) is not null;
             await _cache.RemoveAsync(cacheKey, cancellationToken);
+            await _cache.RemoveAsync(nameKey, cancellationToken);   // ★ 一并清除
             return existed;
         }
         catch (OperationCanceledException) { throw; }
@@ -456,6 +459,106 @@ public sealed class RedisAgentSessionStore : AgentSessionStore, IConversationCat
                 "会话 JSON 无法解析，返回空消息列表：{ConversationId}", conversationId);
             return [];
         }
+    }
+    
+        // ═════════════════════════════════════════════════════════════
+    // ★ 显示名管理
+    // ═════════════════════════════════════════════════════════════
+
+    public async ValueTask<string?> GetDisplayNameAsync(
+        string conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateConversationId(conversationId);
+        var key = DisplayNameKeyPrefix + conversationId;
+
+        try
+        {
+            var bytes = await _cache.GetAsync(key, cancellationToken);
+            return bytes is null or { Length: 0 }
+                ? null
+                : System.Text.Encoding.UTF8.GetString(bytes);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取会话显示名失败：{ConversationId}", conversationId);
+            return null;
+        }
+    }
+
+    public async ValueTask SetDisplayNameAsync(
+        string conversationId,
+        string displayName,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateConversationId(conversationId);
+        var key = DisplayNameKeyPrefix + conversationId;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                await _cache.RemoveAsync(key, cancellationToken);
+            }
+            else
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(displayName.Trim());
+                await _cache.SetAsync(key, bytes, new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = SessionTtl,
+                    SlidingExpiration = SlidingTtl,
+                }, cancellationToken);
+            }
+
+            _logger.LogDebug("会话显示名已保存：{ConversationId} → {Name}",
+                conversationId, displayName);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "保存会话显示名失败：{ConversationId}", conversationId);
+        }
+    }
+
+    public async ValueTask<IReadOnlyDictionary<string, string>> GetAllDisplayNamesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<string, string>();
+
+        var server = _multiplexer.GetServers().FirstOrDefault();
+        if (server is null) return result;
+
+        try
+        {
+            var pattern = $"{DisplayNameKeyPrefix}*";
+            await foreach (var key in server
+                .KeysAsync(pattern: pattern, pageSize: 250)
+                .WithCancellation(cancellationToken))
+            {
+                var raw = (string?)key;
+                if (string.IsNullOrEmpty(raw)) continue;
+
+                var id = raw.StartsWith(DisplayNameKeyPrefix, StringComparison.Ordinal)
+                    ? raw[DisplayNameKeyPrefix.Length..]
+                    : raw;
+
+                if (string.IsNullOrEmpty(id)) continue;
+
+                var bytes = await _cache.GetAsync(raw, cancellationToken);
+                if (bytes is { Length: > 0 })
+                {
+                    result[id] = System.Text.Encoding.UTF8.GetString(bytes);
+                }
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "列举会话显示名失败");
+        }
+
+        return result;
     }
 
     // ─────────────────────────────────────────────────────────────
