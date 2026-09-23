@@ -100,7 +100,8 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
     private static readonly Guid DefaultTenant = Guid.Empty;
     private string? _lastHint;
     private List<SuggestedRelationDto> _lastSuggestions = new();
-
+    private bool _useReranker = true;
+    
     // SVG 画布尺寸
     private const double CanvasWidth = 800;
     private const double CanvasHeight = 600;
@@ -594,7 +595,8 @@ public partial class McpGraphExplorerForce : ComponentBase, IDisposable
             var resp = await GraphApi.SemanticSearchAsync(
                 graphGuid, query,
                 topK: 20,
-                directionOverride: directionOverride); // ★ 传递
+                directionOverride: directionOverride,
+                useReranker: _useReranker); // ★ 传递
 
             if (resp is null)
             {

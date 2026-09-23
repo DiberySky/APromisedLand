@@ -667,6 +667,7 @@ public class GraphAdminApiClient
         string query,
         int topK = 10,
         string? directionOverride = null,   // ★ 新增
+        bool useReranker = true,  
         CancellationToken ct = default)
     {
         try
@@ -675,13 +676,13 @@ public class GraphAdminApiClient
             {
                 Query = query,
                 TopK = topK,
-                DirectionOverride = directionOverride
+                DirectionOverride = directionOverride,
+                UseReranker = useReranker                     // ★ 传递
             };
 
             var resp = await _http.PostAsJsonAsync(
                 $"/api/graph/{graphGuid}/semantic-search",
-                payload,
-                JsonOpts, ct);
+                payload, JsonOpts, ct);
 
             if (!resp.IsSuccessStatusCode)
             {

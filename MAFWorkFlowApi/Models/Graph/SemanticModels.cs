@@ -52,7 +52,7 @@ public sealed class SemanticSearchRequest
     [Range(0.0, 1.0)] public double Bm25Weight   { get; set; } = 0.3;
 
     // ★ 阶段 1 预留（如果已经加了 Reranker，保留即可）
-    public bool UseReranker { get; set; } = false;
+    public bool UseReranker { get; set; } = true;
     
     // ★ 新增：前端点击建议时，显式指定方向（覆盖 LLM 判断）
     /// <summary>"in" / "out" / null。非空时强制覆盖 LLM 的 direction。</summary>

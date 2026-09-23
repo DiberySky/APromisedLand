@@ -902,3 +902,16 @@
     font-family: inherit;
 }
 
+.toggle-reranker {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.82rem;
+    color: #64748b;
+    cursor: pointer;
+    user-select: none;
+}
+.toggle-reranker input {
+    cursor: pointer;
+}
+

@@ -201,6 +201,12 @@
                             disabled="@_isBusy">
                         ⚡ 重建所有向量
                     </button>
+                    
+                    @* ★ 精排开关 *@
+                    <label class="toggle-reranker">
+                        <input type="checkbox" @bind="_useReranker" />
+                        <span>🎯 精排</span>
+                    </label>
                 </div>
 
                 @* ★ 意图横幅 *@

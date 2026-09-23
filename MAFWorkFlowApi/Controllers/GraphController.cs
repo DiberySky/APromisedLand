@@ -18,6 +18,7 @@ public sealed class GraphController(
     EdgeAuthoringService edgeService,
     LiteGraphRestClient liteGraph,
     IntentParserService intentParser,
+    RerankerService reranker, // ★ 新增
     LiteGraphSdk sdk,
     IConfiguration configuration, // ★ 新增
     ILogger<GraphController> logger) : ControllerBase
@@ -706,6 +707,98 @@ public sealed class GraphController(
                 "混合检索 Top1: V={V:F4}, B={B:F4}, Final={F:F4}, Content={C}",
                 scored[0].VectorScore, scored[0].Bm25Score, scored[0].FinalScore,
                 scored[0].Vector.Content);
+        }
+
+    // ══════════════════════════════════════════════════════
+    // ★ 阶段 1：Reranker 精排（LLM 打分）
+    // ══════════════════════════════════════════════════════
+        const int RecallTopK = 20;
+
+        if (request.UseReranker && scored.Count > 1)
+        {
+            var candidates = scored.Take(RecallTopK).ToList();
+            var candidateDocs = candidates.Select(c => c.Vector.Content ?? "").ToList();
+
+            _logger.LogInformation(
+                "Reranker 精排启动：候选 {N} 个，Query={Q}",
+                candidates.Count, request.Query);
+
+            try
+            {
+                var reranked = await reranker.RerankAsync(request.Query, candidateDocs, ct);
+
+                // ══════════════════════════════════════════════
+                // ★ 判定 reranker 是否真正生效
+                //   失效：返回空 / 全 0
+                // ══════════════════════════════════════════════
+                var allZero = reranked.Count == 0
+                              || reranked.All(x => Math.Abs(x.Score) < 1e-6);
+
+                if (allZero)
+                {
+                    _logger.LogWarning(
+                        "Reranker 未生效（返回空或全 0），保留原混合分顺序");
+                    // 不修改 scored
+                }
+                else
+                {
+                    var rerankMap = reranked.ToDictionary(x => x.Index, x => x.Score);
+
+                    // ★ 融合分 = 0.5 × LLM分 + 0.5 × 原混合分
+                    //   （LLM 分数已经是 [0,1] 归一化过的）
+                    const double RerankWeight = 0.5;
+                    const double OriginalWeight = 0.5;
+
+                    var reorderedCandidates = candidates
+                        .Select((c, i) =>
+                        {
+                            var llmScore = rerankMap.GetValueOrDefault(i, 0.0);
+                            var fusedScore =
+                                RerankWeight * llmScore +
+                                OriginalWeight * c.FinalScore;
+
+                            return new
+                            {
+                                c.Vector,
+                                c.VectorScore,
+                                c.Bm25Score,
+                                LlmScore = llmScore,
+                                FinalScore = fusedScore
+                            };
+                        })
+                        .OrderByDescending(x => x.FinalScore)
+                        .ToList();
+
+                    var rest = scored.Skip(RecallTopK).ToList();
+
+                    scored = reorderedCandidates
+                        .Select(x => new
+                        {
+                            x.Vector,
+                            x.VectorScore,
+                            x.Bm25Score,
+                            x.FinalScore
+                        })
+                        .Concat(rest)
+                        .ToList();
+
+                    _logger.LogInformation(
+                        "Reranker 精排完成：{N} 个候选，" +
+                        "Top1 原分={Orig:F4}, LLM分={Llm:F4}, 融合分={Fused:F4}",
+                        candidates.Count,
+                        candidates[0].FinalScore,
+                        reorderedCandidates[0].LlmScore,
+                        reorderedCandidates[0].FinalScore);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Reranker 精排异常，使用原始顺序");
+            }
+        }
+        else if (!request.UseReranker)
+        {
+            _logger.LogInformation("Reranker 已禁用（UseReranker=false）");
         }
 
         // ══════════════════════════════════════════════════

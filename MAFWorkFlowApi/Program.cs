@@ -178,6 +178,20 @@ builder.Services.AddScoped<GraphExportService>();
 
 builder.Services.AddScoped<IntentParserService>();
 
+// ══════════════════════════════════════════════════
+// ① 注册 Reranker 专用 HttpClient
+// ══════════════════════════════════════════════════
+builder.Services.AddHttpClient("Reranker")
+    .ConfigureHttpClient(client =>
+    {
+        client.Timeout = TimeSpan.FromMinutes(3);   // reranker 可能需要较长
+    });
+
+// ══════════════════════════════════════════════════
+// ② 注册 RerankerService（放在 IntentParserService 旁边）
+// ══════════════════════════════════════════════════
+builder.Services.AddScoped<RerankerService>();
+
 var app = builder.Build();
 
 // ---------------------------------------------------------------------------
