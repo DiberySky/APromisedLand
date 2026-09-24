@@ -18,6 +18,10 @@ public static class LiteGraphExtension
         // ─── 1. LiteGraph 专用数据库（复用现有 Postgres 实例）────────
         resourceContext.LiteGraphDb = resourceContext.Postgres!.AddDatabase("LiteGraphDb");
 
+        // Ollama 端点由 Aspire 服务发现提供（容器内互访走内部网络地址），
+        // 不再硬编码 http://ollama:11434，避免与端口/命名变更脱钩。
+        var ollamaBaseUrl = resourceContext.Ollama!.GetEndpoint("http");
+
         // ─── 2. LiteGraph REST API Server ────────────────────────────
         resourceContext.LiteGraph = builder.AddLiteGraphServer("litegraph", port: LiteGraphRestPort)
             // PostgreSQL 连接配置
@@ -29,15 +33,16 @@ public static class LiteGraphExtension
             .WithEnvironment("LITEGRAPH_DB_PASSWORD",
                 resourceContext.Postgres.Resource.PasswordParameter)
             .WithEnvironment("LITEGRAPH_DB_SCHEMA", "litegraph")
-            // Ollama LLM 集成配置
+            // Ollama LLM 集成配置（模型名与 Base URL 均引用统一数据源）
             .WithEnvironment("LITEGRAPH_LLM_PROVIDER", "ollama")
-            .WithEnvironment("LITEGRAPH_OLLAMA_BASE_URL", "http://ollama:11434")
-            .WithEnvironment("LITEGRAPH_OLLAMA_CHAT_MODEL", "qwen2.5:7b")
-            .WithEnvironment("LITEGRAPH_OLLAMA_EMBEDDING_MODEL", "bge-large")
+            .WithEnvironment("LITEGRAPH_OLLAMA_BASE_URL", ollamaBaseUrl)
+            .WithEnvironment("LITEGRAPH_OLLAMA_CHAT_MODEL",      OllamaExtension.ChatModelName)
+            .WithEnvironment("LITEGRAPH_OLLAMA_EMBEDDING_MODEL", OllamaExtension.EmbeddingModelName)
             .WithBindMount(
                 source: Path.Combine(AppContext.BaseDirectory, "litegraph.json"),
                 target: "/app/litegraph.json",
                 isReadOnly: true)
+            .WaitFor(resourceContext.Ollama!)   // ★ 先等 Ollama 就绪
             .WaitFor(resourceContext.LiteGraphDb!);
 
         // ─── 3. LiteGraph MCP Server ────────────────────────────────

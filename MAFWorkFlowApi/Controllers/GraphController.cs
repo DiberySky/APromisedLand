@@ -438,13 +438,13 @@ public sealed class GraphController(
             Vectors = request.Vector
         };
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "创建向量：Graph={Graph}, Node={Node}, Model={Model}, Dim={Dim}",
             graphGuid, request.NodeGuid, modelName, request.Vector.Count);
 
         var created = await _sdk.Vector.Create(metadata, ct);
 
-        _logger.LogInformation("向量创建成功：GUID={Guid}", created.GUID);
+        _logger.LogDebug("向量创建成功：GUID={Guid}", created.GUID);
 
         return Ok(created);
     }
@@ -484,12 +484,12 @@ public sealed class GraphController(
             Vectors = request.Vector
         };
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "创建边向量：Edge={Edge}, Model={Model}, Dim={Dim}, Content={Content}",
             request.EdgeGuid, modelName, request.Vector.Count, request.Content);
 
         var created = await _sdk.Vector.Create(metadata, ct);
-        _logger.LogInformation("边向量创建成功：GUID={Guid}", created.GUID);
+        _logger.LogDebug("边向量创建成功：GUID={Guid}", created.GUID);
 
         return Ok(created);
     }

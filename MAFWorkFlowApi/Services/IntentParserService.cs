@@ -3,6 +3,8 @@ using MAFWorkFlowApi.Models.Graph;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
+using OllamaSharp;
+using OllamaSharp.Models;
 
 namespace MAFWorkFlowApi.Services;
 
@@ -173,104 +175,89 @@ public sealed class IntentParserService
     {
         var relList = string.Join(", ", relations);
 
+        // ★ 精简版 system prompt：从 1173 tokens 降到 ~500 tokens
         var system =
             $$"""
-              你是图数据库查询意图解析器。把自然语言转为 JSON。
+              你是图数据库查询意图解析器。把自然语言转为一行 JSON。
 
-              图中关系名（必须从中选）：{{relList}}
+              可用关系（必须从中选）：{{relList}}
 
-              ═══════════════════════════════════════════════════
-              字段 1：relation（关系名）
-              ═══════════════════════════════════════════════════
-              从上面列表选；无法判断填 null。
-
-              ═══════════════════════════════════════════════════
-              字段 2：direction（方向）
-              ═══════════════════════════════════════════════════
-              假设用户问 "X 的【某关系】"，direction 描述的是
-              "这条关系相对于 X 的方向"：
-
-              - "in"  = 边的终点是 X（即 其他节点 --关系--> X）
-                        例："X的父亲"、"X的上级" → in
-
-              - "out" = 边的起点是 X（即 X --关系--> 其他节点）
-                        例："X的儿子"、"X的框架" → out
-
-              中文方向词速查：
-              - "父亲/父节点/上级/来源/被...引用" → in
-              - "儿子/子节点/下级/目标/基于/使用/框架/例子/方法" → out
-
-              ═══════════════════════════════════════════════════
-              字段 3：aggregationMode（多跳聚合模式）
-              ═══════════════════════════════════════════════════
-              - null         = 单跳（默认）。例如："X的父亲"、"X的框架"
-              - "ancestors"  = 沿关系反向递归找所有祖先
-              - "descendants"= 沿关系正向递归找所有后代
-
-              触发词速查：
-              - "所有/全部/整条/递归 + 祖先/上级/父/来源" → ancestors
-              - "所有/全部/整条/递归 + 后代/下级/子/派生/子孙" → descendants
-              - 单独出现"祖先/后代/子孙" → ancestors/descendants
-
-              ═══════════════════════════════════════════════════
-              字段 4：hopCount（跳数）
-              ═══════════════════════════════════════════════════
-              - 1  = 单跳（默认）
-              - 0  = 无限跳（遍历到尽头）
-              - 2~5 = 指定跳数
-
-              规则：aggregationMode 非 null 时，若用户没明确说"几跳"，默认 hopCount = 0。
-
-              ═══════════════════════════════════════════════════
-              字段 5：subjectName / confidence / reason
-              ═══════════════════════════════════════════════════
-              - subjectName: 主体节点名（如"根节点B的父亲"中的"根节点B"）
+              字段：
+              - relation: 关系名，从上面列表选；无法判断填 null
+              - direction: "in"=其他→X（找父/上级），"out"=X→其他（找子/下级）
+              - subjectName: 主体节点名
+              - aggregationMode: null=单跳，"ancestors"=所有祖先，"descendants"=所有后代
+              - hopCount: 1=单跳，0=无限跳，2~5=指定跳数
               - confidence: 0~1
               - reason: 一句话理由
 
-              只输出 JSON，不要 markdown。
+              方向速查：
+              - "父亲/父节点/上级/来源" → in
+              - "儿子/子节点/下级/基于/使用/框架/方法/例子" → out
 
-              ═══════════════════════════════════════════════════
-              示例
-              ═══════════════════════════════════════════════════
+              多跳速查：出现"所有祖先/上级/父" → ancestors；"所有后代/子孙/子" → descendants
+
+              只输出一行 JSON，无任何解释。
+
+              示例：
               输入：根节点B的父亲
               输出：{"relation":"PARENT_OF","direction":"in","subjectName":"根节点B","aggregationMode":null,"hopCount":1,"confidence":0.95,"reason":"单跳找父"}
 
               输入：深度学习用到的框架
               输出：{"relation":"FRAMEWORK","direction":"out","subjectName":"深度学习","aggregationMode":null,"hopCount":1,"confidence":0.9,"reason":"单跳找框架"}
 
-              输入：根节点B的所有祖先
-              输出：{"relation":"PARENT_OF","direction":"in","subjectName":"根节点B","aggregationMode":"ancestors","hopCount":0,"confidence":0.95,"reason":"所有祖先 → 沿 PARENT_OF 反向递归"}
-
               输入：深度学习的后代
-              输出：{"relation":"SUBFIELD","direction":"out","subjectName":"深度学习","aggregationMode":"descendants","hopCount":0,"confidence":0.9,"reason":"后代 → 沿 SUBFIELD 正向递归"}
-
-              输入：根节点B往上 2 跳
-              输出：{"relation":"PARENT_OF","direction":"in","subjectName":"根节点B","aggregationMode":"ancestors","hopCount":2,"confidence":0.9,"reason":"明确 2 跳"}
+              输出：{"relation":"SUBFIELD","direction":"out","subjectName":"深度学习","aggregationMode":"descendants","hopCount":0,"confidence":0.9,"reason":"后代"}
               """;
-
-        // ══════════════════════════════════════════════════════
-        // ★ 关键：以下代码不能省！
-        // ══════════════════════════════════════════════════════
 
         var messages = new List<ChatMessage>
         {
             new(ChatRole.System, system),
-            // qwen3 默认 thinking，/no_think 关掉
-            new(ChatRole.User, $"/no_think\n用户查询：{query}")
+            new(ChatRole.User, $"/no_think\n查询：{query}\n输出：")
         };
 
-        var response = await _chat.GetResponseAsync(messages, cancellationToken: ct);
-        var raw = ExtractJson(response.Text ?? string.Empty);
+        var options = new ChatOptions
+        {
+            MaxOutputTokens = 256,
+            Temperature = 0f,
+            StopSequences = ["}\n\n", "}\r\n\r\n"],
+        };
 
-        _logger.LogInformation("LLM 意图原始输出：{Raw}", raw);
+        options.AddOllamaOption(OllamaOption.Think, false);
 
-        using var doc = JsonDocument.Parse(raw);
+        var response = await _chat.GetResponseAsync(messages, options, ct);
+        var raw = response.Text ?? string.Empty;
+
+        _logger.LogInformation(
+            "LLM 意图原始输出长度 {Len}，内容前 200 字符：{Preview}",
+            raw.Length,
+            raw.Length > 200 ? raw[..200] : raw);
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            _logger.LogWarning(
+                "LLM 返回空文本（可能 thinking 未关闭，或 max_tokens 不足）。" +
+                "尝试从 Ollama 的 thinking 字段读取…");
+
+            // ★ 兜底：OllamaSharp 5.x 某些版本会把 thinking 放在独立的字段里
+            //   如果 response 实现了特定接口，尝试读取
+            //   否则直接返回 null 让规则兜底
+            return null;
+        }
+
+        var json = ExtractJson(raw);
+        if (string.IsNullOrWhiteSpace(json) || !json.Contains('{'))
+        {
+            _logger.LogWarning("LLM 输出不含 JSON：{Raw}", raw);
+            return null;
+        }
+
+        using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
         var rel = ReadStr(root, "relation");
         if (rel is not null && !relations.Contains(rel, StringComparer.Ordinal))
-            rel = null; // 白名单校验
+            rel = null;
 
         return new IntentResult
         {
@@ -280,8 +267,6 @@ public sealed class IntentParserService
             Confidence = ReadDbl(root, "confidence", 0.5),
             Reason = ReadStr(root, "reason"),
             Strategy = "llm",
-
-            // ★ 阶段 4 新增
             HopCount = Math.Clamp(ReadInt(root, "hopCount", 1), 0, 10),
             AggregationMode = NormalizeAggregationMode(ReadStr(root, "aggregationMode"))
         };

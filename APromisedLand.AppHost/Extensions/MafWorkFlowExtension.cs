@@ -1,4 +1,4 @@
-using Aspire.Hosting; // ★ WithEnvironment 在此命名空间
+using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -7,7 +7,6 @@ namespace APromisedLand.AppHost.Extensions;
 
 public static class MafWorkFlowExtension
 {
-    /// <summary>MAFWorkFlowApi 固定的宿主机 HTTP 端口。</summary>
     private const int MafWorkFlowHttpPort = 5323;
 
     public static void AddMafWorkFlowApi(
@@ -30,27 +29,27 @@ public static class MafWorkFlowExtension
             .WireIfPresent(context.LiteGraph);
 
         // ══════════════════════════════════════════════════════════
-        // ★ 显式注入模型名
-        //   "__" 是 ASP.NET Core 配置的层级分隔符，
-        //   "Embedding__Model" 会映射到 Configuration["Embedding:Model"]
+        // ★ 模型名注入（引用常量，不依赖 AddOllama 的调用顺序）
         // ══════════════════════════════════════════════════════════
-        if (!string.IsNullOrWhiteSpace(context.EmbeddingModelName))
+        context.MafWorkFlowApi
+            .WithEnvironment("Embedding__Model",     OllamaExtension.EmbeddingModelName)
+            .WithEnvironment("Chat__Model",          OllamaExtension.ChatModelName)
+            .WithEnvironment("Reranker__ChatModel",  OllamaExtension.ChatModelName)
+            // ★ 新增：Agent__ModelId —— 供 OllamaWarmupService / 健康检查使用
+            .WithEnvironment("Agent__ModelId",       OllamaExtension.ChatModelName);
+
+        // ══════════════════════════════════════════════════════════
+        // ★ LiteGraph 端点注入（走服务发现，覆盖 appsettings）
+        // ══════════════════════════════════════════════════════════
+        if (context.LiteGraph is not null)
         {
             context.MafWorkFlowApi
-                .WithEnvironment("Embedding__Model", context.EmbeddingModelName);
+                .WithEnvironment(
+                    "LiteGraph__Endpoint",
+                    context.LiteGraph.GetEndpoint(LiteGraphResource.HttpEndpointName));
         }
 
-        if (!string.IsNullOrWhiteSpace(context.ChatModelName))
-        {
-            context.MafWorkFlowApi
-                .WithEnvironment("Chat__Model", context.ChatModelName);
-        }
-
-        // ★ Reranker 打分复用 chat 模型
-        if (!string.IsNullOrWhiteSpace(context.ChatModelName))
-            context.MafWorkFlowApi.WithEnvironment("Reranker__ChatModel", context.ChatModelName);
-        
-        // ─── 外部资源：清单式声明 ─────────────────────────────────
+        // ─── 外部资源 ─────────────────────────────────────────────
         using var loggerFactory = LoggerFactory.Create(logging =>
         {
             logging.AddSimpleConsole(o => o.SingleLine = true);
@@ -60,14 +59,6 @@ public static class MafWorkFlowExtension
 
         ExternalServiceBinding[] externalBindings =
         [
-            // ExternalServiceBinding.From(
-            //     context.NebulaGraph, endpointName: "graph",
-            //     connectionStringName: "nebula", schemeOverride: "thrift"),
-            //
-            // ExternalServiceBinding.From(
-            //     context.Weaviate, endpointName: "http",
-            //     connectionStringName: "weaviate"),
-
             ExternalServiceBinding.From(
                 context.SeaweedS3, endpointName: "s3",
                 connectionStringName: "seaweedfs"),
@@ -76,7 +67,7 @@ public static class MafWorkFlowExtension
         foreach (var binding in externalBindings)
             binding.Apply(builder, context.MafWorkFlowApi, logger);
 
-        // ─── 健康检查接入 Aspire ──────────────────────────────────
+        // ─── 健康检查 ─────────────────────────────────────────────
         context.MafWorkFlowApi
             .WithHttpHealthCheck(
                 path: "/health",

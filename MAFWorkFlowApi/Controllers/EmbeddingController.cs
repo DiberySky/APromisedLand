@@ -22,12 +22,13 @@ public sealed class EmbeddingController : ControllerBase
     public EmbeddingController(
         IServiceProvider sp,
         ILogger<EmbeddingController> logger,
-        IConfiguration configuration)     // ★ 新增
+        IConfiguration configuration)
     {
         _sp = sp;
         _logger = logger;
-        _modelName = configuration["Embedding:Model"] ?? "bge-large";
-        _logger.LogInformation("EmbeddingController 使用模型: {Model}", _modelName);
+        _modelName = configuration["Embedding:Model"] ?? "bge-m3";
+        // ★ 从 Info 降为 Debug —— 避免每个请求打日志
+        _logger.LogDebug("EmbeddingController 使用模型: {Model}", _modelName);
     }
 
     /// <summary>★ 新增：暴露当前模型信息，供前端/调试使用。</summary>
@@ -73,7 +74,7 @@ public sealed class EmbeddingController : ControllerBase
             var embedding = result[0];
             var vector = embedding.Vector.ToArray().ToList();
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "Embedding({Model}) 返回向量: {Dimension}",
                 _modelName, vector.Count);
 

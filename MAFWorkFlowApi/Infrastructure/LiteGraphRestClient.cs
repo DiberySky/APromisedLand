@@ -19,6 +19,7 @@ public sealed class LiteGraphRestClient
     private readonly ILogger<LiteGraphRestClient> _logger;
 
     public Guid TenantGuid { get; }
+    public string Endpoint { get; }
 
     public LiteGraphRestClient(
         IHttpClientFactory factory,
@@ -26,13 +27,15 @@ public sealed class LiteGraphRestClient
         ILogger<LiteGraphRestClient> logger)
     {
         var opt = options.Value;
-        var endpoint = LiteGraphEndpointResolver.Resolve(opt);
+        var endpoint = LiteGraphEndpointResolver.Resolve(opt, logger);
 
         if (!Guid.TryParse(opt.TenantGuid, out var tenantGuid))
             throw new InvalidOperationException(
                 $"LiteGraph:TenantGuid 不是有效 GUID：'{opt.TenantGuid}'");
 
         TenantGuid = tenantGuid;
+        Endpoint = endpoint;
+
         _http = factory.CreateClient("LiteGraph");
         _http.BaseAddress = new Uri(endpoint);
         _http.DefaultRequestHeaders.Authorization =
@@ -41,9 +44,13 @@ public sealed class LiteGraphRestClient
             new MediaTypeWithQualityHeaderValue("application/json"));
 
         _logger = logger;
+
         _logger.LogInformation(
             "LiteGraphRestClient 初始化：endpoint = {Endpoint}, tenant = {Tenant}",
             endpoint, tenantGuid);
+
+        // ★ 使用 Once 版本 —— Interlocked 保证全进程只输出一次
+        LiteGraphEndpointResolver.DescribeResolutionOnce(opt, logger);
     }
 
     // ─── 通用 ──────────────────────────────────────────
@@ -53,23 +60,20 @@ public sealed class LiteGraphRestClient
         using var resp = await _http.GetAsync(path, ct);
         if (resp.StatusCode == HttpStatusCode.NotFound) return null;
         await EnsureSuccessAsync(resp, "GET", path, ct);
+
         var bytes = await resp.Content.ReadAsByteArrayAsync(ct);
         if (bytes.Length == 0) return null;
 
-        // ★ 关键：Clone() 把 JsonElement 从临时 JsonDocument 里独立出来，
-        //    否则返回后引用失效，再次序列化时抛 InvalidOperationException。
         var element = JsonSerializer.Deserialize<JsonElement>(bytes, JsonOpts);
         return element.Clone();
     }
 
-    public Task<JsonElement> PostAsync(string path, object body, CancellationToken ct = default)
+    public Task<JsonElement> PostAsync(
+        string path, object body, CancellationToken ct = default)
         => SendJsonAsync(HttpMethod.Post, path, body, ct);
 
-    /// <summary>
-    /// ★ 修改：返回 Task&lt;JsonElement&gt;（与 PostAsync 一致），
-    /// 调用方可以 await 忽略返回值，也可以 var 接收。
-    /// </summary>
-    public Task<JsonElement> PutAsync(string path, object body, CancellationToken ct = default)
+    public Task<JsonElement> PutAsync(
+        string path, object body, CancellationToken ct = default)
         => SendJsonAsync(HttpMethod.Put, path, body, ct);
 
     public async Task DeleteAsync(string path, CancellationToken ct = default)
@@ -88,10 +92,10 @@ public sealed class LiteGraphRestClient
         };
         using var resp = await _http.SendAsync(req, ct);
         await EnsureSuccessAsync(resp, method.Method, path, ct);
+
         var bytes = await resp.Content.ReadAsByteArrayAsync(ct);
         if (bytes.Length == 0) return default;
 
-        // ★ 同样 Clone
         var element = JsonSerializer.Deserialize<JsonElement>(bytes, JsonOpts);
         return element.Clone();
     }
@@ -100,6 +104,7 @@ public sealed class LiteGraphRestClient
         HttpResponseMessage resp, string method, string path, CancellationToken ct)
     {
         if (resp.IsSuccessStatusCode) return;
+
         var body = await resp.Content.ReadAsStringAsync(ct);
         throw new HttpRequestException(
             $"{method} {path} 失败：HTTP {(int)resp.StatusCode} {body}",
