@@ -3,6 +3,7 @@ using FileStorageApi.Models;
 using FileStorageApi.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
+using System.Diagnostics;                    // ★ 新增
 
 namespace FileStorageApi.Controllers;
 
@@ -32,10 +33,10 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
         return dto is null ? NotFound() : Ok(dto);
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     [HttpGet("{id:guid}/download")]
     public async Task<IActionResult> Download(Guid id, CancellationToken ct)
     {
-        // 1) 先取元数据，用于解析 Range 语义（bytes=-N 需要 Size，越界需 416）
         var head = await files.GetByIdAsync(id, ct);
         if (head is null) return NotFound();
 
@@ -47,7 +48,6 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
         {
             var spec = range["bytes=".Length..];
 
-            // 多 Range 直接降级为 200 全量（保守策略）
             if (spec.Contains(','))
                 return await FullDownloadAsync(id, ct);
 
@@ -56,7 +56,6 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
             {
                 if (long.TryParse(parts[0], out var s))
                 {
-                    // 起点越界 → 416（RFC 7233）
                     if (s >= head.Size)
                     {
                         Response.Headers.ContentRange = $"bytes */{head.Size}";
@@ -67,8 +66,6 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
 
                     if (long.TryParse(parts[1], out var e))
                     {
-                        // ★ 修复：start > end 属非法 Range，直接 416
-                        //   否则 length = end - start + 1 可能为负
                         if (e < s)
                         {
                             Response.Headers.ContentRange = $"bytes */{head.Size}";
@@ -80,7 +77,6 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
                 }
                 else if (long.TryParse(parts[1], out var suffixLen) && suffixLen > 0)
                 {
-                    // ★ 修复：空对象 + suffix Range → 任何 Range 都 416
                     if (head.Size == 0)
                     {
                         Response.Headers.ContentRange = "bytes */0";
@@ -101,7 +97,6 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
         }
         catch (RangeNotSatisfiableException ex)
         {
-            // ★ 存储层拿不到响应头；用元数据 Size 填充 Content-Range
             Response.Headers.ContentRange =
                 ex.ContentRange ?? $"bytes */{head.Size}";
             return StatusCode(StatusCodes.Status416RangeNotSatisfiable);
@@ -116,7 +111,6 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
         if (!isRangeRequest)
             return File(result.Content, contentType, result.Metadata.FileName);
 
-        // ── 206 Partial Content ──
         var actualStart = start ?? 0;
         var actualEnd = end ?? result.Metadata.Size - 1;
         var total = result.TotalLength ?? result.Metadata.Size;
@@ -130,7 +124,7 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
 
         if (!string.IsNullOrEmpty(result.Metadata.FileName))
         {
-            var cd = new Microsoft.Net.Http.Headers.ContentDispositionHeaderValue("attachment");
+            var cd = new ContentDispositionHeaderValue("attachment");
             cd.SetHttpFileName(result.Metadata.FileName);
             Response.Headers.ContentDisposition = cd.ToString();
         }
@@ -147,7 +141,7 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
         => await files.DeleteAsync(id, ct) ? NoContent() : NotFound();
 
-    // ── 本地辅助：全量下载（多 Range 降级用） ──
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task<IActionResult> FullDownloadAsync(Guid id, CancellationToken ct)
     {
         DownloadResult? full;
@@ -157,7 +151,6 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
         }
         catch (RangeNotSatisfiableException)
         {
-            // 全量下载理论上不应触发 416；若发生，返回 500 便于排查
             return StatusCode(StatusCodes.Status500InternalServerError);
         }
 

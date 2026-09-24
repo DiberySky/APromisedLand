@@ -1,17 +1,9 @@
 using FileStorageApi.Data;
 using FileStorageApi.Entities;
+using System.Diagnostics;                    // ★ 新增
 
 namespace FileStorageApi.Files;
 
-/// <summary>
-/// 审计写入后台服务。批量消费 <see cref="AuditQueue"/>，
-/// 每批最多 64 条，一次 SaveChanges。
-///
-/// 与 FileMetadataService.DownloadAsync 中的无界 Task.Run 相比：
-///   - 并发度有界（单读者）
-///   - DB 压力可控（批量提交）
-///   - 应用关闭时可等待队列排空（见 ShutdownTimeout）
-/// </summary>
 public sealed class AuditWriterService : BackgroundService
 {
     private const int MaxBatchSize = 64;
@@ -31,6 +23,7 @@ public sealed class AuditWriterService : BackgroundService
         _logger       = logger;
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var buffer = new List<AuditEntry>(MaxBatchSize);
@@ -41,7 +34,6 @@ public sealed class AuditWriterService : BackgroundService
             {
                 buffer.Add(entry);
 
-                // 尽量同步多读，凑满一批
                 while (buffer.Count < MaxBatchSize &&
                        _queue.Reader.TryRead(out var next))
                 {
@@ -54,7 +46,6 @@ public sealed class AuditWriterService : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // 关闭中：尝试排空剩余条目
             try
             {
                 using var drainCts = new CancellationTokenSource(DrainTimeout);
@@ -79,6 +70,7 @@ public sealed class AuditWriterService : BackgroundService
         }
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task FlushAsync(List<AuditEntry> batch, CancellationToken ct)
     {
         if (batch.Count == 0) return;

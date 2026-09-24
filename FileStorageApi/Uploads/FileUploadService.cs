@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;                    // ★ 新增
 using System.Security.Cryptography;
 using System.Text;
 using FileStorageApi.Data;
@@ -19,12 +20,7 @@ public sealed class FileUploadService : IFileUploadService
     private const long MaxTotalSize    = 2L * 1024 * 1024 * 1024;
     private const int MaxVersionRetries = 5;
     private static readonly TimeSpan SessionTtl = TimeSpan.FromHours(24);
-
-    // ★ S3 合并阶段的独立超时（与客户端 HTTP 请求的 CT 解耦）
     private static readonly TimeSpan MergeTimeout = TimeSpan.FromMinutes(10);
-
-    // ★ 分片删除批次：每批 20 个（1 GB 文件 = 127 片，约 7 批）
-    //   避免单条 DELETE 在 30s+ 上超时。
     private const int ChunkDeleteBatchSize = 20;
 
     private readonly FileStorageContext _db;
@@ -53,6 +49,7 @@ public sealed class FileUploadService : IFileUploadService
     // ───────────────────────────────────────────────────────────
     // 1. 初始化 / 恢复会话
     // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<InitiateUploadResponse> InitiateAsync(
         InitiateUploadRequest request, CancellationToken ct)
     {
@@ -60,7 +57,6 @@ public sealed class FileUploadService : IFileUploadService
             throw new UploadValidationException(
                 $"文件大小必须在 1 字节至 {MaxTotalSize} 字节之间。");
 
-        // ★ P0-2：Fingerprint 命中已有活跃会话 → 直接返回，客户端续传
         if (!string.IsNullOrWhiteSpace(request.Fingerprint))
         {
             var existing = await _db.UploadSessions
@@ -116,7 +112,6 @@ public sealed class FileUploadService : IFileUploadService
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            // 并发 initiate 同 Fingerprint：重新读既有会话
             _db.Entry(session).State = EntityState.Detached;
             var existing = await _db.UploadSessions
                 .AsNoTracking()
@@ -134,6 +129,7 @@ public sealed class FileUploadService : IFileUploadService
     // ───────────────────────────────────────────────────────────
     // 2. 上传分块
     // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<UploadChunkResponse> UploadChunkAsync(
         Guid uploadId, int chunkIndex, Stream data, long contentLength,
         string? expectedSha256, CancellationToken ct)
@@ -163,7 +159,6 @@ public sealed class FileUploadService : IFileUploadService
 
         var computed = Convert.ToHexString(SHA256.HashData(buffer));
 
-        // ★ P1-2：客户端声明的分块 SHA256 校验
         if (!string.IsNullOrWhiteSpace(expectedSha256) &&
             !string.Equals(computed, expectedSha256, StringComparison.OrdinalIgnoreCase))
         {
@@ -189,6 +184,7 @@ public sealed class FileUploadService : IFileUploadService
     // ───────────────────────────────────────────────────────────
     // 3. 查询状态
     // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<UploadStatusResponse> GetStatusAsync(
         Guid uploadId, CancellationToken ct)
     {
@@ -210,12 +206,12 @@ public sealed class FileUploadService : IFileUploadService
     }
 
     // ───────────────────────────────────────────────────────────
-    // 4. 完成（支持 failed 重试）
+    // 4. 完成（支持 failed 重试）★ 最关键
     // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<CompleteUploadResponse> CompleteAsync(
         Guid uploadId, CompleteUploadRequest request, CancellationToken ct)
     {
-        // ── 4.1 幂等 / 状态检查 ──
         var pre = await _db.UploadSessions
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Id == uploadId, ct)
@@ -237,7 +233,6 @@ public sealed class FileUploadService : IFileUploadService
         if (pre.ExpiresAt < DateTimeOffset.UtcNow)
             throw new UploadGoneException("上传会话已过期。");
 
-        // ★ P0-1：failed 允许在分块完整时重试
         var allowedFromStates = new List<string> { "pending", "uploading" };
         if (pre.Status == "failed")
         {
@@ -250,7 +245,6 @@ public sealed class FileUploadService : IFileUploadService
             allowedFromStates.Add("failed");
         }
 
-        // ── 4.2 原子抢占 merging ──
         var claimed = await _db.UploadSessions
             .Where(s => s.Id == uploadId && allowedFromStates.Contains(s.Status))
             .ExecuteUpdateAsync(s => s
@@ -264,7 +258,6 @@ public sealed class FileUploadService : IFileUploadService
         var session = await _db.UploadSessions
             .FirstAsync(s => s.Id == uploadId, ct);
 
-        // ── 4.3 校验分块完整性 ──
         var chunkIndexes = await _db.UploadChunks
             .Where(c => c.UploadId == uploadId)
             .Select(c => c.ChunkIndex)
@@ -283,7 +276,6 @@ public sealed class FileUploadService : IFileUploadService
 
         var docId = request.DocId ?? session.DocId ?? Guid.NewGuid().ToString("N");
 
-        // ── 4.5 元数据 pending_upload + 乐观版本重试 ──
         DocumentMetadataEntity metadata = null!;
         string objectKey = string.Empty;
         int version = 0;
@@ -322,13 +314,11 @@ public sealed class FileUploadService : IFileUploadService
             }
         }
 
-        // ★ 合并阶段使用独立 CT，与客户端请求解耦。
         using var mergeCts = new CancellationTokenSource(MergeTimeout);
         var mergeCt = mergeCts.Token;
 
         try
         {
-            // ── 4.6 单遍：ChunkedReadStream → HashingReadStream → S3 ──
             var uploadIdLocal = uploadId;
             var totalChunks = session.TotalChunks;
 
@@ -371,7 +361,6 @@ public sealed class FileUploadService : IFileUploadService
 
             session.Sha256 = request.Sha256 ?? computed;
 
-            // ── 4.7 第二阶段事务 ──
             await using var tx = await _db.Database.BeginTransactionAsync(mergeCt);
 
             metadata.Status    = "active";
@@ -407,8 +396,6 @@ public sealed class FileUploadService : IFileUploadService
             session.CompletedAt = DateTimeOffset.UtcNow;
             session.UpdatedAt   = DateTimeOffset.UtcNow;
 
-            // ★ 分批删除分片，避免 1GB+ 数据触发单条 DELETE 30s 超时。
-            //   每批 20 个（≈160 MB），约 7 批删除 1 GB。
             await DeleteChunksInBatchesAsync(uploadId, mergeCt);
 
             await _db.SaveChangesAsync(mergeCt);
@@ -437,6 +424,7 @@ public sealed class FileUploadService : IFileUploadService
     // ───────────────────────────────────────────────────────────
     // 5. 续期
     // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<bool> RenewAsync(Guid uploadId, CancellationToken ct)
     {
         var session = await _db.UploadSessions
@@ -459,6 +447,7 @@ public sealed class FileUploadService : IFileUploadService
     // ───────────────────────────────────────────────────────────
     // 6. 取消
     // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<bool> CancelAsync(Guid uploadId, CancellationToken ct)
     {
         var session = await _db.UploadSessions
@@ -466,7 +455,6 @@ public sealed class FileUploadService : IFileUploadService
         if (session is null || session.Tenant != _caller.Tenant) return false;
         if (session.Status is "completed" or "merging") return false;
 
-        // ★ 分批删除，与 CompleteAsync 一致
         await DeleteChunksInBatchesAsync(uploadId, ct);
 
         session.Status = "expired";
@@ -478,6 +466,7 @@ public sealed class FileUploadService : IFileUploadService
     // ───────────────────────────────────────────────────────────
     // 7. 清理
     // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<int> CleanupExpiredAsync(CancellationToken ct)
     {
         var opts = _cleanupOptions.Value;
@@ -485,7 +474,6 @@ public sealed class FileUploadService : IFileUploadService
         var batchSize = opts.EffectiveBatchSize;
         var removed = 0;
 
-        // 7.1 过期会话（pending/uploading/failed/expired）
         while (true)
         {
             var batch = await _db.UploadSessions
@@ -499,7 +487,6 @@ public sealed class FileUploadService : IFileUploadService
 
             if (batch.Count == 0) break;
 
-            // ★ 每个会话内部再分批删除
             foreach (var id in batch)
                 await DeleteChunksInBatchesAsync(id, ct);
 
@@ -511,7 +498,6 @@ public sealed class FileUploadService : IFileUploadService
             if (batch.Count < batchSize) break;
         }
 
-        // ★ 7.1.1 completed 会话保留期清理
         var completedRetention = opts.EffectiveCompletedRetention;
         if (completedRetention > TimeSpan.Zero)
         {
@@ -538,7 +524,6 @@ public sealed class FileUploadService : IFileUploadService
             }
         }
 
-        // 7.2 stale merging
         var staleMergingBefore = now - opts.EffectiveStaleMerging;
         await _db.UploadSessions
             .Where(s => s.Status == "merging" && s.UpdatedAt < staleMergingBefore)
@@ -549,7 +534,6 @@ public sealed class FileUploadService : IFileUploadService
 
         var stalePendingBefore = now - opts.EffectiveStalePending;
 
-        // ★ 7.3 stale pending_upload：S3 删除失败时保留元数据，延后重试
         while (true)
         {
             var orphans = await _db.DocumentMetadata
@@ -607,7 +591,6 @@ public sealed class FileUploadService : IFileUploadService
             if (orphans.Count < batchSize) break;
         }
 
-        // 7.4 delete_pending 恢复
         while (true)
         {
             var pendings = await _db.DocumentMetadata
@@ -633,7 +616,6 @@ public sealed class FileUploadService : IFileUploadService
             if (pendings.Count < batchSize) break;
         }
 
-        // ★ 7.5 stale failed 分块清理
         while (true)
         {
             var failedIds = await _db.UploadSessions
@@ -661,19 +643,10 @@ public sealed class FileUploadService : IFileUploadService
     }
 
     // ───────────────────────────────────────────────────────────
-    // 私有辅助
+    // 私有辅助（同样加属性，覆盖所有 throw 路径）
     // ───────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// ★ 分批删除指定会话的全部分片。
-    ///
-    /// 为什么要分批：
-    ///   1 GB 文件 = 127 个 8 MB 分片，单条 DELETE 涉及约 1 GB 的 bytea，
-    ///   会触发 Npgsql 30s 命令超时（即使调高到 300s 也可能在更大文件上超）。
-    ///   每批 20 片（≈160 MB），单条 DELETE 通常在数秒内完成。
-    ///
-    /// 用原始 SQL 是因为 EF Core 的 ExecuteDeleteAsync 不支持 Take/Limit。
-    /// </summary>
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task DeleteChunksInBatchesAsync(
         Guid uploadId, CancellationToken ct)
     {
@@ -701,6 +674,7 @@ public sealed class FileUploadService : IFileUploadService
         }
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task<UploadSessionEntity> GetActiveSessionAsync(
         Guid uploadId, CancellationToken ct)
     {
@@ -729,11 +703,11 @@ public sealed class FileUploadService : IFileUploadService
         return session;
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task MarkFailedAsync(Guid uploadId, string reason)
     {
         try
         {
-            // ★ 独立 Scope：请求 CT 取消后当前 DbContext 可能不可用
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<FileStorageContext>();
 
@@ -753,6 +727,7 @@ public sealed class FileUploadService : IFileUploadService
         }
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task<int> NextVersionAsync(
         string tenant, string docId, CancellationToken ct)
     {
@@ -762,6 +737,8 @@ public sealed class FileUploadService : IFileUploadService
 
         return (maxVersion ?? 0) + 1;
     }
+
+    // ─── 纯静态方法无需属性 ───
 
     private static bool IsUniqueViolation(DbUpdateException ex)
         => ex.InnerException is Npgsql.PostgresException pg && pg.SqlState == "23505";

@@ -1,5 +1,6 @@
 using FileStorageApi.Uploads;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;                    // ★ 新增
 
 namespace FileStorageApi.Controllers;
 
@@ -8,6 +9,7 @@ namespace FileStorageApi.Controllers;
 [Produces("application/json")]
 public sealed class UploadsController(IFileUploadService uploads) : ControllerBase
 {
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     [HttpPost("initiate")]
     public async Task<ActionResult<InitiateUploadResponse>> Initiate(
         [FromBody] InitiateUploadRequest request, CancellationToken ct)
@@ -16,6 +18,7 @@ public sealed class UploadsController(IFileUploadService uploads) : ControllerBa
         catch (UploadValidationException ex) { return UnprocessableEntity(Problem(ex)); }
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     [HttpPut("{uploadId:guid}/chunks/{chunkIndex:int}")]
     [RequestSizeLimit(16 * 1024 * 1024)]
     [Consumes("application/octet-stream")]
@@ -26,7 +29,6 @@ public sealed class UploadsController(IFileUploadService uploads) : ControllerBa
         if (len <= 0)
             return BadRequest(new ProblemDetails { Title = "缺少 Content-Length 或请求体为空。" });
 
-        // ★ P1-2：客户端分块 SHA256 校验头（可选）
         var expectedSha = Request.Headers["X-Chunk-Sha256"].FirstOrDefault();
 
         try
@@ -40,6 +42,7 @@ public sealed class UploadsController(IFileUploadService uploads) : ControllerBa
         catch (UploadValidationException ex) { return UnprocessableEntity(Problem(ex)); }
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     [HttpGet("{uploadId:guid}/status")]
     public async Task<ActionResult<UploadStatusResponse>> GetStatus(
         Guid uploadId, CancellationToken ct)
@@ -48,6 +51,7 @@ public sealed class UploadsController(IFileUploadService uploads) : ControllerBa
         catch (UploadNotFoundException ex) { return NotFound(Problem(ex)); }
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     [HttpPost("{uploadId:guid}/complete")]
     public async Task<ActionResult<CompleteUploadResponse>> Complete(
         Guid uploadId, [FromBody] CompleteUploadRequest request, CancellationToken ct)
@@ -59,11 +63,12 @@ public sealed class UploadsController(IFileUploadService uploads) : ControllerBa
         catch (UploadValidationException ex) { return UnprocessableEntity(Problem(ex)); }
     }
 
-    /// <summary>★ P2-2：会话续期（heartbeat）——延长 ExpiresAt 24h。</summary>
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     [HttpPost("{uploadId:guid}/heartbeat")]
     public async Task<IActionResult> Renew(Guid uploadId, CancellationToken ct)
         => await uploads.RenewAsync(uploadId, ct) ? NoContent() : NotFound();
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     [HttpDelete("{uploadId:guid}")]
     public async Task<IActionResult> Cancel(Guid uploadId, CancellationToken ct)
         => await uploads.CancelAsync(uploadId, ct) ? NoContent() : NotFound();

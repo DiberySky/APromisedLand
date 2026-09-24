@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -29,6 +30,7 @@ public sealed class LiteGraphExceptionMiddleware
         _logger = logger;
     }
 
+    [DebuggerDisableUserUnhandledExceptions]
     public async Task InvokeAsync(HttpContext context)
     {
         try

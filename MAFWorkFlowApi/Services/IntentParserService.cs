@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using MAFWorkFlowApi.Models.Graph;
 using Microsoft.Extensions.AI;
@@ -59,6 +60,7 @@ public sealed class IntentParserService
         _l2 = l2;
     }
 
+    [DebuggerDisableUserUnhandledExceptions]
     public async Task<IntentResult> ParseAsync(
         string query,
         IReadOnlyCollection<string> relations,
@@ -168,6 +170,7 @@ public sealed class IntentParserService
     // LLM 路径（不变）
     // ══════════════════════════════════════════════════════════
 
+    [DebuggerDisableUserUnhandledExceptions]
     private async Task<IntentResult?> ParseByLlmAsync(
         string query,
         IReadOnlyCollection<string> relations,

@@ -2,6 +2,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.S3.Util;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;                    // ★ 新增
 using System.Globalization;
 
 namespace FileStorageApi.Storage;
@@ -17,9 +18,7 @@ public sealed class S3ObjectStorage(
     private readonly string _bucket = options.Value.Bucket;
     private volatile bool _bucketChecked;
 
-    // ───────────────────────────────────────────────────────────
-    // 上传
-    // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<ObjectStoragePutResult> PutAsync(
         string key, Stream content, long? contentLength,
         string contentType, CancellationToken ct = default)
@@ -48,6 +47,7 @@ public sealed class S3ObjectStorage(
         return new ObjectStoragePutResult(key, contentLength ?? 0, response.ETag);
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task<ObjectStoragePutResult> PutMultipartAsync(
         string key, Stream content, long contentLength,
         string contentType, CancellationToken ct)
@@ -137,9 +137,7 @@ public sealed class S3ObjectStorage(
         }
     }
 
-    // ───────────────────────────────────────────────────────────
-    // 下载（支持 Range 断点续传）
-    // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<ObjectStorageGetResult> GetAsync(
         string key, long? start = null, long? end = null,
         CancellationToken ct = default)
@@ -166,7 +164,6 @@ public sealed class S3ObjectStorage(
         catch (AmazonS3Exception ex) when (
             ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            // ★ 元数据存在但 S3 对象丢失（误删 / 存储故障）→ 语义化 404
             throw new ObjectNotFoundException(key);
         }
 
@@ -198,9 +195,7 @@ public sealed class S3ObjectStorage(
             contentRange);
     }
 
-    // ───────────────────────────────────────────────────────────
-    // 删除 / 存在性检查
-    // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<bool> DeleteAsync(string key, CancellationToken ct = default)
     {
         try
@@ -214,6 +209,7 @@ public sealed class S3ObjectStorage(
         }
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<bool> ExistsAsync(string key, CancellationToken ct = default)
     {
         try
@@ -227,9 +223,7 @@ public sealed class S3ObjectStorage(
         }
     }
 
-    // ───────────────────────────────────────────────────────────
-    // 桶初始化
-    // ───────────────────────────────────────────────────────────
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task EnsureBucketAsync(CancellationToken ct)
     {
         if (_bucketChecked) return;

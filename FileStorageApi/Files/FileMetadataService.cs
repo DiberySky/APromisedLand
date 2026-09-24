@@ -1,3 +1,4 @@
+using System.Diagnostics;                    // ★ 新增
 using System.Text.Json;
 using FileStorageApi.Data;
 using FileStorageApi.Entities;
@@ -30,6 +31,7 @@ public sealed class FileMetadataService : IFileMetadataService
         _logger     = logger;
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<IReadOnlyList<FileMetadataDto>> ListAsync(
         int skip, int take, CancellationToken ct)
     {
@@ -44,6 +46,7 @@ public sealed class FileMetadataService : IFileMetadataService
         return items.Select(ToDto).ToList();
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<FileMetadataDto?> GetByIdAsync(Guid id, CancellationToken ct)
     {
         var m = await _db.DocumentMetadata
@@ -52,6 +55,7 @@ public sealed class FileMetadataService : IFileMetadataService
         return m is null ? null : ToDto(m);
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<FileMetadataDto?> GetByDocIdAsync(
         string docId, int? version, CancellationToken ct)
     {
@@ -59,7 +63,6 @@ public sealed class FileMetadataService : IFileMetadataService
             .AsNoTracking()
             .Where(m => m.DocId == docId
                      && m.Tenant == _caller.Tenant
-                     // ★ 过滤掉已删除 / 待删除的版本，避免暴露"墓碑"行
                      && m.Status != "deleted"
                      && m.Status != "delete_pending");
 
@@ -72,6 +75,7 @@ public sealed class FileMetadataService : IFileMetadataService
         return m is null ? null : ToDto(m);
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<DownloadResult?> DownloadAsync(
         Guid id, long? rangeStart, long? rangeEnd, CancellationToken ct)
     {
@@ -81,7 +85,6 @@ public sealed class FileMetadataService : IFileMetadataService
 
         if (m is null || m.Status != "active") return null;
 
-        // ★ 捕获 S3 404：元数据 active 但对象丢失 → 返回 null → Controller 404
         ObjectStorageGetResult get;
         try
         {
@@ -94,7 +97,6 @@ public sealed class FileMetadataService : IFileMetadataService
             return null;
         }
 
-        // ★ 审计改为入队，由 AuditWriterService 批量落库，避免无界 Task.Run
         _auditQueue.TryEnqueue(new AuditEntry(
             DocId:       m.DocId,
             Tenant:      m.Tenant,
@@ -110,13 +112,13 @@ public sealed class FileMetadataService : IFileMetadataService
             get.ContentRange);
     }
 
+    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
     {
         var m = await _db.DocumentMetadata
             .FirstOrDefaultAsync(x => x.Id == id && x.Tenant == _caller.Tenant, ct);
         if (m is null) return false;
 
-        // 先置 delete_pending，防止下载中途对象消失
         m.Status = "delete_pending";
         m.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
