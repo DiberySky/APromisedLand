@@ -27,8 +27,6 @@ public static class MafWorkFlowExtension
             .WireIfPresent(context.Ollama)
             .WireIfPresent(context.ChatModel, waitFor: false)
             .WireIfPresent(context.Embedding, waitFor: false)
-            .WireIfPresent(context.Reranker, waitFor: false)             // ★ 已有
-            .WireIfPresent(context.RerankerChatModel, waitFor: false)    // ★ 新增
             .WireIfPresent(context.LiteGraph);
 
         // ══════════════════════════════════════════════════════════
@@ -48,18 +46,9 @@ public static class MafWorkFlowExtension
                 .WithEnvironment("Chat__Model", context.ChatModelName);
         }
 
-        if (!string.IsNullOrWhiteSpace(context.RerankerName)) // ★ 新增
-        {
-            context.MafWorkFlowApi
-                .WithEnvironment("Reranker__Model", context.RerankerName);
-        }
-
-        // ★ 新增：Reranker 打分模型
-        if (!string.IsNullOrWhiteSpace(context.RerankerChatModelName))
-        {
-            context.MafWorkFlowApi
-                .WithEnvironment("Reranker__ChatModel", context.RerankerChatModelName);
-        }
+        // ★ Reranker 打分复用 chat 模型
+        if (!string.IsNullOrWhiteSpace(context.ChatModelName))
+            context.MafWorkFlowApi.WithEnvironment("Reranker__ChatModel", context.ChatModelName);
         
         // ─── 外部资源：清单式声明 ─────────────────────────────────
         using var loggerFactory = LoggerFactory.Create(logging =>

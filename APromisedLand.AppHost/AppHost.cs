@@ -26,6 +26,9 @@ void MafWorkFlowService()
     
     builder.AddMafWorkFlowApi(context);
 
+    // ★ 再声明 RerankerService（注入环境变量给 MAFWorkFlowApi）
+    builder.AddRerankerService(context);
+    
     builder.AddBlazorWeb(context);
 }
 

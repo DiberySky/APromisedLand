@@ -12,3 +12,24 @@ POST http://localhost:5323/api/graph/17f42996-55c4-4795-9e21-47b1d15a9635/vector
 Content-Type: application/json
 
 { "MaxResults": 3 }
+
+
+
+### 健康检查
+GET http://localhost:5919/health
+
+### 模型信息
+GET http://localhost:5919/info
+
+### Rerank 测试
+POST http://localhost:5919/rerank
+Content-Type: application/json
+
+{
+  "query": "深度学习的框架",
+  "documents": [
+    "深度学习 --FRAMEWORK--> TensorFlow",
+    "机器学习 --SUBFIELD--> 深度学习",
+    "深度学习 --USES--> 神经网络"
+  ]
+}

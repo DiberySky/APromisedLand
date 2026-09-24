@@ -73,14 +73,11 @@ public class AppHostResourceContext
     public IResourceBuilder<OllamaResource>? Ollama { get; set; }
     public IResourceBuilder<OllamaModelResource>? Embedding { get; set; }
     public IResourceBuilder<OllamaModelResource>? ChatModel { get; set; }
-    public IResourceBuilder<OllamaModelResource>? Reranker { get; set; }
-    public IResourceBuilder<OllamaModelResource>? RerankerChatModel { get; set; }   // ★ 新增
+    public IResourceBuilder<PythonAppResource>? RerankerService { get; set; }
     
     // ★ 新增：模型名元数据，供后续注入使用
     public string? EmbeddingModelName { get; set; }
     public string? ChatModelName { get; set; }
-    public string? RerankerName { get; set; }   // ★ 新增
-    public string? RerankerChatModelName { get; set; }   // ★ 新增
     
     // Elasticsearch
     public IResourceBuilder<ElasticsearchResource>? Elasticsearch { get; set; }

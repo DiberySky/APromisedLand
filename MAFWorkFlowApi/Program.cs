@@ -46,6 +46,12 @@ builder.Services.AddHttpClient(OllamaWarmupService.HttpClientName)
     .ConfigureHttpClient(client =>
         client.Timeout = TimeSpan.FromMinutes(10));
 
+builder.Services.AddHttpClient("Reranker")
+    .ConfigureHttpClient(client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(60);
+    });
+
 // ---------------------------------------------------------------------------
 // 4. OllamaSharp 客户端
 // ══════════════════════════════════════════════════════════
