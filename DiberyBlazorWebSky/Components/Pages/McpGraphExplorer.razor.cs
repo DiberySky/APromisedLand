@@ -2,7 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using DiberyBlazorWebSky.Models.Graph;
 using DiberyBlazorWebSky.Services;
-using LiteGraph.Sdk;
+using LiteGraph;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
@@ -105,9 +105,9 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
 
         try
         {
-            var result = await LiteGraph.Graph.ReadMany(DefaultTenant);
-            _graphs = result.Objects ?? new List<Graph>();
-            Logger.LogInformation("加载 {Count} 个图", _graphs.Count);
+            // var result = await LiteGraph.Graph.ReadMany(DefaultTenant);
+            // _graphs = result.Objects ?? new List<Graph>();
+            // Logger.LogInformation("加载 {Count} 个图", _graphs.Count);
         }
         catch (Exception ex)
         {
@@ -173,12 +173,12 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
                 ContinuationToken = continuationToken
             };
 
-            var result = await LiteGraph.Node.Enumerate(query);
-            _nodes = result.Objects ?? new List<Node>();
-            _nodeTotal = result.TotalRecords;
-            _nodeContinuationToken = result.ContinuationToken;
-            _nodeHasPrev = continuationToken != null;
-            _nodeHasNext = result.ContinuationToken != null;
+            // var result = await LiteGraph.Node.Enumerate(query);
+            // _nodes = result.Objects ?? new List<Node>();
+            // _nodeTotal = result.TotalRecords;
+            // _nodeContinuationToken = result.ContinuationToken;
+            // _nodeHasPrev = continuationToken != null;
+            // _nodeHasNext = result.ContinuationToken != null;
         }
         catch (Exception ex)
         {
@@ -225,12 +225,12 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
                 ContinuationToken = continuationToken
             };
 
-            var result = await LiteGraph.Edge.Enumerate(query);
-            _edges = result.Objects ?? new List<Edge>();
-            _edgeTotal = result.TotalRecords;
-            _edgeContinuationToken = result.ContinuationToken;
-            _edgeHasPrev = continuationToken != null;
-            _edgeHasNext = result.ContinuationToken != null;
+            // var result = await LiteGraph.Edge.Enumerate(query);
+            // _edges = result.Objects ?? new List<Edge>();
+            // _edgeTotal = result.TotalRecords;
+            // _edgeContinuationToken = result.ContinuationToken;
+            // _edgeHasPrev = continuationToken != null;
+            // _edgeHasNext = result.ContinuationToken != null;
         }
         catch (Exception ex)
         {
@@ -272,7 +272,7 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
                 GraphGUID = Guid.Parse(_selectedGraphGuid),
                 Name = _newNodeName.Trim()
             };
-            await LiteGraph.Node.Create(node);
+            // await LiteGraph.Node.Create(node);
             _newNodeName = "";
             await LoadNodesAsync();
         }
@@ -297,10 +297,10 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
 
         try
         {
-            await LiteGraph.Node.DeleteByGuid(
-                DefaultTenant,
-                Guid.Parse(_selectedGraphGuid),
-                nodeGuid);
+            // await LiteGraph.Node.DeleteByGuid(
+            //     DefaultTenant,
+            //     Guid.Parse(_selectedGraphGuid),
+            //     nodeGuid);
             _selectedNodeGuids.Remove(nodeGuid);
             await Task.WhenAll(LoadNodesAsync(), LoadEdgesAsync());
         }
@@ -328,10 +328,10 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
         {
             foreach (var guid in _selectedNodeGuids)
             {
-                await LiteGraph.Node.DeleteByGuid(
-                    DefaultTenant,
-                    Guid.Parse(_selectedGraphGuid),
-                    guid);
+                // await LiteGraph.Node.DeleteByGuid(
+                //     DefaultTenant,
+                //     Guid.Parse(_selectedGraphGuid),
+                //     guid);
             }
             _selectedNodeGuids.Clear();
             await Task.WhenAll(LoadNodesAsync(), LoadEdgesAsync());
@@ -369,7 +369,7 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
                 To = Guid.Parse(_newEdgeTo),
                 Name = string.IsNullOrWhiteSpace(_newEdgeName) ? "RELATED_TO" : _newEdgeName.Trim()
             };
-            await LiteGraph.Edge.Create(edge);
+            // await LiteGraph.Edge.Create(edge);
             _newEdgeFrom = _newEdgeTo = _newEdgeName = "";
             await LoadEdgesAsync();
         }
@@ -394,10 +394,10 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
 
         try
         {
-            await LiteGraph.Edge.DeleteByGuid(
-                DefaultTenant,
-                Guid.Parse(_selectedGraphGuid),
-                edgeGuid);
+            // await LiteGraph.Edge.DeleteByGuid(
+            //     DefaultTenant,
+            //     Guid.Parse(_selectedGraphGuid),
+            //     edgeGuid);
             await LoadEdgesAsync();
         }
         catch (Exception ex)
@@ -505,33 +505,33 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
                 MaxResults = MaxEnumerationResults
             };
 
-            var vectorResult = await LiteGraph.Vector.Enumerate(vectorQuery);
-            var allVectors = vectorResult.Objects ?? new List<VectorMetadata>();
-
-            Logger.LogInformation("加载到 {Count} 条向量记录", allVectors.Count);
-            _vectorProgress = $"计算相似度（{allVectors.Count} 条向量）...";
-            StateHasChanged();
+            // var vectorResult = await LiteGraph.Vector.Enumerate(vectorQuery);
+            // var allVectors = vectorResult.Objects ?? new List<VectorMetadata>();
+            //
+            // Logger.LogInformation("加载到 {Count} 条向量记录", allVectors.Count);
+            // _vectorProgress = $"计算相似度（{allVectors.Count} 条向量）...";
+            // StateHasChanged();
 
             // ★ 按 NodeGUID 去重：同节点只保留最高相似度
             var bestByNode = new Dictionary<Guid, float>();
 
-            foreach (var v in allVectors)
-            {
-                if (v.Vectors == null || v.Vectors.Count == 0) continue;
-                if (v.NodeGUID == null) continue;
+            // foreach (var v in allVectors)
+            // {
+            //     if (v.Vectors == null || v.Vectors.Count == 0) continue;
+            //     if (v.NodeGUID == null) continue;
+            //
+            //     var nodeGuid = v.NodeGUID.Value;
+            //     var score = CosineSimilarity(queryEmbedding, v.Vectors);
+            //
+            //     if (!bestByNode.TryGetValue(nodeGuid, out var existing) || score > existing)
+            //     {
+            //         bestByNode[nodeGuid] = score;
+            //     }
+            // }
 
-                var nodeGuid = v.NodeGUID.Value;
-                var score = CosineSimilarity(queryEmbedding, v.Vectors);
-
-                if (!bestByNode.TryGetValue(nodeGuid, out var existing) || score > existing)
-                {
-                    bestByNode[nodeGuid] = score;
-                }
-            }
-
-            Logger.LogInformation(
-                "去重后：{Count} 个独立节点（原始 {Raw} 条向量）",
-                bestByNode.Count, allVectors.Count);
+            // Logger.LogInformation(
+            //     "去重后：{Count} 个独立节点（原始 {Raw} 条向量）",
+            //     bestByNode.Count, allVectors.Count);
 
             _vectorResults = bestByNode
                 .Select(kv => new VectorSearchDisplayResult
@@ -569,15 +569,15 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
             GraphGUID = graphGuid,
             MaxResults = MaxEnumerationResults
         };
-        var result = await LiteGraph.Node.Enumerate(query);
-        var nodes = result.Objects ?? new List<Node>();
+        // var result = await LiteGraph.Node.Enumerate(query);
+        // var nodes = result.Objects ?? new List<Node>();
 
         var map = new Dictionary<Guid, string>();
-        foreach (var n in nodes)
-        {
-            if (!map.ContainsKey(n.GUID))
-                map[n.GUID] = string.IsNullOrWhiteSpace(n.Name) ? "[无名]" : n.Name;
-        }
+        // foreach (var n in nodes)
+        // {
+        //     if (!map.ContainsKey(n.GUID))
+        //         map[n.GUID] = string.IsNullOrWhiteSpace(n.Name) ? "[无名]" : n.Name;
+        // }
         return map;
     }
 
@@ -611,79 +611,79 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
                 GraphGUID = graphGuid,
                 MaxResults = MaxEnumerationResults
             };
-            var existingVectors = await LiteGraph.Vector.Enumerate(deleteQuery);
-            var toDelete = existingVectors.Objects ?? new List<VectorMetadata>();
-
-            foreach (var v in toDelete)
-            {
-                try
-                {
-                    await LiteGraph.Vector.DeleteByGuid(DefaultTenant, v.GUID);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "删除旧向量 {Guid} 失败", v.GUID);
-                }
-            }
-
-            Logger.LogInformation("已清理 {Count} 条旧向量", toDelete.Count);
-
-            // 加载所有节点
-            var query = new EnumerationRequest
-            {
-                TenantGUID = DefaultTenant,
-                GraphGUID = graphGuid,
-                MaxResults = MaxEnumerationResults
-            };
-            var result = await LiteGraph.Node.Enumerate(query);
-            var allNodes = result.Objects ?? new List<Node>();
-
-            int success = 0, fail = 0;
-            int total = allNodes.Count;
-            int i = 0;
-
-            foreach (var node in allNodes)
-            {
-                i++;
-                _vectorProgress = $"({i}/{total}) {node.Name}";
-                StateHasChanged();
-
-                if (string.IsNullOrWhiteSpace(node.Name))
-                {
-                    fail++;
-                    continue;
-                }
-
-                var embedding = await GetEmbeddingAsync(node.Name);
-                if (embedding == null)
-                {
-                    fail++;
-                    continue;
-                }
-
-                try
-                {
-                    var metadata = new VectorMetadata
-                    {
-                        TenantGUID = DefaultTenant,
-                        GraphGUID = graphGuid,
-                        NodeGUID = node.GUID,
-                        Model = EmbeddingModel,
-                        Dimensionality = embedding.Count,
-                        Vectors = embedding
-                    };
-                    await LiteGraph.Vector.Create(metadata);
-                    success++;
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "为节点 {Name} 创建向量失败", node.Name);
-                    fail++;
-                }
-            }
-
-            _vectorProgress = $"完成：成功 {success} / 失败 {fail}";
-            Logger.LogInformation("向量生成完成: 成功 {S} / 失败 {F}", success, fail);
+            // var existingVectors = await LiteGraph.Vector.Enumerate(deleteQuery);
+            // var toDelete = existingVectors.Objects ?? new List<VectorMetadata>();
+            //
+            // foreach (var v in toDelete)
+            // {
+            //     try
+            //     {
+            //         await LiteGraph.Vector.DeleteByGuid(DefaultTenant, v.GUID);
+            //     }
+            //     catch (Exception ex)
+            //     {
+            //         Logger.LogWarning(ex, "删除旧向量 {Guid} 失败", v.GUID);
+            //     }
+            // }
+            //
+            // Logger.LogInformation("已清理 {Count} 条旧向量", toDelete.Count);
+            //
+            // // 加载所有节点
+            // var query = new EnumerationRequest
+            // {
+            //     TenantGUID = DefaultTenant,
+            //     GraphGUID = graphGuid,
+            //     MaxResults = MaxEnumerationResults
+            // };
+            // var result = await LiteGraph.Node.Enumerate(query);
+            // var allNodes = result.Objects ?? new List<Node>();
+            //
+            // int success = 0, fail = 0;
+            // int total = allNodes.Count;
+            // int i = 0;
+            //
+            // foreach (var node in allNodes)
+            // {
+            //     i++;
+            //     _vectorProgress = $"({i}/{total}) {node.Name}";
+            //     StateHasChanged();
+            //
+            //     if (string.IsNullOrWhiteSpace(node.Name))
+            //     {
+            //         fail++;
+            //         continue;
+            //     }
+            //
+            //     var embedding = await GetEmbeddingAsync(node.Name);
+            //     if (embedding == null)
+            //     {
+            //         fail++;
+            //         continue;
+            //     }
+            //
+            //     try
+            //     {
+            //         var metadata = new VectorMetadata
+            //         {
+            //             TenantGUID = DefaultTenant,
+            //             GraphGUID = graphGuid,
+            //             NodeGUID = node.GUID,
+            //             Model = EmbeddingModel,
+            //             Dimensionality = embedding.Count,
+            //             Vectors = embedding
+            //         };
+            //         await LiteGraph.Vector.Create(metadata);
+            //         success++;
+            //     }
+            //     catch (Exception ex)
+            //     {
+            //         Logger.LogWarning(ex, "为节点 {Name} 创建向量失败", node.Name);
+            //         fail++;
+            //     }
+            // }
+            //
+            // _vectorProgress = $"完成：成功 {success} / 失败 {fail}";
+            // Logger.LogInformation("向量生成完成: 成功 {S} / 失败 {F}", success, fail);
         }
         catch (Exception ex)
         {
@@ -721,18 +721,18 @@ public partial class McpGraphExplorer : ComponentBase, IDisposable
                 Ordering = EnumerationOrderEnum.CreatedDescending,
                 MaxResults = MaxEnumerationResults
             };
-            var nodeResult = await LiteGraph.Node.Enumerate(nodeQuery);
-            _topologyNodes = nodeResult.Objects ?? new List<Node>();
-
-            var edgeQuery = new EnumerationRequest
-            {
-                TenantGUID = DefaultTenant,
-                GraphGUID = graphGuid,
-                Ordering = EnumerationOrderEnum.CreatedDescending,
-                MaxResults = MaxEnumerationResults
-            };
-            var edgeResult = await LiteGraph.Edge.Enumerate(edgeQuery);
-            _topologyEdges = edgeResult.Objects ?? new List<Edge>();
+            // var nodeResult = await LiteGraph.Node.Enumerate(nodeQuery);
+            // _topologyNodes = nodeResult.Objects ?? new List<Node>();
+            //
+            // var edgeQuery = new EnumerationRequest
+            // {
+            //     TenantGUID = DefaultTenant,
+            //     GraphGUID = graphGuid,
+            //     Ordering = EnumerationOrderEnum.CreatedDescending,
+            //     MaxResults = MaxEnumerationResults
+            // };
+            // var edgeResult = await LiteGraph.Edge.Enumerate(edgeQuery);
+            // _topologyEdges = edgeResult.Objects ?? new List<Edge>();
 
             ComputeCircularLayout();
 

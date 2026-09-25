@@ -1,0 +1,81 @@
+@namespace DiberyBlazorWebSky.Components.Pages.GraphExplorerForce.Shared
+@using DiberyBlazorWebSky.Models.Graph
+@using DiberyBlazorWebSky.Services
+
+@if (IsOpen)
+{
+    <div class="modal-overlay" @onclick="CloseAsync">
+        <div class="manage-dialog" @onclick:stopPropagation="true">
+            <div class="manage-header">
+                <strong>⚙️ 图管理</strong>
+                <button class="btn-close" @onclick="CloseAsync">✕</button>
+            </div>
+
+            <div class="manage-body">
+                <div class="create-section">
+                    <div class="section-title">➕ 新建图</div>
+                    <div class="create-row">
+                        <input type="text" @bind="_newGraphName" @bind:event="oninput"
+                               placeholder="输入图名称..." class="create-input"/>
+                        <button class="btn-primary" @onclick="CreateGraphAsync"
+                                disabled="@(_isCreatingGraph || string.IsNullOrWhiteSpace(_newGraphName))">
+                            @(_isCreatingGraph ? "创建中..." : "创建")
+                        </button>
+                    </div>
+                </div>
+
+                <div class="list-section">
+                    <div class="section-title">📋 已有图（@Context.Graphs.Count）</div>
+
+                    @if (Context.Graphs.Count == 0)
+                    {
+                        <p class="hint">暂无图。请先创建一个。</p>
+                    }
+                    else
+                    {
+                        <div class="graph-manage-list">
+                            @foreach (var g in Context.Graphs)
+                            {
+                                <div class="graph-manage-item">
+                                    @if (_renamingGraphGuid == g.Guid)
+                                    {
+                                        <input type="text" @bind="_renamingGraphName" @bind:event="oninput"
+                                               class="rename-input"/>
+                                        <div class="item-actions">
+                                            <button class="btn-sm btn-primary" @onclick="ConfirmRenameAsync"
+                                                    disabled="@_isManaging">✓
+                                            </button>
+                                            <button class="btn-sm" @onclick="CancelRename" disabled="@_isManaging">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="item-info">
+                                            <div class="item-name">@g.Name</div>
+                                            <div class="item-guid">@g.Guid</div>
+                                        </div>
+                                        <div class="item-actions">
+                                            <button class="btn-sm" @onclick="() => StartRename(g)"
+                                                    disabled="@_isManaging">✏️
+                                            </button>
+                                            <button class="btn-sm btn-danger" @onclick="() => DeleteGraphAsync(g)"
+                                                    disabled="@_isManaging">🗑️
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="error-bar" style="margin: 0 20px 16px;">@_errorMessage</div>
+            }
+        </div>
+    </div>
+}

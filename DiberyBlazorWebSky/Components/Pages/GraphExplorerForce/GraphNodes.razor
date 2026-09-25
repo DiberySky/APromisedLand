@@ -1,0 +1,90 @@
+@page "/graph-explorer-force/nodes"
+@namespace DiberyBlazorWebSky.Components.Pages.GraphExplorerForce
+@using System.Linq
+@using System.Text.Json
+@using DiberyBlazorWebSky.Models.Graph
+@using DiberyBlazorWebSky.Services
+@using DiberyBlazorWebSky.Components.Pages.GraphExplorerForce.Shared
+@rendermode InteractiveServer
+
+<PageTitle>节点管理</PageTitle>
+
+<div class="explorer-container">
+    <div class="explorer-header">
+        <h1>📦 节点管理</h1>
+        <p class="page-subtitle">对当前选中图的节点进行增删改查操作</p>
+    </div>
+
+    <GraphSelectorBar />
+
+    @if (!string.IsNullOrEmpty(Context.SelectedGraphGuid))
+    {
+        <div class="panel">
+            <div class="crud-bar">
+                <input type="text" @bind="_newNodeName" placeholder="新节点名称" class="input-sm"/>
+                <button class="btn-primary" @onclick="CreateNodeAsync" disabled="@_isBusy">+ 新建节点</button>
+                <button class="btn-danger" @onclick="DeleteSelectedNodesAsync"
+                        disabled="@(_selectedNodeGuids.Count == 0 || _isBusy)">
+                    🗑️ 删除选中 (@_selectedNodeGuids.Count)
+                </button>
+            </div>
+
+            <div class="list-container">
+                @foreach (var node in _nodes)
+                {
+                    <div class="list-item @(_selectedNodeGuids.Contains(node.Guid) ? "selected" : "")">
+                        @if (_editingNodeGuid == node.Guid)
+                        {
+                            <input type="text" @bind="_editingNodeName" @bind:event="oninput"
+                                   class="inline-edit-input"
+                                   @onkeydown="e => HandleEditKeyDown(e, () => SaveNodeNameAsync(node))"/>
+                            <div class="item-actions">
+                                <button class="btn-sm btn-primary" @onclick="() => SaveNodeNameAsync(node)"
+                                        disabled="@_isBusy">✓
+                                </button>
+                                <button class="btn-sm" @onclick="CancelEditNode" disabled="@_isBusy">✕</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <input type="checkbox" checked="@_selectedNodeGuids.Contains(node.Guid)"
+                                   @onchange="(e) => ToggleNodeSelection(node.Guid, (bool)e.Value!)"/>
+                            <div class="item-info">
+                                <strong>@node.Name</strong>
+                                <span class="guid">@node.Guid.ToString("N")[..8]</span>
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn-icon" @onclick="() => ShowNodeJson(node)">👁️</button>
+                                <button class="btn-icon" @onclick="() => StartEditNode(node)">✏️</button>
+                                <button class="btn-icon danger" @onclick="() => DeleteNodeAsync(node.Guid)"
+                                        disabled="@_isBusy">🗑️
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="pagination">
+                <button class="btn-page" @onclick="PrevNodePageAsync" disabled="@(!_nodeHasPrev || _isBusy)">⬅️
+                    上一页
+                </button>
+                <span class="page-info">已加载 @_nodes.Count / 共 @_nodeTotal 条</span>
+                <button class="btn-page" @onclick="NextNodePageAsync" disabled="@(!_nodeHasNext || _isBusy)">下一页
+                    ➡️
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <p class="hint">请先在上方选择一个图。</p>
+    }
+
+    <JsonDetailModal Json="_detailJson" OnClose="CloseDetailModal" />
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="error-bar">@_errorMessage</div>
+    }
+</div>

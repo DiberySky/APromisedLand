@@ -1,0 +1,108 @@
+@page "/graph-explorer-force/import-export"
+@namespace DiberyBlazorWebSky.Components.Pages.GraphExplorerForce
+@using System.Linq
+@using DiberyBlazorWebSky.Models.Graph
+@using DiberyBlazorWebSky.Services
+@using DiberyBlazorWebSky.Components.Pages.GraphExplorerForce.Shared
+@rendermode InteractiveServer
+
+<PageTitle>导入 / 导出</PageTitle>
+
+<div class="explorer-container">
+    <div class="explorer-header">
+        <h1>💾 导入 / 导出</h1>
+        <p class="page-subtitle">导出当前图为 JSON / CSV，或从 JSON / CSV 文件导入数据</p>
+    </div>
+
+    <GraphSelectorBar />
+
+    @if (!string.IsNullOrEmpty(Context.SelectedGraphGuid))
+    {
+        <div class="panel">
+            <div class="crud-bar">
+                <strong>📤 导出当前图</strong>
+                <button class="btn-primary" @onclick="ExportJsonAsync"
+                        disabled="@(_isBusy || string.IsNullOrEmpty(Context.SelectedGraphGuid))">📥 导出 JSON
+                </button>
+                <button class="btn-secondary" @onclick="ExportNodesCsvAsync"
+                        disabled="@(_isBusy || string.IsNullOrEmpty(Context.SelectedGraphGuid))">📥 导出节点 CSV
+                </button>
+                <button class="btn-secondary" @onclick="ExportEdgesCsvAsync"
+                        disabled="@(_isBusy || string.IsNullOrEmpty(Context.SelectedGraphGuid))">📥 导出边 CSV
+                </button>
+            </div>
+
+            <div class="crud-bar">
+                <strong>📥 导入 JSON</strong>
+                <InputFile OnChange="OnJsonFileSelected" accept=".json" class="file-input"/>
+                <span class="file-status">@_selectedJsonFileName</span>
+            </div>
+
+            <div class="crud-bar">
+                <strong>📥 从 CSV 导入</strong>
+                <InputFile OnChange="OnNodesCsvSelected" accept=".csv" class="file-input"/>
+                <span class="file-status">@_selectedNodesCsvName</span>
+                <InputFile OnChange="OnEdgesCsvSelected" accept=".csv" class="file-input"/>
+                <span class="file-status">@_selectedEdgesCsvName</span>
+            </div>
+
+            <div class="crud-bar">
+                <label class="import-option">
+                    <input type="checkbox" @bind="_clearBeforeImport"/>
+                    <span>导入前清空图中所有节点和边（⚠️ 不可撤销）</span>
+                </label>
+                <button class="btn-primary" @onclick="StartImportAsync" disabled="@(_isBusy || !HasAnyImportFile)">
+                    🚀 开始导入
+                </button>
+                <button class="btn-danger" @onclick="ResetImportState" disabled="@_isBusy">✕ 清空选择</button>
+            </div>
+
+            @if (_isBusy)
+            {
+                <p class="hint">处理中... @_progress</p>
+            }
+
+            @if (_importResult != null)
+            {
+                <div class="response-box">
+                    <strong>导入结果：</strong>
+                    <ul style="margin: 8px 0 0 0;">
+                        <li>✅ 新增节点：@_importResult.NodesCreated</li>
+                        <li>⏭️ 跳过重复节点：@_importResult.NodesSkipped</li>
+                        <li>✅ 新增边：@_importResult.EdgesCreated</li>
+                        <li>⏭️ 跳过边：@_importResult.EdgesSkipped</li>
+                    </ul>
+                    @if (_importResult.Errors.Count > 0)
+                    {
+                        <div style="margin-top: 12px;">
+                            <strong>⚠️ 错误清单（前 20 条）：</strong>
+                            <ul style="margin: 6px 0 0 0; color: #991b1b;">
+                                @foreach (var err in _importResult.Errors.Take(20))
+                                {
+                                    <li>@err</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (_importResult == null && !_isBusy)
+            {
+                <p class="hint">
+                    💡 支持 JSON（含 Nodes + Edges）或 CSV（Nodes + Edges 分开）导入。<br/>
+                    导出的 JSON 可直接用于其他环境的导入，节点以名称引用，跨环境安全。
+                </p>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="hint">请先在上方选择一个图。</p>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="error-bar">@_errorMessage</div>
+    }
+</div>

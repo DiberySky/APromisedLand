@@ -1,0 +1,168 @@
+@page "/graph-explorer-force/vector"
+@namespace DiberyBlazorWebSky.Components.Pages.GraphExplorerForce
+@using System.Linq
+@using DiberyBlazorWebSky.Models.Graph
+@using DiberyBlazorWebSky.Services
+@using DiberyBlazorWebSky.Components.Pages.GraphExplorerForce.Shared
+@rendermode InteractiveServer
+
+<PageTitle>向量语义搜索</PageTitle>
+
+<div class="explorer-container">
+    <div class="explorer-header">
+        <h1>🧠 向量语义搜索</h1>
+        <p class="page-subtitle">基于节点名与边向量的一站式语义搜索，支持意图识别与多跳查询</p>
+    </div>
+
+    <GraphSelectorBar />
+
+    @if (!string.IsNullOrEmpty(Context.SelectedGraphGuid))
+    {
+        <div class="panel">
+            <div class="crud-bar">
+                <input type="text" @bind="_vectorQueryText"
+                       placeholder="输入语义查询 (如: 根节点B的父亲 / 深度学习用到的框架)"
+                       class="input-lg"
+                       @onkeydown="HandleSearchKeyDown"/>
+                <button class="btn-primary"
+                        @onclick="SearchVectorAsync"
+                        disabled="@(_isBusy || string.IsNullOrWhiteSpace(_vectorQueryText))">
+                    🧠 语义搜索
+                </button>
+                <button class="btn-secondary"
+                        @onclick="GenerateAllVectorsAsync"
+                        disabled="@_isBusy">
+                    ⚡ 重建所有向量
+                </button>
+
+                <label class="toggle-reranker">
+                    <input type="checkbox" @bind="_useReranker"/>
+                    <span>🎯 精排</span>
+                </label>
+            </div>
+
+            @if (_lastIntent is not null && _lastIntent.Strategy != "none")
+            {
+                <div class="intent-banner">
+                    <span class="intent-icon">🧠</span>
+                    <span class="intent-label">识别意图：</span>
+                    @if (!string.IsNullOrEmpty(_lastIntent.Relation))
+                    {
+                        <span class="intent-chip relation">@_lastIntent.Relation</span>
+                        <span class="intent-chip direction">
+                            @(_lastIntent.Direction == "in" ? "↓ 入边/找父" : "↑ 出边/找子")
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="intent-chip unknown">按节点名搜索</span>
+                    }
+                    @if (!string.IsNullOrEmpty(_lastIntent.SubjectName))
+                    {
+                        <span class="intent-chip subject">主体: @_lastIntent.SubjectName</span>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_lastIntent.AggregationMode))
+                    {
+                        <span class="intent-chip multi-hop">
+                            @(_lastIntent.AggregationMode == "ancestors" ? "🔗 祖先链" : "🔗 后代链")
+                        </span>
+                        <span class="intent-chip hop-count">
+                            @(_lastIntent.HopCount <= 0 ? "∞ 跳" : $"{_lastIntent.HopCount} 跳")
+                        </span>
+                    }
+
+                    <span class="intent-confidence">@_lastIntent.Confidence.ToString("P0")</span>
+                    <span class="intent-strategy">[@_lastIntent.Strategy]</span>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_lastHint) || _lastSuggestions.Any())
+                {
+                    <div class="hint-banner">
+                        @if (!string.IsNullOrEmpty(_lastHint))
+                        {
+                            <span class="hint-icon">💡</span>
+                            <span class="hint-text">@_lastHint</span>
+                        }
+
+                        @if (_lastSuggestions.Any())
+                        {
+                            <div class="suggestion-list">
+                                @foreach (var s in _lastSuggestions)
+                                {
+                                    <button class="suggestion-btn"
+                                            @onclick="() => RunSuggestionAsync(s)"
+                                            disabled="@_isBusy"
+                                            title="@(string.IsNullOrEmpty(s.Tooltip) ? s.Query : s.Tooltip)">
+                                        <span class="suggestion-label">@s.DisplayLabel</span>
+                                        <span class="suggestion-count">@s.Count</span>
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            }
+
+            @if (_vectorResults.Any())
+            {
+                <div class="list-container">
+                    @foreach (var r in _vectorResults)
+                    {
+                        <div class="list-item">
+                            <div class="item-info">
+                                <strong>@r.NodeName</strong>
+                                <span class="guid">
+                                    @if (r.IsMultiHop && r.HopDistance.HasValue)
+                                    {
+                                        <span class="hop-badge">距离 @r.HopDistance 跳</span>
+                                        <span>· 综合: @r.Score.ToString("F4")</span>
+                                    }
+                                    else
+                                    {
+                                        <span>综合: @r.Score.ToString("F4")</span>
+                                        @if (r.VectorScore.HasValue && r.Bm25Score.HasValue)
+                                        {
+                                            <span class="component-scores">
+                                                （向量 @r.VectorScore.Value.ToString("F4")
+                                                · BM25 @r.Bm25Score.Value.ToString("F4")）
+                                            </span>
+                                        }
+                                    }
+                                    @if (!string.IsNullOrEmpty(r.ViaEdge))
+                                    {
+                                        <span class="via-edge">· 通过 <b>@r.ViaEdge</b></span>
+                                    }
+                                </span>
+                                @if (!string.IsNullOrEmpty(r.MatchedContent))
+                                {
+                                    <div class="content-snippet">@r.MatchedContent</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else if (_isBusy)
+            {
+                <p class="hint">处理中... @_vectorProgress</p>
+            }
+            else
+            {
+                <p class="hint">
+                    输入自然语言进行语义搜索。<br/>
+                    首次使用请点"⚡ 重建所有向量"（生成节点向量 + 边向量）。
+                </p>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="hint">请先在上方选择一个图。</p>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="error-bar">@_errorMessage</div>
+    }
+</div>

@@ -8,6 +8,7 @@
       <Path>Notes</Path>
       <Path>docker</Path>
       <Path>infra</Path>
+      <Path>../RerankerService</Path>
     </attachedFolders>
     <explicitIncludes />
     <explicitExcludes />

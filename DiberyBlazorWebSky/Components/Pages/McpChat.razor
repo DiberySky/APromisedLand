@@ -2,8 +2,7 @@
 @using System.Linq
 @using System.Text.Json
 @using System.Text.Encodings.Web
-@using LiteGraph.Sdk
-@inject LiteGraphSdk LiteGraph
+@using LiteGraph
 @inject ILogger<McpChat> Logger
 @rendermode InteractiveServer
 
@@ -85,12 +84,12 @@
 
         try
         {
-            var result = await LiteGraph.Graph.ReadMany(DefaultTenant);
-            graphs = result.Objects ?? new List<Graph>();
-
-            Logger.LogInformation(
-                "从 PostgreSQL 加载了 {Count} 个图（总数 {Total}）",
-                graphs.Count, result.TotalRecords);
+            // var result = await LiteGraph.Graph.ReadMany(DefaultTenant);
+            // graphs = result.Objects ?? new List<Graph>();
+            //
+            // Logger.LogInformation(
+            //     "从 PostgreSQL 加载了 {Count} 个图（总数 {Total}）",
+            //     graphs.Count, result.TotalRecords);
         }
         catch (Exception ex)
         {
@@ -113,12 +112,12 @@
             responseText = "";
             StateHasChanged();
 
-            var result = await LiteGraph.Node.ReadMany(DefaultTenant, graphGuid);
-            nodes = result.Objects ?? new List<Node>();
-
-            Logger.LogInformation(
-                "图 {GraphGuid} 有 {Count} 个节点（总数 {Total}）",
-                graphGuid, nodes.Count, result.TotalRecords);
+            // var result = await LiteGraph.Node.ReadMany(DefaultTenant, graphGuid);
+            // nodes = result.Objects ?? new List<Node>();
+            //
+            // Logger.LogInformation(
+            //     "图 {GraphGuid} 有 {Count} 个节点（总数 {Total}）",
+            //     graphGuid, nodes.Count, result.TotalRecords);
         }
         catch (Exception ex)
         {

@@ -1,0 +1,99 @@
+@page "/graph-explorer-force/edges"
+@namespace DiberyBlazorWebSky.Components.Pages.GraphExplorerForce
+@using System.Linq
+@using System.Text.Json
+@using DiberyBlazorWebSky.Models.Graph
+@using DiberyBlazorWebSky.Services
+@using DiberyBlazorWebSky.Components.Pages.GraphExplorerForce.Shared
+@rendermode InteractiveServer
+
+<PageTitle>边管理</PageTitle>
+
+<div class="explorer-container">
+    <div class="explorer-header">
+        <h1>🔗 边管理</h1>
+        <p class="page-subtitle">对当前选中图的边进行增删改查操作</p>
+    </div>
+
+    <GraphSelectorBar />
+
+    @if (!string.IsNullOrEmpty(Context.SelectedGraphGuid))
+    {
+        <div class="panel">
+            <div class="crud-bar">
+                <select @bind="_newEdgeFrom" class="input-sm">
+                    <option value="">起点</option>
+                    @foreach (var n in _nodes)
+                    {
+                        <option value="@n.Guid">@n.Name</option>
+                    }
+                </select>
+                <select @bind="_newEdgeTo" class="input-sm">
+                    <option value="">终点</option>
+                    @foreach (var n in _nodes)
+                    {
+                        <option value="@n.Guid">@n.Name</option>
+                    }
+                </select>
+                <input type="text" @bind="_newEdgeName" placeholder="边名称 (如 PARENT_OF)" class="input-sm"/>
+                <button class="btn-primary" @onclick="CreateEdgeAsync" disabled="@_isBusy">+ 新建边</button>
+            </div>
+
+            <div class="list-container">
+                @foreach (var edge in _edges)
+                {
+                    <div class="list-item">
+                        @if (_editingEdgeGuid == edge.Guid)
+                        {
+                            <input type="text" @bind="_editingEdgeName" @bind:event="oninput"
+                                   class="inline-edit-input"
+                                   @onkeydown="e => HandleEditKeyDown(e, () => SaveEdgeNameAsync(edge))"/>
+                            <div class="item-actions">
+                                <button class="btn-sm btn-primary" @onclick="() => SaveEdgeNameAsync(edge)"
+                                        disabled="@_isBusy">✓
+                                </button>
+                                <button class="btn-sm" @onclick="CancelEditEdge" disabled="@_isBusy">✕</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="item-info">
+                                <strong>@edge.Name</strong>
+                                <span
+                                    class="guid">@edge.From.ToString("N")[..8] → @edge.To.ToString("N")[..8]</span>
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn-icon" @onclick="() => ShowEdgeJson(edge)">👁️</button>
+                                <button class="btn-icon" @onclick="() => StartEditEdge(edge)">✏️</button>
+                                <button class="btn-icon danger" @onclick="() => DeleteEdgeAsync(edge.Guid)"
+                                        disabled="@_isBusy">🗑️
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="pagination">
+                <button class="btn-page" @onclick="PrevEdgePageAsync" disabled="@(!_edgeHasPrev || _isBusy)">⬅️
+                    上一页
+                </button>
+                <span class="page-info">已加载 @_edges.Count / 共 @_edgeTotal 条</span>
+                <button class="btn-page" @onclick="NextEdgePageAsync" disabled="@(!_edgeHasNext || _isBusy)">下一页
+                    ➡️
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <p class="hint">请先在上方选择一个图。</p>
+    }
+
+    <JsonDetailModal Json="_detailJson" OnClose="CloseDetailModal" />
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="error-bar">@_errorMessage</div>
+    }
+</div>

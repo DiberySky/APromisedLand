@@ -253,4 +253,40 @@ public sealed class GraphApiClient(HttpClient http, ILogger<GraphApiClient> logg
 
         throw new HttpRequestException(message, null, response.StatusCode);
     }
+    
+    // ── 追加到 GraphApiClient ──
+    public async Task<EnumerateResponse<GraphNodeDto>?> EnumerateNodesAsync(
+        Guid graphGuid, int maxResults = 1000, Guid? continuationToken = null,
+        CancellationToken ct = default)
+        => await PostEnumerateAsync<GraphNodeDto>(
+            $"api/graph/{graphGuid}/nodes/enumerate", maxResults, continuationToken, ct);
+
+    public async Task<EnumerateResponse<GraphEdgeDto>?> EnumerateEdgesAsync(
+        Guid graphGuid, int maxResults = 1000, Guid? continuationToken = null,
+        CancellationToken ct = default)
+        => await PostEnumerateAsync<GraphEdgeDto>(
+            $"api/graph/{graphGuid}/edges/enumerate", maxResults, continuationToken, ct);
+
+    public async Task<EnumerateResponse<GraphVectorDto>?> EnumerateVectorsAsync(
+        Guid graphGuid, int maxResults = 1000, Guid? continuationToken = null,
+        CancellationToken ct = default)
+        => await PostEnumerateAsync<GraphVectorDto>(
+            $"api/graph/{graphGuid}/vectors/enumerate", maxResults, continuationToken, ct);
+
+    private async Task<EnumerateResponse<T>?> PostEnumerateAsync<T>(
+        string url, int maxResults, Guid? continuationToken, CancellationToken ct)
+    {
+        var body = new Dictionary<string, object?>
+        {
+            ["MaxResults"] = Math.Clamp(maxResults, 1, 1000)
+        };
+        if (continuationToken.HasValue)
+            body["ContinuationToken"] = continuationToken.Value;
+
+        using var resp = await http.PostAsJsonAsync(url, body, ct);
+        if (!resp.IsSuccessStatusCode) return null;
+
+        return await resp.Content.ReadFromJsonAsync<EnumerateResponse<T>>(
+            cancellationToken: ct);
+    }
 }

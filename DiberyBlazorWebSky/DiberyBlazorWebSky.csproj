@@ -13,7 +13,6 @@
 
     <ItemGroup>
       <PackageReference Include="LiteGraph" Version="8.1.0" />
-      <PackageReference Include="LiteGraph.Sdk" Version="8.1.0" />
       <PackageReference Include="Markdig" Version="1.4.0" />
       <PackageReference Include="ModelingEvolution.Blazor.Diagrams" Version="3.0.6" />
       <PackageReference Include="ModelingEvolution.Blazor.Diagrams.Algorithms" Version="3.0.6" />

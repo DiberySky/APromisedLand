@@ -1,0 +1,92 @@
+@page "/graph-explorer-force/topology"
+@namespace DiberyBlazorWebSky.Components.Pages.GraphExplorerForce
+@using DiberyBlazorWebSky.Models.Graph
+@using DiberyBlazorWebSky.Services
+@using DiberyBlazorWebSky.Components.Pages.GraphExplorerForce.Shared
+@rendermode InteractiveServer
+
+<PageTitle>拓扑图</PageTitle>
+
+<div class="explorer-container">
+    <div class="explorer-header">
+        <h1>🌐 拓扑图</h1>
+        <p class="page-subtitle">力导向 / 圆形布局可视化当前图的节点与边关系</p>
+    </div>
+
+    <GraphSelectorBar />
+
+    @if (!string.IsNullOrEmpty(Context.SelectedGraphGuid))
+    {
+        <div class="panel">
+            <div class="crud-bar">
+                <button class="btn-primary" @onclick="LoadTopologyAsync" disabled="@_isBusy">🔄 重新加载拓扑</button>
+                <button class="btn-secondary" @onclick='() => SwitchLayout("force")'
+                        disabled="@(_isBusy || _layoutMode == "force")">🌐 力导向
+                </button>
+                <button class="btn-secondary" @onclick='() => SwitchLayout("circular")'
+                        disabled="@(_isBusy || _layoutMode == "circular")">⭕ 圆形
+                </button>
+                <button class="btn-secondary" @onclick="ShuffleLayout" disabled="@_isBusy">🎲 重新布局</button>
+                @if (_selectedTopologyNode != null)
+                {
+                    <span class="topology-selected">🎯 已选：<strong>@_selectedTopologyNode.Name</strong></span>
+                }
+            </div>
+
+            @if (_isBusy)
+            {
+                <p class="hint">加载中...</p>
+            }
+            else if (_topologyNodes.Count == 0)
+            {
+                <p class="hint">点击"重新加载拓扑"以渲染当前图的节点关系图。</p>
+            }
+            else
+            {
+                <div class="svg-wrap">
+                    <svg viewBox="0 0 800 600" class="graph-svg">
+                        @foreach (var edge in _topologyEdges)
+                        {
+                            var fromPos = GetPosition(edge.From);
+                            var toPos = GetPosition(edge.To);
+                            @if (fromPos.HasValue && toPos.HasValue)
+                            {
+                                var midX = (fromPos.Value.X + toPos.Value.X) / 2;
+                                var midY = (fromPos.Value.Y + toPos.Value.Y) / 2;
+                                <line x1="@fromPos.Value.X" y1="@fromPos.Value.Y"
+                                      x2="@toPos.Value.X" y2="@toPos.Value.Y"
+                                      stroke="#94a3b8" stroke-width="1.5"/>
+                                <svg:text x="@midX" y="@midY" class="edge-label">@edge.Name</svg:text>
+                            }
+                        }
+                        @foreach (var node in _topologyNodes)
+                        {
+                            var pos = GetPosition(node.Guid);
+                            @if (pos.HasValue)
+                            {
+                                var isSelected = _selectedTopologyNode?.Guid == node.Guid;
+                                <g class="node-group" @onclick="() => SelectTopologyNode(node)">
+                                    <circle cx="@pos.Value.X" cy="@pos.Value.Y" r="28"
+                                            fill="@(isSelected ? "#f59e0b" : "#4a90e2")"
+                                            stroke="#fff" stroke-width="2"
+                                            class="node-circle"/>
+                                    <svg:text x="@pos.Value.X" y="@pos.Value.Y" text-anchor="middle" dy="5"
+                                              class="node-label">@node.Name</svg:text>
+                                </g>
+                            }
+                        }
+                    </svg>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="hint">请先在上方选择一个图。</p>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="error-bar">@_errorMessage</div>
+    }
+</div>

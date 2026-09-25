@@ -1,8 +1,7 @@
 using DiberyBlazorWebSky.Components;
+using DiberyBlazorWebSky.Components.Pages.GraphExplorerForce.Shared;
 using DiberyBlazorWebSky.Endpoints;
 using DiberyBlazorWebSky.Services;
-using LiteGraph;
-using LiteGraph.Sdk;
 using Microsoft.Extensions.Http.Resilience;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,16 +52,12 @@ builder.Services.AddHttpClient<GraphAdminApiClient>(client =>
     })
     .RemoveAllResilienceHandlers();
 
-builder.Services.AddSingleton<LiteGraphSdk>(sp =>
-{
-    // LiteGraph REST Server 运行在 8701 端口
-    // "default" 是默认租户标识
-    return new LiteGraphSdk("http://localhost:8701", "default");
-});
-
 builder.Services.AddScoped<GraphImportExportService>();
 
 builder.Services.AddScoped<GraphDynamicContextService>();
+
+// ── GraphExplorer 页面共享状态（跨页面保持选中图）──
+builder.Services.AddScoped<IGraphPageContext, GraphPageState>();
 
 // ── FileStorageApi ──
 // ★ 修复：

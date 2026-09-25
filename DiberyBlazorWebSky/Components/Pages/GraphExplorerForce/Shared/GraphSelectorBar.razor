@@ -1,0 +1,15 @@
+@namespace DiberyBlazorWebSky.Components.Pages.GraphExplorerForce.Shared
+
+<div class="toolbar">
+    <select value="@Context.SelectedGraphGuid" @onchange="OnGraphChanged" class="graph-selector">
+        <option value="">-- 选择图 --</option>
+        @foreach (var g in Context.Graphs)
+        {
+            <option value="@g.Guid">@g.Name</option>
+        }
+    </select>
+    <button class="btn-refresh" @onclick="RefreshAsync" disabled="@Context.IsLoading">🔄 刷新图列表</button>
+    <button class="btn-manage" @onclick="OpenManageDialog" disabled="@Context.IsLoading">⚙️ 图管理</button>
+</div>
+
+<GraphManageDialog IsOpen="_showManageDialog" OnClose="CloseManageDialog" />
