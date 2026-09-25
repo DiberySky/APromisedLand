@@ -81,7 +81,7 @@ public partial class GraphEdges : ComponentBase, IDisposable
             return;
         }
 
-        var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+        var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
         try
         {
             _nodes = await GraphApi.ListAllNodesAsync(graphGuid);
@@ -106,7 +106,7 @@ public partial class GraphEdges : ComponentBase, IDisposable
             return;
         }
 
-        var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+        var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
         _isBusy = true;
         _errorMessage = null;
         StateHasChanged();
@@ -156,7 +156,7 @@ public partial class GraphEdges : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             var edgeName = string.IsNullOrWhiteSpace(_newEdgeName) ? "RELATED_TO" : _newEdgeName.Trim();
 
             var ok = await GraphApi.CreateEdgeAsync(
@@ -193,7 +193,7 @@ public partial class GraphEdges : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             await GraphApi.DeleteEdgeAsync(graphGuid, edgeGuid);
             await LoadEdgesAsync();
         }
@@ -225,7 +225,7 @@ public partial class GraphEdges : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             var ok = await GraphApi.UpdateEdgeAsync(graphGuid, edge.Guid, newName);
             if (ok)
             {

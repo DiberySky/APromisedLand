@@ -80,7 +80,7 @@ public partial class GraphNodes : ComponentBase, IDisposable
             return;
         }
 
-        var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+        var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
         _isBusy = true;
         _errorMessage = null;
         StateHasChanged();
@@ -128,7 +128,7 @@ public partial class GraphNodes : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             var ok = await GraphApi.CreateNodeAsync(graphGuid, _newNodeName.Trim());
             if (ok)
             {
@@ -161,7 +161,7 @@ public partial class GraphNodes : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             await GraphApi.DeleteNodeAsync(graphGuid, nodeGuid);
             _selectedNodeGuids.Remove(nodeGuid);
             await LoadNodesAsync();
@@ -188,7 +188,7 @@ public partial class GraphNodes : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             foreach (var guid in _selectedNodeGuids)
                 await GraphApi.DeleteNodeAsync(graphGuid, guid);
 
@@ -223,7 +223,7 @@ public partial class GraphNodes : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             var ok = await GraphApi.UpdateNodeAsync(graphGuid, node.Guid, newName);
             if (ok)
             {

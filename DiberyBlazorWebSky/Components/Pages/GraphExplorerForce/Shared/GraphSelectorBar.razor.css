@@ -1,0 +1,47 @@
+/* 图选择工具栏 */
+.toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.graph-selector {
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    min-width: 240px;
+}
+
+.btn-refresh {
+    padding: 8px 16px;
+    background: #4a90e2;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.btn-refresh:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+.btn-manage {
+    padding: 8px 16px;
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    transition: background 0.15s;
+}
+
+.btn-manage:hover:not(:disabled) {
+    background: #4f46e5;
+}
+
+.btn-manage:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}

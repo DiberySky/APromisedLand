@@ -1,0 +1,168 @@
+/* 主容器 */
+.explorer-container {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* 返回首页链接 */
+::deep .back-link {
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+    color: #4a90e2;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+
+::deep .back-link:hover {
+    color: #2563eb;
+    text-decoration: underline;
+}
+
+.explorer-header h1 {
+    font-size: 1.6rem;
+    margin: 0 0 4px;
+}
+
+.page-subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0 0 20px;
+}
+
+/* 面板 */
+.panel {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.crud-bar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* 按钮 */
+.btn-primary {
+    padding: 6px 14px;
+    background: #4a90e2;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.btn-secondary {
+    padding: 6px 14px;
+    background: #f59e0b;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.btn-danger {
+    padding: 6px 14px;
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+/* 文件输入 */
+.file-input {
+    font-size: 0.82rem;
+    padding: 4px 8px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    max-width: 220px;
+}
+
+.file-input:hover {
+    border-color: #4a90e2;
+    background: #f8fafc;
+}
+
+.file-status {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-family: monospace;
+    max-width: 480px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 导入选项 */
+.import-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #991b1b;
+    cursor: pointer;
+    user-select: none;
+}
+
+.import-option input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #ef4444;
+    cursor: pointer;
+}
+
+/* 响应结果 */
+.response-box {
+    margin: 16px;
+    padding: 16px;
+    background: #f0fdf4;
+    border-left: 4px solid #22c55e;
+    border-radius: 4px;
+    font-size: 0.88rem;
+}
+
+.response-box ul {
+    padding-left: 20px;
+}
+
+.response-box ul li {
+    margin: 4px 0;
+}
+
+/* 提示 / 错误 */
+.hint {
+    padding: 24px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+.error-bar {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #fef2f2;
+    border-left: 4px solid #ef4444;
+    border-radius: 4px;
+    color: #991b1b;
+    font-size: 0.85rem;
+}

@@ -62,7 +62,7 @@ public partial class GraphTopology : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
 
             _topologyNodes = await GraphApi.ListAllNodesAsync(graphGuid);
             _topologyEdges = await GraphApi.ListAllEdgesAsync(graphGuid);

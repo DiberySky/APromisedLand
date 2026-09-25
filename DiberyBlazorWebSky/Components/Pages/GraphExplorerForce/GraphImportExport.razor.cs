@@ -61,7 +61,7 @@ public partial class GraphImportExport : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             var graphName = Context.Graphs.FirstOrDefault(g => g.Guid == graphGuid)?.Name ?? "graph";
             var json = await GraphApi.ExportGraphJsonAsync(graphGuid);
 
@@ -92,7 +92,7 @@ public partial class GraphImportExport : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             var graphName = Context.Graphs.FirstOrDefault(g => g.Guid == graphGuid)?.Name ?? "graph";
             var csv = await GraphApi.ExportNodesCsvAsync(graphGuid);
 
@@ -123,7 +123,7 @@ public partial class GraphImportExport : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             var graphName = Context.Graphs.FirstOrDefault(g => g.Guid == graphGuid)?.Name ?? "graph";
             var csv = await GraphApi.ExportEdgesCsvAsync(graphGuid);
 
@@ -168,7 +168,7 @@ public partial class GraphImportExport : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
 
             ImportResultDto dto;
             if (!string.IsNullOrEmpty(_selectedJsonContent))

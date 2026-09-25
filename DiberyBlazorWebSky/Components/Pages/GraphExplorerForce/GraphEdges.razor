@@ -10,6 +10,7 @@
 <PageTitle>边管理</PageTitle>
 
 <div class="explorer-container">
+    <NavLink class="back-link" href="/graph-explorer-force">← 返回首页</NavLink>
     <div class="explorer-header">
         <h1>🔗 边管理</h1>
         <p class="page-subtitle">对当前选中图的边进行增删改查操作</p>
@@ -90,7 +91,7 @@
         <p class="hint">请先在上方选择一个图。</p>
     }
 
-    <JsonDetailModal Json="_detailJson" OnClose="CloseDetailModal" />
+    <JsonDetailModal Json="@_detailJson" OnClose="CloseDetailModal" />
 
     @if (!string.IsNullOrEmpty(_errorMessage))
     {

@@ -1,0 +1,69 @@
+/* 主容器 */
+.explorer-container {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.explorer-header h1 {
+    font-size: 1.6rem;
+    margin: 0 0 4px;
+}
+
+.page-subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0 0 20px;
+}
+
+/* 导航卡片 */
+.nav-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+}
+
+::deep .nav-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 24px 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+::deep .nav-card:hover {
+    border-color: #4a90e2;
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.15);
+    transform: translateY(-2px);
+}
+
+.nav-card-icon {
+    font-size: 2rem;
+}
+
+.nav-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.nav-card-desc {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    text-align: center;
+}
+
+.hint {
+    padding: 24px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.9rem;
+}

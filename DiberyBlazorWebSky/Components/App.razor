@@ -6,18 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <base href="/"/>
     <link rel="stylesheet" href="app.css"/>
-    <link rel="stylesheet" href="graph-explorer.css"/>
     <link rel="stylesheet" href="DiberyBlazorWebSky.styles.css"/>
 
     @* ★ 前缀改为 ModelingEvolution.Blazor.Diagrams *@
     <link href="_content/ModelingEvolution.Blazor.Diagrams/style.min.css" rel="stylesheet" />
     <link href="_content/ModelingEvolution.Blazor.Diagrams/default.styles.min.css" rel="stylesheet" />
 
-    <HeadOutlet/>
+    <HeadOutlet @rendermode="InteractiveServer"/>
 </head>
 
 <body>
-<Routes/>
+<Routes @rendermode="InteractiveServer"/>
 
 <script src="js/site.js"></script>
 <script src="js/file-download.js"></script>

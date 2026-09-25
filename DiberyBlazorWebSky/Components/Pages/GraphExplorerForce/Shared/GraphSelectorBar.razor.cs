@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 using Microsoft.AspNetCore.Components.Web;
 
 namespace DiberyBlazorWebSky.Components.Pages.GraphExplorerForce.Shared;

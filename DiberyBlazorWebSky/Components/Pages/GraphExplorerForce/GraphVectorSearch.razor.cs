@@ -103,7 +103,7 @@ public partial class GraphVectorSearch : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
             var query = _vectorQueryText.Trim();
 
             var resp = await GraphApi.SemanticSearchAsync(
@@ -184,7 +184,7 @@ public partial class GraphVectorSearch : ComponentBase, IDisposable
 
         try
         {
-            var graphGuid = Guid.Parse(Context.SelectedGraphGuid);
+            var graphGuid = Guid.Parse(Context.SelectedGraphGuid!);
 
             _vectorProgress = "清理旧向量...";
             StateHasChanged();
