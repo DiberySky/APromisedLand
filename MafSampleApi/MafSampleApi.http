@@ -51,7 +51,7 @@ POST {{host}}/api/chat
 Content-Type: {{contentType}}
 
 {
-  "message": "用 JSON 格式输出三个水果名",
+  "message": "用 JSON 格式输出三个水果名, 用中文输出",
   "sessionId": "demo-002",
   "model": "qwen3:4b"
 }
@@ -127,34 +127,175 @@ Content-Type: application/json
   "sessionId": "rider-sse-test"
 }
 
-### 带脚本处理的 SSE 请求
-// @timeout 300000
-POST http://localhost:5324/api/chat/stream
-Content-Type: application/json
+### ═══════════════════════════════════════════════════════════
+### 4. 循环对话 POST /api/chat/loop (SSE)
+###   同一 session 内多轮迭代，每轮带 round/maxRounds/phase
+### ═══════════════════════════════════════════════════════════
+
+### 4.1 基础循环：默认 3 轮，无 continuePrompt（Agent 自行延续）
+# @timeout 300000
+POST {{host}}/api/chat/loop
+Content-Type: {{contentType}}
+Accept: text/event-stream
 
 {
-  "message": "你好",
-  "sessionId": "rider-script-test"
+  "message": "用一句话介绍杭州",
+  "sessionId": "loop-001"
 }
 
-> {%
-    response.body.onEachLine((line) => {
-        // ★ 关键：先判空
-        if (!line || !line.startsWith("data: ")) return;
+### 4.2 指定轮数 + 指定模型
+# @timeout 300000
+POST {{host}}/api/chat/loop
+Content-Type: {{contentType}}
+Accept: text/event-stream
 
-        const jsonStr = line.substring(6).trim();
-        if (!jsonStr) return;
+{
+  "message": "写一首关于秋天的七言绝句",
+  "sessionId": "loop-002",
+  "model": "qwen3:4b",
+  "maxRounds": 3
+}
 
-        try {
-            const data = JSON.parse(jsonStr);
-            if (data.content && data.content.trim() !== "") {
-                client.log(data.content);
-            }
-            if (data.done) {
-                client.log("--- Stream Finished ---");
-            }
-        } catch (e) {
-            // 忽略无法解析的行
-        }
-    });
-%}
+### 4.3 带 continuePrompt 模板：{previous} 会被上一轮回答替换
+# 第 1 轮写诗 → 第 2 轮点评 → 第 3 轮重写
+# @timeout 300000
+POST {{host}}/api/chat/loop
+Content-Type: {{contentType}}
+Accept: text/event-stream
+
+{
+  "message": "写一首关于秋天的七言绝句。",
+  "sessionId": "loop-003",
+  "continuePrompt": "请针对你刚才写的《{previous}》做一次逐句点评，然后重写一版更凝练的。",
+  "maxRounds": 3
+}
+
+### 4.4 单轮循环：maxRounds=1，行为等同于普通 stream
+# @timeout 300000
+POST {{host}}/api/chat/loop
+Content-Type: {{contentType}}
+Accept: text/event-stream
+
+{
+  "message": "用一句话解释什么是递归。",
+  "sessionId": "loop-004",
+  "maxRounds": 1
+}
+
+### 4.5 轮数越界：maxRounds=999 → 服务端夹紧到 20
+# 谨慎使用，会产生较长输出；仅用于验证 Math.Clamp 生效
+# @timeout 600000
+POST {{host}}/api/chat/loop
+Content-Type: {{contentType}}
+Accept: text/event-stream
+
+{
+  "message": "从 1 数到 3，每一轮只输出一个数字，不要多写。",
+  "sessionId": "loop-005",
+  "continuePrompt": "继续下一个数字。",
+  "maxRounds": 999
+}
+
+### 4.6 空消息：返回 400 + SSE 错误帧
+POST {{host}}/api/chat/loop
+Content-Type: {{contentType}}
+Accept: text/event-stream
+
+{
+  "message": "",
+  "sessionId": "loop-006"
+}
+
+### 4.7 复用已有 session：验证 loop 会带上此前上下文
+# 先跑 4.1 建立 loop-001 上下文，再执行本条
+# @timeout 300000
+POST {{host}}/api/chat/loop
+Content-Type: {{contentType}}
+Accept: text/event-stream
+
+{
+  "message": "把刚才你介绍杭州的内容改写成文言文，分两轮：第一轮列关键词，第二轮成篇。",
+  "sessionId": "loop-001",
+  "maxRounds": 2
+}
+
+### ═══════════════════════════════════════════════════════════
+### 5. 循环对话（非流式）POST /api/chat/loop/sync
+###   一次返回全部轮次结果
+### ═══════════════════════════════════════════════════════════
+
+### 5.1 基础循环：默认 3 轮
+# @timeout 600000
+POST {{host}}/api/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "用一句话介绍南京",
+  "sessionId": "loopsync-001"
+}
+
+### 5.2 指定轮数与模型
+# @timeout 600000
+POST {{host}}/api/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "写一首关于春天的五言绝句",
+  "sessionId": "loopsync-002",
+  "model": "qwen3:4b",
+  "maxRounds": 3,
+  "continuePrompt": "针对你刚写的《{previous}》做逐句点评，指出意象与声律上的不足，然后据此重写一版。"
+}
+
+### 5.3 continuePrompt 模板：{previous} 替换上一轮回答
+// @timeout 300000
+POST {{host}}/api/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "写一首关于秋天的七言绝句。",
+  "sessionId": "loopsync-003",
+  "continuePrompt": "请针对你刚才写的《{previous}》做一次逐句点评，然后重写一版更凝练的。",
+  "maxRounds": 3
+}
+
+### 5.4 单轮：maxRounds=1，行为等同 /api/chat
+POST {{host}}/api/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "用一句话解释什么是递归。",
+  "sessionId": "loopsync-004",
+  "maxRounds": 1
+}
+
+### 5.5 轮数越界：maxRounds=999 → 夹紧到 20
+POST {{host}}/api/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "从 1 数到 3，每一轮只输出一个数字，不要多写。",
+  "sessionId": "loopsync-005",
+  "continuePrompt": "继续下一个数字。",
+  "maxRounds": 999
+}
+
+### 5.6 空消息：应返回 400
+POST {{host}}/api/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "",
+  "sessionId": "loopsync-006"
+}
+
+### 5.7 复用已有 session：验证跨端点共享上下文
+# 先跑 5.1 建立 loopsync-001 的上下文，再执行本条
+POST {{host}}/api/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "把刚才你介绍南京的内容改写成文言文，分两轮：第一轮列关键词，第二轮成篇。",
+  "sessionId": "loopsync-001",
+  "maxRounds": 2
+}

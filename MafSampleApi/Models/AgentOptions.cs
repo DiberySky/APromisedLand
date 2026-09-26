@@ -30,4 +30,16 @@ public sealed class AgentOptions
 
     /// <summary>会话空闲超时（保留字段，用于未来后台清理）。</summary>
     public TimeSpan SessionIdleTimeout { get; set; } = TimeSpan.FromMinutes(30);
+    
+    /// <summary>
+    /// /api/chat 单轮非流式的整体时间预算（秒）。
+    /// 超预算即中断并返回 504。夹紧到 [15, 300]。
+    /// </summary>
+    public int ChatBudgetSeconds { get; set; } = 120;
+    
+    /// <summary>
+    /// /api/chat/loop/sync 的整体时间预算（秒）。
+    /// 超预算即停止后续轮次，返回已完成的部分。夹紧到 [30, 600]。
+    /// </summary>
+    public int LoopBudgetSeconds { get; set; } = 300;
 }
