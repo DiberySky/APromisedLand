@@ -2,13 +2,11 @@ using System.Collections.Specialized;
 using LiteGraph.Sdk;
 using MAFWorkFlowApi.Infrastructure;
 using MAFWorkFlowApi.Models;
-using Microsoft.Extensions.Options;
 
 namespace MAFWorkFlowApi.Services;
 
 public sealed class EdgeAuthoringService(
     LiteGraphRestClient liteGraph,
-    IOptions<LiteGraphOptions> options,
     ILogger<EdgeAuthoringService> logger)
 {
     private readonly Guid _tenantGuid = liteGraph.TenantGuid;
@@ -139,7 +137,7 @@ public sealed class EdgeAuthoringService(
             Labels = edge.Labels,
             Cost = edge.Cost,
             Tags = edge.Tags?.AllKeys
-                .ToDictionary(k => k, k => edge.Tags[k]),
+                .ToDictionary(k => k!, k => edge.Tags[k]!),
             Data = edge.Data,
         };
     }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MAFWorkFlowApi.Infrastructure;
 
 namespace MAFWorkFlowApi.Services;
 
@@ -26,7 +27,7 @@ public sealed class RerankerService
         _logger = logger;
 
         _chatModel = config["Reranker:ChatModel"] ?? "qwen3:8b";
-        _ollamaEndpoint = ResolveOllamaEndpoint(config);
+        _ollamaEndpoint = OllamaEndpointResolver.Resolve(config, fallback: "http://localhost:11618");
         _crossEncoderEndpoint = config["Reranker:Endpoint"];
 
         _logger.LogInformation(
@@ -292,28 +293,6 @@ public sealed class RerankerService
 
     private static string Truncate(string s, int maxLen)
         => string.IsNullOrEmpty(s) || s.Length <= maxLen ? s : s[..maxLen] + "...";
-
-    private static string ResolveOllamaEndpoint(IConfiguration config)
-    {
-        var conn = config.GetConnectionString("ollama")
-                   ?? config["ConnectionStrings:ollama"];
-
-        if (!string.IsNullOrWhiteSpace(conn))
-        {
-            foreach (var part in conn.Split(';', StringSplitOptions.RemoveEmptyEntries))
-            {
-                var eq = part.IndexOf('=');
-                if (eq > 0 && part[..eq].Trim().Equals("Endpoint",
-                        StringComparison.OrdinalIgnoreCase))
-                    return part[(eq + 1)..].Trim().TrimEnd('/');
-            }
-
-            return conn.TrimEnd('/');
-        }
-
-        return config["Ollama:Endpoint"]?.TrimEnd('/')
-               ?? "http://localhost:11618";
-    }
 
     /// <summary>从文本里提取所有数字（按出现顺序）。</summary>
     private static List<double>? ExtractNumbers(string content, int expectedCount)

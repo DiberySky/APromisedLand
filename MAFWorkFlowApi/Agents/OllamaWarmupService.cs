@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using MAFWorkFlowApi.Infrastructure;
 using Microsoft.Extensions.Options;
 
 namespace MAFWorkFlowApi.Agents;
@@ -16,15 +17,18 @@ public sealed class OllamaWarmupService : IHostedService
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly OllamaAgentOptions _options;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<OllamaWarmupService> _logger;
 
     public OllamaWarmupService(
         IHttpClientFactory httpClientFactory,
         IOptions<OllamaAgentOptions> options,
+        IConfiguration configuration,
         ILogger<OllamaWarmupService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _options = options.Value;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -39,7 +43,7 @@ public sealed class OllamaWarmupService : IHostedService
 
     private async Task WarmupAsync(CancellationToken ct)
     {
-        var endpoint = ResolveEndpoint();
+        var endpoint = OllamaEndpointResolver.Resolve(_configuration, _options.Endpoint);
         var modelId = _options.ModelId;
 
         _logger.LogInformation(
@@ -82,62 +86,6 @@ public sealed class OllamaWarmupService : IHostedService
         {
             _logger.LogWarning(ex,
                 "Ollama 预热失败（不影响应用启动），模型：{Model}", modelId);
-        }
-    }
-
-    private string ResolveEndpoint()
-    {
-        // 与健康检查相同的端点解析逻辑
-        string?[] candidates =
-        [
-            _options.Endpoint,
-            Environment.GetEnvironmentVariable("ConnectionStrings__chat-model"),
-            Environment.GetEnvironmentVariable("ConnectionStrings__ollama"),
-            Environment.GetEnvironmentVariable("services__chat-model__http__0"),
-            Environment.GetEnvironmentVariable("services__ollama__http__0"),
-        ];
-
-        foreach (var candidate in candidates)
-        {
-            if (string.IsNullOrWhiteSpace(candidate)) continue;
-
-            var trimmed = candidate.Trim().TrimEnd('/');
-
-            // 处理连接字符串格式（含 "="）
-            if (trimmed.Contains('='))
-            {
-                var extracted = TryExtractEndpointFromConnectionString(trimmed);
-                if (extracted is null) continue;
-                trimmed = extracted;
-            }
-
-            if (!trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                !trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                trimmed = "http://" + trimmed;
-
-            return trimmed;
-        }
-
-        return "http://localhost:11434";
-    }
-
-    private static string? TryExtractEndpointFromConnectionString(string connectionString)
-    {
-        try
-        {
-            var builder = new System.Data.Common.DbConnectionStringBuilder
-            {
-                ConnectionString = connectionString
-            };
-            return builder.TryGetValue("Endpoint", out var value)
-                && value is string s
-                && !string.IsNullOrWhiteSpace(s)
-                ? s.Trim()
-                : null;
-        }
-        catch (ArgumentException)
-        {
-            return null;
         }
     }
 }

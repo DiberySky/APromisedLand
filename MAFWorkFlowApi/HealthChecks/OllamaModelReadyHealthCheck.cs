@@ -1,6 +1,6 @@
-using System.Data.Common;
 using System.Text.Json;
 using MAFWorkFlowApi.Agents;
+using MAFWorkFlowApi.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -26,15 +26,18 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
 
     private readonly OllamaAgentOptions _options;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<OllamaModelReadyHealthCheck> _logger;
 
     public OllamaModelReadyHealthCheck(
         IOptions<OllamaAgentOptions> options,
         IHttpClientFactory httpClientFactory,
+        IConfiguration configuration,
         ILogger<OllamaModelReadyHealthCheck> logger)
     {
         _options = options.Value;
         _httpClientFactory = httpClientFactory;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -42,7 +45,7 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = ResolveEndpoint(_options);
+        var endpoint = OllamaEndpointResolver.Resolve(_configuration, _options.Endpoint);
         var modelId = _options.ModelId;
         var cacheKey = $"{endpoint}|{modelId}";
 
@@ -218,74 +221,5 @@ public sealed class OllamaModelReadyHealthCheck : IHealthCheck
         }
 
         return false;
-    }
-
-    private static string ResolveEndpoint(OllamaAgentOptions options)
-    {
-        if (!string.IsNullOrWhiteSpace(options.Endpoint))
-        {
-            var fromOptions = NormalizeEndpoint(options.Endpoint);
-            if (fromOptions is not null)
-                return fromOptions;
-        }
-
-        string?[] candidates =
-        [
-            Environment.GetEnvironmentVariable("ConnectionStrings__chat-model"),
-            Environment.GetEnvironmentVariable("ConnectionStrings__ollama"),
-            Environment.GetEnvironmentVariable("services__chat-model__http__0"),
-            Environment.GetEnvironmentVariable("services__ollama__http__0"),
-        ];
-
-        foreach (var candidate in candidates)
-        {
-            if (string.IsNullOrWhiteSpace(candidate)) continue;
-            var normalized = NormalizeEndpoint(candidate);
-            if (normalized is not null) return normalized;
-        }
-
-        return "http://localhost:11434";
-    }
-
-    private static string? NormalizeEndpoint(string raw)
-    {
-        var trimmed = raw.Trim();
-        if (trimmed.Length == 0) return null;
-
-        if (trimmed.Contains('='))
-        {
-            var extracted = TryExtractEndpointFromConnectionString(trimmed);
-            return extracted is not null ? AddSchemeIfMissing(extracted) : null;
-        }
-
-        return AddSchemeIfMissing(trimmed);
-    }
-
-    private static string? TryExtractEndpointFromConnectionString(string connectionString)
-    {
-        try
-        {
-            var builder = new DbConnectionStringBuilder
-            {
-                ConnectionString = connectionString
-            };
-            if (builder.TryGetValue("Endpoint", out var value)
-                && value is string endpointStr
-                && !string.IsNullOrWhiteSpace(endpointStr))
-            {
-                return endpointStr.Trim();
-            }
-        }
-        catch (ArgumentException) { }
-        return null;
-    }
-
-    private static string AddSchemeIfMissing(string url)
-    {
-        var trimmed = url.Trim().TrimEnd('/');
-        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-            trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            return trimmed;
-        return "http://" + trimmed;
     }
 }

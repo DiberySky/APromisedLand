@@ -3,13 +3,11 @@ using System.Text.Json;
 using LiteGraph.Sdk;   // 只借用 Node/Edge 数据模型
 using MAFWorkFlowApi.Infrastructure;
 using MAFWorkFlowApi.Models;
-using Microsoft.Extensions.Options;
 
 namespace MAFWorkFlowApi.Services;
 
 public sealed class NodeAuthoringService(
     LiteGraphRestClient liteGraph,
-    IOptions<LiteGraphOptions> options,
     ILogger<NodeAuthoringService> logger)
 {
     private readonly Guid _tenantGuid = liteGraph.TenantGuid;
@@ -262,7 +260,7 @@ public sealed class NodeAuthoringService(
             Name = node.Name,
             Labels = node.Labels,
             Tags = node.Tags?.AllKeys
-                .ToDictionary(k => k, k => node.Tags[k]),
+                .ToDictionary(k => k!, k => node.Tags[k]!),
             Data = node.Data,
         };
     }

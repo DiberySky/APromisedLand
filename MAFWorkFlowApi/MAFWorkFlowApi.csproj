@@ -19,8 +19,6 @@
         </PackageReference>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.12" />
-        <PackageReference Include="Microsoft.SemanticKernel" Version="1.80.1" />
-        <PackageReference Include="Microsoft.SemanticKernel.Connectors.Ollama" Version="1.80.1-alpha" />
         <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
         <PackageReference Include="OllamaSharp" Version="5.4.30" />
     </ItemGroup>
