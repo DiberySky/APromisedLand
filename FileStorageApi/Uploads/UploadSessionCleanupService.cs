@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Options;
-using System.Diagnostics;                    // ★ 新增
 
 namespace FileStorageApi.Uploads;
 
@@ -19,7 +18,21 @@ public sealed class UploadSessionCleanupService : BackgroundService
         _logger       = logger;
     }
 
-    [DebuggerDisableUserUnhandledExceptions]                    // ★
+    // ══════════════════════════════════════════════════════════
+    // 主循环：所有异常都不允许逃逸到宿主。
+    //
+    // ★ 关于 [DebuggerDisableUserUnhandledExceptions]：
+    //   已彻底删除。该特性不是"让调试器忽略异常"，而是
+    //   "当异常从本方法逃逸时，主动调用
+    //   Debugger.BreakForUserUnhandledException"。
+    //   保留它反而会让调试器在后台任务出问题时中断。
+    //
+    // ★ 关于 catch (Exception)：
+    //   必须放在 ExecuteAsync 的最外层。BackgroundService 的
+    //   ExecuteAsync 抛出的异常会被 Host 记录，但 .NET 9 的
+    //   Debugger.BreakForUserUnhandledException 会在异常逃逸的
+    //   瞬间触发，因此任何异常都不能离开此方法。
+    // ══════════════════════════════════════════════════════════
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = _options.Value;
@@ -31,7 +44,7 @@ public sealed class UploadSessionCleanupService : BackgroundService
         }
 
         var configuredDelay = opts.EffectiveStartupDelay;
-        var effectiveDelay = configuredDelay < TimeSpan.FromMinutes(2)
+        var effectiveDelay  = configuredDelay < TimeSpan.FromMinutes(2)
             ? TimeSpan.FromMinutes(2)
             : configuredDelay;
 
@@ -54,14 +67,25 @@ public sealed class UploadSessionCleanupService : BackgroundService
                 await Task.Delay(interval, stoppingToken);
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // 正常关闭，不记录为错误
+        }
+        catch (Exception ex)
+        {
+            // 兜底：不让任何异常逃逸到宿主，
+            // 避免触发 BreakForUserUnhandledException。
+            _logger.LogError(ex, "上传会话清理服务遇到未预期异常，即将退出。");
+        }
         finally
         {
             _logger.LogInformation("上传会话清理服务已停止。");
         }
     }
 
-    [DebuggerDisableUserUnhandledExceptions]                    // ★
+    // ══════════════════════════════════════════════════════════
+    // 单次清理。返回 false 表示应终止主循环。
+    // ══════════════════════════════════════════════════════════
     private async Task<bool> RunOnceAsync(CancellationToken stoppingToken)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -95,7 +119,7 @@ public sealed class UploadSessionCleanupService : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            return false;
+            return false;   // 停机期间取消 → 正常结束
         }
         catch (Exception ex)
         {
@@ -103,7 +127,7 @@ public sealed class UploadSessionCleanupService : BackgroundService
             _logger.LogError(ex,
                 "清理过期上传会话失败（已运行 {ElapsedMs} ms），将在下一轮重试。",
                 sw.ElapsedMilliseconds);
-            return true;
+            return true;    // 失败不终止循环
         }
     }
 }

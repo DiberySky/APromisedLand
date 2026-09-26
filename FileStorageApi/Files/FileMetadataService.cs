@@ -31,7 +31,6 @@ public sealed class FileMetadataService : IFileMetadataService
         _logger     = logger;
     }
 
-    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<IReadOnlyList<FileMetadataDto>> ListAsync(
         int skip, int take, CancellationToken ct)
     {
@@ -46,7 +45,6 @@ public sealed class FileMetadataService : IFileMetadataService
         return items.Select(ToDto).ToList();
     }
 
-    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<FileMetadataDto?> GetByIdAsync(Guid id, CancellationToken ct)
     {
         var m = await _db.DocumentMetadata
@@ -55,7 +53,6 @@ public sealed class FileMetadataService : IFileMetadataService
         return m is null ? null : ToDto(m);
     }
 
-    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<FileMetadataDto?> GetByDocIdAsync(
         string docId, int? version, CancellationToken ct)
     {
@@ -75,7 +72,6 @@ public sealed class FileMetadataService : IFileMetadataService
         return m is null ? null : ToDto(m);
     }
 
-    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<DownloadResult?> DownloadAsync(
         Guid id, long? rangeStart, long? rangeEnd, CancellationToken ct)
     {
@@ -112,7 +108,6 @@ public sealed class FileMetadataService : IFileMetadataService
             get.ContentRange);
     }
 
-    [DebuggerDisableUserUnhandledExceptions]                    // ★
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
     {
         var m = await _db.DocumentMetadata

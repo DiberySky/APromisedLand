@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
@@ -107,7 +108,7 @@ builder.Services.Configure<HealthCheckPublisherOptions>(options =>
 {
     options.Delay   = TimeSpan.FromSeconds(30);   // 启动后 30 秒再检查（避开清理服务启动和EF迁移）
     options.Period  = TimeSpan.FromSeconds(30);   // 每 30 秒一次
-    options.Timeout = TimeSpan.FromSeconds(30);   // 单次检查放宽到 30 秒超时
+    options.Timeout = TimeSpan.FromSeconds(60);   // 单次检查放宽到 60 秒超时
 });
 
 var app = builder.Build();

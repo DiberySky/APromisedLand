@@ -2,39 +2,38 @@ using System.Threading.Channels;
 
 namespace FileStorageApi.Files;
 
-/// <summary>审计写入条目（与 DbContext 解耦，由后台服务批量落库）。</summary>
-public sealed record AuditEntry(
-    string DocId,
-    string Tenant,
-    string Action,
-    string? Actor,
-    string? DetailsJson);
-
-/// <summary>
-/// 审计写入队列。有界 Channel + DropOldest：
-///   - 满时丢弃最旧，避免阻塞请求线程
-///   - 单读者（AuditWriterService），多写者（请求线程）
-///   - 应用关闭时残留条目可能丢失（研发阶段可接受）
-/// </summary>
 public sealed class AuditQueue
 {
-    private const int DefaultCapacity = 10_000;
+    private readonly Channel<AuditEntry> _channel =
+        Channel.CreateUnbounded<AuditEntry>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        });
 
-    private readonly Channel<AuditEntry> _channel;
-
-    public AuditQueue(int capacity = DefaultCapacity)
-    {
-        _channel = Channel.CreateBounded<AuditEntry>(
-            new BoundedChannelOptions(capacity)
-            {
-                FullMode     = BoundedChannelFullMode.DropOldest,
-                SingleReader = true,
-                SingleWriter = false,
-            });
-    }
-
-    /// <summary>非阻塞入队。队列满时返回 false（旧条目被丢弃）。</summary>
+    /// <summary>非阻塞入队，永远成功（unbounded channel）。</summary>
     public bool TryEnqueue(AuditEntry entry) => _channel.Writer.TryWrite(entry);
 
-    public ChannelReader<AuditEntry> Reader => _channel.Reader;
+    /// <summary>异步入队（当前 unbounded，不会真正阻塞）。</summary>
+    public ValueTask EnqueueAsync(AuditEntry record, CancellationToken ct = default)
+        => _channel.Writer.WriteAsync(record, ct);
+
+    /// <summary>
+    /// 取一批：首条阻塞等待，避免 CPU 空转；
+    /// 拿到首条后尽量填满 max。
+    /// </summary>
+    public async Task<IReadOnlyList<AuditEntry>> DequeueBatchAsync(
+        int max, CancellationToken ct)
+    {
+        var list = new List<AuditEntry>(max);
+
+        if (await _channel.Reader.WaitToReadAsync(ct))
+        {
+            while (list.Count < max && _channel.Reader.TryRead(out var item))
+            {
+                list.Add(item);
+            }
+        }
+        return list;
+    }
 }

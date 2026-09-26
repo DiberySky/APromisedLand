@@ -23,13 +23,15 @@ void MafWorkFlowService()
 
     // builder.AddNornicDb(context); 
     builder.AddLiteGraph(context);
-    
-    builder.AddMafWorkFlowApi(context);
 
     // ★ 再声明 RerankerService（注入环境变量给 MAFWorkFlowApi）
     builder.AddRerankerService(context);
     
-    builder.AddBlazorWeb(context);
+    //builder.AddMafWorkFlowApi(context);
+
+    builder.AddMafSampleApi(context);  
+    
+    // builder.AddBlazorWeb(context);
 }
 
 void MafRag()

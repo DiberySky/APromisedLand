@@ -42,6 +42,9 @@ public class AppHostResourceContext
     // ── 业务微服务 ──
     public IResourceBuilder<ProjectResource>? FileStorageApi { get; set; }
     public IResourceBuilder<ProjectResource>? MafWorkFlowApi { get; set; }
+    public IResourceBuilder<ProjectResource>? MafSampleApi { get; set; }
+
+
 
     // ── 前端 ──
     public IResourceBuilder<ProjectResource>? BlazorWeb { get; set; }
@@ -74,6 +77,7 @@ public class AppHostResourceContext
     public IResourceBuilder<OllamaModelResource>? Embedding { get; set; }
     public IResourceBuilder<OllamaModelResource>? ChatModel { get; set; }
     public IResourceBuilder<PythonAppResource>? RerankerService { get; set; }
+    
 
     // 模型名不再通过 Context 传递；下游请直接引用 OllamaExtension 上的
     // EmbeddingModelName / ChatModelName / EmbeddingDimension 常量。
