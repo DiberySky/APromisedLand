@@ -5,15 +5,30 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var context = new AppHostResourceContext();
 
-//MafWorkFlowService();
-//MafSampleApi();
-
 builder.AddVllm(context);
+
+MafSampleApi();
+
+//MafWorkFlowService();
 
 builder.Build().Run();
 return;
 
 void MafSampleApi()
+{
+    builder.AddPostgres(context);
+    builder.AddRedis(context);
+
+    // ★ 不再需要 AddOllama —— Chat/Embedding 都走 vLLM
+    // builder.AddOllama(context);
+
+    // builder.AddFileStorageApi(context);
+    builder.AddLiteGraph(context);
+    builder.AddRerankerService(context);
+    builder.AddMafSampleApi(context);
+}
+
+void MafSampleApiOllama()
 {
     builder.AddPostgres(context);
     builder.AddRedis(context);

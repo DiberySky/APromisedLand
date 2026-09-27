@@ -13,17 +13,52 @@ builder.Services
     .Bind(builder.Configuration.GetSection(AgentOptions.SectionName))
     .ValidateOnStart();
 
-// ─── 2. vLLM / OpenAI 兼容端点
+// ═══════════════════════════════════════════════════════════
+// 2. vLLM Chat 客户端 + think 剥离装饰器
+// ═══════════════════════════════════════════════════════════
 builder.Services.AddSingleton<IChatClient>(sp =>
 {
-    var opts = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
+    var opts   = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
     var logger = sp.GetRequiredService<ILogger<Program>>();
 
     var endpoint = Environment.GetEnvironmentVariable("VLLM_HTTP")
                    ?? opts.Endpoint
                    ?? "http://localhost:8000";
 
-    logger.LogInformation("IChatClient 指向: {Endpoint}, 模型: {Model}", endpoint, opts.ChatModel);
+    logger.LogInformation(
+        "IChatClient → {Endpoint}, 模型: {Model}", endpoint, opts.ChatModel);
+
+    var openAiOptions = new OpenAIClientOptions
+    {
+        Endpoint = new Uri(endpoint.TrimEnd('/') + "/v1")
+    };
+
+    IChatClient inner = new OpenAIClient(
+            new ApiKeyCredential(opts.ApiKey),
+            openAiOptions)
+        .GetChatClient(opts.ChatModel)
+        .AsIChatClient();
+
+    return new ThinkStrippingChatClient(
+        inner,
+        sp.GetRequiredService<ILogger<ThinkStrippingChatClient>>());
+});
+
+// ═══════════════════════════════════════════════════════════
+// 3. vLLM Embedding 客户端
+// ═══════════════════════════════════════════════════════════
+builder.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
+{
+    var opts = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
+    var logger = sp.GetRequiredService<ILogger<Program>>();
+
+    var endpoint = Environment.GetEnvironmentVariable("VLLM_EMBEDDING_HTTP")
+                   ?? opts.EmbeddingEndpoint
+                   ?? "http://localhost:8001";
+
+    logger.LogInformation(
+        "IEmbeddingGenerator → {Endpoint}, 模型: {Model}",
+        endpoint, opts.EmbeddingModel);
 
     var openAiOptions = new OpenAIClientOptions
     {
@@ -31,19 +66,33 @@ builder.Services.AddSingleton<IChatClient>(sp =>
     };
 
     return new OpenAIClient(
-            new ApiKeyCredential("EMPTY"),
+            new ApiKeyCredential(opts.ApiKey),
             openAiOptions)
-        .GetChatClient(opts.ChatModel)
-        .AsIChatClient();
+        .GetEmbeddingClient(opts.EmbeddingModel)
+        .AsIEmbeddingGenerator();
 });
 
-// ─── 3. MAF 服务
+// ═══════════════════════════════════════════════════════════
+// 4. vLLM 探活专用 HttpClient（★ 就是缺这一块）
+// ═══════════════════════════════════════════════════════════
+builder.Services.AddHttpClient("vllm", (sp, http) =>
+{
+    var opts = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
+
+    var endpoint = Environment.GetEnvironmentVariable("VLLM_HTTP")
+                   ?? opts.Endpoint
+                   ?? "http://localhost:8000";
+
+    http.BaseAddress = new Uri(endpoint.TrimEnd('/') + "/");
+    http.Timeout = TimeSpan.FromSeconds(5);
+});
+
+// ─── 5. MAF 服务 ────────────────────────────────────────────
 builder.Services.AddSingleton<IAgentFactory, AgentFactory>();
 builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
-// ★ 删掉 OllamaWarmupService —— 那是 Ollama 专用的
-// builder.Services.AddHostedService<OllamaWarmupService>();
+builder.Services.AddHostedService<VllmWarmupService>();
 
-// ─── 4. ASP.NET Core
+// ─── 6. ASP.NET Core ───────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

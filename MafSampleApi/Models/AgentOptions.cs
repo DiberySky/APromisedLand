@@ -1,30 +1,32 @@
 ﻿namespace MafSampleApi.Models;
 
-/// <summary>Ollama / vLLM 相关配置，绑定 appsettings.json 的 "Agent" 节。</summary>
+/// <summary>vLLM 相关配置，绑定 appsettings.json 的 "Agent" 节。</summary>
 public sealed class AgentOptions
 {
     public const string SectionName = "Agent";
 
-    // ─── 后端端点 ─────────────────────────────────────────────
+    // ─── Chat 端点 ────────────────────────────────────────────
     /// <summary>
     /// OpenAI 兼容端点（不带 /v1）。
-    /// - vLLM：http://localhost:8000
-    /// - Ollama 的 OpenAI 兼容层：http://localhost:11434
+    /// 由 Aspire 注入的 VLLM_HTTP 环境变量覆盖。
     /// </summary>
     public string Endpoint { get; set; } = "http://localhost:8000";
 
     /// <summary>API Key。vLLM 不校验，传非空字符串即可。</summary>
     public string ApiKey { get; set; } = "EMPTY";
 
-    // ─── 模型 ─────────────────────────────────────────────────
+    // ─── Embedding 端点 ───────────────────────────────────────
     /// <summary>
-    /// 聊天模型名。
-    /// - vLLM：与 --served-model-name 一致（qwen3-4b-awq）
-    /// - Ollama：qwen3:4b
+    /// Embedding 的 OpenAI 兼容端点（不带 /v1）。
+    /// 由 Aspire 注入的 VLLM_EMBEDDING_HTTP 覆盖。
     /// </summary>
+    public string EmbeddingEndpoint { get; set; } = "http://localhost:8001";
+
+    // ─── 模型 ─────────────────────────────────────────────────
+    /// <summary>聊天模型名（与 vLLM --served-model-name 一致）。</summary>
     public string ChatModel { get; set; } = "qwen3-4b-awq";
 
-    /// <summary>嵌入模型。</summary>
+    /// <summary>嵌入模型名（与 vLLM --served-model-name 一致）。</summary>
     public string EmbeddingModel { get; set; } = "bge-m3";
 
     // ─── 提示词 ───────────────────────────────────────────────
@@ -36,9 +38,6 @@ public sealed class AgentOptions
     public TimeSpan SessionIdleTimeout { get; set; } = TimeSpan.FromMinutes(30);
 
     // ─── 超时预算 ─────────────────────────────────────────────
-    /// <summary>/api/chat 单轮非流式的整体时间预算（秒），夹紧到 [15, 300]。</summary>
     public int ChatBudgetSeconds { get; set; } = 120;
-
-    /// <summary>/api/chat/loop/sync 的整体时间预算（秒），夹紧到 [30, 600]。</summary>
     public int LoopBudgetSeconds { get; set; } = 240;
 }

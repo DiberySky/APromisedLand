@@ -1,14 +1,12 @@
 using Aspire.Hosting;
-using Aspire.Hosting.ApplicationModel;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace APromisedLand.AppHost.Extensions;
 
 /// <summary>
 /// MafSampleApi 的 Aspire 编排扩展。
-/// 结构与 <see cref="MafWorkFlowExtension"/> 保持一致：
-/// 固定端口 → 链式 WireIfPresent → 模型名注入 → 端点注入 → 外部资源 → 健康检查 → OTLP。
+/// ★ 后端已从 Ollama 迁移到 vLLM：
+///   - Chat:      vllm 容器       (Qwen3-4B-AWQ)
+///   - Embedding: vllm-embed 容器 (BAAI/bge-m3)
 /// </summary>
 public static class MafSampleApiExtension
 {
@@ -24,42 +22,71 @@ public static class MafSampleApiExtension
             .WithHttpEndpoint(port: MafSampleApiHttpPort, name: "http");
 
         // ─── 内部资源：链式 WireIfPresent ──────────────────────────
-        // MAF Chat/SSE 场景只需要 Redis（会话持久化可选）与 Ollama。
-        // ChatModel / Embedding 作为模型资源本身不直接 Wire，
-        // 而是等待 Ollama 容器就绪后由 Ollama 内部拉起模型。
+        // 仅 Redis / LiteGraph 这类实现 IResourceWithConnectionString 的资源
+        // 才能走 WireIfPresent。
+        // vLLM 是 ContainerResource，没有连接字符串概念 → 下方用 WaitFor + 环境变量。
         context.MafSampleApi
             .WireIfPresent(context.Redis)
-            .WireIfPresent(context.Ollama)
-            .WireIfPresent(context.ChatModel, waitFor: false)
-            .WireIfPresent(context.Embedding, waitFor: false)
             .WireIfPresent(context.LiteGraph);
 
         // ══════════════════════════════════════════════════════════
-        // ★ 模型名注入（引用常量，不依赖 AddOllama 的调用顺序）
+        // ★ 模型名注入（引用 VllmExtension 常量，与容器 --served-model-name 一致）
         //   配置键与 AgentOptions 一一对应（AgentOptions.SectionName = "Agent"）
         // ══════════════════════════════════════════════════════════
         context.MafSampleApi
-            .WithEnvironment("Agent__ChatModel",      OllamaExtension.ChatModelName)
-            .WithEnvironment("Agent__EmbeddingModel", OllamaExtension.EmbeddingModelName)
-            .WithEnvironment("Agent__ModelId",        OllamaExtension.ChatModelName)
-            .WithEnvironment("Agent__MaxSessions",    "256")
-            .WithEnvironment("Agent__SessionIdleTimeout", "00:30:00");
+            .WithEnvironment("Agent__ChatModel",           VllmExtension.ServedModelName)
+            .WithEnvironment("Agent__EmbeddingModel",      VllmExtension.ServedEmbeddingModelName)
+            .WithEnvironment("Agent__MaxSessions",         "256")
+            .WithEnvironment("Agent__SessionIdleTimeout",  "00:30:00")
+            .WithEnvironment("Agent__ChatBudgetSeconds",   "120")
+            .WithEnvironment("Agent__LoopBudgetSeconds",   "240");
 
         // ══════════════════════════════════════════════════════════
-        // ★ Ollama 端点显式注入
-        //   Program.cs 读取 OLLAMA_ENDPOINT（优先级最高），
-        //   兜底读 Ollama:Endpoint。两条路径都铺好，避免容器 DNS 解析差异。
+        // ★ vLLM Chat 容器：WaitFor + 显式端点注入
+        //   ContainerResource 不实现 IResourceWithConnectionString，
+        //   不能用 WireIfPresent / WithReference，只能 WaitFor 等健康检查通过，
+        //   然后手动把 Endpoint 写进环境变量。
+        //   Program.cs 优先级：VLLM_HTTP > Agent:Endpoint > localhost:8000
         // ══════════════════════════════════════════════════════════
-        if (context.Ollama is not null)
+        if (context.Vllm is not null)
         {
-            var ollamaEndpoint = context.Ollama.GetEndpoint(OllamaExtension.HttpEndpointName);
+            var chatEndpoint = context.Vllm.GetEndpoint(VllmExtension.HttpEndpointName);
+
             context.MafSampleApi
-                .WithEnvironment("OLLAMA_ENDPOINT", ollamaEndpoint)
-                .WithEnvironment("Ollama__Endpoint", ollamaEndpoint);
+                .WaitFor(context.Vllm)                  // ← 等 /health 探活通过
+                .WithEnvironment("VLLM_HTTP",       chatEndpoint)
+                .WithEnvironment("Agent__Endpoint", chatEndpoint);
+
+            Console.WriteLine($"[MafSampleApi] Chat 端点 → {chatEndpoint}");
+        }
+        else
+        {
+            Console.WriteLine("[MafSampleApi] ⚠️ context.Vllm 为 null，未注入 Chat 端点");
         }
 
         // ══════════════════════════════════════════════════════════
-        // ★ LiteGraph 端点注入（与 MafWorkFlowApi 保持一致的键名）
+        // ★ vLLM Embedding 容器：同上
+        //   Program.cs 优先级：VLLM_EMBEDDING_HTTP > Agent:EmbeddingEndpoint > localhost:8001
+        // ══════════════════════════════════════════════════════════
+        if (context.VllmEmbed is not null)
+        {
+            var embedEndpoint = context.VllmEmbed.GetEndpoint(
+                VllmExtension.EmbeddingHttpEndpointName);
+
+            context.MafSampleApi
+                .WaitFor(context.VllmEmbed)
+                .WithEnvironment("VLLM_EMBEDDING_HTTP",      embedEndpoint)
+                .WithEnvironment("Agent__EmbeddingEndpoint", embedEndpoint);
+
+            Console.WriteLine($"[MafSampleApi] Embedding 端点 → {embedEndpoint}");
+        }
+        else
+        {
+            Console.WriteLine("[MafSampleApi] ⚠️ context.VllmEmbed 为 null，未注入 Embedding 端点");
+        }
+
+        // ══════════════════════════════════════════════════════════
+        // ★ LiteGraph 端点注入
         // ══════════════════════════════════════════════════════════
         if (context.LiteGraph is not null)
         {
@@ -69,25 +96,9 @@ public static class MafSampleApiExtension
                     context.LiteGraph.GetEndpoint(LiteGraphResource.HttpEndpointName));
         }
 
-        // ─── 外部资源 ─────────────────────────────────────────────
-        // using var loggerFactory = LoggerFactory.Create(logging =>
-        // {
-        //     logging.AddSimpleConsole(o => o.SingleLine = true);
-        //     logging.SetMinimumLevel(LogLevel.Information);
-        // });
-        // var logger = loggerFactory.CreateLogger("MafSampleApiExtension");
-
-        // ExternalServiceBinding[] externalBindings =
-        // [
-        //     ExternalServiceBinding.From(
-        //         context.SeaweedS3, endpointName: "s3",
-        //         connectionStringName: "seaweedfs"),
-        // ];
-        //
-        // foreach (var binding in externalBindings)
-        //     binding.Apply(builder, context.MafSampleApi, logger);
-
         // ─── 健康检查 ─────────────────────────────────────────────
+        // 轻量端点 /api/health，永远 200，供 liveness probe 使用。
+        // 深度端点 /api/health/deep 会探活 vLLM，供 readiness 使用。
         context.MafSampleApi
             .WithHttpHealthCheck(
                 path: "/api/health",
