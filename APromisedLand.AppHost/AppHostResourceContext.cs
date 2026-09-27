@@ -78,6 +78,8 @@ public class AppHostResourceContext
     public IResourceBuilder<OllamaModelResource>? ChatModel { get; set; }
     public IResourceBuilder<PythonAppResource>? RerankerService { get; set; }
     
+    /// <summary>vLLM 容器资源（AddContainer 返回 ContainerResource）。</summary>
+    public IResourceBuilder<ContainerResource>? Vllm { get; set; }
 
     // 模型名不再通过 Context 传递；下游请直接引用 OllamaExtension 上的
     // EmbeddingModelName / ChatModelName / EmbeddingDimension 常量。

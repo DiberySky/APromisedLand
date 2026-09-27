@@ -46,6 +46,25 @@ Content-Type: {{contentType}}
   "sessionId": "demo-001"
 }
 
+### 1.2.1 显式指定 sessionId（多轮对话起点）
+# @name chatTurn1
+POST {{host}}/api/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "我叫小明",
+  "sessionId": "demo-101"
+}
+
+### 1.3.1 第二轮：复用同一 sessionId，验证上下文记忆
+POST {{host}}/api/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "我叫什么名字？",
+  "sessionId": "demo-101"
+}
+
 ### 1.4 指定模型（覆盖 AgentOptions.ChatModel）
 POST {{host}}/api/chat
 Content-Type: {{contentType}}
@@ -298,4 +317,22 @@ Content-Type: {{contentType}}
   "message": "把刚才你介绍南京的内容改写成文言文，分两轮：第一轮列关键词，第二轮成篇。",
   "sessionId": "loopsync-001",
   "maxRounds": 2
+}
+
+### 6.1 最简调用：只传 message，服务端自动生成 sessionId
+POST {{host}}/api/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "你好，我是老陳",
+  "sessionId": "chat-101",
+}
+
+### 6.1 最简调用：只传 message，服务端自动生成 sessionId
+POST {{host}}/api/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "我是谁？",
+  "sessionId": "chat-101",
 }

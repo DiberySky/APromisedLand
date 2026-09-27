@@ -5,10 +5,32 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var context = new AppHostResourceContext();
 
-MafWorkFlowService();
+//MafWorkFlowService();
+//MafSampleApi();
+
+builder.AddVllm(context);
 
 builder.Build().Run();
 return;
+
+void MafSampleApi()
+{
+    builder.AddPostgres(context);
+    builder.AddRedis(context);
+    builder.AddOllama(context);
+
+    builder.AddFileStorageApi(context);
+
+    builder.AddLiteGraph(context);
+
+    // ★ 再声明 RerankerService（注入环境变量给 MAFWorkFlowApi）
+    builder.AddRerankerService(context);
+    
+    builder.AddMafSampleApi(context);  
+    
+    // builder.AddBlazorWeb(context);
+}
+
 
 void MafWorkFlowService()
 {
@@ -27,11 +49,9 @@ void MafWorkFlowService()
     // ★ 再声明 RerankerService（注入环境变量给 MAFWorkFlowApi）
     builder.AddRerankerService(context);
     
-    //builder.AddMafWorkFlowApi(context);
-
-    builder.AddMafSampleApi(context);  
+    builder.AddMafWorkFlowApi(context);
     
-    // builder.AddBlazorWeb(context);
+    builder.AddBlazorWeb(context);
 }
 
 void MafRag()

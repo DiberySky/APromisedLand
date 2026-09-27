@@ -70,22 +70,22 @@ public static class MafSampleApiExtension
         }
 
         // ─── 外部资源 ─────────────────────────────────────────────
-        using var loggerFactory = LoggerFactory.Create(logging =>
-        {
-            logging.AddSimpleConsole(o => o.SingleLine = true);
-            logging.SetMinimumLevel(LogLevel.Information);
-        });
-        var logger = loggerFactory.CreateLogger("MafSampleApiExtension");
+        // using var loggerFactory = LoggerFactory.Create(logging =>
+        // {
+        //     logging.AddSimpleConsole(o => o.SingleLine = true);
+        //     logging.SetMinimumLevel(LogLevel.Information);
+        // });
+        // var logger = loggerFactory.CreateLogger("MafSampleApiExtension");
 
-        ExternalServiceBinding[] externalBindings =
-        [
-            ExternalServiceBinding.From(
-                context.SeaweedS3, endpointName: "s3",
-                connectionStringName: "seaweedfs"),
-        ];
-
-        foreach (var binding in externalBindings)
-            binding.Apply(builder, context.MafSampleApi, logger);
+        // ExternalServiceBinding[] externalBindings =
+        // [
+        //     ExternalServiceBinding.From(
+        //         context.SeaweedS3, endpointName: "s3",
+        //         connectionStringName: "seaweedfs"),
+        // ];
+        //
+        // foreach (var binding in externalBindings)
+        //     binding.Apply(builder, context.MafSampleApi, logger);
 
         // ─── 健康检查 ─────────────────────────────────────────────
         context.MafSampleApi
