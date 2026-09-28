@@ -63,6 +63,20 @@ public static class MafSampleApiExtension
         {
             Console.WriteLine("[MafSampleApi] ⚠️ context.Vllm 为 null，未注入 Chat 端点");
         }
+        
+        // ══════════════════════════════════════════════════════════
+        // ★ Reranker 端点注入
+        // ══════════════════════════════════════════════════════════
+        if (context.RerankerService is not null)
+        {
+            var rerankerEndpoint = context.RerankerService.GetEndpoint("http");
+
+            context.MafSampleApi
+                .WithEnvironment("Reranker__Endpoint", rerankerEndpoint)
+                .WaitFor(context.RerankerService);
+
+            Console.WriteLine($"[MafSampleApi] Reranker 端点 → {rerankerEndpoint}");
+        }
 
         // ══════════════════════════════════════════════════════════
         // ★ vLLM Embedding 容器：同上

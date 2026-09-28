@@ -87,15 +87,43 @@ builder.Services.AddHttpClient("vllm", (sp, http) =>
     http.Timeout = TimeSpan.FromSeconds(5);
 });
 
-// ─── 5. MAF 服务 ────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// 5. Reranker 客户端
+// ═══════════════════════════════════════════════════════════
+builder.Services
+    .AddOptions<RerankerOptions>()
+    .Bind(builder.Configuration.GetSection(RerankerOptions.SectionName));
+
+builder.Services.AddHttpClient<IRerankerClient, RerankerClient>("reranker",
+    (sp, http) =>
+    {
+        var opts = sp.GetRequiredService<IOptions<RerankerOptions>>().Value;
+        var endpoint = Environment.GetEnvironmentVariable("Reranker__Endpoint")
+                       ?? opts.Endpoint
+                       ?? "http://localhost:5919";
+        http.BaseAddress = new Uri(endpoint.TrimEnd('/') + "/");
+        http.Timeout     = TimeSpan.FromSeconds(opts.TimeoutSeconds);
+        sp.GetRequiredService<ILogger<Program>>()
+            .LogInformation("Reranker client → {Endpoint}", endpoint);
+    });
+
+// ─── 6. MAF 服务 ────────────────────────────────────────────
 builder.Services.AddSingleton<IAgentFactory, AgentFactory>();
 builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
 builder.Services.AddHostedService<VllmWarmupService>();
 
-// ─── 6. ASP.NET Core ───────────────────────────────────────
+// ─── 7. ASP.NET Core ───────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy => policy
+        .AllowAnyOrigin()
+        .AllowAnyHeader()
+        .AllowAnyMethod());
+});
 
 var app = builder.Build();
 
@@ -105,6 +133,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
+app.UseStaticFiles();   // ← 新增
+app.UseCors();          // 如果已经加了 CORS 就留着
+
 app.UseAuthorization();
 app.MapControllers();
+
 app.Run();

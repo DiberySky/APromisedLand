@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <title>vLLM 循环流式</title>
+    <style>
+        body   { font-family: system-ui, sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; }
+        input  { width: 60%; padding: 6px; }
+        button { padding: 6px 16px; }
+        #out   { background:#f6f8fa; padding:16px; border-radius:8px;
+            white-space:pre-wrap; word-break:break-word; line-height:1.55;
+            min-height:180px; font-family: ui-monospace, Consolas, monospace; font-size: 14px; }
+        .round-divider { color:#0969da; font-weight:600; }
+        .err  { color:#cf222e; }
+        .meta { color:#57606a; font-style: italic; }
+    </style>
+</head>
+<body>
+<h1>vLLM 循环流式</h1>
+<input id="msg" value="用三句话解释量子纠缠">
+<button id="btn" onclick="start()">开始</button>
+<button onclick="document.getElementById('out').textContent=''">清空</button>
+<div id="out"></div>
+
+<script>
+    const API = 'http://localhost:5324/api/vllm/chat/loop';
+
+    async function start() {
+        const out = document.getElementById('out');
+        const btn = document.getElementById('btn');
+        out.textContent = '';
+        btn.disabled = true;
+
+        try {
+            const resp = await fetch(API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: document.getElementById('msg').value,
+                    maxRounds: 2,
+                    maxOutputTokens: 512,
+                }),
+            });
+
+            if (!resp.ok) {
+                append(out, `HTTP ${resp.status}`, 'err');
+                return;
+            }
+
+            const reader  = resp.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buf = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buf += decoder.decode(value, { stream: true });
+
+                // SSE 事件以空行 \n\n 分隔
+                let idx;
+                while ((idx = buf.indexOf('\n\n')) >= 0) {
+                    const raw = buf.slice(0, idx);
+                    buf = buf.slice(idx + 2);
+                    handleEvent(raw, out);
+                }
+            }
+        } catch (e) {
+            append(out, '\n[异常] ' + e.message, 'err');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function handleEvent(raw, out) {
+        // 一个事件可能有多行，只取 "data: " 开头的
+        for (const line of raw.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            let chunk;
+            try { chunk = JSON.parse(line.slice(6)); }
+            catch { continue; }
+
+            switch (chunk.phase) {
+                case 'start':
+                    append(out, `[开始，共 ${chunk.maxRounds} 轮]\n`, 'meta');
+                    break;
+                case 'round_start':
+                    append(out, `\n──── 第 ${chunk.round} / ${chunk.maxRounds} 轮 ────\n`, 'round-divider');
+                    break;
+                case 'delta':
+                    append(out, chunk.content);
+                    break;
+                case 'round_end':
+                    append(out, '\n', 'meta');
+                    break;
+                case 'done':
+                    append(out, `\n[完成]${chunk.truncated ? '（时间预算耗尽，已截断）' : ''}\n`, 'meta');
+                    break;
+                case 'error':
+                    append(out, `\n[错误] ${chunk.content}\n`, 'err');
+                    break;
+            }
+        }
+    }
+
+    function append(el, text, cls) {
+        const span = document.createElement('span');
+        if (cls) span.className = cls;
+        span.textContent = text;
+        el.appendChild(span);
+        el.scrollTop = el.scrollHeight;
+    }
+</script>
+</body>
+</html>

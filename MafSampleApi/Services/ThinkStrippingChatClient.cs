@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 
@@ -12,11 +13,10 @@ namespace MafSampleApi.Services;
 ///   /no_think 只抑制推理内容，不抑制标签本身。
 ///
 /// 实现要点：
-///   - ChatResponse.Text 是懒加载 + 缓存属性。若已读过一次，
-///     只改 Messages 不会刷新 Text。这里选择构造新的 ChatResponse
-///     返回，避免依赖内部缓存行为。
-///   - 流式（GetStreamingResponseAsync）逐块剥离。跨块边界不做缓冲，
-///     对"空 think 块 + 紧跟回答"这种最常见形态足够。
+///   - 非流式：整段正则剥离，构造新的 ChatResponse。
+///   - 流式：用状态机跨 chunk 剥离。上游（vLLM）会把
+///     &lt;think&gt; 和 &lt;/think&gt; 拆成独立 token 推送，单 chunk 正则匹配不到，
+///     因此必须缓冲尾部，识别"半个标签"。
 /// </summary>
 public sealed class ThinkStrippingChatClient(
     IChatClient inner,
@@ -37,9 +37,7 @@ public sealed class ThinkStrippingChatClient(
     {
         var response = await base.GetResponseAsync(messages, options, cancellationToken);
 
-        // 先检查有没有需要剥离的内容，避免无谓地重建对象
         bool anyChanged = false;
-
         foreach (var msg in response.Messages)
         {
             foreach (var content in msg.Contents)
@@ -58,7 +56,6 @@ public sealed class ThinkStrippingChatClient(
         if (!anyChanged)
             return response;
 
-        // 构造剥离后的 Messages
         var newMessages = new List<ChatMessage>(response.Messages.Count);
 
         foreach (var msg in response.Messages)
@@ -88,30 +85,30 @@ public sealed class ThinkStrippingChatClient(
         }
 
         logger.LogDebug(
-            "Stripped <think> block: {MsgCount} message(s), {OrigChars} → {NewChars} chars",
-            newMessages.Count,
-            response.Text?.Length ?? 0,
-            string.Concat(newMessages.SelectMany(m => m.Contents.OfType<TextContent>()).Select(t => t.Text)).Length);
+            "Stripped <think> block (non-stream): {MsgCount} message(s)",
+            newMessages.Count);
 
-        // 构造新响应，保留关键元数据
         return new ChatResponse(newMessages)
         {
-            ModelId       = response.ModelId,
-            ResponseId    = response.ResponseId,
-            CreatedAt     = response.CreatedAt,
-            FinishReason  = response.FinishReason,
-            Usage         = response.Usage,
+            ModelId      = response.ModelId,
+            ResponseId   = response.ResponseId,
+            CreatedAt    = response.CreatedAt,
+            FinishReason = response.FinishReason,
+            Usage        = response.Usage,
         };
     }
 
     // ══════════════════════════════════════════════════════════
-    // 流式（逐块剥离）
+    // 流式（跨 chunk 状态机剥离）
     // ══════════════════════════════════════════════════════════
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        // ★ 每个流一个独立 stripper，避免多次调用互相污染
+        var stripper = new ThinkStreamStripper();
+
         await foreach (var update in base.GetStreamingResponseAsync(
                            messages, options, cancellationToken))
         {
@@ -120,10 +117,10 @@ public sealed class ThinkStrippingChatClient(
                 if (update.Contents[i] is TextContent text
                     && !string.IsNullOrEmpty(text.Text))
                 {
-                    var stripped = Strip(text.Text);
+                    var stripped = stripper.Process(text.Text);
 
-                    // 整块是 think 内部或纯空白 → 丢弃
-                    if (stripped.Length == 0 && text.Text.Length > 0)
+                    // 整块被吞（缓冲中或 think 内）→ 丢弃该 content
+                    if (stripped is null)
                     {
                         update.Contents.RemoveAt(i);
                         i--;
@@ -137,18 +134,163 @@ public sealed class ThinkStrippingChatClient(
                 }
             }
 
+            // 内容已被清空且没有 finish 信息 → 整帧丢弃，不产生空 delta
+            if (update.Contents.Count == 0 && update.FinishReason is null)
+                continue;
+
             yield return update;
+        }
+
+        // 流结束时冲掉缓冲区（若仍在 think 中则整段丢弃）
+        var tail = stripper.Flush();
+        if (!string.IsNullOrEmpty(tail))
+        {
+            yield return new ChatResponseUpdate(
+                ChatRole.Assistant,
+                new List<AIContent> { new TextContent(tail) });
         }
     }
 
     // ══════════════════════════════════════════════════════════
-    // 剥离逻辑
+    // 非流式剥离
     // ══════════════════════════════════════════════════════════
     private static string Strip(string text)
     {
         if (string.IsNullOrEmpty(text)) return text;
         var result = ThinkBlock.Replace(text, string.Empty);
-        // 剥完后可能残留前导换行/空格
         return result.TrimStart('\n', '\r', ' ', '\t');
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // 跨 chunk 状态机
+    // ══════════════════════════════════════════════════════════
+    /// <summary>
+    /// 逐 chunk 剥离 &lt;think&gt;...&lt;/think&gt;。
+    /// 维护一个缓冲区：不完整的标签前缀保留到下一次 Process。
+    /// </summary>
+    private sealed class ThinkStreamStripper
+    {
+        private const string OpenTag  = "<think>";
+        private const string CloseTag = "</think>";
+        private static readonly int MaxTagLen = Math.Max(OpenTag.Length, CloseTag.Length);
+
+        private readonly StringBuilder _buffer = new();
+        private bool _inThink;
+
+        // ★ 跨 chunk：刚关闭 think，下一个 chunk 的前导空白要继续吞
+        private bool _skipLeadingWhitespace;
+
+        public string? Process(string chunk)
+        {
+            if (string.IsNullOrEmpty(chunk)) return null;
+
+            // ★ 先处理跨 chunk 的前导空白
+            if (_skipLeadingWhitespace)
+            {
+                int i = 0;
+                while (i < chunk.Length &&
+                       (chunk[i] == '\n' || chunk[i] == '\r' ||
+                        chunk[i] == ' '  || chunk[i] == '\t'))
+                    i++;
+
+                if (i == chunk.Length)
+                    return null;  // 整个 chunk 都是空白，丢弃，flag 保留
+
+                _skipLeadingWhitespace = false;
+                chunk = chunk[i..];
+            }
+
+            _buffer.Append(chunk);
+
+            var sb = new StringBuilder();
+            bool progress = true;
+
+            while (progress)
+            {
+                progress = false;
+                var s = _buffer.ToString();
+
+                if (!_inThink)
+                {
+                    int idx = s.IndexOf(OpenTag, StringComparison.Ordinal);
+                    if (idx >= 0)
+                    {
+                        if (idx > 0) sb.Append(s, 0, idx);
+                        _buffer.Remove(0, idx + OpenTag.Length);
+                        _inThink = true;
+                        progress = true;
+                    }
+                    else
+                    {
+                        int safeLen = FindSafeFlushLength(s, OpenTag);
+                        if (safeLen > 0)
+                        {
+                            sb.Append(s, 0, safeLen);
+                            _buffer.Remove(0, safeLen);
+                        }
+                        break;
+                    }
+                }
+                else
+                {
+                    int idx = s.IndexOf(CloseTag, StringComparison.Ordinal);
+                    if (idx >= 0)
+                    {
+                        _buffer.Remove(0, idx + CloseTag.Length);
+                        _inThink = false;
+                        _skipLeadingWhitespace = true;  // ★ 关键：交给下一个 chunk 继续吞
+
+                        // 同 buffer 内能吞的空白先吞掉
+                        while (_buffer.Length > 0 &&
+                               (_buffer[0] == '\n' || _buffer[0] == '\r' ||
+                                _buffer[0] == ' '  || _buffer[0] == '\t'))
+                        {
+                            _buffer.Remove(0, 1);
+                        }
+
+                        // 如果 buffer 里还有内容 → 说明空白吞完了，取消 flag
+                        if (_buffer.Length > 0)
+                            _skipLeadingWhitespace = false;
+
+                        progress = true;
+                    }
+                    else
+                    {
+                        int safeLen = FindSafeFlushLength(s, CloseTag);
+                        if (safeLen > 0)
+                            _buffer.Remove(0, safeLen);
+                        break;
+                    }
+                }
+            }
+
+            return sb.Length > 0 ? sb.ToString() : null;
+        }
+
+        public string? Flush()
+        {
+            if (_inThink)
+            {
+                _buffer.Clear();
+                return null;
+            }
+            if (_buffer.Length == 0) return null;
+
+            var s = _buffer.ToString();
+            _buffer.Clear();
+            return s;
+        }
+
+        private static int FindSafeFlushLength(string s, string tag)
+        {
+            int maxCheck = Math.Min(tag.Length - 1, s.Length);
+            for (int len = maxCheck; len >= 1; len--)
+            {
+                var tail = s.AsSpan(s.Length - len);
+                if (tag.AsSpan(0, len).SequenceEqual(tail))
+                    return s.Length - len;
+            }
+            return s.Length;
+        }
     }
 }

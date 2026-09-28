@@ -28,6 +28,7 @@ public sealed class AgentOptions
 
     /// <summary>嵌入模型名（与 vLLM --served-model-name 一致）。</summary>
     public string EmbeddingModel { get; set; } = "bge-m3";
+    public int EmbeddingDimension { get; set; } = 1024;
 
     // ─── 提示词 ───────────────────────────────────────────────
     public string SystemPrompt { get; set; } =
@@ -40,4 +41,8 @@ public sealed class AgentOptions
     // ─── 超时预算 ─────────────────────────────────────────────
     public int ChatBudgetSeconds { get; set; } = 120;
     public int LoopBudgetSeconds { get; set; } = 240;
+
+    // ★ 新增：vLLM 无状态端点独立预算
+    public int VllmChatBudgetSeconds { get; set; } = 60;   // 单轮
+    public int VllmLoopBudgetSeconds { get; set; } = 180;  // 循环总预算
 }
