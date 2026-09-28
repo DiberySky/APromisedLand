@@ -15,4 +15,7 @@ public sealed class LoopStreamChunkDto
     public string Phase { get; set; } = "delta";
 
     public bool Done { get; set; }
+
+    /// <summary>仅 Phase=done 的收尾帧有意义。</summary>
+    public bool Truncated { get; set; }          // ★★★ 就是这一行
 }

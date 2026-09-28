@@ -11,7 +11,7 @@ public sealed class LoopChatResponseDto
     public int CompletedRounds { get; set; }
 
     /// <summary>true 表示时间预算耗尽，未跑满 MaxRounds。</summary>
-    public bool Truncated { get; set; }
+    public bool Truncated { get; set; }               // ★ 新增
 
     /// <summary>每一轮的输出，按轮次顺序排列。</summary>
     public List<LoopRoundDto> Rounds { get; set; } = new();

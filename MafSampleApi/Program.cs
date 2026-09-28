@@ -112,6 +112,7 @@ builder.Services.AddSingleton<IAgentFactory, AgentFactory>();
 builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
 builder.Services.AddHostedService<VllmWarmupService>();
 builder.Services.AddSingleton<IInstructionTemplateStore, InMemoryInstructionTemplateStore>();
+builder.Services.AddSingleton<AgentSessionStore>();
 
 // ─── 7. ASP.NET Core ───────────────────────────────────────
 builder.Services.AddControllers();

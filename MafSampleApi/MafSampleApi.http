@@ -1,11 +1,494 @@
+### ═══════════════════════════════════════════════════════════
+### 变量
+### ═══════════════════════════════════════════════════════════
 
-@host = http://localhost:5324
+@baseUrl = http://localhost:5324
 @contentType = application/json
-POST {{host}}/api/vllm/chat/stream
-Content-Type: application/json
+
+# 全局默认超时，覆盖 Rider 内置的 60s
+# @timeout 600
+
+### ═══════════════════════════════════════════════════════════
+### 健康检查
+### ═══════════════════════════════════════════════════════════
+
+### 轻量：回显配置
+GET {{baseUrl}}/api/health
+
+### 深度：探活 vLLM /v1/models
+GET {{baseUrl}}/api/health/deep
+
+
+### ═══════════════════════════════════════════════════════════
+### vLLM 单轮
+### ═══════════════════════════════════════════════════════════
+
+### 非流式
+POST {{baseUrl}}/api/vllm/chat
+Content-Type: {{contentType}}
 
 {
-  "message": "用一句话解释量子纠缠",
-  "systemPrompt": "你是一个科普助手。",
+  "message": "用三句话解释量子纠缠。",
   "maxOutputTokens": 512
 }
+
+### 流式 SSE（Rider 会在 Response 面板逐帧显示）
+POST {{baseUrl}}/api/vllm/chat/stream
+Content-Type: {{contentType}}
+
+{
+  "message": "用三句话解释量子纠缠。",
+  "maxOutputTokens": 512
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### vLLM 循环
+### ═══════════════════════════════════════════════════════════
+
+### 循环非流式
+POST {{baseUrl}}/api/vllm/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "解释 CAP 定理。",
+  "continuePrompt": "针对上一条回答给出一个真实系统例子。",
+  "maxRounds": 2,
+  "maxOutputTokens": 512
+}
+
+### 循环流式 SSE
+POST {{baseUrl}}/api/vllm/chat/loop
+Content-Type: {{contentType}}
+
+{
+  "message": "写一个三幕短剧的第一幕：咖啡馆里的偶遇。",
+  "continuePrompt": "承接上一幕，写第二幕。上一幕内容：\n{previous}",
+  "maxRounds": 3,
+  "maxOutputTokens": 800
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### vLLM 指令式（无状态 + 模板 + schema + 重试）
+### ═══════════════════════════════════════════════════════════
+
+### 基础指令
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "instruction": "你是一名中文技术编辑。将用户输入改写为简洁、专业、无口语化的技术说明，不超过两句话。",
+  "message": "这个 API 老卡了，有时候还直接挂了，得重启才能用，挺烦的。",
+  "temperature": 0.3
+}
+
+### 模板 + schema 校验 + 采样参数 + stop
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "instructionId": "extract-json",
+  "message": "王五加入美团，年包 80 万。",
+  "temperature": 0.1,
+  "topP": 0.9,
+  "seed": 42,
+  "stop": ["</s>", "###"],
+  "responseSchema": "{\"type\":\"object\",\"required\":[\"company\",\"person\",\"amount\"],\"properties\":{\"company\":{\"type\":\"string\"},\"person\":{\"type\":\"string\"},\"amount\":{\"type\":\"number\"}}}",
+  "maxRetries": 1
+}
+
+### 流式指令
+POST {{baseUrl}}/api/vllm/chat/instruct/stream
+Content-Type: {{contentType}}
+
+{
+  "instruction": "用分点方式解释概念，每点不超过 30 字。",
+  "message": "解释量子纠缠。",
+  "temperature": 0.2
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### 指令模板 CRUD
+### ═══════════════════════════════════════════════════════════
+
+### 列出全部
+GET {{baseUrl}}/api/vllm/chat/instruct/templates
+
+### 获取单个
+GET {{baseUrl}}/api/vllm/chat/instruct/templates/extract-json
+
+### 新增 / 覆盖
+POST {{baseUrl}}/api/vllm/chat/instruct/templates
+Content-Type: {{contentType}}
+
+{
+  "id": "sql-gen",
+  "name": "SQL 生成",
+  "description": "自然语言转 PostgreSQL 查询。",
+  "instruction": "用户描述查询意图，你输出等价的 PostgreSQL 语句。只输出 SQL，无解释。"
+}
+
+### 删除
+DELETE {{baseUrl}}/api/vllm/chat/instruct/templates/sql-gen
+
+
+### ═══════════════════════════════════════════════════════════
+### MAF Agent + vLLM 增强版（有会话 + 采样参数 + 模板 + schema）
+### ═══════════════════════════════════════════════════════════
+
+### 非流式（首次：无 sessionId，服务端生成）
+# @name agentChatFirst
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "帮我解释一下 CAP 定理。"
+}
+
+### 非流式（续聊：把上一响应里的 sessionId 粘过来）
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "在此粘贴上一响应返回的 sessionId",
+  "message": "举个 CP 系统的真实例子。"
+}
+
+### 请求级覆盖 system prompt + 采样参数
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "把这句话改成正式的商务邮件开头：嘿老王那事搞定了没",
+  "instruction": "你是中文商务写作专家，输出要正式、简洁。",
+  "temperature": 0.3,
+  "topP": 0.9,
+  "seed": 42
+}
+
+### 模板 + schema 校验
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "instructionId": "extract-json",
+  "message": "王五加入美团，年包 80 万。",
+  "responseSchema": "{\"type\":\"object\",\"required\":[\"company\",\"person\",\"amount\"]}",
+  "maxRetries": 1
+}
+
+### 流式
+POST {{baseUrl}}/api/agent/chat/stream
+Content-Type: {{contentType}}
+
+{
+  "message": "用三句话解释量子纠缠。"
+}
+
+### 循环流式
+POST {{baseUrl}}/api/agent/chat/loop
+Content-Type: {{contentType}}
+
+{
+  "instruction": "你是短剧编剧。",
+  "message": "写第一幕：咖啡馆里的偶遇。",
+  "continuePrompt": "承接上一幕写第二幕。上一幕：\n{previous}",
+  "maxRounds": 3
+}
+
+### 循环非流式
+POST {{baseUrl}}/api/agent/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "instruction": "你是物理讲师。",
+  "message": "解释 CAP 定理。",
+  "continuePrompt": "针对上一条回答给出一个真实系统例子。",
+  "maxRounds": 2
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### MAF Agent（原版，有会话，无采样参数）
+### ═══════════════════════════════════════════════════════════
+
+### 非流式
+POST {{baseUrl}}/api/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "你好，请自我介绍。"
+}
+
+### 流式
+POST {{baseUrl}}/api/chat/stream
+Content-Type: {{contentType}}
+
+{
+  "message": "用三句话解释量子纠缠。"
+}
+
+### 循环流式
+POST {{baseUrl}}/api/chat/loop
+Content-Type: {{contentType}}
+
+{
+  "message": "写一个三幕短剧的第一幕。",
+  "continuePrompt": "承接上一幕写第二幕。",
+  "maxRounds": 3
+}
+
+### 循环非流式
+POST {{baseUrl}}/api/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "解释 CAP 定理。",
+  "continuePrompt": "针对上一条回答给出一个真实系统例子。",
+  "maxRounds": 2
+}
+
+### 列出所有会话
+GET {{baseUrl}}/api/sessions
+
+### 删除指定会话（把 id 换成实际值）
+DELETE {{baseUrl}}/api/sessions/替换为实际sessionId
+
+### 清空所有会话
+DELETE {{baseUrl}}/api/sessions
+
+
+### ═══════════════════════════════════════════════════════════
+### Embedding
+### ═══════════════════════════════════════════════════════════
+
+### 模型信息
+GET {{baseUrl}}/api/embedding/model
+
+### 文本向量化
+POST {{baseUrl}}/api/embedding/embed
+Content-Type: {{contentType}}
+
+{
+  "text": "量子纠缠是量子力学中的核心概念。"
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### Rerank
+### ═══════════════════════════════════════════════════════════
+
+### 语义重排
+POST {{baseUrl}}/api/rerank
+Content-Type: {{contentType}}
+
+{
+  "query": "量子纠缠是什么",
+  "documents": [
+    "量子纠缠是量子力学中的非局域关联现象。",
+    "CAP 定理是分布式系统的基本原理。",
+    "纠缠粒子之间的状态测量会相互影响。",
+    "Redis 是一个内存数据库。"
+  ],
+  "topK": 2
+}
+### ═══════════════════════════════════════════════════════════
+### 【冷门】变量捕获 —— 自动续聊（两个块连跑）
+### 用法：点第一个块的 ▶ 跑完，再点第二个块的 ▶
+### ═══════════════════════════════════════════════════════════
+
+# @name captureAgentChat
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "解释 CAP 定理。",
+  "instruction": "你是分布式系统讲师。"
+}
+
+> {%
+    // Rider / JetBrains HTTP Client 用 JS 处理响应
+    // response.body 会自动解析 JSON
+    client.global.set("agentSessionId", response.body.sessionId);
+    client.log("captured sessionId = " + response.body.sessionId);
+%}
+
+###
+# 引用上一步捕获的 sessionId
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "{{agentSessionId}}",
+  "message": "举个 CP 系统的真实例子。"
+}
+
+###
+# 同一个 sessionId，只改 instruction → 指纹变了 → 历史清空
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "{{agentSessionId}}",
+  "message": "我上一个问题是什么？",
+  "instruction": "你现在是脱口秀演员。"
+}
+
+### ═══════════════════════════════════════════════════════════
+### 【冷门】边界 / 错误路径
+### ═══════════════════════════════════════════════════════════
+
+### 空消息 → 400
+POST {{baseUrl}}/api/vllm/chat
+Content-Type: {{contentType}}
+
+{
+  "message": ""
+}
+
+### instruction 缺失 → 400
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "message": "hi"
+}
+
+### 不存在的模板 id → 404
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "instructionId": "no-such-template",
+  "message": "hi"
+}
+
+### 删除后立即 get → 404
+DELETE {{baseUrl}}/api/vllm/chat/instruct/templates/proofread
+
+###
+GET {{baseUrl}}/api/vllm/chat/instruct/templates/proofread
+
+###
+### 不存在的会话 → 404
+DELETE {{baseUrl}}/api/sessions/does-not-exist-xyz
+
+
+### ═══════════════════════════════════════════════════════════
+### 【冷门】Schema 重试行为验证
+### 故意让 schema 要求一个模型永远不会输出的字段
+### 预期：attempts=2, schemaValid=false, schemaError=缺少必需字段
+### ═══════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "instructionId": "extract-json",
+  "message": "张三加入字节跳动，月薪 5 万。",
+  "responseSchema": "{\"type\":\"object\",\"required\":[\"company\",\"person\",\"amount\",\"impossible_field\"]}",
+  "maxRetries": 1
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### 【冷门】采样参数行为
+### ═══════════════════════════════════════════════════════════
+
+### seed 固定 + temperature=0 → 同一请求重放应得相同结果（多跑几次对比）
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "instruction": "用 10 个字以内回答。",
+  "message": "1+1=?",
+  "temperature": 0,
+  "seed": 42,
+  "maxOutputTokens": 32
+}
+
+### stop 序列生效验证：一旦输出到 "。" 就停
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "instruction": "写一段介绍量子纠缠的段落。",
+  "message": "开始。",
+  "stop": ["。"],
+  "maxOutputTokens": 256
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### 【冷门】指令优先级 —— instruction 覆盖模板
+### 预期：走 instruction 而不是 extract-json 模板
+### ═══════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "instructionId": "extract-json",
+  "instruction": "把输入翻译成英语。只输出译文。",
+  "message": "量子纠缠是量子力学的核心概念。"
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### 【冷门】keepHistory 对比
+### 同一 sessionId 两轮，看第 2 轮是否承接上下文
+### ═══════════════════════════════════════════════════════════
+
+### keepHistory=true（默认）—— 第 2 轮应围绕 ATM 举例而不是乱扯
+POST {{baseUrl}}/api/vllm/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "解释 CAP 定理。",
+  "continuePrompt": "针对上一条回答给出一个真实系统例子。",
+  "maxRounds": 2,
+  "keepHistory": true
+}
+
+### keepHistory=false —— 第 2 轮丢失上下文，会答非所问
+POST {{baseUrl}}/api/vllm/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "解释 CAP 定理。",
+  "continuePrompt": "针对上一条回答给出一个真实系统例子。",
+  "maxRounds": 2,
+  "keepHistory": false
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### 【冷门】夹紧行为验证
+### maxRounds=999 → 服务端夹紧到 20；日志会显示 maxRounds=20
+### 建议把 VllmLoopBudgetSeconds 调成 10 后测，看会不会截断
+### ═══════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/api/vllm/chat/loop/sync
+Content-Type: {{contentType}}
+
+{
+  "message": "数到 100。",
+  "maxRounds": 999,
+  "maxOutputTokens": 32
+}
+
+
+### ═══════════════════════════════════════════════════════════
+### 【冷门】Embedding 边界
+### ═══════════════════════════════════════════════════════════
+
+### 空文本 → 400
+POST {{baseUrl}}/api/embedding/embed
+Content-Type: {{contentType}}
+
+{
+  "text": ""
+}
+
