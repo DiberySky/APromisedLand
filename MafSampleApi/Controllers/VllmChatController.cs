@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using MafSampleApi.Models;
+using MafSampleApi.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
@@ -12,10 +13,12 @@ namespace MafSampleApi.Controllers;
 /// vLLM（Qwen3-4B-AWQ）专用聊天端点。
 ///
 /// 路由：
-///   POST /api/vllm/chat             —— 非流式
-///   POST /api/vllm/chat/stream      —— 流式（SSE）
-///   POST /api/vllm/chat/loop        —— 循环流式（SSE）
-///   POST /api/vllm/chat/loop/sync   —— 循环非流式
+///   POST /api/vllm/chat                    —— 非流式
+///   POST /api/vllm/chat/stream             —— 流式（SSE）
+///   POST /api/vllm/chat/loop               —— 循环流式（SSE）
+///   POST /api/vllm/chat/loop/sync          —— 循环非流式
+///   POST /api/vllm/chat/instruct           —— 指令式（非流式，支持 schema 校验 + 重试）
+///   POST /api/vllm/chat/instruct/stream    —— 指令式（流式）
 /// </summary>
 [ApiController]
 [Route("api/vllm/chat")]
@@ -23,6 +26,7 @@ namespace MafSampleApi.Controllers;
 public sealed class VllmChatController(
     IChatClient chatClient,
     IOptions<AgentOptions> agentOptions,
+    IInstructionTemplateStore templates,
     ILogger<VllmChatController> logger) : ControllerBase
 {
     private readonly AgentOptions _options = agentOptions.Value;
@@ -30,6 +34,7 @@ public sealed class VllmChatController(
     private const string NoThinkHint = " /no_think";
     private const int DefaultMaxOutputTokens = 2048;
     private const int MaxRoundsLimit = 20;
+    private const int MaxSchemaRetriesLimit = 5;
 
     private static readonly JsonSerializerOptions SseJson = new()
     {
@@ -66,22 +71,17 @@ public sealed class VllmChatController(
 
             return Ok(new VllmChatResponseDto
             {
-                Model = model,
-                Content = response.Text,
+                Model     = model,
+                Content   = response.Text,
                 Truncated = false,
             });
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            logger.LogInformation("vLLM chat client disconnected: model={Model}", model);
             return new EmptyResult();
         }
         catch (OperationCanceledException) when (budgetCts.IsCancellationRequested)
         {
-            logger.LogWarning(
-                "vLLM chat budget exhausted ({Budget}s): model={Model}",
-                budgetSeconds, model);
-
             return StatusCode(StatusCodes.Status504GatewayTimeout, new
             {
                 error = $"vLLM chat exceeded server budget of {budgetSeconds}s.",
@@ -121,10 +121,6 @@ public sealed class VllmChatController(
         budgetCts.CancelAfter(TimeSpan.FromSeconds(budgetSeconds));
         var chatCt = budgetCts.Token;
 
-        logger.LogInformation(
-            "vLLM chat (stream): model={Model}, msgLen={Len}, maxTokens={Max}, budget={Budget}s",
-            model, messages[^1].Text.Length, options.MaxOutputTokens, budgetSeconds);
-
         await WriteEventAsync(new VllmStreamChunkDto
         {
             Model = model, Content = "", Done = false
@@ -138,7 +134,6 @@ public sealed class VllmChatController(
                                messages, options, chatCt))
             {
                 if (chatCt.IsCancellationRequested) break;
-
                 var delta = update.Text;
                 if (string.IsNullOrEmpty(delta)) continue;
 
@@ -150,16 +145,11 @@ public sealed class VllmChatController(
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            logger.LogInformation(
-                "vLLM chat (stream) client disconnected: model={Model}", model);
             return;
         }
         catch (OperationCanceledException) when (budgetCts.IsCancellationRequested)
         {
             truncated = true;
-            logger.LogWarning(
-                "vLLM chat (stream) budget exhausted ({Budget}s): model={Model}",
-                budgetSeconds, model);
         }
         catch (Exception ex)
         {
@@ -171,7 +161,6 @@ public sealed class VllmChatController(
             return;
         }
 
-        // 收尾帧（正常或截断）。用 ct 而非 chatCt —— budgetCts 已取消
         await WriteEventAsync(new VllmStreamChunkDto
         {
             Model = model, Content = "", Done = true, Truncated = truncated,
@@ -195,16 +184,16 @@ public sealed class VllmChatController(
             return;
         }
 
-        var model = ResolveModel(request.Model);
+        var model        = ResolveModel(request.Model);
         var systemPrompt = ResolveSystemPrompt(request.SystemPrompt);
-        var maxRounds = Math.Clamp(request.MaxRounds, 1, MaxRoundsLimit);
-        var maxTokens = request.MaxOutputTokens is > 0
+        var maxRounds    = Math.Clamp(request.MaxRounds, 1, MaxRoundsLimit);
+        var maxTokens    = request.MaxOutputTokens is > 0
             ? request.MaxOutputTokens.Value
             : DefaultMaxOutputTokens;
 
         var chatOptions = new ChatOptions
         {
-            ModelId = model,
+            ModelId         = model,
             MaxOutputTokens = maxTokens,
         };
 
@@ -216,13 +205,8 @@ public sealed class VllmChatController(
         var history = new List<ChatMessage>
         {
             new(ChatRole.System, systemPrompt),
-            new(ChatRole.User, AppendNoThink(request.Message)),
+            new(ChatRole.User,   AppendNoThink(request.Message)),
         };
-
-        logger.LogInformation(
-            "vLLM loop (stream) start: model={Model}, maxRounds={MaxRounds}, " +
-            "keepHistory={Keep}, budget={Budget}s",
-            model, maxRounds, request.KeepHistory, budgetSeconds);
 
         await WriteEventAsync(new VllmLoopStreamChunkDto
         {
@@ -230,19 +214,12 @@ public sealed class VllmChatController(
             Phase = "start", Done = false,
         }, ct);
 
-        var finished = 0;
+        var finished  = 0;
         var truncated = false;
 
         for (var round = 1; round <= maxRounds && !ct.IsCancellationRequested; round++)
         {
-            if (loopCt.IsCancellationRequested)
-            {
-                truncated = true;
-                logger.LogWarning(
-                    "vLLM loop (stream) budget exhausted before round {Round}",
-                    round);
-                break;
-            }
+            if (loopCt.IsCancellationRequested) { truncated = true; break; }
 
             var sb = new StringBuilder();
 
@@ -258,10 +235,8 @@ public sealed class VllmChatController(
                                    history, chatOptions, loopCt))
                 {
                     if (loopCt.IsCancellationRequested) break;
-
                     var delta = update.Text;
                     if (string.IsNullOrEmpty(delta)) continue;
-
                     sb.Append(delta);
 
                     await WriteEventAsync(new VllmLoopStreamChunkDto
@@ -271,33 +246,23 @@ public sealed class VllmChatController(
                     }, ct);
                 }
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                return;
-            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
             catch (OperationCanceledException) when (budgetCts.IsCancellationRequested)
             {
-                truncated = true;
-                logger.LogWarning(
-                    "vLLM loop (stream) budget exhausted at round {Round}", round);
-                break;
+                truncated = true; break;
             }
             catch (Exception ex)
             {
                 logger.LogError(ex,
-                    "vLLM loop (stream) failed: model={Model}, round={Round}",
-                    model, round);
-
+                    "vLLM loop (stream) failed: model={Model}, round={Round}", model, round);
                 await WriteEventAsync(new VllmLoopStreamChunkDto
                 {
                     Model = model, Round = round, MaxRounds = maxRounds,
-                    Content = $"[error] {ex.Message}",
-                    Phase = "error", Done = true,
+                    Content = $"[error] {ex.Message}", Phase = "error", Done = true,
                 }, ct);
                 return;
             }
 
-            // 若本轮因预算中断：不发 round_end，直接收尾
             if (truncated) break;
 
             var text = sb.ToString();
@@ -310,7 +275,6 @@ public sealed class VllmChatController(
             }, ct);
 
             if (round == maxRounds) break;
-
             PrepareNextTurn(history, systemPrompt, text,
                 request.ContinuePrompt, request.KeepHistory);
         }
@@ -333,16 +297,16 @@ public sealed class VllmChatController(
         if (string.IsNullOrWhiteSpace(request.Message))
             return BadRequest(new { error = "message is required." });
 
-        var model = ResolveModel(request.Model);
+        var model        = ResolveModel(request.Model);
         var systemPrompt = ResolveSystemPrompt(request.SystemPrompt);
-        var maxRounds = Math.Clamp(request.MaxRounds, 1, MaxRoundsLimit);
-        var maxTokens = request.MaxOutputTokens is > 0
+        var maxRounds    = Math.Clamp(request.MaxRounds, 1, MaxRoundsLimit);
+        var maxTokens    = request.MaxOutputTokens is > 0
             ? request.MaxOutputTokens.Value
             : DefaultMaxOutputTokens;
 
         var chatOptions = new ChatOptions
         {
-            ModelId = model,
+            ModelId         = model,
             MaxOutputTokens = maxTokens,
         };
 
@@ -354,68 +318,40 @@ public sealed class VllmChatController(
         var history = new List<ChatMessage>
         {
             new(ChatRole.System, systemPrompt),
-            new(ChatRole.User, AppendNoThink(request.Message)),
+            new(ChatRole.User,   AppendNoThink(request.Message)),
         };
 
-        logger.LogInformation(
-            "vLLM loop (sync) start: model={Model}, maxRounds={MaxRounds}, " +
-            "keepHistory={Keep}, budget={Budget}s",
-            model, maxRounds, request.KeepHistory, budgetSeconds);
-
-        var rounds = new List<VllmLoopRoundDto>(maxRounds);
+        var rounds    = new List<VllmLoopRoundDto>(maxRounds);
         var truncated = false;
 
         for (var round = 1; round <= maxRounds; round++)
         {
-            if (ct.IsCancellationRequested)
-                return new EmptyResult();
-
-            if (loopCt.IsCancellationRequested)
-            {
-                truncated = true;
-                logger.LogWarning(
-                    "vLLM loop (sync) budget exhausted before round {Round}", round);
-                break;
-            }
+            if (ct.IsCancellationRequested) return new EmptyResult();
+            if (loopCt.IsCancellationRequested) { truncated = true; break; }
 
             try
             {
                 var response = await chatClient.GetResponseAsync(history, chatOptions, loopCt);
                 var text = response.Text;
 
-                rounds.Add(new VllmLoopRoundDto
-                {
-                    Round = round,
-                    Content = text,
-                });
-
-                logger.LogInformation(
-                    "vLLM loop (sync) round {Round}/{MaxRounds} done: len={Len}",
-                    round, maxRounds, text.Length);
+                rounds.Add(new VllmLoopRoundDto { Round = round, Content = text });
 
                 if (round == maxRounds) break;
-
                 PrepareNextTurn(history, systemPrompt, text,
                     request.ContinuePrompt, request.KeepHistory);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                logger.LogInformation(
-                    "vLLM loop (sync) client disconnected: round={Round}", round);
                 return new EmptyResult();
             }
             catch (OperationCanceledException) when (budgetCts.IsCancellationRequested)
             {
-                truncated = true;
-                logger.LogWarning(
-                    "vLLM loop (sync) budget exhausted at round {Round}", round);
-                break;
+                truncated = true; break;
             }
             catch (Exception ex)
             {
                 logger.LogError(ex,
-                    "vLLM loop (sync) failed: model={Model}, round={Round}",
-                    model, round);
+                    "vLLM loop (sync) failed: model={Model}, round={Round}", model, round);
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new { error = ex.Message, model, round });
             }
@@ -423,48 +359,94 @@ public sealed class VllmChatController(
 
         return Ok(new VllmLoopResponseDto
         {
-            Model = model,
-            MaxRounds = maxRounds,
+            Model           = model,
+            MaxRounds       = maxRounds,
             CompletedRounds = rounds.Count,
-            Truncated = truncated,
-            Rounds = rounds,
-            Content = rounds.Count > 0 ? rounds[^1].Content : string.Empty,
+            Truncated       = truncated,
+            Rounds          = rounds,
+            Content         = rounds.Count > 0 ? rounds[^1].Content : string.Empty,
         });
     }
 
     // ═══════════════════════════════════════════════════════════
-//  AI 指令 Chat —— 非流式
-// ═══════════════════════════════════════════════════════════
+    //  指令式 Chat —— 非流式（带 schema 校验 + 自动重试）
+    // ═══════════════════════════════════════════════════════════
     [HttpPost("instruct")]
     public async Task<ActionResult<InstructChatResponseDto>> InstructAsync(
         [FromBody] InstructChatRequestDto request,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Instruction))
-            return BadRequest(new { error = "instruction is required." });
         if (string.IsNullOrWhiteSpace(request.Message))
             return BadRequest(new { error = "message is required." });
 
-        var (model, messages, options) = BuildInstructInput(request);
+        // 解析指令来源（模板 / 内联）
+        if (!TryResolveInstruction(request, out var resolved, out var resolveError))
+        {
+            if (resolveError!.Value.status == 404)
+                return NotFound(new { error = resolveError.Value.msg });
+            return BadRequest(new { error = resolveError.Value.msg });
+        }
+
+        var (model, messages, options) = BuildInstructInput(
+            resolved.instruction, resolved.examples, resolved.outputFormat, request);
 
         var budgetSeconds = Math.Clamp(_options.VllmChatBudgetSeconds, 5, 600);
         using var budgetCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         budgetCts.CancelAfter(TimeSpan.FromSeconds(budgetSeconds));
         var chatCt = budgetCts.Token;
 
+        var maxAttempts = 1 + Math.Clamp(request.MaxRetries, 0, MaxSchemaRetriesLimit);
+        var needSchema  = !string.IsNullOrWhiteSpace(request.ResponseSchema);
+
         logger.LogInformation(
-            "vLLM instruct: model={Model}, msgLen={Len}, examples={Ex}, fmt={Fmt}, budget={B}s",
-            model, request.Message.Length, request.Examples?.Count ?? 0,
-            request.OutputFormat ?? "text", budgetSeconds);
+            "vLLM instruct: model={Model}, tmpl={Tmpl}, msgLen={Len}, fmt={Fmt}, " +
+            "schema={Schema}, maxAttempts={A}, budget={B}s",
+            model, request.InstructionId ?? "-", request.Message.Length,
+            resolved.outputFormat ?? "text",
+            needSchema ? "yes" : "no", maxAttempts, budgetSeconds);
 
         try
         {
-            var response = await chatClient.GetResponseAsync(messages, options, chatCt);
+            ChatResponse?  lastResp   = null;
+            string?        schemaErr  = null;
+            int            attempt    = 0;
+
+            for (; attempt < maxAttempts; attempt++)
+            {
+                lastResp = await chatClient.GetResponseAsync(messages, options, chatCt);
+
+                if (!needSchema) break;
+
+                if (JsonSchemaValidator.TryValidate(
+                        lastResp.Text, request.ResponseSchema!, out var err))
+                {
+                    schemaErr = null;
+                    break;
+                }
+
+                schemaErr = err;
+                logger.LogWarning(
+                    "vLLM instruct schema failed (attempt {A}/{T}): {Err}",
+                    attempt + 1, maxAttempts, err);
+
+                // 还能重试 → 把模型输出 + 错误提示追加进对话
+                if (attempt < maxAttempts - 1)
+                {
+                    messages.Add(new ChatMessage(ChatRole.Assistant, lastResp.Text));
+                    messages.Add(new ChatMessage(ChatRole.User,
+                        $"你上一次的输出不符合 JSON Schema。错误：{err}。" +
+                        "请严格按 Schema 重新输出，只输出 JSON，不要任何解释或代码块围栏。"));
+                }
+            }
+
             return Ok(new InstructChatResponseDto
             {
-                Model = model,
-                Content = response.Text,
-                Truncated = false,
+                Model       = model,
+                Content     = lastResp!.Text,
+                Truncated   = false,
+                Attempts    = attempt + 1,
+                SchemaValid = schemaErr is null,
+                SchemaError = schemaErr,
             });
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -487,22 +469,15 @@ public sealed class VllmChatController(
         }
     }
 
-// ═══════════════════════════════════════════════════════════
-//  AI 指令 Chat —— 流式 SSE
-// ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════
+    //  指令式 Chat —— 流式（末尾附加 schema 校验结果，不自动重试）
+    // ═══════════════════════════════════════════════════════════
     [HttpPost("instruct/stream")]
     public async Task InstructStreamAsync(
         [FromBody] InstructChatRequestDto request,
         CancellationToken ct)
     {
         SetSseHeaders();
-
-        if (string.IsNullOrWhiteSpace(request.Instruction))
-        {
-            Response.StatusCode = StatusCodes.Status400BadRequest;
-            await WriteEventAsync(new { error = "instruction is required." }, ct);
-            return;
-        }
 
         if (string.IsNullOrWhiteSpace(request.Message))
         {
@@ -511,7 +486,15 @@ public sealed class VllmChatController(
             return;
         }
 
-        var (model, messages, options) = BuildInstructInput(request);
+        if (!TryResolveInstruction(request, out var resolved, out var resolveError))
+        {
+            Response.StatusCode = resolveError!.Value.status;
+            await WriteEventAsync(new { error = resolveError.Value.msg }, ct);
+            return;
+        }
+
+        var (model, messages, options) = BuildInstructInput(
+            resolved.instruction, resolved.examples, resolved.outputFormat, request);
 
         var budgetSeconds = Math.Clamp(_options.VllmChatBudgetSeconds, 5, 600);
         using var budgetCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -519,15 +502,15 @@ public sealed class VllmChatController(
         var chatCt = budgetCts.Token;
 
         logger.LogInformation(
-            "vLLM instruct (stream): model={Model}, examples={Ex}, fmt={Fmt}, budget={B}s",
-            model, request.Examples?.Count ?? 0,
-            request.OutputFormat ?? "text", budgetSeconds);
+            "vLLM instruct (stream): model={Model}, tmpl={Tmpl}, fmt={Fmt}, budget={B}s",
+            model, request.InstructionId ?? "-", resolved.outputFormat ?? "text", budgetSeconds);
 
         await WriteEventAsync(new InstructStreamChunkDto
         {
             Model = model, Content = "", Done = false
         }, ct);
 
+        var sb        = new StringBuilder();
         var truncated = false;
 
         try
@@ -536,9 +519,9 @@ public sealed class VllmChatController(
                                messages, options, chatCt))
             {
                 if (chatCt.IsCancellationRequested) break;
-
                 var delta = update.Text;
                 if (string.IsNullOrEmpty(delta)) continue;
+                sb.Append(delta);
 
                 await WriteEventAsync(new InstructStreamChunkDto
                 {
@@ -553,9 +536,6 @@ public sealed class VllmChatController(
         catch (OperationCanceledException) when (budgetCts.IsCancellationRequested)
         {
             truncated = true;
-            logger.LogWarning(
-                "vLLM instruct (stream) budget exhausted ({B}s): model={Model}",
-                budgetSeconds, model);
         }
         catch (Exception ex)
         {
@@ -567,9 +547,23 @@ public sealed class VllmChatController(
             return;
         }
 
+        // 流式不做重试，只在校验失败时附上 SchemaError 让客户端决定
+        var schemaValid = true;
+        string? schemaErr = null;
+        if (!truncated && !string.IsNullOrWhiteSpace(request.ResponseSchema))
+        {
+            schemaValid = JsonSchemaValidator.TryValidate(
+                sb.ToString(), request.ResponseSchema, out schemaErr);
+        }
+
         await WriteEventAsync(new InstructStreamChunkDto
         {
-            Model = model, Content = "", Done = true, Truncated = truncated,
+            Model       = model,
+            Content     = "",
+            Done        = true,
+            Truncated   = truncated,
+            SchemaValid = schemaValid,
+            SchemaError = schemaErr,
         }, ct);
     }
 
@@ -586,14 +580,14 @@ public sealed class VllmChatController(
     private (string Model, List<ChatMessage> Messages, ChatOptions Options) BuildChatInput(
         string message, string? model, string? systemPrompt, int? maxOutputTokens)
     {
-        var resolvedModel = ResolveModel(model);
+        var resolvedModel  = ResolveModel(model);
         var resolvedSystem = ResolveSystemPrompt(systemPrompt);
-        var userMessage = AppendNoThink(message);
+        var userMessage    = AppendNoThink(message);
 
         var messages = new List<ChatMessage>
         {
             new(ChatRole.System, resolvedSystem),
-            new(ChatRole.User, userMessage),
+            new(ChatRole.User,   userMessage),
         };
 
         var tokens = maxOutputTokens is > 0
@@ -602,11 +596,100 @@ public sealed class VllmChatController(
 
         var options = new ChatOptions
         {
-            ModelId = resolvedModel,
+            ModelId         = resolvedModel,
             MaxOutputTokens = tokens,
         };
 
         return (resolvedModel, messages, options);
+    }
+
+    /// <summary>解析模板 / 内联指令，合并 examples 与 outputFormat。</summary>
+    private bool TryResolveInstruction(
+        InstructChatRequestDto request,
+        out (string instruction, IReadOnlyList<InstructExampleDto>? examples, string? outputFormat) resolved,
+        out (int status, string msg)? error)
+    {
+        resolved = default;
+        error    = null;
+
+        InstructionTemplate? tpl = null;
+        if (!string.IsNullOrWhiteSpace(request.InstructionId))
+        {
+            if (!templates.TryGet(request.InstructionId, out tpl))
+            {
+                error = (404, $"instructionId '{request.InstructionId}' not found.");
+                return false;
+            }
+        }
+
+        var instruction = !string.IsNullOrWhiteSpace(request.Instruction)
+            ? request.Instruction!
+            : tpl?.Instruction;
+
+        if (string.IsNullOrWhiteSpace(instruction))
+        {
+            error = (400, "either instruction or instructionId is required.");
+            return false;
+        }
+
+        var examples = request.Examples ?? tpl?.Examples;
+        var fmt      = !string.IsNullOrWhiteSpace(request.OutputFormat)
+            ? request.OutputFormat
+            : tpl?.OutputFormat;
+
+        resolved = (instruction, examples, fmt);
+        return true;
+    }
+
+    /// <summary>构造指令式 Chat 消息与 ChatOptions。</summary>
+    private (string Model, List<ChatMessage> Messages, ChatOptions Options) BuildInstructInput(
+        string instruction,
+        IReadOnlyList<InstructExampleDto>? examples,
+        string? outputFormat,
+        InstructChatRequestDto request)
+    {
+        var model = ResolveModel(request.Model);
+
+        var systemText = instruction.Trim();
+        if (string.Equals(outputFormat, "json", StringComparison.OrdinalIgnoreCase))
+        {
+            systemText += "\n\n只输出合法 JSON，不要任何解释、代码块围栏或前后缀。";
+        }
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, systemText),
+        };
+
+        if (examples is { Count: > 0 })
+        {
+            foreach (var ex in examples)
+            {
+                if (string.IsNullOrWhiteSpace(ex.Input)) continue;
+                messages.Add(new ChatMessage(ChatRole.User,      ex.Input));
+                messages.Add(new ChatMessage(ChatRole.Assistant, ex.Output));
+            }
+        }
+
+        messages.Add(new ChatMessage(ChatRole.User, AppendNoThink(request.Message)));
+
+        var tokens = request.MaxOutputTokens is > 0
+            ? request.MaxOutputTokens.Value
+            : DefaultMaxOutputTokens;
+
+        var options = new ChatOptions
+        {
+            ModelId         = model,
+            MaxOutputTokens = tokens,
+            Temperature     = request.Temperature,
+            TopP            = request.TopP,
+            Seed            = request.Seed,
+            StopSequences   = request.Stop is { Count: > 0 }
+                                ? request.Stop.ToList()
+                                : null,
+        };
+
+        return (model, messages, options);
     }
 
     private static void PrepareNextTurn(
@@ -661,51 +744,5 @@ public sealed class VllmChatController(
         var json = JsonSerializer.Serialize(payload, SseJson);
         await Response.WriteAsync($"data: {json}\n\n", ct);
         await Response.Body.FlushAsync(ct);
-    }
-    
-    /// <summary>构造指令式 Chat 的消息序列与 ChatOptions。</summary>
-    private (string Model, List<ChatMessage> Messages, ChatOptions Options) BuildInstructInput(
-        InstructChatRequestDto request)
-    {
-        var model = ResolveModel(request.Model);
-
-        // system = instruction (+ JSON 输出规范)
-        var systemText = request.Instruction.Trim();
-        if (string.Equals(request.OutputFormat, "json", StringComparison.OrdinalIgnoreCase))
-        {
-            systemText += "\n\n只输出合法 JSON，不要任何解释、代码块围栏或前后缀。";
-        }
-
-        var messages = new List<ChatMessage>
-        {
-            new(ChatRole.System, systemText),
-        };
-
-        // few-shot: user/assistant 交替
-        if (request.Examples is { Count: > 0 })
-        {
-            foreach (var ex in request.Examples)
-            {
-                if (string.IsNullOrWhiteSpace(ex.Input)) continue;
-                messages.Add(new ChatMessage(ChatRole.User,      ex.Input));
-                messages.Add(new ChatMessage(ChatRole.Assistant, ex.Output));
-            }
-        }
-
-        // 用户实际输入
-        messages.Add(new ChatMessage(ChatRole.User, AppendNoThink(request.Message)));
-
-        var tokens = request.MaxOutputTokens is > 0
-            ? request.MaxOutputTokens.Value
-            : DefaultMaxOutputTokens;
-
-        var options = new ChatOptions
-        {
-            ModelId         = model,
-            MaxOutputTokens = tokens,
-            Temperature     = request.Temperature,   // null = 用服务端默认
-        };
-
-        return (model, messages, options);
     }
 }

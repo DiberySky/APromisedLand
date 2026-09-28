@@ -111,6 +111,7 @@ builder.Services.AddHttpClient<IRerankerClient, RerankerClient>("reranker",
 builder.Services.AddSingleton<IAgentFactory, AgentFactory>();
 builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
 builder.Services.AddHostedService<VllmWarmupService>();
+builder.Services.AddSingleton<IInstructionTemplateStore, InMemoryInstructionTemplateStore>();
 
 // ─── 7. ASP.NET Core ───────────────────────────────────────
 builder.Services.AddControllers();
