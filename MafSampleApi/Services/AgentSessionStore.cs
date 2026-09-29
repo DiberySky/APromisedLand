@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 using MafSampleApi.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -66,21 +67,32 @@ public sealed class AgentSessionStore(
 
             EnforceCapacity();
 
+            var agentChatOpts = new ChatOptions
+            {
+                Instructions    = systemPrompt,
+                ModelId         = model,
+                Temperature     = chatOptions.Temperature,
+                TopP            = chatOptions.TopP,
+                Seed            = chatOptions.Seed,
+                StopSequences   = chatOptions.StopSequences,
+                MaxOutputTokens = chatOptions.MaxOutputTokens,
+                // ★ 修复：List<AIFunction> → IList<AITool>
+                Tools           = baseTools.Cast<AITool>().ToList(),
+            };
+
+            // ★ 透传 provider 扩展参数（结构化输出 response_format 等）
+            if (chatOptions.AdditionalProperties is { Count: > 0 } props)
+            {
+                if (agentChatOpts.AdditionalProperties is null)
+                    agentChatOpts.AdditionalProperties = new();
+                foreach (var kv in props)
+                    agentChatOpts.AdditionalProperties[kv.Key] = kv.Value;
+            }
+
             var agentOptions = new ChatClientAgentOptions
             {
-                Name = $"assistant-{model}",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions    = systemPrompt,
-                    ModelId         = model,
-                    Temperature     = chatOptions.Temperature,
-                    TopP            = chatOptions.TopP,
-                    Seed            = chatOptions.Seed,
-                    StopSequences   = chatOptions.StopSequences,
-                    MaxOutputTokens = chatOptions.MaxOutputTokens,
-                    // ★ 修复：List<AIFunction> → IList<AITool>
-                    Tools           = baseTools.Cast<AITool>().ToList(),
-                },
+                Name        = $"assistant-{model}",
+                ChatOptions = agentChatOpts,
             };
 
             var agent   = new ChatClientAgent(chatClient, agentOptions);
@@ -219,6 +231,15 @@ public sealed class AgentSessionStore(
         if (opts.StopSequences is { Count: > 0 })
             foreach (var s in opts.StopSequences)
                 sb.Append(s).Append('\u0002');
+
+        // ★ 结构化输出的 response_format 也必须进指纹：
+        //   不同 schema 不能复用同一个 Agent 会话，否则后建的请求会拿到旧 schema。
+        if (opts.AdditionalProperties is { } props
+            && props.TryGetValue(StructuredOutput.AdditionalPropertiesKey, out var rfObj)
+            && rfObj is JsonNode rfNode)
+        {
+            sb.Append("\u0003rf:").Append(rfNode.ToJsonString());
+        }
 
         sb.Append('\u0003');
         foreach (var n in baseToolNames)

@@ -249,6 +249,16 @@ internal sealed class VllmChatClient : IChatClient
                 }
                 payload["tools"] = toolsArray;
             }
+
+            // ── 原生结构化输出：response_format ──────────────────
+            // 由控制器通过 ChatOptions.AdditionalProperties["response_format"] 传入。
+            // 支持 json_schema（strict）与 json_object 两种模式。
+            if (options.AdditionalProperties is { } props
+                && props.TryGetValue(StructuredOutput.AdditionalPropertiesKey, out var rfObj)
+                && rfObj is JsonNode rfNode)
+            {
+                payload["response_format"] = rfNode.DeepClone();
+            }
         }
 
         return payload;

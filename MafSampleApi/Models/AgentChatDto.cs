@@ -30,6 +30,14 @@ public sealed record AgentChatRequestDto
 
     // ─── Schema 校验 ──────────────────────────
     public string? ResponseSchema { get; init; }
+
+    /// <summary>
+    /// 是否启用 vLLM 原生结构化输出（response_format）。
+    /// true（默认）：传 ResponseSchema 时走 json_schema 严格模式，仅 OutputFormat=json 时走 json_object。
+    /// false：只做后置校验 + 重试，不向 vLLM 传 response_format。
+    /// </summary>
+    public bool UseStructuredOutput { get; init; } = true;
+
     public int MaxRetries { get; init; } = 1;
 
     // ─── 模型 ──────────────────────────────────

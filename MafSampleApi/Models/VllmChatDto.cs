@@ -106,6 +106,13 @@ public sealed record InstructChatRequestDto
     /// <summary>JSON Schema 字符串。提供时服务端会校验输出；不合规触发重试。</summary>
     public string? ResponseSchema { get; init; }
 
+    /// <summary>
+    /// 是否启用 vLLM 原生结构化输出（response_format）。
+    /// true（默认）：传 ResponseSchema 时走 json_schema 严格模式，仅 OutputFormat=json 时走 json_object。
+    /// false：只做后置校验 + 重试，不向 vLLM 传 response_format。
+    /// </summary>
+    public bool UseStructuredOutput { get; init; } = true;
+
     /// <summary>schema 校验失败时的最大重试次数（默认 1，即最多发 2 次请求）。</summary>
     public int MaxRetries { get; init; } = 1;
 

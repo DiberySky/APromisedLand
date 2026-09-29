@@ -556,29 +556,40 @@ public sealed class AgentChatController(
     /// 所以要把基础 + 动态工具合并后一起传，并把 Instructions / ModelId 补上。
     /// ★ 修复：必须同时把 Agent 创建时绑定的采样参数（Temperature/TopP/Seed/Stop/MaxOutputTokens）
     ///   一起复制过来，否则带工具的请求会回退到模型默认值，丢失用户传入的采样配置。
+    /// ★ 新增：复制 AdditionalProperties（含 response_format 等 provider 扩展参数），
+    ///   否则结构化输出在 Agent 链路会丢失。
     /// </summary>
-    private static ChatClientAgentRunOptions? BuildRunOptions(
+    private static ChatClientAgentRunOptions BuildRunOptions(
         AgentSessionStore.Entry entry,
         IReadOnlyList<AIFunction> allTools)
     {
-        if (allTools.Count == 0) return null;
-
         var src = entry.BoundChatOptions;
-        return new ChatClientAgentRunOptions
+
+        var chatOpts = new ChatOptions
         {
-            ChatOptions = new ChatOptions
-            {
-                Instructions    = entry.SystemPrompt,
-                ModelId         = entry.Model,
-                Temperature     = src.Temperature,
-                TopP            = src.TopP,
-                Seed            = src.Seed,
-                StopSequences   = src.StopSequences,
-                MaxOutputTokens = src.MaxOutputTokens,
-                // ★ ChatOptions.Tools 类型是 IList<AITool>?，需要 Cast
-                Tools           = allTools.Cast<AITool>().ToList(),
-            },
+            Instructions    = entry.SystemPrompt,
+            ModelId         = entry.Model,
+            Temperature     = src.Temperature,
+            TopP            = src.TopP,
+            Seed            = src.Seed,
+            StopSequences   = src.StopSequences,
+            MaxOutputTokens = src.MaxOutputTokens,
         };
+
+        // 透传 provider 扩展参数（结构化输出 response_format 等）
+        if (src.AdditionalProperties is { Count: > 0 } props)
+        {
+            if (chatOpts.AdditionalProperties is null)
+                chatOpts.AdditionalProperties = new();
+            foreach (var kv in props)
+                chatOpts.AdditionalProperties[kv.Key] = kv.Value;
+        }
+
+        // 仅当确实有工具时才覆盖 Tools，避免把 Agent 绑定的基础工具清空
+        if (allTools.Count > 0)
+            chatOpts.Tools = allTools.Cast<AITool>().ToList();
+
+        return new ChatClientAgentRunOptions { ChatOptions = chatOpts };
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -750,7 +761,8 @@ public sealed class AgentChatController(
     }
 
     private static ChatOptions BuildChatOptions(string model, AgentChatRequestDto r)
-        => new()
+    {
+        var opts = new ChatOptions
         {
             ModelId         = model,
             Temperature     = r.Temperature,
@@ -762,8 +774,23 @@ public sealed class AgentChatController(
                                 : DefaultMaxOutputTokens,
         };
 
+        if (r.UseStructuredOutput)
+        {
+            var rf = StructuredOutput.BuildResponseFormat(r.ResponseSchema, r.OutputFormat);
+            if (rf is not null)
+            {
+                if (opts.AdditionalProperties is null)
+                    opts.AdditionalProperties = new();
+                opts.AdditionalProperties[StructuredOutput.AdditionalPropertiesKey] = rf;
+            }
+        }
+
+        return opts;
+    }
+
     private static ChatOptions BuildChatOptions(string model, AgentLoopRequestDto r)
-        => new()
+    {
+        var opts = new ChatOptions
         {
             ModelId         = model,
             Temperature     = r.Temperature,
@@ -774,6 +801,21 @@ public sealed class AgentChatController(
                                 ? r.MaxOutputTokens.Value
                                 : DefaultMaxOutputTokens,
         };
+
+        // loop 端点目前不暴露 ResponseSchema，但 OutputFormat=json 仍可走 json_object
+        if (string.Equals(r.OutputFormat, "json", StringComparison.OrdinalIgnoreCase))
+        {
+            var rf = StructuredOutput.BuildResponseFormat(null, r.OutputFormat);
+            if (rf is not null)
+            {
+                if (opts.AdditionalProperties is null)
+                    opts.AdditionalProperties = new();
+                opts.AdditionalProperties[StructuredOutput.AdditionalPropertiesKey] = rf;
+            }
+        }
+
+        return opts;
+    }
 
     private static string BuildNextPrompt(string? continuePrompt, string previousAnswer)
     {

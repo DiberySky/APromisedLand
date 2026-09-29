@@ -3,8 +3,10 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using MafSampleApi.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 using MafSampleApi.Services;
+using Microsoft.Agents.AI;
 
 namespace MafSampleApi.Controllers;
 
@@ -47,6 +49,8 @@ public async Task<ActionResult<ChatResponseDto>> ChatAsync(
         m => agentFactory.GetAgent(m), ct);
 
     var effectiveMessage = AppendNoThink(request.Message);
+    var runOptions = BuildRunOptions(
+        request.ResponseSchema, request.OutputFormat, request.UseStructuredOutput, model);
 
     // ★ 单轮时间预算：默认 120s，夹紧到 [15, 300]
     var budgetSeconds = Math.Clamp(_agentOptions.ChatBudgetSeconds, 15, 300);
@@ -55,14 +59,15 @@ public async Task<ActionResult<ChatResponseDto>> ChatAsync(
     var chatCt = budgetCts.Token;
 
     logger.LogInformation(
-        "Chat request: session={SessionId}, model={Model}, msgLen={Len}, budget={Budget}s",
-        sessionId, model, effectiveMessage.Length, budgetSeconds);
+        "Chat request: session={SessionId}, model={Model}, msgLen={Len}, budget={Budget}s, structured={So}",
+        sessionId, model, effectiveMessage.Length, budgetSeconds, runOptions is not null);
 
     try
     {
         var response = await entry.Agent.RunAsync(
             effectiveMessage,
             session: entry.Session,
+            options: runOptions,
             cancellationToken: chatCt);
 
         return Ok(new ChatResponseDto
@@ -134,12 +139,15 @@ public async Task<ActionResult<ChatResponseDto>> ChatAsync(
         }, ct);
 
         var effectiveMessage = AppendNoThink(request.Message);
+        var runOptions = BuildRunOptions(
+            request.ResponseSchema, request.OutputFormat, request.UseStructuredOutput, model);
 
         try
         {
             await foreach (var update in entry.Agent.RunStreamingAsync(
                                effectiveMessage,
                                session: entry.Session,
+                               options: runOptions,
                                cancellationToken: ct))
             {
                 if (ct.IsCancellationRequested) break;
@@ -206,9 +214,12 @@ public async Task<ActionResult<ChatResponseDto>> ChatAsync(
         var entry = await sessionStore.GetOrCreateAsync(sessionId, model,
             m => agentFactory.GetAgent(m), ct);
 
+        var runOptions = BuildRunOptions(
+            request.ResponseSchema, request.OutputFormat, request.UseStructuredOutput, model);
+
         logger.LogInformation(
-            "Loop chat start: session={SessionId}, model={Model}, maxRounds={MaxRounds}",
-            sessionId, model, maxRounds);
+            "Loop chat start: session={SessionId}, model={Model}, maxRounds={MaxRounds}, structured={So}",
+            sessionId, model, maxRounds, runOptions is not null);
 
         await WriteRawEventAsync(new LoopStreamChunkDto
         {
@@ -236,6 +247,7 @@ public async Task<ActionResult<ChatResponseDto>> ChatAsync(
                 await foreach (var update in entry.Agent.RunStreamingAsync(
                                    prompt,
                                    session: entry.Session,
+                                   options: runOptions,
                                    cancellationToken: ct))
                 {
                     if (ct.IsCancellationRequested) break;
@@ -312,6 +324,9 @@ public async Task<ActionResult<ChatResponseDto>> ChatAsync(
         var entry = await sessionStore.GetOrCreateAsync(sessionId, model,
             m => agentFactory.GetAgent(m), ct);
 
+        var runOptions = BuildRunOptions(
+            request.ResponseSchema, request.OutputFormat, request.UseStructuredOutput, model);
+
         // ★ 总时间预算：默认 240s，夹紧到 [30, 600]
         var budgetSeconds = Math.Clamp(_agentOptions.LoopBudgetSeconds, 30, 600);
         using var budgetCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -319,8 +334,8 @@ public async Task<ActionResult<ChatResponseDto>> ChatAsync(
         var loopCt = budgetCts.Token;
 
         logger.LogInformation(
-            "Loop chat (sync) start: session={SessionId}, model={Model}, maxRounds={MaxRounds}, budget={Budget}s",
-            sessionId, model, maxRounds, budgetSeconds);
+            "Loop chat (sync) start: session={SessionId}, model={Model}, maxRounds={MaxRounds}, budget={Budget}s, structured={So}",
+            sessionId, model, maxRounds, budgetSeconds, runOptions is not null);
 
         var prompt = AppendNoThink(request.Message);
         var result = new LoopChatResponseDto
@@ -348,6 +363,7 @@ public async Task<ActionResult<ChatResponseDto>> ChatAsync(
                 var response = await entry.Agent.RunAsync(
                     prompt,
                     session: entry.Session,
+                    options: runOptions,
                     cancellationToken: loopCt);
 
                 var text = response.Text ?? string.Empty;
@@ -410,6 +426,30 @@ public async Task<ActionResult<ChatResponseDto>> ChatAsync(
         if (message.Contains("/no_think", StringComparison.OrdinalIgnoreCase))
             return message;
         return message.TrimEnd() + NoThinkHint;
+    }
+
+    /// <summary>
+    /// 根据请求构造 Agent RunOptions，注入 vLLM 原生结构化输出（response_format）。
+    /// 无需结构化输出时返回 null，让 Agent 使用默认 ChatOptions。
+    /// </summary>
+    private ChatClientAgentRunOptions? BuildRunOptions(
+        string? responseSchema, string? outputFormat, bool useStructuredOutput, string model)
+    {
+        if (!useStructuredOutput) return null;
+
+        var rf = StructuredOutput.BuildResponseFormat(responseSchema, outputFormat);
+        if (rf is null) return null;
+
+        var chatOpts = new ChatOptions
+        {
+            ModelId      = model,
+            Instructions = _agentOptions.SystemPrompt,
+        };
+        if (chatOpts.AdditionalProperties is null)
+            chatOpts.AdditionalProperties = new();
+        chatOpts.AdditionalProperties[StructuredOutput.AdditionalPropertiesKey] = rf;
+
+        return new ChatClientAgentRunOptions { ChatOptions = chatOpts };
     }
 
     /// <summary>

@@ -689,6 +689,19 @@ public sealed class VllmChatController(
                                 : null,
         };
 
+        // ── 原生结构化输出：把 schema / json 模式转成 response_format ──
+        if (request.UseStructuredOutput)
+        {
+            var rf = StructuredOutput.BuildResponseFormat(
+                request.ResponseSchema, outputFormat);
+            if (rf is not null)
+            {
+                if (options.AdditionalProperties is null)
+                    options.AdditionalProperties = new();
+                options.AdditionalProperties[StructuredOutput.AdditionalPropertiesKey] = rf;
+            }
+        }
+
         return (model, messages, options);
     }
 
