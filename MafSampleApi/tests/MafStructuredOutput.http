@@ -1,0 +1,70 @@
+@baseUrl = http://localhost:5737
+@contentType = application/json
+
+### ═══════════════════════════════════════════════════════════
+### 结构化输出（response_format）
+### 说明：
+###   - 传 responseSchema       → vLLM json_schema 严格模式（生成时约束）
+###   - 仅 outputFormat="json"  → vLLM json_object 模式（只保证合法 JSON 对象）
+###   - useStructuredOutput=false → 只走后置校验 + 重试，不传 response_format
+### ═══════════════════════════════════════════════════════════
+
+### ── /api/vllm/chat/instruct：json_schema 严格模式 ──
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "instruction": "从用户输入中提取公司、人名、金额。",
+  "message": "王五加入美团，年包 80 万。",
+  "responseSchema": "{\"type\":\"object\",\"required\":[\"company\",\"person\",\"amount\"],\"properties\":{\"company\":{\"type\":\"string\"},\"person\":{\"type\":\"string\"},\"amount\":{\"type\":\"number\"}}}",
+  "maxRetries": 1
+}
+
+### ── 同上，但关闭原生结构化输出（仅后置校验，用于对比） ──
+POST {{baseUrl}}/api/vllm/chat/instruct
+Content-Type: {{contentType}}
+
+{
+  "instruction": "从用户输入中提取公司、人名、金额。",
+  "message": "王五加入美团，年包 80 万。",
+  "responseSchema": "{\"type\":\"object\",\"required\":[\"company\",\"person\",\"amount\"],\"properties\":{\"company\":{\"type\":\"string\"},\"person\":{\"type\":\"string\"},\"amount\":{\"type\":\"number\"}}}",
+  "useStructuredOutput": false,
+  "maxRetries": 1
+}
+
+### ── /api/chat：json_schema 严格模式 ──
+POST {{baseUrl}}/api/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "请输出一个人的信息：姓名=张三，年龄=28，城市=北京。",
+  "responseSchema": "{\"type\":\"object\",\"required\":[\"name\",\"age\",\"city\"],\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"},\"city\":{\"type\":\"string\"}}}"
+}
+
+### ── /api/chat：json_object 模式（仅保证合法 JSON） ──
+POST {{baseUrl}}/api/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "用 JSON 输出今天的日期和一个随机数。",
+  "outputFormat": "json"
+}
+
+### ── /api/chat/stream：流式 + json_schema ──
+POST {{baseUrl}}/api/chat/stream
+Content-Type: {{contentType}}
+
+{
+  "message": "输出一部电影的信息：片名=盗梦空间，年份=2010，导演=诺兰。",
+  "responseSchema": "{\"type\":\"object\",\"required\":[\"title\",\"year\",\"director\"],\"properties\":{\"title\":{\"type\":\"string\"},\"year\":{\"type\":\"integer\"},\"director\":{\"type\":\"string\"}}}"
+}
+
+### ── /api/agent/chat：Agent 链路 + json_schema ──
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "提取：李四入职腾讯，年薪 60 万。",
+  "instruction": "你是信息抽取助手，只输出 JSON。",
+  "responseSchema": "{\"type\":\"object\",\"required\":[\"company\",\"person\",\"amount\"],\"properties\":{\"company\":{\"type\":\"string\"},\"person\":{\"type\":\"string\"},\"amount\":{\"type\":\"number\"}}}"
+}

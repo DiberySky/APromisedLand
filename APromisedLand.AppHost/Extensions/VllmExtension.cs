@@ -45,6 +45,11 @@ public static class VllmExtension
     public const string HttpEndpointName = "http";
     public const string EmbeddingHttpEndpointName = "http-embed";
 
+    // ─── 固定宿主端口（避免 Aspire 随机分配）───────────────────
+    public const int ChatHostPort = 5723;
+    public const int EmbeddingHostPort = 5719;
+    private const int ContainerPort = 8000;
+
     // ─── 内部常量 ──────────────────────────────────────────────
     private const string HuggingFaceCacheVolumeName = "vllm-hf-cache";
 
@@ -78,7 +83,7 @@ public static class VllmExtension
         // ══════════════════════════════════════════════════════
         var vllm = builder.AddContainer("vllm", "vllm/vllm-openai")
             .WithImageTag(TuringSafeImageTag)
-            .WithHttpEndpoint(targetPort: 8000, name: HttpEndpointName)
+            .WithEndpoint(port: ChatHostPort, targetPort: ContainerPort, scheme: "http", name: HttpEndpointName)
             .WithVolume(HuggingFaceCacheVolumeName, "/root/.cache/huggingface")
             .WithLifetime(ContainerLifetime.Persistent)
             .WithEntrypoint("python3")
@@ -134,7 +139,7 @@ public static class VllmExtension
         // ══════════════════════════════════════════════════════
         var vllmEmbed = builder.AddContainer("vllm-embed", "vllm/vllm-openai")
             .WithImageTag(TuringSafeImageTag)
-            .WithHttpEndpoint(targetPort: 8000, name: EmbeddingHttpEndpointName)
+            .WithEndpoint(port: EmbeddingHostPort, targetPort: ContainerPort, scheme: "http", name: EmbeddingHttpEndpointName)
             .WithVolume(HuggingFaceCacheVolumeName, "/root/.cache/huggingface")
             .WithLifetime(ContainerLifetime.Persistent)
             .WithEntrypoint("python3")
@@ -173,8 +178,8 @@ public static class VllmExtension
         // 3. 启动摘要
         // ══════════════════════════════════════════════════════
         Console.WriteLine(
-            $"[vLLM] Chat={ChatModelName} (:{8000}), " +
-            $"Embed={EmbeddingModelName} (:{8001}), " +
+            $"[vLLM] Chat={ChatModelName} (:{ChatHostPort}→{ContainerPort}), " +
+            $"Embed={EmbeddingModelName} (:{EmbeddingHostPort}→{ContainerPort}), " +
             $"Context={contextLength}, Gpu={useGpu}, Tag={imageTag ?? TuringSafeImageTag}");
 
         return builder;

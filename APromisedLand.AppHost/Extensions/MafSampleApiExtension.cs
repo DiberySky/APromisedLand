@@ -10,7 +10,7 @@ namespace APromisedLand.AppHost.Extensions;
 /// </summary>
 public static class MafSampleApiExtension
 {
-    private const int MafSampleApiHttpPort = 5324;
+    private const int MafSampleApiHttpPort = 5737;
 
     public static void AddMafSampleApi(
         this IDistributedApplicationBuilder builder,

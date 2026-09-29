@@ -1,0 +1,152 @@
+@baseUrl = http://localhost:5737
+@contentType = application/json
+
+### ═══════════════════════════════════════════════════════════
+### RAG（检索增强生成）测试集
+### 依赖：vLLM(11891) + Embedding bge-m3(12976) + Reranker(5919)
+### ═══════════════════════════════════════════════════════════
+
+### 0. 健康检查
+GET {{baseUrl}}/api/health
+
+### 1. 摄入 JSON 文档（自动扁平化分块）
+POST {{baseUrl}}/api/rag/ingest
+Content-Type: {{contentType}}
+
+{
+  "title": "QC小组简介",
+  "content": {
+    "二、小组简介": {
+      "1. QC小组概况": {
+        "小组名称": "武东变电工班数字化管理 QC 小组",
+        "成立时间": "2024 年 1 月",
+        "课题类型": "管理型",
+        "活动时间": "2024 年 1 月至 2025 年 04 月",
+        "小组成员": [
+          { "角色": "组长", "姓名": "贺军", "职责": "负责整体协调与资源调配" },
+          { "角色": "组员", "姓名": "张慧慧", "职责": "负责数据管理与系统优化" },
+          { "角色": "组员", "姓名": "闫静辉", "职责": "负责培训实施与效果评估" },
+          { "角色": "组员", "姓名": "陈世浩", "职责": "负责软件开发与技术实现" }
+        ]
+      },
+      "2. 活动目标": [
+        "实现设备、备件、工具管理的数字化，减少人工记录错误率。",
+        "建立移动化培训平台，提高员工技能培训效率。",
+        "降低管理成本，提升工班运维响应速度。",
+        "实现数据离线本地化，内网数据交换和共享，确保信息安全。"
+      ]
+    }
+  }
+}
+
+### 2. 检索：组长是谁
+POST {{baseUrl}}/api/rag/retrieve
+Content-Type: {{contentType}}
+
+{
+  "query": "组长是谁",
+  "topK": 3,
+  "useReranker": true
+}
+
+### 3. 检索：谁负责软件开发
+POST {{baseUrl}}/api/rag/retrieve
+Content-Type: {{contentType}}
+
+{
+  "query": "谁负责软件开发与技术实现",
+  "topK": 3,
+  "useReranker": true
+}
+
+### 4. RAG 问答（检索增强模式）：组长叫什么名字
+POST {{baseUrl}}/api/rag/chat
+Content-Type: {{contentType}}
+
+{
+  "query": "组长叫什么名字？",
+  "mode": "rag",
+  "topK": 5,
+  "useReranker": true
+}
+
+### 5. RAG 问答（检索增强模式）：成员人数与名单
+POST {{baseUrl}}/api/rag/chat
+Content-Type: {{contentType}}
+
+{
+  "query": "小组一共有几名成员？分别是谁？",
+  "mode": "rag",
+  "topK": 8,
+  "useReranker": true
+}
+
+### 6. RAG 问答（全文投喂模式）：成员人数与名单
+POST {{baseUrl}}/api/rag/chat
+Content-Type: {{contentType}}
+
+{
+  "query": "小组一共有几名成员？分别是谁？",
+  "mode": "fulltext"
+}
+
+### 7. RAG 问答（全文投喂模式）：组长和负责培训的组员
+POST {{baseUrl}}/api/rag/chat
+Content-Type: {{contentType}}
+
+{
+  "query": "组长和负责培训的组员分别是谁？",
+  "mode": "fulltext"
+}
+
+### 8. 资料外问题（应拒答）
+POST {{baseUrl}}/api/rag/chat
+Content-Type: {{contentType}}
+
+{
+  "query": "QC小组的预算是多少？",
+  "mode": "fulltext"
+}
+
+### 9. RAG + 结构化输出
+POST {{baseUrl}}/api/rag/chat
+Content-Type: {{contentType}}
+
+{
+  "query": "负责软件开发的成员信息",
+  "mode": "fulltext",
+  "responseSchema": "{\"type\":\"object\",\"required\":[\"name\",\"role\",\"duty\"],\"properties\":{\"name\":{\"type\":\"string\"},\"role\":{\"type\":\"string\"},\"duty\":{\"type\":\"string\"}}}"
+}
+
+### 10. 知识库统计
+GET {{baseUrl}}/api/rag/stats
+
+### 11. 检索：QC项目简介
+POST {{baseUrl}}/api/rag/retrieve
+Content-Type: {{contentType}}
+
+{
+  "query": "QC项目简介",
+  "topK": 5,
+  "useReranker": true
+}
+
+### 12. RAG 问答（全文投喂）：QC项目简介
+POST {{baseUrl}}/api/rag/chat
+Content-Type: {{contentType}}
+
+{
+  "query": "请介绍一下这个QC项目",
+  "mode": "fulltext"
+}
+
+### 13. RAG 问答（检索增强）：QC项目简介
+POST {{baseUrl}}/api/rag/chat
+Content-Type: {{contentType}}
+
+{
+  "query": "这个QC项目的基本情况是什么？",
+  "mode": "rag",
+  "topK": 8,
+  "useReranker": true
+}

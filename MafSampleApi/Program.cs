@@ -121,6 +121,7 @@ builder.Services.AddHostedService<VllmWarmupService>();
 builder.Services.AddSingleton<IInstructionTemplateStore, InMemoryInstructionTemplateStore>();
 builder.Services.AddSingleton<AgentSessionStore>();
 builder.Services.AddHostedService<SessionCleanupService>();
+builder.Services.AddSingleton<RagService>();
 
 // ─── 6.1 工具注册 ─────────────────────────────
 builder.Services.AddSingleton<TimeTools>();
