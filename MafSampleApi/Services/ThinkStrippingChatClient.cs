@@ -27,15 +27,87 @@ public sealed class ThinkStrippingChatClient(
         @"<think>.*?</think>\s*",
         RegexOptions.Singleline | RegexOptions.Compiled);
 
+    // ★ 给 FunctionResultContent 追加 /no_think，确保 tool result 轮次也抑制 thinking
+    //   Qwen3 的 /no_think 是 per-message 指令，只对 user 消息生效。
+    //   tool result 消息没有 /no_think → 模型恢复完整 thinking（每次 60-80s）。
+    //   在此处拦截 messages，给工具结果追加 /no_think 后缀。
+    private List<ChatMessage> AppendNoThinkToToolResults(IEnumerable<ChatMessage> messages)
+    {
+        var list = messages is IReadOnlyList<ChatMessage> rl
+            ? new List<ChatMessage>(rl.Count) { }
+            : new List<ChatMessage>();
+
+        int toolResultCount = 0;
+
+        foreach (var msg in messages)
+        {
+            bool hasFuncResult = false;
+            var newContents = new List<AIContent>(msg.Contents.Count);
+
+            foreach (var content in msg.Contents)
+            {
+                if (content is FunctionResultContent fr)
+                {
+                    toolResultCount++;
+                    var resultStr = fr.Result?.ToString() ?? "";
+                    logger.LogInformation(
+                        "FunctionResultContent: callId={Id}, resultType={Type}, resultLen={Len}, result=[{R}]",
+                        fr.CallId, fr.Result?.GetType().Name, resultStr.Length, resultStr);
+                    DiagWrite($"FunctionResultContent: callId={fr.CallId}, type={fr.Result?.GetType().Name}, len={resultStr.Length}, result=[{resultStr}]");
+
+                    if (!resultStr.Contains("/no_think", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasFuncResult = true;
+                        newContents.Add(new FunctionResultContent(
+                            fr.CallId, resultStr + " /no_think"));
+                    }
+                    else
+                    {
+                        newContents.Add(content);
+                    }
+                }
+                else
+                {
+                    newContents.Add(content);
+                }
+            }
+
+            list.Add(hasFuncResult
+                ? new ChatMessage(msg.Role, newContents) { RawRepresentation = msg.RawRepresentation }
+                : msg);
+        }
+
+        if (toolResultCount > 0)
+        {
+            logger.LogInformation(
+                "AppendNoThinkToToolResults: found {Count} tool result(s)", toolResultCount);
+            DiagWrite($"AppendNoThinkToToolResults: found {toolResultCount} tool result(s)");
+        }
+
+        return list;
+    }
+
     // ══════════════════════════════════════════════════════════
     // 非流式
     // ══════════════════════════════════════════════════════════
+    // ★ 诊断：写到运行目录确保可写
+    private static readonly string DiagPath =
+        System.IO.Path.Combine(AppContext.BaseDirectory, "diag.log");
+
+    private static void DiagWrite(string msg)
+    {
+        try { System.IO.File.AppendAllText(DiagPath, $"{DateTime.Now:HH:mm:ss} {msg}\n"); }
+        catch { /* ignore */ }
+    }
+
     public override async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        var response = await base.GetResponseAsync(messages, options, cancellationToken);
+        DiagWrite($"GetResponseAsync called, msgCount={messages.Count()}");
+        var response = await base.GetResponseAsync(
+            AppendNoThinkToToolResults(messages), options, cancellationToken);
 
         bool anyChanged = false;
         foreach (var msg in response.Messages)
@@ -109,8 +181,10 @@ public sealed class ThinkStrippingChatClient(
         // ★ 每个流一个独立 stripper，避免多次调用互相污染
         var stripper = new ThinkStreamStripper();
 
+        DiagWrite($"GetStreamingResponseAsync called, msgCount={messages.Count()}");
+
         await foreach (var update in base.GetStreamingResponseAsync(
-                           messages, options, cancellationToken))
+                           AppendNoThinkToToolResults(messages), options, cancellationToken))
         {
             for (int i = 0; i < update.Contents.Count; i++)
             {

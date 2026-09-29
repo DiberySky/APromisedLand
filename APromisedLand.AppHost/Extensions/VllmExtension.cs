@@ -86,6 +86,8 @@ public static class VllmExtension
                 "-m", "vllm.entrypoints.openai.api_server",
                 "--model", ChatModelName,
                 "--served-model-name", ServedModelName,
+                "--enable-auto-tool-choice",
+                "--tool-call-parser", "hermes",
                 "--dtype", "float16",
                 "--quantization", "awq",
                 "--max-model-len", contextLength.ToString(),
@@ -93,7 +95,9 @@ public static class VllmExtension
                 "--enforce-eager"
             )
             .WithEnvironment("VLLM_USE_V1", forceV0Engine ? "0" : "1")
-            .WithEnvironment("HF_ENDPOINT", hfEndpoint);
+            .WithEnvironment("HF_ENDPOINT", hfEndpoint)
+            .WithEnvironment("HF_HUB_OFFLINE", "1")
+            .WithEnvironment("TRANSFORMERS_OFFLINE", "1");
 
         // ★ 不注册 WithHttpHealthCheck —— 见文件头注释
 
@@ -144,7 +148,9 @@ public static class VllmExtension
                 "--enforce-eager"
             )
             .WithEnvironment("VLLM_USE_V1", forceV0Engine ? "0" : "1")
-            .WithEnvironment("HF_ENDPOINT", hfEndpoint);
+            .WithEnvironment("HF_ENDPOINT", hfEndpoint)
+            .WithEnvironment("HF_HUB_OFFLINE", "1")
+            .WithEnvironment("TRANSFORMERS_OFFLINE", "1");
 
         // ★ 同样不注册 WithHttpHealthCheck
 

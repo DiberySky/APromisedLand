@@ -35,6 +35,16 @@ public sealed record AgentChatRequestDto
     // ─── 模型 ──────────────────────────────────
     public string? Model           { get; init; }
     public int?    MaxOutputTokens { get; init; }
+    
+    // ─── 工具调用 ──────────────────────────────
+    /// <summary>动态启用的高级工具名单。基础工具自动随 Agent 加载，无需列出。</summary>
+    public IReadOnlyList<string>? Tools { get; init; }
+
+    /// <summary>按标签启用（与 Tools 二选一；同时给时 Tools 优先）。</summary>
+    public IReadOnlyList<string>? ToolTags { get; init; }
+
+    /// <summary>禁用所有高级工具（基础工具不受影响）。</summary>
+    public bool DisableDynamicTools { get; init; }
 }
 
 /// <summary>POST /api/agent/chat 响应体。</summary>
@@ -47,6 +57,7 @@ public sealed record AgentChatResponseDto
     public int     Attempts    { get; init; } = 1;
     public bool    SchemaValid { get; init; } = true;
     public string? SchemaError { get; init; }
+    public IReadOnlyList<AgentToolCallDto>? ToolCalls { get; init; }
 }
 
 /// <summary>POST /api/agent/chat/stream 的 SSE 分片。</summary>
@@ -59,6 +70,17 @@ public sealed record AgentStreamChunkDto
     public bool    Truncated   { get; init; }
     public bool    SchemaValid { get; init; } = true;
     public string? SchemaError { get; init; }
+    
+    /// <summary>"delta"（默认）| "tool_call" | "tool_result"</summary>
+    public string Phase { get; init; } = "delta";
+
+    /// <summary>仅 Phase=tool_call 时有值。</summary>
+    public string? ToolName { get; init; }
+    public string? ToolCallId { get; init; }
+    public string? ToolArgumentsJson { get; init; }
+
+    /// <summary>仅 Phase=tool_result 时有值。</summary>
+    public string? ToolResultText { get; init; }
 }
 
 /// <summary>POST /api/agent/chat/loop 与 /loop/sync 请求体。</summary>
@@ -81,4 +103,22 @@ public sealed record AgentLoopRequestDto
 
     public string? Model           { get; init; }
     public int?    MaxOutputTokens { get; init; }
+    
+    // ─── 工具调用 ──────────────────────────────
+    /// <summary>动态启用的高级工具名单。基础工具自动随 Agent 加载。</summary>
+    public IReadOnlyList<string>? Tools { get; init; }
+
+    /// <summary>按标签启用（与 Tools 二选一；同时给时 Tools 优先）。</summary>
+    public IReadOnlyList<string>? ToolTags { get; init; }
+
+    /// <summary>禁用所有高级工具（基础工具不受影响）。</summary>
+    public bool DisableDynamicTools { get; init; }
+}
+
+public sealed record AgentToolCallDto
+{
+    public string CallId { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string ArgumentsJson { get; init; } = string.Empty;
+    public string? ResultText { get; init; }
 }

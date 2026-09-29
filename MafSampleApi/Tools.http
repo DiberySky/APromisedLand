@@ -1,0 +1,102 @@
+@baseUrl = http://localhost:5324
+@contentType = application/json
+
+# @timeout 300
+
+### 14.1 查看工具清单
+GET http://localhost:5324/api/agent/tools
+
+### 14.2 只用基础工具（默认）
+POST http://localhost:5324/api/agent/chat
+Content-Type: application/json
+
+{
+  "message": "现在北京几点？另外 (100+50)*2 等于多少？"
+}
+
+### 14.3 动态启用知识库
+POST http://localhost:5324/api/agent/chat
+Content-Type: application/json
+
+{
+  "message": "先记住：MAF 是微软的多智能体框架。然后告诉我 MAF 是什么。",
+  "tools": ["add_document", "search_knowledge"]
+}
+
+### 14.4 同一会话换工具
+# 第 1 次：只用基础工具
+POST /api/agent/chat
+{ "sessionId": "abc", "message": "你好"}
+
+# 第 2 次：加 RAG 工具（sessionId 相同 → 历史保留 ✅）
+POST /api/agent/chat
+{ "sessionId": "abc", "message": "查一下我的知识库", "tools": ["search_knowledge"] }
+
+### 
+POST http://localhost:5324/api/agent/chat/stream
+Content-Type: application/json
+
+{ "message": "现在 UTC 几点？", "tools": [] }
+
+###
+# 第 1 次：基础工具
+POST /api/agent/chat
+{ "sessionId": "abc", "message": "你好", "disableDynamicTools": true }
+
+# 第 2 次：带 RAG 工具，同 sessionId
+POST /api/agent/chat
+{ "sessionId": "abc", "message": "查我的知识库", "tools": ["search_knowledge"] }
+
+###
+### 14.4 同一会话换工具 —— 第 1 次（只用基础工具）
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "abc",
+  "message": "你好",
+  "disableDynamicTools": true
+}
+
+### 14.4 同一会话换工具 —— 第 2 次（加 RAG，sessionId 相同）
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "abc",
+  "message": "查一下我的知识库",
+  "tools": ["search_knowledge"]
+}
+
+###
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "rag-demo-001",
+  "message": "帮我记住：MAF 是 Microsoft Agent Framework，微软的多智能体框架。",
+  "instruction": "你可以使用工具。规则：\n1. 用户说'记住'、'记下'、'保存'时，必须调用 add_document 工具。\n2. 用户询问知识库内容时，必须调用 search_knowledge 工具。\n3. 不要用自然语言描述工具能力，直接调用。",
+  "tools": ["add_document", "search_knowledge"]
+}
+
+###
+### 第 1 步：存资料（新会话）
+# @timeout 900
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "把这句存入知识库：MAF 是 Microsoft Agent Framework，微软的多智能体框架。",
+  "instruction": "调用 add_document 工具保存用户提供的资料。不要用自然语言回答。",
+  "tools": ["add_document"]
+}
+
+### 第 2 步：查资料（另一个新会话）
+POST {{baseUrl}}/api/agent/chat
+Content-Type: {{contentType}}
+
+{
+  "message": "在知识库里查找 MAF 是什么。",
+  "instruction": "调用 search_knowledge 工具检索。不要问用户要查询语句，直接查。",
+  "tools": ["search_knowledge"]
+}

@@ -32,7 +32,7 @@ public sealed class VllmChatController(
     private readonly AgentOptions _options = agentOptions.Value;
 
     private const string NoThinkHint = " /no_think";
-    private const int DefaultMaxOutputTokens = 2048;
+    private const int DefaultMaxOutputTokens = 512;
     private const int MaxRoundsLimit = 20;
     private const int MaxSchemaRetriesLimit = 5;
 

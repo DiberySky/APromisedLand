@@ -24,4 +24,7 @@ public sealed class LoopRoundDto
 {
     public int Round { get; set; }
     public string Content { get; set; } = string.Empty;
+
+    /// <summary>该轮内 Agent 触发的工具调用（含结果文本）。无调用时为 null。</summary>
+    public IReadOnlyList<AgentToolCallDto>? ToolCalls { get; set; }
 }

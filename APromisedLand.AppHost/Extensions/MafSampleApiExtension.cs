@@ -38,8 +38,8 @@ public static class MafSampleApiExtension
             .WithEnvironment("Agent__EmbeddingModel",      VllmExtension.ServedEmbeddingModelName)
             .WithEnvironment("Agent__MaxSessions",         "256")
             .WithEnvironment("Agent__SessionIdleTimeout",  "00:30:00")
-            .WithEnvironment("Agent__ChatBudgetSeconds",   "120")
-            .WithEnvironment("Agent__LoopBudgetSeconds",   "240");
+            .WithEnvironment("Agent__ChatBudgetSeconds",   "900")
+            .WithEnvironment("Agent__LoopBudgetSeconds",   "1800");
 
         // ══════════════════════════════════════════════════════════
         // ★ vLLM Chat 容器：WaitFor + 显式端点注入
