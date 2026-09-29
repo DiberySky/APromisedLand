@@ -89,7 +89,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiberyBlazorWebSky", "Diber
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileStorageApi", "FileStorageApi\FileStorageApi.csproj", "{97FC032B-5F86-4C6E-A652-39F045D9E036}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MafSampleApi", "MafSampleApi\MafSampleApi.csproj", "{CDEC5879-8D47-4386-B735-44C138E167E0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MafRagApi", "MafRagApi\MafRagApi.csproj", "{CDEC5879-8D47-4386-B735-44C138E167E0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

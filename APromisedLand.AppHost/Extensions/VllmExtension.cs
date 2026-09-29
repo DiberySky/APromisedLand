@@ -18,7 +18,7 @@ namespace APromisedLand.AppHost.Extensions;
 ///     但模型权重仍在异步加载（30s~数分钟）。Aspire 的探针周期固定
 ///     且不支持 initialDelaySeconds，启动窗口必然失败，导致状态被
 ///     错误标记为 Unhealthy（不影响功能，但影响 Dashboard 可读性）。
-///   - 就绪判断交给业务层：MafSampleApi 的 VllmWarmupService 负责预热，
+///   - 就绪判断交给业务层：MafRagApi 的 VllmWarmupService 负责预热，
 ///     /api/health/deep 提供 readiness 探活。
 ///
 /// ★ 硬件约束（GTX 1660 Ti / Turing / SM 7.5 / 6GB）：

@@ -3,7 +3,7 @@ using Aspire.Hosting;
 namespace APromisedLand.AppHost.Extensions;
 
 /// <summary>
-/// MafSampleApi 的 Aspire 编排扩展。
+/// MafRagApi 的 Aspire 编排扩展。
 /// ★ 后端已从 Ollama 迁移到 vLLM：
 ///   - Chat:      vllm 容器       (Qwen3-4B-AWQ)
 ///   - Embedding: vllm-embed 容器 (BAAI/bge-m3)
@@ -18,7 +18,7 @@ public static class MafSampleApiExtension
     {
         // ─── 项目声明与固定端口 ────────────────────────────────────
         context.MafSampleApi = builder
-            .AddProject<Projects.MafSampleApi>("MafSampleApi")
+            .AddProject<Projects.MafRagApi>("MafRagApi")
             .WithHttpEndpoint(port: MafSampleApiHttpPort, name: "http");
 
         // ─── 内部资源：链式 WireIfPresent ──────────────────────────
@@ -57,11 +57,11 @@ public static class MafSampleApiExtension
                 .WithEnvironment("VLLM_HTTP",       chatEndpoint)
                 .WithEnvironment("Agent__Endpoint", chatEndpoint);
 
-            Console.WriteLine($"[MafSampleApi] Chat 端点 → {chatEndpoint}");
+            Console.WriteLine($"[MafRagApi] Chat 端点 → {chatEndpoint}");
         }
         else
         {
-            Console.WriteLine("[MafSampleApi] ⚠️ context.Vllm 为 null，未注入 Chat 端点");
+            Console.WriteLine("[MafRagApi] ⚠️ context.Vllm 为 null，未注入 Chat 端点");
         }
         
         // ══════════════════════════════════════════════════════════
@@ -75,7 +75,7 @@ public static class MafSampleApiExtension
                 .WithEnvironment("Reranker__Endpoint", rerankerEndpoint)
                 .WaitFor(context.RerankerService);
 
-            Console.WriteLine($"[MafSampleApi] Reranker 端点 → {rerankerEndpoint}");
+            Console.WriteLine($"[MafRagApi] Reranker 端点 → {rerankerEndpoint}");
         }
 
         // ══════════════════════════════════════════════════════════
@@ -92,11 +92,11 @@ public static class MafSampleApiExtension
                 .WithEnvironment("VLLM_EMBEDDING_HTTP",      embedEndpoint)
                 .WithEnvironment("Agent__EmbeddingEndpoint", embedEndpoint);
 
-            Console.WriteLine($"[MafSampleApi] Embedding 端点 → {embedEndpoint}");
+            Console.WriteLine($"[MafRagApi] Embedding 端点 → {embedEndpoint}");
         }
         else
         {
-            Console.WriteLine("[MafSampleApi] ⚠️ context.VllmEmbed 为 null，未注入 Embedding 端点");
+            Console.WriteLine("[MafRagApi] ⚠️ context.VllmEmbed 为 null，未注入 Embedding 端点");
         }
 
         // ══════════════════════════════════════════════════════════
