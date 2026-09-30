@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using APromisedLand.Api.MafRag.Dtos;
 using MafRagApi.Models;
 using Microsoft.Extensions.Options;
 

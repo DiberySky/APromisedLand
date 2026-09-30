@@ -1,4 +1,4 @@
-using MafRagApi.Models;
+using APromisedLand.Api.MafRag.Dtos;
 
 namespace MafRagApi.Services;
 

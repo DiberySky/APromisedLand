@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace MafRagApi.Models;
+namespace APromisedLand.Api.MafRag.Dtos;
 
 /// <summary>POST /api/embedding/embed 请求体。</summary>
 public sealed class EmbedRequest

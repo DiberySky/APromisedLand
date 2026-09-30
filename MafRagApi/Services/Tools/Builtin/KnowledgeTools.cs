@@ -1,28 +1,26 @@
 using System.ComponentModel;
 using System.Text;
+using APromisedLand.Api.MafRag.Dtos;
 using MafRagApi.Models;
 using Microsoft.Extensions.AI;
 
 namespace MafRagApi.Services.Tools;
 
 /// <summary>
-/// 语义检索工具。演示用内存文档库，生产请替换为向量库（Qdrant / Milvus / pgvector）。
+/// 语义检索工具（Agent 工具适配层）。
+/// 向量库与检索逻辑的唯一事实来源（SSOT）是 <see cref="RagService"/>，
+/// 本类不再自维护向量库，仅把 RagService 的结果适配为 Agent 工具的字符串契约。
 /// </summary>
 public sealed class KnowledgeTools
 {
-    private readonly IEmbeddingGenerator<string, Embedding<float>> _embedder;
-    private readonly IRerankerClient _reranker;
+    private readonly RagService _rag;
     private readonly ILogger<KnowledgeTools> _logger;
-    private readonly List<Doc> _docs = new();
-    private readonly SemaphoreSlim _lock = new(1, 1);
 
     public KnowledgeTools(
-        IEmbeddingGenerator<string, Embedding<float>> embedder,
-        IRerankerClient reranker,
+        RagService rag,
         ILogger<KnowledgeTools> logger)
     {
-        _embedder = embedder;
-        _reranker = reranker;
+        _rag = rag;
         _logger = logger;
     }
 
@@ -38,23 +36,14 @@ public sealed class KnowledgeTools
 
         try
         {
-            var emb = await _embedder.GenerateAsync(new[] { content });
-            var vec = emb[0].Vector.ToArray();
-
-            await _lock.WaitAsync();
-            try
+            var resp = await _rag.IngestAsync(new RagIngestRequest
             {
-                _docs.Add(new Doc
-                {
-                    Id = Guid.NewGuid().ToString("N"),
-                    Title = title ?? $"doc-{_docs.Count + 1}",
-                    Content = content,
-                    Vector = vec,
-                });
-            }
-            finally { _lock.Release(); }
+                Content = content,
+                Title   = title,
+            });
 
-            return $"已添加，当前知识库共 {_docs.Count} 条。";
+            var stats = _rag.GetStats();
+            return $"已添加文档（{resp.Mode} 模式，{resp.ChunkCount} 块），当前知识库共 {stats.DocCount} 条文档。";
         }
         catch (Exception ex)
         {
@@ -71,42 +60,21 @@ public sealed class KnowledgeTools
         if (string.IsNullOrWhiteSpace(query)) return "错误: query 不能为空。";
         topK = Math.Clamp(topK, 1, 10);
 
-        List<Doc> snapshot;
-        await _lock.WaitAsync();
-        try { snapshot = _docs.ToList(); }
-        finally { _lock.Release(); }
-
-        if (snapshot.Count == 0)
-            return "知识库为空，请先调用 add_document。";
-
         try
         {
-            var qEmb = await _embedder.GenerateAsync(new[] { query });
-            var qVec = qEmb[0].Vector.ToArray();
-
-            var ranked = snapshot
-                .Select(d => new { Doc = d, Score = Cosine(qVec, d.Vector) })
-                .OrderByDescending(x => x.Score)
-                .Take(Math.Min(topK * 3, snapshot.Count))
-                .ToList();
-
-            if (ranked.Count > 1)
+            var resp = await _rag.RetrieveAsync(new RagRetrieveRequest
             {
-                try
-                {
-                    var docs = ranked.Select(x => x.Doc.Content).ToArray();
-                    var reranked = await _reranker.RerankAsync(query, docs, topK);
-                    var result = reranked.Select(r => ranked[r.Index].Doc).ToList();
-                    return Format(result.Select((d, i) => (d, i, 0.0)).ToList());
-                }
-                catch (Exception rex)
-                {
-                    _logger.LogWarning(rex, "Rerank 失败，退化为纯向量检索");
-                }
-            }
+                Query       = query,
+                TopK        = topK,
+                UseReranker = true,
+            });
 
-            return Format(ranked.Take(topK)
-                .Select((x, i) => (x.Doc, i, x.Score)).ToList());
+            if (resp.Hits.Count == 0)
+                return resp.TotalChunks == 0
+                    ? "知识库为空，请先调用 add_document。"
+                    : "无匹配结果。";
+
+            return Format(resp.Hits);
         }
         catch (Exception ex)
         {
@@ -115,32 +83,19 @@ public sealed class KnowledgeTools
         }
     }
 
-    private static string Format(IReadOnlyList<(Doc doc, int idx, double score)> items)
+    private static string Format(IReadOnlyList<RagHitDto> hits)
     {
-        if (items.Count == 0) return "无匹配结果。";
+        if (hits.Count == 0) return "无匹配结果。";
 
         var sb = new StringBuilder();
-        for (int i = 0; i < items.Count; i++)
+        for (int i = 0; i < hits.Count; i++)
         {
-            var (doc, _, score) = items[i];
-            sb.AppendLine($"[{i + 1}] {doc.Title} (相关度 {score:F3})");
-            sb.AppendLine(doc.Content.Length > 500 ? doc.Content[..500] + "…" : doc.Content);
+            var h = hits[i];
+            sb.AppendLine($"[{i + 1}] {h.Title} (相关度 {h.Score:F3})");
+            sb.AppendLine(h.Content.Length > 500 ? h.Content[..500] + "…" : h.Content);
             sb.AppendLine();
         }
         return sb.ToString();
-    }
-
-    private static double Cosine(float[] a, float[] b)
-    {
-        double dot = 0, na = 0, nb = 0;
-        int n = Math.Min(a.Length, b.Length);
-        for (int i = 0; i < n; i++)
-        {
-            dot += a[i] * b[i];
-            na += a[i] * a[i];
-            nb += b[i] * b[i];
-        }
-        return na > 0 && nb > 0 ? dot / (Math.Sqrt(na) * Math.Sqrt(nb)) : 0;
     }
 
     public IReadOnlyList<ToolDescriptor> GetTools()
@@ -171,13 +126,5 @@ public sealed class KnowledgeTools
                 Tags = new[] { "knowledge", "safe" },
             },
         };
-    }
-
-    private sealed class Doc
-    {
-        public required string Id { get; init; }
-        public required string Title { get; init; }
-        public required string Content { get; init; }
-        public required float[] Vector { get; init; }
     }
 }

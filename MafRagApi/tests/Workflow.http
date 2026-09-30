@@ -1,0 +1,23 @@
+@baseUrl = http://localhost:5737
+@contentType = application/json
+
+### ═══════════════════════════════════════════════════════════
+### MAF Workflow 工作流测试（仅测 maf workflow）
+### 依赖：vLLM Chat (5723)
+### ═══════════════════════════════════════════════════════════
+
+### 1. Writer-Critic 工作流（非流式）
+POST {{baseUrl}}/api/workflows/writer-critic
+Content-Type: {{contentType}}
+
+{
+  "topic": "微服务架构下分布式事务的常见解决方案"
+}
+
+### 2. Writer-Critic 工作流（流式 SSE）
+POST {{baseUrl}}/api/workflows/writer-critic/stream
+Content-Type: {{contentType}}
+
+{
+  "topic": "vLLM 推理服务的核心优化技术"
+}

@@ -1,25 +1,25 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using APromisedLand.Api.MafRag.Dtos;
 using MafRagApi.Models;
 using Microsoft.Extensions.AI;
 
 namespace MafRagApi.Services;
 
 /// <summary>
-/// 内存版 RAG 服务。
+/// 内存版 RAG 向量检索服务（不含 LLM 生成）。
 ///
 /// 流水线：
 ///   Ingest  → 文本/JSON 分块 → embedding → 存入内存向量库
 ///   Retrieve → query embedding → 余弦相似度 → 可选 reranker 精排
-///   Chat     → Retrieve TopK → 拼装上下文 → IChatClient 生成答案
 ///
+/// RAG 问答编排（检索 + 拼装上下文 + LLM 生成）由 RagChatOrchestrator 负责。
 /// 生产环境请把 _chunks 换成 Qdrant / Milvus / pgvector 等向量库。
 /// </summary>
 public sealed class RagService
 {
     private readonly IEmbeddingGenerator<string, Embedding<float>> _embedder;
     private readonly IRerankerClient _reranker;
-    private readonly IChatClient _chat;
     private readonly ILogger<RagService> _logger;
 
     private readonly List<RagChunk> _chunks = new();
@@ -29,12 +29,10 @@ public sealed class RagService
     public RagService(
         IEmbeddingGenerator<string, Embedding<float>> embedder,
         IRerankerClient reranker,
-        IChatClient chat,
         ILogger<RagService> logger)
     {
         _embedder = embedder;
         _reranker = reranker;
-        _chat = chat;
         _logger = logger;
     }
 
@@ -197,95 +195,7 @@ public sealed class RagService
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 3. RAG 对话
-    // ═══════════════════════════════════════════════════════════
-
-    public async Task<RagChatResponse> ChatAsync(RagChatRequest req, string model, CancellationToken ct = default)
-    {
-        string context;
-        List<RagHitDto> sources;
-
-        if (string.Equals(req.Mode, "fulltext", StringComparison.OrdinalIgnoreCase))
-        {
-            // ── 全文投喂模式：把所有文档原文直接交给 AI ──
-            List<RagDoc> docs;
-            await _lock.WaitAsync(ct);
-            try { docs = _documents.Values.ToList(); }
-            finally { _lock.Release(); }
-
-            if (docs.Count == 0)
-            {
-                return new RagChatResponse
-                {
-                    Query   = req.Query,
-                    Answer  = "知识库为空，请先摄入文档。",
-                    Sources = new(),
-                    Model   = model,
-                };
-            }
-
-            var sb = new StringBuilder();
-            foreach (var d in docs)
-                sb.AppendLine($"【文档：{d.Title}】\n{d.RawText}\n");
-            context = sb.ToString();
-            sources = new();
-        }
-        else
-        {
-            // ── 检索增强模式（默认）：向量检索 → 取相关片段 ──
-            var retrieve = await RetrieveAsync(new RagRetrieveRequest
-            {
-                Query       = req.Query,
-                TopK        = req.TopK,
-                UseReranker = req.UseReranker,
-            }, ct);
-            context = BuildContext(retrieve.Hits);
-            sources = retrieve.Hits;
-        }
-
-        var sysPrompt = string.Equals(req.Mode, "fulltext", StringComparison.OrdinalIgnoreCase)
-            ? @"你是一个严谨的问答助手。请仔细阅读下面的【文档全文】，从中找出用户问题的答案。
-- 文档中没有的信息，直接回答「根据现有资料无法回答」，不要编造。
-- 回答要简洁准确，可引用文档中的内容。"
-            : @"你是一个严谨的问答助手。请严格依据下面的【参考资料】回答用户问题。
-- 资料中没有的信息，直接回答「根据现有资料无法回答」，不要编造。
-- 回答要简洁准确，可引用资料中的路径。";
-
-        var messages = new List<ChatMessage>
-        {
-            new(ChatRole.System, sysPrompt),
-            new(ChatRole.User, $"【{(sources.Count == 0 ? "文档全文" : "参考资料")}】\n{context}\n\n【用户问题】\n{req.Query}"),
-        };
-
-        var options = new ChatOptions { ModelId = model };
-
-        // 可选结构化输出
-        if (req.UseStructuredOutput)
-        {
-            var rf = StructuredOutput.BuildResponseFormat(req.ResponseSchema, req.OutputFormat);
-            if (rf is not null)
-            {
-                if (options.AdditionalProperties is null)
-                    options.AdditionalProperties = new();
-                options.AdditionalProperties[StructuredOutput.AdditionalPropertiesKey] = rf;
-            }
-        }
-
-        // 3) 生成
-        var resp = await _chat.GetResponseAsync(messages, options, ct);
-        var answer = resp.Messages.FirstOrDefault()?.Text ?? "";
-
-        return new RagChatResponse
-        {
-            Query   = req.Query,
-            Answer  = answer,
-            Sources = sources,
-            Model   = model,
-        };
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // 4. 统计
+    // 3. 统计
     // ═══════════════════════════════════════════════════════════
 
     public RagStatsResponse GetStats()
@@ -303,21 +213,24 @@ public sealed class RagService
         return new RagStatsResponse { DocCount = docs, ChunkCount = chunks };
     }
 
+    /// <summary>
+    /// 返回知识库中所有文档的原文（标题 + 正文），供 fulltext 模式直接投喂 AI。
+    /// </summary>
+    public async Task<IReadOnlyList<(string Title, string RawText)>> GetAllDocumentsAsync(CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct);
+        try
+        {
+            return _documents.Values
+                .Select(d => (d.Title, d.RawText))
+                .ToList();
+        }
+        finally { _lock.Release(); }
+    }
+
     // ═══════════════════════════════════════════════════════════
     // 辅助
     // ═══════════════════════════════════════════════════════════
-
-    private static string BuildContext(IReadOnlyList<RagHitDto> hits)
-    {
-        if (hits.Count == 0) return "（无相关资料）";
-
-        var sb = new StringBuilder();
-        for (int i = 0; i < hits.Count; i++)
-        {
-            sb.AppendLine($"[{i + 1}] {hits[i].Content}");
-        }
-        return sb.ToString();
-    }
 
     private static RagHitDto ToHit(RagChunk c, double score) => new()
     {

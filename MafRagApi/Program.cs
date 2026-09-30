@@ -122,6 +122,8 @@ builder.Services.AddSingleton<IInstructionTemplateStore, InMemoryInstructionTemp
 builder.Services.AddSingleton<AgentSessionStore>();
 builder.Services.AddHostedService<SessionCleanupService>();
 builder.Services.AddSingleton<RagService>();
+builder.Services.AddSingleton<RagChatOrchestrator>();
+builder.Services.AddSingleton<WorkflowService>();
 
 // ─── 6.1 工具注册 ─────────────────────────────
 builder.Services.AddSingleton<TimeTools>();

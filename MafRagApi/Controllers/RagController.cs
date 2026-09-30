@@ -1,3 +1,4 @@
+using APromisedLand.Api.MafRag.Dtos;
 using MafRagApi.Models;
 using MafRagApi.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +15,7 @@ namespace MafRagApi.Controllers;
 [Produces("application/json")]
 public sealed class RagController(
     RagService rag,
+    RagChatOrchestrator chatOrchestrator,
     IOptions<AgentOptions> agentOptions,
     ILogger<RagController> logger) : ControllerBase
 {
@@ -73,7 +75,7 @@ public sealed class RagController(
     {
         try
         {
-            var resp = await rag.ChatAsync(request, _opts.ChatModel, ct);
+            var resp = await chatOrchestrator.ChatAsync(request, _opts.ChatModel, ct);
             return Ok(resp);
         }
         catch (Exception ex)

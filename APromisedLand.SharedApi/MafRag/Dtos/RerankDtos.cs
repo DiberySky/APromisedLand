@@ -1,4 +1,4 @@
-namespace MafRagApi.Models;
+namespace APromisedLand.Api.MafRag.Dtos;
 
 /// <summary>POST /api/rerank 的请求体。</summary>
 public sealed record RerankRequestDto

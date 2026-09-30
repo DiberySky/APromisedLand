@@ -91,6 +91,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileStorageApi", "FileStora
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MafRagApi", "MafRagApi\MafRagApi.csproj", "{CDEC5879-8D47-4386-B735-44C138E167E0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APromisedLand.SharedApi", "APromisedLand.SharedApi\APromisedLand.SharedApi.csproj", "{0B797059-6611-4839-AC7D-44D374E6D6B6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -247,6 +249,10 @@ Global
 		{CDEC5879-8D47-4386-B735-44C138E167E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CDEC5879-8D47-4386-B735-44C138E167E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CDEC5879-8D47-4386-B735-44C138E167E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0B797059-6611-4839-AC7D-44D374E6D6B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0B797059-6611-4839-AC7D-44D374E6D6B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0B797059-6611-4839-AC7D-44D374E6D6B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0B797059-6611-4839-AC7D-44D374E6D6B6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -290,6 +296,7 @@ Global
 		{7D81B19A-E49B-45C1-AA71-A3FA90915A8C} = {7FE54680-F616-4864-A8F6-8E07813C378A}
 		{97FC032B-5F86-4C6E-A652-39F045D9E036} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
 		{CDEC5879-8D47-4386-B735-44C138E167E0} = {DE1CBDD2-2B25-4FA1-AA4E-65AA54E951F7}
+		{0B797059-6611-4839-AC7D-44D374E6D6B6} = {DC357836-6548-4918-9C56-E876B4E81A44}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9647CF65-ABDB-4637-B56C-E0CDAC22FFFB}
