@@ -33,13 +33,30 @@ public sealed class WorkflowService
         _options = options.Value;
         _logger = logger;
 
-        _writer = _chatClient.AsAIAgent(
-            instructions: "你是一名技术文案撰写专家。根据用户给出的主题，写一段结构清晰、信息密度高的中文初稿，不超过 300 字。只输出正文。",
-            name: "Writer");
+        // 限制每步输出长度，避免本地模型推理过慢
+        var writerOptions = new ChatClientAgentOptions
+        {
+            Name = "Writer",
+            ChatOptions = new ChatOptions
+            {
+                Instructions = "你是一名技术文案撰写专家。根据用户给出的主题，写一段结构清晰、信息密度高的中文初稿，不超过 100 字。只输出正文。",
+                MaxOutputTokens = 256,
+                Temperature = 0.7f,
+            },
+        };
+        var criticOptions = new ChatClientAgentOptions
+        {
+            Name = "Critic",
+            ChatOptions = new ChatOptions
+            {
+                Instructions = "你是一名严格的技术编辑。阅读下面这篇初稿，挑出事实性、逻辑和表达问题，并直接输出一版润色后的中文终稿。只输出终稿正文，不要解释你改了什么。",
+                MaxOutputTokens = 256,
+                Temperature = 0.5f,
+            },
+        };
 
-        _critic = _chatClient.AsAIAgent(
-            instructions: "你是一名严格的技术编辑。阅读下面这篇初稿，挑出事实性、逻辑和表达问题，并直接输出一版润色后的中文终稿。只输出终稿正文，不要解释你改了什么。",
-            name: "Critic");
+        _writer = new ChatClientAgent(_chatClient, writerOptions);
+        _critic = new ChatClientAgent(_chatClient, criticOptions);
     }
 
     // ─────────────────────────────────────────────────────────────

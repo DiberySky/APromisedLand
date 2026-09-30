@@ -21,7 +21,6 @@ public sealed class HealthController(
         => Ok(new HealthResponseDto
         {
             ChatModel      = _options.ChatModel,
-            EmbeddingModel = _options.EmbeddingModel,
         });
 
     /// <summary>深度：探活 vLLM /v1/models（readiness）。</summary>
@@ -46,7 +45,6 @@ public sealed class HealthController(
                     {
                         Status = "vllm reachable but no models loaded",
                         ChatModel = _options.ChatModel,
-                        EmbeddingModel = _options.EmbeddingModel,
                     });
             }
 
@@ -59,7 +57,6 @@ public sealed class HealthController(
                     ? $"ok ({ids.Length} models, serving '{expected}')"
                     : $"degraded (expected '{expected}' not found; have: {string.Join(", ", ids)})",
                 ChatModel = _options.ChatModel,
-                EmbeddingModel = _options.EmbeddingModel,
             });
         }
         catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
@@ -70,7 +67,6 @@ public sealed class HealthController(
                 {
                     Status = "vllm timeout (5s)",
                     ChatModel = _options.ChatModel,
-                    EmbeddingModel = _options.EmbeddingModel,
                 });
         }
         catch (Exception ex)
@@ -81,7 +77,6 @@ public sealed class HealthController(
                 {
                     Status = $"vllm unreachable: {ex.Message}",
                     ChatModel = _options.ChatModel,
-                    EmbeddingModel = _options.EmbeddingModel,
                 });
         }
     }

@@ -6,21 +6,22 @@ using Microsoft.Extensions.AI;
 namespace MafRagApi.Services;
 
 /// <summary>
-/// RAG 问答编排层：调用 RagService 做检索/取全文，拼装上下文后交由 IChatClient 生成答案。
+/// RAG 问答编排层：通过 VectorSearchClient 调用远程向量搜索服务做检索/取全文，
+/// 拼装上下文后交由 IChatClient 生成答案。
 /// 本类不持有向量库，仅负责"检索 → 上下文拼装 → LLM 生成"的流程编排。
 /// </summary>
 public sealed class RagChatOrchestrator
 {
-    private readonly RagService _rag;
+    private readonly VectorSearchClient _vectorSearch;
     private readonly IChatClient _chat;
     private readonly ILogger<RagChatOrchestrator> _logger;
 
     public RagChatOrchestrator(
-        RagService rag,
+        VectorSearchClient vectorSearch,
         IChatClient chat,
         ILogger<RagChatOrchestrator> logger)
     {
-        _rag = rag;
+        _vectorSearch = vectorSearch;
         _chat = chat;
         _logger = logger;
     }
@@ -33,7 +34,7 @@ public sealed class RagChatOrchestrator
         if (string.Equals(req.Mode, "fulltext", StringComparison.OrdinalIgnoreCase))
         {
             // ── 全文投喂模式：把所有文档原文直接交给 AI ──
-            var docs = await _rag.GetAllDocumentsAsync(ct);
+            var docs = await _vectorSearch.GetAllDocumentsAsync(ct);
 
             if (docs.Count == 0)
             {
@@ -55,7 +56,7 @@ public sealed class RagChatOrchestrator
         else
         {
             // ── 检索增强模式（默认）：向量检索 → 取相关片段 ──
-            var retrieve = await _rag.RetrieveAsync(new RagRetrieveRequest
+            var retrieve = await _vectorSearch.RetrieveAsync(new RagRetrieveRequest
             {
                 Query       = req.Query,
                 TopK        = req.TopK,

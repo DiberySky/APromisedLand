@@ -1,4 +1,4 @@
-﻿<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -36,6 +36,7 @@
         <ProjectReference Include="..\FoundryLocalService\FoundryLocalService.csproj" />
         <ProjectReference Include="..\MAFRagService\MAFRagService.csproj" />
         <ProjectReference Include="..\MafRagApi\MafRagApi.csproj" />
+        <ProjectReference Include="..\MafVectorSearchApi\MafVectorSearchApi.csproj" />
         <ProjectReference Include="..\MafStatefulApi.Client\MafStatefulApi.Client.csproj" />
         <ProjectReference Include="..\MafAIService\MafAIService.csproj" />
         <ProjectReference Include="..\MafStatefulApi.Web\MafStatefulApi.Web.csproj" />

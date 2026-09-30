@@ -44,6 +44,9 @@ public class AppHostResourceContext
     public IResourceBuilder<ProjectResource>? MafWorkFlowApi { get; set; }
     public IResourceBuilder<ProjectResource>? MafSampleApi { get; set; }
 
+    /// <summary>向量搜索服务（文本向量化 + 语义检索 + 重排序）。</summary>
+    public IResourceBuilder<ProjectResource>? MafVectorSearchApi { get; set; }
+
 
 
     // ── 前端 ──

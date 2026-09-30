@@ -1,10 +1,9 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using APromisedLand.Api.MafRag.Dtos;
-using MafRagApi.Models;
 using Microsoft.Extensions.AI;
 
-namespace MafRagApi.Services;
+namespace MafVectorSearchApi.Services;
 
 /// <summary>
 /// 内存版 RAG 向量检索服务（不含 LLM 生成）。
@@ -13,7 +12,7 @@ namespace MafRagApi.Services;
 ///   Ingest  → 文本/JSON 分块 → embedding → 存入内存向量库
 ///   Retrieve → query embedding → 余弦相似度 → 可选 reranker 精排
 ///
-/// RAG 问答编排（检索 + 拼装上下文 + LLM 生成）由 RagChatOrchestrator 负责。
+/// RAG 问答编排（检索 + 拼装上下文 + LLM 生成）由调用方负责。
 /// 生产环境请把 _chunks 换成 Qdrant / Milvus / pgvector 等向量库。
 /// </summary>
 public sealed class RagService
@@ -263,7 +262,7 @@ public sealed class RagService
     /// - 对象数组元素 → "路径[i]: {字段: 值, ...}"（整体保留，避免关联信息拆散）
     /// - 嵌套对象 → 递归到叶子
     /// </summary>
-    private static IEnumerable<(string Path, string Value)> FlattenJson(JsonNode node, string path = "")
+    private static IEnumerable<(string? Path, string Value)> FlattenJson(JsonNode node, string path = "")
     {
         switch (node)
         {

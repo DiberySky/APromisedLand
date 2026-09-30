@@ -1,10 +1,10 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using APromisedLand.Api.MafRag.Dtos;
-using MafRagApi.Models;
+using MafVectorSearchApi.Models;
 using Microsoft.Extensions.Options;
 
-namespace MafRagApi.Services;
+namespace MafVectorSearchApi.Services;
 
 /// <summary>
 /// 基于 HttpClient 的 Reranker 客户端。

@@ -1,10 +1,11 @@
 using APromisedLand.Api.MafRag.Dtos;
-using MafRagApi.Models;
+using MafVectorSearchApi.Models;
+using MafVectorSearchApi.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 
-namespace MafRagApi.Controllers;
+namespace MafVectorSearchApi.Controllers;
 
 /// <summary>
 /// 文本向量化入口（vLLM bge-m3）。
@@ -15,17 +16,17 @@ namespace MafRagApi.Controllers;
 [Produces("application/json")]
 public sealed class EmbeddingController(
     IEmbeddingGenerator<string, Embedding<float>> generator,
-    IOptions<AgentOptions> agentOptions,
+    IOptions<EmbeddingOptions> options,
     ILogger<EmbeddingController> logger) : ControllerBase
 {
-    private readonly AgentOptions _options = agentOptions.Value;
+    private readonly EmbeddingOptions _options = options.Value;
 
     /// <summary>暴露当前使用的模型名与维度。</summary>
     [HttpGet("model")]
     public ActionResult<object> GetModel() => Ok(new
     {
-        Model     = _options.EmbeddingModel,
-        Dimension = _options.EmbeddingDimension
+        Model     = _options.Model,
+        Dimension = _options.Dimension
     });
 
     /// <summary>将文本转为向量。</summary>
@@ -60,12 +61,12 @@ public sealed class EmbeddingController(
 
             logger.LogDebug(
                 "Embedding({Model}) 返回向量: {Dimension}",
-                _options.EmbeddingModel, vector.Count);
+                _options.Model, vector.Count);
 
             return Ok(new EmbedResponse(
                 Vector:    vector,
                 Dimension: vector.Count,
-                Model:     _options.EmbeddingModel));
+                Model:     _options.Model));
         }
         catch (Exception ex)
         {

@@ -1,16 +1,19 @@
 @baseUrl = http://localhost:5737
+@vectorSearchUrl = http://localhost:5741
 @contentType = application/json
 
 ### ═══════════════════════════════════════════════════════════
 ### RAG（检索增强生成）测试集
-### 依赖：vLLM(11891) + Embedding bge-m3(12976) + Reranker(5919)
+### 依赖：vLLM Chat(5723) + Embedding bge-m3(5719) + Reranker(5919)
+### MafRagApi(5737): chat / health
+### MafVectorSearchApi(5741): ingest / retrieve / stats
 ### ═══════════════════════════════════════════════════════════
 
 ### 0. 健康检查
 GET {{baseUrl}}/api/health
 
 ### 1. 摄入 JSON 文档（自动扁平化分块）
-POST {{baseUrl}}/api/rag/ingest
+POST {{vectorSearchUrl}}/api/rag/ingest
 Content-Type: {{contentType}}
 
 {
@@ -40,7 +43,7 @@ Content-Type: {{contentType}}
 }
 
 ### 2. 检索：组长是谁
-POST {{baseUrl}}/api/rag/retrieve
+POST {{vectorSearchUrl}}/api/rag/retrieve
 Content-Type: {{contentType}}
 
 {
@@ -50,7 +53,7 @@ Content-Type: {{contentType}}
 }
 
 ### 3. 检索：谁负责软件开发
-POST {{baseUrl}}/api/rag/retrieve
+POST {{vectorSearchUrl}}/api/rag/retrieve
 Content-Type: {{contentType}}
 
 {
@@ -119,10 +122,10 @@ Content-Type: {{contentType}}
 }
 
 ### 10. 知识库统计
-GET {{baseUrl}}/api/rag/stats
+GET {{vectorSearchUrl}}/api/rag/stats
 
 ### 11. 检索：QC项目简介
-POST {{baseUrl}}/api/rag/retrieve
+POST {{vectorSearchUrl}}/api/rag/retrieve
 Content-Type: {{contentType}}
 
 {

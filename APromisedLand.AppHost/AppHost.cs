@@ -25,6 +25,7 @@ void MafSampleApi()
     // builder.AddFileStorageApi(context);
     builder.AddLiteGraph(context);
     builder.AddRerankerService(context);
+    builder.AddMafVectorSearchApi(context);   // 向量搜索服务（需先于 MafSampleApi 声明）
     builder.AddMafSampleApi(context);
 }
 

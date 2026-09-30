@@ -53,7 +53,7 @@ public static class OllamaExtension
     // ─── 内部常量 ──────────────────────────────────────────────
     private const string OllamaDataVolumeName = "ollama-data";
 
-    /// <summary>Ollama HTTP 端点名（供其它扩展引用，例如 MafSampleApiExtension）。</summary>
+    /// <summary>Ollama HTTP 端点名（供其它扩展引用，例如 MafRagApiExtension）。</summary>
     public const string HttpEndpointName = "http";
 
     // ─── 主入口 ────────────────────────────────────────────────

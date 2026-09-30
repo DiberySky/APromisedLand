@@ -1,26 +1,26 @@
 using System.ComponentModel;
 using System.Text;
 using APromisedLand.Api.MafRag.Dtos;
-using MafRagApi.Models;
+using MafRagApi.Services;
 using Microsoft.Extensions.AI;
 
 namespace MafRagApi.Services.Tools;
 
 /// <summary>
 /// 语义检索工具（Agent 工具适配层）。
-/// 向量库与检索逻辑的唯一事实来源（SSOT）是 <see cref="RagService"/>，
-/// 本类不再自维护向量库，仅把 RagService 的结果适配为 Agent 工具的字符串契约。
+/// 向量库与检索逻辑由独立的 MafVectorSearchApi 服务提供，
+/// 本类通过 VectorSearchClient 调用远程服务，把结果适配为 Agent 工具的字符串契约。
 /// </summary>
 public sealed class KnowledgeTools
 {
-    private readonly RagService _rag;
+    private readonly VectorSearchClient _vectorSearch;
     private readonly ILogger<KnowledgeTools> _logger;
 
     public KnowledgeTools(
-        RagService rag,
+        VectorSearchClient vectorSearch,
         ILogger<KnowledgeTools> logger)
     {
-        _rag = rag;
+        _vectorSearch = vectorSearch;
         _logger = logger;
     }
 
@@ -36,13 +36,13 @@ public sealed class KnowledgeTools
 
         try
         {
-            var resp = await _rag.IngestAsync(new RagIngestRequest
+            var resp = await _vectorSearch.IngestAsync(new RagIngestRequest
             {
                 Content = content,
                 Title   = title,
             });
 
-            var stats = _rag.GetStats();
+            var stats = await _vectorSearch.GetStatsAsync();
             return $"已添加文档（{resp.Mode} 模式，{resp.ChunkCount} 块），当前知识库共 {stats.DocCount} 条文档。";
         }
         catch (Exception ex)
@@ -62,7 +62,7 @@ public sealed class KnowledgeTools
 
         try
         {
-            var resp = await _rag.RetrieveAsync(new RagRetrieveRequest
+            var resp = await _vectorSearch.RetrieveAsync(new RagRetrieveRequest
             {
                 Query       = query,
                 TopK        = topK,

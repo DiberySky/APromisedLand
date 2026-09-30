@@ -1,0 +1,94 @@
+@baseUrl = http://localhost:5741
+@contentType = application/json
+
+### ═══════════════════════════════════════════════════════════
+### MafVectorSearchApi 测试集
+### 端口 5741
+### 依赖：vLLM Embedding bge-m3(5719) + Reranker(5919)
+### 若 Embedding 不可用，ingest/retrieve 自动降级为 BM25
+### ═══════════════════════════════════════════════════════════
+
+### 1. Embedding 模型信息
+GET {{baseUrl}}/api/embedding/model
+
+### 2. 文本向量化
+POST {{baseUrl}}/api/embedding/embed
+Content-Type: {{contentType}}
+
+{
+  "text": "QC小组简介"
+}
+
+### 3. 知识库统计（初始）
+GET {{baseUrl}}/api/rag/stats
+
+### 4. 摄入 JSON 文档（自动扁平化分块）
+### ⚠️ content 必须是 JSON 字符串，RagService 内部会解析为对象后扁平化
+POST {{baseUrl}}/api/rag/ingest
+Content-Type: {{contentType}}
+
+{
+  "title": "QC小组简介",
+  "content": "{\"二、小组简介\":{\"1. QC小组概况\":{\"小组名称\":\"武东变电工班数字化管理 QC 小组\",\"成立时间\":\"2024 年 1 月\",\"课题类型\":\"管理型\",\"活动时间\":\"2024 年 1 月至 2025 年 04 月\",\"小组成员\":[{\"角色\":\"组长\",\"姓名\":\"贺军\",\"职责\":\"负责整体协调与资源调配\"},{\"角色\":\"组员\",\"姓名\":\"张慧慧\",\"职责\":\"负责数据管理与系统优化\"},{\"角色\":\"组员\",\"姓名\":\"闫静辉\",\"职责\":\"负责培训实施与效果评估\"},{\"角色\":\"组员\",\"姓名\":\"陈世浩\",\"职责\":\"负责软件开发与技术实现\"}]},\"2. 活动目标\":[\"实现设备管理数字化\",\"建立移动化培训平台\",\"降低管理成本\",\"实现数据离线本地化\"]}}"
+}
+
+### 5. 摄入纯文本文档
+POST {{baseUrl}}/api/rag/ingest
+Content-Type: {{contentType}}
+
+{
+  "title": "项目背景",
+  "content": "武东变电工班数字化管理QC小组成立于2024年1月，致力于通过数字化手段提升班组管理效率。小组由4名成员组成，涵盖管理、数据、培训和软件开发等领域。",
+  "chunkSize": 200
+}
+
+### 6. 知识库统计（摄入后）
+GET {{baseUrl}}/api/rag/stats
+
+### 7. 语义检索：组长是谁
+POST {{baseUrl}}/api/rag/retrieve
+Content-Type: {{contentType}}
+
+{
+  "query": "组长是谁",
+  "topK": 3,
+  "useReranker": true
+}
+
+### 8. 语义检索：谁负责软件开发
+POST {{baseUrl}}/api/rag/retrieve
+Content-Type: {{contentType}}
+
+{
+  "query": "谁负责软件开发与技术实现",
+  "topK": 3,
+  "useReranker": true
+}
+
+### 9. 语义检索：活动目标
+POST {{baseUrl}}/api/rag/retrieve
+Content-Type: {{contentType}}
+
+{
+  "query": "QC小组的活动目标是什么",
+  "topK": 5,
+  "useReranker": false
+}
+
+### 10. 全文获取（供 fulltext 模式投喂 AI）
+GET {{baseUrl}}/api/rag/fulltext
+
+### 11. 文档重排序
+POST {{baseUrl}}/api/rerank
+Content-Type: {{contentType}}
+
+{
+  "query": "组长",
+  "documents": [
+    "武东变电工班数字化管理 QC 小组",
+    "组长贺军负责整体协调与资源调配",
+    "组员张慧慧负责数据管理与系统优化",
+    "组员陈世浩负责软件开发与技术实现"
+  ],
+  "topK": 2
+}

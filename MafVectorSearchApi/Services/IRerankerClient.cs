@@ -1,6 +1,6 @@
 using APromisedLand.Api.MafRag.Dtos;
 
-namespace MafRagApi.Services;
+namespace MafVectorSearchApi.Services;
 
 /// <summary>Reranker 客户端抽象。</summary>
 public interface IRerankerClient

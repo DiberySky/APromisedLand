@@ -8,7 +8,7 @@ namespace APromisedLand.AppHost.Extensions;
 ///   - Chat:      vllm 容器       (Qwen3-4B-AWQ)
 ///   - Embedding: vllm-embed 容器 (BAAI/bge-m3)
 /// </summary>
-public static class MafSampleApiExtension
+public static class MafRagApiExtension
 {
     private const int MafSampleApiHttpPort = 5737;
 
@@ -35,7 +35,6 @@ public static class MafSampleApiExtension
         // ══════════════════════════════════════════════════════════
         context.MafSampleApi
             .WithEnvironment("Agent__ChatModel",           VllmExtension.ServedModelName)
-            .WithEnvironment("Agent__EmbeddingModel",      VllmExtension.ServedEmbeddingModelName)
             .WithEnvironment("Agent__MaxSessions",         "256")
             .WithEnvironment("Agent__SessionIdleTimeout",  "00:30:00")
             .WithEnvironment("Agent__ChatBudgetSeconds",   "900")
@@ -63,40 +62,26 @@ public static class MafSampleApiExtension
         {
             Console.WriteLine("[MafRagApi] ⚠️ context.Vllm 为 null，未注入 Chat 端点");
         }
-        
+
         // ══════════════════════════════════════════════════════════
-        // ★ Reranker 端点注入
+        // ★ MafVectorSearchApi 端点注入
+        //   MafRagApi 通过 VectorSearchClient 远程调用向量搜索服务。
+        //   Program.cs 优先级：VECTOR_SEARCH__BASEURL > VectorSearch:BaseUrl > localhost:5741
         // ══════════════════════════════════════════════════════════
-        if (context.RerankerService is not null)
+        if (context.MafVectorSearchApi is not null)
         {
-            var rerankerEndpoint = context.RerankerService.GetEndpoint("http");
+            var vectorSearchEndpoint = context.MafVectorSearchApi.GetEndpoint("http");
 
             context.MafSampleApi
-                .WithEnvironment("Reranker__Endpoint", rerankerEndpoint)
-                .WaitFor(context.RerankerService);
+                .WaitFor(context.MafVectorSearchApi)
+                .WithEnvironment("VECTOR_SEARCH__BASEURL", vectorSearchEndpoint)
+                .WithEnvironment("VectorSearch__BaseUrl",  vectorSearchEndpoint);
 
-            Console.WriteLine($"[MafRagApi] Reranker 端点 → {rerankerEndpoint}");
-        }
-
-        // ══════════════════════════════════════════════════════════
-        // ★ vLLM Embedding 容器：同上
-        //   Program.cs 优先级：VLLM_EMBEDDING_HTTP > Agent:EmbeddingEndpoint > localhost:8001
-        // ══════════════════════════════════════════════════════════
-        if (context.VllmEmbed is not null)
-        {
-            var embedEndpoint = context.VllmEmbed.GetEndpoint(
-                VllmExtension.EmbeddingHttpEndpointName);
-
-            context.MafSampleApi
-                .WaitFor(context.VllmEmbed)
-                .WithEnvironment("VLLM_EMBEDDING_HTTP",      embedEndpoint)
-                .WithEnvironment("Agent__EmbeddingEndpoint", embedEndpoint);
-
-            Console.WriteLine($"[MafRagApi] Embedding 端点 → {embedEndpoint}");
+            Console.WriteLine($"[MafRagApi] VectorSearch 端点 → {vectorSearchEndpoint}");
         }
         else
         {
-            Console.WriteLine("[MafRagApi] ⚠️ context.VllmEmbed 为 null，未注入 Embedding 端点");
+            Console.WriteLine("[MafRagApi] ⚠️ context.MafVectorSearchApi 为 null，未注入向量搜索端点");
         }
 
         // ══════════════════════════════════════════════════════════

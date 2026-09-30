@@ -50,37 +50,7 @@ builder.Services.AddSingleton<IChatClient>(sp =>
 });
 
 // ═══════════════════════════════════════════════════════════
-// 3. vLLM Embedding 客户端
-// ═══════════════════════════════════════════════════════════
-builder.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
-{
-    var opts = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
-    var logger = sp.GetRequiredService<ILogger<Program>>();
-
-    var endpoint = Environment.GetEnvironmentVariable("VLLM_EMBEDDING_HTTP")
-                   ?? opts.EmbeddingEndpoint
-                   ?? "http://localhost:8001";
-
-    logger.LogInformation(
-        "IEmbeddingGenerator → {Endpoint}, 模型: {Model}",
-        endpoint, opts.EmbeddingModel);
-
-    var openAiOptions = new OpenAIClientOptions
-    {
-        Endpoint = new Uri(endpoint.TrimEnd('/') + "/v1"),
-        NetworkTimeout = TimeSpan.FromMinutes(5),
-        RetryPolicy = new ClientRetryPolicy(maxRetries: 0),
-    };
-
-    return new OpenAIClient(
-            new ApiKeyCredential(opts.ApiKey),
-            openAiOptions)
-        .GetEmbeddingClient(opts.EmbeddingModel)
-        .AsIEmbeddingGenerator();
-});
-
-// ═══════════════════════════════════════════════════════════
-// 4. vLLM 探活专用 HttpClient（★ 就是缺这一块）
+// 3. vLLM 探活专用 HttpClient
 // ═══════════════════════════════════════════════════════════
 builder.Services.AddHttpClient("vllm", (sp, http) =>
 {
@@ -95,44 +65,37 @@ builder.Services.AddHttpClient("vllm", (sp, http) =>
 });
 
 // ═══════════════════════════════════════════════════════════
-// 5. Reranker 客户端
+// 4. 向量搜索服务客户端（远程调用 MafVectorSearchApi）
 // ═══════════════════════════════════════════════════════════
-builder.Services
-    .AddOptions<RerankerOptions>()
-    .Bind(builder.Configuration.GetSection(RerankerOptions.SectionName));
+builder.Services.AddHttpClient<VectorSearchClient>((sp, http) =>
+{
+    var baseUrl = Environment.GetEnvironmentVariable("VECTOR_SEARCH__BASEURL")
+                  ?? builder.Configuration["VectorSearch:BaseUrl"]
+                  ?? "http://localhost:5741";
+    http.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+    http.Timeout = TimeSpan.FromSeconds(120);
+    sp.GetRequiredService<ILogger<Program>>()
+        .LogInformation("VectorSearch client → {BaseUrl}", baseUrl);
+});
 
-builder.Services.AddHttpClient<IRerankerClient, RerankerClient>("reranker",
-    (sp, http) =>
-    {
-        var opts = sp.GetRequiredService<IOptions<RerankerOptions>>().Value;
-        var endpoint = Environment.GetEnvironmentVariable("Reranker__Endpoint")
-                       ?? opts.Endpoint
-                       ?? "http://localhost:5919";
-        http.BaseAddress = new Uri(endpoint.TrimEnd('/') + "/");
-        http.Timeout     = TimeSpan.FromSeconds(opts.TimeoutSeconds);
-        sp.GetRequiredService<ILogger<Program>>()
-            .LogInformation("Reranker client → {Endpoint}", endpoint);
-    });
-
-// ─── 6. MAF 服务 ────────────────────────────────────────────
+// ─── 5. MAF 服务 ────────────────────────────────────────────
 builder.Services.AddSingleton<IAgentFactory, AgentFactory>();
 builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
 builder.Services.AddHostedService<VllmWarmupService>();
 builder.Services.AddSingleton<IInstructionTemplateStore, InMemoryInstructionTemplateStore>();
 builder.Services.AddSingleton<AgentSessionStore>();
 builder.Services.AddHostedService<SessionCleanupService>();
-builder.Services.AddSingleton<RagService>();
 builder.Services.AddSingleton<RagChatOrchestrator>();
 builder.Services.AddSingleton<WorkflowService>();
 
-// ─── 6.1 工具注册 ─────────────────────────────
+// ─── 5.1 工具注册 ─────────────────────────────
 builder.Services.AddSingleton<TimeTools>();
 builder.Services.AddSingleton<MathTools>();
 builder.Services.AddSingleton<TemplateTools>();
 builder.Services.AddSingleton<KnowledgeTools>();
 builder.Services.AddSingleton<IToolRegistry, DefaultToolRegistry>();
 
-// ─── 7. ASP.NET Core ───────────────────────────────────────
+// ─── 6. ASP.NET Core ───────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
