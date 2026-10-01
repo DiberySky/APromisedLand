@@ -2,18 +2,44 @@
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>单位管理</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">单位管理</MudText>
 
-<MudButton Variant="Variant.Filled" Color="Color.Success"
-           OnClick="OpenCreate" StartIcon="@Icons.Material.Filled.Add"
-           Class="mb-4">
-    新建单位
-</MudButton>
+<MudPaper Class="pa-4 mb-4">
+    <div class="d-flex align-center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LoadAsync" Disabled="_loading"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            刷新
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   OnClick="OpenCreate"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Class="ml-2">
+            新建单位
+        </MudButton>
+    </div>
+</MudPaper>
 
-@if (_categories is not null)
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_categories is null || _categories.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.Straighten"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">暂无单位</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            点击"新建单位"创建第一个
+        </MudText>
+    </MudPaper>
+}
+else
 {
     @foreach (var c in _categories)
     {
@@ -27,16 +53,40 @@
                         基准: @c.BaseUnit.Symbol
                     </MudChip>
                 }
+                else
+                {
+                    @* ★ 无基准分类的"重新指定"入口 *@
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                             Class="ml-2">
+                        无基准单位
+                    </MudChip>
+                    @if (c.Units.Count > 0)
+                    {
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Warning"
+                                   StartIcon="@Icons.Material.Filled.Star"
+                                   Class="ml-2"
+                                   OnClick="@(() => OpenAssignBaseDialog(c))">
+                            指定基准单位
+                        </MudButton>
+                    }
+                }
             </div>
             <MudTable Items="c.Units" Hover="true" Bordered="true" Dense="true">
                 <HeaderContent>
                     <MudTh>名称</MudTh>
                     <MudTh>符号</MudTh>
+                    <MudTh>换算系数</MudTh>
+                    <MudTh>顺序</MudTh>
                     <MudTh>基准</MudTh>
+                    <MudTh>操作</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd>@context.Name</MudTd>
                     <MudTd>@context.Symbol</MudTd>
+                    <MudTd>@context.ToBaseFactor</MudTd>
+                    <MudTd>@context.DisplayOrder</MudTd>
                     <MudTd>
                         @if (context.IsBaseUnit)
                         {
@@ -44,17 +94,28 @@
                                      Color="Color.Success" />
                         }
                     </MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => OpenEdit(context))"
+                                       title="编辑" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(async () => await DeleteAsync(context))"
+                                       title="删除" />
+                    </MudTd>
                 </RowTemplate>
             </MudTable>
         </MudPaper>
     }
 }
-else if (_loading)
-{
-    <MudProgressLinear Indeterminate="true" />
-}
 
-<MudDialog @bind-Visible="_showDialog" Options="_dialogOptions">
+@* ============================================================ *@
+@* 新建单位 *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showCreateDialog" Options="_dialogOptions">
     <TitleContent>
         <MudText Typo="Typo.h6">新建单位</MudText>
     </TitleContent>
@@ -66,32 +127,308 @@ else if (_loading)
         <MudTextField @bind-Value="_newUnit.Symbol" Label="符号"
                       Variant="Variant.Outlined" Class="mb-3" />
         <MudNumericField T="decimal" @bind-Value="_newUnit.ToBaseFactor"
-                         Label="换算系数" Variant="Variant.Outlined" Class="mb-3" />
-        <MudSwitch @bind-Value="_newUnit.IsBaseUnit" Label="基准单位" />
+                         Label="换算系数（相对基准单位）"
+                         Variant="Variant.Outlined" Class="mb-3" />
+        <MudSwitch T="bool" @bind-Value="_newUnit.IsBaseUnit"
+                   Label="基准单位（每分类只能一个）" />
         <MudNumericField T="int" @bind-Value="_newUnit.DisplayOrder"
-                         Label="显示顺序" Variant="Variant.Outlined" />
+                         Label="显示顺序" Variant="Variant.Outlined"
+                         Class="mt-3" />
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _showDialog = false)">取消</MudButton>
-        <MudButton Color="Color.Primary" OnClick="SaveNewUnitAsync">创建</MudButton>
+        <MudButton OnClick="@(() => _showCreateDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="CreateAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "创建中..." : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ============================================================ *@
+@* 编辑单位（含高级操作） *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showEditDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">编辑单位</MudText>
+        @if (_editingUnit is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_editingUnit.Category / @_editingUnit.Name
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_editForm.Name" Label="名称"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_editForm.Symbol" Label="符号"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudNumericField T="int" @bind-Value="_editForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined" Class="mb-3" />
+
+        @if (_editingUnit is not null)
+        {
+            <MudSwitch T="bool"
+                       Value="_editForm.IsBaseUnit"
+                       ValueChanged="OnIsBaseUnitChanged"
+                       Label="基准单位（同分类仅一个）"
+                       Color="Color.Primary"
+                       Disabled="@_editingUnit.IsBaseUnit" />
+
+            @if (_editingUnit.IsBaseUnit)
+            {
+                <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                    该单位已是基准单位。若要更换基准，请在另一个单位上勾选"基准单位"。
+                </MudAlert>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    勾选后本分类的其它基准单位会自动降级。
+                </MudAlert>
+            }
+
+            <MudDivider Class="my-4" />
+
+            @* ★ 高级操作 *@
+            <MudExpansionPanels>
+                <MudExpansionPanel Text="高级操作">
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                        以下操作会修改已有数据的语义或分类归属，请谨慎执行。建议先备份数据库。
+                    </MudAlert>
+
+                    <div class="d-flex flex-column gap-2">
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.SwapHoriz"
+                                   OnClick="OpenMigrateDialog">
+                            迁移到其它分类
+                        </MudButton>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2 mb-2">
+                            仅当该单位未被任何属性绑定或被数值数据引用时可用。
+                        </MudText>
+
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.Calculate"
+                                   OnClick="OpenRecalculateDialog">
+                            修改换算系数并重算数据
+                        </MudButton>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
+                            影响所有以该单位为输入单位或基准单位的历史数据。
+                        </MudText>
+                    </div>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showEditDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="UpdateAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "保存中..." : "保存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ============================================================ *@
+@* 迁移分类对话框 *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showMigrateDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">迁移到其它分类</MudText>
+        @if (_editingUnit is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_editingUnit.Category / @_editingUnit.Name
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+            迁移后 ToBaseFactor 的语义会变化，需要重新指定。
+        </MudAlert>
+
+        <MudSelect T="string"
+                   Value="_migrateForm.NewCategory"
+                   ValueChanged="@(v => _migrateForm.NewCategory = v)"
+                   Label="目标分类"
+                   Variant="Variant.Outlined"
+                   Class="mb-3">
+            @foreach (var cat in GetAllCategories())
+            {
+                <MudSelectItem T="string" Value="@cat">@cat</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField @bind-Value="_migrateForm.NewCategory"
+                      Label="或输入新分类名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudNumericField T="decimal"
+                         @bind-Value="_migrateForm.NewToBaseFactor"
+                         Label="新的换算系数（相对新分类基准单位）"
+                         Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showMigrateDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="MigrateAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "迁移中..." : "迁移")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ============================================================ *@
+@* 重算换算系数对话框 *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showRecalculateDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">修改换算系数并重算</MudText>
+        @if (_editingUnit is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_editingUnit.Category / @_editingUnit.Name
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">
+            <b>危险操作。</b>将重算所有引用该单位的历史数据，请确认已备份数据库。
+        </MudAlert>
+
+        @if (_editingUnit is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">
+                当前换算系数：<code>@_editingUnit.ToBaseFactor</code>
+            </MudText>
+        }
+
+        <MudNumericField T="decimal"
+                         @bind-Value="_recalcForm.NewToBaseFactor"
+                         Label="新的换算系数"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            重算公式：<br />
+            · 作为输入单位：值 × 新系数 / 旧系数<br />
+            · 作为基准单位：值 × 旧系数 / 新系数<br />
+            · 同时命中两种角色：不变
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showRecalculateDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Error"
+                   OnClick="RecalculateAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "重算中..." : "确认重算")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ============================================================ *@
+@* 指定基准单位对话框（无基准分类用） *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showAssignBaseDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">指定基准单位</MudText>
+        @if (_assignBaseCategory is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                分类：@_assignBaseCategory.Category
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+            该分类当前无基准单位。请选择一个单位作为基准——此操作不会重算已有数据。
+        </MudAlert>
+
+        <MudSelect T="Guid?"
+                   Value="_assignBaseUnitId"
+                   ValueChanged="@(v => _assignBaseUnitId = v)"
+                   Label="选择单位"
+                   Variant="Variant.Outlined">
+            @if (_assignBaseCategory is not null)
+            {
+                @foreach (var u in _assignBaseCategory.Units)
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">
+                        @u.Name (@u.Symbol) — 系数 @u.ToBaseFactor
+                    </MudSelectItem>
+                }
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showAssignBaseDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="AssignBaseAsync"
+                   Disabled="@(_submitting || _assignBaseUnitId is null)">
+            @(_submitting ? "设置中..." : "设为基准")
+        </MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
     private IReadOnlyList<UnitCategoryDto>? _categories;
     private bool _loading;
+    private bool _initialized;
+    private bool _submitting;
 
-    private bool _showDialog;
-    private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small };
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    // 新建
+    private bool _showCreateDialog;
     private CreateUnitRequest _newUnit = new();
 
-    // 端点 ㉕：GET api/units/categories
-    protected override async Task OnInitializedAsync()
+    // 编辑
+    private bool _showEditDialog;
+    private UnitDto? _editingUnit;
+    private UpdateUnitForm _editForm = new();
+
+    // 迁移分类
+    private bool _showMigrateDialog;
+    private MigrateUnitCategoryForm _migrateForm = new();
+
+    // 重算系数
+    private bool _showRecalculateDialog;
+    private RecalculateUnitFactorForm _recalcForm = new();
+
+    // 指定基准
+    private bool _showAssignBaseDialog;
+    private UnitCategoryDto? _assignBaseCategory;
+    private Guid? _assignBaseUnitId;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
     {
         _loading = true;
         try
         {
             _categories = await Api.GetUnitCategoriesAsync();
+            if (_categories is null)
+            {
+                Snackbar.Add("单位加载失败，请检查后端服务", Severity.Error);
+                _categories = Array.Empty<UnitCategoryDto>();
+            }
         }
         finally
         {
@@ -99,24 +436,376 @@ else if (_loading)
         }
     }
 
+    private IEnumerable<string> GetAllCategories()
+        => _categories?.Select(c => c.Category).Distinct() ?? Enumerable.Empty<string>();
+
+    // ---------- 新建 ----------
+
     private void OpenCreate()
     {
         _newUnit = new CreateUnitRequest();
-        _showDialog = true;
+        _showCreateDialog = true;
     }
 
-    // 端点 ㉖：POST api/units
-    private async Task SaveNewUnitAsync()
+    private async Task CreateAsync()
     {
-        var id = await Api.CreateUnitAsync(_newUnit);
-        if (id is null)
+        if (string.IsNullOrWhiteSpace(_newUnit.Category) ||
+            string.IsNullOrWhiteSpace(_newUnit.Name) ||
+            string.IsNullOrWhiteSpace(_newUnit.Symbol))
         {
-            Snackbar.Add("创建失败", Severity.Error);
+            Snackbar.Add("请填写分类、名称、符号", Severity.Warning);
+            return;
+        }
+        if (_newUnit.ToBaseFactor <= 0)
+        {
+            Snackbar.Add("换算系数必须大于 0", Severity.Warning);
             return;
         }
 
-        Snackbar.Add($"创建成功：{id}", Severity.Success);
-        _showDialog = false;
-        _categories = await Api.GetUnitCategoriesAsync();
+        _submitting = true;
+        try
+        {
+            var id = await Api.CreateUnitAsync(_newUnit);
+            if (id is null)
+            {
+                Snackbar.Add("创建失败（可能分类下已存在同名单位或基准单位）", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add($"创建成功：{id}", Severity.Success);
+            _showCreateDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 编辑 ----------
+
+    private void OpenEdit(UnitDto unit)
+    {
+        _editingUnit = unit;
+        _editForm = new UpdateUnitForm
+        {
+            Name = unit.Name,
+            Symbol = unit.Symbol,
+            DisplayOrder = unit.DisplayOrder,
+            IsBaseUnit = unit.IsBaseUnit
+        };
+        _showEditDialog = true;
+    }
+
+    private async Task OnIsBaseUnitChanged(bool desired)
+    {
+        if (_editingUnit is null) return;
+
+        if (!desired && _editingUnit.IsBaseUnit)
+        {
+            Snackbar.Add(
+                "不能直接取消基准单位。如需切换，请在目标单位上勾选'基准单位'。",
+                Severity.Warning);
+            _editForm.IsBaseUnit = true;
+            return;
+        }
+
+        if (desired && !_editingUnit.IsBaseUnit)
+        {
+            var confirmed = await DialogService.ShowMessageBoxAsync(
+                "设为基准单位",
+                $"将「{_editingUnit.Name}」({_editingUnit.Symbol}) " +
+                $"设为分类「{_editingUnit.Category}」的基准单位？\n\n" +
+                "· 本分类现有的基准单位将自动降级。\n" +
+                "· 已有属性值按原基准单位归一化存储，切换基准会导致数值语义变化。\n" +
+                "· 若属性目录中存在绑定到本分类基准单位的属性，请评估后再操作。",
+                yesText: "确认", cancelText: "取消");
+
+            _editForm.IsBaseUnit = confirmed == true;
+            return;
+        }
+
+        _editForm.IsBaseUnit = desired;
+    }
+
+    private async Task UpdateAsync()
+    {
+        if (_editingUnit is null) return;
+
+        if (string.IsNullOrWhiteSpace(_editForm.Name))
+        {
+            Snackbar.Add("名称不能为空", Severity.Warning);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_editForm.Symbol))
+        {
+            Snackbar.Add("符号不能为空", Severity.Warning);
+            return;
+        }
+
+        var baseUnchanged = _editForm.IsBaseUnit == _editingUnit.IsBaseUnit
+                         || _editingUnit.IsBaseUnit;
+
+        if (_editForm.Name == _editingUnit.Name &&
+            _editForm.Symbol == _editingUnit.Symbol &&
+            _editForm.DisplayOrder == _editingUnit.DisplayOrder &&
+            baseUnchanged)
+        {
+            _showEditDialog = false;
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateUnitAsync(
+                _editingUnit.Id,
+                new UpdateUnitRequest
+                {
+                    Name = _editForm.Name,
+                    Symbol = _editForm.Symbol,
+                    DisplayOrder = _editForm.DisplayOrder,
+                    IsBaseUnit = !_editingUnit.IsBaseUnit && _editForm.IsBaseUnit
+                        ? true
+                        : null
+                });
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            _showEditDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 迁移分类 ----------
+
+    private void OpenMigrateDialog()
+    {
+        if (_editingUnit is null) return;
+
+        _migrateForm = new MigrateUnitCategoryForm
+        {
+            NewCategory = "",
+            NewToBaseFactor = _editingUnit.ToBaseFactor
+        };
+        _showMigrateDialog = true;
+    }
+
+    private async Task MigrateAsync()
+    {
+        if (_editingUnit is null) return;
+
+        if (string.IsNullOrWhiteSpace(_migrateForm.NewCategory))
+        {
+            Snackbar.Add("请选择或输入目标分类", Severity.Warning);
+            return;
+        }
+        if (_migrateForm.NewCategory == _editingUnit.Category)
+        {
+            Snackbar.Add("目标分类与原分类相同", Severity.Warning);
+            return;
+        }
+        if (_migrateForm.NewToBaseFactor <= 0)
+        {
+            Snackbar.Add("新换算系数必须大于 0", Severity.Warning);
+            return;
+        }
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认迁移",
+            $"将「{_editingUnit.Name}」从分类「{_editingUnit.Category}」" +
+            $"迁移到「{_migrateForm.NewCategory}」，新系数 {_migrateForm.NewToBaseFactor}？\n\n" +
+            "此操作会改变该单位的分类归属，不可撤销。",
+            yesText: "确认迁移", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.MigrateUnitCategoryAsync(
+                _editingUnit.Id,
+                new MigrateUnitCategoryRequest
+                {
+                    NewCategory = _migrateForm.NewCategory,
+                    NewToBaseFactor = _migrateForm.NewToBaseFactor
+                });
+
+            if (!ok)
+            {
+                Snackbar.Add($"迁移失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("迁移成功", Severity.Success);
+            _showMigrateDialog = false;
+            _showEditDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 重算系数 ----------
+
+    private void OpenRecalculateDialog()
+    {
+        if (_editingUnit is null) return;
+
+        _recalcForm = new RecalculateUnitFactorForm
+        {
+            NewToBaseFactor = _editingUnit.ToBaseFactor
+        };
+        _showRecalculateDialog = true;
+    }
+
+    private async Task RecalculateAsync()
+    {
+        if (_editingUnit is null) return;
+
+        if (_recalcForm.NewToBaseFactor <= 0)
+        {
+            Snackbar.Add("新换算系数必须大于 0", Severity.Warning);
+            return;
+        }
+        if (_recalcForm.NewToBaseFactor == _editingUnit.ToBaseFactor)
+        {
+            Snackbar.Add("系数未变化", Severity.Info);
+            return;
+        }
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认重算",
+            $"将「{_editingUnit.Name}」的换算系数从 {_editingUnit.ToBaseFactor} " +
+            $"改为 {_recalcForm.NewToBaseFactor}，并重算所有引用该单位的历史数据？\n\n" +
+            "此操作不可撤销，请确认已备份数据库。",
+            yesText: "确认重算", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        _submitting = true;
+        try
+        {
+            var (ok, result, error) = await Api.RecalculateUnitFactorAsync(
+                _editingUnit.Id,
+                new RecalculateUnitFactorRequest
+                {
+                    NewToBaseFactor = _recalcForm.NewToBaseFactor
+                });
+
+            if (!ok)
+            {
+                Snackbar.Add($"重算失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add(
+                $"重算成功：影响 {result?.AffectedValues ?? 0} 条数据、" +
+                $"{result?.AffectedAttributes ?? 0} 个属性",
+                Severity.Success);
+
+            _showRecalculateDialog = false;
+            _showEditDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 指定基准单位（无基准分类） ----------
+
+    private void OpenAssignBaseDialog(UnitCategoryDto category)
+    {
+        _assignBaseCategory = category;
+        _assignBaseUnitId = null;
+        _showAssignBaseDialog = true;
+    }
+
+    private async Task AssignBaseAsync()
+    {
+        if (_assignBaseCategory is null || _assignBaseUnitId is null) return;
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateUnitAsync(
+                _assignBaseUnitId.Value,
+                new UpdateUnitRequest { IsBaseUnit = true });
+
+            if (!ok)
+            {
+                Snackbar.Add($"设置失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("已设为基准单位", Severity.Success);
+            _showAssignBaseDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 删除 ----------
+
+    private async Task DeleteAsync(UnitDto unit)
+    {
+        var extraHint = unit.IsBaseUnit
+            ? "\n\n注意：这是该分类的基准单位，删除后本分类将没有基准单位。"
+            : "";
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除单位「{unit.Name}」({unit.Symbol})？{extraHint}",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteUnitAsync(unit.Id);
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    // ---------- 表单模型 ----------
+
+    private class UpdateUnitForm
+    {
+        public string Name { get; set; } = "";
+        public string Symbol { get; set; } = "";
+        public int DisplayOrder { get; set; }
+        public bool IsBaseUnit { get; set; }
+    }
+
+    private class MigrateUnitCategoryForm
+    {
+        public string NewCategory { get; set; } = "";
+        public decimal NewToBaseFactor { get; set; }
+    }
+
+    private class RecalculateUnitFactorForm
+    {
+        public decimal NewToBaseFactor { get; set; }
     }
 }

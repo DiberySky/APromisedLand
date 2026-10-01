@@ -1,6 +1,5 @@
 @page "/metadata/custom-tables"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
-@using System.Text.Json
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -9,9 +8,6 @@
 
 <MudText Typo="Typo.h5" Class="mb-4">自定义表管理</MudText>
 
-@* ============================================================ *@
-@* 顶部工具栏                                                    *@
-@* ============================================================ *@
 <MudPaper Class="pa-4 mb-4">
     <MudGrid>
         <MudItem xs="12" md="4" Class="d-flex align-center">
@@ -35,17 +31,10 @@
     </MudGrid>
 </MudPaper>
 
-@* ============================================================ *@
-@* 加载中                                                        *@
-@* ============================================================ *@
 @if (_loading)
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
 }
-
-@* ============================================================ *@
-@* 空状态                                                        *@
-@* ============================================================ *@
 else if (_tables is null || _tables.Count == 0)
 {
     <MudPaper Class="pa-8 text-center">
@@ -57,10 +46,6 @@ else if (_tables is null || _tables.Count == 0)
         </MudText>
     </MudPaper>
 }
-
-@* ============================================================ *@
-@* 自定义表列表（折叠面板）                                      *@
-@* ============================================================ *@
 else
 {
     <MudExpansionPanels MultiExpansion="true">
@@ -88,16 +73,21 @@ else
                             @table.Columns.Count 列
                         </MudChip>
                         <MudSpacer />
+                        @* ★ 新增：编辑表入口 *@
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="@(() => OpenEditTableDialog(table))"
+                                       title="编辑显示名 / 顺序" />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                        Color="Color.Error"
                                        Size="Size.Small"
-                                       OnClick="@(async e => await DeleteTableAsync(table))"
+                                       OnClick="@(async () => await DeleteTableAsync(table))"
                                        title="删除自定义表" />
                     </div>
                 </TitleContent>
 
                 <ChildContent>
-                    @* 列工具栏 *@
                     <div class="d-flex mb-3">
                         <MudButton Size="Size.Small"
                                    Variant="Variant.Outlined"
@@ -108,7 +98,6 @@ else
                         </MudButton>
                     </div>
 
-                    @* 列列表 *@
                     @if (table.Columns.Count == 0)
                     {
                         <MudAlert Severity="Severity.Info" Dense="true">
@@ -190,10 +179,8 @@ else
 }
 
 @* ============================================================ *@
-@* 对话框                                                        *@
-@* ============================================================ *@
-
 @* 新建自定义表 *@
+@* ============================================================ *@
 <MudDialog @bind-Visible="_showCreateTableDialog" Options="_dialogOptions">
     <TitleContent>
         <MudText Typo="Typo.h6">新建自定义表</MudText>
@@ -229,7 +216,47 @@ else
     </DialogActions>
 </MudDialog>
 
+@* ============================================================ *@
+@* ★ 编辑自定义表（后端支持改 DisplayName / DisplayOrder） *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showEditTableDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">编辑自定义表</MudText>
+        @if (_editingTable is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_editingTable.EntityType / @_editingTable.TableName
+                （表名与实体类型不可修改）
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_editTableForm.DisplayName"
+                      Label="显示名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudNumericField T="int?"
+                         @bind-Value="_editTableForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+        <MudAlert Severity="Severity.Info" Dense="true">
+            TableName 与 EntityType 是引用标识，不可修改。如需更名，请新建并迁移引用。
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showEditTableDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="UpdateTableAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "保存中..." : "保存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ============================================================ *@
 @* 添加 / 编辑列 *@
+@* ============================================================ *@
 <MudDialog @bind-Visible="_showColumnDialog" Options="_dialogOptions">
     <TitleContent>
         <MudText Typo="Typo.h6">
@@ -255,18 +282,19 @@ else
                       Variant="Variant.Outlined"
                       Class="mb-3" />
 
-        <MudSelect @bind-Value="_columnForm.DataType"
+        <MudSelect T="string"
+                   Value="_columnForm.DataType"
+                   ValueChanged="OnColumnDataTypeChanged"
                    Label="数据类型"
                    Variant="Variant.Outlined"
                    Disabled="@(_editingColumn is not null)"
                    Class="mb-3">
             @foreach (var dt in DataTypeOptions)
             {
-                <MudSelectItem Value="@dt.Value">@dt.Label</MudSelectItem>
+                <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
             }
         </MudSelect>
 
-        @* 组合类型列：引用嵌套类型 *@
         @if (_columnForm.DataType == "composite")
         {
             <MudSelect T="long?"
@@ -332,6 +360,7 @@ else
     private IReadOnlyList<CustomTableDetailDto>? _tables;
     private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
     private bool _loading;
+    private bool _initialized;
 
     private bool _submitting;
     private readonly DialogOptions _dialogOptions = new()
@@ -343,6 +372,11 @@ else
     // 新建自定义表
     private bool _showCreateTableDialog;
     private CreateCustomTableRequest _newTable = new() { EntityType = "Product" };
+
+    // ★ 编辑自定义表
+    private bool _showEditTableDialog;
+    private CustomTableDetailDto? _editingTable;
+    private UpdateCustomTableRequest _editTableForm = new();
 
     // 添加 / 编辑列
     private bool _showColumnDialog;
@@ -364,20 +398,34 @@ else
         ("json",     "JSON")
     };
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // 加载组合类型（供列引用嵌套类型时选择）
-        _compositeTypes = await Api.ListCompositeTypesAsync();
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        await LoadCompositeTypesAsync();
         await LoadAsync();
+        StateHasChanged();
     }
 
-    // 端点 ㉝：GET api/eav/metadata/custom-tables?entityType=
+    private async Task LoadCompositeTypesAsync()
+    {
+        _compositeTypes = await Api.ListCompositeTypesAsync();
+        if (_compositeTypes is null)
+            Snackbar.Add("组合类型加载失败（列若需嵌套类型将不可选）", Severity.Warning);
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
             _tables = await Api.ListCustomTablesAsync(_entityType);
+            if (_tables is null)
+            {
+                Snackbar.Add("加载失败，请检查后端服务", Severity.Error);
+                _tables = Array.Empty<CustomTableDetailDto>();
+            }
         }
         finally
         {
@@ -393,7 +441,6 @@ else
         _showCreateTableDialog = true;
     }
 
-    // 端点 ⑭：POST api/eav/metadata/custom-tables
     private async Task CreateTableAsync()
     {
         if (string.IsNullOrWhiteSpace(_newTable.EntityType) ||
@@ -424,9 +471,65 @@ else
         }
     }
 
+    // ---------- ★ 编辑自定义表 ----------
+
+    private void OpenEditTableDialog(CustomTableDetailDto table)
+    {
+        _editingTable = table;
+        _editTableForm = new UpdateCustomTableRequest
+        {
+            DisplayName = table.DisplayName,
+            DisplayOrder = table.DisplayOrder
+        };
+        _showEditTableDialog = true;
+    }
+
+    private async Task UpdateTableAsync()
+    {
+        if (_editingTable is null) return;
+
+        if (string.IsNullOrWhiteSpace(_editTableForm.DisplayName))
+        {
+            Snackbar.Add("显示名不能为空", Severity.Warning);
+            return;
+        }
+
+        // 未变更则直接关闭，避免无谓请求（后端 null 语义为"不修改"）
+        var unchanged =
+            _editTableForm.DisplayName == _editingTable.DisplayName &&
+            _editTableForm.DisplayOrder == _editingTable.DisplayOrder;
+
+        if (unchanged)
+        {
+            _showEditTableDialog = false;
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateCustomTableAsync(
+                _editingTable.TableDefinitionId,
+                _editTableForm);
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            _showEditTableDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
     // ---------- 删除自定义表 ----------
 
-    // 端点 ㊱：DELETE api/eav/metadata/custom-tables/{id}
     private async Task DeleteTableAsync(CustomTableDetailDto table)
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
@@ -444,7 +547,7 @@ else
         }
         else
         {
-            Snackbar.Add($"删除失败：{ParseError(error)}", Severity.Error);
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
         }
     }
 
@@ -482,6 +585,12 @@ else
         _showColumnDialog = true;
     }
 
+    private void OnColumnDataTypeChanged(string dt)
+    {
+        _columnForm.DataType = dt;
+        if (dt != "composite") _columnForm.RefCompositeTypeId = null;
+    }
+
     private async Task SaveColumnAsync()
     {
         if (_currentTable is null) return;
@@ -505,7 +614,6 @@ else
         {
             if (_editingColumn is null)
             {
-                // 端点 ⑮：POST api/eav/metadata/custom-tables/{id}/columns
                 var id = await Api.AddCustomTableColumnAsync(
                     _currentTable.TableDefinitionId,
                     new CreateTableColumnRequest
@@ -530,7 +638,6 @@ else
             }
             else
             {
-                // 端点 ㊲：PUT api/eav/metadata/custom-tables/{id}/columns/{columnId}
                 var (ok, error) = await Api.UpdateTableColumnAsync(
                     _currentTable.TableDefinitionId,
                     _editingColumn.ColumnId,
@@ -546,7 +653,7 @@ else
 
                 if (!ok)
                 {
-                    Snackbar.Add($"更新失败：{ParseError(error)}", Severity.Error);
+                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
                     return;
                 }
                 Snackbar.Add("更新成功", Severity.Success);
@@ -563,7 +670,6 @@ else
 
     // ---------- 删除列 ----------
 
-    // 端点 ㊳：DELETE api/eav/metadata/custom-tables/{id}/columns/{columnId}
     private async Task DeleteColumnAsync(
         CustomTableDetailDto table, CustomTableColumnDto column)
     {
@@ -584,7 +690,7 @@ else
         }
         else
         {
-            Snackbar.Add($"删除失败：{ParseError(error)}", Severity.Error);
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
         }
     }
 
@@ -601,21 +707,6 @@ else
         _ => Color.Default
     };
 
-    /// <summary>从后端返回的 JSON 错误体中提取 error 字段</summary>
-    private static string ParseError(string? raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) return "未知错误";
-        try
-        {
-            using var doc = JsonDocument.Parse(raw);
-            if (doc.RootElement.TryGetProperty("error", out var err))
-                return err.GetString() ?? raw;
-        }
-        catch { /* 不是 JSON，直接返回原文 */ }
-        return raw;
-    }
-
-    /// <summary>列表单临时模型</summary>
     private class ColumnForm
     {
         public string ColumnName { get; set; } = "";

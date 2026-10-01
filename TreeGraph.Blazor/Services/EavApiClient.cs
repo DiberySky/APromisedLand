@@ -343,6 +343,66 @@ public class EavApiClient
         }
     }
 
+    /// <summary>★ 新增：POST api/units/{id}/migrate-category</summary>
+    public async Task<(bool Ok, string? Error)> MigrateUnitCategoryAsync(
+        Guid unitId, MigrateUnitCategoryRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync(
+                $"api/units/{unitId}/migrate-category", request, JsonOptions, ct);
+            if (resp.IsSuccessStatusCode) return (true, null);
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            _logger.LogWarning("POST migrate-category → {Status}: {Error}",
+                resp.StatusCode, msg);
+            return (false, msg);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "POST migrate-category 失败");
+            return (false, ex.Message);
+        }
+    }
+
+    /// <summary>★ 新增：POST api/units/{id}/recalculate-factor</summary>
+    public async Task<(bool Ok, RecalculateUnitFactorResult? Result, string? Error)>
+        RecalculateUnitFactorAsync(
+        Guid unitId, RecalculateUnitFactorRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync(
+                $"api/units/{unitId}/recalculate-factor", request, JsonOptions, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var msg = await ExtractErrorAsync(resp, ct);
+                _logger.LogWarning("POST recalculate-factor → {Status}: {Error}",
+                    resp.StatusCode, msg);
+                return (false, null, msg);
+            }
+
+            var result = await resp.Content
+                .ReadFromJsonAsync<RecalculateUnitFactorResult>(JsonOptions, ct);
+            return (true, result, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "POST recalculate-factor 失败");
+            return (false, null, ex.Message);
+        }
+    }
+
+    /// <summary>★ 新增：PUT api/units/{id}</summary>
+    public async Task<(bool Ok, string? Error)> UpdateUnitAsync(
+        Guid unitId, UpdateUnitRequest request, CancellationToken ct = default)
+        => await PutAsync($"api/units/{unitId}", request, ct);
+
+    /// <summary>★ 新增：DELETE api/units/{id}（带引用校验错误体）</summary>
+    public async Task<(bool Ok, string? Error)> DeleteUnitAsync(
+        Guid unitId, CancellationToken ct = default)
+        => await DeleteWithErrorAsync($"api/units/{unitId}", ct);
+
     // ============================================================
     // 通用助手
     // ============================================================

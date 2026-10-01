@@ -1,6 +1,5 @@
 @page "/metadata/option-sets"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
-@using System.Text.Json
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -9,9 +8,6 @@
 
 <MudText Typo="Typo.h5" Class="mb-4">选项集管理</MudText>
 
-@* ============================================================ *@
-@* 顶部工具栏                                                    *@
-@* ============================================================ *@
 <MudPaper Class="pa-4 mb-4">
     <MudGrid>
         <MudItem xs="12" md="4" Class="d-flex align-center">
@@ -35,9 +31,6 @@
     </MudGrid>
 </MudPaper>
 
-@* ============================================================ *@
-@* 加载中 / 空状态                                               *@
-@* ============================================================ *@
 @if (_loading)
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
@@ -53,10 +46,6 @@ else if (_sets is null || _sets.Count == 0)
         </MudText>
     </MudPaper>
 }
-
-@* ============================================================ *@
-@* 选项集列表（折叠面板）                                        *@
-@* ============================================================ *@
 else
 {
     <MudExpansionPanels MultiExpansion="true">
@@ -111,7 +100,6 @@ else
                 </TitleContent>
 
                 <ChildContent>
-                    @* 选项工具栏 *@
                     <div class="d-flex mb-3">
                         <MudButton Size="Size.Small"
                                    Variant="Variant.Outlined"
@@ -122,7 +110,6 @@ else
                         </MudButton>
                     </div>
 
-                    @* 选项表格 *@
                     @if (items.Count == 0)
                     {
                         <MudAlert Severity="Severity.Info" Dense="true">
@@ -176,7 +163,6 @@ else
                                     {
                                         <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
                                                        Size="Size.Small"
-                                                       Disabled="@(context.DisplayOrder <= 1)"
                                                        OnClick="@(async () => await MoveUpAsync(currentSet, context))"
                                                        title="上移" />
                                         <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
@@ -213,7 +199,7 @@ else
 }
 
 @* ============================================================ *@
-@* 新建选项集对话框                                              *@
+@* 新建选项集 *@
 @* ============================================================ *@
 <MudDialog @bind-Visible="_showCreateSetDialog" Options="_dialogOptions">
     <TitleContent>
@@ -246,7 +232,7 @@ else
 </MudDialog>
 
 @* ============================================================ *@
-@* 编辑选项集对话框                                              *@
+@* 编辑选项集 *@
 @* ============================================================ *@
 <MudDialog @bind-Visible="_showEditSetDialog" Options="_dialogOptions">
     <TitleContent>
@@ -274,7 +260,7 @@ else
 </MudDialog>
 
 @* ============================================================ *@
-@* 添加 / 编辑选项对话框                                         *@
+@* 添加 / 编辑选项 *@
 @* ============================================================ *@
 <MudDialog @bind-Visible="_showItemDialog" Options="_dialogOptions">
     <TitleContent>
@@ -332,6 +318,7 @@ else
     private IReadOnlyList<OptionSetSummaryDto>? _sets;
     private readonly Dictionary<long, List<OptionItemDetailDto>> _itemsCache = new();
     private bool _loading;
+    private bool _initialized;
 
     private bool _submitting;
     private readonly DialogOptions _dialogOptions = new()
@@ -340,33 +327,43 @@ else
         FullWidth = true
     };
 
-    // 新建选项集
     private bool _showCreateSetDialog;
     private CreateOptionSetRequest _newSet = new() { EntityType = "Shared" };
 
-    // 编辑选项集
     private bool _showEditSetDialog;
     private OptionSetSummaryDto? _editingSet;
     private UpdateOptionSetRequest _editSetForm = new();
 
-    // 添加 / 编辑选项
     private bool _showItemDialog;
     private OptionSetSummaryDto? _currentSet;
     private OptionItemDetailDto? _editingItem;
     private OptionItemForm _itemForm = new();
 
-    protected override async Task OnInitializedAsync()
-        => await LoadAsync();
+    // ★ P1-1：避免预渲染 + 交互式执行两次
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
 
-    // 端点 ⑱ + items：加载集合列表 + 并行加载每个集合的选项
+        await LoadAsync();
+        StateHasChanged();
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
             _sets = await Api.ListOptionSetsAsync(_entityType);
+            if (_sets is null)
+            {
+                Snackbar.Add("加载失败，请检查后端服务", Severity.Error);
+                _sets = Array.Empty<OptionSetSummaryDto>();
+                _itemsCache.Clear();
+                return;
+            }
 
-            if (_sets is null || _sets.Count == 0)
+            if (_sets.Count == 0)
             {
                 _itemsCache.Clear();
                 return;
@@ -382,10 +379,15 @@ else
             var results = await Task.WhenAll(tasks);
 
             _itemsCache.Clear();
+            int failedCount = 0;
             foreach (var (setId, items) in results)
             {
+                if (items is null) failedCount++;
                 _itemsCache[setId] = items?.ToList() ?? new List<OptionItemDetailDto>();
             }
+
+            if (failedCount > 0)
+                Snackbar.Add($"{failedCount} 个选项集的选项加载失败", Severity.Warning);
         }
         finally
         {
@@ -393,7 +395,6 @@ else
         }
     }
 
-    /// <summary>只刷新单个集合的选项</summary>
     private async Task ReloadItemsAsync(long optionSetId)
     {
         var items = await Api.ListOptionItemsAsync(optionSetId);
@@ -408,7 +409,6 @@ else
         _showCreateSetDialog = true;
     }
 
-    // 端点 ⑰：POST api/eav/metadata/option-sets
     private async Task CreateSetAsync()
     {
         if (string.IsNullOrWhiteSpace(_newSet.EntityType) ||
@@ -438,8 +438,6 @@ else
         }
     }
 
-    // ---------- 编辑选项集 ----------
-
     private void OpenEditSetDialog(OptionSetSummaryDto set)
     {
         _editingSet = set;
@@ -447,7 +445,6 @@ else
         _showEditSetDialog = true;
     }
 
-    // 端点 ㊸：PUT api/eav/metadata/option-sets/{setId}
     private async Task UpdateSetAsync()
     {
         if (_editingSet is null) return;
@@ -460,7 +457,7 @@ else
 
             if (!ok)
             {
-                Snackbar.Add($"更新失败：{ParseError(error)}", Severity.Error);
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
                 return;
             }
 
@@ -474,10 +471,8 @@ else
         }
     }
 
-    // 端点 ⑲：DELETE api/eav/metadata/option-sets/{setId}
     private async Task DeleteSetAsync(OptionSetSummaryDto set)
     {
-        // 先检查引用（端点 ㊹），被引用时列出引用属性并阻止
         var refs = await Api.GetOptionSetReferencesAsync(set.OptionSetId);
         if (refs is not null && refs.Count > 0)
         {
@@ -506,7 +501,7 @@ else
         }
         else
         {
-            Snackbar.Add($"删除失败：{error}", Severity.Error);
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
         }
     }
 
@@ -557,7 +552,6 @@ else
         {
             if (_editingItem is null)
             {
-                // 端点 ⑳：POST api/eav/metadata/option-sets/{setId}/items
                 var id = await Api.AddOptionItemAsync(
                     _currentSet.OptionSetId,
                     new CreateOptionItemRequest
@@ -577,7 +571,6 @@ else
             }
             else
             {
-                // 端点 ㉑：PUT api/eav/metadata/option-sets/{setId}/items/{itemId}
                 var (ok, error) = await Api.UpdateOptionItemAsync(
                     _currentSet.OptionSetId,
                     _editingItem.OptionItemId,
@@ -590,18 +583,14 @@ else
 
                 if (!ok)
                 {
-                    Snackbar.Add($"更新失败：{ParseError(error)}", Severity.Error);
+                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
                     return;
                 }
                 Snackbar.Add("更新成功", Severity.Success);
             }
 
             _showItemDialog = false;
-
-            // 只刷新当前集合的选项
             await ReloadItemsAsync(_currentSet.OptionSetId);
-
-            // 设置默认可能清除同集合其他默认（后端保证），重拉即可
         }
         finally
         {
@@ -609,7 +598,6 @@ else
         }
     }
 
-    // 端点 ㉒：DELETE api/eav/metadata/option-sets/{setId}/items/{itemId}
     private async Task DeleteItemAsync(
         OptionSetSummaryDto set, OptionItemDetailDto item)
     {
@@ -629,13 +617,12 @@ else
         }
         else
         {
-            Snackbar.Add($"删除失败：{error}", Severity.Error);
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
         }
     }
 
     // ---------- 设为默认 ----------
 
-    // 端点 ㉑：PUT（只更新 IsDefault）
     private async Task SetDefaultAsync(
         OptionSetSummaryDto set, OptionItemDetailDto item)
     {
@@ -645,7 +632,7 @@ else
 
         if (!ok)
         {
-            Snackbar.Add($"设置默认失败：{ParseError(error)}", Severity.Error);
+            Snackbar.Add($"设置默认失败：{error ?? "未知错误"}", Severity.Error);
             return;
         }
 
@@ -654,6 +641,8 @@ else
     }
 
     // ---------- 重排序（上移 / 下移） ----------
+    // ★ P2-5：按 (DisplayOrder, OptionItemId) 稳定排序后，交换位置，
+    // 再把连续索引作为新 DisplayOrder 一次性提交，避免 DisplayOrder 相等导致无变化。
 
     private async Task MoveUpAsync(
         OptionSetSummaryDto set, OptionItemDetailDto item)
@@ -661,21 +650,14 @@ else
         var items = _itemsCache[set.OptionSetId]
             .Where(i => !i.IsDeleted)
             .OrderBy(i => i.DisplayOrder)
+            .ThenBy(i => i.OptionItemId)
             .ToList();
 
         var idx = items.FindIndex(i => i.OptionItemId == item.OptionItemId);
         if (idx <= 0) return;
 
-        // 与上一个交换 DisplayOrder
-        var prev = items[idx - 1];
-        var itemOrder = prev.DisplayOrder;
-        var prevOrder = item.DisplayOrder;
-
-        await ApplyReorderAsync(set.OptionSetId, new List<ReorderOptionItem>
-        {
-            new() { OptionItemId = item.OptionItemId, DisplayOrder = itemOrder },
-            new() { OptionItemId = prev.OptionItemId, DisplayOrder = prevOrder }
-        });
+        (items[idx - 1], items[idx]) = (items[idx], items[idx - 1]);
+        await ApplyReorderAsync(set.OptionSetId, items);
     }
 
     private async Task MoveDownAsync(
@@ -684,55 +666,37 @@ else
         var items = _itemsCache[set.OptionSetId]
             .Where(i => !i.IsDeleted)
             .OrderBy(i => i.DisplayOrder)
+            .ThenBy(i => i.OptionItemId)
             .ToList();
 
         var idx = items.FindIndex(i => i.OptionItemId == item.OptionItemId);
         if (idx < 0 || idx >= items.Count - 1) return;
 
-        var next = items[idx + 1];
-        var itemOrder = next.DisplayOrder;
-        var nextOrder = item.DisplayOrder;
-
-        await ApplyReorderAsync(set.OptionSetId, new List<ReorderOptionItem>
-        {
-            new() { OptionItemId = item.OptionItemId, DisplayOrder = itemOrder },
-            new() { OptionItemId = next.OptionItemId, DisplayOrder = nextOrder }
-        });
+        (items[idx + 1], items[idx]) = (items[idx], items[idx + 1]);
+        await ApplyReorderAsync(set.OptionSetId, items);
     }
 
-    // 端点 ㉓：PUT api/eav/metadata/option-sets/{setId}/items/reorder
     private async Task ApplyReorderAsync(
-        long optionSetId, List<ReorderOptionItem> orders)
+        long optionSetId, List<OptionItemDetailDto> orderedItems)
     {
+        var orders = orderedItems
+            .Select((it, i) => new ReorderOptionItem
+            {
+                OptionItemId = it.OptionItemId,
+                DisplayOrder = i + 1
+            })
+            .ToList();
+
         var (ok, error) = await Api.ReorderOptionItemsAsync(optionSetId, orders);
 
-        if (ok)
-        {
-            await ReloadItemsAsync(optionSetId);
-        }
-        else
-        {
-            Snackbar.Add($"重排序失败：{ParseError(error)}", Severity.Error);
-            // 回滚：重新加载
-            await ReloadItemsAsync(optionSetId);
-        }
+        if (!ok)
+            Snackbar.Add($"重排序失败：{error ?? "未知错误"}", Severity.Error);
+
+        // 无论成功失败都重拉，保证 UI 与服务端一致
+        await ReloadItemsAsync(optionSetId);
     }
 
     // ---------- 辅助 ----------
-
-    /// <summary>从后端返回的 JSON 错误体中提取 error 字段</summary>
-    private static string ParseError(string? raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) return "未知错误";
-        try
-        {
-            using var doc = JsonDocument.Parse(raw);
-            if (doc.RootElement.TryGetProperty("error", out var err))
-                return err.GetString() ?? raw;
-        }
-        catch { /* 不是 JSON，直接返回原文 */ }
-        return raw;
-    }
 
     private class OptionItemForm
     {

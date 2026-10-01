@@ -1,6 +1,5 @@
 @page "/metadata/composite-types"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
-@using System.Text.Json
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -9,9 +8,6 @@
 
 <MudText Typo="Typo.h5" Class="mb-4">组合类型管理</MudText>
 
-@* ============================================================ *@
-@* 顶部工具栏                                                    *@
-@* ============================================================ *@
 <MudPaper Class="pa-4 mb-4">
     <MudGrid>
         <MudItem xs="12" md="4" Class="d-flex align-center">
@@ -35,17 +31,10 @@
     </MudGrid>
 </MudPaper>
 
-@* ============================================================ *@
-@* 加载中                                                        *@
-@* ============================================================ *@
 @if (_loading)
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
 }
-
-@* ============================================================ *@
-@* 空状态                                                        *@
-@* ============================================================ *@
 else if (_types is null || _types.Count == 0)
 {
     <MudPaper Class="pa-8 text-center">
@@ -57,10 +46,6 @@ else if (_types is null || _types.Count == 0)
         </MudText>
     </MudPaper>
 }
-
-@* ============================================================ *@
-@* 组合类型列表（折叠面板）                                      *@
-@* ============================================================ *@
 else
 {
     <MudExpansionPanels MultiExpansion="true">
@@ -88,16 +73,21 @@ else
                             @type.Fields.Count 字段
                         </MudChip>
                         <MudSpacer />
+                        @* ★ 新增：编辑类型入口 *@
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="@(() => OpenEditTypeDialog(type))"
+                                       title="编辑显示名" />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                        Color="Color.Error"
                                        Size="Size.Small"
-                                       OnClick="@(async e => await DeleteTypeAsync(type))"
+                                       OnClick="@(async () => await DeleteTypeAsync(type))"
                                        title="删除组合类型" />
                     </div>
                 </TitleContent>
 
                 <ChildContent>
-                    @* 字段工具栏 *@
                     <div class="d-flex mb-3">
                         <MudButton Size="Size.Small"
                                    Variant="Variant.Outlined"
@@ -108,7 +98,6 @@ else
                         </MudButton>
                     </div>
 
-                    @* 字段列表 *@
                     @if (type.Fields.Count == 0)
                     {
                         <MudAlert Severity="Severity.Info" Dense="true">
@@ -190,10 +179,8 @@ else
 }
 
 @* ============================================================ *@
-@* 对话框                                                        *@
-@* ============================================================ *@
-
 @* 新建组合类型 *@
+@* ============================================================ *@
 <MudDialog @bind-Visible="_showCreateTypeDialog" Options="_dialogOptions">
     <TitleContent>
         <MudText Typo="Typo.h6">新建组合类型</MudText>
@@ -224,7 +211,42 @@ else
     </DialogActions>
 </MudDialog>
 
+@* ============================================================ *@
+@* ★ 编辑组合类型（后端仅支持改 DisplayName） *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showEditTypeDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">编辑组合类型</MudText>
+        @if (_editingType is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_editingType.EntityType / @_editingType.TypeName
+                （类型标识不可修改）
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_editTypeForm.DisplayName"
+                      Label="显示名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudAlert Severity="Severity.Info" Dense="true">
+            TypeName 与 EntityType 是引用标识，不可修改。如需更名，请新建并迁移引用。
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showEditTypeDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="UpdateTypeAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "保存中..." : "保存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ============================================================ *@
 @* 添加 / 编辑字段 *@
+@* ============================================================ *@
 <MudDialog @bind-Visible="_showFieldDialog" Options="_dialogOptions">
     <TitleContent>
         <MudText Typo="Typo.h6">
@@ -250,18 +272,19 @@ else
                       Variant="Variant.Outlined"
                       Class="mb-3" />
 
-        <MudSelect @bind-Value="_fieldForm.DataType"
+        <MudSelect T="string"
+                   Value="_fieldForm.DataType"
+                   ValueChanged="OnFieldDataTypeChanged"
                    Label="数据类型"
                    Variant="Variant.Outlined"
                    Disabled="@(_editingField is not null)"
                    Class="mb-3">
             @foreach (var dt in DataTypeOptions)
             {
-                <MudSelectItem Value="@dt.Value">@dt.Label</MudSelectItem>
+                <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
             }
         </MudSelect>
 
-        @* 组合类型：引用嵌套类型 *@
         @if (_fieldForm.DataType == "composite")
         {
             <MudSelect T="long?"
@@ -270,9 +293,8 @@ else
                        Label="嵌套组合类型"
                        Variant="Variant.Outlined"
                        Class="mb-3">
-                @foreach (var t in _types ?? (IReadOnlyList<CompositeTypeDetailDto>)Array.Empty<CompositeTypeDetailDto>())
+                @foreach (var t in GetNestedTypeOptions())
                 {
-                    if (t.CompositeTypeId == _currentType?.CompositeTypeId) continue;
                     <MudSelectItem T="long?" Value="@t.CompositeTypeId">
                         @t.DisplayName (@t.TypeName)
                     </MudSelectItem>
@@ -330,6 +352,7 @@ else
     private string? _entityType;
     private IReadOnlyList<CompositeTypeDetailDto>? _types;
     private bool _loading;
+    private bool _initialized;
 
     private bool _submitting;
     private readonly DialogOptions _dialogOptions = new()
@@ -341,6 +364,11 @@ else
     // 新建组合类型
     private bool _showCreateTypeDialog;
     private CreateCompositeTypeRequest _newType = new() { EntityType = "Shared" };
+
+    // ★ 编辑组合类型
+    private bool _showEditTypeDialog;
+    private CompositeTypeDetailDto? _editingType;
+    private UpdateCompositeTypeRequest _editTypeForm = new();
 
     // 添加 / 编辑字段
     private bool _showFieldDialog;
@@ -362,16 +390,26 @@ else
         ("json",     "JSON")
     };
 
-    protected override async Task OnInitializedAsync()
-        => await LoadAsync();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
 
-    // 端点 ㉗：GET api/eav/metadata/composite-types?entityType=
+        await LoadAsync();
+        StateHasChanged();
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
             _types = await Api.ListCompositeTypesAsync(_entityType);
+            if (_types is null)
+            {
+                Snackbar.Add("加载失败，请检查后端服务", Severity.Error);
+                _types = Array.Empty<CompositeTypeDetailDto>();
+            }
         }
         finally
         {
@@ -387,7 +425,6 @@ else
         _showCreateTypeDialog = true;
     }
 
-    // 端点 ⑫：POST api/eav/metadata/composite-types
     private async Task CreateTypeAsync()
     {
         if (string.IsNullOrWhiteSpace(_newType.EntityType) ||
@@ -418,9 +455,60 @@ else
         }
     }
 
+    // ---------- ★ 编辑组合类型 ----------
+
+    private void OpenEditTypeDialog(CompositeTypeDetailDto type)
+    {
+        _editingType = type;
+        _editTypeForm = new UpdateCompositeTypeRequest
+        {
+            DisplayName = type.DisplayName
+        };
+        _showEditTypeDialog = true;
+    }
+
+    private async Task UpdateTypeAsync()
+    {
+        if (_editingType is null) return;
+
+        if (string.IsNullOrWhiteSpace(_editTypeForm.DisplayName))
+        {
+            Snackbar.Add("显示名不能为空", Severity.Warning);
+            return;
+        }
+
+        // 未变更则直接关闭
+        if (_editTypeForm.DisplayName == _editingType.DisplayName)
+        {
+            _showEditTypeDialog = false;
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateCompositeTypeAsync(
+                _editingType.CompositeTypeId,
+                _editTypeForm);
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            _showEditTypeDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
     // ---------- 删除组合类型 ----------
 
-    // 端点 ㉚：DELETE api/eav/metadata/composite-types/{id}
     private async Task DeleteTypeAsync(CompositeTypeDetailDto type)
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
@@ -438,7 +526,7 @@ else
         }
         else
         {
-            Snackbar.Add($"删除失败：{ParseError(error)}", Severity.Error);
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
         }
     }
 
@@ -476,6 +564,22 @@ else
         _showFieldDialog = true;
     }
 
+    private void OnFieldDataTypeChanged(string dt)
+    {
+        _fieldForm.DataType = dt;
+        if (dt != "composite") _fieldForm.RefCompositeTypeId = null;
+    }
+
+    private IEnumerable<CompositeTypeDetailDto> GetNestedTypeOptions()
+    {
+        if (_types is null) yield break;
+        foreach (var t in _types)
+        {
+            if (t.CompositeTypeId == _currentType?.CompositeTypeId) continue;
+            yield return t;
+        }
+    }
+
     private async Task SaveFieldAsync()
     {
         if (_currentType is null) return;
@@ -499,7 +603,6 @@ else
         {
             if (_editingField is null)
             {
-                // 端点 ⑬：POST api/eav/metadata/composite-types/{id}/fields
                 var id = await Api.AddCompositeFieldAsync(
                     _currentType.CompositeTypeId,
                     new CreateCompositeFieldRequest
@@ -524,7 +627,6 @@ else
             }
             else
             {
-                // 端点 ㉛：PUT api/eav/metadata/composite-types/{id}/fields/{fieldId}
                 var (ok, error) = await Api.UpdateCompositeFieldAsync(
                     _currentType.CompositeTypeId,
                     _editingField.FieldId,
@@ -539,7 +641,7 @@ else
 
                 if (!ok)
                 {
-                    Snackbar.Add($"更新失败：{ParseError(error)}", Severity.Error);
+                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
                     return;
                 }
                 Snackbar.Add("更新成功", Severity.Success);
@@ -556,7 +658,6 @@ else
 
     // ---------- 删除字段 ----------
 
-    // 端点 ㉜：DELETE api/eav/metadata/composite-types/{id}/fields/{fieldId}
     private async Task DeleteFieldAsync(
         CompositeTypeDetailDto type, CompositeFieldDetailDto field)
     {
@@ -577,7 +678,7 @@ else
         }
         else
         {
-            Snackbar.Add($"删除失败：{ParseError(error)}", Severity.Error);
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
         }
     }
 
@@ -594,21 +695,6 @@ else
         _ => Color.Default
     };
 
-    /// <summary>从后端返回的 JSON 错误体中提取 error 字段</summary>
-    private static string ParseError(string? raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) return "未知错误";
-        try
-        {
-            using var doc = JsonDocument.Parse(raw);
-            if (doc.RootElement.TryGetProperty("error", out var err))
-                return err.GetString() ?? raw;
-        }
-        catch { /* 不是 JSON，直接返回原文 */ }
-        return raw;
-    }
-
-    /// <summary>字段表单临时模型</summary>
     private class FieldForm
     {
         public string FieldName { get; set; } = "";
