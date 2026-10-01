@@ -1,0 +1,283 @@
+@using System.Text.Json
+
+@* 按 EAV Schema 动态渲染表单（文档第五章，核心组件）。
+   支持 string/int/decimal/bool/date/datetime/time/single_choice；
+   json/file/composite/table 等复杂类型暂不编辑，提交时跳过以避免误清空。
+   值存于内部字典 _values，保存时由 BuildSubmitValues 转换为 PUT 提交格式。 *@
+
+<MudForm @ref="_form">
+    @foreach (var attr in SortedAttributes)
+    {
+        <div class="mb-4">
+            @switch (attr.DataType)
+            {
+                case EavDataTypes.String:
+                    <StringField Attr="attr"
+                                 Value="GetString(attr.AttributeName)"
+                                 ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                case EavDataTypes.Int:
+                case EavDataTypes.Decimal:
+                    if (attr.AvailableUnits is { Count: > 0 })
+                    {
+                        <UnitNumberField Attr="attr"
+                                         AvailableUnits="attr.AvailableUnits"
+                                         Value="GetNumeric(attr.AttributeName)"
+                                         ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    }
+                    else
+                    {
+                        <NumberField Attr="attr"
+                                     Value="GetDecimal(attr.AttributeName)"
+                                     ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    }
+                    break;
+
+                case EavDataTypes.Bool:
+                    <BoolField Attr="attr"
+                               Value="GetBool(attr.AttributeName)"
+                               ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                case EavDataTypes.Date:
+                    <DateField Attr="attr"
+                               Value="GetDateTime(attr.AttributeName)"
+                               ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                case EavDataTypes.Datetime:
+                    <DateTimeField Attr="attr"
+                                   Value="GetDateTime(attr.AttributeName)"
+                                   ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                case EavDataTypes.Time:
+                    <TimeField Attr="attr"
+                               Value="GetTime(attr.AttributeName)"
+                               ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                case EavDataTypes.SingleChoice:
+                    <SingleChoiceField Attr="attr"
+                                       Value="GetString(attr.AttributeName)"
+                                       ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                case EavDataTypes.Composite:
+                    <CompositeField Attr="attr"
+                                    Value="GetJson(attr.AttributeName)"
+                                    ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                case EavDataTypes.Table:
+                    @* 表数据由 TableField 通过独立端点自行加载/保存，不参与本表单提交 *@
+                    <TableField Attr="attr"
+                                EntityType="EntityType"
+                                EntityId="EntityId"
+                                Value="GetJson(attr.AttributeName)"
+                                ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                case EavDataTypes.File:
+                    <FileField Attr="attr"
+                               Value="GetJson(attr.AttributeName)"
+                               ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                case EavDataTypes.Json:
+                    @* json：StringField 兜底，原文本编辑 *@
+                    <StringField Attr="attr"
+                                 Value="GetJsonText(attr.AttributeName)"
+                                 ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                    break;
+
+                default:
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        @attr.DisplayName：类型 @attr.DataType 暂不支持在表单中编辑（保存时不会提交此字段）
+                    </MudAlert>
+                    break;
+            }
+        </div>
+    }
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               OnClick="SubmitAsync" Disabled="_submitting"
+               StartIcon="@Icons.Material.Filled.Save">
+        @(_submitting ? "保存中..." : "保存")
+    </MudButton>
+</MudForm>
+
+@code {
+    [Parameter, EditorRequired] public string EntityType { get; set; } = "";
+    [Parameter] public long EntityId { get; set; }
+
+    /// <summary>动态表单 Schema。</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<AttributeSchemaDto> Schema { get; set; } = [];
+
+    /// <summary>保存回调，参数为已转换为提交格式的值字典。</summary>
+    [Parameter] public EventCallback<Dictionary<string, object?>> OnSubmit { get; set; }
+
+    private MudForm _form = null!;
+    private bool _submitting;
+    private readonly Dictionary<string, object?> _values = new();
+
+    private IEnumerable<AttributeSchemaDto> SortedAttributes =>
+        Schema.OrderBy(a => a.DisplayOrder);
+
+    /// <summary>从后端返回的属性值加载到表单（按 DataType 逐属性转换）。</summary>
+    public void LoadFrom(IReadOnlyDictionary<string, JsonElement> props)
+    {
+        _values.Clear();
+        foreach (var attr in Schema)
+        {
+            if (props.TryGetValue(attr.AttributeName, out var elem))
+                _values[attr.AttributeName] = ConvertElement(elem, attr);
+        }
+        StateHasChanged();
+    }
+
+    private void SetValue(string key, object? value) => _values[key] = value;
+
+    private string? GetString(string key)
+        => _values.TryGetValue(key, out var v) ? v as string : null;
+    private decimal? GetDecimal(string key)
+        => _values.TryGetValue(key, out var v) && v is decimal d ? d : null;
+    private bool? GetBool(string key)
+        => _values.TryGetValue(key, out var v) && v is bool b ? b : null;
+    private DateTime? GetDateTime(string key)
+        => _values.TryGetValue(key, out var v) && v is DateTime dt ? dt : null;
+    private TimeSpan? GetTime(string key)
+        => _values.TryGetValue(key, out var v) && v is TimeSpan t ? t : null;
+    private NumericValueDto? GetNumeric(string key)
+        => _values.TryGetValue(key, out var v) ? v as NumericValueDto : null;
+
+    // composite/file 的原始 JSON 值（编辑场景由 ConvertElement 写入）
+    private JsonElement? GetJson(string key)
+        => _values.TryGetValue(key, out var v) && v is JsonElement je ? je : null;
+
+    // json 类型：以原文本编辑（StringField 兜底）
+    private string? GetJsonText(string key)
+        => _values.TryGetValue(key, out var v) ? v?.ToString() : null;
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _submitting = true;
+        try
+        {
+            await OnSubmit.InvokeAsync(BuildSubmitValues());
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 初始值解析（按属性类型感知转换） ----------
+
+    private static object? ConvertElement(JsonElement elem, AttributeSchemaDto attr)
+    {
+        if (elem.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            return null;
+
+        return attr.DataType switch
+        {
+            EavDataTypes.String => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString() : elem.GetRawText(),
+            EavDataTypes.Int or EavDataTypes.Decimal => ConvertNumeric(elem, attr),
+            EavDataTypes.Bool => elem.ValueKind == JsonValueKind.True,
+            EavDataTypes.Datetime => elem.TryGetDateTime(out var dt)
+                ? dt : (DateTime?)null,
+            EavDataTypes.Date => elem.ValueKind == JsonValueKind.String
+                && DateOnly.TryParse(elem.GetString(), out var d)
+                ? d.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
+            EavDataTypes.Time => elem.ValueKind == JsonValueKind.String
+                && TimeOnly.TryParse(elem.GetString(), out var t)
+                ? t.ToTimeSpan() : (TimeSpan?)null,
+            EavDataTypes.SingleChoice => elem.ValueKind == JsonValueKind.Object
+                && elem.TryGetProperty("value", out var v)
+                ? v.GetString()
+                : elem.ValueKind == JsonValueKind.String ? elem.GetString() : null,
+            // composite/file：保留原始 JSON（克隆避免节点归属冲突），由对应组件自行解析
+            EavDataTypes.Composite or EavDataTypes.File => elem.Clone(),
+            // json：以原文本编辑，提交时再尝试解析回 JSON
+            EavDataTypes.Json => elem.GetRawText(),
+            _ => null
+        };
+    }
+
+    /// <summary>数值：带单位属性为 { value, unitId } 或裸数字；否则为裸数字。</summary>
+    private static object? ConvertNumeric(JsonElement elem, AttributeSchemaDto attr)
+    {
+        if (attr.AvailableUnits is { Count: > 0 })
+        {
+            if (elem.ValueKind == JsonValueKind.Object
+                && elem.TryGetProperty("value", out var v))
+            {
+                return new NumericValueDto
+                {
+                    Value = v.ValueKind == JsonValueKind.Number ? v.GetDecimal() : null,
+                    UnitId = elem.TryGetProperty("unitId", out var u)
+                        && u.ValueKind == JsonValueKind.String
+                        && Guid.TryParse(u.GetString(), out var id)
+                        ? id : null
+                };
+            }
+            if (elem.ValueKind == JsonValueKind.Number)
+                return new NumericValueDto { Value = elem.GetDecimal() };
+            return null;
+        }
+        return elem.ValueKind == JsonValueKind.Number ? elem.GetDecimal() : null;
+    }
+
+    // ---------- 提交值构建 ----------
+
+    /// <summary>把表单值转换为 PUT 接口接受的 JSON 值字典（不支持的类型不提交）。</summary>
+    private Dictionary<string, object?> BuildSubmitValues()
+    {
+        var result = new Dictionary<string, object?>();
+        foreach (var attr in Schema)
+        {
+            if (attr.DataType is EavDataTypes.Table)
+                continue;   // 表数据由 TableField 独立保存，不随表单提交
+            if (attr.IsMultiValue)
+                continue;   // 多值属性暂不支持编辑
+
+            if (!_values.TryGetValue(attr.AttributeName, out var v) || v is null)
+            {
+                result[attr.AttributeName] = null;
+                continue;
+            }
+
+            result[attr.AttributeName] = attr.DataType switch
+            {
+                // decimal 序列化会带小数点（5.0），int 属性先转为 long
+                EavDataTypes.Int => v is decimal d ? (long)d : v,
+                EavDataTypes.Decimal when attr.AvailableUnits is { Count: > 0 } =>
+                    BuildUnitValue(v),
+                EavDataTypes.Datetime => ((DateTime)v).ToString("o"),
+                EavDataTypes.Date => DateOnly.FromDateTime((DateTime)v).ToString("yyyy-MM-dd"),
+                EavDataTypes.Time => TimeOnly.FromTimeSpan((TimeSpan)v).ToString("HH:mm:ss"),
+                // json：文本框输入的原文尝试解析回 JSON，非法 JSON 按字符串提交
+                EavDataTypes.Json => TryParseJson(v),
+                _ => v
+            };
+        }
+        return result;
+    }
+
+    private static object? TryParseJson(object v)
+    {
+        if (v is not string s || string.IsNullOrWhiteSpace(s)) return null;
+        try { return JsonDocument.Parse(s).RootElement.Clone(); }
+        catch (JsonException) { return s; }
+    }
+
+    private static object? BuildUnitValue(object v)
+        => v is NumericValueDto { Value: { } num } nv
+            ? new { value = num, unitId = nv.UnitId }
+            : null;
+}

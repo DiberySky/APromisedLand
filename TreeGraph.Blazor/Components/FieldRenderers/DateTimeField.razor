@@ -1,0 +1,52 @@
+@* 日期时间字段渲染器（按文档 6.x 同模式实现）：日期 + 时间组合为 DateTime *@
+
+<MudGrid>
+    <MudItem xs="12" sm="6">
+        <MudDatePicker Label="@Attr.DisplayName"
+                       Date="_date" DateChanged="OnDateChanged"
+                       Required="@Attr.IsRequired"
+                       Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <MudTimePicker Label="时间"
+                       Time="_time" TimeChanged="OnTimeChanged"
+                       Variant="Variant.Outlined" />
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+
+    private DateTime? _date;
+    private TimeSpan? _time;
+
+    protected override void OnParametersSet()
+    {
+        // 外部值变化时拆分同步；本地编辑回传值与本地组合一致，不会触发覆盖
+        if (Value != Combine(_date, _time))
+        {
+            _date = Value?.Date;
+            _time = Value?.TimeOfDay;
+        }
+    }
+
+    private Task OnDateChanged(DateTime? d)
+    {
+        _date = d;
+        return NotifyAsync();
+    }
+
+    private Task OnTimeChanged(TimeSpan? t)
+    {
+        _time = t;
+        return NotifyAsync();
+    }
+
+    private Task NotifyAsync()
+        => ValueChanged.InvokeAsync(Combine(_date, _time));
+
+    private static DateTime? Combine(DateTime? d, TimeSpan? t)
+        => d is null ? null : d.Value.Date + (t ?? TimeSpan.Zero);
+}

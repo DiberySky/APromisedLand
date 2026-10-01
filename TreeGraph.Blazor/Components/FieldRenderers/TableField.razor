@@ -1,0 +1,235 @@
+@* 自定义表字段渲染器：内嵌行编辑器，数据走 CustomTableData 端点独立保存 *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-3" Elevation="1" Outlined="true">
+    <div class="d-flex align-center mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.TableChart"
+                 Size="Size.Small" Color="Color.Primary" Class="mr-1" />
+        <MudText Typo="Typo.subtitle2">@Attr.DisplayName</MudText>
+        <MudChip T="string" Size="Size.Small" Class="ml-2">
+            @(_rows.Count) 行
+        </MudChip>
+        <MudSpacer />
+        <MudButton Size="Size.Small" Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="AddRow" Disabled="@(!CanEdit)">
+            添加行
+        </MudButton>
+    </div>
+
+    @if (!CanEdit)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true">
+            请先保存实体，然后再添加 @Attr.DisplayName 数据
+        </MudAlert>
+    }
+    else if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_rows.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true">
+            暂无数据，点击"添加行"开始
+        </MudAlert>
+    }
+    else
+    {
+        @for (int i = 0; i < _rows.Count; i++)
+        {
+            var idx = i;
+            var row = _rows[i];
+
+            <MudPaper Class="pa-2 mb-2" Elevation="0" Outlined="true">
+                <div class="d-flex align-center mb-1">
+                    <MudText Typo="Typo.caption">#@(idx + 1)</MudText>
+                    @if (row.RowId.HasValue)
+                    {
+                        <MudChip T="string" Size="Size.Small" Class="ml-2">
+                            RowId: @row.RowId
+                        </MudChip>
+                    }
+                    <MudSpacer />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => RemoveRow(idx))" />
+                </div>
+
+                @foreach (var col in _columns)
+                {
+                    var key = col.ColumnName;
+                    var value = row.Fields.TryGetValue(key, out var v) ? v : null;
+
+                    <MudTextField T="string"
+                                  Label="@col.DisplayName"
+                                  Value="@(value?.ToString())"
+                                  ValueChanged="@(nv => UpdateField(row, key, nv))"
+                                  Required="@col.IsRequired"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Class="mb-2" />
+                }
+            </MudPaper>
+        }
+    }
+
+    @if (CanEdit && _hasChanges)
+    {
+        <div class="d-flex mt-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveAsync" Disabled="@_saving">
+                @(_saving ? "保存中..." : "保存表数据")
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Default"
+                       OnClick="ReloadAsync" Class="ml-2" Disabled="@_saving">
+                放弃修改
+            </MudButton>
+        </div>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter, EditorRequired] public string EntityType { get; set; } = "";
+    [Parameter] public long EntityId { get; set; }
+    [Parameter] public JsonElement? Value { get; set; }
+    [Parameter] public EventCallback<JsonElement?> ValueChanged { get; set; }
+
+    private List<TableRowForm> _rows = new();
+    private List<CustomTableColumnDto> _columns = new();
+    private bool _loading;
+    private bool _saving;
+    private bool _hasChanges;
+
+    private bool CanEdit => EntityId > 0 && Attr.RefTableDefinitionId is not null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!CanEdit) return;
+
+        // 只在初次加载时从后端拉取
+        if (_columns.Count == 0)
+        {
+            await LoadDefinitionAsync();
+        }
+        if (!_loading && _rows.Count == 0)
+        {
+            await LoadRowsAsync();
+        }
+    }
+
+    // 列定义：端点 ㉝ GET api/eav/metadata/custom-tables
+    private async Task LoadDefinitionAsync()
+    {
+        var tables = await Api.ListCustomTablesAsync();
+        var table = tables?.FirstOrDefault(t =>
+            t.TableDefinitionId == Attr.RefTableDefinitionId);
+        if (table is not null)
+        {
+            _columns = table.Columns.OrderBy(c => c.DisplayOrder).ToList();
+        }
+    }
+
+    // 行数据：端点 ⑦ GET api/eav/{entityType}/entities/{id}/tables/{tableName}
+    private async Task LoadRowsAsync()
+    {
+        _loading = true;
+        try
+        {
+            var table = await Api.LoadCustomTableAsync(
+                EntityType, EntityId, Attr.AttributeName);
+            if (table is not null)
+            {
+                _rows = table.Rows.Select(r => new TableRowForm
+                {
+                    RowId = r.RowId,
+                    RowOrder = r.RowOrder,
+                    Fields = r.Fields.ToDictionary(
+                        k => k.Key,
+                        v => v.Value?.ToString() ?? "")
+                }).ToList();
+            }
+        }
+        finally
+        {
+            _loading = false;
+            _hasChanges = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadRowsAsync();
+        StateHasChanged();
+    }
+
+    private void AddRow()
+    {
+        _rows.Add(new TableRowForm
+        {
+            RowOrder = _rows.Count,
+            Fields = _columns.ToDictionary(c => c.ColumnName, _ => "")
+        });
+        _hasChanges = true;
+    }
+
+    private void RemoveRow(int index)
+    {
+        _rows.RemoveAt(index);
+        _hasChanges = true;
+    }
+
+    private void UpdateField(TableRowForm row, string key, string? value)
+    {
+        row.Fields[key] = value ?? "";
+        _hasChanges = true;
+    }
+
+    // 端点 ⑧：PUT api/eav/{entityType}/entities/{id}/tables/{tableName}（整表替换）
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        try
+        {
+            var value = new CustomTableValue
+            {
+                TableName = Attr.AttributeName,
+                Rows = _rows.Select(r => new CustomTableRowValue
+                {
+                    RowId = r.RowId,
+                    RowOrder = r.RowOrder,
+                    Fields = r.Fields.ToDictionary(
+                        k => k.Key,
+                        v => (object?)v.Value)
+                }).ToList()
+            };
+
+            var (ok, error) = await Api.ReplaceCustomTableAsync(
+                EntityType, EntityId, Attr.AttributeName, value);
+
+            if (ok)
+            {
+                Snackbar.Add("表数据保存成功", Severity.Success);
+                await LoadRowsAsync();
+            }
+            else
+            {
+                Snackbar.Add($"保存失败：{error}", Severity.Error);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private class TableRowForm
+    {
+        public long? RowId { get; set; }
+        public int RowOrder { get; set; }
+        public Dictionary<string, string> Fields { get; set; } = new();
+    }
+}

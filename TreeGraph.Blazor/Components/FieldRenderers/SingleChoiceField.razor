@@ -1,0 +1,23 @@
+@* 单选字段渲染器（文档 6.4） *@
+
+<MudSelect T="string" Label="@Attr.DisplayName"
+           Value="Value" ValueChanged="ValueChanged"
+           Required="@Attr.IsRequired"
+           Variant="Variant.Outlined">
+    @if (!Attr.IsRequired)
+    {
+        <MudSelectItem T="string" Value="@((string?)null)">（未选择）</MudSelectItem>
+    }
+    @foreach (var item in Attr.OptionSet?.Items ?? Array.Empty<OptionItemSchemaDto>())
+    {
+        <MudSelectItem T="string" Value="@item.Value">
+            @item.Label
+        </MudSelectItem>
+    }
+</MudSelect>
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+}

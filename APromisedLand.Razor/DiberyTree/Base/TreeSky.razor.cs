@@ -16,7 +16,8 @@ public partial class TreeSky<TItem>
     private string HighlightedText { get; set; } = string.Empty;
     
     private bool _loading = true;
-
+    private ITreeItemData<TItem>? _item;
+    
     // private TreeNodeDialogService<TItem>? _nodeDialogService;
     // private TreeNodeDialogService<TItem> NodeDialogSvc =>
     //     _nodeDialogService ??= new TreeNodeDialogService<TItem>(DialogService);

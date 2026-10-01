@@ -1,0 +1,122 @@
+@page "/metadata/units"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageTitle>单位管理</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">单位管理</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Success"
+           OnClick="OpenCreate" StartIcon="@Icons.Material.Filled.Add"
+           Class="mb-4">
+    新建单位
+</MudButton>
+
+@if (_categories is not null)
+{
+    @foreach (var c in _categories)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <div class="d-flex align-center mb-2">
+                <MudText Typo="Typo.h6">@c.Category</MudText>
+                @if (c.BaseUnit is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success"
+                             Class="ml-2">
+                        基准: @c.BaseUnit.Symbol
+                    </MudChip>
+                }
+            </div>
+            <MudTable Items="c.Units" Hover="true" Bordered="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>名称</MudTh>
+                    <MudTh>符号</MudTh>
+                    <MudTh>基准</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.Symbol</MudTd>
+                    <MudTd>
+                        @if (context.IsBaseUnit)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Check"
+                                     Color="Color.Success" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+}
+else if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+
+<MudDialog @bind-Visible="_showDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">新建单位</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_newUnit.Category" Label="分类"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_newUnit.Name" Label="名称"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_newUnit.Symbol" Label="符号"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudNumericField T="decimal" @bind-Value="_newUnit.ToBaseFactor"
+                         Label="换算系数" Variant="Variant.Outlined" Class="mb-3" />
+        <MudSwitch @bind-Value="_newUnit.IsBaseUnit" Label="基准单位" />
+        <MudNumericField T="int" @bind-Value="_newUnit.DisplayOrder"
+                         Label="显示顺序" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary" OnClick="SaveNewUnitAsync">创建</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private IReadOnlyList<UnitCategoryDto>? _categories;
+    private bool _loading;
+
+    private bool _showDialog;
+    private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small };
+    private CreateUnitRequest _newUnit = new();
+
+    // 端点 ㉕：GET api/units/categories
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            _categories = await Api.GetUnitCategoriesAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenCreate()
+    {
+        _newUnit = new CreateUnitRequest();
+        _showDialog = true;
+    }
+
+    // 端点 ㉖：POST api/units
+    private async Task SaveNewUnitAsync()
+    {
+        var id = await Api.CreateUnitAsync(_newUnit);
+        if (id is null)
+        {
+            Snackbar.Add("创建失败", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"创建成功：{id}", Severity.Success);
+        _showDialog = false;
+        _categories = await Api.GetUnitCategoriesAsync();
+    }
+}

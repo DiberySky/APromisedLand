@@ -1,0 +1,12 @@
+@namespace APromisedLand.SharedRazor.Components
+
+<MudContainer Style="@($"display:flex;justify-content:center;align-items:center;height:{Height}px;")">
+    <MudProgressCircular Color="@Color" Indeterminate="true" Size="@Size" />
+</MudContainer>
+
+@code {
+    // 可配置化:原实现硬编码 Color.Warning / Size.Large / 300px,失去复用价值
+    [Parameter] public Color Color { get; set; } = Color.Warning;
+    [Parameter] public Size Size { get; set; } = Size.Large;
+    [Parameter] public int Height { get; set; } = 300;
+}

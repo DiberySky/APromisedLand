@@ -11,6 +11,7 @@ public static class PostgresExtension
             .WithPgAdmin(pg => pg.WithHostPort(15050));
 
         resourceContext.TreeDb        = resourceContext.Postgres.AddDatabase("TreeDb");
+        resourceContext.TreeGraphDb   = resourceContext.Postgres.AddDatabase("TreeGraphDb");
         resourceContext.FileTransDb   = resourceContext.Postgres.AddDatabase("fileTransDb");
         resourceContext.MetadataDb    = resourceContext.Postgres.AddDatabase("MetadataDb");
         resourceContext.HangfireDb    = resourceContext.Postgres.AddDatabase("HangfireDb");

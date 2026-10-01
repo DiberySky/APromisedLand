@@ -1,0 +1,12 @@
+@* 时间字段渲染器（按文档 6.x 同模式实现） *@
+
+<MudTimePicker Label="@Attr.DisplayName"
+               Time="Value" TimeChanged="ValueChanged"
+               Required="@Attr.IsRequired"
+               Variant="Variant.Outlined" />
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter] public TimeSpan? Value { get; set; }
+    [Parameter] public EventCallback<TimeSpan?> ValueChanged { get; set; }
+}

@@ -1,0 +1,93 @@
+@page "/entities"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>实体列表</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">实体列表</MudText>
+
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="4">
+        <MudTextField @bind-Value="_entityType" Label="实体类型"
+                      Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudNumericField T="int?" @bind-Value="_pageSize"
+                         Label="每页数量" Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" md="4" Class="d-flex align-center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LoadAsync" Disabled="@_loading"
+                   StartIcon="@Icons.Material.Filled.Search">
+            查询
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+@if (_result is not null)
+{
+    <MudText Typo="Typo.body2" Class="mb-2">
+        共 @_result.Total 条，第 @_result.Page 页
+    </MudText>
+
+    <MudTable Items="_result.Items" Hover="true" Bordered="true" Dense="true">
+        <HeaderContent>
+            <MudTh>EntityId</MudTh>
+            <MudTh>操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.EntityId</MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" Variant="Variant.Text"
+                           OnClick="@(() => Edit(context.EntityId))">
+                    编辑
+                </MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Text"
+                           OnClick="@(() => History(context.EntityId))">
+                    历史
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 20, 50 }" />
+        </PagerContent>
+    </MudTable>
+}
+else if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+
+@code {
+    private string _entityType = "Product";
+    private int? _pageSize = 20;
+    private PagedResult<DynamicEntityDto>? _result;
+    private bool _loading;
+
+    // 调用端点 ④：POST api/eav/{entityType}/entities/query
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _result = await Api.QueryAsync(_entityType, new EavQueryRequest
+            {
+                EntityType = _entityType,
+                Filters = new List<AttributeFilter>(),
+                Page = 1,
+                PageSize = _pageSize ?? 20
+            });
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void Edit(long id)
+        => Nav.NavigateTo($"/entities/{_entityType}/{id}/edit");
+
+    private void History(long id)
+        => Nav.NavigateTo($"/entities/{_entityType}/{id}/history");
+}

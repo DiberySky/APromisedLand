@@ -1,0 +1,62 @@
+@page "/"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+
+<PageTitle>首页</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">TreeGraph EAV 管理台</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6">单位分类</MudText>
+            @if (_categories is null)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else
+            {
+                <MudList T="string" Dense="true">
+                    @foreach (var c in _categories)
+                    {
+                        <MudListItem T="string">
+                            <div class="d-flex justify-space-between">
+                                <span>@c.Category</span>
+                                <MudChip T="string" Size="Size.Small">
+                                    @c.Units.Count 个
+                                </MudChip>
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6">快速操作</MudText>
+            <MudButtonGroup Vertical="true" FullWidth="true" Class="mt-2">
+                <MudButton Href="/entities" StartIcon="@Icons.Material.Filled.List">
+                    浏览实体
+                </MudButton>
+                <MudButton Href="/query" StartIcon="@Icons.Material.Filled.Search">
+                    动态查询
+                </MudButton>
+                <MudButton Href="/metadata/attributes" StartIcon="@Icons.Material.Filled.Add">
+                    定义属性
+                </MudButton>
+            </MudButtonGroup>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private IReadOnlyList<UnitCategoryDto>? _categories;
+
+    // 调用端点 ㉕：GET api/units/categories
+    protected override async Task OnInitializedAsync()
+    {
+        _categories = await Api.GetUnitCategoriesAsync();
+    }
+}

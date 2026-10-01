@@ -1,6 +1,4 @@
 using APromisedLand.Razor.Helper.Blazor;
-using APromisedLand.Shared.DiberyTree.Interfaces;
-using Microsoft.AspNetCore.Components;
 using MudBlazor;
 
 namespace APromisedLand.Razor.DiberyTree.Base;
@@ -90,9 +88,6 @@ public partial class TreeSky<TItem>
         await ExpandToNodeAsync(node.Value!.Id);
 
         StateHasChanged();
-
-        // SelectedValue = node.Value;
-        // _ = SelectedValueChanged.InvokeAsync(SelectedValue);
     }
 
 }

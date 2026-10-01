@@ -1,0 +1,13 @@
+@* 字符串字段渲染器（文档 6.1） *@
+
+<MudTextField T="string" Label="@Attr.DisplayName"
+              Value="Value" ValueChanged="ValueChanged"
+              Required="@Attr.IsRequired"
+              Variant="Variant.Outlined"
+              HelperText="@Attr.DisplayName" />
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+}

@@ -1,0 +1,296 @@
+@* 组合类型字段渲染器：按 Schema 递归渲染字段，嵌套 composite 递归自身 *@
+
+<MudPaper Class="pa-3" Elevation="1" Outlined="true">
+    <div class="d-flex align-center mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.AccountTree"
+                 Size="Size.Small" Color="Color.Primary" Class="mr-1" />
+        <MudText Typo="Typo.subtitle2">@Attr.DisplayName</MudText>
+        @if (Attr.IsRequired)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Error" Class="ml-1">*</MudText>
+        }
+    </div>
+
+    @if (Attr.CompositeType is null)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true">
+            组合类型定义缺失
+        </MudAlert>
+    }
+    else
+    {
+        @foreach (var field in SortedFields)
+        {
+            <div class="mb-3">
+                @if (field.IsArray)
+                {
+                    @* 数组字段：渲染为多行列表 *@
+                    <ArrayFieldRenderer Field="field"
+                                        Values="GetArrayValues(field.FieldName)"
+                                        ValuesChanged="v => SetArrayValues(field.FieldName, v)" />
+                }
+                else
+                {
+                    @* 单值字段：按类型声明式分发 *@
+                    @switch (field.DataType)
+                    {
+                        case EavDataTypes.String:
+                            <MudTextField T="string"
+                                          Label="@field.DisplayName"
+                                          Value="GetString(field.FieldName)"
+                                          ValueChanged="v => SetString(field.FieldName, v)"
+                                          Required="field.IsRequired"
+                                          Variant="Variant.Outlined"
+                                          Immediate="true" />
+                            break;
+
+                        case EavDataTypes.Int:
+                        case EavDataTypes.Decimal:
+                            <MudNumericField T="decimal?"
+                                             Label="@field.DisplayName"
+                                             Value="GetDecimal(field.FieldName)"
+                                             ValueChanged="v => SetDecimal(field.FieldName, v)"
+                                             Required="field.IsRequired"
+                                             Variant="Variant.Outlined" />
+                            break;
+
+                        case EavDataTypes.Bool:
+                            <MudSwitch T="bool?"
+                                       Label="@field.DisplayName"
+                                       Value="GetBool(field.FieldName)"
+                                       ValueChanged="v => SetBool(field.FieldName, v)"
+                                       Color="Color.Primary" />
+                            break;
+
+                        case EavDataTypes.Date:
+                            <MudDatePicker Label="@field.DisplayName"
+                                           Date="GetDateTime(field.FieldName)"
+                                           DateChanged="v => SetDate(field.FieldName, v)"
+                                           Required="field.IsRequired"
+                                           Variant="Variant.Outlined"
+                                           DateFormat="yyyy-MM-dd" />
+                            break;
+
+                        case EavDataTypes.Datetime:
+                            <MudTextField T="string"
+                                          Label="@field.DisplayName"
+                                          Value="@(GetDateTime(field.FieldName)?.ToString("yyyy-MM-dd HH:mm:ss"))"
+                                          ValueChanged="v => SetDateTimeText(field.FieldName, v)"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="yyyy-MM-dd HH:mm:ss" />
+                            break;
+
+                        case EavDataTypes.Time:
+                            <MudTimePicker Label="@field.DisplayName"
+                                           Time="GetTime(field.FieldName)"
+                                           TimeChanged="v => SetTime(field.FieldName, v)"
+                                           Variant="Variant.Outlined" />
+                            break;
+
+                        case EavDataTypes.Composite:
+                            @if (field.NestedType is null)
+                            {
+                                <MudAlert Severity="Severity.Warning" Dense="true">
+                                    嵌套类型未定义: @field.FieldName
+                                </MudAlert>
+                            }
+                            else
+                            {
+                                @* 嵌套组合：递归渲染自身 *@
+                                <CompositeField Attr="MakeChildAttr(field)"
+                                                Value="GetObject(field.FieldName)"
+                                                ValueChanged="v => SetObject(field.FieldName, v)" />
+                            }
+                            break;
+
+                        default:
+                            <MudTextField T="string"
+                                          Label="@field.DisplayName"
+                                          Value="GetString(field.FieldName)"
+                                          ValueChanged="v => SetString(field.FieldName, v)"
+                                          Variant="Variant.Outlined"
+                                          Immediate="true" />
+                            break;
+                    }
+                }
+            </div>
+        }
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired]
+    public AttributeSchemaDto Attr { get; set; } = null!;
+
+    [Parameter]
+    public JsonElement? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<JsonElement?> ValueChanged { get; set; }
+
+    /// <summary>内部字段值存储：字段名 → JSON 值</summary>
+    private Dictionary<string, JsonElement?> _fields = new();
+
+    private IEnumerable<CompositeFieldSchemaDto> SortedFields =>
+        (Attr.CompositeType?.Fields ?? new List<CompositeFieldSchemaDto>())
+            .OrderBy(f => f.DisplayOrder);
+
+    protected override void OnParametersSet()
+    {
+        if (Value is { ValueKind: JsonValueKind.Object } obj)
+        {
+            _fields = new Dictionary<string, JsonElement?>();
+            foreach (var prop in obj.EnumerateObject())
+            {
+                _fields[prop.Name] = prop.Value.Clone();
+            }
+        }
+        else
+        {
+            _fields = new Dictionary<string, JsonElement?>();
+        }
+    }
+
+    /// <summary>为嵌套 composite 字段构造临时 AttributeSchemaDto 供递归使用</summary>
+    private static AttributeSchemaDto MakeChildAttr(CompositeFieldSchemaDto field)
+        => new(
+            AttributeName: field.FieldName,
+            DisplayName: field.DisplayName,
+            DataType: field.DataType,
+            IsRequired: field.IsRequired,
+            IsSearchable: field.IsSearchable,
+            IsSortable: false,
+            IsMultiValue: field.IsArray,
+            DisplayOrder: field.DisplayOrder,
+            AllowedValues: null,
+            ValidationRule: null,
+            CompositeType: field.NestedType,
+            Unit: null,
+            AvailableUnits: null,
+            OptionSet: null);
+
+    // ---------- 值访问 ----------
+
+    private string? GetString(string name)
+        => _fields.TryGetValue(name, out var e) && e is { ValueKind: JsonValueKind.String } v
+            ? v.GetString() : null;
+
+    private decimal? GetDecimal(string name)
+        => _fields.TryGetValue(name, out var e) && e is { ValueKind: JsonValueKind.Number } v
+            ? v.GetDecimal() : null;
+
+    private bool? GetBool(string name)
+        => _fields.TryGetValue(name, out var e) && e is { } v
+            ? v.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                _ => null
+            }
+            : null;
+
+    private DateTime? GetDateTime(string name)
+    {
+        var s = GetString(name);
+        return DateTime.TryParse(s, out var dt) ? dt : null;
+    }
+
+    private TimeSpan? GetTime(string name)
+    {
+        var s = GetString(name);
+        return TimeSpan.TryParse(s, out var ts) ? ts : null;
+    }
+
+    private JsonElement? GetObject(string name)
+        => _fields.TryGetValue(name, out var e) ? e : null;
+
+    private List<JsonElement?> GetArrayValues(string name)
+    {
+        if (!_fields.TryGetValue(name, out var e)
+            || e is not { ValueKind: JsonValueKind.Array } arr)
+            return new List<JsonElement?>();
+
+        return arr.EnumerateArray()
+            .Select(x => (JsonElement?)x.Clone())
+            .ToList();
+    }
+
+    // ---------- 值设置 ----------
+
+    private Task SetString(string name, string? v)
+    {
+        _fields[name] = v is null
+            ? null
+            : JsonSerializer.SerializeToElement(v);
+        return NotifyChangedAsync();
+    }
+
+    private Task SetDecimal(string name, decimal? v)
+    {
+        _fields[name] = v.HasValue
+            ? JsonSerializer.SerializeToElement(v.Value)
+            : null;
+        return NotifyChangedAsync();
+    }
+
+    private Task SetBool(string name, bool? v)
+    {
+        _fields[name] = v.HasValue
+            ? JsonSerializer.SerializeToElement(v.Value)
+            : null;
+        return NotifyChangedAsync();
+    }
+
+    private Task SetDate(string name, DateTime? v)
+    {
+        _fields[name] = v.HasValue
+            ? JsonSerializer.SerializeToElement(v.Value.ToString("yyyy-MM-dd"))
+            : null;
+        return NotifyChangedAsync();
+    }
+
+    private Task SetDateTimeText(string name, string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _fields[name] = null;
+        }
+        else if (DateTime.TryParse(text, out var dt))
+        {
+            _fields[name] = JsonSerializer.SerializeToElement(
+                dt.ToString("yyyy-MM-ddTHH:mm:ss"));
+        }
+        return NotifyChangedAsync();
+    }
+
+    private Task SetTime(string name, TimeSpan? v)
+    {
+        _fields[name] = v.HasValue
+            ? JsonSerializer.SerializeToElement(v.Value.ToString(@"hh\:mm\:ss"))
+            : null;
+        return NotifyChangedAsync();
+    }
+
+    private Task SetObject(string name, JsonElement? v)
+    {
+        _fields[name] = v;
+        return NotifyChangedAsync();
+    }
+
+    private Task SetArrayValues(string name, List<JsonElement?> values)
+    {
+        _fields[name] = JsonSerializer.SerializeToElement(values);
+        return NotifyChangedAsync();
+    }
+
+    private Task NotifyChangedAsync()
+    {
+        var dict = new Dictionary<string, JsonElement?>();
+        foreach (var (k, v) in _fields)
+        {
+            dict[k] = v;
+        }
+        var element = JsonSerializer.SerializeToElement(dict);
+        return ValueChanged.InvokeAsync(element);
+    }
+}

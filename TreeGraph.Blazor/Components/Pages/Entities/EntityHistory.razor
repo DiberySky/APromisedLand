@@ -1,0 +1,97 @@
+@page "/entities/{EntityType}/{EntityId:long}/history"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+
+<PageTitle>审计历史 - @EntityType #@EntityId</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    @EntityType #@EntityId 的审计历史
+</MudText>
+
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="4">
+        <MudDatePicker @bind-Date="_from" Label="起始时间"
+                       Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" md="4" Class="d-flex align-center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LoadAsync" Disabled="@_loading">
+            查询
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_history is not null && _history.Count > 0)
+{
+    <MudTimeline TimelinePosition="TimelinePosition.Start">
+        @foreach (var h in _history)
+        {
+            <MudTimelineItem Color="@GetColor(h.ChangeType)" Elevation="0">
+                <MudText Typo="Typo.subtitle2">
+                    @h.ChangedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                </MudText>
+                <MudText Typo="Typo.caption" Class="mb-2">
+                    @h.AttributeName · @h.ChangeType · @h.ChangedBy
+                </MudText>
+                <MudPaper Class="pa-2" Elevation="1">
+                    @if (!string.IsNullOrEmpty(h.OldValue))
+                    {
+                        <MudText Typo="Typo.body2" Class="text-decoration-line-through">
+                            旧值: @h.OldValue
+                        </MudText>
+                    }
+                    @if (!string.IsNullOrEmpty(h.NewValue))
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Success">
+                            新值: @h.NewValue
+                        </MudText>
+                    }
+                </MudPaper>
+            </MudTimelineItem>
+        }
+    </MudTimeline>
+}
+else if (_history is not null)
+{
+    <MudAlert Severity="Severity.Info">暂无历史记录</MudAlert>
+}
+
+@code {
+    [Parameter] public string EntityType { get; set; } = "";
+    [Parameter] public long EntityId { get; set; }
+
+    private IReadOnlyList<EntityHistoryDto>? _history;
+    private DateTime? _from;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    // 端点 ⑥：GET api/eav/{entityType}/entities/{id}/history?from=
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var from = _from.HasValue
+                ? new DateTimeOffset(_from.Value, TimeSpan.Zero)
+                : (DateTimeOffset?)null;
+            _history = await Api.GetHistoryAsync(EntityType, EntityId, from);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static Color GetColor(string changeType) => changeType switch
+    {
+        "Insert" => Color.Success,
+        "Update" => Color.Info,
+        "Delete" => Color.Error,
+        _ => Color.Default
+    };
+}

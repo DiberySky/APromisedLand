@@ -1,0 +1,109 @@
+@page "/schema"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+
+<PageTitle>Schema 查看</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">Schema 查看</MudText>
+
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="6">
+        <MudTextField @bind-Value="_entityType" Label="实体类型"
+                      Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" md="6" Class="d-flex align-center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LoadAsync" Disabled="@_loading">
+            @(_loading ? "加载中..." : "加载 Schema")
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+@if (_schema is not null)
+{
+    <MudTable Items="_schema" Hover="true" Bordered="true" Dense="true">
+        <HeaderContent>
+            <MudTh>属性名</MudTh>
+            <MudTh>显示名</MudTh>
+            <MudTh>类型</MudTh>
+            <MudTh>必填</MudTh>
+            <MudTh>可搜索</MudTh>
+            <MudTh>可排序</MudTh>
+            <MudTh>附加信息</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.AttributeName</MudTd>
+            <MudTd>@context.DisplayName</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                    @context.DataType
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                @if (context.IsRequired)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" />
+                }
+            </MudTd>
+            <MudTd>
+                @if (context.IsSearchable)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" />
+                }
+            </MudTd>
+            <MudTd>
+                @if (context.IsSortable)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" />
+                }
+            </MudTd>
+            <MudTd>
+                @if (context.Unit is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                        单位: @context.Unit.Symbol
+                    </MudChip>
+                }
+                @if (context.OptionSet is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                        选项: @context.OptionSet.Items.Count 项
+                    </MudChip>
+                }
+                @if (context.CompositeType is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">
+                        组合: @context.CompositeType.Fields.Count 字段
+                    </MudChip>
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+else if (!_loading && _loaded)
+{
+    <MudAlert Severity="Severity.Warning">未找到 Schema</MudAlert>
+}
+
+@code {
+    private string _entityType = "Product";
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private bool _loading;
+    private bool _loaded;
+
+    // 调用端点 ①：GET api/eav/{entityType}/schema
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loaded = false;
+        try
+        {
+            _schema = await Api.GetSchemaAsync(_entityType);
+        }
+        finally
+        {
+            _loading = false;
+            _loaded = true;
+        }
+    }
+}

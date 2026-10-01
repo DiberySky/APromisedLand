@@ -1,0 +1,12 @@
+@* 数值字段渲染器（文档 6.2），int / decimal（无单位）共用 *@
+
+<MudNumericField T="decimal?" Label="@Attr.DisplayName"
+                 Value="Value" ValueChanged="ValueChanged"
+                 Required="@Attr.IsRequired"
+                 Variant="Variant.Outlined" />
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter] public decimal? Value { get; set; }
+    [Parameter] public EventCallback<decimal?> ValueChanged { get; set; }
+}

@@ -1,0 +1,70 @@
+@namespace APromisedLand.SharedRazor.Components.TreeGraph
+
+@using APromisedLand.Shared.TreeGraph.Models
+
+@* 泛型约束:T 必须是 class + ITreeNode<string>,默认用于 APromisedLand.Shared.TreeGraph.Models.TreeNodeDto *@
+@typeparam T where T : class, ITreeNode<string>
+
+<MudTreeView T="T"
+            Items="Items"
+            ServerData="LoadServerData"
+            ExpandOnClick="true"
+            SelectedValueChanged="OnSelectedChanged">
+    <ItemTemplate Context="item">
+        <MudTreeViewItem T="T"
+                        Text="@item.Text"
+                        Value="@item.Value"
+                        Icon="@item.Icon"
+                        Expanded="@item.Expanded">
+            @if (NodeTemplate is not null && item.Value is T node)
+            {
+                @NodeTemplate(node)
+            }
+        </MudTreeViewItem>
+    </ItemTemplate>
+</MudTreeView>
+
+@code {
+    /// <summary>首次加载的根节点集合(由调用方通过 Api.GetRootsAsync + ToTreeItemData 注入)</summary>
+    [Parameter]
+    public IReadOnlyCollection<TreeItemData<T>>? Items { get; set; }
+
+    /// <summary>
+    /// 懒加载委托:展开节点时调用,接收父节点本身(类型 T),
+    /// 返回其子节点集合。父节点为 null 时表示加载顶层根节点。
+    /// 调用方实现示例:
+    /// <code>async parent => (await Api.GetChildrenAsync(parent!.Id)).ToTreeItemData()</code>
+    /// 注:此签名对齐 MudBlazor 9.9.0 的 MudTreeView&lt;T&gt;.ServerData,
+    /// 该属性入参为 T?(节点本身),而非 TreeItemData&lt;T&gt;。
+    /// </summary>
+    [Parameter]
+    public Func<T?, Task<IReadOnlyCollection<TreeItemData<T>>>>? ServerData { get; set; }
+
+    /// <summary>双向绑定的选中节点(强类型 T)</summary>
+    [Parameter]
+    public T? SelectedValue { get; set; }
+
+    [Parameter]
+    public EventCallback<T?> SelectedValueChanged { get; set; }
+
+    /// <summary>自定义节点内容渲染片段</summary>
+    [Parameter]
+    public RenderFragment<T>? NodeTemplate { get; set; }
+
+    /// <summary>
+    /// 适配 MudBlazor 9.9.0 的 ServerData 签名:Func&lt;T?, Task&lt;IReadOnlyCollection&lt;TreeItemData&lt;T&gt;&gt;&gt;&gt;?
+    /// 仅当调用方传入 ServerData 时启用懒加载。
+    /// </summary>
+    private Func<T?, Task<IReadOnlyCollection<TreeItemData<T>>>>? LoadServerData
+        => ServerData;
+
+    /// <summary>
+    /// 选中值变化回调:把 MudTreeView 透传的 SelectedValue 还原为强类型 T。
+    /// 修正方案 bug:原方案用 @bind-SelectedValue 假设与泛型 MudTreeView 不一致。
+    /// </summary>
+    private Task OnSelectedChanged(T? value)
+    {
+        SelectedValue = value;
+        return SelectedValueChanged.InvokeAsync(SelectedValue);
+    }
+}

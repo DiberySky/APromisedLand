@@ -82,6 +82,9 @@
 
   <ItemGroup>
     <Folder Include="DiberyTree\Helpers\" />
+    <Folder Include="TreeGraph\Attributes\" />
+    <Folder Include="TreeGraph\Nodes\" />
+    <Folder Include="TreeGraph\Trees\" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,65 @@
+@* 带单位数值字段渲染器（文档 6.3）。
+   修正文档两处问题：数值变化需回传父组件；外部 LoadFrom 后需重新同步本地状态。 *@
+
+<MudGrid>
+    <MudItem xs="12" sm="8">
+        <MudNumericField T="decimal?" Label="@Attr.DisplayName"
+                         Value="_value" ValueChanged="OnValueChanged"
+                         Required="@Attr.IsRequired"
+                         Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudSelect T="Guid?" Label="单位"
+                   Value="_unitId" ValueChanged="OnUnitChanged"
+                   Variant="Variant.Outlined" Dense="true">
+            @foreach (var u in AvailableUnits)
+            {
+                <MudSelectItem T="Guid?" Value="@u.Id">
+                    @u.Name (@u.Symbol)
+                </MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter] public IReadOnlyList<UnitSchemaDto> AvailableUnits { get; set; }
+        = Array.Empty<UnitSchemaDto>();
+    [Parameter] public NumericValueDto? Value { get; set; }
+    [Parameter] public EventCallback<NumericValueDto?> ValueChanged { get; set; }
+
+    private decimal? _value;
+    private Guid? _unitId;
+
+    protected override void OnParametersSet()
+    {
+        // 仅当外部值与本地状态不一致时才同步（本地编辑回传的值与本地一致，不会触发覆盖）
+        if (Value?.Value != _value || Value?.UnitId != _unitId)
+        {
+            _value = Value?.Value;
+            _unitId = Value?.UnitId ?? Attr.Unit?.Id
+                ?? AvailableUnits.FirstOrDefault(u => u.IsBaseUnit)?.Id;
+        }
+    }
+
+    private Task OnValueChanged(decimal? v)
+    {
+        _value = v;
+        return NotifyAsync();
+    }
+
+    private Task OnUnitChanged(Guid? id)
+    {
+        _unitId = id;
+        return NotifyAsync();
+    }
+
+    // 始终回传 dto（即使数值为空也保留单位选择）；Value 为 null 时 DynamicForm 提交 null
+    private Task NotifyAsync()
+        => ValueChanged.InvokeAsync(new NumericValueDto
+        {
+            Value = _value,
+            UnitId = _unitId
+        });
+}

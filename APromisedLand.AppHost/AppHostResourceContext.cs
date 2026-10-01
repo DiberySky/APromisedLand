@@ -33,6 +33,7 @@ public class AppHostResourceContext
 
     // ── 数据库 ──
     public IResourceBuilder<PostgresDatabaseResource>? TreeDb { get; set; }
+    public IResourceBuilder<PostgresDatabaseResource>? TreeGraphDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? FileTransDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? MetadataDb { get; set; }
     public IResourceBuilder<PostgresDatabaseResource>? HangfireDb { get; set; }
@@ -44,6 +45,15 @@ public class AppHostResourceContext
     public IResourceBuilder<ProjectResource>? MafWorkFlowApi { get; set; }
     public IResourceBuilder<ProjectResource>? MafSampleApi { get; set; }
 
+    /// <summary>泛型树形数据 API(基于 TreeDb,无 ltree,纯递归 CTE + LIKE)。</summary>
+    public IResourceBuilder<ProjectResource>? TreeGraphApi { get; set; }
+
+    /// <summary>EAV 动态类型 API(复用 TreeGraphDb,端口 5773)。</summary>
+    public IResourceBuilder<ProjectResource>? TreeGraphEavApi { get; set; }
+
+    /// <summary>TreeGraph 管理台 Blazor Server 应用(端口 5783,调用 TreeGraphEavApi)。</summary>
+    public IResourceBuilder<ProjectResource>? TreeGraphBlazor { get; set; }
+
     /// <summary>向量搜索服务（文本向量化 + 语义检索 + 重排序）。</summary>
     public IResourceBuilder<ProjectResource>? MafVectorSearchApi { get; set; }
 
@@ -51,6 +61,9 @@ public class AppHostResourceContext
 
     // ── 前端 ──
     public IResourceBuilder<ProjectResource>? BlazorWeb { get; set; }
+
+    /// <summary>TreeGraph 前端 Blazor Server 应用(端口 5763,调用 TreeGraphApi)。</summary>
+    public IResourceBuilder<ProjectResource>? MafRagTreeGraph { get; set; }
 
     // Database & RabbitMQ
     public IResourceBuilder<PostgresDatabaseResource>? QuestionDb { get; set; }

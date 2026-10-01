@@ -1,0 +1,70 @@
+@namespace APromisedLand.SharedRazor.Components
+
+@inject ISnackbar Snackbar
+
+<MudButton Disabled="@(_processing || Disabled)"
+           EndIcon="@EndIcon"
+           IconColor="@IconColor"
+           StartIcon="@StartIcon"
+           Size="@Size" Class="@Class"
+           FullWidth="FullWidth"
+           OnClick="@ProcessSomething"
+           Variant="@Variant" Color="@Color">
+    @if (_processing)
+    {
+        <MudProgressCircular Size="@Size"
+                             Indeterminate="true" Color="@ProgressColor" />
+    }
+    else
+    {
+        <MudText>@Text</MudText>
+    }
+</MudButton>
+
+@code {
+    [Parameter] public string Text { get; set; } = "提交";
+    [Parameter] public Color Color { get; set; } = Color.Default;
+    [Parameter] public Size Size { get; set; } = Size.Small;
+    [Parameter] public Variant Variant { get; set; } = Variant.Text;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool FullWidth { get; set; }
+    [Parameter] public Color ProgressColor { get; set; } = Color.Warning;
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? EndIcon { get; set; }
+    [Parameter] public string? StartIcon { get; set; }
+    [Parameter] public Color IconColor { get; set; } = Color.Inherit;
+
+    [Parameter] public Func<Task>? OnClickFunc { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool _processing = false;
+
+    private async Task ProcessSomething()
+    {
+        // 入口守卫:Disabled 属性是渲染期生效,无法阻止已入队的回调重入;
+        // 此处显式拦截,防止连续点击 / 事件重入导致 OnClickFunc 被多次调用
+        if (_processing) return;
+
+        try
+        {
+            _processing = true;
+            StateHasChanged();
+            await Task.Yield();
+
+            if (OnClickFunc is not null)
+            {
+                await OnClickFunc();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"操作失败: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+            StateHasChanged();
+        }
+    }
+}

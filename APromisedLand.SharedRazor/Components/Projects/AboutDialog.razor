@@ -1,0 +1,39 @@
+@namespace APromisedLand.SharedRazor.Components
+
+<DialogSky Title="关于">
+    <DialogContent>
+        <MudContainer Class="d-flex justify-center py-4" MaxWidth="MaxWidth.Small">
+            <MudStack>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6" Color="Color.Default">版本：</MudText>
+                    <MudText Color="Color.Success">@SolutionService.Version</MudText>
+                </MudStack>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6" Color="Color.Default">操作系统：</MudText>
+                    <MudText Color="Color.Success">@SolutionService.PlatformOS</MudText>
+                </MudStack>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6" Color="Color.Default">设备：</MudText>
+                    <MudText Color="Color.Success">@SolutionService.PlatformType</MudText>
+                </MudStack>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6" Color="Color.Default">方向：</MudText>
+                    <MudText Color="Color.Success">@SolutionService.ScreenInfo.Orientation</MudText>
+                </MudStack>
+                <MudStack Row AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6" Color="Color.Default">屏幕尺寸：</MudText>
+                    <MudText Color="Color.Success">@SolutionService.ScreenInfo.Width x @SolutionService.ScreenInfo.Height</MudText>
+                </MudStack>
+            </MudStack>
+        </MudContainer>
+    </DialogContent>
+    <DialogRightActions>
+        <MudSpacer />
+        <MudText Color="Color.Primary">@SolutionService.Copyright</MudText>
+        <MudSpacer />
+    </DialogRightActions>
+</DialogSky>
+
+@code {
+
+}

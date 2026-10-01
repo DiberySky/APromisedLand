@@ -1,0 +1,131 @@
+@page "/custom-table/{EntityType}/{EntityId:long}/{TableName}"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageTitle>自定义表 - @TableName</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    自定义表：@EntityType #@EntityId / @TableName
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_table is null)
+{
+    <MudAlert Severity="Severity.Warning">未加载到表数据</MudAlert>
+}
+else
+{
+    <MudButton Variant="Variant.Filled" Color="Color.Success"
+               OnClick="AddRow" StartIcon="@Icons.Material.Filled.Add"
+               Class="mb-4">
+        添加行
+    </MudButton>
+
+    @for (int i = 0; i < _table.Rows.Count; i++)
+    {
+        var idx = i;
+        var row = _table.Rows[i];
+        <MudPaper Class="pa-3 mb-2">
+            <div class="d-flex align-center mb-2">
+                <MudText Typo="Typo.subtitle2">行 #@(idx + 1)</MudText>
+                @if (row.RowId is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Class="ml-2">
+                        RowId: @row.RowId
+                    </MudChip>
+                }
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Color="Color.Error" Size="Size.Small"
+                               OnClick="@(() => DeleteRowAsync(row))" />
+            </div>
+            @foreach (var (key, value) in row.Fields)
+            {
+                <MudTextField T="string"
+                              Label="@key"
+                              Value="@(value?.ToString())"
+                              ValueChanged="@(v => UpdateField(row, key, v))"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Class="mb-2" />
+            }
+        </MudPaper>
+    }
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               OnClick="SaveAsync" StartIcon="@Icons.Material.Filled.Save">
+        保存整表
+    </MudButton>
+}
+
+@code {
+    [Parameter] public string EntityType { get; set; } = "";
+    [Parameter] public long EntityId { get; set; }
+    [Parameter] public string TableName { get; set; } = "";
+
+    private CustomTableValue? _table;
+    private bool _loading = true;
+
+    // 端点 ⑦：GET api/eav/{entityType}/entities/{id}/tables/{tableName}
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _table = await Api.LoadCustomTableAsync(EntityType, EntityId, TableName);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void AddRow()
+    {
+        _table!.Rows.Add(new CustomTableRowValue
+        {
+            RowId = null,
+            RowOrder = _table.Rows.Count,
+            Fields = new Dictionary<string, object?>()
+        });
+    }
+
+    private void UpdateField(CustomTableRowValue row, string key, string? value)
+    {
+        row.Fields[key] = value;
+    }
+
+    // 端点 ⑧：PUT api/eav/{entityType}/entities/{id}/tables/{tableName}
+    private async Task SaveAsync()
+    {
+        var (ok, error) = await Api.ReplaceCustomTableAsync(
+            EntityType, EntityId, TableName, _table!);
+        Snackbar.Add(ok ? "保存成功" : $"保存失败：{error}",
+            ok ? Severity.Success : Severity.Error);
+    }
+
+    // 端点 ⑩：DELETE api/eav/{entityType}/entities/{id}/tables/{tableName}/rows/{rowId}
+    private async Task DeleteRowAsync(CustomTableRowValue row)
+    {
+        if (row.RowId is null)
+        {
+            _table!.Rows.Remove(row);
+            return;
+        }
+
+        var (ok, error) = await Api.DeleteCustomTableRowAsync(
+            EntityType, EntityId, TableName, row.RowId.Value);
+        if (ok)
+        {
+            _table!.Rows.Remove(row);
+            Snackbar.Add("删除成功", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error}", Severity.Error);
+        }
+    }
+}

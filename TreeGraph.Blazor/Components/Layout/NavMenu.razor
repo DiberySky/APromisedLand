@@ -1,0 +1,23 @@
+<MudNavMenu>
+    <MudNavLink Href="/" Match="NavLinkMatch.All"
+                Icon="@Icons.Material.Filled.Home">首页</MudNavLink>
+
+    <MudNavGroup Title="数据" Icon="@Icons.Material.Filled.Storage" Expanded="true">
+        <MudNavLink Href="/entities" Icon="@Icons.Material.Filled.List">实体列表</MudNavLink>
+        <MudNavLink Href="/query" Icon="@Icons.Material.Filled.Search">动态查询</MudNavLink>
+        <MudNavLink Href="/schema" Icon="@Icons.Material.Filled.Schema">Schema 查看</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="元数据" Icon="@Icons.Material.Filled.Settings" Expanded="true">
+        <MudNavLink Href="/metadata/attributes"
+                    Icon="@Icons.Material.Filled.ListAlt">属性定义</MudNavLink>
+        <MudNavLink Href="/metadata/composite-types"
+                    Icon="@Icons.Material.Filled.AccountTree">组合类型</MudNavLink>
+        <MudNavLink Href="/metadata/custom-tables"
+                    Icon="@Icons.Material.Filled.TableChart">自定义表定义</MudNavLink>
+        <MudNavLink Href="/metadata/option-sets"
+                    Icon="@Icons.Material.Filled.Checklist">选项集</MudNavLink>
+        <MudNavLink Href="/metadata/units"
+                    Icon="@Icons.Material.Filled.Straighten">单位</MudNavLink>
+    </MudNavGroup>
+</MudNavMenu>

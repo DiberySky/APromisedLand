@@ -1,0 +1,110 @@
+@page "/treegraph"
+@rendermode InteractiveServer
+
+@inject TreeApiClient Api
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4">TreeGraph Demo</MudText>
+<MudText Typo="Typo.body2" Color="Color.Info" Class="mb-4">
+    通用泛型树组件 + 后端 TreeGraphApi(端口 5753 + PostgreSQL TreeGraphDb,无 ltree)
+</MudText>
+
+@if (_loadFailed)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">
+        无法连接到 TreeGraphApi,请确认后端服务已启动(默认 http://localhost:5753)。
+    </MudAlert>
+}
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-2">TreeView(懒加载)</MudText>
+            @if (_roots is null)
+            {
+                <MudProgressCircular Color="Color.Warning" Indeterminate="true" />
+            }
+            else
+            {
+                <TreeGraph T="TreeNodeDto"
+                           Items="_roots"
+                           ServerData="LoadChildrenAsync"
+                           SelectedValueChanged="OnSelectedChanged">
+                    <NodeTemplate Context="node">
+                        <MudText Typo="Typo.body2">
+                            [@node.NodeType] @node.Text
+                        </MudText>
+                    </NodeTemplate>
+                </TreeGraph>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-2">节点详情</MudText>
+            @if (_selected is null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Default">
+                    请在左侧树中选择一个节点。
+                </MudText>
+            }
+            else
+            {
+                <MudStack Spacing="2">
+                    <MudText>Id: <b>@_selected.Id</b></MudText>
+                    <MudText>ParentId: <b>@(_selected.ParentId ?? "(root)")</b></MudText>
+                    <MudText>Text: <b>@_selected.Text</b></MudText>
+                    <MudText>NodeType: <b>@_selected.NodeType</b></MudText>
+                    <MudText>SortOrder: <b>@_selected.SortOrder</b></MudText>
+                    <MudText>HasChildren: <b>@_selected.HasChildren</b></MudText>
+                </MudStack>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private IReadOnlyCollection<TreeItemData<TreeNodeDto>>? _roots;
+    private TreeNodeDto? _selected;
+    private bool _loadFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var rootDtos = await Api.GetRootsAsync();
+            _roots = rootDtos.ToTreeItemData();
+            _loadFailed = false;
+        }
+        catch (Exception ex)
+        {
+            _loadFailed = true;
+            Snackbar.Add($"加载根节点失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task<IReadOnlyCollection<TreeItemData<TreeNodeDto>>> LoadChildrenAsync(
+        TreeNodeDto? parent)
+    {
+        try
+        {
+            // parent 为 null 时表示加载顶层根节点;此处根节点由 OnInitializedAsync 已加载,
+            // 懒加载只处理子节点展开场景。
+            if (parent is null) return Array.Empty<TreeItemData<TreeNodeDto>>();
+            var children = await Api.GetChildrenAsync(parent.Id);
+            return children.ToTreeItemData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载子节点失败: {ex.Message}", Severity.Error);
+            return Array.Empty<TreeItemData<TreeNodeDto>>();
+        }
+    }
+
+    private Task OnSelectedChanged(TreeNodeDto? node)
+    {
+        _selected = node;
+        return Task.CompletedTask;
+    }
+}

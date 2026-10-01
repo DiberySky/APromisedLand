@@ -1,0 +1,241 @@
+@page "/query"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageTitle>动态查询</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">动态查询</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="_entityType" Label="实体类型"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudSelect @bind-Value="_queryMode" Label="查询方式"
+                       Variant="Variant.Outlined">
+                <MudSelectItem Value="@("filter")">属性过滤</MudSelectItem>
+                <MudSelectItem Value="@("by-table")">自定义表行查询</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="LoadSchemaAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                加载 Schema
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @if (_queryMode == "by-table")
+    {
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_tableAttributeName"
+                              Label="自定义表属性名"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_rowConditionsJson"
+                              Label="行条件 (JSON 数组)"
+                              Lines="3"
+                              Variant="Variant.Outlined"
+                              HelperText="示例: [{&quot;name&quot;:&quot;重量&quot;,&quot;value&quot;:&quot;1.8&quot;}]" />
+            </MudItem>
+        </MudGrid>
+    }
+    else if (_schema is not null)
+    {
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.subtitle1" Class="mb-2">过滤条件</MudText>
+
+        @foreach (var f in _filters)
+        {
+            <MudGrid Class="mb-2 align-center">
+                <MudItem xs="12" md="3">
+                    <MudSelect T="AttributeSchemaDto"
+                               Value="f.Attribute"
+                               ValueChanged="a => { f.Attribute = a; }"
+                               Label="属性" Variant="Variant.Outlined" Dense="true">
+                        @foreach (var attr in _schema.Where(a => a.IsSearchable))
+                        {
+                            <MudSelectItem Value="@attr">
+                                @attr.DisplayName
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudSelect @bind-Value="f.Operator" Label="运算符"
+                               Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem Value="@("eq")">等于</MudSelectItem>
+                        <MudSelectItem Value="@("neq")">不等于</MudSelectItem>
+                        <MudSelectItem Value="@("gt")">大于</MudSelectItem>
+                        <MudSelectItem Value="@("gte")">大于等于</MudSelectItem>
+                        <MudSelectItem Value="@("lt")">小于</MudSelectItem>
+                        <MudSelectItem Value="@("lte")">小于等于</MudSelectItem>
+                        <MudSelectItem Value="@("like")">包含</MudSelectItem>
+                        <MudSelectItem Value="@("in")">属于</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="f.ValueText" Label="值"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Color="Color.Error"
+                                   OnClick="@(() => _filters.Remove(f))" />
+                </MudItem>
+            </MudGrid>
+        }
+
+        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => _filters.Add(new FilterRow()))"
+                   Variant="Variant.Outlined" Class="mt-2">
+            添加条件
+        </MudButton>
+    }
+
+    <MudDivider Class="my-4" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               OnClick="QueryAsync" Disabled="@_loading"
+               StartIcon="@Icons.Material.Filled.Search">
+        @(_loading ? "查询中..." : "执行查询")
+    </MudButton>
+</MudPaper>
+
+@if (_ids is not null)
+{
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-2">
+            结果（@_ids.Count 个）
+        </MudText>
+        @if (_ids.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">无结果</MudAlert>
+        }
+        else
+        {
+            <MudChipSet T="long">
+                @foreach (var id in _ids)
+                {
+                    <MudChip T="long" Value="@id" Color="Color.Primary">
+                        #@id
+                    </MudChip>
+                }
+            </MudChipSet>
+        }
+    </MudPaper>
+}
+else if (_entities is not null)
+{
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-2">
+            结果（共 @_entities.Total 条）
+        </MudText>
+        <MudTable Items="_entities.Items" Hover="true" Bordered="true" Dense="true">
+            <HeaderContent>
+                <MudTh>EntityId</MudTh>
+                <MudTh>属性预览</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.EntityId</MudTd>
+                <MudTd>
+                    @foreach (var (k, v) in context.Properties.Take(3))
+                    {
+                        <MudChip T="string" Size="Size.Small">
+                            @k=@v.ToString()
+                        </MudChip>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private string _entityType = "Product";
+    private string _queryMode = "filter";
+    private string _tableAttributeName = "specs";
+    private string _rowConditionsJson = "[]";
+
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private PagedResult<DynamicEntityDto>? _entities;
+    private IReadOnlyList<long>? _ids;
+    private bool _loading;
+
+    private readonly List<FilterRow> _filters = new();
+
+    // 端点 ①：加载 Schema
+    private async Task LoadSchemaAsync()
+    {
+        _schema = await Api.GetSchemaAsync(_entityType);
+        _filters.Clear();
+        Snackbar.Add($"已加载 {_schema?.Count ?? 0} 个属性", Severity.Info);
+    }
+
+    // 端点 ④ 或 ⑤
+    private async Task QueryAsync()
+    {
+        _loading = true;
+        _entities = null;
+        _ids = null;
+        try
+        {
+            if (_queryMode == "by-table")
+            {
+                var conditions = System.Text.Json.JsonSerializer
+                    .Deserialize<List<Dictionary<string, object?>>>(_rowConditionsJson)
+                    ?? new();
+
+                _ids = await Api.QueryByTableAsync(_entityType, new QueryByTableRequest
+                {
+                    AttributeName = _tableAttributeName,
+                    RowConditions = conditions
+                });
+            }
+            else
+            {
+                _entities = await Api.QueryAsync(_entityType, new EavQueryRequest
+                {
+                    EntityType = _entityType,
+                    Filters = _filters
+                        .Where(f => f.Attribute is not null && f.ValueText is not null)
+                        .Select(f => new AttributeFilter
+                        {
+                            AttributeName = f.Attribute!.AttributeName,
+                            Operator = f.Operator,
+                            Value = ConvertValue(f.Attribute, f.ValueText!)
+                        })
+                        .ToList(),
+                    Page = 1,
+                    PageSize = 50
+                });
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static object ConvertValue(AttributeSchemaDto attr, string text)
+    {
+        return attr.DataType switch
+        {
+            EavDataTypes.Int => long.TryParse(text, out var l) ? l : text,
+            EavDataTypes.Decimal => decimal.TryParse(text, out var d) ? d : text,
+            EavDataTypes.Bool => bool.TryParse(text, out var b) ? b : text,
+            _ => text
+        };
+    }
+
+    private class FilterRow
+    {
+        public AttributeSchemaDto? Attribute { get; set; }
+        public string Operator { get; set; } = "eq";
+        public string ValueText { get; set; } = "";
+    }
+}

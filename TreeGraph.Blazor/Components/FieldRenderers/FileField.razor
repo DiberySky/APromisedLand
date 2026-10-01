@@ -1,0 +1,82 @@
+@* 文件字段渲染器（基础版）：URL 输入 + JSON 元数据展示 *@
+
+<MudTextField T="string"
+              Label="@($"{Attr.DisplayName} - 文件 URL")"
+              Value="_url"
+              ValueChanged="OnUrlChanged"
+              Required="@Attr.IsRequired"
+              Variant="Variant.Outlined"
+              Placeholder="https://..."
+              Class="mb-2" />
+
+@if (_meta is not null)
+{
+    <MudPaper Class="pa-2" Elevation="0" Outlined="true">
+        <MudText Typo="Typo.caption">
+            文件名: @_meta.FileName
+        </MudText>
+        <MudText Typo="Typo.caption">
+            类型: @_meta.MimeType
+        </MudText>
+        <MudText Typo="Typo.caption">
+            大小: @(_meta.SizeBytes / 1024) KB
+        </MudText>
+    </MudPaper>
+}
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter] public JsonElement? Value { get; set; }
+    [Parameter] public EventCallback<JsonElement?> ValueChanged { get; set; }
+
+    private string? _url;
+    private FileMeta? _meta;
+
+    protected override void OnParametersSet()
+    {
+        if (Value is { ValueKind: JsonValueKind.Object } obj)
+        {
+            _url = obj.TryGetProperty("url", out var u) ? u.GetString() : null;
+            _meta = new FileMeta
+            {
+                FileName = obj.TryGetProperty("fileName", out var fn)
+                    ? fn.GetString() ?? "" : "",
+                MimeType = obj.TryGetProperty("mimeType", out var mt)
+                    ? mt.GetString() ?? "" : "",
+                SizeBytes = obj.TryGetProperty("sizeBytes", out var sz)
+                    && sz.TryGetInt64(out var s) ? s : 0
+            };
+        }
+        else
+        {
+            _url = null;
+            _meta = null;
+        }
+    }
+
+    private Task OnUrlChanged(string? v)
+    {
+        _url = v;
+        if (string.IsNullOrWhiteSpace(v))
+        {
+            _meta = null;
+            return ValueChanged.InvokeAsync(null);
+        }
+
+        var obj = new
+        {
+            url = v,
+            fileName = Path.GetFileName(v),
+            mimeType = "",
+            sizeBytes = 0
+        };
+        return ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(obj));
+    }
+
+    private class FileMeta
+    {
+        public string FileName { get; set; } = "";
+        public string MimeType { get; set; } = "";
+        public long SizeBytes { get; set; }
+    }
+}

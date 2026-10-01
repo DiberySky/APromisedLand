@@ -1,0 +1,24 @@
+@namespace APromisedLand.SharedRazor.Components
+
+@inherits LayoutComponentBase
+
+<MudLayout>
+    <MudAppBar Dense Class="mud-theme-primary">
+        <MudSpacer />
+        <MudText Color="Color.Success">@SolutionService.Copyright</MudText>
+        <MudSpacer />
+    </MudAppBar>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@* Required *@
+<MudThemeProvider IsDarkMode DefaultScrollbar />
+<MudPopoverProvider />
+@* Needed for dialogs *@
+<MudDialogProvider />
+@* Needed for snackbars *@
+<MudSnackbarProvider />

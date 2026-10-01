@@ -1,0 +1,127 @@
+@namespace APromisedLand.SharedRazor.Components
+
+@using APromisedLand.Razor.Helper.Blazor
+@using APromisedLand.Shared.Interfaces
+@using APromisedLand.Shared.Services.Solution
+
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject MessageService Message
+
+@inject IAuthenticationService AuthenticationService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Navigator
+
+<PageSky Title="@Title" ArrowBackVisible="false"
+         BottomBarVisible="true"
+         StartButtonVisible="true"
+         OnStartClick="@(() => Navigator.NavigateTo("StartPage"))">
+    <PageContent>
+        <MudMainContent>
+            <MudContainer Class="align-content-center" MaxWidth="MaxWidth.Small">
+                <MudCard Outlined="true">
+                    <MudCardHeader Class="mud-theme-success">
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">登录</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudIconButton Icon="@Icons.Material.Filled.Login"
+                                           Color="Color.Warning" />
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudForm @ref="_form">
+                            <MudStack Spacing="2" Class="px-12">
+                                <MudTextField T="string" @bind-Value="@_user" Required
+                                              Variant="Variant.Outlined" Label="用户" />
+
+                                <PasswordSky @ref="_passwordField" Variant="Variant.Outlined" />
+                            </MudStack>
+                        </MudForm>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudSpacer />
+                        <ButtonLoadingSky Text="登录" Color="Color.Primary" Size="Size.Small"
+                                          Class="mr-12 mb-2"
+                                          Variant="Variant.Filled"
+                                          OnClickFunc="OnSubmitClick" />
+                    </MudCardActions>
+                </MudCard>
+            </MudContainer>
+        </MudMainContent>
+    </PageContent>
+</PageSky>
+
+@code {
+    private MudForm? _form;
+    private PasswordSky? _passwordField;
+    private string? _user;
+
+    [Parameter] public required string Title { get; set; }
+    [Parameter] public EventCallback OnBackClick { get; set; }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+#if DEBUG
+        _user = "tian";
+#endif
+    }
+
+    private async Task OnSubmitClick()
+    {
+        if (_form is null || _passwordField is null
+                          || string.IsNullOrEmpty(_user) || string.IsNullOrEmpty(_passwordField.Password))
+        {
+            return;
+        }
+
+        try
+        {
+            await _form.ValidateAsync();
+
+            if (_form.IsValid == false) return;
+
+            var logonUser = new SignInUser { UserName = _user, Password = _passwordField.Password };
+
+            await SignInClick(logonUser);
+        }
+        catch (Exception e)
+        {
+            Message.Details("登录失败", e.Message);
+        }
+    }
+
+    private async Task SignInClick(SignInUser user)
+    {
+        try
+        {
+            SolutionService.Authorized = false;
+
+            var success = await AuthenticationService.LoginAsync(user.UserName, user.Password);
+            if (success)
+            {
+                var authState = await AuthProvider.GetAuthenticationStateAsync();
+                var userlogin = authState.User;
+
+                SolutionService.GetClaimValue(userlogin.Claims);
+
+                StateHasChanged();
+
+                SolutionService.Authorized = true;
+
+                Message.Success($"登录成功: {SolutionService.UserName}");
+
+                Navigator.NavigateTo(SolutionService.StartPage);
+            }
+            else
+            {
+                Message.Error("登录失败，请检查用户名或密码。");
+            }
+        }
+        catch (Exception e)
+        {
+            Message.Details("登录失败。", e.Message);
+        }
+    }
+}

@@ -1,0 +1,777 @@
+@page "/metadata/attributes"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using System.Text.Json
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>属性定义管理</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">属性定义管理</MudText>
+
+@* ============================================================ *@
+@* 顶部工具栏                                                    *@
+@* ============================================================ *@
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="3" Class="d-flex align-center">
+            <MudTextField @bind-Value="_entityType" Label="实体类型"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Placeholder="如 Product" />
+        </MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-center">
+            <MudSwitch T="bool" @bind-Value="_includeDeleted"
+                       Label="显示已删除"
+                       Color="Color.Warning" />
+        </MudItem>
+        <MudItem xs="12" md="6" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="LoadAsync" Disabled="_loading"
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       OnClick="OpenCreateDialog"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Class="ml-2">
+                新建属性
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@* ============================================================ *@
+@* 加载中                                                        *@
+@* ============================================================ *@
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+
+@* ============================================================ *@
+@* 空状态                                                        *@
+@* ============================================================ *@
+else if (_attributes is null || _attributes.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.ListAlt"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">暂无属性定义</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            点击"新建属性"创建第一个
+        </MudText>
+    </MudPaper>
+}
+
+@* ============================================================ *@
+@* 属性表格                                                      *@
+@* ============================================================ *@
+else
+{
+    <MudTable Items="_attributes" Hover="true" Bordered="true" Dense="true"
+              Filter="new Func<AttributeDetailDto, bool>(FilterFunc)">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">
+                共 @_attributes.Count 个属性
+            </MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString"
+                          Placeholder="搜索属性名 / 显示名"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          IconSize="Size.Medium"
+                          Class="mt-0"
+                          Immediate="true" />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>属性名</MudTh>
+            <MudTh>显示名</MudTh>
+            <MudTh>类型</MudTh>
+            <MudTh>引用</MudTh>
+            <MudTh>必填</MudTh>
+            <MudTh>可搜索</MudTh>
+            <MudTh>可排序</MudTh>
+            <MudTh>顺序</MudTh>
+            <MudTh>操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <code>@context.AttributeName</code>
+                @if (context.IsDeleted)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error"
+                             Class="ml-1">
+                        已删除
+                    </MudChip>
+                }
+            </MudTd>
+            <MudTd>@context.DisplayName</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small"
+                         Color="@GetDataTypeColor(context.DataType)">
+                    @context.DataType
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                @* 引用信息 *@
+                @if (context.UnitId is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                        单位: @context.UnitSymbol
+                    </MudChip>
+                }
+                @if (context.RefCompositeTypeId is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Dark">
+                        组合: @context.CompositeTypeName
+                    </MudChip>
+                }
+                @if (context.RefTableDefinitionId is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                        表: @context.TableName
+                    </MudChip>
+                }
+                @if (context.RefOptionSetId is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                        选项: @context.OptionSetName
+                    </MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                @if (context.IsRequired)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check"
+                             Color="Color.Success" Size="Size.Small" />
+                }
+            </MudTd>
+            <MudTd>
+                @if (context.IsSearchable)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check"
+                             Color="Color.Success" Size="Size.Small" />
+                }
+            </MudTd>
+            <MudTd>
+                @if (context.IsSortable)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check"
+                             Color="Color.Success" Size="Size.Small" />
+                }
+            </MudTd>
+            <MudTd>@context.DisplayOrder</MudTd>
+            <MudTd>
+                @if (!context.IsDeleted)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="@(async () => await OpenEditDialog(context))"
+                                   title="编辑" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   OnClick="@(async () => await DeleteAsync(context))"
+                                   title="删除" />
+                }
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 20, 50, 100 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@* ============================================================ *@
+@* 新建对话框                                                    *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showCreateDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">新建属性</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_createForm.EntityType"
+                      Label="实体类型"
+                      Placeholder="Product"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_createForm.AttributeName"
+                      Label="属性名 (snake_case)"
+                      Placeholder="screen_size"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_createForm.DisplayName"
+                      Label="显示名"
+                      Placeholder="屏幕尺寸"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudSelect @bind-Value="_createForm.DataType"
+                   Label="数据类型"
+                   Variant="Variant.Outlined"
+                   Class="mb-3">
+            @foreach (var dt in DataTypeOptions)
+            {
+                <MudSelectItem Value="@dt.Value">@dt.Label</MudSelectItem>
+            }
+        </MudSelect>
+
+        @* 类型相关的引用选择 *@
+        @if (_createForm.DataType is "int" or "decimal")
+        {
+            <MudSelect T="Guid?"
+                       Value="_createForm.UnitId"
+                       ValueChanged="@(v => _createForm.UnitId = v)"
+                       Label="基准单位（可选）"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">
+                    （不使用单位）
+                </MudSelectItem>
+                @foreach (var u in _units ?? new List<UnitDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">
+                        @u.Name (@u.Symbol) - @u.Category
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @if (_createForm.DataType == "composite")
+        {
+            <MudSelect T="long?"
+                       Value="_createForm.RefCompositeTypeId"
+                       ValueChanged="@(v => _createForm.RefCompositeTypeId = v)"
+                       Label="组合类型"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in _compositeTypes ?? new List<CompositeTypeDetailDto>())
+                {
+                    <MudSelectItem T="long?" Value="@t.CompositeTypeId">
+                        @t.DisplayName (@t.TypeName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @if (_createForm.DataType == "table")
+        {
+            <MudSelect T="long?"
+                       Value="_createForm.RefTableDefinitionId"
+                       ValueChanged="@(v => _createForm.RefTableDefinitionId = v)"
+                       Label="自定义表"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in _customTables ?? new List<CustomTableDetailDto>())
+                {
+                    <MudSelectItem T="long?" Value="@t.TableDefinitionId">
+                        @t.DisplayName (@t.TableName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @if (_createForm.DataType == "single_choice")
+        {
+            <MudSelect T="long?"
+                       Value="_createForm.RefOptionSetId"
+                       ValueChanged="@(v => _createForm.RefOptionSetId = v)"
+                       Label="选项集"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var s in _optionSets ?? new List<OptionSetSummaryDto>())
+                {
+                    <MudSelectItem T="long?" Value="@s.OptionSetId">
+                        @s.DisplayName (@s.SetName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        <MudNumericField T="int"
+                         @bind-Value="_createForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudGrid>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_createForm.IsRequired"
+                           Label="必填" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_createForm.IsSearchable"
+                           Label="可搜索" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_createForm.IsSortable"
+                           Label="可排序" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_createForm.IsMultiValue"
+                           Label="多值" Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showCreateDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="CreateAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "创建中..." : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ============================================================ *@
+@* 编辑对话框                                                    *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showEditDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">编辑属性</MudText>
+        @if (_editingAttribute is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_editingAttribute.EntityType / @_editingAttribute.AttributeName
+                （类型: @_editingAttribute.DataType，不可修改）
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_editForm.DisplayName"
+                      Label="显示名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        @* 单位引用（仅 int/decimal） *@
+        @if (_editingAttribute?.DataType is "int" or "decimal")
+        {
+            <MudSelect T="Guid?"
+                       Value="_editForm.UnitId"
+                       ValueChanged="@(v => _editForm.UnitId = v)"
+                       Label="基准单位"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">
+                    （不使用单位）
+                </MudSelectItem>
+                @foreach (var u in _units ?? new List<UnitDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">
+                        @u.Name (@u.Symbol) - @u.Category
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                修改基准单位不会自动转换已有数据。如需变更，请先规划数据迁移。
+            </MudAlert>
+        }
+
+        @* 组合类型引用 *@
+        @if (_editingAttribute?.DataType == "composite")
+        {
+            <MudSelect T="long?"
+                       Value="_editForm.RefCompositeTypeId"
+                       ValueChanged="@(v => _editForm.RefCompositeTypeId = v)"
+                       Label="组合类型"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in _compositeTypes ?? new List<CompositeTypeDetailDto>())
+                {
+                    <MudSelectItem T="long?" Value="@t.CompositeTypeId">
+                        @t.DisplayName (@t.TypeName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @* 自定义表引用 *@
+        @if (_editingAttribute?.DataType == "table")
+        {
+            <MudSelect T="long?"
+                       Value="_editForm.RefTableDefinitionId"
+                       ValueChanged="@(v => _editForm.RefTableDefinitionId = v)"
+                       Label="自定义表"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in _customTables ?? new List<CustomTableDetailDto>())
+                {
+                    <MudSelectItem T="long?" Value="@t.TableDefinitionId">
+                        @t.DisplayName (@t.TableName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @* 选项集引用 *@
+        @if (_editingAttribute?.DataType == "single_choice")
+        {
+            <MudSelect T="long?"
+                       Value="_editForm.RefOptionSetId"
+                       ValueChanged="@(v => _editForm.RefOptionSetId = v)"
+                       Label="选项集"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var s in _optionSets ?? new List<OptionSetSummaryDto>())
+                {
+                    <MudSelectItem T="long?" Value="@s.OptionSetId">
+                        @s.DisplayName (@s.SetName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        <MudNumericField T="int"
+                         @bind-Value="_editForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudGrid>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_editForm.IsRequired"
+                           Label="必填" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_editForm.IsSearchable"
+                           Label="可搜索" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_editForm.IsSortable"
+                           Label="可排序" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_editForm.IsMultiValue"
+                           Label="多值" Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showEditDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="UpdateAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "保存中..." : "保存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private string? _entityType;
+    private bool _includeDeleted;
+    private string? _searchString;
+    private IReadOnlyList<AttributeDetailDto>? _attributes;
+    private bool _loading;
+
+    // 引用数据（供对话框选择）
+    private IReadOnlyList<UnitDto>? _units;
+    private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
+    private IReadOnlyList<CustomTableDetailDto>? _customTables;
+    private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
+
+    private bool _submitting;
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true
+    };
+
+    // 新建
+    private bool _showCreateDialog;
+    private CreateAttributeForm _createForm = new();
+
+    // 编辑
+    private bool _showEditDialog;
+    private AttributeDetailDto? _editingAttribute;
+    private UpdateAttributeForm _editForm = new();
+
+    private static readonly (string Value, string Label)[] DataTypeOptions =
+    {
+        ("string",   "字符串"),
+        ("int",      "整数"),
+        ("decimal",  "小数"),
+        ("bool",     "布尔"),
+        ("datetime", "日期时间"),
+        ("date",     "日期"),
+        ("time",     "时间"),
+        ("single_choice", "单选"),
+        ("file",     "文件"),
+        ("composite", "组合类型"),
+        ("table",    "自定义表"),
+        ("json",     "JSON")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReferencesAsync();
+        await LoadAsync();
+    }
+
+    /// <summary>预加载所有引用数据（单位、组合、表、选项集）</summary>
+    private async Task LoadReferencesAsync()
+    {
+        _units = await Api.ListUnitsAsync();
+        _compositeTypes = await Api.ListCompositeTypesAsync();
+        _customTables = await Api.ListCustomTablesAsync();
+        _optionSets = await Api.ListOptionSetsAsync();
+    }
+
+    // 端点 ㊴：GET api/eav/metadata/attributes?entityType=&includeDeleted=
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _attributes = await Api.ListAttributesAsync(_entityType, _includeDeleted);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // ---------- 新建 ----------
+
+    private void OpenCreateDialog()
+    {
+        _createForm = new CreateAttributeForm
+        {
+            EntityType = _entityType ?? "Product",
+            DisplayOrder = (_attributes?.Count ?? 0) + 1,
+            IsSearchable = true
+        };
+        _showCreateDialog = true;
+    }
+
+    // 端点 ⑪：POST api/eav/metadata/attributes
+    private async Task CreateAsync()
+    {
+        var f = _createForm;
+        if (string.IsNullOrWhiteSpace(f.EntityType) ||
+            string.IsNullOrWhiteSpace(f.AttributeName) ||
+            string.IsNullOrWhiteSpace(f.DisplayName))
+        {
+            Snackbar.Add("请填写实体类型、属性名、显示名", Severity.Warning);
+            return;
+        }
+
+        // 引用校验
+        if (f.DataType == "composite" && f.RefCompositeTypeId is null)
+        {
+            Snackbar.Add("组合类型必须选择引用的类型", Severity.Warning);
+            return;
+        }
+        if (f.DataType == "table" && f.RefTableDefinitionId is null)
+        {
+            Snackbar.Add("自定义表必须选择引用的表", Severity.Warning);
+            return;
+        }
+        if (f.DataType == "single_choice" && f.RefOptionSetId is null)
+        {
+            Snackbar.Add("单选类型必须选择选项集", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var id = await Api.CreateAttributeAsync(new CreateAttributeRequest
+            {
+                EntityType = f.EntityType,
+                AttributeName = f.AttributeName,
+                DisplayName = f.DisplayName,
+                DataType = f.DataType,
+                IsRequired = f.IsRequired,
+                IsSearchable = f.IsSearchable,
+                IsSortable = f.IsSortable,
+                IsMultiValue = f.IsMultiValue,
+                DisplayOrder = f.DisplayOrder,
+                UnitId = f.UnitId,
+                RefCompositeTypeId = f.RefCompositeTypeId,
+                RefTableDefinitionId = f.RefTableDefinitionId,
+                RefOptionSetId = f.RefOptionSetId
+            });
+
+            if (id is null)
+            {
+                Snackbar.Add("创建失败", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add($"创建成功：AttributeId={id}", Severity.Success);
+            _showCreateDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 编辑 ----------
+
+    // 端点 ㊵：GET api/eav/metadata/attributes/{id}
+    private async Task OpenEditDialog(AttributeDetailDto attr)
+    {
+        // 从详情端点加载最新数据
+        var detail = await Api.GetAttributeAsync(attr.AttributeId);
+        if (detail is null)
+        {
+            Snackbar.Add("加载详情失败", Severity.Error);
+            return;
+        }
+
+        _editingAttribute = detail;
+        _editForm = new UpdateAttributeForm
+        {
+            DisplayName = detail.DisplayName,
+            IsRequired = detail.IsRequired,
+            IsSearchable = detail.IsSearchable,
+            IsSortable = detail.IsSortable,
+            IsMultiValue = detail.IsMultiValue,
+            DisplayOrder = detail.DisplayOrder,
+            UnitId = detail.UnitId,
+            RefCompositeTypeId = detail.RefCompositeTypeId,
+            RefTableDefinitionId = detail.RefTableDefinitionId,
+            RefOptionSetId = detail.RefOptionSetId
+        };
+        _showEditDialog = true;
+    }
+
+    // 端点 ㊶：PUT api/eav/metadata/attributes/{id}
+    private async Task UpdateAsync()
+    {
+        if (_editingAttribute is null) return;
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateAttributeAsync(
+                _editingAttribute.AttributeId,
+                new UpdateAttributeRequest
+                {
+                    DisplayName = _editForm.DisplayName,
+                    IsRequired = _editForm.IsRequired,
+                    IsSearchable = _editForm.IsSearchable,
+                    IsSortable = _editForm.IsSortable,
+                    IsMultiValue = _editForm.IsMultiValue,
+                    DisplayOrder = _editForm.DisplayOrder,
+                    UnitId = _editForm.UnitId,
+                    RefCompositeTypeId = _editForm.RefCompositeTypeId,
+                    RefTableDefinitionId = _editForm.RefTableDefinitionId,
+                    RefOptionSetId = _editForm.RefOptionSetId
+                });
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{ParseError(error)}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            _showEditDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 删除 ----------
+
+    // 端点 ⑯：DELETE api/eav/metadata/attributes/{id}
+    private async Task DeleteAsync(AttributeDetailDto attr)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除属性「{attr.DisplayName}」({attr.AttributeName})？" +
+            "此操作将软删除属性定义，已有数据保留但不再被新业务使用。",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteAttributeAsync(attr.AttributeId);
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error}", Severity.Error);
+        }
+    }
+
+    // ---------- 辅助 ----------
+
+    private bool FilterFunc(AttributeDetailDto a)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString)) return true;
+        var s = _searchString;
+        return a.AttributeName.Contains(s, StringComparison.OrdinalIgnoreCase)
+            || a.DisplayName.Contains(s, StringComparison.OrdinalIgnoreCase)
+            || a.EntityType.Contains(s, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Color GetDataTypeColor(string dataType) => dataType switch
+    {
+        "string" => Color.Info,
+        "int" or "decimal" => Color.Primary,
+        "bool" => Color.Success,
+        "datetime" or "date" or "time" => Color.Warning,
+        "single_choice" => Color.Tertiary,
+        "composite" => Color.Dark,
+        "table" => Color.Info,
+        "file" => Color.Default,
+        _ => Color.Default
+    };
+
+    /// <summary>从后端返回的 JSON 错误体中提取 error 字段</summary>
+    private static string ParseError(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "未知错误";
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            if (doc.RootElement.TryGetProperty("error", out var err))
+                return err.GetString() ?? raw;
+        }
+        catch { /* 不是 JSON，直接返回原文 */ }
+        return raw;
+    }
+
+    // ---------- 表单模型 ----------
+
+    private class CreateAttributeForm
+    {
+        public string EntityType { get; set; } = "";
+        public string AttributeName { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string DataType { get; set; } = "string";
+        public bool IsRequired { get; set; }
+        public bool IsSearchable { get; set; }
+        public bool IsSortable { get; set; }
+        public bool IsMultiValue { get; set; }
+        public int DisplayOrder { get; set; }
+        public Guid? UnitId { get; set; }
+        public long? RefCompositeTypeId { get; set; }
+        public long? RefTableDefinitionId { get; set; }
+        public long? RefOptionSetId { get; set; }
+    }
+
+    private class UpdateAttributeForm
+    {
+        public string DisplayName { get; set; } = "";
+        public bool IsRequired { get; set; }
+        public bool IsSearchable { get; set; }
+        public bool IsSortable { get; set; }
+        public bool IsMultiValue { get; set; }
+        public int DisplayOrder { get; set; }
+        public Guid? UnitId { get; set; }
+        public long? RefCompositeTypeId { get; set; }
+        public long? RefTableDefinitionId { get; set; }
+        public long? RefOptionSetId { get; set; }
+    }
+}

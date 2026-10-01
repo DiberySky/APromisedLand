@@ -1,0 +1,368 @@
+@TreeGraph.Api_HostAddress = http://localhost:5773
+
+### 单位列表（52 个单位，随机 Guid，供后续请求通过 JSONPath 引用）
+# @name getUnits
+GET {{TreeGraph.Api_HostAddress}}/api/units
+Accept: application/json
+
+### 写入实体 1001（基础类型 + 组合类型 + 带单位数量：净重 500 克）
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001
+Content-Type: application/json
+
+{
+  "screen_size": 55.5,
+  "release_date": "2024-01-15",
+  "net_weight": { "value": 500, "unitId": "{{getUnits.response.body.$.[?(@.symbol=='g')].id}}" },
+  "specs": {
+    "color": "black",
+    "weight": 12.5,
+    "brand": { "name": "SkyView", "origin": "武汉" }
+  }
+}
+
+### 写入实体 1002（净重按基准单位千克裸数值）
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1002
+Content-Type: application/json
+
+{
+  "screen_size": 65,
+  "release_date": "2024-03-20",
+  "net_weight": 12.5
+}
+
+### 读取实体（默认：净重返回基准单位千克 { value: 0.5, unitId: kg }）
+GET {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001
+Accept: application/json
+
+### 读取实体（按原始输入单位还原：净重返回 { value: 500, unitId: g }）
+GET {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001?unit=original
+Accept: application/json
+
+### 单位分类（附基准单位）
+GET {{TreeGraph.Api_HostAddress}}/api/units/categories
+Accept: application/json
+
+### 创建单位（POST /api/units）
+POST {{TreeGraph.Api_HostAddress}}/api/units
+Content-Type: application/json
+
+{
+  "category": "weight",
+  "name": "两",
+  "symbol": "liang",
+  "toBaseFactor": 0.05,
+  "isBaseUnit": false,
+  "displayOrder": 7
+}
+
+### 元数据：创建属性定义（面积，绑定平方米基准单位）
+# @name createAttribute
+POST {{TreeGraph.Api_HostAddress}}/api/eav/metadata/attributes
+Content-Type: application/json
+
+{
+  "entityType": "Product",
+  "attributeName": "screen_area",
+  "displayName": "屏幕面积",
+  "dataType": "decimal",
+  "isSearchable": true,
+  "displayOrder": 5,
+  "unitId": "{{getUnits.response.body.$.[?(@.symbol=='m²')].id}}",
+  "validationRule": { "min": 0, "max": 10 }
+}
+
+### 元数据：删除属性定义（软删除）
+DELETE {{TreeGraph.Api_HostAddress}}/api/eav/metadata/attributes/{{createAttribute.response.body.$.attributeId}}
+
+### 元数据：创建组合类型 + 字段
+# @name createCompositeType
+POST {{TreeGraph.Api_HostAddress}}/api/eav/metadata/composite-types
+Content-Type: application/json
+
+{
+  "entityType": "Product",
+  "typeName": "Dimensions",
+  "displayName": "尺寸"
+}
+
+### 元数据：添加组合字段（长度，绑定米基准单位）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/metadata/composite-types/{{createCompositeType.response.body.$.compositeTypeId}}/fields
+Content-Type: application/json
+
+{
+  "fieldName": "height",
+  "displayName": "高度",
+  "dataType": "decimal",
+  "displayOrder": 1,
+  "unitId": "{{getUnits.response.body.$.[?(@.symbol=='m')].id}}"
+}
+
+### 动态查询：多属性 AND（Intersect）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query
+Content-Type: application/json
+
+{
+  "filters": [
+    { "attributeName": "screen_size", "operator": "gte", "value": 50 },
+    { "attributeName": "specs", "fieldPath": "color", "operator": "eq", "value": "black" }
+  ],
+  "page": 1,
+  "pageSize": 20
+}
+
+### 跨单位查询：净重 > 1 吨（过滤值带单位，自动归一化到千克比较）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query
+Content-Type: application/json
+
+{
+  "filters": [
+    {
+      "attributeName": "net_weight",
+      "operator": "gt",
+      "value": { "value": 1, "unitId": "{{getUnits.response.body.$.[?(@.symbol=='t')].id}}" }
+    }
+  ],
+  "page": 1,
+  "pageSize": 20
+}
+
+### 按原始输入单位过滤（unit_eq：净重以克为单位输入的实体）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query
+Content-Type: application/json
+
+{
+  "filters": [
+    {
+      "attributeName": "net_weight",
+      "operator": "unit_eq",
+      "value": "{{getUnits.response.body.$.[?(@.symbol=='g')].id}}"
+    }
+  ],
+  "page": 1,
+  "pageSize": 20
+}
+
+### 元数据：创建自定义表结构定义
+# @name createCustomTable
+POST {{TreeGraph.Api_HostAddress}}/api/eav/metadata/custom-tables
+Content-Type: application/json
+
+{
+  "entityType": "Product",
+  "tableName": "education",
+  "displayName": "教育经历",
+  "displayOrder": 2
+}
+
+### 元数据：添加自定义表列（学校名，列内唯一）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/metadata/custom-tables/{{createCustomTable.response.body.$.tableDefinitionId}}/columns
+Content-Type: application/json
+
+{
+  "columnName": "school",
+  "displayName": "学校",
+  "dataType": "string",
+  "isRequired": true,
+  "isSearchable": true,
+  "isUnique": true,
+  "displayOrder": 1
+}
+
+### 元数据：创建表类型属性（education）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/metadata/attributes
+Content-Type: application/json
+
+{
+  "entityType": "Product",
+  "attributeName": "education",
+  "displayName": "教育经历",
+  "dataType": "table",
+  "refTableDefinitionId": "{{createCustomTable.response.body.$.tableDefinitionId}}",
+  "displayOrder": 6
+}
+
+### 自定义表：整表替换实体 1001 的认证证书
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001/tables/certifications
+Content-Type: application/json
+
+{
+  "tableName": "certifications",
+  "rows": [
+    {
+      "rowOrder": 0,
+      "fields": { "cert_name": "3C认证", "issuer": "中国质量认证中心", "issued_date": "2023-06-01" }
+    },
+    {
+      "rowOrder": 1,
+      "fields": { "cert_name": "CE认证", "issuer": "TÜV Rheinland", "issued_date": "2023-08-15" }
+    },
+    {
+      "rowOrder": 2,
+      "fields": { "cert_name": "能效标识", "issuer": "中国标准化研究院", "issued_date": "2024-01-10" }
+    }
+  ]
+}
+
+### 自定义表：加载实体 1001 的认证证书
+GET {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001/tables/certifications
+Accept: application/json
+
+### 自定义表：行级新增（追加一行）
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001/tables/certifications/rows
+Content-Type: application/json
+
+{
+  "rowId": null,
+  "rowOrder": 3,
+  "fields": { "cert_name": "RoHS认证", "issuer": "SGS", "issued_date": "2024-03-20" }
+}
+
+### 自定义表：列内唯一性校验（重复 cert_name 应返回 400）
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1002/tables/certifications
+Content-Type: application/json
+
+{
+  "tableName": "certifications",
+  "rows": [
+    { "rowOrder": 0, "fields": { "cert_name": "3C认证", "issuer": "CQC" } },
+    { "rowOrder": 1, "fields": { "cert_name": "3C认证", "issuer": "TÜV" } }
+  ]
+}
+
+### 自定义表：按行内数据查询父实体（存在 issuer=TÜV 行的产品）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query-by-table
+Content-Type: application/json
+
+{
+  "attributeName": "certifications",
+  "rowConditions": [
+    { "issuer": "TÜV Rheinland" }
+  ]
+}
+
+### 自定义表：多条件交集（存在 CE 行 且 存在 RoHS 行的产品）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query-by-table
+Content-Type: application/json
+
+{
+  "attributeName": "certifications",
+  "rowConditions": [
+    { "cert_name": "CE认证" },
+    { "cert_name": "RoHS认证" }
+  ]
+}
+
+### 审计历史（数量记录形如 "0.5 kg"）
+GET {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001/history
+Accept: application/json
+
+### 选项集：创建选项集（Shared 表示全局共享）
+# @name createOptionSet
+POST {{TreeGraph.Api_HostAddress}}/api/eav/metadata/option-sets
+Content-Type: application/json
+
+{
+  "entityType": "Product",
+  "setName": "color_grade",
+  "displayName": "颜色等级"
+}
+
+### 选项集：添加选项（设为默认）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/metadata/option-sets/{{createOptionSet.response.body.$.optionSetId}}/items
+Content-Type: application/json
+
+{
+  "value": "red",
+  "label": "红色",
+  "displayOrder": 1,
+  "isDefault": true
+}
+
+### 选项集：列表（含 Shared 共享集）
+GET {{TreeGraph.Api_HostAddress}}/api/eav/metadata/option-sets
+Accept: application/json
+
+### 单选：写入 quality_grade（grade_a）
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001
+Content-Type: application/json
+
+{
+  "quality_grade": "grade_a"
+}
+
+### 单选：写入非法值（应返回 400，附有效值列表）
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001
+Content-Type: application/json
+
+{
+  "quality_grade": "grade_x"
+}
+
+### 单选：显式传 null 自动填充默认选项
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1003
+Content-Type: application/json
+
+{
+  "quality_grade": null
+}
+
+### 单选：读取（返回 { value: "grade_a", label: "一级" }）
+GET {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/1001
+Accept: application/json
+
+### 单选：按值查询（质量等级 = 一级）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query
+Content-Type: application/json
+
+{
+  "filters": [
+    { "attributeName": "quality_grade", "operator": "eq", "value": "grade_a" }
+  ],
+  "page": 1,
+  "pageSize": 20
+}
+
+### 单选：in 查询
+POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query
+Content-Type: application/json
+
+{
+  "filters": [
+    { "attributeName": "quality_grade", "operator": "in", "value": ["grade_a", "grade_b"] }
+  ],
+  "page": 1,
+  "pageSize": 20
+}
+
+### 单选：nin 查询（含未设置的实体）
+POST {{TreeGraph.Api_HostAddress}}/api/eav/Product/entities/query
+Content-Type: application/json
+
+{
+  "filters": [
+    { "attributeName": "quality_grade", "operator": "nin", "value": ["grade_c"] }
+  ],
+  "page": 1,
+  "pageSize": 20
+}
+
+### 选项集：改 Label（不影响已存数据，读取端即时生效）
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/metadata/option-sets/2/items/2
+Content-Type: application/json
+
+{
+  "label": "特级"
+}
+
+### 选项集：选项重排序
+PUT {{TreeGraph.Api_HostAddress}}/api/eav/metadata/option-sets/2/items/reorder
+Content-Type: application/json
+
+[
+  { "optionItemId": 1, "displayOrder": 3 },
+  { "optionItemId": 2, "displayOrder": 1 },
+  { "optionItemId": 3, "displayOrder": 2 }
+]
+
+### 选项集：软删除选项
+DELETE {{TreeGraph.Api_HostAddress}}/api/eav/metadata/option-sets/2/items/3

@@ -1,0 +1,76 @@
+@page "/entities/{EntityType}/{EntityId:long}/edit"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageTitle>编辑 @EntityType #@EntityId</PageTitle>
+
+<MudBreadcrumbs Items="_crumbs" Class="mb-4" />
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    编辑 @EntityType #@EntityId
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_schema is null)
+{
+    <MudAlert Severity="Severity.Error">无法加载 @EntityType 的 Schema</MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-4">
+        <DynamicForm @ref="_form"
+                     EntityType="EntityType"
+                     EntityId="EntityId"
+                     Schema="_schema"
+                     OnSubmit="SaveAsync" />
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public string EntityType { get; set; } = "";
+    [Parameter] public long EntityId { get; set; }
+
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private DynamicForm? _form;
+    private bool _loading = true;
+    private bool _entityLoaded;
+    private List<BreadcrumbItem> _crumbs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _crumbs =
+        [
+            new BreadcrumbItem("实体列表", "/entities"),
+            new BreadcrumbItem(EntityType, null, disabled: true),
+            new BreadcrumbItem($"#{EntityId}", null, disabled: true)
+        ];
+
+        // 端点 ①：Schema
+        _schema = await Api.GetSchemaAsync(EntityType);
+        _loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // DynamicForm 首次渲染完成后才能 LoadFrom（端点 ②：读取实体）
+        if (!_entityLoaded && _form is not null)
+        {
+            _entityLoaded = true;
+            var entity = await Api.GetEntityAsync(EntityType, EntityId);
+            if (entity is not null)
+                _form.LoadFrom(entity.Properties);
+        }
+    }
+
+    // 端点 ③：PUT api/eav/{entityType}/entities/{id}
+    private async Task SaveAsync(Dictionary<string, object?> values)
+    {
+        var (ok, error) = await Api.SaveEntityAsync(EntityType, EntityId, values);
+        Snackbar.Add(ok ? "保存成功" : $"保存失败：{error}",
+            ok ? Severity.Success : Severity.Error);
+    }
+}

@@ -1,0 +1,99 @@
+@namespace APromisedLand.SharedRazor.Components
+
+@inject NavigationManager NavigationManager
+@inject IAuthenticationService AuthenticationService
+@inject BlazorService BlazorService
+
+<MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense="true"
+           Elevation="0">
+    <ChildContent>
+        @if (ArrowBackVisible)
+        {
+            <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                           Edge="Edge.Start" Color="Color.Warning"
+                           OnClick="@(() => BackClick())" />
+        }
+
+        @if (string.IsNullOrEmpty(Title) == false)
+        {
+            <MudSpacer />
+            <MudText>@Title</MudText>
+            <MudSpacer />
+        }
+
+        @if (TopBarRightContent is not null)
+        {
+            @TopBarRightContent
+        }
+
+        @if (StartButtonVisible)
+        {
+            <MudIconButton Icon="@Icons.Material.Outlined.Menu"
+                           Color="Color.Success"
+                           OnClick="@(() => OnStartClick.InvokeAsync())" />
+        }
+    </ChildContent>
+</MudAppBar>
+
+<MudContainer MaxWidth="@MaxWidth" Class="mb-16">
+    @if (PageContent is not null)
+    {
+        @PageContent
+    }
+</MudContainer>
+
+@if (BottomBarVisible)
+{
+    <MudAppBar Bottom Color="@BottomBarColor" Dense>
+        <ChildContent>
+            @if (BottomBarContent is not null)
+            {
+                @BottomBarContent
+            }
+
+            @if (SolutionService.Authorized)
+            {
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Outlined.Logout"
+                               Color="Color.Error"
+                               OnClick="@(() => Logout())" />
+            }
+        </ChildContent>
+    </MudAppBar>
+}
+
+@code {
+    [Parameter] public required string Title { get; set; }
+    [Parameter] public bool ArrowBackVisible { get; set; } = true;
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.False;
+    [Parameter] public bool BottomBarVisible { get; set; } = false;
+    [Parameter] public Color BottomBarColor { get; set; } = Color.Dark;
+    [Parameter] public bool StartButtonVisible { get; set; } = false;
+
+    [Parameter] public RenderFragment? TopBarRightContent { get; set; }
+    [Parameter] public RenderFragment? PageContent { get; set; }
+    [Parameter] public RenderFragment? BottomBarContent { get; set; }
+
+    [Parameter] public EventCallback OnStartClick { get; set; }
+    [Parameter] public EventCallback OnBackClick { get; set; }
+    [Parameter] public string? BackPage { get; set; }
+
+    private void BackClick()
+    {
+        if (string.IsNullOrEmpty(BackPage))
+        {
+            OnBackClick.InvokeAsync();
+        }
+        else
+        {
+            NavigationManager.NavigateTo(BackPage);
+        }
+    }
+
+    private async Task Logout()
+    {
+        await AuthenticationService.LogoutAsync();
+        SolutionService.Reset();
+        NavigationManager.NavigateTo("/");
+    }
+}

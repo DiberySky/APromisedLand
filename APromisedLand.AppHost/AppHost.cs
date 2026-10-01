@@ -5,17 +5,33 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var context = new AppHostResourceContext();
 
-builder.AddVllm(context);
+TreeGraph();
 
-MafSampleApi();
 
+
+
+// MafRagApi();
 //MafWorkFlowService();
 
 builder.Build().Run();
 return;
 
-void MafSampleApi()
+void TreeGraph()
 {
+    builder.AddPostgres(context);
+    builder.AddRedis(context);
+    builder.AddNebulaGraph(context);
+
+    // ★ EAV 动态类型 API(复用 TreeGraphDb,固定端口 5773)
+    builder.AddTreeGraphEavApi(context);
+
+    // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi)
+    builder.AddTreeGraphBlazor(context);
+}
+
+void MafRagApi()
+{
+    builder.AddVllm(context);
     builder.AddPostgres(context);
     builder.AddRedis(context);
 
@@ -27,6 +43,12 @@ void MafSampleApi()
     builder.AddRerankerService(context);
     builder.AddMafVectorSearchApi(context);   // 向量搜索服务（需先于 MafSampleApi 声明）
     builder.AddMafSampleApi(context);
+
+    // ★ 新增:泛型树形数据 API(复用 TreeDb,固定端口 5753)
+    builder.AddTreeGraphApi(context);
+
+    // ★ 新增:TreeGraph 前端 Blazor Server(固定端口 5763,调用 TreeGraphApi)
+    builder.AddMafRagTreeGraph(context);
 }
 
 void MafSampleApiOllama()

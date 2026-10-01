@@ -1,0 +1,12 @@
+@* 日期字段渲染器（按文档 6.x 同模式实现） *@
+
+<MudDatePicker Label="@Attr.DisplayName"
+               Date="Value" DateChanged="ValueChanged"
+               Required="@Attr.IsRequired"
+               Variant="Variant.Outlined" />
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+}

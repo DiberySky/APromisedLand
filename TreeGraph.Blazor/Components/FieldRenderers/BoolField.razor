@@ -1,0 +1,12 @@
+@* 布尔字段渲染器（按文档 6.x 同模式实现） *@
+
+<MudSwitch T="bool?" Label="@Attr.DisplayName"
+           Value="Value" ValueChanged="ValueChanged"
+           Required="@Attr.IsRequired"
+           Color="Color.Primary" />
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+    [Parameter] public bool? Value { get; set; }
+    [Parameter] public EventCallback<bool?> ValueChanged { get; set; }
+}

@@ -1,0 +1,89 @@
+@* 数组字段渲染器：组合字段 IsArray=true 时的多行编辑 *@
+
+<MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">
+    @Field.DisplayName（共 @Values.Count 项）
+</MudText>
+
+@for (int i = 0; i < Values.Count; i++)
+{
+    var idx = i;
+    var item = Values[i];
+
+    <MudPaper Class="pa-2 mb-2" Elevation="0" Outlined="true">
+        <div class="d-flex align-center mb-1">
+            <MudText Typo="Typo.caption">#@(idx + 1)</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Small" Color="Color.Error"
+                           OnClick="@(() => RemoveAt(idx))" />
+        </div>
+
+        @if (Field.DataType == EavDataTypes.Composite && Field.NestedType is not null)
+        {
+            <CompositeField Attr="MakeChildAttr(Field)"
+                            Value="item"
+                            ValueChanged="v => UpdateAt(idx, v)" />
+        }
+        else
+        {
+            <MudTextField T="string"
+                          Value="@(item?.ToString())"
+                          ValueChanged="@(v => UpdateAt(idx, v is null ? null
+                              : JsonSerializer.SerializeToElement(v)))"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense" />
+        }
+    </MudPaper>
+}
+
+<MudButton Size="Size.Small" Variant="Variant.Outlined"
+           Color="Color.Primary"
+           StartIcon="@Icons.Material.Filled.Add"
+           OnClick="AddNew">
+    添加一项
+</MudButton>
+
+@code {
+    [Parameter, EditorRequired] public CompositeFieldSchemaDto Field { get; set; } = null!;
+    [Parameter] public List<JsonElement?> Values { get; set; } = new();
+    [Parameter] public EventCallback<List<JsonElement?>> ValuesChanged { get; set; }
+
+    private Task AddNew()
+    {
+        Values.Add(null);
+        return ValuesChanged.InvokeAsync(Values);
+    }
+
+    private Task RemoveAt(int index)
+    {
+        Values.RemoveAt(index);
+        return ValuesChanged.InvokeAsync(Values);
+    }
+
+    private Task UpdateAt(int index, JsonElement? value)
+    {
+        if (index >= 0 && index < Values.Count)
+        {
+            Values[index] = value;
+            return ValuesChanged.InvokeAsync(Values);
+        }
+        return Task.CompletedTask;
+    }
+
+    private static AttributeSchemaDto MakeChildAttr(CompositeFieldSchemaDto field)
+        => new(
+            AttributeName: field.FieldName,
+            DisplayName: field.DisplayName,
+            DataType: field.DataType,
+            IsRequired: field.IsRequired,
+            IsSearchable: field.IsSearchable,
+            IsSortable: false,
+            IsMultiValue: false,
+            DisplayOrder: field.DisplayOrder,
+            AllowedValues: null,
+            ValidationRule: null,
+            CompositeType: field.NestedType,
+            Unit: null,
+            AvailableUnits: null,
+            OptionSet: null);
+}
