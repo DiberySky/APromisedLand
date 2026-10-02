@@ -25,8 +25,8 @@ public class CustomTableReadService
     }
 
     public async Task<CustomTableValue> LoadAsync(
-        long parentEntityId, string parentEntityType,
-        long attributeId, long tableDefinitionId,
+        string parentEntityId, string parentEntityType,
+        string attributeId, string tableDefinitionId,
         CancellationToken ct = default)
     {
         var table = _tableCache.GetTable(tableDefinitionId);
@@ -70,7 +70,7 @@ public class CustomTableReadService
         if (col.DataType == EavDataTypes.Composite)
         {
             using var doc = JsonDocument.Parse(elem.GetRawText());
-            return _composite.Deserialize(doc, col.RefCompositeTypeId!.Value);
+            return _composite.Deserialize(doc, col.RefCompositeTypeId!);
         }
 
         return col.DataType switch

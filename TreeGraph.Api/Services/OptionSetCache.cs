@@ -7,9 +7,9 @@ namespace TreeGraph.Api.Services;
 
 public interface IOptionSetCache
 {
-    OptionSet GetSet(long optionSetId);
+    OptionSet GetSet(string optionSetId);
     List<OptionSet> GetAll(string? entityType = null, bool includeDeleted = false);
-    void Invalidate(long optionSetId);
+    void Invalidate(string optionSetId);
 }
 
 /// <summary>选项集缓存（单例，含未删除选项项）</summary>
@@ -29,7 +29,7 @@ public class OptionSetCache : IOptionSetCache
     /// 历史数据里已存有该集合的 Value，读取时需要 Label 做降级显示。
     /// 集合级 IsDeleted 仅用于管理页列表过滤。
     /// </summary>
-    public OptionSet GetSet(long optionSetId)
+    public OptionSet GetSet(string optionSetId)
     {
         return _cache.GetOrCreate($"eav:oset:{optionSetId}", entry =>
         {
@@ -76,7 +76,7 @@ public class OptionSetCache : IOptionSetCache
         return result;
     }
 
-    public void Invalidate(long optionSetId)
+    public void Invalidate(string optionSetId)
         => _cache.Remove($"eav:oset:{optionSetId}");
 }
 

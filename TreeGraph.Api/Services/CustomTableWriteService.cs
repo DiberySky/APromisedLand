@@ -30,8 +30,8 @@ public class CustomTableWriteService
 
     /// <summary>整表替换：删除旧行，写入新行</summary>
     public async Task ReplaceAsync(
-        long parentEntityId, string parentEntityType,
-        long attributeId, long tableDefinitionId,
+        string parentEntityId, string parentEntityType,
+        string attributeId, string tableDefinitionId,
         CustomTableValue value, CancellationToken ct = default)
     {
         var table = _tableCache.GetTable(tableDefinitionId);
@@ -77,8 +77,8 @@ public class CustomTableWriteService
     ///   并额外做一次跨行唯一性检查（DB 已存在的其它行）。
     /// </summary>
     public async Task UpsertRowAsync(
-        long parentEntityId, string parentEntityType,
-        long attributeId, long tableDefinitionId,
+        string parentEntityId, string parentEntityType,
+        string attributeId, string tableDefinitionId,
         CustomTableRowValue rowValue, CancellationToken ct = default)
     {
         var table = _tableCache.GetTable(tableDefinitionId);
@@ -135,8 +135,8 @@ public class CustomTableWriteService
 
     /// <summary>删除单行（★ 修复 P0-3：带归属校验）</summary>
     public async Task DeleteRowAsync(
-        long rowId, long parentEntityId, string parentEntityType,
-        long attributeId, CancellationToken ct = default)
+        string rowId, string parentEntityId, string parentEntityType,
+        string attributeId, CancellationToken ct = default)
     {
         var row = await _db.CustomTableRows
             .FirstOrDefaultAsync(r =>
@@ -159,7 +159,7 @@ public class CustomTableWriteService
     /// 其它行的 RowData 逐字段做 JSON 字面量比较，保证与存储格式一致。
     /// </summary>
     private async Task CheckCrossRowUniquenessAsync(
-        long parentEntityId, string parentEntityType, long attributeId,
+        string parentEntityId, string parentEntityType, string attributeId,
         CustomTableDefinition table, CustomTableRowValue rowValue,
         CancellationToken ct)
     {
@@ -172,7 +172,7 @@ public class CustomTableWriteService
                      && r.ParentEntityId == parentEntityId
                      && r.AttributeId == attributeId);
 
-        if (rowValue.RowId is long excludeId)
+        if (rowValue.RowId is string excludeId)
             query = query.Where(r => r.RowId != excludeId);
 
         var otherRows = await query
@@ -233,7 +233,7 @@ public class CustomTableWriteService
         if (col.DataType == EavDataTypes.Composite)
         {
             using var doc = JsonDocument.Parse(elem.GetRawText());
-            return _composite.Deserialize(doc, col.RefCompositeTypeId!.Value);
+            return _composite.Deserialize(doc, col.RefCompositeTypeId!);
         }
 
         return col.DataType switch
@@ -274,7 +274,7 @@ public class CustomTableWriteService
 
         if (col.DataType == EavDataTypes.Composite && value is DynamicCompositeValue cv)
         {
-            var doc = _composite.Serialize(cv, col.RefCompositeTypeId!.Value);
+            var doc = _composite.Serialize(cv, col.RefCompositeTypeId!);
             return doc.RootElement.Clone();
         }
 

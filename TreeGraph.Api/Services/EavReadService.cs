@@ -29,7 +29,7 @@ public class EavReadService
 
     /// <param name="originalUnits">true 时数量值按原始输入单位还原（UI 展示）；默认返回基准单位</param>
     public async Task<DynamicEntity> LoadAsync(
-        long entityId, string entityType, bool originalUnits = false,
+        string entityId, string entityType, bool originalUnits = false,
         CancellationToken ct = default)
     {
         var definitions = _attrCache.GetDefinitions(entityType);
@@ -57,7 +57,7 @@ public class EavReadService
     }
 
     public async Task<List<DynamicEntity>> LoadBatchAsync(
-        IEnumerable<long> entityIds, string entityType,
+        IEnumerable<string> entityIds, string entityType,
         bool originalUnits = false, CancellationToken ct = default)
     {
         var ids = entityIds.ToList();
@@ -115,7 +115,7 @@ public class EavReadService
                 ? null
                 // ★ #4：组合反序列化支持 originalUnits 参数
                 : _composite.Deserialize(
-                    row.ValueJsonb, def.RefCompositeTypeId!.Value, originalUnits),
+                    row.ValueJsonb, def.RefCompositeTypeId!, originalUnits),
             _ => null
         };
     }
@@ -174,7 +174,7 @@ public class EavReadService
     }
 
     public async Task<List<AttributeAuditLog>> GetHistoryAsync(
-        long entityId, string entityType, DateTimeOffset? from = null,
+        string entityId, string entityType, DateTimeOffset? from = null,
         CancellationToken ct = default)
     {
         var query = _db.AttributeAuditLogs
@@ -194,7 +194,9 @@ public class EavReadService
 public class DynamicEntity
 {
     private readonly Dictionary<string, object?> _props = new();
-    public long EntityId { get; }
+
+    /// <summary>实体 ID（GUID 字符串）。</summary>
+    public string EntityId { get; }
     public string EntityType { get; }
 
     /// <summary>
@@ -203,7 +205,7 @@ public class DynamicEntity
     /// </summary>
     public DateTimeOffset? UpdatedAt { get; set; }
 
-    public DynamicEntity(long id, string type) { EntityId = id; EntityType = type; }
+    public DynamicEntity(string id, string type) { EntityId = id; EntityType = type; }
 
     public void SetProperty(string name, object? value) => _props[name] = value;
     public object? GetProperty(string name) => _props.TryGetValue(name, out var v) ? v : null;

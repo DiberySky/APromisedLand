@@ -4,8 +4,9 @@ using TreeGraph.Shared.Eav.Dtos;
 namespace TreeGraph.Blazor.Services;
 
 /// <summary>
-/// TreeGraphEavApi 客户端。BaseAddress 由 DI 注册时通过 Aspire 服务发现注入
-/// （https+http://treegrapheavapi），本类只使用相对路径。
+/// TreeGraphEavApi 客户端。
+///
+/// ★ 所有实体 ID / 元数据 ID 均为 GUID 字符串（36 字符）。
 /// </summary>
 public class EavApiClient
 {
@@ -32,7 +33,7 @@ public class EavApiClient
     }
 
     public async Task<DynamicEntityDto?> GetEntityAsync(
-        string entityType, long entityId,
+        string entityType, string entityId,
         bool originalUnits = false, CancellationToken ct = default)
     {
         var url = $"api/eav/{entityType}/entities/{entityId}";
@@ -40,16 +41,9 @@ public class EavApiClient
         return await GetAsync<DynamicEntityDto>(url, ct);
     }
 
-    /// <summary>
-    /// ★ #3：保存实体支持乐观锁 header。
-    /// expectedUpdatedAt 为 null 时不发 header（跳过冲突检测）。
-    /// </summary>
-    /// <summary>
-    /// ★ P1-1：409 冲突时返回服务端最新 UpdatedAt，供调用方提示用户刷新。
-    /// </summary>
     public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
         SaveEntityAsync(
-        string entityType, long entityId,
+        string entityType, string entityId,
         Dictionary<string, object?> values,
         DateTimeOffset? expectedUpdatedAt = null,
         CancellationToken ct = default)
@@ -71,7 +65,6 @@ public class EavApiClient
             var resp = await _http.SendAsync(req, ct);
             if (resp.IsSuccessStatusCode) return (true, null, null);
 
-            // 409 特殊处理：解析后端返回的 currentUpdatedAt
             if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
                 var text = await resp.Content.ReadAsStringAsync(ct);
@@ -80,8 +73,7 @@ public class EavApiClient
                 DateTimeOffset? currentUpdatedAt = null;
                 try
                 {
-                    var conflict = System.Text.Json.JsonSerializer
-                        .Deserialize<ConflictResponse>(text, JsonOptions);
+                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(text, JsonOptions);
                     currentUpdatedAt = conflict?.CurrentUpdatedAt;
                 }
                 catch (Exception parseEx)
@@ -105,18 +97,80 @@ public class EavApiClient
         }
     }
 
-    /// <summary>★ #7：DELETE api/eav/{entityType}/entities/{id}</summary>
+    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        PatchEntityAsync(
+        string entityType, string entityId,
+        Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var url = $"api/eav/{entityType}/entities/{entityId}";
+            using var req = new HttpRequestMessage(HttpMethod.Patch, url)
+            {
+                Content = JsonContent.Create(values, options: JsonOptions)
+            };
+
+            if (expectedUpdatedAt is { } expected)
+            {
+                req.Headers.Add("X-Expected-Updated-At",
+                    expected.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            var resp = await _http.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return (true, null, null);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("PATCH {Url} → 409：{Body}", url, text);
+
+                DateTimeOffset? currentUpdatedAt = null;
+                try
+                {
+                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(text, JsonOptions);
+                    currentUpdatedAt = conflict?.CurrentUpdatedAt;
+                }
+                catch { }
+
+                return (false,
+                    "并发冲突：实体已被其他用户修改，请刷新后重试",
+                    currentUpdatedAt);
+            }
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            _logger.LogWarning("PATCH {Url} → {Status}: {Error}", url, resp.StatusCode, msg);
+            return (false, msg, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PATCH entities 失败");
+            return (false, ex.Message, null);
+        }
+    }
+
     public async Task<(bool Ok, string? Error)> DeleteEntityAsync(
-        string entityType, long entityId, CancellationToken ct = default)
+        string entityType, string entityId, CancellationToken ct = default)
         => await DeleteWithErrorAsync(
             $"api/eav/{entityType}/entities/{entityId}", ct);
+
+    public async Task<BatchDeleteResultDto?> BatchDeleteEntitiesAsync(
+        string entityType,
+        IReadOnlyList<string> entityIds,
+        CancellationToken ct = default)
+    {
+        var body = new BatchDeleteRequest { EntityIds = entityIds.ToList() };
+        return await PostAsync<BatchDeleteResultDto>(
+            $"api/eav/{entityType}/entities/batch-delete", body, ct);
+    }
 
     public async Task<PagedResult<DynamicEntityDto>?> QueryAsync(
         string entityType, EavQueryRequest request, CancellationToken ct = default)
         => await PostAsync<PagedResult<DynamicEntityDto>>(
             $"api/eav/{entityType}/entities/query", request, ct);
 
-    public async Task<IReadOnlyList<long>?> QueryByTableAsync(
+    public async Task<IReadOnlyList<string>?> QueryByTableAsync(
         string entityType, QueryByTableRequest request, CancellationToken ct = default)
     {
         var resp = await PostAsync<QueryByTableResponse>(
@@ -125,7 +179,7 @@ public class EavApiClient
     }
 
     public async Task<IReadOnlyList<EntityHistoryDto>?> GetHistoryAsync(
-        string entityType, long entityId,
+        string entityType, string entityId,
         DateTimeOffset? from = null, CancellationToken ct = default)
     {
         var url = $"api/eav/{entityType}/entities/{entityId}/history";
@@ -139,25 +193,24 @@ public class EavApiClient
     // ============================================================
 
     public async Task<CustomTableValue?> LoadCustomTableAsync(
-        string entityType, long entityId, string tableName, CancellationToken ct = default)
+        string entityType, string entityId, string tableName, CancellationToken ct = default)
         => await GetAsync<CustomTableValue>(
             $"api/eav/{entityType}/entities/{entityId}/tables/{tableName}", ct);
 
     public async Task<(bool Ok, string? Error)> ReplaceCustomTableAsync(
-        string entityType, long entityId, string tableName,
+        string entityType, string entityId, string tableName,
         CustomTableValue value, CancellationToken ct = default)
         => await PutAsync(
             $"api/eav/{entityType}/entities/{entityId}/tables/{tableName}", value, ct);
 
     public async Task<(bool Ok, string? Error)> UpsertCustomTableRowAsync(
-        string entityType, long entityId, string tableName,
+        string entityType, string entityId, string tableName,
         CustomTableRowValue rowValue, CancellationToken ct = default)
         => await PutAsync(
             $"api/eav/{entityType}/entities/{entityId}/tables/{tableName}/rows", rowValue, ct);
 
-    /// <summary>★ 修复 P0-2：改用 DeleteWithErrorAsync 以保留后端业务错误消息</summary>
     public async Task<(bool Ok, string? Error)> DeleteCustomTableRowAsync(
-        string entityType, long entityId, string tableName, long rowId,
+        string entityType, string entityId, string tableName, string rowId,
         CancellationToken ct = default)
         => await DeleteWithErrorAsync(
             $"api/eav/{entityType}/entities/{entityId}/tables/{tableName}/rows/{rowId}", ct);
@@ -166,46 +219,40 @@ public class EavApiClient
     // EavMetadataController - 创建
     // ============================================================
 
-    /// <summary>★ 修复 P0-1：按属性名提取 ID</summary>
-    public Task<long?> CreateAttributeAsync(
+    public Task<string?> CreateAttributeAsync(
         CreateAttributeRequest request, CancellationToken ct = default)
         => PostForIdAsync("api/eav/metadata/attributes", request, "attributeId", ct);
 
-    public Task<long?> CreateCompositeTypeAsync(
+    public Task<string?> CreateCompositeTypeAsync(
         CreateCompositeTypeRequest request, CancellationToken ct = default)
         => PostForIdAsync("api/eav/metadata/composite-types", request, "compositeTypeId", ct);
 
-    public Task<long?> AddCompositeFieldAsync(
-        long compositeTypeId, CreateCompositeFieldRequest request,
+    public Task<string?> AddCompositeFieldAsync(
+        string compositeTypeId, CreateCompositeFieldRequest request,
         CancellationToken ct = default)
         => PostForIdAsync(
             $"api/eav/metadata/composite-types/{compositeTypeId}/fields",
             request, "fieldId", ct);
 
-    public Task<long?> CreateCustomTableAsync(
+    public Task<string?> CreateCustomTableAsync(
         CreateCustomTableRequest request, CancellationToken ct = default)
         => PostForIdAsync("api/eav/metadata/custom-tables", request, "tableDefinitionId", ct);
 
-    public Task<long?> AddCustomTableColumnAsync(
-        long tableDefinitionId, CreateTableColumnRequest request,
+    public Task<string?> AddCustomTableColumnAsync(
+        string tableDefinitionId, CreateTableColumnRequest request,
         CancellationToken ct = default)
         => PostForIdAsync(
             $"api/eav/metadata/custom-tables/{tableDefinitionId}/columns",
             request, "columnId", ct);
 
-    /// <summary>★ 修复 P0-2</summary>
     public Task<(bool Ok, string? Error)> DeleteAttributeAsync(
-        long attributeId, CancellationToken ct = default)
+        string attributeId, CancellationToken ct = default)
         => DeleteWithErrorAsync($"api/eav/metadata/attributes/{attributeId}", ct);
 
     // ============================================================
     // 组合类型
     // ============================================================
 
-    /// <summary>
-    /// 列出组合类型。
-    /// ★ 新增 includeDeleted：管理页可勾选"显示已删除"以提供恢复入口。
-    /// </summary>
     public async Task<IReadOnlyList<CompositeTypeDetailDto>?> ListCompositeTypesAsync(
         string? entityType = null,
         bool includeDeleted = false,
@@ -223,26 +270,26 @@ public class EavApiClient
     }
 
     public Task<CompositeTypeDetailDto?> GetCompositeTypeAsync(
-        long id, CancellationToken ct = default)
+        string id, CancellationToken ct = default)
         => GetAsync<CompositeTypeDetailDto>($"api/eav/metadata/composite-types/{id}", ct);
 
     public Task<(bool Ok, string? Error)> UpdateCompositeTypeAsync(
-        long id, UpdateCompositeTypeRequest request, CancellationToken ct = default)
+        string id, UpdateCompositeTypeRequest request, CancellationToken ct = default)
         => PutAsync($"api/eav/metadata/composite-types/{id}", request, ct);
 
     public Task<(bool Ok, string? Error)> DeleteCompositeTypeAsync(
-        long id, CancellationToken ct = default)
+        string id, CancellationToken ct = default)
         => DeleteWithErrorAsync($"api/eav/metadata/composite-types/{id}", ct);
 
     public Task<(bool Ok, string? Error)> UpdateCompositeFieldAsync(
-        long compositeTypeId, long fieldId,
+        string compositeTypeId, string fieldId,
         UpdateCompositeFieldRequest request, CancellationToken ct = default)
         => PutAsync(
             $"api/eav/metadata/composite-types/{compositeTypeId}/fields/{fieldId}",
             request, ct);
 
     public Task<(bool Ok, string? Error)> DeleteCompositeFieldAsync(
-        long compositeTypeId, long fieldId, CancellationToken ct = default)
+        string compositeTypeId, string fieldId, CancellationToken ct = default)
         => DeleteWithErrorAsync(
             $"api/eav/metadata/composite-types/{compositeTypeId}/fields/{fieldId}", ct);
 
@@ -267,26 +314,26 @@ public class EavApiClient
     }
 
     public Task<CustomTableDetailDto?> GetCustomTableAsync(
-        long id, CancellationToken ct = default)
+        string id, CancellationToken ct = default)
         => GetAsync<CustomTableDetailDto>($"api/eav/metadata/custom-tables/{id}", ct);
 
     public Task<(bool Ok, string? Error)> UpdateCustomTableAsync(
-        long id, UpdateCustomTableRequest request, CancellationToken ct = default)
+        string id, UpdateCustomTableRequest request, CancellationToken ct = default)
         => PutAsync($"api/eav/metadata/custom-tables/{id}", request, ct);
 
     public Task<(bool Ok, string? Error)> DeleteCustomTableAsync(
-        long id, CancellationToken ct = default)
+        string id, CancellationToken ct = default)
         => DeleteWithErrorAsync($"api/eav/metadata/custom-tables/{id}", ct);
 
     public Task<(bool Ok, string? Error)> UpdateTableColumnAsync(
-        long tableId, long columnId,
+        string tableId, string columnId,
         UpdateTableColumnRequest request, CancellationToken ct = default)
         => PutAsync(
             $"api/eav/metadata/custom-tables/{tableId}/columns/{columnId}",
             request, ct);
 
     public Task<(bool Ok, string? Error)> DeleteTableColumnAsync(
-        long tableId, long columnId, CancellationToken ct = default)
+        string tableId, string columnId, CancellationToken ct = default)
         => DeleteWithErrorAsync(
             $"api/eav/metadata/custom-tables/{tableId}/columns/{columnId}", ct);
 
@@ -310,16 +357,14 @@ public class EavApiClient
     }
 
     public Task<AttributeDetailDto?> GetAttributeAsync(
-        long id, CancellationToken ct = default)
+        string id, CancellationToken ct = default)
         => GetAsync<AttributeDetailDto>($"api/eav/metadata/attributes/{id}", ct);
 
-    /// <summary>★ GET api/eav/entity-types（侧边栏用，含属性计数）</summary>
     public async Task<IReadOnlyList<EntityTypeSummaryDto>?> ListEntityTypesAsync(
         CancellationToken ct = default)
         => await GetAsync<IReadOnlyList<EntityTypeSummaryDto>>(
             "api/eav/entity-types", ct);
 
-    /// <summary>★ 列出某实体类型的实体（复用 query 端点，空 filters）</summary>
     public async Task<PagedResult<DynamicEntityDto>?> ListEntitiesAsync(
         string entityType, int page = 1, int pageSize = 20,
         CancellationToken ct = default)
@@ -336,51 +381,53 @@ public class EavApiClient
     }
 
     public Task<(bool Ok, string? Error)> UpdateAttributeAsync(
-        long id, UpdateAttributeRequest request, CancellationToken ct = default)
+        string id, UpdateAttributeRequest request, CancellationToken ct = default)
         => PutAsync($"api/eav/metadata/attributes/{id}", request, ct);
 
     // ============================================================
     // 选项集
     // ============================================================
 
-    public Task<long?> CreateOptionSetAsync(
+    public Task<string?> CreateOptionSetAsync(
         CreateOptionSetRequest request, CancellationToken ct = default)
         => PostForIdAsync("api/eav/metadata/option-sets", request, "optionSetId", ct);
 
     public async Task<IReadOnlyList<OptionSetSummaryDto>?> ListOptionSetsAsync(
-        string? entityType = null, bool includeDeleted = false, CancellationToken ct = default)
+        string? entityType = null,
+        bool includeDeleted = false,
+        CancellationToken ct = default)
     {
-        var url = "api/eav/metadata/option-sets";
-        var sep = '?';
+        var query = new List<string>();
         if (!string.IsNullOrEmpty(entityType))
-        {
-            url += $"{sep}entityType={Uri.EscapeDataString(entityType)}";
-            sep = '&';
-        }
-        if (includeDeleted)
-            url += $"{sep}includeDeleted=true";
+            query.Add($"entityType={Uri.EscapeDataString(entityType)}");
+        if (includeDeleted) query.Add("includeDeleted=true");
+
+        var url = "api/eav/metadata/option-sets";
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+
         return await GetAsync<IReadOnlyList<OptionSetSummaryDto>>(url, ct);
     }
 
-    /// <summary>★ 修复 P0-2</summary>
     public Task<(bool Ok, string? Error)> DeleteOptionSetAsync(
-        long optionSetId, CancellationToken ct = default)
+        string optionSetId, CancellationToken ct = default)
         => DeleteWithErrorAsync($"api/eav/metadata/option-sets/{optionSetId}", ct);
 
-    public async Task<OptionSetDetailDto?> GetOptionSetAsync(
-        long optionSetId, bool includeDeleted = false, CancellationToken ct = default)
+    public Task<OptionSetDetailDto?> GetOptionSetAsync(
+        string optionSetId,
+        bool includeDeleted = false,
+        CancellationToken ct = default)
     {
         var url = $"api/eav/metadata/option-sets/{optionSetId}";
         if (includeDeleted) url += "?includeDeleted=true";
-        return await GetAsync<OptionSetDetailDto>(url, ct);
+        return GetAsync<OptionSetDetailDto>(url, ct);
     }
 
     public Task<(bool Ok, string? Error)> UpdateOptionSetAsync(
-        long optionSetId, UpdateOptionSetRequest request, CancellationToken ct = default)
+        string optionSetId, UpdateOptionSetRequest request, CancellationToken ct = default)
         => PutAsync($"api/eav/metadata/option-sets/{optionSetId}", request, ct);
 
     public Task<IReadOnlyList<OptionSetReferenceDto>?> GetOptionSetReferencesAsync(
-        long optionSetId, CancellationToken ct = default)
+        string optionSetId, CancellationToken ct = default)
         => GetAsync<IReadOnlyList<OptionSetReferenceDto>>(
             $"api/eav/metadata/option-sets/{optionSetId}/references", ct);
 
@@ -389,36 +436,74 @@ public class EavApiClient
     // ============================================================
 
     public Task<IReadOnlyList<OptionItemDetailDto>?> ListOptionItemsAsync(
-        long optionSetId, CancellationToken ct = default)
+        string optionSetId, CancellationToken ct = default)
         => GetAsync<IReadOnlyList<OptionItemDetailDto>>(
             $"api/eav/metadata/option-sets/{optionSetId}/items", ct);
 
-    public Task<long?> AddOptionItemAsync(
-        long optionSetId, CreateOptionItemRequest request,
+    public Task<string?> AddOptionItemAsync(
+        string optionSetId, CreateOptionItemRequest request,
         CancellationToken ct = default)
         => PostForIdAsync(
             $"api/eav/metadata/option-sets/{optionSetId}/items",
             request, "optionItemId", ct);
 
     public Task<(bool Ok, string? Error)> UpdateOptionItemAsync(
-        long optionSetId, long itemId, UpdateOptionItemRequest request,
+        string optionSetId, string itemId, UpdateOptionItemRequest request,
         CancellationToken ct = default)
         => PutAsync(
             $"api/eav/metadata/option-sets/{optionSetId}/items/{itemId}",
             request, ct);
 
-    /// <summary>★ 修复 P0-2</summary>
     public Task<(bool Ok, string? Error)> DeleteOptionItemAsync(
-        long optionSetId, long itemId, CancellationToken ct = default)
+        string optionSetId, string itemId, CancellationToken ct = default)
         => DeleteWithErrorAsync(
             $"api/eav/metadata/option-sets/{optionSetId}/items/{itemId}", ct);
 
     public Task<(bool Ok, string? Error)> ReorderOptionItemsAsync(
-        long optionSetId, List<ReorderOptionItem> orders,
+        string optionSetId, List<ReorderOptionItem> orders,
         CancellationToken ct = default)
         => PutAsync(
             $"api/eav/metadata/option-sets/{optionSetId}/items/reorder",
             orders, ct);
+
+    // ============================================================
+    // undelete 端点
+    // ============================================================
+
+    public Task<(bool Ok, string? Error)> UndeleteAttributeAsync(
+        string attributeId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/attributes/{attributeId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteCompositeTypeAsync(
+        string compositeTypeId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/composite-types/{compositeTypeId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteCompositeFieldAsync(
+        string compositeTypeId, string fieldId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/composite-types/{compositeTypeId}/fields/{fieldId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteCustomTableAsync(
+        string tableId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/custom-tables/{tableId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteTableColumnAsync(
+        string tableId, string columnId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/custom-tables/{tableId}/columns/{columnId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteOptionSetAsync(
+        string optionSetId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/option-sets/{optionSetId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteOptionItemAsync(
+        string optionSetId, string itemId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/option-sets/{optionSetId}/items/{itemId}/undelete", ct);
 
     // ============================================================
     // 单位
@@ -458,7 +543,6 @@ public class EavApiClient
         }
     }
 
-    /// <summary>POST api/units/{id}/migrate-category（保守策略，有引用时后端拒绝）</summary>
     public async Task<(bool Ok, string? Error)> MigrateUnitCategoryAsync(
         Guid unitId, MigrateUnitCategoryRequest request, CancellationToken ct = default)
     {
@@ -482,10 +566,6 @@ public class EavApiClient
         }
     }
 
-    /// <summary>
-    /// POST api/units/{id}/recalculate-factor（同步：数据库端 3 条批量 UPDATE，
-    /// 超过阈值时后端返回 400，错误消息见 Error）。
-    /// </summary>
     public async Task<(bool Ok, RecalculateUnitFactorResult? Result, string? Error)>
         RecalculateUnitFactorAsync(
         Guid unitId, RecalculateUnitFactorRequest request, CancellationToken ct = default)
@@ -513,12 +593,10 @@ public class EavApiClient
         }
     }
 
-    /// <summary>★ 新增：PUT api/units/{id}</summary>
     public async Task<(bool Ok, string? Error)> UpdateUnitAsync(
         Guid unitId, UpdateUnitRequest request, CancellationToken ct = default)
         => await PutAsync($"api/units/{unitId}", request, ct);
 
-    /// <summary>★ 新增：DELETE api/units/{id}（带引用校验错误体）</summary>
     public async Task<(bool Ok, string? Error)> DeleteUnitAsync(
         Guid unitId, CancellationToken ct = default)
         => await DeleteWithErrorAsync($"api/units/{unitId}", ct);
@@ -574,7 +652,6 @@ public class EavApiClient
             var resp = await _http.PutAsJsonAsync(relativeUrl, body, JsonOptions, ct);
             if (resp.IsSuccessStatusCode) return (true, null);
 
-            // ★ 修复 P1-5：解析后端业务错误消息，而不是直接暴露原始 JSON
             var msg = await ExtractErrorAsync(resp, ct);
             _logger.LogWarning("PUT {Url} → {Status}: {Error}",
                 relativeUrl, resp.StatusCode, msg);
@@ -607,184 +684,6 @@ public class EavApiClient
         }
     }
 
-    /// <summary>解析后端 400/409 响应体中的 { error } / { errors[] }</summary>
-    private static async Task<string?> ExtractErrorAsync(
-        HttpResponseMessage resp, CancellationToken ct)
-    {
-        try
-        {
-            var body = await resp.Content
-                .ReadFromJsonAsync<ErrorResponse>(JsonOptions, ct);
-            if (body?.Errors is { Count: > 0 })
-                return string.Join("; ",
-                    body.Errors.Select(e => $"{e.Field}: {e.Message}"));
-            return body?.Error ?? resp.ReasonPhrase;
-        }
-        catch
-        {
-            return resp.ReasonPhrase;
-        }
-    }
-
-    /// <summary>★ 修复 P0-1：按属性名取 ID，不再"取第一个数字"</summary>
-    private async Task<long?> PostForIdAsync(
-        string relativeUrl, object body, string idPropertyName,
-        CancellationToken ct)
-    {
-        try
-        {
-            var resp = await _http.PostAsJsonAsync(relativeUrl, body, JsonOptions, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var text = await resp.Content.ReadAsStringAsync(ct);
-                _logger.LogWarning("POST {Url} → {Status}: {Body}",
-                    relativeUrl, resp.StatusCode, text);
-                return null;
-            }
-
-            using var doc = await JsonDocument.ParseAsync(
-                await resp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-            if (doc.RootElement.TryGetProperty(idPropertyName, out var p)
-                && p.ValueKind == JsonValueKind.Number)
-                return p.GetInt64();
-
-            _logger.LogWarning(
-                "POST {Url} → 响应缺少 {IdProperty}: {Body}",
-                relativeUrl, idPropertyName, doc.RootElement.GetRawText());
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "POST {Url} 失败", relativeUrl);
-            return null;
-        }
-    }
-
-    private sealed record SchemaResponse(
-        string EntityType, IReadOnlyList<AttributeSchemaDto> Attributes);
-
-    private sealed record QueryByTableResponse(List<long> EntityIds);
-
-    private sealed record IdResponse<T>(T Id);
-
-    /// <summary>后端错误响应：{ error } 或 { errors: [{ field, message }] }</summary>
-    private sealed record ErrorResponse(
-        string? Error, List<ValidationErrorDto>? Errors);
-
-    private sealed record ValidationErrorDto(string Field, string Message);
-
-    /// <summary>后端 409 Conflict 响应体：{ error, currentUpdatedAt, expectedUpdatedAt }</summary>
-    private sealed record ConflictResponse(
-        string? Error,
-        DateTimeOffset? CurrentUpdatedAt,
-        DateTimeOffset? ExpectedUpdatedAt);
-
-    /// <summary>
-    /// ★ PATCH 部分更新实体。
-    /// 语义：未提供的属性保持不动（与 PUT 的"未提供 = 删除"不同）。
-    /// </summary>
-    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
-        PatchEntityAsync(
-        string entityType, long entityId,
-        Dictionary<string, object?> values,
-        DateTimeOffset? expectedUpdatedAt = null,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            var url = $"api/eav/{entityType}/entities/{entityId}";
-            using var req = new HttpRequestMessage(HttpMethod.Patch, url)
-            {
-                Content = JsonContent.Create(values, options: JsonOptions)
-            };
-
-            if (expectedUpdatedAt is { } expected)
-            {
-                req.Headers.Add("X-Expected-Updated-At",
-                    expected.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
-            }
-
-            var resp = await _http.SendAsync(req, ct);
-            if (resp.IsSuccessStatusCode) return (true, null, null);
-
-            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
-            {
-                var text = await resp.Content.ReadAsStringAsync(ct);
-                _logger.LogWarning("PATCH {Url} → 409：{Body}", url, text);
-
-                DateTimeOffset? currentUpdatedAt = null;
-                try
-                {
-                    var conflict = System.Text.Json.JsonSerializer
-                        .Deserialize<ConflictResponse>(text, JsonOptions);
-                    currentUpdatedAt = conflict?.CurrentUpdatedAt;
-                }
-                catch { /* ignore */ }
-
-                return (false,
-                    "并发冲突：实体已被其他用户修改，请刷新后重试",
-                    currentUpdatedAt);
-            }
-
-            var msg = await ExtractErrorAsync(resp, ct);
-            _logger.LogWarning("PATCH {Url} → {Status}: {Error}", url, resp.StatusCode, msg);
-            return (false, msg, null);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "PATCH entities 失败");
-            return (false, ex.Message, null);
-        }
-    }
-
-    /// <summary>★ 批量删除实体。</summary>
-    public async Task<BatchDeleteResultDto?> BatchDeleteEntitiesAsync(
-        string entityType,
-        IReadOnlyList<long> entityIds,
-        CancellationToken ct = default)
-    {
-        var body = new BatchDeleteRequest { EntityIds = entityIds.ToList() };
-        return await PostAsync<BatchDeleteResultDto>(
-            $"api/eav/{entityType}/entities/batch-delete", body, ct);
-    }
-
-    // ---------- undelete（元数据恢复） ----------
-
-    public Task<(bool Ok, string? Error)> UndeleteAttributeAsync(
-        long attributeId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/attributes/{attributeId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteCompositeTypeAsync(
-        long compositeTypeId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/composite-types/{compositeTypeId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteCompositeFieldAsync(
-        long compositeTypeId, long fieldId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/composite-types/{compositeTypeId}/fields/{fieldId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteCustomTableAsync(
-        long tableId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/custom-tables/{tableId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteTableColumnAsync(
-        long tableId, long columnId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/custom-tables/{tableId}/columns/{columnId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteOptionSetAsync(
-        long optionSetId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/option-sets/{optionSetId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteOptionItemAsync(
-        long optionSetId, long itemId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/option-sets/{optionSetId}/items/{itemId}/undelete", ct);
-
     private async Task<(bool Ok, string? Error)> PostNoBodyAsync(
         string relativeUrl, CancellationToken ct)
     {
@@ -804,4 +703,79 @@ public class EavApiClient
             return (false, ex.Message);
         }
     }
+
+    private static async Task<string?> ExtractErrorAsync(
+        HttpResponseMessage resp, CancellationToken ct)
+    {
+        try
+        {
+            var body = await resp.Content
+                .ReadFromJsonAsync<ErrorResponse>(JsonOptions, ct);
+            if (body?.Errors is { Count: > 0 })
+                return string.Join("; ",
+                    body.Errors.Select(e => $"{e.Field}: {e.Message}"));
+            return body?.Error ?? resp.ReasonPhrase;
+        }
+        catch
+        {
+            return resp.ReasonPhrase;
+        }
+    }
+
+    /// <summary>
+    /// ★ 按属性名取 ID。ID 值从 JSON 数字改为字符串。
+    /// </summary>
+    private async Task<string?> PostForIdAsync(
+        string relativeUrl, object body, string idPropertyName,
+        CancellationToken ct)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync(relativeUrl, body, JsonOptions, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("POST {Url} → {Status}: {Body}",
+                    relativeUrl, resp.StatusCode, text);
+                return null;
+            }
+
+            using var doc = await JsonDocument.ParseAsync(
+                await resp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            if (doc.RootElement.TryGetProperty(idPropertyName, out var p)
+                && p.ValueKind == JsonValueKind.String)
+                return p.GetString();
+
+            _logger.LogWarning(
+                "POST {Url} → 响应缺少或类型不符 {IdProperty}: {Body}",
+                relativeUrl, idPropertyName, doc.RootElement.GetRawText());
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "POST {Url} 失败", relativeUrl);
+            return null;
+        }
+    }
+
+    // ============================================================
+    // 私有 record
+    // ============================================================
+
+    private sealed record SchemaResponse(
+        string EntityType, IReadOnlyList<AttributeSchemaDto> Attributes);
+
+    private sealed record QueryByTableResponse(List<string> EntityIds);
+
+    private sealed record IdResponse<T>(T Id);
+
+    private sealed record ErrorResponse(
+        string? Error, List<ValidationErrorDto>? Errors);
+
+    private sealed record ValidationErrorDto(string Field, string Message);
+
+    private sealed record ConflictResponse(
+        string? Error,
+        DateTimeOffset? CurrentUpdatedAt,
+        DateTimeOffset? ExpectedUpdatedAt);
 }

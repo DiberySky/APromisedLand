@@ -79,11 +79,11 @@ public class EavFieldValidatorTests
     private static OptionSetSchemaDto OptionSet(
         params (string Value, bool IsDefault)[] items)
         => new(
-            OptionSetId: 1,
+            OptionSetId: "00000000-0000-0000-0000-000000000001",
             SetName: "test",
             DisplayName: "test",
             Items: items.Select((x, i) => new OptionItemSchemaDto(
-                i + 1, x.Value, x.Value, i, x.IsDefault)).ToList());
+                $"00000000-0000-0000-0000-{(i + 1):D12}", x.Value, x.Value, i, x.IsDefault)).ToList());
 
     private static JsonElement Json(string s) => JsonDocument.Parse(s).RootElement;
 

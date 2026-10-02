@@ -3,7 +3,7 @@ namespace TreeGraph.Api.Entities;
 /// <summary>组合类型定义</summary>
 public class CompositeTypeDefinition
 {
-    public long CompositeTypeId { get; set; }
+    public string CompositeTypeId { get; set; } = "";
     public string EntityType { get; set; } = "";
     public string TypeName { get; set; } = "";
     public string DisplayName { get; set; } = "";
@@ -24,14 +24,14 @@ public class CompositeTypeDefinition
 /// </summary>
 public class CompositeFieldDefinition
 {
-    public long FieldId { get; set; }
-    public long CompositeTypeId { get; set; }
+    public string FieldId { get; set; } = "";
+    public string CompositeTypeId { get; set; } = "";
     public string FieldName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string DataType { get; set; } = "string";
 
     /// <summary>当 DataType = "composite" 时指向嵌套类型</summary>
-    public long? RefCompositeTypeId { get; set; }
+    public string? RefCompositeTypeId { get; set; }
     public CompositeTypeDefinition? RefCompositeType { get; set; }
 
     /// <summary>数量字段的基准单位（仅 DataType = "decimal" 允许）</summary>
@@ -42,7 +42,7 @@ public class CompositeFieldDefinition
     /// ★ #8：选项集引用（仅 DataType = "single_choice" 允许）。
     /// 设置后，选项集提供的 Value / Label 优先于 AllowedValues。
     /// </summary>
-    public long? RefOptionSetId { get; set; }
+    public string? RefOptionSetId { get; set; }
     public OptionSet? RefOptionSet { get; set; }
 
     public bool IsArray { get; set; }

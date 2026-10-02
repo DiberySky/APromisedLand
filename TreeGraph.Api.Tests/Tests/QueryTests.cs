@@ -17,7 +17,7 @@ public class QueryTests : IntegrationTestBase
         await TestData.EnsureSchemaAsync(Client);
 
         // 三档 price
-        var ids = new[] { 93001L, 93002L, 93003L };
+        var ids = new[] { GuidFromInt(93001), GuidFromInt(93002), GuidFromInt(93003) };
         var prices = new[] { 10.5m, 99.9m, 5.0m };
         for (int i = 0; i < ids.Length; i++)
         {
@@ -64,9 +64,9 @@ public class QueryTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        await PutEntityAsync(TestData.EntityType, 93010,
+        await PutEntityAsync(TestData.EntityType, GuidFromInt(93010),
             new Dictionary<string, object?> { ["amount"] = 1L, ["price"] = 42m });
-        await PutEntityAsync(TestData.EntityType, 93011,
+        await PutEntityAsync(TestData.EntityType, GuidFromInt(93011),
             new Dictionary<string, object?> { ["amount"] = 1L, ["price"] = 43m });
 
         var req = new EavQueryRequest

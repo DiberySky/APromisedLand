@@ -8,10 +8,10 @@ namespace TreeGraph.Api.Entities;
 /// </summary>
 public class CustomTableRow
 {
-    public long RowId { get; set; }
-    public long TableDefinitionId { get; set; }
-    public long AttributeId { get; set; }             // 关联的属性（一个属性对应一张表）
-    public long ParentEntityId { get; set; }
+    public string RowId { get; set; } = "";
+    public string TableDefinitionId { get; set; } = "";
+    public string AttributeId { get; set; } = "";     // 关联的属性（一个属性对应一张表）
+    public string ParentEntityId { get; set; } = "";
     public string ParentEntityType { get; set; } = "";
 
     /// <summary>行内数据 JSONB：{ "cert_name": "CE", "issuer": "TÜV" }</summary>

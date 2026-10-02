@@ -23,7 +23,7 @@ public class CustomTableValidationService
         _compositeValidator = compositeValidator;
     }
 
-    public ValidationResult Validate(CustomTableValue value, long tableDefinitionId)
+    public ValidationResult Validate(CustomTableValue value, string tableDefinitionId)
     {
         var table = _tableCache.GetTable(tableDefinitionId);
         var errors = new List<ValidationError>();
@@ -56,7 +56,7 @@ public class CustomTableValidationService
                         errors.Add(new($"{rowPath}.{col.ColumnName}", "期望组合值"));
                         continue;
                     }
-                    var result = _compositeValidator.Validate(cv, col.RefCompositeTypeId!.Value);
+                    var result = _compositeValidator.Validate(cv, col.RefCompositeTypeId!);
                     foreach (var e in result.Errors)
                         errors.Add(new($"{rowPath}.{col.ColumnName}.{e.Field}", e.Message));
                 }

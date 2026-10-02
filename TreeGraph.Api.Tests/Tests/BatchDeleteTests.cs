@@ -16,7 +16,7 @@ public class BatchDeleteTests : IntegrationTestBase
         await TestData.EnsureSchemaAsync(Client);
 
         // 创建 3 个
-        var existing = new[] { 94001L, 94002L, 94003L };
+        var existing = new[] { GuidFromInt(94001), GuidFromInt(94002), GuidFromInt(94003) };
         foreach (var id in existing)
         {
             await PutEntityAsync(TestData.EntityType, id,
@@ -26,7 +26,7 @@ public class BatchDeleteTests : IntegrationTestBase
         // 请求里混合：2 个存在 + 1 个不存在 + 1 个重复
         var req = new BatchDeleteRequest
         {
-            EntityIds = new List<long> { 94001, 94002, 94001, 94999 }
+            EntityIds = new List<string> { GuidFromInt(94001), GuidFromInt(94002), GuidFromInt(94001), GuidFromInt(94999) }
         };
 
         var resp = await Client.PostAsJsonAsync(
@@ -35,9 +35,9 @@ public class BatchDeleteTests : IntegrationTestBase
 
         var result = await resp.Content.ReadFromJsonAsync<BatchDeleteResultDto>();
         Assert.NotNull(result);
-        Assert.Equal(new[] { 94001L, 94002L }, result!.Deleted.OrderBy(x => x));
-        Assert.Contains(94999L, result.NotFound);
-        Assert.DoesNotContain(94003L, result.Deleted);   // 94003 未在请求中
+        Assert.Equal(new[] { GuidFromInt(94001), GuidFromInt(94002) }, result!.Deleted.OrderBy(x => x));
+        Assert.Contains(GuidFromInt(94999), result.NotFound);
+        Assert.DoesNotContain(GuidFromInt(94003), result.Deleted);   // 94003 未在请求中
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public class BatchDeleteTests : IntegrationTestBase
     {
         var resp = await Client.PostAsJsonAsync(
             $"/api/eav/{TestData.EntityType}/entities/batch-delete",
-            new BatchDeleteRequest { EntityIds = new List<long>() });
+            new BatchDeleteRequest { EntityIds = new List<string>() });
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content.ReadFromJsonAsync<BatchDeleteResultDto>();

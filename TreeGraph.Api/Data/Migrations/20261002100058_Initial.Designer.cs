@@ -13,7 +13,7 @@ using TreeGraph.Api.Data;
 namespace TreeGraph.Api.Data.Migrations
 {
     [DbContext(typeof(EavDbContext))]
-    [Migration("20261002072250_Initial")]
+    [Migration("20261002100058_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -28,15 +28,17 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.AttributeAuditLog", b =>
                 {
-                    b.Property<long>("AuditId")
+                    b.Property<string>("AuditId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("audit_id");
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("audit_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("AuditId"));
-
-                    b.Property<long>("AttributeId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("attribute_id");
 
                     b.Property<string>("AttributeName")
@@ -71,8 +73,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("correlation_id");
 
-                    b.Property<long>("EntityId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("entity_id");
 
                     b.Property<string>("EntityType")
@@ -103,12 +107,12 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.AttributeDefinition", b =>
                 {
-                    b.Property<long>("AttributeId")
+                    b.Property<string>("AttributeId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("attribute_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("AttributeId"));
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
                     b.Property<JsonDocument>("AllowedValues")
                         .HasColumnType("jsonb")
@@ -167,16 +171,19 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_sortable");
 
-                    b.Property<long?>("RefCompositeTypeId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("ref_composite_type_id");
 
-                    b.Property<long?>("RefOptionSetId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("RefOptionSetId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("ref_option_set_id");
 
-                    b.Property<long?>("RefTableDefinitionId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("RefTableDefinitionId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("ref_table_definition_id");
 
                     b.Property<Guid?>("UnitId")
@@ -221,23 +228,27 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.AttributeValue", b =>
                 {
-                    b.Property<long>("ValueId")
+                    b.Property<string>("ValueId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("value_id");
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("value_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("ValueId"));
-
-                    b.Property<long>("AttributeId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("attribute_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<long>("EntityId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("entity_id");
 
                     b.Property<string>("EntityType")
@@ -352,19 +363,21 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.CompositeFieldDefinition", b =>
                 {
-                    b.Property<long>("FieldId")
+                    b.Property<string>("FieldId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("field_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("FieldId"));
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("field_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
                     b.Property<JsonDocument>("AllowedValues")
                         .HasColumnType("jsonb")
                         .HasColumnName("allowed_values");
 
-                    b.Property<long>("CompositeTypeId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("CompositeTypeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("composite_type_id");
 
                     b.Property<string>("DataType")
@@ -414,12 +427,14 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_sortable");
 
-                    b.Property<long?>("RefCompositeTypeId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("ref_composite_type_id");
 
-                    b.Property<long?>("RefOptionSetId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("RefOptionSetId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("ref_option_set_id");
 
                     b.Property<Guid?>("UnitId")
@@ -452,12 +467,12 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.CompositeTypeDefinition", b =>
                 {
-                    b.Property<long>("CompositeTypeId")
+                    b.Property<string>("CompositeTypeId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("composite_type_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("CompositeTypeId"));
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("composite_type_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -504,12 +519,12 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableColumn", b =>
                 {
-                    b.Property<long>("ColumnId")
+                    b.Property<string>("ColumnId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("column_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("ColumnId"));
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("column_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
                     b.Property<JsonDocument>("AllowedValues")
                         .HasColumnType("jsonb")
@@ -562,12 +577,15 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_unique");
 
-                    b.Property<long?>("RefCompositeTypeId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("ref_composite_type_id");
 
-                    b.Property<long>("TableDefinitionId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("TableDefinitionId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("table_definition_id");
 
                     b.Property<JsonDocument>("ValidationRule")
@@ -587,12 +605,12 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableDefinition", b =>
                 {
-                    b.Property<long>("TableDefinitionId")
+                    b.Property<string>("TableDefinitionId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("table_definition_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("TableDefinitionId"));
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -643,23 +661,27 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableRow", b =>
                 {
-                    b.Property<long>("RowId")
+                    b.Property<string>("RowId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("row_id");
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("row_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("RowId"));
-
-                    b.Property<long>("AttributeId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("attribute_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<long>("ParentEntityId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("ParentEntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("parent_entity_id");
 
                     b.Property<string>("ParentEntityType")
@@ -677,8 +699,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("row_order");
 
-                    b.Property<long>("TableDefinitionId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("TableDefinitionId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("table_definition_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -708,12 +732,12 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.OptionItem", b =>
                 {
-                    b.Property<long>("OptionItemId")
+                    b.Property<string>("OptionItemId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("option_item_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("OptionItemId"));
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_item_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -737,8 +761,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("label");
 
-                    b.Property<long>("OptionSetId")
-                        .HasColumnType("bigint")
+                    b.Property<string>("OptionSetId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("option_set_id");
 
                     b.Property<string>("Value")
@@ -761,12 +787,12 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.Entities.OptionSet", b =>
                 {
-                    b.Property<long>("OptionSetId")
+                    b.Property<string>("OptionSetId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("option_set_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("OptionSetId"));
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_set_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")

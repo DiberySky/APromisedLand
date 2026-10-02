@@ -13,9 +13,9 @@ public class CreateAttributeRequest
     public bool IsSortable { get; set; }
     public int DisplayOrder { get; set; }
     public Guid? UnitId { get; set; }
-    public long? RefCompositeTypeId { get; set; }
-    public long? RefTableDefinitionId { get; set; }
-    public long? RefOptionSetId { get; set; }
+    public string? RefCompositeTypeId { get; set; }
+    public string? RefTableDefinitionId { get; set; }
+    public string? RefOptionSetId { get; set; }
     public string? DefaultValue { get; set; }
     public JsonElement? AllowedValues { get; set; }
     public JsonElement? ValidationRule { get; set; }
@@ -33,9 +33,9 @@ public class CreateCompositeFieldRequest
     public string FieldName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string DataType { get; set; } = "string";
-    public long? RefCompositeTypeId { get; set; }
-    public Guid? UnitId { get; set; }               // ★ #4
-    public long? RefOptionSetId { get; set; }       // ★ #8
+    public string? RefCompositeTypeId { get; set; }
+    public Guid? UnitId { get; set; }
+    public string? RefOptionSetId { get; set; }
     public bool IsArray { get; set; }
     public bool IsRequired { get; set; }
     public bool IsSearchable { get; set; }
@@ -59,7 +59,7 @@ public class CreateTableColumnRequest
     public string ColumnName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string DataType { get; set; } = "string";
-    public long? RefCompositeTypeId { get; set; }
+    public string? RefCompositeTypeId { get; set; }
     public bool IsRequired { get; set; }
     public bool IsSearchable { get; set; }
     public bool IsSortable { get; set; }
@@ -71,20 +71,20 @@ public class CreateTableColumnRequest
 }
 
 public record CompositeTypeDetailDto(
-    long CompositeTypeId,
+    string CompositeTypeId,
     string EntityType,
     string TypeName,
     string DisplayName,
     int Version,
     IReadOnlyList<CompositeFieldDetailDto> Fields,
-    bool IsDeleted = false);   // ★ 新增
+    bool IsDeleted = false);
 
 public record CompositeFieldDetailDto(
-    long FieldId,
+    string FieldId,
     string FieldName,
     string DisplayName,
     string DataType,
-    long? RefCompositeTypeId,
+    string? RefCompositeTypeId,
     bool IsArray,
     bool IsRequired,
     bool IsSearchable,
@@ -93,23 +93,17 @@ public record CompositeFieldDetailDto(
     string? DefaultValue,
     JsonElement? AllowedValues,
     JsonElement? ValidationRule,
-    Guid? UnitId = null,                        // ★ #4
-    long? RefOptionSetId = null,                // ★ #8
-    string? OptionSetName = null,               // ★ #8
-    string? OptionSetDisplayName = null,        // ★ #8
-    bool IsDeleted = false);                    // ★ 软删除恢复：前端展示"已删除"状态
+    Guid? UnitId = null,
+    string? RefOptionSetId = null,
+    string? OptionSetName = null,
+    string? OptionSetDisplayName = null,
+    bool IsDeleted = false);
 
 public class UpdateCompositeTypeRequest
 {
     public string? DisplayName { get; set; }
 }
 
-/// <summary>
-/// 更新组合字段。
-///
-/// 空值语义：null 表示不修改。
-/// 显式清除语义：Clear* = true 优先于对应字段赋值。
-/// </summary>
 public class UpdateCompositeFieldRequest
 {
     public string? DisplayName { get; set; }
@@ -121,35 +115,29 @@ public class UpdateCompositeFieldRequest
     public JsonElement? AllowedValues { get; set; }
     public JsonElement? ValidationRule { get; set; }
 
-    /// <summary>★ #8：选项集引用（仅 single_choice 允许）。null 表示不修改。</summary>
-    public long? RefOptionSetId { get; set; }
-
-    /// <summary>★ #8：显式清除选项集引用（优先级高于 RefOptionSetId）。</summary>
+    public string? RefOptionSetId { get; set; }
     public bool ClearRefOptionSetId { get; set; }
 
-    /// <summary>★ 新增：单位引用（仅 decimal 允许）。null 表示不修改。</summary>
     public Guid? UnitId { get; set; }
-
-    /// <summary>★ 新增：显式清除单位引用（优先级高于 UnitId）。</summary>
     public bool ClearUnitId { get; set; }
 }
 
 public record CustomTableDetailDto(
-    long TableDefinitionId,
+    string TableDefinitionId,
     string EntityType,
     string TableName,
     string DisplayName,
     int Version,
     int DisplayOrder,
     IReadOnlyList<CustomTableColumnDto> Columns,
-    bool IsDeleted = false);   // ★ 新增：前端展示"已删除"状态
+    bool IsDeleted = false);
 
 public record CustomTableColumnDto(
-    long ColumnId,
+    string ColumnId,
     string ColumnName,
     string DisplayName,
     string DataType,
-    long? RefCompositeTypeId,
+    string? RefCompositeTypeId,
     bool IsRequired,
     bool IsSearchable,
     bool IsSortable,
@@ -158,7 +146,7 @@ public record CustomTableColumnDto(
     string? DefaultValue,
     JsonElement? AllowedValues,
     JsonElement? ValidationRule,
-    bool IsDeleted = false);   // ★ 新增：前端展示"已删除"状态
+    bool IsDeleted = false);
 
 public class UpdateCustomTableRequest
 {
@@ -180,7 +168,7 @@ public class UpdateTableColumnRequest
 }
 
 public record AttributeDetailDto(
-    long AttributeId,
+    string AttributeId,
     string EntityType,
     string AttributeName,
     string DisplayName,
@@ -200,22 +188,16 @@ public record AttributeDetailDto(
     string? UnitName,
     string? UnitSymbol,
     string? UnitCategory,
-    long? RefCompositeTypeId,
+    string? RefCompositeTypeId,
     string? CompositeTypeName,
     string? CompositeTypeDisplayName,
-    long? RefTableDefinitionId,
+    string? RefTableDefinitionId,
     string? TableName,
     string? TableDisplayName,
-    long? RefOptionSetId,
+    string? RefOptionSetId,
     string? OptionSetName,
     string? OptionSetDisplayName);
 
-/// <summary>
-/// 更新属性定义。
-///
-/// 空值语义：null 表示不修改。
-/// 显式清除语义：Clear* = true 优先于对应字段赋值。
-/// </summary>
 public class UpdateAttributeRequest
 {
     public string? DisplayName { get; set; }
@@ -227,13 +209,11 @@ public class UpdateAttributeRequest
     public JsonElement? AllowedValues { get; set; }
     public JsonElement? ValidationRule { get; set; }
 
-    // 引用（按需修改；null 表示不动）
     public Guid? UnitId { get; set; }
-    public long? RefCompositeTypeId { get; set; }
-    public long? RefTableDefinitionId { get; set; }
-    public long? RefOptionSetId { get; set; }
+    public string? RefCompositeTypeId { get; set; }
+    public string? RefTableDefinitionId { get; set; }
+    public string? RefOptionSetId { get; set; }
 
-    // 显式清除（优先级高于上面的赋值字段）
     public bool ClearUnitId { get; set; }
     public bool ClearRefCompositeTypeId { get; set; }
     public bool ClearRefTableDefinitionId { get; set; }

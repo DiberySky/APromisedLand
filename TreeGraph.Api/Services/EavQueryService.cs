@@ -33,13 +33,13 @@ public class EavQueryService
         _converter = converter;
     }
 
-    public async Task<PagedResult<long>> FilterEntityIdsAsync(
+    public async Task<PagedResult<string>> FilterEntityIdsAsync(
         EavQueryRequest request, CancellationToken ct = default)
     {
         var definitions = _attrCache.GetDefinitions(request.EntityType)
             .ToDictionary(d => d.AttributeName);
 
-        IQueryable<long>? entityQuery = null;
+        IQueryable<string>? entityQuery = null;
 
         foreach (var filter in request.Filters)
         {
@@ -61,7 +61,7 @@ public class EavQueryService
         var skip = (request.Page - 1) * request.PageSize;
         var take = request.PageSize;
 
-        List<long> ids;
+        List<string> ids;
 
         if (string.IsNullOrEmpty(request.OrderByAttribute))
         {
@@ -96,7 +96,7 @@ public class EavQueryService
                 .ToList();
         }
 
-        return new PagedResult<long>
+        return new PagedResult<string>
         {
             Items = ids,
             Total = total,
@@ -106,7 +106,7 @@ public class EavQueryService
     }
 
     /// <summary>排序键缺失时返回 null（DESC 排最后，ASC 排最前——与 C# LINQ 默认一致）。</summary>
-    private static object? GetKey(IReadOnlyDictionary<long, object?> map, long id)
+    private static object? GetKey(IReadOnlyDictionary<string, object?> map, string id)
         => map.TryGetValue(id, out var v) ? v : null;
 
     /// <summary>
@@ -115,13 +115,13 @@ public class EavQueryService
     /// （long / decimal / string / bool / DateTimeOffset / DateOnly / TimeOnly）。
     /// 每个实体最多一行（uq_av_entity_attr 保证）。
     /// </summary>
-    private async Task<Dictionary<long, object?>> LoadSortKeysAsync(
+    private async Task<Dictionary<string, object?>> LoadSortKeysAsync(
         string entityType,
         AttributeDefinition def,
-        IReadOnlyList<long> entityIds,
+        IReadOnlyList<string> entityIds,
         CancellationToken ct)
     {
-        if (entityIds.Count == 0) return new Dictionary<long, object?>();
+        if (entityIds.Count == 0) return new Dictionary<string, object?>();
 
         var baseQuery = _db.AttributeValues
             .Where(v => v.EntityType == entityType
@@ -186,7 +186,7 @@ public class EavQueryService
         };
     }
 
-    private IQueryable<long> BuildSingleFilterQuery(
+    private IQueryable<string> BuildSingleFilterQuery(
         string entityType, AttributeDefinition def, AttributeFilter filter)
     {
         if (def.DataType == EavDataTypes.Composite)
@@ -408,7 +408,7 @@ public class EavQueryService
     // 组合类型查询
     // ============================================================
 
-    private IQueryable<long> BuildCompositeFilterQuery(
+    private IQueryable<string> BuildCompositeFilterQuery(
         string entityType, AttributeDefinition def, AttributeFilter filter)
     {
         if (string.IsNullOrEmpty(filter.FieldPath))
@@ -664,7 +664,7 @@ public class EavQueryService
         if (def.RefCompositeTypeId is null) return null;
 
         CompositeFieldDefinition? current = null;
-        long typeId = def.RefCompositeTypeId.Value;
+        string typeId = def.RefCompositeTypeId;
 
         foreach (var segment in path)
         {
@@ -675,7 +675,7 @@ public class EavQueryService
 
             if (current.DataType == EavDataTypes.Composite
                 && current.RefCompositeTypeId is not null)
-                typeId = current.RefCompositeTypeId.Value;
+                typeId = current.RefCompositeTypeId;
         }
 
         return current;

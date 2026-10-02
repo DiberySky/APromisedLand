@@ -5,10 +5,10 @@ namespace TreeGraph.Api.Entities;
 /// <summary>类型化值表：每种基础类型独立存储列</summary>
 public class AttributeValue
 {
-    public long ValueId { get; set; }
-    public long EntityId { get; set; }
+    public string ValueId { get; set; } = "";
+    public string EntityId { get; set; } = "";
     public string EntityType { get; set; } = "";
-    public long AttributeId { get; set; }
+    public string AttributeId { get; set; } = "";
 
     // 类型化值列
     public string? ValueString { get; set; }

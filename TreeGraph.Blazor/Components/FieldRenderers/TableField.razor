@@ -45,7 +45,7 @@
             <MudPaper Class="pa-2 mb-2" Elevation="0" Outlined="true">
                 <div class="d-flex align-center mb-1">
                     <MudText Typo="Typo.caption">#@(idx + 1)</MudText>
-                    @if (row.RowId.HasValue)
+                    @if (row.RowId is not null)
                     {
                         <MudChip T="string" Size="Size.Small" Class="ml-2">
                             RowId: @row.RowId
@@ -94,7 +94,7 @@
 @code {
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter, EditorRequired] public string EntityType { get; set; } = "";
-    [Parameter] public long EntityId { get; set; }
+    [Parameter] public string EntityId { get; set; } = "";
     [Parameter] public JsonElement? Value { get; set; }
     [Parameter] public EventCallback<JsonElement?> ValueChanged { get; set; }
 
@@ -104,7 +104,7 @@
     private bool _saving;
     private bool _hasChanges;
 
-    private bool CanEdit => EntityId > 0 && Attr.RefTableDefinitionId is not null;
+    private bool CanEdit => !string.IsNullOrEmpty(EntityId) && Attr.RefTableDefinitionId is not null;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -228,7 +228,7 @@
 
     private class TableRowForm
     {
-        public long? RowId { get; set; }
+        public string? RowId { get; set; }
         public int RowOrder { get; set; }
         public Dictionary<string, string> Fields { get; set; } = new();
     }

@@ -77,10 +77,10 @@
         }
         else
         {
-            <MudChipSet T="long">
+            <MudChipSet T="string">
                 @foreach (var id in _ids)
                 {
-                    <MudChip T="long" Value="@id" Color="Color.Primary">
+                    <MudChip T="string" Value="@id" Color="Color.Primary">
                         #@id
                     </MudChip>
                 }
@@ -124,7 +124,7 @@ else if (_entities is not null)
     private IReadOnlyList<AttributeSchemaDto> _searchableAttributes
         = Array.Empty<AttributeSchemaDto>();
     private PagedResult<DynamicEntityDto>? _entities;
-    private IReadOnlyList<long>? _ids;
+    private IReadOnlyList<string>? _ids;
     private bool _loading;
 
     private readonly List<AttributeFilter> _filters = new();

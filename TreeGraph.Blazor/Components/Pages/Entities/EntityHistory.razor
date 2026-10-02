@@ -1,4 +1,4 @@
-@page "/entities/{EntityType}/{EntityId:long}/history"
+@page "/entities/{EntityType}/{EntityId}/history"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @inject EavApiClient Api
 @* EntityHistory.razor *@
@@ -62,7 +62,7 @@ else if (_history is not null)
 
 @code {
     [Parameter] public string EntityType { get; set; } = "";
-    [Parameter] public long EntityId { get; set; }
+    [Parameter] public string EntityId { get; set; } = "";
 
     private IReadOnlyList<EntityHistoryDto>? _history;
     private DateTime? _from;

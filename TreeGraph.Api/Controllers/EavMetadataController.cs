@@ -163,9 +163,9 @@ public class EavMetadataController : ControllerBase
     ///
     /// ★ 校验：composite 类型必须指定 refCompositeTypeId，非 composite 不允许引用。
     /// </summary>
-    [HttpPost("custom-tables/{id:long}/columns")]
+    [HttpPost("custom-tables/{id}/columns")]
     public async Task<IActionResult> AddTableColumn(
-        long id, [FromBody] CreateTableColumnRequest req, CancellationToken ct)
+        string id, [FromBody] CreateTableColumnRequest req, CancellationToken ct)
     {
         // 表存在性
         var tableExists = await _db.CustomTables
@@ -175,7 +175,7 @@ public class EavMetadataController : ControllerBase
         // ★ 类型与引用匹配
         if (req.DataType == EavDataTypes.Composite)
         {
-            if (req.RefCompositeTypeId is not long rid)
+            if (req.RefCompositeTypeId is not string rid)
                 return BadRequest(new { error = "composite 类型必须指定 refCompositeTypeId" });
 
             var exists = await _db.CompositeTypes
@@ -220,9 +220,9 @@ public class EavMetadataController : ControllerBase
     ///   - 只有 decimal 类型可以绑定单位
     ///   - 只有 single_choice 类型可以引用选项集
     /// </summary>
-    [HttpPost("composite-types/{id:long}/fields")]
+    [HttpPost("composite-types/{id}/fields")]
     public async Task<IActionResult> AddCompositeField(
-        long id, [FromBody] CreateCompositeFieldRequest req, CancellationToken ct)
+        string id, [FromBody] CreateCompositeFieldRequest req, CancellationToken ct)
     {
         // 组合类型存在性
         var typeExists = await _db.CompositeTypes
@@ -232,7 +232,7 @@ public class EavMetadataController : ControllerBase
         // 组合类型引用校验
         if (req.DataType == EavDataTypes.Composite)
         {
-            if (req.RefCompositeTypeId is not long rid)
+            if (req.RefCompositeTypeId is not string rid)
                 return BadRequest(new { error = "composite 类型必须指定 refCompositeTypeId" });
 
             if (rid == id)
@@ -309,14 +309,14 @@ public class EavMetadataController : ControllerBase
     /// 无限递归 StackOverflow（不可捕获）。
     /// </summary>
     private async Task<bool> WouldCreateCycleAsync(
-        long parentTypeId, long refTypeId, CancellationToken ct)
+        string parentTypeId, string refTypeId, CancellationToken ct)
     {
         if (parentTypeId == refTypeId) return true;
 
         // 一次性加载所有组合字段的引用关系，避免 BFS 中的 N+1 查询
         var edges = await _db.CompositeFields
             .Where(f => f.RefCompositeTypeId != null && !f.IsDeleted)
-            .Select(f => new { f.CompositeTypeId, Ref = f.RefCompositeTypeId!.Value })
+            .Select(f => new { f.CompositeTypeId, Ref = f.RefCompositeTypeId! })
             .AsNoTracking()
             .ToListAsync(ct);
 
@@ -324,8 +324,8 @@ public class EavMetadataController : ControllerBase
             .GroupBy(e => e.CompositeTypeId)
             .ToDictionary(g => g.Key, g => g.Select(e => e.Ref).ToList());
 
-        var visited = new HashSet<long>();
-        var queue = new Queue<long>();
+        var visited = new HashSet<string>();
+        var queue = new Queue<string>();
         queue.Enqueue(refTypeId);
 
         while (queue.Count > 0)
@@ -365,8 +365,8 @@ public class EavMetadataController : ControllerBase
         return Ok(list.Select(ToCustomTableDto));
     }
 
-    [HttpGet("custom-tables/{id:long}")]
-    public async Task<IActionResult> GetCustomTable(long id, CancellationToken ct)
+    [HttpGet("custom-tables/{id}")]
+    public async Task<IActionResult> GetCustomTable(string id, CancellationToken ct)
     {
         // ★ 不再检查 IsDeleted：ID 唯一标识资源，允许按 ID 查询已删除的表
         //   （恢复流程需要）。是否过滤由调用方决定。
@@ -377,9 +377,9 @@ public class EavMetadataController : ControllerBase
         return Ok(ToCustomTableDto(table));
     }
 
-    [HttpPut("custom-tables/{id:long}")]
+    [HttpPut("custom-tables/{id}")]
     public async Task<IActionResult> UpdateCustomTable(
-        long id, [FromBody] UpdateCustomTableRequest req, CancellationToken ct)
+        string id, [FromBody] UpdateCustomTableRequest req, CancellationToken ct)
     {
         var table = await _db.CustomTables.FindAsync(new object[] { id }, ct);
         if (table is null || table.IsDeleted) return NotFound();
@@ -391,8 +391,8 @@ public class EavMetadataController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("custom-tables/{id:long}")]
-    public async Task<IActionResult> DeleteCustomTable(long id, CancellationToken ct)
+    [HttpDelete("custom-tables/{id}")]
+    public async Task<IActionResult> DeleteCustomTable(string id, CancellationToken ct)
     {
         var table = await _db.CustomTables.Include(t => t.Columns)
             .FirstOrDefaultAsync(t => t.TableDefinitionId == id, ct);
@@ -414,9 +414,9 @@ public class EavMetadataController : ControllerBase
         return NoContent();
     }
 
-    [HttpPut("custom-tables/{id:long}/columns/{columnId:long}")]
+    [HttpPut("custom-tables/{id}/columns/{columnId}")]
     public async Task<IActionResult> UpdateTableColumn(
-        long id, long columnId,
+        string id, string columnId,
         [FromBody] UpdateTableColumnRequest req, CancellationToken ct)
     {
         var col = await _db.CustomTableColumns
@@ -440,9 +440,9 @@ public class EavMetadataController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("custom-tables/{id:long}/columns/{columnId:long}")]
+    [HttpDelete("custom-tables/{id}/columns/{columnId}")]
     public async Task<IActionResult> DeleteTableColumn(
-        long id, long columnId, CancellationToken ct)
+        string id, string columnId, CancellationToken ct)
     {
         var col = await _db.CustomTableColumns
             .FirstOrDefaultAsync(c => c.ColumnId == columnId && c.TableDefinitionId == id, ct);
@@ -488,8 +488,8 @@ public class EavMetadataController : ControllerBase
     /// ★ 不再检查 IsDeleted：ID 唯一标识资源，允许按 ID 查询已删除的类型
     ///   （恢复流程需要）。是否过滤由调用方决定。
     /// </summary>
-    [HttpGet("composite-types/{id:long}")]
-    public async Task<IActionResult> GetCompositeType(long id, CancellationToken ct)
+    [HttpGet("composite-types/{id}")]
+    public async Task<IActionResult> GetCompositeType(string id, CancellationToken ct)
     {
         var type = await _db.CompositeTypes
             .Include(t => t.Fields).ThenInclude(f => f.RefOptionSet)
@@ -499,9 +499,9 @@ public class EavMetadataController : ControllerBase
         return Ok(ToCompositeTypeDto(type));
     }
 
-    [HttpPut("composite-types/{id:long}")]
+    [HttpPut("composite-types/{id}")]
     public async Task<IActionResult> UpdateCompositeType(
-        long id, [FromBody] UpdateCompositeTypeRequest req, CancellationToken ct)
+        string id, [FromBody] UpdateCompositeTypeRequest req, CancellationToken ct)
     {
         var type = await _db.CompositeTypes.FindAsync(new object[] { id }, ct);
         if (type is null || type.IsDeleted) return NotFound();
@@ -512,8 +512,8 @@ public class EavMetadataController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("composite-types/{id:long}")]
-    public async Task<IActionResult> DeleteCompositeType(long id, CancellationToken ct)
+    [HttpDelete("composite-types/{id}")]
+    public async Task<IActionResult> DeleteCompositeType(string id, CancellationToken ct)
     {
         var type = await _db.CompositeTypes
             .Include(t => t.Fields).ThenInclude(f => f.RefOptionSet)
@@ -548,9 +548,9 @@ public class EavMetadataController : ControllerBase
     ///   - 单位引用（decimal）：新增
     ///   - 显式清除语义：Clear* = true 优先
     /// </summary>
-    [HttpPut("composite-types/{id:long}/fields/{fieldId:long}")]
+    [HttpPut("composite-types/{id}/fields/{fieldId}")]
     public async Task<IActionResult> UpdateCompositeField(
-        long id, long fieldId,
+        string id, string fieldId,
         [FromBody] UpdateCompositeFieldRequest req, CancellationToken ct)
     {
         var field = await _db.CompositeFields
@@ -604,9 +604,9 @@ public class EavMetadataController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("composite-types/{id:long}/fields/{fieldId:long}")]
+    [HttpDelete("composite-types/{id}/fields/{fieldId}")]
     public async Task<IActionResult> DeleteCompositeField(
-        long id, long fieldId, CancellationToken ct)
+        string id, string fieldId, CancellationToken ct)
     {
         var field = await _db.CompositeFields
             .FirstOrDefaultAsync(f => f.FieldId == fieldId && f.CompositeTypeId == id, ct);
@@ -644,8 +644,8 @@ public class EavMetadataController : ControllerBase
         return Ok(list.Select(ToAttributeDetailDto));
     }
 
-    [HttpGet("attributes/{id:long}")]
-    public async Task<IActionResult> GetAttribute(long id, CancellationToken ct)
+    [HttpGet("attributes/{id}")]
+    public async Task<IActionResult> GetAttribute(string id, CancellationToken ct)
     {
         var def = await _db.AttributeCatalog
             .Include(a => a.Unit).Include(a => a.RefCompositeType)
@@ -662,9 +662,9 @@ public class EavMetadataController : ControllerBase
     /// ★ 单位绑定约束：只有 decimal 类型可以绑定 UnitId。
     /// 不可修改：EntityType、AttributeName、DataType。
     /// </summary>
-    [HttpPut("attributes/{id:long}")]
+    [HttpPut("attributes/{id}")]
     public async Task<IActionResult> UpdateAttribute(
-        long id, [FromBody] UpdateAttributeRequest req, CancellationToken ct)
+        string id, [FromBody] UpdateAttributeRequest req, CancellationToken ct)
     {
         var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
         if (def is null || def.IsDeleted) return NotFound();
@@ -715,7 +715,7 @@ public class EavMetadataController : ControllerBase
                 return BadRequest(new { error = "只有 composite 类型可以引用组合类型" });
 
             var exists = await _db.CompositeTypes.AnyAsync(
-                t => t.CompositeTypeId == req.RefCompositeTypeId.Value && !t.IsDeleted, ct);
+                t => t.CompositeTypeId == req.RefCompositeTypeId && !t.IsDeleted, ct);
             if (!exists) return BadRequest(new { error = $"组合类型不存在: {req.RefCompositeTypeId}" });
             def.RefCompositeTypeId = req.RefCompositeTypeId;
         }
@@ -731,7 +731,7 @@ public class EavMetadataController : ControllerBase
                 return BadRequest(new { error = "只有 table 类型可以引用自定义表" });
 
             var exists = await _db.CustomTables.AnyAsync(
-                t => t.TableDefinitionId == req.RefTableDefinitionId.Value && !t.IsDeleted, ct);
+                t => t.TableDefinitionId == req.RefTableDefinitionId && !t.IsDeleted, ct);
             if (!exists) return BadRequest(new { error = $"自定义表不存在: {req.RefTableDefinitionId}" });
             def.RefTableDefinitionId = req.RefTableDefinitionId;
         }
@@ -747,7 +747,7 @@ public class EavMetadataController : ControllerBase
                 return BadRequest(new { error = "只有 single_choice 类型可以引用选项集" });
 
             var exists = await _db.OptionSets.AnyAsync(
-                s => s.OptionSetId == req.RefOptionSetId.Value, ct);
+                s => s.OptionSetId == req.RefOptionSetId, ct);
             if (!exists) return BadRequest(new { error = $"选项集不存在: {req.RefOptionSetId}" });
             def.RefOptionSetId = req.RefOptionSetId;
         }
@@ -758,8 +758,8 @@ public class EavMetadataController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("attributes/{id:long}")]
-    public async Task<IActionResult> DeleteAttribute(long id, CancellationToken ct)
+    [HttpDelete("attributes/{id}")]
+    public async Task<IActionResult> DeleteAttribute(string id, CancellationToken ct)
     {
         var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
         if (def is null) return NotFound();
@@ -829,8 +829,8 @@ public class EavMetadataController : ControllerBase
     /// 唯一约束（entity_type, attribute_name）不区分 IsDeleted：
     /// 若已存在同名的活动属性，恢复会失败 → 返回 409。
     /// </summary>
-    [HttpPost("attributes/{id:long}/undelete")]
-    public async Task<IActionResult> UndeleteAttribute(long id, CancellationToken ct)
+    [HttpPost("attributes/{id}/undelete")]
+    public async Task<IActionResult> UndeleteAttribute(string id, CancellationToken ct)
     {
         var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
         if (def is null) return NotFound();
@@ -860,8 +860,8 @@ public class EavMetadataController : ControllerBase
     /// ★ 恢复被软删除的组合类型（同时恢复其字段）。
     /// 唯一约束（entity_type, type_name, version）不区分 IsDeleted。
     /// </summary>
-    [HttpPost("composite-types/{id:long}/undelete")]
-    public async Task<IActionResult> UndeleteCompositeType(long id, CancellationToken ct)
+    [HttpPost("composite-types/{id}/undelete")]
+    public async Task<IActionResult> UndeleteCompositeType(string id, CancellationToken ct)
     {
         var type = await _db.CompositeTypes
             .Include(t => t.Fields)
@@ -896,9 +896,9 @@ public class EavMetadataController : ControllerBase
     /// ★ 恢复被软删除的组合字段。
     /// 唯一约束（composite_type_id, field_name）不区分 IsDeleted。
     /// </summary>
-    [HttpPost("composite-types/{id:long}/fields/{fieldId:long}/undelete")]
+    [HttpPost("composite-types/{id}/fields/{fieldId}/undelete")]
     public async Task<IActionResult> UndeleteCompositeField(
-        long id, long fieldId, CancellationToken ct)
+        string id, string fieldId, CancellationToken ct)
     {
         var field = await _db.CompositeFields
             .FirstOrDefaultAsync(f => f.FieldId == fieldId && f.CompositeTypeId == id, ct);
@@ -927,8 +927,8 @@ public class EavMetadataController : ControllerBase
     /// ★ 恢复被软删除的自定义表（同时恢复其列）。
     /// 唯一约束（entity_type, table_name, version）不区分 IsDeleted。
     /// </summary>
-    [HttpPost("custom-tables/{id:long}/undelete")]
-    public async Task<IActionResult> UndeleteCustomTable(long id, CancellationToken ct)
+    [HttpPost("custom-tables/{id}/undelete")]
+    public async Task<IActionResult> UndeleteCustomTable(string id, CancellationToken ct)
     {
         var table = await _db.CustomTables
             .Include(t => t.Columns)
@@ -967,9 +967,9 @@ public class EavMetadataController : ControllerBase
     /// ★ 恢复被软删除的自定义表列。
     /// 唯一约束（table_definition_id, column_name）不区分 IsDeleted。
     /// </summary>
-    [HttpPost("custom-tables/{id:long}/columns/{columnId:long}/undelete")]
+    [HttpPost("custom-tables/{id}/columns/{columnId}/undelete")]
     public async Task<IActionResult> UndeleteTableColumn(
-        long id, long columnId, CancellationToken ct)
+        string id, string columnId, CancellationToken ct)
     {
         var col = await _db.CustomTableColumns
             .FirstOrDefaultAsync(c => c.ColumnId == columnId

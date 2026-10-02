@@ -35,7 +35,7 @@ public class CompositeValueService
     // 验证
     // ============================================================
 
-    public ValidationResult Validate(DynamicCompositeValue value, long compositeTypeId)
+    public ValidationResult Validate(DynamicCompositeValue value, string compositeTypeId)
     {
         var typeDef = _cache.GetType(compositeTypeId);
         var errors = new List<ValidationError>();
@@ -85,7 +85,7 @@ public class CompositeValueService
                 errors.Add(new(path, "期望嵌套组合值"));
                 return;
             }
-            var nestedResult = Validate(nested, field.RefCompositeTypeId!.Value);
+            var nestedResult = Validate(nested, field.RefCompositeTypeId!);
             foreach (var e in nestedResult.Errors)
                 errors.Add(new($"{path}.{e.Field}", e.Message));
             return;
@@ -177,7 +177,7 @@ public class CompositeValueService
     /// `{ value: <归一化到基准单位的数值>, unitId: <原始输入单位 Guid> }`。
     /// 读取端（Deserialize）根据 originalUnits 决定是否还原。
     /// </summary>
-    public JsonDocument Serialize(DynamicCompositeValue value, long compositeTypeId)
+    public JsonDocument Serialize(DynamicCompositeValue value, string compositeTypeId)
     {
         var typeDef = _cache.GetType(compositeTypeId);
         var dict = new Dictionary<string, object?>();
@@ -200,7 +200,7 @@ public class CompositeValueService
 
         if (field.DataType == EavDataTypes.Composite && value is DynamicCompositeValue nested)
         {
-            var inner = Serialize(nested, field.RefCompositeTypeId!.Value);
+            var inner = Serialize(nested, field.RefCompositeTypeId!);
             return inner.RootElement.Clone();
         }
 
@@ -236,7 +236,7 @@ public class CompositeValueService
     ///   - true：按原始输入单位还原
     /// </summary>
     public DynamicCompositeValue Deserialize(
-        JsonDocument doc, long compositeTypeId, bool originalUnits = false)
+        JsonDocument doc, string compositeTypeId, bool originalUnits = false)
     {
         var typeDef = _cache.GetType(compositeTypeId);
         var result = new DynamicCompositeValue(typeDef.TypeName);
@@ -263,7 +263,7 @@ public class CompositeValueService
         if (field.DataType == EavDataTypes.Composite)
         {
             using var nestedDoc = JsonDocument.Parse(elem.GetRawText());
-            return Deserialize(nestedDoc, field.RefCompositeTypeId!.Value, originalUnits);
+            return Deserialize(nestedDoc, field.RefCompositeTypeId!, originalUnits);
         }
 
         // ★ #4：组合内 decimal 的 {value, unitId} 对象

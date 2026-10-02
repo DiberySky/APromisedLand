@@ -110,7 +110,7 @@
 
 @code {
     [Parameter, EditorRequired] public string EntityType { get; set; } = "";
-    [Parameter] public long EntityId { get; set; }
+    [Parameter] public string EntityId { get; set; } = "";
 
     /// <summary>动态表单 Schema。</summary>
     [Parameter, EditorRequired] public IReadOnlyList<AttributeSchemaDto> Schema { get; set; } = [];

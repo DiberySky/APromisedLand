@@ -19,7 +19,7 @@ public class OptimisticLockTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        long id = 90001;
+        var id = GuidFromInt(90001);
         await PutEntityAsync(TestData.EntityType, id,
             new Dictionary<string, object?> { ["amount"] = 10L });
 
@@ -58,7 +58,7 @@ public class OptimisticLockTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        long id = 90002;
+        var id = GuidFromInt(90002);
         await PutEntityAsync(TestData.EntityType, id,
             new Dictionary<string, object?> { ["amount"] = 20L });
 

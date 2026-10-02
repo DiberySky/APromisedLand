@@ -103,7 +103,7 @@
 
 @code {
     [Parameter, EditorRequired] public string EntityType { get; set; } = "";
-    [Parameter, EditorRequired] public long EntityId { get; set; }
+    [Parameter, EditorRequired] public string EntityId { get; set; } = "";
 
     /// <summary>
     /// 父组件保存成功后自增此值，触发面板重新加载。

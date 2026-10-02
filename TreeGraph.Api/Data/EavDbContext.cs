@@ -74,7 +74,11 @@ public class EavDbContext : DbContext
             });
 
             e.HasKey(x => x.AttributeId);
-            e.Property(x => x.AttributeId).HasColumnName("attribute_id").UseIdentityAlwaysColumn();
+            e.Property(x => x.AttributeId)
+                .HasColumnName("attribute_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
             e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
@@ -89,9 +93,9 @@ public class EavDbContext : DbContext
 
             e.Property(x => x.AllowedValues).HasColumnName("allowed_values").HasColumnType("jsonb");
             e.Property(x => x.ValidationRule).HasColumnName("validation_rule").HasColumnType("jsonb");
-            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id");
-            e.Property(x => x.RefTableDefinitionId).HasColumnName("ref_table_definition_id");
-            e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id");
+            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
+            e.Property(x => x.RefTableDefinitionId).HasColumnName("ref_table_definition_id").HasMaxLength(36);
+            e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
             e.Property(x => x.UnitId).HasColumnName("unit_id");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
@@ -125,10 +129,14 @@ public class EavDbContext : DbContext
         {
             e.ToTable("attribute_values");
             e.HasKey(x => x.ValueId);
-            e.Property(x => x.ValueId).HasColumnName("value_id").UseIdentityAlwaysColumn();
-            e.Property(x => x.EntityId).HasColumnName("entity_id");
+            e.Property(x => x.ValueId)
+                .HasColumnName("value_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.AttributeId).HasColumnName("attribute_id");
+            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.ValueString).HasColumnName("value_string").HasMaxLength(2000);
             e.Property(x => x.ValueInt).HasColumnName("value_int");
 
@@ -194,7 +202,11 @@ public class EavDbContext : DbContext
         {
             e.ToTable("composite_type_definitions");
             e.HasKey(x => x.CompositeTypeId);
-            e.Property(x => x.CompositeTypeId).HasColumnName("composite_type_id").UseIdentityAlwaysColumn();
+            e.Property(x => x.CompositeTypeId)
+                .HasColumnName("composite_type_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
             e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
@@ -223,17 +235,21 @@ public class EavDbContext : DbContext
             });
 
             e.HasKey(x => x.FieldId);
-            e.Property(x => x.FieldId).HasColumnName("field_id").UseIdentityAlwaysColumn();
-            e.Property(x => x.CompositeTypeId).HasColumnName("composite_type_id");
+            e.Property(x => x.FieldId)
+                .HasColumnName("field_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.CompositeTypeId).HasColumnName("composite_type_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.FieldName).HasColumnName("field_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
-            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id");
+            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
 
             // ★ #4：单位外键列
             e.Property(x => x.UnitId).HasColumnName("unit_id");
             // ★ #8：选项集外键列
-            e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id");
+            e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
 
             e.Property(x => x.IsArray).HasColumnName("is_array");
             e.Property(x => x.IsRequired).HasColumnName("is_required");
@@ -269,7 +285,11 @@ public class EavDbContext : DbContext
         {
             e.ToTable("option_sets");
             e.HasKey(x => x.OptionSetId);
-            e.Property(x => x.OptionSetId).HasColumnName("option_set_id").UseIdentityAlwaysColumn();
+            e.Property(x => x.OptionSetId)
+                .HasColumnName("option_set_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
             e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.SetName).HasColumnName("set_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
@@ -288,8 +308,12 @@ public class EavDbContext : DbContext
         {
             e.ToTable("option_items");
             e.HasKey(x => x.OptionItemId);
-            e.Property(x => x.OptionItemId).HasColumnName("option_item_id").UseIdentityAlwaysColumn();
-            e.Property(x => x.OptionSetId).HasColumnName("option_set_id");
+            e.Property(x => x.OptionItemId)
+                .HasColumnName("option_item_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.OptionSetId).HasColumnName("option_set_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.Value).HasColumnName("value").HasMaxLength(200).IsRequired();
             e.Property(x => x.Label).HasColumnName("label").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayOrder).HasColumnName("display_order");
@@ -312,7 +336,11 @@ public class EavDbContext : DbContext
         {
             e.ToTable("custom_table_definitions");
             e.HasKey(x => x.TableDefinitionId);
-            e.Property(x => x.TableDefinitionId).HasColumnName("table_definition_id").UseIdentityAlwaysColumn();
+            e.Property(x => x.TableDefinitionId)
+                .HasColumnName("table_definition_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
             e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.TableName).HasColumnName("table_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
@@ -330,12 +358,16 @@ public class EavDbContext : DbContext
         {
             e.ToTable("custom_table_columns");
             e.HasKey(x => x.ColumnId);
-            e.Property(x => x.ColumnId).HasColumnName("column_id").UseIdentityAlwaysColumn();
-            e.Property(x => x.TableDefinitionId).HasColumnName("table_definition_id");
+            e.Property(x => x.ColumnId)
+                .HasColumnName("column_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.TableDefinitionId).HasColumnName("table_definition_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.ColumnName).HasColumnName("column_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
-            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id");
+            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
             e.Property(x => x.IsRequired).HasColumnName("is_required");
             e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
             e.Property(x => x.IsSortable).HasColumnName("is_sortable");
@@ -359,10 +391,14 @@ public class EavDbContext : DbContext
         {
             e.ToTable("custom_table_rows");
             e.HasKey(x => x.RowId);
-            e.Property(x => x.RowId).HasColumnName("row_id").UseIdentityAlwaysColumn();
-            e.Property(x => x.TableDefinitionId).HasColumnName("table_definition_id");
-            e.Property(x => x.AttributeId).HasColumnName("attribute_id");
-            e.Property(x => x.ParentEntityId).HasColumnName("parent_entity_id");
+            e.Property(x => x.RowId)
+                .HasColumnName("row_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.TableDefinitionId).HasColumnName("table_definition_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.ParentEntityId).HasColumnName("parent_entity_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.ParentEntityType).HasColumnName("parent_entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.RowData).HasColumnName("row_data").HasColumnType("jsonb").IsRequired();
             e.Property(x => x.RowOrder).HasColumnName("row_order");
@@ -389,10 +425,14 @@ public class EavDbContext : DbContext
         {
             e.ToTable("attribute_audit_log");
             e.HasKey(x => x.AuditId);
-            e.Property(x => x.AuditId).HasColumnName("audit_id").UseIdentityAlwaysColumn();
-            e.Property(x => x.EntityId).HasColumnName("entity_id");
+            e.Property(x => x.AuditId)
+                .HasColumnName("audit_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.AttributeId).HasColumnName("attribute_id");
+            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.OldValue).HasColumnName("old_value");
             e.Property(x => x.NewValue).HasColumnName("new_value");

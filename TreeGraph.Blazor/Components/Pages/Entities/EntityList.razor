@@ -37,18 +37,27 @@
 
         <MudSpacer />
 
-        <MudNumericField T="long?"
-                         Label="新建 EntityId"
-                         Value="_newEntityId"
-                         ValueChanged="@(v => _newEntityId = v)"
-                         Variant="Variant.Outlined"
-                         Margin="Margin.Dense"
-                         Style="width: 200px;" />
+        <MudTextField T="string"
+                      Label="新建 EntityId (GUID)"
+                      Value="_newEntityId"
+                      ValueChanged="@(v => _newEntityId = v)"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Style="width: 320px;"
+                      Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.Autorenew"
+                   OnClick="GenerateNewGuid"
+                   Disabled="@_loading">
+            生成 GUID
+        </MudButton>
 
         <MudButton Variant="Variant.Filled" Color="Color.Success"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="CreateNew"
-                   Disabled="@(_newEntityId is null)">
+                   Disabled="@(!IsValidGuid(_newEntityId))">
             新建
         </MudButton>
     </div>
@@ -164,7 +173,7 @@ else
     private bool _initialized;
     private int _page = 1;
     private int _pageSize = 20;
-    private long? _newEntityId;
+    private string? _newEntityId;
 
     private int TotalPages => _result is null || _result.PageSize <= 0
         ? 1
@@ -244,12 +253,12 @@ else
         await LoadAsync();
     }
 
-    private void OpenEdit(long entityId)
+    private void OpenEdit(string entityId)
     {
         Nav.NavigateTo($"/entities/{EntityType}/{entityId}");
     }
 
-    private async Task ConfirmDelete(long entityId)
+    private async Task ConfirmDelete(string entityId)
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
@@ -273,8 +282,28 @@ else
 
     private void CreateNew()
     {
-        if (_newEntityId is { } id) Nav.NavigateTo($"/entities/{EntityType}/{id}");
+        var id = _newEntityId?.Trim();
+        if (string.IsNullOrEmpty(id)) return;
+
+        // 校验 GUID 格式（后端也校验，但前端先给友好提示）
+        if (!Guid.TryParse(id, out var guid))
+        {
+            Snackbar.Add("EntityId 必须是 GUID 格式（36 字符，含连字符）", Severity.Warning);
+            return;
+        }
+
+        // 统一为小写带连字符的标准格式
+        Nav.NavigateTo($"/entities/{EntityType}/{guid:D}");
     }
+
+    /// <summary>一键生成新 GUID 填入输入框（免手打）。</summary>
+    private void GenerateNewGuid()
+    {
+        _newEntityId = Guid.NewGuid().ToString("D");
+    }
+
+    private static bool IsValidGuid(string? s)
+        => !string.IsNullOrWhiteSpace(s) && Guid.TryParse(s, out _);
 
     private void BackToHome()
     {
@@ -295,9 +324,28 @@ else
             System.Text.Json.JsonValueKind.Number => e.ToString(),
             System.Text.Json.JsonValueKind.True => "✓",
             System.Text.Json.JsonValueKind.False => "✗",
-            System.Text.Json.JsonValueKind.Object => "{…}",
+            System.Text.Json.JsonValueKind.Object => FormatObjectPreview(e),
             System.Text.Json.JsonValueKind.Array => $"[{e.GetArrayLength()}]",
             _ => e.ToString()
         };
+    }
+
+    /// <summary>
+    /// 对象形态的属性值预览。后端两类已知对象：
+    ///   - SingleChoiceValue {value,label}（single_choice 绑定选项集）→ 显示 label
+    ///   - NumericValue {value,unitId}（数值绑定单位）→ 显示数值
+    /// 其余对象保留 {…} 占位。
+    /// </summary>
+    private static string FormatObjectPreview(System.Text.Json.JsonElement e)
+    {
+        if (e.TryGetProperty("label", out var lbl)
+            && lbl.ValueKind == System.Text.Json.JsonValueKind.String)
+            return lbl.GetString() ?? "";
+
+        if (e.TryGetProperty("value", out var v)
+            && v.ValueKind == System.Text.Json.JsonValueKind.Number)
+            return v.ToString();
+
+        return "{…}";
     }
 }

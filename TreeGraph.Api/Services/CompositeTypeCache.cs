@@ -7,8 +7,8 @@ namespace TreeGraph.Api.Services;
 
 public interface ICompositeTypeCache
 {
-    CompositeTypeDefinition GetType(long compositeTypeId);
-    void Invalidate(long compositeTypeId);
+    CompositeTypeDefinition GetType(string compositeTypeId);
+    void Invalidate(string compositeTypeId);
 }
 
 /// <summary>组合类型定义缓存（单例）</summary>
@@ -23,7 +23,7 @@ public class CompositeTypeCache : ICompositeTypeCache
         _scopeFactory = scopeFactory;
     }
 
-    public CompositeTypeDefinition GetType(long compositeTypeId)
+    public CompositeTypeDefinition GetType(string compositeTypeId)
     {
         return _cache.GetOrCreate($"eav:composite:{compositeTypeId}", entry =>
         {
@@ -40,6 +40,6 @@ public class CompositeTypeCache : ICompositeTypeCache
         })!;
     }
 
-    public void Invalidate(long compositeTypeId)
+    public void Invalidate(string compositeTypeId)
         => _cache.Remove($"eav:composite:{compositeTypeId}");
 }

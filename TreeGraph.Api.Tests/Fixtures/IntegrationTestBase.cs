@@ -16,11 +16,18 @@ public abstract class IntegrationTestBase
     }
 
     /// <summary>
-    /// PUT 实体并返回 id。payload 用匿名对象或 Dictionary。
-    /// 默认用 PUT（全量替换语义）。
+    /// 把测试用整数 n 转换为一个合法 GUID 字符串。
+    /// 格式：00000000-0000-0000-0000-{n:D12}
+    /// 便于在测试日志 / DB 中按数字识别。
     /// </summary>
-    protected async Task<long> PutEntityAsync(
-        string entityType, long entityId, object payload)
+    protected static string GuidFromInt(long n)
+        => $"00000000-0000-0000-0000-{n:D12}";
+
+    /// <summary>
+    /// PUT 实体（全量替换语义）。返回 entityId（GUID 字符串）。
+    /// </summary>
+    protected async Task<string> PutEntityAsync(
+        string entityType, string entityId, object payload)
     {
         var resp = await Client.PutAsJsonAsync(
             $"/api/eav/{entityType}/entities/{entityId}", payload);

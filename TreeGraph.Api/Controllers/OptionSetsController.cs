@@ -69,9 +69,9 @@ public class OptionSetsController : ControllerBase
     /// ★ 新增 includeDeleted：默认过滤已删除集合（返回 404）；
     ///   恢复流程 / 管理页可通过 includeDeleted=true 读取。
     /// </summary>
-    [HttpGet("{setId:long}")]
+    [HttpGet("{setId}")]
     public async Task<IActionResult> GetSet(
-        long setId,
+        string setId,
         [FromQuery] bool includeDeleted = false,
         CancellationToken ct = default)
     {
@@ -92,9 +92,9 @@ public class OptionSetsController : ControllerBase
     /// 更新选项集基本信息。SetName 和 EntityType 不可修改（它们是引用标识），
     /// 只允许修改 DisplayName。
     /// </summary>
-    [HttpPut("{setId:long}")]
+    [HttpPut("{setId}")]
     public async Task<IActionResult> UpdateSet(
-        long setId, [FromBody] UpdateOptionSetRequest req, CancellationToken ct)
+        string setId, [FromBody] UpdateOptionSetRequest req, CancellationToken ct)
     {
         var set = await _db.OptionSets.FindAsync(new object[] { setId }, ct);
         if (set is null) return NotFound();
@@ -108,8 +108,8 @@ public class OptionSetsController : ControllerBase
     }
 
     /// <summary>查询选项集被哪些属性引用（删除前检查用）</summary>
-    [HttpGet("{setId:long}/references")]
-    public async Task<IActionResult> GetReferences(long setId, CancellationToken ct)
+    [HttpGet("{setId}/references")]
+    public async Task<IActionResult> GetReferences(string setId, CancellationToken ct)
     {
         var refs = await _db.AttributeCatalog
             .Where(a => a.RefOptionSetId == setId && !a.IsDeleted)
@@ -130,8 +130,8 @@ public class OptionSetsController : ControllerBase
     ///   - 唯一索引（entity_type, set_name）改为 partial（仅 is_deleted = false），
     ///     软删后同名集合可被重新创建。
     /// </summary>
-    [HttpDelete("{setId:long}")]
-    public async Task<IActionResult> DeleteSet(long setId, CancellationToken ct)
+    [HttpDelete("{setId}")]
+    public async Task<IActionResult> DeleteSet(string setId, CancellationToken ct)
     {
         var set = await _db.OptionSets.FindAsync(new object[] { setId }, ct);
         if (set is null || set.IsDeleted) return NotFound();
@@ -167,8 +167,8 @@ public class OptionSetsController : ControllerBase
     ///   - 若某选项 Value 与活动项冲突 → 409，返回冲突列表
     /// 恢复后 IsDefault 一律清空（需显式重设）。
     /// </summary>
-    [HttpPost("{setId:long}/undelete")]
-    public async Task<IActionResult> UndeleteSet(long setId, CancellationToken ct)
+    [HttpPost("{setId}/undelete")]
+    public async Task<IActionResult> UndeleteSet(string setId, CancellationToken ct)
     {
         var set = await _db.OptionSets.FindAsync(new object[] { setId }, ct);
         if (set is null) return NotFound();

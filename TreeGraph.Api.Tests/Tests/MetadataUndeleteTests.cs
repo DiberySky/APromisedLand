@@ -60,5 +60,5 @@ public class MetadataUndeleteTests : IntegrationTestBase
             a.AttributeId == created.AttributeId && !a.IsDeleted);
     }
 
-    private sealed record IdResponse(long AttributeId);
+    private sealed record IdResponse(string AttributeId);
 }

@@ -65,9 +65,9 @@ public class EavController : ControllerBase
         return Ok(new { EntityType = entityType, Attributes = schema });
     }
 
-    [HttpGet("entities/{id:long}")]
+    [HttpGet("entities/{id}")]
     public async Task<IActionResult> Get(
-        long id, string entityType,
+        string id, string entityType,
         [FromQuery] string? unit,
         CancellationToken ct)
     {
@@ -85,9 +85,9 @@ public class EavController : ControllerBase
     /// 服务端比对 DB 中最新 UpdatedAt，不符则 409 Conflict 并返回最新值。
     /// header 缺失时跳过冲突检测（向后兼容）。
     /// </summary>
-    [HttpPut("entities/{id:long}")]
+    [HttpPut("entities/{id}")]
     public async Task<IActionResult> Put(
-        long id, string entityType,
+        string id, string entityType,
         [FromBody] Dictionary<string, JsonElement> values,
         CancellationToken ct)
     {
@@ -177,9 +177,9 @@ public class EavController : ControllerBase
         return Ok(new { EntityIds = ids });
     }
 
-    [HttpGet("entities/{id:long}/history")]
+    [HttpGet("entities/{id}/history")]
     public async Task<IActionResult> History(
-        long id, string entityType,
+        string id, string entityType,
         [FromQuery] DateTimeOffset? from,
         CancellationToken ct)
     {
@@ -207,9 +207,9 @@ public class EavController : ControllerBase
     /// ★ #7：删除实体（物理删除所有属性值 + 自定义表行）。
     /// 实体不存在时返回 404。
     /// </summary>
-    [HttpDelete("entities/{id:long}")]
+    [HttpDelete("entities/{id}")]
     public async Task<IActionResult> Delete(
-        long id, string entityType,
+        string id, string entityType,
         CancellationToken ct)
     {
         var deleted = await _write.DeleteEntityAsync(
@@ -231,9 +231,9 @@ public class EavController : ControllerBase
     ///
     /// 乐观锁、未知属性检查、验证流程与 PUT 完全一致。
     /// </summary>
-    [HttpPatch("entities/{id:long}")]
+    [HttpPatch("entities/{id}")]
     public async Task<IActionResult> Patch(
-        long id, string entityType,
+        string id, string entityType,
         [FromBody] Dictionary<string, JsonElement> values,
         CancellationToken ct)
     {
@@ -295,7 +295,7 @@ public class EavController : ControllerBase
         if (req.EntityIds.Count == 0)
         {
             return Ok(new BatchDeleteResultDto(
-                Array.Empty<long>(), Array.Empty<long>(), 0));
+                Array.Empty<string>(), Array.Empty<string>(), 0));
         }
 
         var result = await _write.DeleteEntitiesAsync(
@@ -314,7 +314,7 @@ public class EavController : ControllerBase
     {
         CompositeTypeSchemaDto? composite = null;
         if (d.RefCompositeTypeId is not null)
-            composite = BuildCompositeSchema(d.RefCompositeTypeId.Value);
+            composite = BuildCompositeSchema(d.RefCompositeTypeId);
 
         UnitSchemaDto? unit = null;
         IReadOnlyList<UnitSchemaDto>? availableUnits = null;
@@ -359,7 +359,7 @@ public class EavController : ControllerBase
     ///
     /// ★ #4：字段的 Unit / AvailableUnits 一并下放（仅 decimal 字段可能非空）。
     /// </summary>
-    private CompositeTypeSchemaDto BuildCompositeSchema(long compositeTypeId)
+    private CompositeTypeSchemaDto BuildCompositeSchema(string compositeTypeId)
     {
         var ct = _compositeCache.GetType(compositeTypeId);
 
@@ -506,10 +506,10 @@ public class EavController : ControllerBase
     private DynamicCompositeValue JsonToComposite(JsonElement elem, AttributeDefinition def)
     {
         using var doc = JsonDocument.Parse(elem.GetRawText());
-        return CompositeFromDoc(doc, def.RefCompositeTypeId!.Value);
+        return CompositeFromDoc(doc, def.RefCompositeTypeId!);
     }
 
-    private DynamicCompositeValue CompositeFromDoc(JsonDocument doc, long compositeTypeId)
+    private DynamicCompositeValue CompositeFromDoc(JsonDocument doc, string compositeTypeId)
     {
         var typeDef = _compositeCache.GetType(compositeTypeId);
         var result = new DynamicCompositeValue(typeDef.TypeName);
@@ -538,7 +538,7 @@ public class EavController : ControllerBase
         if (field.DataType == EavDataTypes.Composite)
         {
             using var nested = JsonDocument.Parse(elem.GetRawText());
-            return CompositeFromDoc(nested, field.RefCompositeTypeId!.Value);
+            return CompositeFromDoc(nested, field.RefCompositeTypeId!);
         }
 
         // decimal 且带单位对象：返回 NumericValue 让下游统一处理

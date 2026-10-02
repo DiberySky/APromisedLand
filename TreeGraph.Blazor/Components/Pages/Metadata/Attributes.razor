@@ -243,15 +243,15 @@ else
 
         @if (_createForm.DataType == "composite")
         {
-            <MudSelect T="long?"
-                       Value="_createForm.RefCompositeTypeId"
-                       ValueChanged="@(v => _createForm.RefCompositeTypeId = v)"
+            <MudSelect T="string"
+                       Value="@(_createForm.RefCompositeTypeId ?? "")"
+                       ValueChanged="@(v => _createForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
                        Label="组合类型"
                        Variant="Variant.Outlined"
                        Class="mb-3">
                 @foreach (var t in _compositeTypes ?? new List<CompositeTypeDetailDto>())
                 {
-                    <MudSelectItem T="long?" Value="@t.CompositeTypeId">
+                    <MudSelectItem T="string" Value="@t.CompositeTypeId">
                         @t.DisplayName (@t.TypeName)
                     </MudSelectItem>
                 }
@@ -260,15 +260,15 @@ else
 
         @if (_createForm.DataType == "table")
         {
-            <MudSelect T="long?"
-                       Value="_createForm.RefTableDefinitionId"
-                       ValueChanged="@(v => _createForm.RefTableDefinitionId = v)"
+            <MudSelect T="string"
+                       Value="@(_createForm.RefTableDefinitionId ?? "")"
+                       ValueChanged="@(v => _createForm.RefTableDefinitionId = string.IsNullOrEmpty(v) ? null : v)"
                        Label="自定义表"
                        Variant="Variant.Outlined"
                        Class="mb-3">
                 @foreach (var t in _customTables ?? new List<CustomTableDetailDto>())
                 {
-                    <MudSelectItem T="long?" Value="@t.TableDefinitionId">
+                    <MudSelectItem T="string" Value="@t.TableDefinitionId">
                         @t.DisplayName (@t.TableName)
                     </MudSelectItem>
                 }
@@ -277,15 +277,15 @@ else
 
         @if (_createForm.DataType == "single_choice")
         {
-            <MudSelect T="long?"
-                       Value="_createForm.RefOptionSetId"
-                       ValueChanged="@(v => _createForm.RefOptionSetId = v)"
+            <MudSelect T="string"
+                       Value="@(_createForm.RefOptionSetId ?? "")"
+                       ValueChanged="@(v => _createForm.RefOptionSetId = string.IsNullOrEmpty(v) ? null : v)"
                        Label="选项集"
                        Variant="Variant.Outlined"
                        Class="mb-3">
                 @foreach (var s in _optionSets ?? new List<OptionSetSummaryDto>())
                 {
-                    <MudSelectItem T="long?" Value="@s.OptionSetId">
+                    <MudSelectItem T="string" Value="@s.OptionSetId">
                         @s.DisplayName (@s.SetName)
                     </MudSelectItem>
                 }
@@ -397,15 +397,15 @@ else
 
         @if (_editingAttribute?.DataType == "composite")
         {
-            <MudSelect T="long?"
-                       Value="_editForm.RefCompositeTypeId"
-                       ValueChanged="@(v => _editForm.RefCompositeTypeId = v)"
+            <MudSelect T="string"
+                       Value="@(_editForm.RefCompositeTypeId ?? "")"
+                       ValueChanged="@(v => _editForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
                        Label="组合类型"
                        Variant="Variant.Outlined"
                        Class="mb-3">
                 @foreach (var t in _compositeTypes ?? new List<CompositeTypeDetailDto>())
                 {
-                    <MudSelectItem T="long?" Value="@t.CompositeTypeId">
+                    <MudSelectItem T="string" Value="@t.CompositeTypeId">
                         @t.DisplayName (@t.TypeName)
                     </MudSelectItem>
                 }
@@ -414,15 +414,15 @@ else
 
         @if (_editingAttribute?.DataType == "table")
         {
-            <MudSelect T="long?"
-                       Value="_editForm.RefTableDefinitionId"
-                       ValueChanged="@(v => _editForm.RefTableDefinitionId = v)"
+            <MudSelect T="string"
+                       Value="@(_editForm.RefTableDefinitionId ?? "")"
+                       ValueChanged="@(v => _editForm.RefTableDefinitionId = string.IsNullOrEmpty(v) ? null : v)"
                        Label="自定义表"
                        Variant="Variant.Outlined"
                        Class="mb-3">
                 @foreach (var t in _customTables ?? new List<CustomTableDetailDto>())
                 {
-                    <MudSelectItem T="long?" Value="@t.TableDefinitionId">
+                    <MudSelectItem T="string" Value="@t.TableDefinitionId">
                         @t.DisplayName (@t.TableName)
                     </MudSelectItem>
                 }
@@ -431,15 +431,15 @@ else
 
         @if (_editingAttribute?.DataType == "single_choice")
         {
-            <MudSelect T="long?"
-                       Value="_editForm.RefOptionSetId"
-                       ValueChanged="@(v => _editForm.RefOptionSetId = v)"
+            <MudSelect T="string"
+                       Value="@(_editForm.RefOptionSetId ?? "")"
+                       ValueChanged="@(v => _editForm.RefOptionSetId = string.IsNullOrEmpty(v) ? null : v)"
                        Label="选项集"
                        Variant="Variant.Outlined"
                        Class="mb-3">
                 @foreach (var s in _optionSets ?? new List<OptionSetSummaryDto>())
                 {
-                    <MudSelectItem T="long?" Value="@s.OptionSetId">
+                    <MudSelectItem T="string" Value="@s.OptionSetId">
                         @s.DisplayName (@s.SetName)
                     </MudSelectItem>
                 }
@@ -785,6 +785,14 @@ else
         return (null, false);
     }
 
+    /// <summary>string 引用类型重载（ID 字符串化后 Diff 需要独立版本）。</summary>
+    private static (string? Value, bool Clear) Diff(string? current, string? original)
+    {
+        if (current is null && original is not null) return (null, true);
+        if (current is not null && current != original) return (current, false);
+        return (null, false);
+    }
+
     // ---------- 删除 ----------
 
     private async Task DeleteAsync(AttributeDetailDto attr)
@@ -871,9 +879,9 @@ else
         public bool IsSortable { get; set; }
         public int DisplayOrder { get; set; }
         public Guid? UnitId { get; set; }
-        public long? RefCompositeTypeId { get; set; }
-        public long? RefTableDefinitionId { get; set; }
-        public long? RefOptionSetId { get; set; }
+        public string? RefCompositeTypeId { get; set; }
+        public string? RefTableDefinitionId { get; set; }
+        public string? RefOptionSetId { get; set; }
     }
 
     private class UpdateAttributeForm
@@ -884,8 +892,8 @@ else
         public bool IsSortable { get; set; }
         public int DisplayOrder { get; set; }
         public Guid? UnitId { get; set; }
-        public long? RefCompositeTypeId { get; set; }
-        public long? RefTableDefinitionId { get; set; }
-        public long? RefOptionSetId { get; set; }
+        public string? RefCompositeTypeId { get; set; }
+        public string? RefTableDefinitionId { get; set; }
+        public string? RefOptionSetId { get; set; }
     }
 }

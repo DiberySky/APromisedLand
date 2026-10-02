@@ -1,4 +1,4 @@
-@page "/custom-table/{EntityType}/{EntityId:long}/{TableName}"
+@page "/custom-table/{EntityType}/{EntityId}/{TableName}"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
@@ -64,7 +64,7 @@ else
 
 @code {
     [Parameter] public string EntityType { get; set; } = "";
-    [Parameter] public long EntityId { get; set; }
+    [Parameter] public string EntityId { get; set; } = "";
     [Parameter] public string TableName { get; set; } = "";
 
     private CustomTableValue? _table;
@@ -117,7 +117,7 @@ else
         }
 
         var (ok, error) = await Api.DeleteCustomTableRowAsync(
-            EntityType, EntityId, TableName, row.RowId.Value);
+            EntityType, EntityId, TableName, row.RowId!);
         if (ok)
         {
             _table!.Rows.Remove(row);

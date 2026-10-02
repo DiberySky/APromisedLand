@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -17,11 +16,10 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "attribute_audit_log",
                 columns: table => new
                 {
-                    audit_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    entity_id = table.Column<long>(type: "bigint", nullable: false),
+                    audit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    attribute_id = table.Column<long>(type: "bigint", nullable: false),
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     old_value = table.Column<string>(type: "text", nullable: true),
                     new_value = table.Column<string>(type: "text", nullable: true),
@@ -40,8 +38,7 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "composite_type_definitions",
                 columns: table => new
                 {
-                    composite_type_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
+                    composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
                     entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     type_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
@@ -59,8 +56,7 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "custom_table_definitions",
                 columns: table => new
                 {
-                    table_definition_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
+                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
                     entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     table_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
@@ -79,8 +75,7 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "option_sets",
                 columns: table => new
                 {
-                    option_set_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
+                    option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
                     entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     set_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
@@ -117,13 +112,12 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "custom_table_columns",
                 columns: table => new
                 {
-                    column_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    table_definition_id = table.Column<long>(type: "bigint", nullable: false),
+                    column_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     column_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    ref_composite_type_id = table.Column<long>(type: "bigint", nullable: true),
+                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     is_required = table.Column<bool>(type: "boolean", nullable: false),
                     is_searchable = table.Column<bool>(type: "boolean", nullable: false),
                     is_sortable = table.Column<bool>(type: "boolean", nullable: false),
@@ -155,9 +149,8 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "option_items",
                 columns: table => new
                 {
-                    option_item_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    option_set_id = table.Column<long>(type: "bigint", nullable: false),
+                    option_item_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     value = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     label = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_order = table.Column<int>(type: "integer", nullable: false),
@@ -180,8 +173,7 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "attribute_catalog",
                 columns: table => new
                 {
-                    attribute_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
                     entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
@@ -195,9 +187,9 @@ namespace TreeGraph.Api.Data.Migrations
                     allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
                     validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
                     default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    ref_composite_type_id = table.Column<long>(type: "bigint", nullable: true),
-                    ref_table_definition_id = table.Column<long>(type: "bigint", nullable: true),
-                    ref_option_set_id = table.Column<long>(type: "bigint", nullable: true),
+                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    ref_table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     unit_id = table.Column<Guid>(type: "uuid", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
@@ -236,15 +228,14 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "composite_field_definitions",
                 columns: table => new
                 {
-                    field_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    composite_type_id = table.Column<long>(type: "bigint", nullable: false),
+                    field_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     field_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    ref_composite_type_id = table.Column<long>(type: "bigint", nullable: true),
+                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     unit_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    ref_option_set_id = table.Column<long>(type: "bigint", nullable: true),
+                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     is_array = table.Column<bool>(type: "boolean", nullable: false),
                     is_required = table.Column<bool>(type: "boolean", nullable: false),
                     is_searchable = table.Column<bool>(type: "boolean", nullable: false),
@@ -290,11 +281,10 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "attribute_values",
                 columns: table => new
                 {
-                    value_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    entity_id = table.Column<long>(type: "bigint", nullable: false),
+                    value_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    attribute_id = table.Column<long>(type: "bigint", nullable: false),
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     value_string = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     value_int = table.Column<long>(type: "bigint", nullable: true),
                     value_decimal = table.Column<decimal>(type: "numeric(38,15)", precision: 38, scale: 15, nullable: true),
@@ -329,11 +319,10 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "custom_table_rows",
                 columns: table => new
                 {
-                    row_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    table_definition_id = table.Column<long>(type: "bigint", nullable: false),
-                    attribute_id = table.Column<long>(type: "bigint", nullable: false),
-                    parent_entity_id = table.Column<long>(type: "bigint", nullable: false),
+                    row_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    parent_entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     parent_entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     row_data = table.Column<JsonDocument>(type: "jsonb", nullable: false),
                     row_order = table.Column<int>(type: "integer", nullable: false),

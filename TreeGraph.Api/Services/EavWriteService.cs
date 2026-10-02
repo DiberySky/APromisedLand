@@ -53,7 +53,7 @@ public class EavWriteService
     ///   而非静默丢弃（防客户端拼写错误导致数据丢失）。
     /// </summary>
     public Task SaveAsync(
-        long entityId, string entityType,
+        string entityId, string entityType,
         Dictionary<string, object?> values,
         string changedBy, string? correlationId = null,
         CancellationToken ct = default,
@@ -74,7 +74,7 @@ public class EavWriteService
     /// 乐观锁、未知属性检查、验证流程与 SaveAsync 完全一致。
     /// </summary>
     public Task PatchAsync(
-        long entityId, string entityType,
+        string entityId, string entityType,
         Dictionary<string, object?> values,
         string changedBy, string? correlationId = null,
         CancellationToken ct = default,
@@ -90,13 +90,18 @@ public class EavWriteService
     /// - fullReplace = false → 未提供的键保持不动（PATCH 语义）
     /// </summary>
     private async Task SaveCoreAsync(
-        long entityId, string entityType,
+        string entityId, string entityType,
         Dictionary<string, object?> values,
         string changedBy, string? correlationId,
         CancellationToken ct,
         DateTimeOffset? expectedUpdatedAt,
         bool fullReplace)
     {
+        // ---- -1. Entity Id 格式校验（GUID 字符串）----
+        if (!Guid.TryParse(entityId, out _))
+            throw new EavValidationException(new List<ValidationError>
+                { new("id", "Entity Id 必须是 GUID 格式") });
+
         var definitions = _attrCache.GetDefinitions(entityType)
             .ToDictionary(d => d.AttributeName);
 
@@ -153,7 +158,7 @@ public class EavWriteService
 
             if (def.DataType == EavDataTypes.Composite && rawValue is DynamicCompositeValue cv)
             {
-                var r = _composite.Validate(cv, def.RefCompositeTypeId!.Value);
+                var r = _composite.Validate(cv, def.RefCompositeTypeId!);
                 if (!r.IsValid) validationErrors.AddRange(r.Errors);
             }
             else
@@ -205,6 +210,7 @@ public class EavWriteService
             {
                 existingValue = new AttributeValue
                 {
+                    // ValueId 为空字符串 → 触发 DB DEFAULT gen_random_uuid()（HasSentinel 语义）
                     EntityId = entityId,
                     EntityType = entityType,
                     AttributeId = def.AttributeId,
@@ -324,7 +330,7 @@ public class EavWriteService
             case EavDataTypes.Composite:
                 if (value is not DynamicCompositeValue cv)
                     throw new InvalidOperationException("composite 值类型错误");
-                target.ValueJsonb = _composite.Serialize(cv, def.RefCompositeTypeId!.Value);
+                target.ValueJsonb = _composite.Serialize(cv, def.RefCompositeTypeId!);
                 break;
         }
     }
@@ -413,12 +419,13 @@ public class EavWriteService
     }
 
     private static AttributeAuditLog CreateAudit(
-        long entityId, string entityType, AttributeDefinition def,
+        string entityId, string entityType, AttributeDefinition def,
         string? oldValue, string? newValue, string changeType,
         string changedBy, string? correlationId, DateTimeOffset now)
     {
         return new AttributeAuditLog
         {
+            // AuditId 为空字符串 → 触发 DB DEFAULT gen_random_uuid()（HasSentinel 语义）
             EntityId = entityId,
             EntityType = entityType,
             AttributeId = def.AttributeId,
@@ -434,7 +441,7 @@ public class EavWriteService
 
     /// <summary>删除实体（物理删除所有属性值 + 自定义表行，写审计）。</summary>
     public async Task<bool> DeleteEntityAsync(
-        long entityId, string entityType,
+        string entityId, string entityType,
         string changedBy, string? correlationId = null,
         CancellationToken ct = default)
     {
@@ -512,7 +519,7 @@ public class EavWriteService
     ///   - 与 DeleteEntityAsync 共享"删除 = 删两张表 + 写审计"的策略
     /// </summary>
     public async Task<BatchDeleteResult> DeleteEntitiesAsync(
-        IReadOnlyList<long> entityIds,
+        IReadOnlyList<string> entityIds,
         string entityType,
         string changedBy,
         string? correlationId = null,
@@ -520,7 +527,7 @@ public class EavWriteService
     {
         if (entityIds.Count == 0)
             return new BatchDeleteResult(
-                Array.Empty<long>(), Array.Empty<long>(), 0);
+                Array.Empty<string>(), Array.Empty<string>(), 0);
 
         var requested = entityIds.Distinct().ToList();
 
@@ -544,7 +551,7 @@ public class EavWriteService
 
         if (toDelete.Count == 0)
             return new BatchDeleteResult(
-                Array.Empty<long>(), notFound, 0);
+                Array.Empty<string>(), notFound, 0);
 
         var strategy = _db.Database.CreateExecutionStrategy();
         int totalAttributesDeleted = 0;
@@ -611,8 +618,8 @@ public class EavWriteService
 /// 批量删除结果。
 /// </summary>
 public record BatchDeleteResult(
-    IReadOnlyList<long> Deleted,
-    IReadOnlyList<long> NotFound,
+    IReadOnlyList<string> Deleted,
+    IReadOnlyList<string> NotFound,
     int TotalAttributesDeleted);
 
 /// <summary>

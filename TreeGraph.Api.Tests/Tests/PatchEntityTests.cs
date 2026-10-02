@@ -29,7 +29,7 @@ public class PatchEntityTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        long id = 95001;
+        var id = GuidFromInt(95001);
         // 初始：amount=1, price=100, label="original"
         await PutEntityAsync(TestData.EntityType, id, new Dictionary<string, object?>
         {
@@ -65,7 +65,7 @@ public class PatchEntityTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        long id = 95002;
+        var id = GuidFromInt(95002);
         await PutEntityAsync(TestData.EntityType, id, new Dictionary<string, object?>
         {
             ["amount"] = 1L,
@@ -97,7 +97,7 @@ public class PatchEntityTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        long id = 95003;
+        var id = GuidFromInt(95003);
         var patch = new Dictionary<string, object?>
         {
             ["amoutn"] = 2L   // typo
@@ -119,7 +119,7 @@ public class PatchEntityTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        long id = 95004;
+        var id = GuidFromInt(95004);
         await PutEntityAsync(TestData.EntityType, id, new Dictionary<string, object?>
         {
             ["amount"] = 1L
@@ -152,7 +152,7 @@ public class PatchEntityTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        long id = 95005;
+        var id = GuidFromInt(95005);
         await PutEntityAsync(TestData.EntityType, id, new Dictionary<string, object?>
         {
             ["amount"] = 42L
@@ -179,7 +179,7 @@ public class PatchEntityTests : IntegrationTestBase
         await TestData.EnsureSchemaAsync(Client);
 
         // === 场景 A：PUT 只提供 amount → label 被删除 ===
-        long idA = 95006;
+        var idA = GuidFromInt(95006);
         await PutEntityAsync(TestData.EntityType, idA, new Dictionary<string, object?>
         {
             ["amount"] = 1L,
@@ -197,7 +197,7 @@ public class PatchEntityTests : IntegrationTestBase
         Assert.False(afterA!.Properties.ContainsKey("label"));   // PUT 删除了
 
         // === 场景 B：PATCH 只提供 amount → label 保留 ===
-        long idB = 95007;
+        var idB = GuidFromInt(95007);
         await PutEntityAsync(TestData.EntityType, idB, new Dictionary<string, object?>
         {
             ["amount"] = 1L,

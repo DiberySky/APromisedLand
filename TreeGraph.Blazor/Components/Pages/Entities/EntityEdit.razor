@@ -1,4 +1,4 @@
-@page "/entities/{EntityType}/{EntityId:long}"
+@page "/entities/{EntityType}/{EntityId}"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @using System.Text.Json
 @using TreeGraph.Blazor.Components.Shared
@@ -123,7 +123,7 @@ else
 
 @code {
     [Parameter] public string EntityType { get; set; } = "";
-    [Parameter] public long EntityId { get; set; }
+    [Parameter] public string EntityId { get; set; } = "";
 
     private IReadOnlyList<AttributeSchemaDto>? _schema;
     private readonly Dictionary<string, object?> _values = new();
@@ -338,7 +338,14 @@ else
             "datetime" => elem.GetDateTimeOffset(),
             "date" => elem.GetString(),
             "time" => elem.GetString(),
-            "single_choice" => elem.GetString(),
+            // ★ 后端绑定选项集时返回 SingleChoiceValue 对象 {value,label}
+            //   （EavReadService.ExtractSingleChoice），未绑定时才是纯字符串
+            "single_choice" => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString()
+                : elem.ValueKind == JsonValueKind.Object
+                  && elem.TryGetProperty("value", out var sc)
+                  && sc.ValueKind == JsonValueKind.String ? sc.GetString()
+                : elem.ToString(),
             "json" or "file" => elem.Clone(),
             "composite" => schema.CompositeType is not null
                 ? JsonToComposite(elem, schema.CompositeType)

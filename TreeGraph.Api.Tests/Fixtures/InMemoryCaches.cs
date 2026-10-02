@@ -5,17 +5,17 @@ namespace TreeGraph.Api.Tests.Fixtures;
 
 public sealed class InMemoryCompositeTypeCache : ICompositeTypeCache
 {
-    private readonly Dictionary<long, CompositeTypeDefinition> _types = new();
+    private readonly Dictionary<string, CompositeTypeDefinition> _types = new();
 
     public void Add(CompositeTypeDefinition type) => _types[type.CompositeTypeId] = type;
     public void Clear() => _types.Clear();
 
-    public CompositeTypeDefinition GetType(long id)
+    public CompositeTypeDefinition GetType(string id)
         => _types.TryGetValue(id, out var t)
             ? t
             : throw new KeyNotFoundException($"CompositeType {id} 不存在");
 
-    public void Invalidate(long id) => _types.Remove(id);
+    public void Invalidate(string id) => _types.Remove(id);
 }
 
 public sealed class InMemoryUnitCache : IUnitCache
@@ -39,17 +39,16 @@ public sealed class InMemoryUnitCache : IUnitCache
 
 public sealed class InMemoryOptionSetCache : IOptionSetCache
 {
-    private readonly Dictionary<long, OptionSet> _sets = new();
+    private readonly Dictionary<string, OptionSet> _sets = new();
 
     public void Add(OptionSet s) => _sets[s.OptionSetId] = s;
     public void Clear() => _sets.Clear();
 
-    public OptionSet GetSet(long id)
+    public OptionSet GetSet(string id)
         => _sets.TryGetValue(id, out var s)
             ? s
             : throw new KeyNotFoundException($"OptionSet {id} 不存在");
 
-    // ★ D2：与生产接口 IOptionSetCache.GetAll 的 2 参数签名保持一致
     public List<OptionSet> GetAll(string? entityType = null, bool includeDeleted = false)
     {
         var query = _sets.Values.AsEnumerable();
@@ -60,5 +59,5 @@ public sealed class InMemoryOptionSetCache : IOptionSetCache
         return query.ToList();
     }
 
-    public void Invalidate(long id) => _sets.Remove(id);
+    public void Invalidate(string id) => _sets.Remove(id);
 }

@@ -54,7 +54,7 @@
                 <MudPaper Class="pa-3 mb-2" Outlined="true">
                     <div class="d-flex align-center mb-2">
                         <MudText Typo="Typo.caption">
-                            行 @(idx + 1) @(row.RowId.HasValue ? $"（ID: {row.RowId}）" : "（新增）")
+                            行 @(idx + 1) @(row.RowId is not null ? $"（ID: {row.RowId}）" : "（新增）")
                         </MudText>
                         <MudSpacer />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
@@ -103,15 +103,15 @@
 
 @code {
     [Parameter, EditorRequired] public string EntityType { get; set; } = "";
-    [Parameter, EditorRequired] public long EntityId { get; set; }
+    [Parameter, EditorRequired] public string EntityId { get; set; } = "";
     [Parameter, EditorRequired] public string AttributeName { get; set; } = "";
     [Parameter, EditorRequired] public string TableName { get; set; } = "";
     [Parameter, EditorRequired] public string DisplayName { get; set; } = "";
-    [Parameter] public long? RefTableDefinitionId { get; set; }
+    [Parameter] public string? RefTableDefinitionId { get; set; }
 
     private class RowState
     {
-        public long? RowId { get; set; }
+        public string? RowId { get; set; }
         public int RowOrder { get; set; }
         public Dictionary<string, object?> Fields { get; set; } = new();
 

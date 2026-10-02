@@ -20,8 +20,8 @@ public class CustomTableQueryService
     /// 查找所有含指定行数据的父实体
     /// 例：查找含 cert_name=CE 的证书的所有产品
     /// </summary>
-    public async Task<List<long>> FindParentEntitiesByRowAsync(
-        string parentEntityType, long attributeId,
+    public async Task<List<string>> FindParentEntitiesByRowAsync(
+        string parentEntityType, string attributeId,
         Dictionary<string, object?> rowFilter,
         CancellationToken ct = default)
     {
@@ -41,12 +41,12 @@ public class CustomTableQueryService
     /// <summary>
     /// 组合多条件查询：每个条件匹配某一行，多条件间取交集（AND 语义）
     /// </summary>
-    public async Task<List<long>> FindByMultipleRowConditionsAsync(
-        string parentEntityType, long attributeId,
+    public async Task<List<string>> FindByMultipleRowConditionsAsync(
+        string parentEntityType, string attributeId,
         List<Dictionary<string, object?>> rowConditions,
         CancellationToken ct = default)
     {
-        IQueryable<long>? result = null;
+        IQueryable<string>? result = null;
 
         foreach (var condition in rowConditions)
         {
@@ -64,7 +64,7 @@ public class CustomTableQueryService
         }
 
         return result is null
-            ? new List<long>()
+            ? new List<string>()
             : await result.ToListAsync(ct);
     }
 }

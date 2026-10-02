@@ -29,7 +29,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
 
     private static bool _schemaReady;
     private static readonly SemaphoreSlim _schemaLock = new(1, 1);
-    private static long _tableDefId;
+    private static string _tableDefId = "";
 
     private async Task EnsureSchemaAsync()
     {
@@ -83,7 +83,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
             // 顺带验证建属性响应字段名 attributeId 可解析
             var attrId = (await attrResp.Content
                 .ReadFromJsonAsync<AttrIdResponse>())!.AttributeId;
-            Assert.True(attrId > 0);
+            Assert.False(string.IsNullOrEmpty(attrId));
 
             _schemaReady = true;
         }
@@ -94,7 +94,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
     }
 
     private async Task<HttpResponseMessage> UpsertRowAsync(
-        long entityId, string certName, long? rowId = null)
+        string entityId, string certName, string? rowId = null)
     {
         var body = new
         {
@@ -116,7 +116,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
     {
         await EnsureSchemaAsync();
 
-        var resp = await UpsertRowAsync(96001, "CERT-A");
+        var resp = await UpsertRowAsync(GuidFromInt(96001), "CERT-A");
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
     }
 
@@ -129,7 +129,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
     {
         await EnsureSchemaAsync();
 
-        long parent = 96002;
+        var parent = GuidFromInt(96002);
         var first = await UpsertRowAsync(parent, "CERT-DUP");
         Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
 
@@ -149,13 +149,13 @@ public class CrossRowUniqueTests : IntegrationTestBase
     {
         await EnsureSchemaAsync();
 
-        long parent = 96003;
+        var parent = GuidFromInt(96003);
         await UpsertRowAsync(parent, "SELF-X");
 
         // 拿到 rowId
         var tableValue = await Client.GetFromJsonAsync<CustomTableValue>(
             $"/api/eav/{EntityType}/entities/{parent}/tables/unique_certs");
-        var rowId = tableValue!.Rows[0].RowId!.Value;
+        var rowId = tableValue!.Rows[0].RowId!;
 
         // 更新自身（同值）→ 应 OK
         var resp = await UpsertRowAsync(parent, "SELF-X", rowId);
@@ -171,8 +171,8 @@ public class CrossRowUniqueTests : IntegrationTestBase
     {
         await EnsureSchemaAsync();
 
-        var a = await UpsertRowAsync(96004, "SHARED-VAL");
-        var b = await UpsertRowAsync(96005, "SHARED-VAL");   // 不同父实体
+        var a = await UpsertRowAsync(GuidFromInt(96004), "SHARED-VAL");
+        var b = await UpsertRowAsync(GuidFromInt(96005), "SHARED-VAL");   // 不同父实体
 
         Assert.Equal(HttpStatusCode.NoContent, a.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, b.StatusCode);
@@ -187,12 +187,12 @@ public class CrossRowUniqueTests : IntegrationTestBase
     {
         await EnsureSchemaAsync();
 
-        long parent = 96006;
+        var parent = GuidFromInt(96006);
         await UpsertRowAsync(parent, "RELEASE-X");
 
         var tableValue = await Client.GetFromJsonAsync<CustomTableValue>(
             $"/api/eav/{EntityType}/entities/{parent}/tables/unique_certs");
-        var rowId = tableValue!.Rows[0].RowId!.Value;
+        var rowId = tableValue!.Rows[0].RowId!;
 
         // 删除该行
         var del = await Client.DeleteAsync(
@@ -208,6 +208,6 @@ public class CrossRowUniqueTests : IntegrationTestBase
     // 辅助 record
     // ============================================================
 
-    private sealed record IdResponse(long TableDefinitionId);
-    private sealed record AttrIdResponse(long AttributeId);
+    private sealed record IdResponse(string TableDefinitionId);
+    private sealed record AttrIdResponse(string AttributeId);
 }

@@ -17,7 +17,7 @@ public class ValidationTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        long id = 91001;
+        var id = GuidFromInt(91001);
         var payload = new Dictionary<string, object?>
         {
             ["amount"] = 1L,
@@ -38,7 +38,7 @@ public class ValidationTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        long id = 91002;
+        var id = GuidFromInt(91002);
         var payload = new Dictionary<string, object?>
         {
             ["amount"] = 3.14m
@@ -63,7 +63,7 @@ public class ValidationTests : IntegrationTestBase
         };
 
         var resp = await Client.PutAsJsonAsync(
-            "/api/eav/Product/entities/92001", payload);
+            $"/api/eav/Product/entities/{GuidFromInt(92001)}", payload);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();

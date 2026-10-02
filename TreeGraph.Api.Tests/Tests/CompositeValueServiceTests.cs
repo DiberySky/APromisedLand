@@ -9,14 +9,6 @@ namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
 /// CompositeValueService 的序列化/反序列化单测。
-///
-/// 焦点：
-///   - 组合内带单位 decimal 的 `{ value, unitId }` 序列化
-///   - 无单位 decimal 的裸数值序列化
-///   - originalUnits=true 时的单位还原
-///   - 未知 unitId 的降级
-///   - 数组字段 / 嵌套组合递归
-///
 /// 不触 DB：用内存 stub 提供 type / unit / option set。
 /// </summary>
 public class CompositeValueServiceTests
@@ -27,20 +19,19 @@ public class CompositeValueServiceTests
     private readonly UnitConverter _converter;
     private readonly CompositeValueService _service;
 
-    // 测试类型 ID
-    private const long SpecsTypeId = 100;
-    private const long BrandTypeId = 101;
+    // 测试类型 ID（GUID 字符串）
+    private const string SpecsTypeId = "00000000-0000-0000-0000-000000000100";
+    private const string BrandTypeId = "00000000-0000-0000-0000-000000000101";
+    private const string NoUnitTypeId = "00000000-0000-0000-0000-000000000200";
 
-    // 测试单位
     private Guid _kg;
     private Guid _g;
-    private Guid _cm;   // 不同分类
+    private Guid _cm;
 
     public CompositeValueServiceTests()
     {
         _converter = new UnitConverter(_unitCache);
 
-        // 构造单位
         _kg = Guid.NewGuid();
         _g = Guid.NewGuid();
         _cm = Guid.NewGuid();
@@ -60,7 +51,7 @@ public class CompositeValueServiceTests
             ToBaseFactor = 0.01m, IsBaseUnit = false
         });
 
-        // 构造组合类型 Specs：{ color, weight(kg), brand(嵌套 Brand) }
+        // Brand 组合
         var brandType = new CompositeTypeDefinition
         {
             CompositeTypeId = BrandTypeId,
@@ -68,12 +59,15 @@ public class CompositeValueServiceTests
             DisplayName = "品牌",
             Fields = new List<CompositeFieldDefinition>
             {
-                new() { FieldId = 11, FieldName = "name", DataType = EavDataTypes.String, DisplayOrder = 1 },
-                new() { FieldId = 12, FieldName = "origin", DataType = EavDataTypes.String, DisplayOrder = 2 }
+                new() { FieldId = "00000000-0000-0000-0001-000000000011",
+                        FieldName = "name", DataType = EavDataTypes.String, DisplayOrder = 1 },
+                new() { FieldId = "00000000-0000-0000-0001-000000000012",
+                        FieldName = "origin", DataType = EavDataTypes.String, DisplayOrder = 2 }
             }
         };
         _compositeCache.Add(brandType);
 
+        // Specs 组合
         var specsType = new CompositeTypeDefinition
         {
             CompositeTypeId = SpecsTypeId,
@@ -81,14 +75,30 @@ public class CompositeValueServiceTests
             DisplayName = "规格",
             Fields = new List<CompositeFieldDefinition>
             {
-                new() { FieldId = 1, FieldName = "color", DataType = EavDataTypes.String, DisplayOrder = 1 },
-                new() { FieldId = 2, FieldName = "weight", DataType = EavDataTypes.Decimal,
+                new() { FieldId = "00000000-0000-0000-0002-000000000001",
+                        FieldName = "color", DataType = EavDataTypes.String, DisplayOrder = 1 },
+                new() { FieldId = "00000000-0000-0000-0002-000000000002",
+                        FieldName = "weight", DataType = EavDataTypes.Decimal,
                         UnitId = _kg, DisplayOrder = 2 },
-                new() { FieldId = 3, FieldName = "brand", DataType = EavDataTypes.Composite,
+                new() { FieldId = "00000000-0000-0000-0002-000000000003",
+                        FieldName = "brand", DataType = EavDataTypes.Composite,
                         RefCompositeTypeId = BrandTypeId, DisplayOrder = 3 }
             }
         };
         _compositeCache.Add(specsType);
+
+        // NoUnit 组合
+        var noUnitType = new CompositeTypeDefinition
+        {
+            CompositeTypeId = NoUnitTypeId,
+            TypeName = "NoUnit",
+            Fields = new List<CompositeFieldDefinition>
+            {
+                new() { FieldId = "00000000-0000-0000-0003-000000000020",
+                        FieldName = "ratio", DataType = EavDataTypes.Decimal }
+            }
+        };
+        _compositeCache.Add(noUnitType);
 
         var validator = new EavValidationService(
             _compositeCache, _unitCache, _converter, _optionSetCache);
@@ -130,34 +140,20 @@ public class CompositeValueServiceTests
     [Fact]
     public void Serialize_DecimalWithoutUnit_OutputsBareNumber()
     {
-        // 临时把 weight 的 UnitId 去掉，构造独立 type
-        var tempType = new CompositeTypeDefinition
-        {
-            CompositeTypeId = 200,
-            TypeName = "NoUnit",
-            Fields = new List<CompositeFieldDefinition>
-            {
-                new() { FieldId = 20, FieldName = "ratio",
-                        DataType = EavDataTypes.Decimal }
-            }
-        };
-        _compositeCache.Add(tempType);
-
         var v = MakeValue("NoUnit", ("ratio", 1.5m));
-        var doc = _service.Serialize(v, 200);
+        var doc = _service.Serialize(v, NoUnitTypeId);
 
         Assert.Equal(JsonValueKind.Number, Root(doc).GetProperty("ratio").ValueKind);
         Assert.Equal(1.5m, Root(doc).GetProperty("ratio").GetDecimal());
     }
 
     // ============================================================
-    // Serialize — 带单位 decimal → { value, unitId }
+    // Serialize — 带单位 decimal
     // ============================================================
 
     [Fact]
     public void Serialize_DecimalWithUnit_WhenInputIsBaseUnit_OutputsBareNumber()
     {
-        // 输入用基准单位，且没有 unitId 引用 → 裸数值
         var v = MakeValue("Specs", ("weight", 5m));
         var doc = _service.Serialize(v, SpecsTypeId);
 
@@ -168,7 +164,6 @@ public class CompositeValueServiceTests
     [Fact]
     public void Serialize_DecimalWithUnit_WhenInputHasUnit_OutputsObjectWithNormalizedValue()
     {
-        // 输入 1000 克 → 归一化到 1 千克
         var v = MakeValue("Specs", ("weight", new NumericValue(1000m, _g)));
         var doc = _service.Serialize(v, SpecsTypeId);
 
@@ -208,13 +203,12 @@ public class CompositeValueServiceTests
     }
 
     // ============================================================
-    // Deserialize — 无 originalUnits → 基准单位
+    // Deserialize
     // ============================================================
 
     [Fact]
     public void Deserialize_WithUnitObject_DefaultReturnsBaseUnitValue()
     {
-        // JSON: { weight: { value: 1, unitId: <g> } } — 存储已归一化到 kg 的值
         var json = $$"""
         {
             "weight": { "value": 1, "unitId": "{{_g}}" }
@@ -228,17 +222,12 @@ public class CompositeValueServiceTests
         Assert.IsType<NumericValue>(weight);
         var nv = (NumericValue)weight!;
         Assert.Equal(1m, nv.Value);
-        Assert.Equal(_kg, nv.UnitId);   // 无 originalUnits → 返回基准单位 kg
+        Assert.Equal(_kg, nv.UnitId);
     }
-
-    // ============================================================
-    // Deserialize — originalUnits=true → 还原
-    // ============================================================
 
     [Fact]
     public void Deserialize_WithUnitObject_OriginalUnits_RestoresInputUnit()
     {
-        // 存储 1 kg（基准），原始输入是克
         var json = $$"""
         {
             "weight": { "value": 1, "unitId": "{{_g}}" }
@@ -249,14 +238,13 @@ public class CompositeValueServiceTests
         var result = _service.Deserialize(doc, SpecsTypeId, originalUnits: true);
 
         var nv = (NumericValue)result["weight"]!;
-        Assert.Equal(1000m, nv.Value);   // 1 kg → 1000 g
+        Assert.Equal(1000m, nv.Value);
         Assert.Equal(_g, nv.UnitId);
     }
 
     [Fact]
     public void Deserialize_BareNumberWithUnitField_DefaultsToBaseUnit()
     {
-        // 无 unitId 引用（旧数据兼容）→ 按基准单位
         var json = """{"weight": 5}""";
 
         using var doc = JsonDocument.Parse(json);
@@ -266,10 +254,6 @@ public class CompositeValueServiceTests
         Assert.Equal(5m, nv.Value);
         Assert.Equal(_kg, nv.UnitId);
     }
-
-    // ============================================================
-    // Deserialize — 未知 unitId → 降级到基准单位
-    // ============================================================
 
     [Fact]
     public void Deserialize_UnknownUnitId_FallsBackToBaseUnit()
@@ -286,35 +270,28 @@ public class CompositeValueServiceTests
 
         var nv = (NumericValue)result["weight"]!;
         Assert.Equal(2m, nv.Value);
-        Assert.Equal(_kg, nv.UnitId);   // 无法还原时退回基准单位
+        Assert.Equal(_kg, nv.UnitId);
     }
 
     // ============================================================
-    // 往返一致性
+    // 往返
     // ============================================================
 
     [Fact]
     public void RoundTrip_WithUnit_PreservesOriginalValue()
     {
-        // 输入 1500 克
         var v = MakeValue("Specs", ("weight", new NumericValue(1500m, _g)));
 
         var doc = _service.Serialize(v, SpecsTypeId);
 
-        // 存储后 JSON 里的 value 应为 1.5 kg
         var stored = Root(doc).GetProperty("weight");
         Assert.Equal(1.5m, stored.GetProperty("value").GetDecimal());
 
-        // 反序列化 originalUnits=true → 应还原为 1500 克
         var result = _service.Deserialize(doc, SpecsTypeId, originalUnits: true);
         var nv = (NumericValue)result["weight"]!;
         Assert.Equal(1500m, nv.Value);
         Assert.Equal(_g, nv.UnitId);
     }
-
-    // ============================================================
-    // 嵌套组合往返
-    // ============================================================
 
     [Fact]
     public void RoundTrip_NestedComposite_PreservesValues()
@@ -333,13 +310,13 @@ public class CompositeValueServiceTests
     }
 
     // ============================================================
-    // 缺失字段的处理
+    // 缺失字段
     // ============================================================
 
     [Fact]
     public void Deserialize_MissingField_LeavesItUnset()
     {
-        var json = """{"color": "blue"}""";   // 无 weight / brand
+        var json = """{"color": "blue"}""";
         using var doc = JsonDocument.Parse(json);
 
         var result = _service.Deserialize(doc, SpecsTypeId);

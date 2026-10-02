@@ -8,7 +8,7 @@ using TreeGraph.Shared.Eav.Dtos;
 namespace TreeGraph.Api.Controllers;
 
 [ApiController]
-[Route("api/eav/metadata/option-sets/{setId:long}/items")]
+[Route("api/eav/metadata/option-sets/{setId}/items")]
 public class OptionItemsController : ControllerBase
 {
     private readonly EavDbContext _db;
@@ -22,7 +22,7 @@ public class OptionItemsController : ControllerBase
 
     /// <summary>列出选项集内所有选项（含已软删除的，供管理员查看）</summary>
     [HttpGet]
-    public async Task<IActionResult> ListItems(long setId, CancellationToken ct)
+    public async Task<IActionResult> ListItems(string setId, CancellationToken ct)
     {
         var setExists = await _db.OptionSets
             .AnyAsync(s => s.OptionSetId == setId, ct);
@@ -49,7 +49,7 @@ public class OptionItemsController : ControllerBase
     /// <summary>添加选项</summary>
     [HttpPost]
     public async Task<IActionResult> AddOption(
-        long setId, [FromBody] CreateOptionItemRequest req, CancellationToken ct)
+        string setId, [FromBody] CreateOptionItemRequest req, CancellationToken ct)
     {
         var item = new OptionItem
         {
@@ -76,9 +76,9 @@ public class OptionItemsController : ControllerBase
     }
 
     /// <summary>更新选项（可改 Value 之外的 Label、顺序、默认标记；改 Label 不影响已存数据）</summary>
-    [HttpPut("{itemId:long}")]
+    [HttpPut("{itemId}")]
     public async Task<IActionResult> UpdateOption(
-        long setId, long itemId, [FromBody] UpdateOptionItemRequest req,
+        string setId, string itemId, [FromBody] UpdateOptionItemRequest req,
         CancellationToken ct)
     {
         var item = await _db.OptionItems
@@ -107,9 +107,9 @@ public class OptionItemsController : ControllerBase
     }
 
     /// <summary>删除选项（软删除：历史数据仍存有旧 Value，读取端降级显示）</summary>
-    [HttpDelete("{itemId:long}")]
+    [HttpDelete("{itemId}")]
     public async Task<IActionResult> DeleteOption(
-        long setId, long itemId, CancellationToken ct)
+        string setId, string itemId, CancellationToken ct)
     {
         var item = await _db.OptionItems
             .FirstOrDefaultAsync(i => i.OptionItemId == itemId && i.OptionSetId == setId, ct);
@@ -126,7 +126,7 @@ public class OptionItemsController : ControllerBase
     /// <summary>选项重排序</summary>
     [HttpPut("reorder")]
     public async Task<IActionResult> ReorderOptions(
-        long setId, [FromBody] List<ReorderOptionItem> items, CancellationToken ct)
+        string setId, [FromBody] List<ReorderOptionItem> items, CancellationToken ct)
     {
         var ids = items.Select(i => i.OptionItemId).ToList();
         var existing = await _db.OptionItems
@@ -148,9 +148,9 @@ public class OptionItemsController : ControllerBase
     /// ★ 恢复被软删除的选项项。
     /// 唯一约束（option_set_id, value）不区分 IsDeleted。
     /// </summary>
-    [HttpPost("{itemId:long}/undelete")]
+    [HttpPost("{itemId}/undelete")]
     public async Task<IActionResult> UndeleteOption(
-        long setId, long itemId, CancellationToken ct)
+        string setId, string itemId, CancellationToken ct)
     {
         var item = await _db.OptionItems
             .FirstOrDefaultAsync(i => i.OptionItemId == itemId

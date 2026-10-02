@@ -365,7 +365,7 @@ else
     private string? _entityType;
     private bool _includeDeleted;               // ★ 新增
     private IReadOnlyList<OptionSetSummaryDto>? _sets;
-    private readonly Dictionary<long, List<OptionItemDetailDto>> _itemsCache = new();
+    private readonly Dictionary<string, List<OptionItemDetailDto>> _itemsCache = new();
     private bool _loading;
     private bool _initialized;
 
@@ -443,7 +443,7 @@ else
         }
     }
 
-    private async Task ReloadItemsAsync(long optionSetId)
+    private async Task ReloadItemsAsync(string optionSetId)
     {
         var items = await Api.ListOptionItemsAsync(optionSetId);
         _itemsCache[optionSetId] = items?.ToList() ?? new List<OptionItemDetailDto>();
@@ -801,7 +801,7 @@ else
     }
 
     private async Task ApplyReorderAsync(
-        long optionSetId, List<OptionItemDetailDto> orderedItems)
+        string optionSetId, List<OptionItemDetailDto> orderedItems)
     {
         var orders = orderedItems
             .Select((it, i) => new ReorderOptionItem

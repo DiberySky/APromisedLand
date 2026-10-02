@@ -3,10 +3,10 @@ namespace TreeGraph.Api.Entities;
 /// <summary>属性变更审计日志（与值变更同事务提交）</summary>
 public class AttributeAuditLog
 {
-    public long AuditId { get; set; }
-    public long EntityId { get; set; }
+    public string AuditId { get; set; } = "";
+    public string EntityId { get; set; } = "";
     public string EntityType { get; set; } = "";
-    public long AttributeId { get; set; }
+    public string AttributeId { get; set; } = "";
     public string AttributeName { get; set; } = "";
     public string? OldValue { get; set; }
     public string? NewValue { get; set; }

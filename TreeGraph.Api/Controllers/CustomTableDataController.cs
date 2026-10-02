@@ -5,7 +5,7 @@ using TreeGraph.Shared.Eav.Dtos;
 namespace TreeGraph.Api.Controllers;
 
 [ApiController]
-[Route("api/eav/{entityType}/entities/{entityId:long}/tables")]
+[Route("api/eav/{entityType}/entities/{entityId}/tables")]
 public class CustomTableDataController : ControllerBase
 {
     private readonly CustomTableReadService _read;
@@ -23,7 +23,7 @@ public class CustomTableDataController : ControllerBase
 
     [HttpGet("{tableName}")]
     public async Task<IActionResult> Load(
-        string entityType, long entityId, string tableName,
+        string entityType, string entityId, string tableName,
         CancellationToken ct)
     {
         var def = _attrCache.GetDefinition(entityType, tableName);
@@ -31,13 +31,13 @@ public class CustomTableDataController : ControllerBase
 
         var result = await _read.LoadAsync(
             entityId, entityType,
-            def.AttributeId, def.RefTableDefinitionId.Value, ct);
+            def.AttributeId, def.RefTableDefinitionId, ct);
         return Ok(result);
     }
 
     [HttpPut("{tableName}")]
     public async Task<IActionResult> Replace(
-        string entityType, long entityId, string tableName,
+        string entityType, string entityId, string tableName,
         [FromBody] CustomTableValue value, CancellationToken ct)
     {
         var def = _attrCache.GetDefinition(entityType, tableName);
@@ -47,7 +47,7 @@ public class CustomTableDataController : ControllerBase
         {
             await _write.ReplaceAsync(
                 entityId, entityType,
-                def.AttributeId, def.RefTableDefinitionId.Value, value, ct);
+                def.AttributeId, def.RefTableDefinitionId, value, ct);
             return NoContent();
         }
         catch (EavValidationException ex)
@@ -58,7 +58,7 @@ public class CustomTableDataController : ControllerBase
 
     [HttpPut("{tableName}/rows")]
     public async Task<IActionResult> UpsertRow(
-        string entityType, long entityId, string tableName,
+        string entityType, string entityId, string tableName,
         [FromBody] CustomTableRowValue rowValue, CancellationToken ct)
     {
         var def = _attrCache.GetDefinition(entityType, tableName);
@@ -68,7 +68,7 @@ public class CustomTableDataController : ControllerBase
         {
             await _write.UpsertRowAsync(
                 entityId, entityType,
-                def.AttributeId, def.RefTableDefinitionId.Value,
+                def.AttributeId, def.RefTableDefinitionId,
                 rowValue, ct);
             return NoContent();
         }
@@ -82,11 +82,11 @@ public class CustomTableDataController : ControllerBase
         }
     }
 
-    /// <summary>删除单行（★ 修复 P0-3：带归属校验）</summary>
-    [HttpDelete("{tableName}/rows/{rowId:long}")]
+    /// <summary>删除单行（★ 修复 P0-3：带归属校验；rowId 是 GUID 字符串）</summary>
+    [HttpDelete("{tableName}/rows/{rowId}")]
     public async Task<IActionResult> DeleteRow(
-        string entityType, long entityId, string tableName,
-        long rowId, CancellationToken ct)
+        string entityType, string entityId, string tableName,
+        string rowId, CancellationToken ct)
     {
         var def = _attrCache.GetDefinition(entityType, tableName);
         if (def?.RefTableDefinitionId is null) return NotFound();

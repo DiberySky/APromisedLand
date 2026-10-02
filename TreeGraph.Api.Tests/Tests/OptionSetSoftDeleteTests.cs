@@ -29,13 +29,13 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
 {
     public OptionSetSoftDeleteTests(EavApiFactory factory) : base(factory) { }
 
-    private sealed record IdResponse(long OptionSetId);
+    private sealed record IdResponse(string OptionSetId);
 
     // ============================================================
     // 辅助
     // ============================================================
 
-    private async Task<long> CreateSetAsync(
+    private async Task<string> CreateSetAsync(
         string entityType, string setName,
         params (string Value, string Label)[] items)
     {
@@ -59,14 +59,14 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
         return created!.OptionSetId;
     }
 
-    private async Task DeleteSetAsync(long setId)
+    private async Task DeleteSetAsync(string setId)
     {
         var resp = await Client.DeleteAsync(
             $"/api/eav/metadata/option-sets/{setId}");
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
     }
 
-    private async Task<HttpResponseMessage> UndeleteSetRawAsync(long setId)
+    private async Task<HttpResponseMessage> UndeleteSetRawAsync(string setId)
         => await Client.PostAsync(
             $"/api/eav/metadata/option-sets/{setId}/undelete", content: null);
 

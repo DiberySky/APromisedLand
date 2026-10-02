@@ -40,7 +40,7 @@ public class CustomTableEditorTests : TestContext
         bool requiredCertName = false,
         JsonElement? certNameRule = null)
         => new(
-            TableDefinitionId: 100,
+            TableDefinitionId: "00000000-0000-0000-0000-000000000100",
             EntityType: "Product",
             TableName: "certs",
             DisplayName: "认证证书",
@@ -49,7 +49,7 @@ public class CustomTableEditorTests : TestContext
             Columns: new[]
             {
                 new CustomTableColumnDto(
-                    ColumnId: 1,
+                    ColumnId: "00000000-0000-0000-0000-000000000001",
                     ColumnName: "cert_name",
                     DisplayName: "证书名称",
                     DataType: "string",
@@ -63,7 +63,7 @@ public class CustomTableEditorTests : TestContext
                     AllowedValues: null,
                     ValidationRule: certNameRule),
                 new CustomTableColumnDto(
-                    ColumnId: 2,
+                    ColumnId: "00000000-0000-0000-0000-000000000002",
                     ColumnName: "issuer",
                     DisplayName: "颁发机构",
                     DataType: "string",
@@ -85,7 +85,7 @@ public class CustomTableEditorTests : TestContext
         {
             result.Rows.Add(new CustomTableRowValue
             {
-                RowId = i + 1,
+                RowId = $"00000000-0000-0000-0000-{(i + 1):D12}",
                 RowOrder = i,
                 Fields = new Dictionary<string, object?>
                 {
@@ -100,7 +100,7 @@ public class CustomTableEditorTests : TestContext
     private IRenderedComponent<CustomTableEditor> RenderEditor(
         CustomTableDetailDto? table,
         CustomTableValue? value,
-        long? refTableDefinitionId = 100)
+        string? refTableDefinitionId = "00000000-0000-0000-0000-000000000100")
     {
         var handler = new TestHttpMessageHandler();
         if (table is not null)
@@ -116,7 +116,7 @@ public class CustomTableEditorTests : TestContext
 
         return RenderComponent<CustomTableEditor>(p => p
             .Add(x => x.EntityType, "Product")
-            .Add(x => x.EntityId, 1L)
+            .Add(x => x.EntityId, "1")
             .Add(x => x.AttributeName, "certs")
             .Add(x => x.TableName, "certs")
             .Add(x => x.DisplayName, "认证证书")
@@ -162,7 +162,7 @@ public class CustomTableEditorTests : TestContext
         // 后端 ToCustomTableDto 不过滤 IsDeleted（恢复 UI 需要），
         // 数据编辑器必须自行过滤：3 列中 legacy 已删除。
         var table = new CustomTableDetailDto(
-            TableDefinitionId: 100,
+            TableDefinitionId: "00000000-0000-0000-0000-000000000100",
             EntityType: "Product",
             TableName: "certs",
             DisplayName: "认证",
@@ -170,13 +170,13 @@ public class CustomTableEditorTests : TestContext
             DisplayOrder: 1,
             Columns: new[]
             {
-                new CustomTableColumnDto(1, "cert_name", "证书", "string",
+                new CustomTableColumnDto("00000000-0000-0000-0000-000000000001", "cert_name", "证书", "string",
                     null, true, true, false, false, 1, null, null, null,
                     IsDeleted: false),
-                new CustomTableColumnDto(2, "issuer", "机构", "string",
+                new CustomTableColumnDto("00000000-0000-0000-0000-000000000002", "issuer", "机构", "string",
                     null, false, true, false, false, 2, null, null, null,
                     IsDeleted: false),
-                new CustomTableColumnDto(3, "legacy", "旧列", "string",
+                new CustomTableColumnDto("00000000-0000-0000-0000-000000000003", "legacy", "旧列", "string",
                     null, false, false, false, false, 3, null, null, null,
                     IsDeleted: true),
             });
@@ -185,7 +185,7 @@ public class CustomTableEditorTests : TestContext
         var value = new CustomTableValue { TableName = "certs" };
         value.Rows.Add(new CustomTableRowValue
         {
-            RowId = 1,
+            RowId = "00000000-0000-0000-0000-000000000001",
             RowOrder = 0,
             Fields = new Dictionary<string, object?>
             {
@@ -312,11 +312,11 @@ public class CustomTableEditorTests : TestContext
 
         var cut = RenderComponent<CustomTableEditor>(p => p
             .Add(x => x.EntityType, "Product")
-            .Add(x => x.EntityId, 1L)
+            .Add(x => x.EntityId, "1")
             .Add(x => x.AttributeName, "certs")
             .Add(x => x.TableName, "certs")
             .Add(x => x.DisplayName, "认证证书")
-            .Add(x => x.RefTableDefinitionId, 100L));
+            .Add(x => x.RefTableDefinitionId, "00000000-0000-0000-0000-000000000100"));
 
         cut.WaitForState(
             () => cut.Markup.Contains("无法加载表结构"),
@@ -333,7 +333,7 @@ public class CustomTableEditorTests : TestContext
     public async Task TableWithNoColumns_ShowsInfo()
     {
         var emptyTable = new CustomTableDetailDto(
-            TableDefinitionId: 100,
+            TableDefinitionId: "00000000-0000-0000-0000-000000000100",
             EntityType: "Product",
             TableName: "certs",
             DisplayName: "空表",
