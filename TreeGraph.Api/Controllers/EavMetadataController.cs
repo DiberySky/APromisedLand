@@ -104,7 +104,6 @@ public class EavMetadataController : ControllerBase
             IsRequired = req.IsRequired,
             IsSearchable = req.IsSearchable,
             IsSortable = req.IsSortable,
-            IsMultiValue = req.IsMultiValue,
             DisplayOrder = req.DisplayOrder,
             UnitId = req.UnitId,
             RefCompositeTypeId = req.RefCompositeTypeId,
@@ -674,7 +673,6 @@ public class EavMetadataController : ControllerBase
         if (req.IsRequired is not null) def.IsRequired = req.IsRequired.Value;
         if (req.IsSearchable is not null) def.IsSearchable = req.IsSearchable.Value;
         if (req.IsSortable is not null) def.IsSortable = req.IsSortable.Value;
-        if (req.IsMultiValue is not null) def.IsMultiValue = req.IsMultiValue.Value;
         if (req.DisplayOrder is not null) def.DisplayOrder = req.DisplayOrder.Value;
         if (req.DefaultValue is not null) def.DefaultValue = req.DefaultValue;
 
@@ -779,7 +777,7 @@ public class EavMetadataController : ControllerBase
 
     private static AttributeDetailDto ToAttributeDetailDto(AttributeDefinition a) => new(
         a.AttributeId, a.EntityType, a.AttributeName, a.DisplayName, a.DataType,
-        a.IsRequired, a.IsSearchable, a.IsSortable, a.IsMultiValue, a.IsDeleted,
+        a.IsRequired, a.IsSearchable, a.IsSortable, a.IsDeleted,
         a.Version, a.DisplayOrder, a.DefaultValue, a.CreatedAt, a.UpdatedAt,
         a.AllowedValues != null ? a.AllowedValues.RootElement.Clone() : (JsonElement?)null,
         a.ValidationRule != null ? a.ValidationRule.RootElement.Clone() : (JsonElement?)null,

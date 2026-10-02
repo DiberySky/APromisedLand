@@ -62,7 +62,6 @@ public sealed record AttributeSchemaDto(
     bool IsRequired,
     bool IsSearchable,
     bool IsSortable,
-    bool IsMultiValue,
     int DisplayOrder,
     JsonElement? AllowedValues,
     JsonElement? ValidationRule,

@@ -11,7 +11,6 @@ public class CreateAttributeRequest
     public bool IsRequired { get; set; }
     public bool IsSearchable { get; set; }
     public bool IsSortable { get; set; }
-    public bool IsMultiValue { get; set; }
     public int DisplayOrder { get; set; }
     public Guid? UnitId { get; set; }
     public long? RefCompositeTypeId { get; set; }
@@ -189,7 +188,6 @@ public record AttributeDetailDto(
     bool IsRequired,
     bool IsSearchable,
     bool IsSortable,
-    bool IsMultiValue,
     bool IsDeleted,
     int Version,
     int DisplayOrder,
@@ -224,7 +222,6 @@ public class UpdateAttributeRequest
     public bool? IsRequired { get; set; }
     public bool? IsSearchable { get; set; }
     public bool? IsSortable { get; set; }
-    public bool? IsMultiValue { get; set; }
     public int? DisplayOrder { get; set; }
     public string? DefaultValue { get; set; }
     public JsonElement? AllowedValues { get; set; }

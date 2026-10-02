@@ -76,6 +76,31 @@ description: 把外部设计文档/补丁落地到本仓库前，逐项核对"�
 3. **不假设用户偏好**：改文档/改代码是产品决策，不是技术决策
 4. **建议可执行**：每条差异末尾给出具体动作（"保留 X 用法" / "回滚 Y 变更" / "补充 Z 定义"）
 
+## 删除类变更的强制步骤
+
+当补丁涉及**删除** DTO 属性 / 实体字段 / 方法 / 参数时，**禁止**基于"已提供文件"
+推断引用点。必须：
+
+1. 全仓库搜索属性名（含 PascalCase / camelCase / snake_case 三种形式）
+2. 把搜索结果**分为四类**：
+   - **必须处理**：真实引用，需给补丁
+   - **同名无关**：同名但语义不同的字段（如 `OperatorInfo.IsMultiValue` 之于属性 `IsMultiValue`）
+   - **历史产物**：旧迁移文件、旧 Designer 快照（冻结不动；`ModelSnapshot` 由新迁移自动更新）
+   - **编译缓存**：`obj/`、`bin/` 下的生成代码（自动重建，搜索时排除）
+3. 输出清单时**必须**附上这四类的分类理由，同名项要给出语义证据
+4. 补丁应用后、跑测试前，**再搜一次**确认只剩"同名无关 / 历史产物"两类
+5. 以 `dotnet build` 的 CS 错误为最终兜底——即使清单再有漏，编译器也会兜住
+
+### 反例（实战）
+
+删除 `AttributeDefinition.IsMultiValue` 时，设计文档逐一列出 8 个文件的完整代码，
+核对者最初只在这 8 个文件内确认引用点；按本步骤全仓库搜索（三种命名形式）后，
+发现**另有 5 个文件**含真实引用：`ArrayFieldRenderer.razor`、`CompositeField.razor`、
+`DynamicForm.razor` 与 2 个测试文件（`AttributeSchemaDto` 构造实参 / 逻辑守卫）。
+同时识别出 7 行同名干扰（`OperatorInfo.IsMultiValue`，in/nin 运算符语义）
+与 7 行历史产物（旧迁移 .cs/.Designer.cs 冻结、`ModelSnapshot` 由新迁移自动更新），
+必须分类排除，不能误删。
+
 ## Example
 
 ### 输入

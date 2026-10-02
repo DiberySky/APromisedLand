@@ -311,10 +311,6 @@ else
                 <MudSwitch T="bool" @bind-Value="_createForm.IsSortable"
                            Label="可排序" Color="Color.Primary" />
             </MudItem>
-            <MudItem xs="6" md="3">
-                <MudSwitch T="bool" @bind-Value="_createForm.IsMultiValue"
-                           Label="多值" Color="Color.Primary" />
-            </MudItem>
         </MudGrid>
     </DialogContent>
     <DialogActions>
@@ -468,10 +464,6 @@ else
             <MudItem xs="6" md="3">
                 <MudSwitch T="bool" @bind-Value="_editForm.IsSortable"
                            Label="可排序" Color="Color.Primary" />
-            </MudItem>
-            <MudItem xs="6" md="3">
-                <MudSwitch T="bool" @bind-Value="_editForm.IsMultiValue"
-                           Label="多值" Color="Color.Primary" />
             </MudItem>
         </MudGrid>
     </DialogContent>
@@ -644,7 +636,6 @@ else
                 IsRequired = f.IsRequired,
                 IsSearchable = f.IsSearchable,
                 IsSortable = f.IsSortable,
-                IsMultiValue = f.IsMultiValue,
                 DisplayOrder = f.DisplayOrder,
                 UnitId = f.UnitId,
                 RefCompositeTypeId = f.RefCompositeTypeId,
@@ -686,7 +677,6 @@ else
             IsRequired = detail.IsRequired,
             IsSearchable = detail.IsSearchable,
             IsSortable = detail.IsSortable,
-            IsMultiValue = detail.IsMultiValue,
             DisplayOrder = detail.DisplayOrder,
             UnitId = detail.UnitId,
             RefCompositeTypeId = detail.RefCompositeTypeId,
@@ -757,7 +747,6 @@ else
                     IsRequired = _editForm.IsRequired,
                     IsSearchable = _editForm.IsSearchable,
                     IsSortable = _editForm.IsSortable,
-                    IsMultiValue = _editForm.IsMultiValue,
                     DisplayOrder = _editForm.DisplayOrder,
 
                     UnitId = unitId,
@@ -880,7 +869,6 @@ else
         public bool IsRequired { get; set; }
         public bool IsSearchable { get; set; }
         public bool IsSortable { get; set; }
-        public bool IsMultiValue { get; set; }
         public int DisplayOrder { get; set; }
         public Guid? UnitId { get; set; }
         public long? RefCompositeTypeId { get; set; }
@@ -894,7 +882,6 @@ else
         public bool IsRequired { get; set; }
         public bool IsSearchable { get; set; }
         public bool IsSortable { get; set; }
-        public bool IsMultiValue { get; set; }
         public int DisplayOrder { get; set; }
         public Guid? UnitId { get; set; }
         public long? RefCompositeTypeId { get; set; }

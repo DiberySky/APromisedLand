@@ -82,7 +82,6 @@ public class EavDbContext : DbContext
             e.Property(x => x.IsRequired).HasColumnName("is_required");
             e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
             e.Property(x => x.IsSortable).HasColumnName("is_sortable");
-            e.Property(x => x.IsMultiValue).HasColumnName("is_multi_value");
             e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
             e.Property(x => x.Version).HasColumnName("version");
             e.Property(x => x.DisplayOrder).HasColumnName("display_order");

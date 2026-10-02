@@ -292,9 +292,14 @@ public class CompositeValueService
             }
         }
 
+        // ★ 修复 D1：decimal 字段绑定了基准单位时，裸数字（旧数据形态）也返回
+        //   NumericValue，与 Object 分支（{ value, unitId }）保持类型一致；
+        //   未绑定单位时仍返回裸 decimal。when 子句必须在裸 Decimal 分支之前。
         return field.DataType switch
         {
             EavDataTypes.Int => elem.GetInt64(),
+            EavDataTypes.Decimal when field.UnitId is { } baseUnitId
+                => new NumericValue(elem.GetDecimal(), baseUnitId),
             EavDataTypes.Decimal => elem.GetDecimal(),
             EavDataTypes.Bool => elem.GetBoolean(),
             EavDataTypes.Datetime => elem.GetDateTimeOffset(),

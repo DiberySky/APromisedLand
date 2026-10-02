@@ -347,7 +347,7 @@ public class EavController : ControllerBase
 
         return new AttributeSchemaDto(
             d.AttributeName, d.DisplayName, d.DataType,
-            d.IsRequired, d.IsSearchable, d.IsSortable, d.IsMultiValue, d.DisplayOrder,
+            d.IsRequired, d.IsSearchable, d.IsSortable, d.DisplayOrder,
             d.AllowedValues?.RootElement.Clone(),
             d.ValidationRule?.RootElement.Clone(),
             composite, unit, availableUnits, optionSet,

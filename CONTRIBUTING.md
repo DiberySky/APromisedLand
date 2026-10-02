@@ -68,6 +68,31 @@ Claude Code 环境：使用工作区技能 **`patch-against-docs`**（触发词�
 
 ---
 
+## 案例：删除字段只搜"已提供文件"，漏掉 5 个真实引用点
+
+**背景**：落地"彻底移除 `AttributeDefinition.IsMultiValue`"补丁。设计文档逐一给出 8 个文件的完整代码，核对者最初也只在这 8 个文件内确认引用点。
+
+**全仓库搜索的结果**（PascalCase / camelCase / snake_case）：真实引用点有 **13 个**，文档漏了 5 个：
+
+| 漏掉的文件 | 引用形式 | 不删的后果 |
+|---|---|---|
+| `CompositeField.razor:163` | `new AttributeSchemaDto(..., IsMultiValue: field.IsArray)` | CS7036 编译失败 |
+| `ArrayFieldRenderer.razor:81` | `new AttributeSchemaDto(..., IsMultiValue: false)` | CS7036 编译失败 |
+| `DynamicForm.razor:246` | `if (attr.IsMultiValue) continue;` 逻辑守卫 | CS1061 编译失败 |
+| `EavFieldValidatorTests.cs:44` | 测试 DTO 构造实参 | CS7036 编译失败 |
+| `QueryFilterBuilderTests.cs:36` | 测试 DTO 构造实参 | CS7036 编译失败 |
+
+**同时必须排除的干扰项**：
+- `FilterOperatorCatalog.cs` 与 `QueryFilterEditor.razor` 中的 `OperatorInfo.IsMultiValue`——**同名但无关**：表示 `in/nin` 运算符接受多值输入，删除会破坏筛选器
+- 旧迁移（`Initial.cs`）与两个历史 Designer 快照——历史产物，冻结不动
+- `EavDbContextModelSnapshot`——由新迁移自动更新，不手改
+
+**教训**：
+
+> 删除类变更**禁止**基于"补丁提供了哪些文件"推断引用范围，必须先全仓库搜索并四分类（必须处理 / 同名无关 / 历史产物 / 编译缓存），应用后再搜一次兜底。该步骤已固化进 `patch-against-docs` 技能的"删除类变更的强制步骤"。
+
+---
+
 ## 编译与测试基线
 
 本仓库当前的绿色基线（提交前请核对）：
@@ -75,9 +100,9 @@ Claude Code 环境：使用工作区技能 **`patch-against-docs`**（触发词�
 | 项目 | 编译 | 测试 |
 |---|---|---|
 | `TreeGraph.Api` | 0 警告 0 错误 | — |
-| `TreeGraph.Api.Tests` | 0 警告 0 错误 | 23/23 |
+| `TreeGraph.Api.Tests` | 0 警告 0 错误 | 48/48 |
 | `TreeGraph.Blazor` | 0 警告 0 错误 | — |
-| `TreeGraph.Blazor.Tests` | 0 警告 0 错误 | 79/79 |
+| `TreeGraph.Blazor.Tests` | 0 警告 0 错误 | 81/81 |
 
 提交前跑：
 

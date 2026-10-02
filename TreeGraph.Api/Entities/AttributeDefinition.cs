@@ -14,7 +14,6 @@ public class AttributeDefinition
     public bool IsRequired { get; set; }
     public bool IsSearchable { get; set; }
     public bool IsSortable { get; set; }
-    public bool IsMultiValue { get; set; }
     public bool IsDeleted { get; set; }
     public int Version { get; set; } = 1;
     public int DisplayOrder { get; set; }

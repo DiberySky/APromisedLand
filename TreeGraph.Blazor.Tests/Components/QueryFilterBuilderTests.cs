@@ -33,7 +33,6 @@ public class QueryFilterBuilderTests : TestContext
             IsRequired: false,
             IsSearchable: searchable,
             IsSortable: false,
-            IsMultiValue: false,
             DisplayOrder: 0,
             AllowedValues: null,
             ValidationRule: null,

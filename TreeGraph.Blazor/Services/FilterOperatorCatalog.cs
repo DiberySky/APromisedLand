@@ -69,7 +69,7 @@ public static class FilterOperatorCatalog
         new OperatorInfo("nin", "不包含于", IsMultiValue: true)
     };
 
-    /// <summary>属性的基准类型（忽略 unit 与 IsMultiValue）。</summary>
+    /// <summary>属性的基准类型（忽略 unit 后缀）。</summary>
     public static string BaseKind(string dataType) => dataType switch
     {
         "int" or "decimal" => "numeric",

@@ -243,8 +243,6 @@
         {
             if (attr.DataType is EavDataTypes.Table)
                 continue;   // 表数据由 TableField 独立保存，不随表单提交
-            if (attr.IsMultiValue)
-                continue;   // 多值属性暂不支持编辑
 
             if (!_values.TryGetValue(attr.AttributeName, out var v) || v is null)
             {

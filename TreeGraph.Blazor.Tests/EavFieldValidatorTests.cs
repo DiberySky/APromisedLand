@@ -41,7 +41,6 @@ public class EavFieldValidatorTests
             IsRequired: isRequired,
             IsSearchable: true,
             IsSortable: false,
-            IsMultiValue: false,
             DisplayOrder: 0,
             AllowedValues: allowedValues,
             ValidationRule: rule,
