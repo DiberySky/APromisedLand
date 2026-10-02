@@ -13,8 +13,8 @@ using TreeGraph.Api.Data;
 namespace TreeGraph.Api.Data.Migrations
 {
     [DbContext(typeof(EavDbContext))]
-    [Migration("20261002012906_AddOptionSetSoftDelete")]
-    partial class AddOptionSetSoftDelete
+    [Migration("20261002072250_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -154,10 +154,6 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsMultiValue")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_multi_value");
 
                     b.Property<bool>("IsRequired")
                         .HasColumnType("boolean")

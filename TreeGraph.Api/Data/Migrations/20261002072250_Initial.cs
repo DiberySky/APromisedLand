@@ -189,7 +189,6 @@ namespace TreeGraph.Api.Data.Migrations
                     is_required = table.Column<bool>(type: "boolean", nullable: false),
                     is_searchable = table.Column<bool>(type: "boolean", nullable: false),
                     is_sortable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_multi_value = table.Column<bool>(type: "boolean", nullable: false),
                     is_deleted = table.Column<bool>(type: "boolean", nullable: false),
                     version = table.Column<int>(type: "integer", nullable: false),
                     display_order = table.Column<int>(type: "integer", nullable: false),
