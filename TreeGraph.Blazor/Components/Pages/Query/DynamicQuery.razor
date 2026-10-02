@@ -2,6 +2,7 @@
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
+@* DynamicQuery.razor *@
 
 <PageTitle>动态查询</PageTitle>
 
@@ -22,7 +23,8 @@
         </MudItem>
         <MudItem xs="12" md="4" Class="d-flex align-center">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       OnClick="LoadSchemaAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                       OnClick="LoadSchemaAsync"
+                       StartIcon="@Icons.Material.Filled.Refresh">
                 加载 Schema
             </MudButton>
         </MudItem>
@@ -48,54 +50,11 @@
     else if (_schema is not null)
     {
         <MudDivider Class="my-4" />
-        <MudText Typo="Typo.subtitle1" Class="mb-2">过滤条件</MudText>
-
-        @foreach (var f in _filters)
-        {
-            <MudGrid Class="mb-2 align-center">
-                <MudItem xs="12" md="3">
-                    <MudSelect T="AttributeSchemaDto"
-                               Value="f.Attribute"
-                               ValueChanged="a => { f.Attribute = a; }"
-                               Label="属性" Variant="Variant.Outlined" Dense="true">
-                        @foreach (var attr in _schema.Where(a => a.IsSearchable))
-                        {
-                            <MudSelectItem Value="@attr">
-                                @attr.DisplayName
-                            </MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" md="2">
-                    <MudSelect @bind-Value="f.Operator" Label="运算符"
-                               Variant="Variant.Outlined" Dense="true">
-                        <MudSelectItem Value="@("eq")">等于</MudSelectItem>
-                        <MudSelectItem Value="@("neq")">不等于</MudSelectItem>
-                        <MudSelectItem Value="@("gt")">大于</MudSelectItem>
-                        <MudSelectItem Value="@("gte")">大于等于</MudSelectItem>
-                        <MudSelectItem Value="@("lt")">小于</MudSelectItem>
-                        <MudSelectItem Value="@("lte")">小于等于</MudSelectItem>
-                        <MudSelectItem Value="@("like")">包含</MudSelectItem>
-                        <MudSelectItem Value="@("in")">属于</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" md="4">
-                    <MudTextField @bind-Value="f.ValueText" Label="值"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
-                </MudItem>
-                <MudItem xs="12" md="2">
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Color="Color.Error"
-                                   OnClick="@(() => _filters.Remove(f))" />
-                </MudItem>
-            </MudGrid>
-        }
-
-        <MudButton StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="@(() => _filters.Add(new FilterRow()))"
-                   Variant="Variant.Outlined" Class="mt-2">
-            添加条件
-        </MudButton>
+        @* ★ 修复：用 QueryFilterBuilder 替换硬编码运算符列表。
+           运算符由 FilterOperatorCatalog 驱动，与后端 EavQueryService 严格对应。 *@
+        <QueryFilterBuilder Filters="_filters"
+                            SupportedAttributes="_searchableAttributes"
+                            OnApply="QueryAsync" />
     }
 
     <MudDivider Class="my-4" />
@@ -135,7 +94,7 @@ else if (_entities is not null)
         <MudText Typo="Typo.h6" Class="mb-2">
             结果（共 @_entities.Total 条）
         </MudText>
-        <MudTable Items="_entities.Items" Hover="true" Bordered="true" Dense="true">
+        <MudTable Items="_entities.Items" Hover="true" Bordered="true">
             <HeaderContent>
                 <MudTh>EntityId</MudTh>
                 <MudTh>属性预览</MudTh>
@@ -162,18 +121,29 @@ else if (_entities is not null)
     private string _rowConditionsJson = "[]";
 
     private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private IReadOnlyList<AttributeSchemaDto> _searchableAttributes
+        = Array.Empty<AttributeSchemaDto>();
     private PagedResult<DynamicEntityDto>? _entities;
     private IReadOnlyList<long>? _ids;
     private bool _loading;
 
-    private readonly List<FilterRow> _filters = new();
+    private readonly List<AttributeFilter> _filters = new();
 
     // 端点 ①：加载 Schema
     private async Task LoadSchemaAsync()
     {
-        _schema = await Api.GetSchemaAsync(_entityType);
+        var schema = await Api.GetSchemaAsync(_entityType);
+        _schema = schema ?? Array.Empty<AttributeSchemaDto>();
+
+        // ★ 用 FilterOperatorCatalog 筛可搜索属性（与后端能力对齐）
+        _searchableAttributes = _schema
+            .Where(a => a.IsSearchable && FilterOperatorCatalog.IsSupported(a))
+            .OrderBy(a => a.DisplayOrder)
+            .ToList();
+
         _filters.Clear();
-        Snackbar.Add($"已加载 {_schema?.Count ?? 0} 个属性", Severity.Info);
+        Snackbar.Add($"已加载 {_schema.Count} 个属性，其中 {_searchableAttributes.Count} 个可搜索",
+            Severity.Info);
     }
 
     // 端点 ④ 或 ⑤
@@ -201,15 +171,7 @@ else if (_entities is not null)
                 _entities = await Api.QueryAsync(_entityType, new EavQueryRequest
                 {
                     EntityType = _entityType,
-                    Filters = _filters
-                        .Where(f => f.Attribute is not null && f.ValueText is not null)
-                        .Select(f => new AttributeFilter
-                        {
-                            AttributeName = f.Attribute!.AttributeName,
-                            Operator = f.Operator,
-                            Value = ConvertValue(f.Attribute, f.ValueText!)
-                        })
-                        .ToList(),
+                    Filters = _filters,
                     Page = 1,
                     PageSize = 50
                 });
@@ -219,23 +181,5 @@ else if (_entities is not null)
         {
             _loading = false;
         }
-    }
-
-    private static object ConvertValue(AttributeSchemaDto attr, string text)
-    {
-        return attr.DataType switch
-        {
-            EavDataTypes.Int => long.TryParse(text, out var l) ? l : text,
-            EavDataTypes.Decimal => decimal.TryParse(text, out var d) ? d : text,
-            EavDataTypes.Bool => bool.TryParse(text, out var b) ? b : text,
-            _ => text
-        };
-    }
-
-    private class FilterRow
-    {
-        public AttributeSchemaDto? Attribute { get; set; }
-        public string Operator { get; set; } = "eq";
-        public string ValueText { get; set; } = "";
     }
 }

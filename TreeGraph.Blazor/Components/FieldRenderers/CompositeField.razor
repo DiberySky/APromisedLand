@@ -13,7 +13,7 @@
 
     @if (Attr.CompositeType is null)
     {
-        <MudAlert Severity="Severity.Warning" Dense="true">
+        <MudAlert Severity="Severity.Warning">
             组合类型定义缺失
         </MudAlert>
     }
@@ -90,7 +90,7 @@
                         case EavDataTypes.Composite:
                             @if (field.NestedType is null)
                             {
-                                <MudAlert Severity="Severity.Warning" Dense="true">
+                                <MudAlert Severity="Severity.Warning">
                                     嵌套类型未定义: @field.FieldName
                                 </MudAlert>
                             }

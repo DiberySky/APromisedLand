@@ -28,7 +28,17 @@ public class EavMetadataController : ControllerBase
         _customTableCache = customTableCache;
     }
 
-    /// <summary>创建属性定义（★ 修复 P1-2：全量引用校验）</summary>
+    // ============================================================
+    // 属性定义
+    // ============================================================
+
+    /// <summary>
+    /// 创建属性定义。
+    ///
+    /// ★ 单位绑定约束：只有 decimal 类型可以绑定 UnitId。
+    /// int 类型拒绝绑定，因为归一化到基准单位时会产生小数（如 150 cm → 1.5 m），
+    /// 写入 ValueInt (bigint) 会静默截断，造成数据损坏。
+    /// </summary>
     [HttpPost("attributes")]
     public async Task<IActionResult> CreateAttribute(
         [FromBody] CreateAttributeRequest req, CancellationToken ct)
@@ -58,10 +68,16 @@ public class EavMetadataController : ControllerBase
             or EavDataTypes.SingleChoice) && refCount > 0)
             return BadRequest(new { error = "当前 dataType 不支持引用" });
 
-        // 单位只允许 int/decimal
-        if (req.UnitId is not null
-            && req.DataType is not (EavDataTypes.Int or EavDataTypes.Decimal))
-            return BadRequest(new { error = "只有 int/decimal 可以绑定单位" });
+        // ★ 单位只允许 decimal
+        if (req.UnitId is not null && req.DataType != EavDataTypes.Decimal)
+        {
+            return BadRequest(new
+            {
+                error = "只有 decimal 类型可以绑定单位。" +
+                        "int 类型归一化到基准单位时会产生小数（如 150 cm → 1.5 m），" +
+                        "写入 bigint 列会静默截断，请改用 decimal。"
+            });
+        }
 
         // 引用存在性
         if (req.UnitId is { } uid
@@ -138,13 +154,41 @@ public class EavMetadataController : ControllerBase
         };
         _db.CustomTables.Add(table);
         await _db.SaveChangesAsync(ct);
+        // ★ 清除 name 缓存中可能存在的"不存在"哨兵，使新表按名立即可见
+        _customTableCache.InvalidateByName(table.EntityType, table.TableName);
         return Ok(new { table.TableDefinitionId });
     }
 
+    /// <summary>
+    /// 添加自定义表列。
+    ///
+    /// ★ 校验：composite 类型必须指定 refCompositeTypeId，非 composite 不允许引用。
+    /// </summary>
     [HttpPost("custom-tables/{id:long}/columns")]
     public async Task<IActionResult> AddTableColumn(
         long id, [FromBody] CreateTableColumnRequest req, CancellationToken ct)
     {
+        // 表存在性
+        var tableExists = await _db.CustomTables
+            .AnyAsync(t => t.TableDefinitionId == id && !t.IsDeleted, ct);
+        if (!tableExists) return NotFound(new { error = $"自定义表不存在: {id}" });
+
+        // ★ 类型与引用匹配
+        if (req.DataType == EavDataTypes.Composite)
+        {
+            if (req.RefCompositeTypeId is not long rid)
+                return BadRequest(new { error = "composite 类型必须指定 refCompositeTypeId" });
+
+            var exists = await _db.CompositeTypes
+                .AnyAsync(t => t.CompositeTypeId == rid && !t.IsDeleted, ct);
+            if (!exists)
+                return BadRequest(new { error = $"组合类型不存在: {rid}" });
+        }
+        else if (req.RefCompositeTypeId is not null)
+        {
+            return BadRequest(new { error = "只有 composite 类型可以引用组合类型" });
+        }
+
         var col = new CustomTableColumn
         {
             TableDefinitionId = id,
@@ -169,10 +213,71 @@ public class EavMetadataController : ControllerBase
         return Ok(new { col.ColumnId });
     }
 
+    /// <summary>
+    /// 添加组合字段。
+    ///
+    /// ★ 校验：
+    ///   - composite 类型必须指定 refCompositeTypeId，且不能自引用/循环引用
+    ///   - 只有 decimal 类型可以绑定单位
+    ///   - 只有 single_choice 类型可以引用选项集
+    /// </summary>
     [HttpPost("composite-types/{id:long}/fields")]
     public async Task<IActionResult> AddCompositeField(
         long id, [FromBody] CreateCompositeFieldRequest req, CancellationToken ct)
     {
+        // 组合类型存在性
+        var typeExists = await _db.CompositeTypes
+            .AnyAsync(t => t.CompositeTypeId == id && !t.IsDeleted, ct);
+        if (!typeExists) return NotFound(new { error = $"组合类型不存在: {id}" });
+
+        // 组合类型引用校验
+        if (req.DataType == EavDataTypes.Composite)
+        {
+            if (req.RefCompositeTypeId is not long rid)
+                return BadRequest(new { error = "composite 类型必须指定 refCompositeTypeId" });
+
+            if (rid == id)
+                return BadRequest(new { error = "组合类型不能自引用" });
+
+            var exists = await _db.CompositeTypes
+                .AnyAsync(t => t.CompositeTypeId == rid && !t.IsDeleted, ct);
+            if (!exists)
+                return BadRequest(new { error = $"组合类型不存在: {rid}" });
+
+            // ★ 循环引用检测：从 rid 出发，看是否能回到 id
+            if (await WouldCreateCycleAsync(id, rid, ct))
+                return BadRequest(new { error = "会造成组合类型循环引用" });
+        }
+        else if (req.RefCompositeTypeId is not null)
+        {
+            return BadRequest(new { error = "只有 composite 类型可以引用组合类型" });
+        }
+
+        // ★ 单位只允许 decimal
+        if (req.UnitId is not null)
+        {
+            if (req.DataType != EavDataTypes.Decimal)
+                return BadRequest(new
+                {
+                    error = "只有 decimal 类型可以绑定单位（数据库 CHECK 约束）"
+                });
+
+            var unitExists = await _db.Units
+                .AnyAsync(u => u.Id == req.UnitId.Value && !u.IsDeleted, ct);
+            if (!unitExists)
+                return BadRequest(new { error = $"单位不存在: {req.UnitId}" });
+        }
+
+        // 选项集引用校验
+        if (req.RefOptionSetId is { } sid)
+        {
+            if (req.DataType != EavDataTypes.SingleChoice)
+                return BadRequest(new { error = "只有 single_choice 类型可以引用选项集" });
+
+            var exists = await _db.OptionSets.AnyAsync(s => s.OptionSetId == sid, ct);
+            if (!exists) return BadRequest(new { error = $"选项集不存在: {sid}" });
+        }
+
         var field = new CompositeFieldDefinition
         {
             CompositeTypeId = id,
@@ -180,6 +285,8 @@ public class EavMetadataController : ControllerBase
             DisplayName = req.DisplayName,
             DataType = req.DataType,
             RefCompositeTypeId = req.RefCompositeTypeId,
+            UnitId = req.UnitId,
+            RefOptionSetId = req.RefOptionSetId,
             IsArray = req.IsArray,
             IsRequired = req.IsRequired,
             IsSearchable = req.IsSearchable,
@@ -197,15 +304,57 @@ public class EavMetadataController : ControllerBase
         return Ok(new { field.FieldId });
     }
 
+    /// <summary>
+    /// 循环引用检测：从 refTypeId 出发 BFS，若回溯到 parentTypeId 则说明
+    /// 添加此字段会形成环（A→B→A 或更深），导致 CompositeTypeCache.GetType
+    /// 无限递归 StackOverflow（不可捕获）。
+    /// </summary>
+    private async Task<bool> WouldCreateCycleAsync(
+        long parentTypeId, long refTypeId, CancellationToken ct)
+    {
+        if (parentTypeId == refTypeId) return true;
+
+        // 一次性加载所有组合字段的引用关系，避免 BFS 中的 N+1 查询
+        var edges = await _db.CompositeFields
+            .Where(f => f.RefCompositeTypeId != null && !f.IsDeleted)
+            .Select(f => new { f.CompositeTypeId, Ref = f.RefCompositeTypeId!.Value })
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var lookup = edges
+            .GroupBy(e => e.CompositeTypeId)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.Ref).ToList());
+
+        var visited = new HashSet<long>();
+        var queue = new Queue<long>();
+        queue.Enqueue(refTypeId);
+
+        while (queue.Count > 0)
+        {
+            var cur = queue.Dequeue();
+            if (cur == parentTypeId) return true;
+            if (!visited.Add(cur)) continue;
+
+            if (lookup.TryGetValue(cur, out var children))
+            {
+                foreach (var c in children) queue.Enqueue(c);
+            }
+        }
+        return false;
+    }
+
     // ============================================================
     // 自定义表查询与删除
     // ============================================================
 
     [HttpGet("custom-tables")]
     public async Task<IActionResult> ListCustomTables(
-        [FromQuery] string? entityType, CancellationToken ct)
+        [FromQuery] string? entityType,
+        [FromQuery] bool includeDeleted = false,
+        CancellationToken ct = default)
     {
-        var query = _db.CustomTables.Include(t => t.Columns).Where(t => !t.IsDeleted);
+        var query = _db.CustomTables.Include(t => t.Columns).AsQueryable();
+        if (!includeDeleted) query = query.Where(t => !t.IsDeleted);
         if (!string.IsNullOrEmpty(entityType))
             query = query.Where(t => t.EntityType == entityType);
 
@@ -220,10 +369,12 @@ public class EavMetadataController : ControllerBase
     [HttpGet("custom-tables/{id:long}")]
     public async Task<IActionResult> GetCustomTable(long id, CancellationToken ct)
     {
+        // ★ 不再检查 IsDeleted：ID 唯一标识资源，允许按 ID 查询已删除的表
+        //   （恢复流程需要）。是否过滤由调用方决定。
         var table = await _db.CustomTables.Include(t => t.Columns)
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.TableDefinitionId == id, ct);
-        if (table is null || table.IsDeleted) return NotFound();
+        if (table is null) return NotFound();
         return Ok(ToCustomTableDto(table));
     }
 
@@ -259,6 +410,8 @@ public class EavMetadataController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
         _customTableCache.Invalidate(id);
+        // ★ 一并清 name 缓存，否则 10 分钟内按名查询仍会命中已删表
+        _customTableCache.InvalidateByName(table.EntityType, table.TableName);
         return NoContent();
     }
 
@@ -306,11 +459,21 @@ public class EavMetadataController : ControllerBase
     // 组合类型查询与删除
     // ============================================================
 
+    /// <summary>
+    /// 列出组合类型。
+    /// ★ 新增 includeDeleted 参数：管理页可勾选"显示已删除"以提供恢复入口。
+    /// </summary>
     [HttpGet("composite-types")]
     public async Task<IActionResult> ListCompositeTypes(
-        [FromQuery] string? entityType, CancellationToken ct)
+        [FromQuery] string? entityType,
+        [FromQuery] bool includeDeleted = false,
+        CancellationToken ct = default)
     {
-        var query = _db.CompositeTypes.Include(t => t.Fields).Where(t => !t.IsDeleted);
+        var query = _db.CompositeTypes
+            .Include(t => t.Fields).ThenInclude(f => f.RefOptionSet)
+            .AsQueryable();
+
+        if (!includeDeleted) query = query.Where(t => !t.IsDeleted);
         if (!string.IsNullOrEmpty(entityType))
             query = query.Where(t => t.EntityType == entityType || t.EntityType == "Shared");
 
@@ -321,13 +484,19 @@ public class EavMetadataController : ControllerBase
         return Ok(list.Select(ToCompositeTypeDto));
     }
 
+    /// <summary>
+    /// 按 ID 获取组合类型详情。
+    /// ★ 不再检查 IsDeleted：ID 唯一标识资源，允许按 ID 查询已删除的类型
+    ///   （恢复流程需要）。是否过滤由调用方决定。
+    /// </summary>
     [HttpGet("composite-types/{id:long}")]
     public async Task<IActionResult> GetCompositeType(long id, CancellationToken ct)
     {
-        var type = await _db.CompositeTypes.Include(t => t.Fields)
+        var type = await _db.CompositeTypes
+            .Include(t => t.Fields).ThenInclude(f => f.RefOptionSet)
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.CompositeTypeId == id, ct);
-        if (type is null || type.IsDeleted) return NotFound();
+        if (type is null) return NotFound();
         return Ok(ToCompositeTypeDto(type));
     }
 
@@ -347,14 +516,21 @@ public class EavMetadataController : ControllerBase
     [HttpDelete("composite-types/{id:long}")]
     public async Task<IActionResult> DeleteCompositeType(long id, CancellationToken ct)
     {
-        var type = await _db.CompositeTypes.Include(t => t.Fields)
-            .FirstOrDefaultAsync(t => t.CompositeTypeId == id, ct);
+        var type = await _db.CompositeTypes
+            .Include(t => t.Fields).ThenInclude(f => f.RefOptionSet)
+            .FirstOrDefaultAsync(t => t.CompositeTypeId == id && !t.IsDeleted, ct);
         if (type is null) return NotFound();
 
         var referenced = await _db.AttributeCatalog
             .AnyAsync(a => a.RefCompositeTypeId == id && !a.IsDeleted, ct);
         if (referenced)
             return BadRequest(new { error = "该组合类型仍被属性引用，无法删除" });
+
+        // 也被其它组合字段引用时禁止删除
+        var fieldReferenced = await _db.CompositeFields
+            .AnyAsync(f => f.RefCompositeTypeId == id && !f.IsDeleted, ct);
+        if (fieldReferenced)
+            return BadRequest(new { error = "该组合类型仍被其它组合字段引用，无法删除" });
 
         type.IsDeleted = true;
         type.UpdatedAt = DateTimeOffset.UtcNow;
@@ -365,6 +541,14 @@ public class EavMetadataController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// 更新组合字段。
+    ///
+    /// ★ 支持：
+    ///   - 选项集引用（single_choice）
+    ///   - 单位引用（decimal）：新增
+    ///   - 显式清除语义：Clear* = true 优先
+    /// </summary>
     [HttpPut("composite-types/{id:long}/fields/{fieldId:long}")]
     public async Task<IActionResult> UpdateCompositeField(
         long id, long fieldId,
@@ -385,6 +569,37 @@ public class EavMetadataController : ControllerBase
         if (req.ValidationRule is not null)
             field.ValidationRule = JsonDocument.Parse(req.ValidationRule.Value.GetRawText());
 
+        // ---- 选项集引用 ----
+        if (req.ClearRefOptionSetId)
+        {
+            field.RefOptionSetId = null;
+        }
+        else if (req.RefOptionSetId is { } sid)
+        {
+            if (field.DataType != EavDataTypes.SingleChoice)
+                return BadRequest(new { error = "只有 single_choice 类型可以引用选项集" });
+
+            var exists = await _db.OptionSets.AnyAsync(s => s.OptionSetId == sid, ct);
+            if (!exists) return BadRequest(new { error = $"选项集不存在: {sid}" });
+            field.RefOptionSetId = sid;
+        }
+
+        // ★ 新增：单位引用
+        if (req.ClearUnitId)
+        {
+            field.UnitId = null;
+        }
+        else if (req.UnitId is { } uid)
+        {
+            if (field.DataType != EavDataTypes.Decimal)
+                return BadRequest(new { error = "只有 decimal 类型可以绑定单位" });
+
+            var unitExists = await _db.Units
+                .AnyAsync(u => u.Id == uid && !u.IsDeleted, ct);
+            if (!unitExists) return BadRequest(new { error = $"单位不存在: {uid}" });
+            field.UnitId = uid;
+        }
+
         await _db.SaveChangesAsync(ct);
         _compositeCache.Invalidate(id);
         return NoContent();
@@ -403,42 +618,6 @@ public class EavMetadataController : ControllerBase
         _compositeCache.Invalidate(id);
         return NoContent();
     }
-
-    // ---------- DTO 映射 ----------
-
-    private static AttributeDetailDto ToAttributeDetailDto(AttributeDefinition a) => new(
-        a.AttributeId, a.EntityType, a.AttributeName, a.DisplayName, a.DataType,
-        a.IsRequired, a.IsSearchable, a.IsSortable, a.IsMultiValue, a.IsDeleted,
-        a.Version, a.DisplayOrder, a.DefaultValue, a.CreatedAt, a.UpdatedAt,
-        a.AllowedValues != null ? a.AllowedValues.RootElement.Clone() : (JsonElement?)null,
-        a.ValidationRule != null ? a.ValidationRule.RootElement.Clone() : (JsonElement?)null,
-        a.UnitId, a.Unit?.Name, a.Unit?.Symbol, a.Unit?.Category,
-        a.RefCompositeTypeId, a.RefCompositeType?.TypeName, a.RefCompositeType?.DisplayName,
-        a.RefTableDefinitionId, a.RefTableDefinition?.TableName, a.RefTableDefinition?.DisplayName,
-        a.RefOptionSetId, a.RefOptionSet?.SetName, a.RefOptionSet?.DisplayName);
-
-    private static CustomTableDetailDto ToCustomTableDto(CustomTableDefinition t) => new(
-        t.TableDefinitionId, t.EntityType, t.TableName, t.DisplayName,
-        t.Version, t.DisplayOrder,
-        t.Columns.Where(c => !c.IsDeleted).OrderBy(c => c.DisplayOrder)
-            .Select(c => new CustomTableColumnDto(
-                c.ColumnId, c.ColumnName, c.DisplayName, c.DataType, c.RefCompositeTypeId,
-                c.IsRequired, c.IsSearchable, c.IsSortable, c.IsUnique, c.DisplayOrder,
-                c.DefaultValue,
-                c.AllowedValues != null ? c.AllowedValues.RootElement.Clone() : (JsonElement?)null,
-                c.ValidationRule != null ? c.ValidationRule.RootElement.Clone() : (JsonElement?)null))
-            .ToList());
-
-    private static CompositeTypeDetailDto ToCompositeTypeDto(CompositeTypeDefinition t) => new(
-        t.CompositeTypeId, t.EntityType, t.TypeName, t.DisplayName, t.Version,
-        t.Fields.Where(f => !f.IsDeleted).OrderBy(f => f.DisplayOrder)
-            .Select(f => new CompositeFieldDetailDto(
-                f.FieldId, f.FieldName, f.DisplayName, f.DataType, f.RefCompositeTypeId,
-                f.IsArray, f.IsRequired, f.IsSearchable, f.IsSortable, f.DisplayOrder,
-                f.DefaultValue,
-                f.AllowedValues != null ? f.AllowedValues.RootElement.Clone() : (JsonElement?)null,
-                f.ValidationRule != null ? f.ValidationRule.RootElement.Clone() : (JsonElement?)null))
-            .ToList());
 
     // ============================================================
     // 属性定义查询与更新
@@ -479,7 +658,9 @@ public class EavMetadataController : ControllerBase
     }
 
     /// <summary>
-    /// 更新属性定义（★ 修复 P1-3：支持显式清除引用）。
+    /// 更新属性定义。
+    ///
+    /// ★ 单位绑定约束：只有 decimal 类型可以绑定 UnitId。
     /// 不可修改：EntityType、AttributeName、DataType。
     /// </summary>
     [HttpPut("attributes/{id:long}")]
@@ -502,15 +683,22 @@ public class EavMetadataController : ControllerBase
         if (req.ValidationRule is not null)
             def.ValidationRule = JsonDocument.Parse(req.ValidationRule.Value.GetRawText());
 
-        // 单位引用：清除 / 设置
+        // ---- 单位引用 ----
         if (req.ClearUnitId)
         {
             def.UnitId = null;
         }
         else if (req.UnitId is not null)
         {
-            if (def.DataType is not (EavDataTypes.Int or EavDataTypes.Decimal))
-                return BadRequest(new { error = "只有 int/decimal 类型可以绑定单位" });
+            if (def.DataType != EavDataTypes.Decimal)
+            {
+                return BadRequest(new
+                {
+                    error = "只有 decimal 类型可以绑定单位。" +
+                            "int 类型归一化到基准单位时会产生小数（如 150 cm → 1.5 m），" +
+                            "写入 bigint 列会静默截断。"
+                });
+            }
 
             var exists = await _db.Units.AnyAsync(
                 u => u.Id == req.UnitId.Value && !u.IsDeleted, ct);
@@ -518,7 +706,7 @@ public class EavMetadataController : ControllerBase
             def.UnitId = req.UnitId;
         }
 
-        // 组合类型引用
+        // ---- 组合类型引用 ----
         if (req.ClearRefCompositeTypeId)
         {
             def.RefCompositeTypeId = null;
@@ -534,7 +722,7 @@ public class EavMetadataController : ControllerBase
             def.RefCompositeTypeId = req.RefCompositeTypeId;
         }
 
-        // 自定义表引用
+        // ---- 自定义表引用 ----
         if (req.ClearRefTableDefinitionId)
         {
             def.RefTableDefinitionId = null;
@@ -550,7 +738,7 @@ public class EavMetadataController : ControllerBase
             def.RefTableDefinitionId = req.RefTableDefinitionId;
         }
 
-        // 选项集引用
+        // ---- 选项集引用 ----
         if (req.ClearRefOptionSetId)
         {
             def.RefOptionSetId = null;
@@ -582,6 +770,230 @@ public class EavMetadataController : ControllerBase
         def.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
         _attrCache.Invalidate(def.EntityType);
+        return NoContent();
+    }
+
+    // ============================================================
+    // DTO 映射
+    // ============================================================
+
+    private static AttributeDetailDto ToAttributeDetailDto(AttributeDefinition a) => new(
+        a.AttributeId, a.EntityType, a.AttributeName, a.DisplayName, a.DataType,
+        a.IsRequired, a.IsSearchable, a.IsSortable, a.IsMultiValue, a.IsDeleted,
+        a.Version, a.DisplayOrder, a.DefaultValue, a.CreatedAt, a.UpdatedAt,
+        a.AllowedValues != null ? a.AllowedValues.RootElement.Clone() : (JsonElement?)null,
+        a.ValidationRule != null ? a.ValidationRule.RootElement.Clone() : (JsonElement?)null,
+        a.UnitId, a.Unit?.Name, a.Unit?.Symbol, a.Unit?.Category,
+        a.RefCompositeTypeId, a.RefCompositeType?.TypeName, a.RefCompositeType?.DisplayName,
+        a.RefTableDefinitionId, a.RefTableDefinition?.TableName, a.RefTableDefinition?.DisplayName,
+        a.RefOptionSetId, a.RefOptionSet?.SetName, a.RefOptionSet?.DisplayName);
+
+    private static CustomTableDetailDto ToCustomTableDto(CustomTableDefinition t) => new(
+        t.TableDefinitionId, t.EntityType, t.TableName, t.DisplayName,
+        t.Version, t.DisplayOrder,
+        t.Columns
+            // ★ 不按 IsDeleted 过滤，让前端展示"已删除"状态并提供恢复入口
+            .OrderBy(c => c.DisplayOrder)
+            .Select(c => new CustomTableColumnDto(
+                c.ColumnId, c.ColumnName, c.DisplayName, c.DataType, c.RefCompositeTypeId,
+                c.IsRequired, c.IsSearchable, c.IsSortable, c.IsUnique, c.DisplayOrder,
+                c.DefaultValue,
+                c.AllowedValues != null ? c.AllowedValues.RootElement.Clone() : (JsonElement?)null,
+                c.ValidationRule != null ? c.ValidationRule.RootElement.Clone() : (JsonElement?)null,
+                c.IsDeleted))                    // ★ 透出列的删除状态
+            .ToList(),
+        t.IsDeleted);                            // ★ 透出表的删除状态
+
+    private static CompositeTypeDetailDto ToCompositeTypeDto(CompositeTypeDefinition t) => new(
+        t.CompositeTypeId, t.EntityType, t.TypeName, t.DisplayName, t.Version,
+        t.Fields
+            // ★ 不按 IsDeleted 过滤，让前端展示"已删除"状态 + 提供恢复入口
+            .OrderBy(f => f.DisplayOrder)
+            .Select(f => new CompositeFieldDetailDto(
+                f.FieldId, f.FieldName, f.DisplayName, f.DataType, f.RefCompositeTypeId,
+                f.IsArray, f.IsRequired, f.IsSearchable, f.IsSortable, f.DisplayOrder,
+                f.DefaultValue,
+                f.AllowedValues != null ? f.AllowedValues.RootElement.Clone() : (JsonElement?)null,
+                f.ValidationRule != null ? f.ValidationRule.RootElement.Clone() : (JsonElement?)null,
+                f.UnitId,
+                f.RefOptionSetId,
+                f.RefOptionSet?.SetName,
+                f.RefOptionSet?.DisplayName,
+                f.IsDeleted))                    // ★ 透出字段删除状态
+            .ToList(),
+        t.IsDeleted);                            // ★ 透出类型删除状态
+
+    // ---------- 软删除恢复（undelete） ----------
+
+    /// <summary>
+    /// ★ 恢复被软删除的属性。
+    ///
+    /// 唯一约束（entity_type, attribute_name）不区分 IsDeleted：
+    /// 若已存在同名的活动属性，恢复会失败 → 返回 409。
+    /// </summary>
+    [HttpPost("attributes/{id:long}/undelete")]
+    public async Task<IActionResult> UndeleteAttribute(long id, CancellationToken ct)
+    {
+        var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
+        if (def is null) return NotFound();
+        if (!def.IsDeleted) return NoContent();   // 幂等
+
+        var conflict = await _db.AttributeCatalog.AnyAsync(
+            a => a.AttributeId != id
+              && a.EntityType == def.EntityType
+              && a.AttributeName == def.AttributeName
+              && !a.IsDeleted, ct);
+
+        if (conflict)
+            return Conflict(new
+            {
+                error = $"同名的活动属性已存在（{def.EntityType}.{def.AttributeName}），" +
+                        "请先删除或改名后再恢复"
+            });
+
+        def.IsDeleted = false;
+        def.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        _attrCache.Invalidate(def.EntityType);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// ★ 恢复被软删除的组合类型（同时恢复其字段）。
+    /// 唯一约束（entity_type, type_name, version）不区分 IsDeleted。
+    /// </summary>
+    [HttpPost("composite-types/{id:long}/undelete")]
+    public async Task<IActionResult> UndeleteCompositeType(long id, CancellationToken ct)
+    {
+        var type = await _db.CompositeTypes
+            .Include(t => t.Fields)
+            .FirstOrDefaultAsync(t => t.CompositeTypeId == id, ct);
+        if (type is null) return NotFound();
+        if (!type.IsDeleted) return NoContent();   // 幂等
+
+        var conflict = await _db.CompositeTypes.AnyAsync(
+            t => t.CompositeTypeId != id
+              && t.EntityType == type.EntityType
+              && t.TypeName == type.TypeName
+              && t.Version == type.Version
+              && !t.IsDeleted, ct);
+
+        if (conflict)
+            return Conflict(new
+            {
+                error = $"同名的活动组合类型已存在" +
+                        $"（{type.EntityType}/{type.TypeName}/v{type.Version}）"
+            });
+
+        type.IsDeleted = false;
+        type.UpdatedAt = DateTimeOffset.UtcNow;
+        foreach (var f in type.Fields) f.IsDeleted = false;
+
+        await _db.SaveChangesAsync(ct);
+        _compositeCache.Invalidate(id);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// ★ 恢复被软删除的组合字段。
+    /// 唯一约束（composite_type_id, field_name）不区分 IsDeleted。
+    /// </summary>
+    [HttpPost("composite-types/{id:long}/fields/{fieldId:long}/undelete")]
+    public async Task<IActionResult> UndeleteCompositeField(
+        long id, long fieldId, CancellationToken ct)
+    {
+        var field = await _db.CompositeFields
+            .FirstOrDefaultAsync(f => f.FieldId == fieldId && f.CompositeTypeId == id, ct);
+        if (field is null) return NotFound();
+        if (!field.IsDeleted) return NoContent();
+
+        var conflict = await _db.CompositeFields.AnyAsync(
+            f => f.FieldId != fieldId
+              && f.CompositeTypeId == id
+              && f.FieldName == field.FieldName
+              && !f.IsDeleted, ct);
+
+        if (conflict)
+            return Conflict(new
+            {
+                error = $"同名的活动字段已存在（{field.FieldName}）"
+            });
+
+        field.IsDeleted = false;
+        await _db.SaveChangesAsync(ct);
+        _compositeCache.Invalidate(id);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// ★ 恢复被软删除的自定义表（同时恢复其列）。
+    /// 唯一约束（entity_type, table_name, version）不区分 IsDeleted。
+    /// </summary>
+    [HttpPost("custom-tables/{id:long}/undelete")]
+    public async Task<IActionResult> UndeleteCustomTable(long id, CancellationToken ct)
+    {
+        var table = await _db.CustomTables
+            .Include(t => t.Columns)
+            .FirstOrDefaultAsync(t => t.TableDefinitionId == id, ct);
+        if (table is null) return NotFound();
+        if (!table.IsDeleted) return NoContent();
+
+        var conflict = await _db.CustomTables.AnyAsync(
+            t => t.TableDefinitionId != id
+              && t.EntityType == table.EntityType
+              && t.TableName == table.TableName
+              && t.Version == table.Version
+              && !t.IsDeleted, ct);
+
+        if (conflict)
+            return Conflict(new
+            {
+                error = $"同名的活动自定义表已存在" +
+                        $"（{table.EntityType}/{table.TableName}/v{table.Version}）"
+            });
+
+        table.IsDeleted = false;
+        table.UpdatedAt = DateTimeOffset.UtcNow;
+        foreach (var c in table.Columns) c.IsDeleted = false;
+
+        await _db.SaveChangesAsync(ct);
+
+        // ★ 缓存一致性：实体 + name→id 两级都要清
+        _customTableCache.Invalidate(id);
+        _customTableCache.InvalidateByName(table.EntityType, table.TableName);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// ★ 恢复被软删除的自定义表列。
+    /// 唯一约束（table_definition_id, column_name）不区分 IsDeleted。
+    /// </summary>
+    [HttpPost("custom-tables/{id:long}/columns/{columnId:long}/undelete")]
+    public async Task<IActionResult> UndeleteTableColumn(
+        long id, long columnId, CancellationToken ct)
+    {
+        var col = await _db.CustomTableColumns
+            .FirstOrDefaultAsync(c => c.ColumnId == columnId
+                                   && c.TableDefinitionId == id, ct);
+        if (col is null) return NotFound();
+        if (!col.IsDeleted) return NoContent();
+
+        var conflict = await _db.CustomTableColumns.AnyAsync(
+            c => c.ColumnId != columnId
+              && c.TableDefinitionId == id
+              && c.ColumnName == col.ColumnName
+              && !c.IsDeleted, ct);
+
+        if (conflict)
+            return Conflict(new
+            {
+                error = $"同名的活动列已存在（{col.ColumnName}）"
+            });
+
+        col.IsDeleted = false;
+        await _db.SaveChangesAsync(ct);
+        _customTableCache.Invalidate(id);
         return NoContent();
     }
 }

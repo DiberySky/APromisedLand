@@ -1,0 +1,182 @@
+@using System.Globalization
+@using System.Text.Json
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+@* QueryFilterEditor.razor *@
+@* 单条过滤条件编辑器：属性 + 运算符 + 值。 *@
+
+<MudPaper Class="pa-3 mb-2" Outlined="true">
+    <MudGrid Spacing="2">
+        @* 属性 *@
+        <MudItem xs="12" md="4">
+            <MudSelect T="string"
+                       Value="@Filter.AttributeName"
+                       ValueChanged="OnAttributeChanged"
+                       Label="属性"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       FullWidth="true">
+                @foreach (var attr in SupportedAttributes)
+                {
+                    <MudSelectItem T="string" Value="@attr.AttributeName">
+                        @attr.DisplayName (@attr.DataType)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        @* 运算符 *@
+        <MudItem xs="12" md="3">
+            <MudSelect T="string"
+                       Value="@Filter.Operator"
+                       ValueChanged="OnOperatorChanged"
+                       Label="运算符"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Disabled="@(SelectedAttr is null)"
+                       FullWidth="true">
+                @if (SelectedAttr is not null)
+                {
+                    foreach (var op in FilterOperatorCatalog.For(SelectedAttr))
+                    {
+                        <MudSelectItem T="string" Value="@op.Code">@op.DisplayName</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+        </MudItem>
+
+        @* 值 *@
+        <MudItem xs="12" md="4">
+            @if (SelectedAttr is not null && OperatorInfo is not null)
+            {
+                @if (OperatorInfo.IsMultiValue)
+                {
+                    <MudTextField T="string"
+                                  Label="值（逗号分隔）"
+                                  Value="@MultiValueText"
+                                  ValueChanged="OnMultiValueChanged"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth="true" />
+                }
+                else if (OperatorInfo.NeedsValue2)
+                {
+                    <div class="d-flex" style="gap: 8px;">
+                        @RenderValueInput(1)
+                        @RenderValueInput(2)
+                    </div>
+                }
+                else
+                {
+                    @RenderValueInput(1)
+                }
+            }
+        </MudItem>
+
+        @* 删除 *@
+        <MudItem xs="12" md="1" Class="d-flex align-center">
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           Size="Size.Small"
+                           Color="Color.Error"
+                           OnClick="@(() => OnRemove.InvokeAsync())"
+                           title="移除" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public AttributeFilter Filter { get; set; } = new();
+    [Parameter, EditorRequired] public IReadOnlyList<AttributeSchemaDto> SupportedAttributes { get; set; }
+        = Array.Empty<AttributeSchemaDto>();
+    [Parameter] public EventCallback OnRemove { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private AttributeSchemaDto? SelectedAttr =>
+        SupportedAttributes.FirstOrDefault(a => a.AttributeName == Filter.AttributeName);
+
+    private FilterOperatorCatalog.OperatorInfo? OperatorInfo =>
+        SelectedAttr is null ? null : FilterOperatorCatalog.Get(SelectedAttr, Filter.Operator);
+
+    private string MultiValueText
+    {
+        get => Filter.Value is JsonElement je && je.ValueKind == JsonValueKind.Array
+            ? string.Join(", ", je.EnumerateArray().Select(x => x.ToString()))
+            : Filter.Value?.ToString() ?? "";
+        set { }
+    }
+
+    private async Task OnAttributeChanged(string name)
+    {
+        Filter.AttributeName = name;
+        Filter.Operator = "";
+        Filter.Value = null;
+        Filter.Value2 = null;
+
+        // 自动选默认运算符
+        var attr = SelectedAttr;
+        if (attr is not null)
+        {
+            var ops = FilterOperatorCatalog.For(attr);
+            if (ops.Count > 0)
+                Filter.Operator = ops[0].Code;
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnOperatorChanged(string op)
+    {
+        Filter.Operator = op;
+        Filter.Value = null;
+        Filter.Value2 = null;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnMultiValueChanged(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            Filter.Value = null;
+        }
+        else
+        {
+            var parts = text.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim()).ToArray();
+
+            // 根据属性类型转换
+            var attr = SelectedAttr;
+            Filter.Value = attr?.DataType switch
+            {
+                "int" => parts.Select(s => long.TryParse(s, out var l) ? l : 0).ToArray(),
+                "decimal" => parts.Select(s =>
+                    decimal.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var d)
+                        ? d : 0m).ToArray(),
+                _ => parts
+            };
+        }
+        await OnChanged.InvokeAsync();
+    }
+
+    private RenderFragment RenderValueInput(int position) => builder =>
+    {
+        var attr = SelectedAttr;
+        if (attr is null) return;
+
+        void OnValueChanged(object? v)
+        {
+            if (position == 1) Filter.Value = v;
+            else Filter.Value2 = v;
+
+            // 状态变化后通知父级（异步 fire-and-forget）
+            _ = OnChanged.InvokeAsync();
+        }
+
+        builder.OpenComponent(0, typeof(ValueInput));
+        builder.AddAttribute(1, nameof(ValueInput.Attribute), attr);
+        builder.AddAttribute(2, nameof(ValueInput.Value),
+            position == 1 ? Filter.Value : Filter.Value2);
+        builder.AddAttribute(3, nameof(ValueInput.ValueChanged),
+            (EventCallback<object?>)new EventCallback<object?>(null, (Action<object?>)OnValueChanged));
+        builder.CloseComponent();
+    };
+}

@@ -143,4 +143,37 @@ public class OptionItemsController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>
+    /// ★ 恢复被软删除的选项项。
+    /// 唯一约束（option_set_id, value）不区分 IsDeleted。
+    /// </summary>
+    [HttpPost("{itemId:long}/undelete")]
+    public async Task<IActionResult> UndeleteOption(
+        long setId, long itemId, CancellationToken ct)
+    {
+        var item = await _db.OptionItems
+            .FirstOrDefaultAsync(i => i.OptionItemId == itemId
+                                   && i.OptionSetId == setId, ct);
+        if (item is null) return NotFound();
+        if (!item.IsDeleted) return NoContent();
+
+        var conflict = await _db.OptionItems.AnyAsync(
+            i => i.OptionItemId != itemId
+              && i.OptionSetId == setId
+              && i.Value == item.Value
+              && !i.IsDeleted, ct);
+
+        if (conflict)
+            return Conflict(new
+            {
+                error = $"同 Value 的活动选项已存在（{item.Value}）"
+            });
+
+        item.IsDeleted = false;
+        item.IsDefault = false;
+        await _db.SaveChangesAsync(ct);
+        _optionSetCache.Invalidate(setId);
+        return NoContent();
+    }
 }

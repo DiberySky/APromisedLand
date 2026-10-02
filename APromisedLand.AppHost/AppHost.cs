@@ -20,7 +20,7 @@ void TreeGraph()
 {
     builder.AddPostgres(context);
     builder.AddRedis(context);
-    builder.AddNebulaGraph(context);
+    // builder.AddNebulaGraph(context);
 
     // ★ EAV 动态类型 API(复用 TreeGraphDb,固定端口 5773)
     builder.AddTreeGraphEavApi(context);

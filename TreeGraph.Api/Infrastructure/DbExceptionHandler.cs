@@ -14,9 +14,16 @@ public sealed class DbExceptionHandler : IExceptionHandler
     public async ValueTask<bool> TryHandleAsync(
         HttpContext context, Exception ex, CancellationToken ct)
     {
-        if (ex is not DbUpdateException due
-            || due.InnerException is not PostgresException pg)
-            return false;
+        // ★ 修复：ExecuteUpdateAsync / ExecuteDeleteAsync 会抛出未经 DbUpdateException
+        //   包装的裸 PostgresException，需要单独处理，否则会 500。
+        var pg = ex switch
+        {
+            DbUpdateException due when due.InnerException is PostgresException inner => inner,
+            PostgresException direct => direct,
+            _ => null
+        };
+
+        if (pg is null) return false;
 
         if (pg.SqlState == PostgresErrorCodes.UniqueViolation)
         {
@@ -37,6 +44,19 @@ public sealed class DbExceptionHandler : IExceptionHandler
             await context.Response.WriteAsJsonAsync(new
             {
                 error = "外键约束冲突",
+                constraint = pg.ConstraintName
+            }, ct);
+            return true;
+        }
+
+        // ★ 新增：CHECK 约束（如 ck_attr_int_no_unit / ck_composite_field_*）
+        if (pg.SqlState == PostgresErrorCodes.CheckViolation)
+        {
+            _logger.LogWarning("CHECK 约束冲突: {Constraint}", pg.ConstraintName);
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                error = "约束校验失败",
                 constraint = pg.ConstraintName
             }, ct);
             return true;

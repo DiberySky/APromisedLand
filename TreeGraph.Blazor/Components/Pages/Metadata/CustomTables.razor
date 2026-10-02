@@ -3,7 +3,7 @@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-
+@* CustomTables.razor *@
 <PageTitle>自定义表管理</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">自定义表管理</MudText>
@@ -100,13 +100,13 @@ else
 
                     @if (table.Columns.Count == 0)
                     {
-                        <MudAlert Severity="Severity.Info" Dense="true">
+                        <MudAlert Severity="Severity.Info">
                             该自定义表暂无列
                         </MudAlert>
                     }
                     else
                     {
-                        <MudTable Items="table.Columns" Dense="true" Bordered="true"
+                        <MudTable Items="table.Columns" Bordered="true"
                                   Hover="true">
                             <HeaderContent>
                                 <MudTh>列名</MudTh>
@@ -240,7 +240,7 @@ else
                          Label="显示顺序"
                          Variant="Variant.Outlined"
                          Class="mb-3" />
-        <MudAlert Severity="Severity.Info" Dense="true">
+        <MudAlert Severity="Severity.Info">
             TableName 与 EntityType 是引用标识，不可修改。如需更名，请新建并迁移引用。
         </MudAlert>
     </DialogContent>

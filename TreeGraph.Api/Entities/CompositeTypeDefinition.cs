@@ -15,7 +15,13 @@ public class CompositeTypeDefinition
     public List<CompositeFieldDefinition> Fields { get; set; } = new();
 }
 
-/// <summary>组合类型字段定义（DataType = "composite" 时可嵌套）</summary>
+/// <summary>
+/// 组合类型字段定义。
+///
+/// ★ #8：新增 RefOptionSetId，组合内 single_choice 可用选项集（与属性级对齐）。
+/// 与 AllowedValues 并存：优先使用 RefOptionSetId，未设置时回退到 AllowedValues。
+/// 数据库 CHECK 约束：仅 single_choice 类型可以设置 ref_option_set_id。
+/// </summary>
 public class CompositeFieldDefinition
 {
     public long FieldId { get; set; }
@@ -27,6 +33,17 @@ public class CompositeFieldDefinition
     /// <summary>当 DataType = "composite" 时指向嵌套类型</summary>
     public long? RefCompositeTypeId { get; set; }
     public CompositeTypeDefinition? RefCompositeType { get; set; }
+
+    /// <summary>数量字段的基准单位（仅 DataType = "decimal" 允许）</summary>
+    public Guid? UnitId { get; set; }
+    public Unit? Unit { get; set; }
+
+    /// <summary>
+    /// ★ #8：选项集引用（仅 DataType = "single_choice" 允许）。
+    /// 设置后，选项集提供的 Value / Label 优先于 AllowedValues。
+    /// </summary>
+    public long? RefOptionSetId { get; set; }
+    public OptionSet? RefOptionSet { get; set; }
 
     public bool IsArray { get; set; }
     public bool IsRequired { get; set; }

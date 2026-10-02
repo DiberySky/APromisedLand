@@ -1,83 +1,220 @@
-@page "/entities"
+@page "/entities/{EntityType}"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using TreeGraph.Blazor.Components.Shared
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
 @inject EavApiClient Api
+@inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject IDialogService DialogService
+@* EntityList.razor *@
+<PageTitle>@EntityType 实体列表</PageTitle>
 
-<PageTitle>实体列表</PageTitle>
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudButton Variant="Variant.Text" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="BackToHome">
+        返回
+    </MudButton>
+    <MudText Typo="Typo.h5">@EntityType 实体</MudText>
+</div>
 
-<MudText Typo="Typo.h5" Class="mb-4">实体列表</MudText>
-
-<MudGrid Class="mb-4">
-    <MudItem xs="12" md="4">
-        <MudTextField @bind-Value="_entityType" Label="实体类型"
-                      Variant="Variant.Outlined" />
-    </MudItem>
-    <MudItem xs="12" md="4">
-        <MudNumericField T="int?" @bind-Value="_pageSize"
-                         Label="每页数量" Variant="Variant.Outlined" />
-    </MudItem>
-    <MudItem xs="12" md="4" Class="d-flex align-center">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   OnClick="LoadAsync" Disabled="@_loading"
-                   StartIcon="@Icons.Material.Filled.Search">
-            查询
-        </MudButton>
-    </MudItem>
-</MudGrid>
-
-@if (_result is not null)
+@* ★ 动态查询过滤器 *@
+@if (_schema is not null && _schema.Count > 0)
 {
-    <MudText Typo="Typo.body2" Class="mb-2">
-        共 @_result.Total 条，第 @_result.Page 页
-    </MudText>
-
-    <MudTable Items="_result.Items" Hover="true" Bordered="true" Dense="true">
-        <HeaderContent>
-            <MudTh>EntityId</MudTh>
-            <MudTh>操作</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd>@context.EntityId</MudTd>
-            <MudTd>
-                <MudButton Size="Size.Small" Variant="Variant.Text"
-                           OnClick="@(() => Edit(context.EntityId))">
-                    编辑
-                </MudButton>
-                <MudButton Size="Size.Small" Variant="Variant.Text"
-                           OnClick="@(() => History(context.EntityId))">
-                    历史
-                </MudButton>
-            </MudTd>
-        </RowTemplate>
-        <PagerContent>
-            <MudTablePager PageSizeOptions="new[] { 10, 20, 50 }" />
-        </PagerContent>
-    </MudTable>
+    <QueryFilterBuilder Filters="_filters"
+                        SupportedAttributes="_searchableAttributes"
+                        OnApply="OnFilterChanged" />
 }
-else if (_loading)
+
+<MudPaper Class="pa-4 mb-4">
+    <div class="d-flex align-center" style="gap: 8px;">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="LoadAsync" Disabled="@_loading">
+            刷新
+        </MudButton>
+
+        <MudSpacer />
+
+        <MudNumericField T="long?"
+                         Label="新建 EntityId"
+                         Value="_newEntityId"
+                         ValueChanged="@(v => _newEntityId = v)"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         Style="width: 200px;" />
+
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="CreateNew"
+                   Disabled="@(_newEntityId is null)">
+            新建
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" />
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_result is null)
+{
+    <MudAlert Severity="Severity.Error">加载失败，请检查后端服务</MudAlert>
+}
+else if (_result.Items.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.Inbox"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">未找到实体</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            @if (_filters.Count > 0)
+            {
+                <text>当前查询条件无匹配结果，试试清空过滤条件。</text>
+            }
+            else
+            {
+                <text>在右上角输入 EntityId 后点击"新建"创建第一个</text>
+            }
+        </MudText>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            共 <b>@_result.Total</b> 个实体，第 @_result.Page / @TotalPages 页
+        </MudText>
+
+        <MudTable Items="_result.Items" Hover="true" Bordered="true"
+                  @key="(_result.Page, _result.Total, _filters.Count)">
+            <HeaderContent>
+                <MudTh>EntityId</MudTh>
+                @foreach (var col in _previewColumns)
+                {
+                    <MudTh>@GetColumnDisplayName(col)</MudTh>
+                }
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <code>@context.EntityId</code>
+                </MudTd>
+                @foreach (var col in _previewColumns)
+                {
+                    <MudTd>@FormatPreview(context.Properties.GetValueOrDefault(col))</MudTd>
+                }
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => OpenEdit(context.EntityId))"
+                                   title="编辑" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   OnClick="@(() => ConfirmDelete(context.EntityId))"
+                                   title="删除" />
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <div class="d-flex align-center pa-2" style="gap: 8px;">
+                    <MudSelect T="int"
+                               Value="_pageSize"
+                               ValueChanged="OnPageSizeChanged"
+                               Label="每页"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Style="width: 120px;">
+                        <MudSelectItem T="int" Value="10">10</MudSelectItem>
+                        <MudSelectItem T="int" Value="20">20</MudSelectItem>
+                        <MudSelectItem T="int" Value="50">50</MudSelectItem>
+                        <MudSelectItem T="int" Value="100">100</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSpacer />
+
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                                   Size="Size.Small"
+                                   Disabled="@(_result.Page <= 1)"
+                                   OnClick="@(() => GoToPage(_result.Page - 1))" />
+                    <MudText Typo="Typo.body2">@_result.Page / @TotalPages</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                                   Size="Size.Small"
+                                   Disabled="@(_result.Page >= TotalPages)"
+                                   OnClick="@(() => GoToPage(_result.Page + 1))" />
+                </div>
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
 }
 
 @code {
-    private string _entityType = "Product";
-    private int? _pageSize = 20;
-    private PagedResult<DynamicEntityDto>? _result;
-    private bool _loading;
+    [Parameter] public string EntityType { get; set; } = "";
 
-    // 调用端点 ④：POST api/eav/{entityType}/entities/query
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private List<AttributeSchemaDto> _searchableAttributes = new();
+    private List<string> _previewColumns = new();
+
+    private readonly List<AttributeFilter> _filters = new();
+    private PagedResult<DynamicEntityDto>? _result;
+
+    private bool _loading;
+    private bool _initialized;
+    private int _page = 1;
+    private int _pageSize = 20;
+    private long? _newEntityId;
+
+    private int TotalPages => _result is null || _result.PageSize <= 0
+        ? 1
+        : Math.Max(1, (int)Math.Ceiling((double)_result.Total / _result.PageSize));
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        var schema = await Api.GetSchemaAsync(EntityType);
+        if (schema is not null)
+        {
+            _schema = schema;
+
+            // 可搜索属性（用于过滤器）
+            _searchableAttributes = schema
+                .Where(a => a.IsSearchable && FilterOperatorCatalog.IsSupported(a))
+                .OrderBy(a => a.DisplayOrder)
+                .ToList();
+
+            // 预览列（前 3 个可搜索的简单属性）
+            _previewColumns = schema
+                .Where(a => a.IsSearchable && a.DataType != "table" && a.DataType != "composite")
+                .OrderBy(a => a.DisplayOrder)
+                .Take(3)
+                .Select(a => a.AttributeName)
+                .ToList();
+        }
+
+        await LoadAsync();
+        StateHasChanged();
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
-            _result = await Api.QueryAsync(_entityType, new EavQueryRequest
+            var request = new EavQueryRequest
             {
-                EntityType = _entityType,
-                Filters = new List<AttributeFilter>(),
-                Page = 1,
-                PageSize = _pageSize ?? 20
-            });
+                EntityType = EntityType,
+                Filters = _filters,
+                Page = _page,
+                PageSize = _pageSize
+            };
+
+            _result = await Api.QueryAsync(EntityType, request);
+            if (_result is null)
+                Snackbar.Add("加载失败", Severity.Error);
         }
         finally
         {
@@ -85,9 +222,82 @@ else if (_loading)
         }
     }
 
-    private void Edit(long id)
-        => Nav.NavigateTo($"/entities/{_entityType}/{id}/edit");
+    /// <summary>过滤器条件变化时（点击"应用查询"或条件增删）触发。</summary>
+    private async Task OnFilterChanged()
+    {
+        _page = 1;  // 重置到第一页
+        await LoadAsync();
+        StateHasChanged();
+    }
 
-    private void History(long id)
-        => Nav.NavigateTo($"/entities/{_entityType}/{id}/history");
+    private async Task OnPageSizeChanged(int size)
+    {
+        _pageSize = size;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > TotalPages) return;
+        _page = page;
+        await LoadAsync();
+    }
+
+    private void OpenEdit(long entityId)
+    {
+        Nav.NavigateTo($"/entities/{EntityType}/{entityId}");
+    }
+
+    private async Task ConfirmDelete(long entityId)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除实体 {EntityType}/{entityId} 及其所有属性值和子表数据吗？\n\n" +
+            "此操作不可撤销。",
+            yesText: "永久删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteEntityAsync(EntityType, entityId);
+        if (!ok)
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("已删除", Severity.Success);
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private void CreateNew()
+    {
+        if (_newEntityId is { } id) Nav.NavigateTo($"/entities/{EntityType}/{id}");
+    }
+
+    private void BackToHome()
+    {
+        Nav.NavigateTo("/");
+    }
+
+    private string GetColumnDisplayName(string name)
+        => _schema?.FirstOrDefault(a => a.AttributeName == name)?.DisplayName ?? name;
+
+    private static string FormatPreview(System.Text.Json.JsonElement? elem)
+    {
+        if (elem is null) return "";
+        var e = elem.Value;
+        return e.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.Null => "",
+            System.Text.Json.JsonValueKind.String => e.GetString() ?? "",
+            System.Text.Json.JsonValueKind.Number => e.ToString(),
+            System.Text.Json.JsonValueKind.True => "✓",
+            System.Text.Json.JsonValueKind.False => "✗",
+            System.Text.Json.JsonValueKind.Object => "{…}",
+            System.Text.Json.JsonValueKind.Array => $"[{e.GetArrayLength()}]",
+            _ => e.ToString()
+        };
+    }
 }

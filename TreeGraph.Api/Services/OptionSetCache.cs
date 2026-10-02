@@ -8,7 +8,7 @@ namespace TreeGraph.Api.Services;
 public interface IOptionSetCache
 {
     OptionSet GetSet(long optionSetId);
-    List<OptionSet> GetAll(string? entityType = null);
+    List<OptionSet> GetAll(string? entityType = null, bool includeDeleted = false);
     void Invalidate(long optionSetId);
 }
 
@@ -24,8 +24,11 @@ public class OptionSetCache : IOptionSetCache
         _scopeFactory = scopeFactory;
     }
 
-    /// <summary>★ 修复 P1-1：集合不存在时抛 KeyNotFoundException，
-    /// 让调用端可以捕获并降级（而不是 NRE）</summary>
+    /// <summary>
+    /// 按 ID 取选项集。**不过滤集合级 IsDeleted**：
+    /// 历史数据里已存有该集合的 Value，读取时需要 Label 做降级显示。
+    /// 集合级 IsDeleted 仅用于管理页列表过滤。
+    /// </summary>
     public OptionSet GetSet(long optionSetId)
     {
         return _cache.GetOrCreate($"eav:oset:{optionSetId}", entry =>
@@ -45,14 +48,21 @@ public class OptionSetCache : IOptionSetCache
         })!;
     }
 
-    public List<OptionSet> GetAll(string? entityType = null)
+    /// <summary>
+    /// 列出选项集。
+    /// ★ includeDeleted = true 时返回软删除的集合（管理页恢复入口）。
+    /// </summary>
+    public List<OptionSet> GetAll(string? entityType = null, bool includeDeleted = false)
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
-        var ids = db.OptionSets
-            .Where(s => entityType == null
-                     || s.EntityType == entityType || s.EntityType == "Shared")
-            .OrderBy(s => s.OptionSetId)
+
+        var query = db.OptionSets.AsQueryable();
+        if (!includeDeleted) query = query.Where(s => !s.IsDeleted);
+        if (entityType is not null)
+            query = query.Where(s => s.EntityType == entityType || s.EntityType == "Shared");
+
+        var ids = query.OrderBy(s => s.OptionSetId)
             .AsNoTracking()
             .Select(s => s.OptionSetId)
             .ToList();

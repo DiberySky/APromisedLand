@@ -27,6 +27,7 @@ public class EavReadService
         _optionSetCache = optionSetCache;
     }
 
+    /// <param name="originalUnits">true 时数量值按原始输入单位还原（UI 展示）；默认返回基准单位</param>
     public async Task<DynamicEntity> LoadAsync(
         long entityId, string entityType, bool originalUnits = false,
         CancellationToken ct = default)
@@ -40,6 +41,10 @@ public class EavReadService
             .ToListAsync(ct);
 
         var result = new DynamicEntity(entityId, entityType);
+
+        // ★ #3：填充 UpdatedAt（供乐观锁使用）
+        if (rows.Count > 0)
+            result.UpdatedAt = rows.Max(r => r.UpdatedAt);
 
         foreach (var row in rows)
         {
@@ -66,9 +71,16 @@ public class EavReadService
 
         var grouped = allRows.GroupBy(r => r.EntityId);
 
+        // ★ 保持输入 ids 的顺序——FilterEntityIdsAsync 已按业务键排好序，
+        //   GroupBy 的输出顺序由 DB 行序决定，必须显式按输入序重排。
+        var inputOrder = ids
+            .Select((id, idx) => (id, idx))
+            .ToDictionary(x => x.id, x => x.idx);
+
         return grouped.Select(g =>
         {
             var entity = new DynamicEntity(g.Key, entityType);
+            entity.UpdatedAt = g.Max(r => r.UpdatedAt);  // ★
             foreach (var row in g)
             {
                 if (defMap.TryGetValue(row.AttributeId, out var def))
@@ -78,7 +90,9 @@ public class EavReadService
                 }
             }
             return entity;
-        }).ToList();
+        })
+        .OrderBy(e => inputOrder.GetValueOrDefault(e.EntityId, int.MaxValue))
+        .ToList();
     }
 
     private object? ExtractTypedValue(AttributeValue row, AttributeDefinition def, bool originalUnits)
@@ -99,15 +113,13 @@ public class EavReadService
             EavDataTypes.Json => row.ValueJsonb,
             EavDataTypes.Composite => row.ValueJsonb is null
                 ? null
-                : _composite.Deserialize(row.ValueJsonb, def.RefCompositeTypeId!.Value),
+                // ★ #4：组合反序列化支持 originalUnits 参数
+                : _composite.Deserialize(
+                    row.ValueJsonb, def.RefCompositeTypeId!.Value, originalUnits),
             _ => null
         };
     }
 
-    /// <summary>
-    /// 单选值提取：返回 { value, label }。
-    /// ★ 修复：选项集已被删除时降级为裸 Value，避免 NRE。
-    /// </summary>
     private object? ExtractSingleChoice(AttributeValue row, AttributeDefinition def)
     {
         if (row.ValueString is null) return null;
@@ -121,18 +133,28 @@ public class EavReadService
         }
         catch (KeyNotFoundException)
         {
-            // 选项集已被删除，降级为裸 Value
             return row.ValueString;
         }
     }
 
+    /// <summary>
+    /// 数值列还原。
+    ///
+    /// ★ 修复：当属性未绑定基准单位时，int 类型必须返回 long（而非 decimal），
+    /// 否则前端会收到 decimal 的 JSON 数字（含小数位）与 API 契约不符。
+    /// </summary>
     private object? ExtractNumericValue(
         decimal? baseValue, Guid? originalUnitId, AttributeDefinition def, bool originalUnits)
     {
         if (baseValue is null) return null;
 
         if (def.UnitId is not { } baseUnitId)
-            return baseValue.Value;
+        {
+            // 无单位绑定：按数据类型返回对应 C# 类型
+            return def.DataType == EavDataTypes.Int
+                ? (object)(long)baseValue.Value
+                : baseValue.Value;
+        }
 
         if (!originalUnits)
             return new NumericValue(baseValue.Value, baseUnitId);
@@ -147,7 +169,6 @@ public class EavReadService
         }
         catch (InvalidOperationException)
         {
-            // 原始单位已被删除：回退到基准单位
             return new NumericValue(baseValue.Value, baseUnitId);
         }
     }
@@ -175,6 +196,12 @@ public class DynamicEntity
     private readonly Dictionary<string, object?> _props = new();
     public long EntityId { get; }
     public string EntityType { get; }
+
+    /// <summary>
+    /// ★ #3：实体所有 AttributeValue 行的最大 UpdatedAt。
+    /// 无属性值时（新建）为 null。
+    /// </summary>
+    public DateTimeOffset? UpdatedAt { get; set; }
 
     public DynamicEntity(long id, string type) { EntityId = id; EntityType = type; }
 

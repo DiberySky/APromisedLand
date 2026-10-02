@@ -13,7 +13,8 @@ public record OptionSetSummaryDto(
     long OptionSetId,
     string EntityType,
     string SetName,
-    string DisplayName);
+    string DisplayName,
+    bool IsDeleted = false);   // ★ 新增
 
 /// <summary>添加选项（POST api/eav/metadata/option-sets/{setId}/items）</summary>
 public class CreateOptionItemRequest
@@ -47,7 +48,8 @@ public record OptionSetDetailDto(
     string DisplayName,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<OptionItemDetailDto> Items);
+    IReadOnlyList<OptionItemDetailDto> Items,
+    bool IsDeleted = false);   // ★ 新增
 
 /// <summary>选项详情（含软删除状态，供管理页展示）</summary>
 public record OptionItemDetailDto(

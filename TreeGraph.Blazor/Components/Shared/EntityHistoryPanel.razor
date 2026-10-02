@@ -1,0 +1,187 @@
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+@inject EavApiClient Api
+
+@* EntityHistoryPanel.razor *@
+@* 审计历史面板：在实体编辑页底部展示变更记录。 *@
+
+<MudExpansionPanel @ref="_panel"
+                   Text="@($"变更历史 ({_items?.Count ?? 0})")"
+                   Expanded="_panelExpanded"
+                   ExpandedChanged="OnPanelExpandedChanged"
+                   Class="mt-4">
+    <TitleContent>
+        <div class="d-flex align-center" style="width: 100%;">
+            <MudIcon Icon="@Icons.Material.Filled.History"
+                     Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.subtitle1">变更历史</MudText>
+            @if (_items is { Count: > 0 })
+            {
+                <MudChip T="string" Size="Size.Small" Class="ml-2">
+                    @_items.Count 条
+                </MudChip>
+            }
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Size="Size.Small"
+                           OnClick="@(async () => await LoadAsync())"
+                           title="刷新" />
+        </div>
+    </TitleContent>
+
+    <ChildContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_items is null || _items.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">
+                暂无变更历史
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="_items" Bordered="true" Hover="true"
+                      Elevation="0">
+                <HeaderContent>
+                    <MudTh>时间</MudTh>
+                    <MudTh>属性</MudTh>
+                    <MudTh>类型</MudTh>
+                    <MudTh>旧值</MudTh>
+                    <MudTh>新值</MudTh>
+                    <MudTh>操作人</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        @context.ChangedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                    </MudTd>
+                    <MudTd>
+                        <code>@context.AttributeName</code>
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@GetChangeColor(context.ChangeType)">
+                            @GetChangeLabel(context.ChangeType)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        @if (string.IsNullOrEmpty(context.OldValue))
+                        {
+                            <span class="mud-text-secondary">—</span>
+                        }
+                        else
+                        {
+                            <code>@Truncate(context.OldValue, 60)</code>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        @if (string.IsNullOrEmpty(context.NewValue))
+                        {
+                            <span class="mud-text-secondary">—</span>
+                        }
+                        else
+                        {
+                            <code>@Truncate(context.NewValue, 60)</code>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        @if (string.IsNullOrEmpty(context.ChangedBy))
+                        {
+                            <span class="mud-text-secondary">—</span>
+                        }
+                        else
+                        {
+                            @context.ChangedBy
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </ChildContent>
+</MudExpansionPanel>
+
+@code {
+    [Parameter, EditorRequired] public string EntityType { get; set; } = "";
+    [Parameter, EditorRequired] public long EntityId { get; set; }
+
+    /// <summary>
+    /// 父组件保存成功后自增此值，触发面板重新加载。
+    /// 首次渲染时不加载（用户展开面板时按需加载）。
+    /// </summary>
+    [Parameter] public int RefreshToken { get; set; }
+
+    private MudExpansionPanel? _panel;
+    private bool _panelExpanded;
+    private IReadOnlyList<EntityHistoryDto>? _items;
+    private bool _loading;
+    private int _lastRefreshToken = -1;
+    private bool _loaded;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+
+        // 刷新令牌变化时：如面板展开则立即重载，否则清空由下次展开触发
+        if (RefreshToken != _lastRefreshToken)
+        {
+            _lastRefreshToken = RefreshToken;
+            if (_panelExpanded)
+            {
+                _ = LoadAsync();
+            }
+            else
+            {
+                _loaded = false;
+                _items = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// ★ 修复 P0-NEW-1：面板展开/折叠事件。
+    /// 展开时若尚未加载则立即加载；否则什么都不做（保留已加载数据）。
+    /// 通过 @bind-Expanded + ExpandedChanged 触发，之前的方法从未被绑定。
+    /// </summary>
+    private async Task OnPanelExpandedChanged(bool expanded)
+    {
+        _panelExpanded = expanded;
+        if (expanded && !_loaded)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loaded = true;
+        try
+        {
+            _items = await Api.GetHistoryAsync(EntityType, EntityId);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static Color GetChangeColor(string changeType) => changeType switch
+    {
+        "Insert" => Color.Success,
+        "Update" => Color.Info,
+        "Delete" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetChangeLabel(string changeType) => changeType switch
+    {
+        "Insert" => "新增",
+        "Update" => "修改",
+        "Delete" => "删除",
+        _ => changeType
+    };
+
+    private static string Truncate(string s, int max)
+        => s.Length <= max ? s : s.Substring(0, max) + "…";
+}

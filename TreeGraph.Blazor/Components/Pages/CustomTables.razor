@@ -1,0 +1,822 @@
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@* CustomTables.razor *@
+<PageTitle>自定义表管理</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">自定义表管理</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudTextField @bind-Value="_entityType" Label="实体类型（可选）"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Placeholder="留空显示全部" />
+        </MudItem>
+        <MudItem xs="12" md="2" Class="d-flex align-center">
+            @* ★ 新增：显示已删除开关 *@
+            <MudSwitch T="bool" @bind-Value="_includeDeleted"
+                       Label="显示已删除"
+                       Color="Color.Warning" />
+        </MudItem>
+        <MudItem xs="12" md="6" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="LoadAsync" Disabled="_loading"
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       OnClick="OpenCreateTableDialog"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Class="ml-2">
+                新建自定义表
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_tables is null || _tables.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.TableChart"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">暂无自定义表</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            点击"新建自定义表"创建第一个
+        </MudText>
+    </MudPaper>
+}
+else
+{
+    <MudExpansionPanels MultiExpansion="true">
+        @foreach (var table in _tables)
+        {
+            <MudExpansionPanel @key="table.TableDefinitionId">
+                <TitleContent>
+                    <div class="d-flex align-center" style="width: 100%;">
+                        <MudIcon Icon="@Icons.Material.Filled.TableChart"
+                                 Color="@(table.IsDeleted ? Color.Error : Color.Primary)"
+                                 Class="mr-2" />
+                        <MudText Typo="Typo.subtitle1">@table.DisplayName</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info"
+                                 Class="ml-2">
+                            @table.TableName
+                        </MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary"
+                                 Class="ml-2">
+                            @table.EntityType
+                        </MudChip>
+                        <MudChip T="string" Size="Size.Small" Class="ml-2">
+                            v@table.Version
+                        </MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                                 Class="ml-2">
+                            @table.Columns.Count(c => !c.IsDeleted) 列
+                        </MudChip>
+                        @* ★ 已删除标记 *@
+                        @if (table.IsDeleted)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error"
+                                     Class="ml-2">
+                                已删除
+                            </MudChip>
+                        }
+                        <MudSpacer />
+                        @if (!table.IsDeleted)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           OnClick="@(() => OpenEditTableDialog(table))"
+                                           title="编辑显示名 / 顺序" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           OnClick="@(async () => await DeleteTableAsync(table))"
+                                           title="删除自定义表" />
+                        }
+                        else
+                        {
+                            @* ★ 已删除表：提供恢复入口 *@
+                            <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                           Color="Color.Success"
+                                           Size="Size.Small"
+                                           OnClick="@(async () => await UndeleteTableAsync(table))"
+                                           title="恢复" />
+                        }
+                    </div>
+                </TitleContent>
+
+                <ChildContent>
+                    @if (!table.IsDeleted)
+                    {
+                        <div class="d-flex mb-3">
+                            <MudButton Size="Size.Small"
+                                       Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       OnClick="@(() => OpenAddColumnDialog(table))">
+                                添加列
+                            </MudButton>
+                        </div>
+                    }
+
+                    @if (table.Columns.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info">
+                            该自定义表暂无列
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable Items="table.Columns" Bordered="true"
+                                  Hover="true">
+                            <HeaderContent>
+                                <MudTh>列名</MudTh>
+                                <MudTh>显示名</MudTh>
+                                <MudTh>类型</MudTh>
+                                <MudTh>必填</MudTh>
+                                <MudTh>可搜索</MudTh>
+                                <MudTh>可排序</MudTh>
+                                <MudTh>唯一</MudTh>
+                                <MudTh>顺序</MudTh>
+                                <MudTh>操作</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>
+                                    <code>@context.ColumnName</code>
+                                    @* ★ 已删除列标记 *@
+                                    @if (context.IsDeleted)
+                                    {
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="Color.Error" Class="ml-1">
+                                            已删除
+                                        </MudChip>
+                                    }
+                                </MudTd>
+                                <MudTd>@context.DisplayName</MudTd>
+                                <MudTd>
+                                    <MudChip T="string" Size="Size.Small"
+                                             Color="@GetDataTypeColor(context.DataType)">
+                                        @context.DataType
+                                    </MudChip>
+                                </MudTd>
+                                <MudTd>
+                                    @if (context.IsRequired)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                                 Color="Color.Success" Size="Size.Small" />
+                                    }
+                                </MudTd>
+                                <MudTd>
+                                    @if (context.IsSearchable)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                                 Color="Color.Success" Size="Size.Small" />
+                                    }
+                                </MudTd>
+                                <MudTd>
+                                    @if (context.IsSortable)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                                 Color="Color.Success" Size="Size.Small" />
+                                    }
+                                </MudTd>
+                                <MudTd>
+                                    @if (context.IsUnique)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                                 Color="Color.Success" Size="Size.Small" />
+                                    }
+                                </MudTd>
+                                <MudTd>@context.DisplayOrder</MudTd>
+                                <MudTd>
+                                    @if (!context.IsDeleted)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                       Size="Size.Small"
+                                                       Color="Color.Primary"
+                                                       OnClick="@(() => OpenEditColumnDialog(table, context))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Size="Size.Small"
+                                                       Color="Color.Error"
+                                                       OnClick="@(async () => await DeleteColumnAsync(table, context))" />
+                                    }
+                                    else
+                                    {
+                                        @* ★ 已删除列：提供恢复入口 *@
+                                        <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                                       Size="Size.Small"
+                                                       Color="Color.Success"
+                                                       OnClick="@(async () => await UndeleteColumnAsync(table, context))"
+                                                       title="恢复" />
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </ChildContent>
+            </MudExpansionPanel>
+        }
+    </MudExpansionPanels>
+}
+
+@* ============================================================ *@
+@* 新建自定义表 *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showCreateTableDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">新建自定义表</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_newTable.EntityType"
+                      Label="实体类型"
+                      Placeholder="Product"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_newTable.TableName"
+                      Label="表名 (snake_case)"
+                      Placeholder="specs"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_newTable.DisplayName"
+                      Label="显示名"
+                      Placeholder="规格参数"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudNumericField T="int"
+                         @bind-Value="_newTable.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showCreateTableDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="CreateTableAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "创建中..." : "创建")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ============================================================ *@
+@* 编辑自定义表 *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showEditTableDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">编辑自定义表</MudText>
+        @if (_editingTable is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_editingTable.EntityType / @_editingTable.TableName
+                （表名与实体类型不可修改）
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_editTableForm.DisplayName"
+                      Label="显示名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudNumericField T="int?"
+                         @bind-Value="_editTableForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+        <MudAlert Severity="Severity.Info">
+            TableName 与 EntityType 是引用标识，不可修改。如需更名，请新建并迁移引用。
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showEditTableDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="UpdateTableAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "保存中..." : "保存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ============================================================ *@
+@* 添加 / 编辑列 *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showColumnDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(_editingColumn is null ? "添加列" : "编辑列")
+        </MudText>
+        @if (_currentTable is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_currentTable.DisplayName (@_currentTable.TableName)
+            </MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_columnForm.ColumnName"
+                      Label="列名 (snake_case)"
+                      Placeholder="weight"
+                      Variant="Variant.Outlined"
+                      Disabled="@(_editingColumn is not null)"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_columnForm.DisplayName"
+                      Label="显示名"
+                      Placeholder="重量"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudSelect T="string"
+                   Value="_columnForm.DataType"
+                   ValueChanged="OnColumnDataTypeChanged"
+                   Label="数据类型"
+                   Variant="Variant.Outlined"
+                   Disabled="@(_editingColumn is not null)"
+                   Class="mb-3">
+            @foreach (var dt in DataTypeOptions)
+            {
+                <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+            }
+        </MudSelect>
+
+        @if (_columnForm.DataType == "composite")
+        {
+            <MudSelect T="long?"
+                       Value="_columnForm.RefCompositeTypeId"
+                       ValueChanged="@(v => _columnForm.RefCompositeTypeId = v)"
+                       Label="嵌套组合类型"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in _compositeTypes ?? (IReadOnlyList<CompositeTypeDetailDto>)Array.Empty<CompositeTypeDetailDto>())
+                {
+                    <MudSelectItem T="long?" Value="@t.CompositeTypeId">
+                        @t.DisplayName (@t.TypeName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        <MudNumericField T="int"
+                         @bind-Value="_columnForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudSwitch T="bool"
+                           @bind-Value="_columnForm.IsRequired"
+                           Label="必填"
+                           Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSwitch T="bool"
+                           @bind-Value="_columnForm.IsSearchable"
+                           Label="可搜索"
+                           Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSwitch T="bool"
+                           @bind-Value="_columnForm.IsSortable"
+                           Label="可排序"
+                           Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSwitch T="bool"
+                           @bind-Value="_columnForm.IsUnique"
+                           Label="唯一"
+                           Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showColumnDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="SaveColumnAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "保存中..." : "保存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private string? _entityType;
+    private bool _includeDeleted;               // ★ 新增
+    private IReadOnlyList<CustomTableDetailDto>? _tables;
+    private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
+    private bool _loading;
+    private bool _initialized;
+
+    private bool _submitting;
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true
+    };
+
+    // 新建自定义表
+    private bool _showCreateTableDialog;
+    private CreateCustomTableRequest _newTable = new() { EntityType = "Product" };
+
+    // 编辑自定义表
+    private bool _showEditTableDialog;
+    private CustomTableDetailDto? _editingTable;
+    private UpdateCustomTableRequest _editTableForm = new();
+
+    // 添加 / 编辑列
+    private bool _showColumnDialog;
+    private CustomTableDetailDto? _currentTable;
+    private CustomTableColumnDto? _editingColumn;
+    private ColumnForm _columnForm = new();
+
+    private static readonly (string Value, string Label)[] DataTypeOptions =
+    {
+        ("string",   "字符串"),
+        ("int",      "整数"),
+        ("decimal",  "小数"),
+        ("bool",     "布尔"),
+        ("datetime", "日期时间"),
+        ("date",     "日期"),
+        ("time",     "时间"),
+        ("single_choice", "单选"),
+        ("composite", "嵌套组合"),
+        ("json",     "JSON")
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        await LoadCompositeTypesAsync();
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadCompositeTypesAsync()
+    {
+        _compositeTypes = await Api.ListCompositeTypesAsync();
+        if (_compositeTypes is null)
+            Snackbar.Add("组合类型加载失败（列若需嵌套类型将不可选）", Severity.Warning);
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            // ★ 传 includeDeleted
+            _tables = await Api.ListCustomTablesAsync(_entityType, _includeDeleted);
+            if (_tables is null)
+            {
+                Snackbar.Add("加载失败，请检查后端服务", Severity.Error);
+                _tables = Array.Empty<CustomTableDetailDto>();
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // ---------- 新建自定义表 ----------
+
+    private void OpenCreateTableDialog()
+    {
+        _newTable = new CreateCustomTableRequest { EntityType = "Product" };
+        _showCreateTableDialog = true;
+    }
+
+    private async Task CreateTableAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newTable.EntityType) ||
+            string.IsNullOrWhiteSpace(_newTable.TableName) ||
+            string.IsNullOrWhiteSpace(_newTable.DisplayName))
+        {
+            Snackbar.Add("请填写所有字段", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var id = await Api.CreateCustomTableAsync(_newTable);
+            if (id is null)
+            {
+                Snackbar.Add("创建失败", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add($"创建成功：Id={id}", Severity.Success);
+            _showCreateTableDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 编辑自定义表 ----------
+
+    private void OpenEditTableDialog(CustomTableDetailDto table)
+    {
+        _editingTable = table;
+        _editTableForm = new UpdateCustomTableRequest
+        {
+            DisplayName = table.DisplayName,
+            DisplayOrder = table.DisplayOrder
+        };
+        _showEditTableDialog = true;
+    }
+
+    private async Task UpdateTableAsync()
+    {
+        if (_editingTable is null) return;
+
+        if (string.IsNullOrWhiteSpace(_editTableForm.DisplayName))
+        {
+            Snackbar.Add("显示名不能为空", Severity.Warning);
+            return;
+        }
+
+        var unchanged =
+            _editTableForm.DisplayName == _editingTable.DisplayName &&
+            _editTableForm.DisplayOrder == _editingTable.DisplayOrder;
+
+        if (unchanged)
+        {
+            _showEditTableDialog = false;
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateCustomTableAsync(
+                _editingTable.TableDefinitionId, _editTableForm);
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            _showEditTableDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 删除自定义表 ----------
+
+    private async Task DeleteTableAsync(CustomTableDetailDto table)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除自定义表「{table.DisplayName}」？此操作将同时标记所有列为删除。\n\n" +
+            "如需恢复，勾选上方「显示已删除」后点击恢复按钮。",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteCustomTableAsync(table.TableDefinitionId);
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    // ---------- ★ 恢复自定义表 ----------
+
+    private async Task UndeleteTableAsync(CustomTableDetailDto table)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认恢复",
+            $"确定恢复自定义表「{table.DisplayName}」({table.TableName})？\n\n" +
+            "恢复后其所有列将一并恢复。",
+            yesText: "恢复", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.UndeleteCustomTableAsync(table.TableDefinitionId);
+        if (ok)
+        {
+            Snackbar.Add("恢复成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    // ---------- 添加 / 编辑列 ----------
+
+    private void OpenAddColumnDialog(CustomTableDetailDto table)
+    {
+        _currentTable = table;
+        _editingColumn = null;
+        _columnForm = new ColumnForm
+        {
+            DisplayOrder = table.Columns.Count(c => !c.IsDeleted) + 1,
+            IsSearchable = true
+        };
+        _showColumnDialog = true;
+    }
+
+    private void OpenEditColumnDialog(
+        CustomTableDetailDto table, CustomTableColumnDto column)
+    {
+        _currentTable = table;
+        _editingColumn = column;
+        _columnForm = new ColumnForm
+        {
+            ColumnName = column.ColumnName,
+            DisplayName = column.DisplayName,
+            DataType = column.DataType,
+            RefCompositeTypeId = column.RefCompositeTypeId,
+            IsRequired = column.IsRequired,
+            IsSearchable = column.IsSearchable,
+            IsSortable = column.IsSortable,
+            IsUnique = column.IsUnique,
+            DisplayOrder = column.DisplayOrder
+        };
+        _showColumnDialog = true;
+    }
+
+    private void OnColumnDataTypeChanged(string dt)
+    {
+        _columnForm.DataType = dt;
+        if (dt != "composite") _columnForm.RefCompositeTypeId = null;
+    }
+
+    private async Task SaveColumnAsync()
+    {
+        if (_currentTable is null) return;
+
+        if (string.IsNullOrWhiteSpace(_columnForm.ColumnName) ||
+            string.IsNullOrWhiteSpace(_columnForm.DisplayName))
+        {
+            Snackbar.Add("请填写列名和显示名", Severity.Warning);
+            return;
+        }
+
+        if (_columnForm.DataType == "composite" &&
+            _columnForm.RefCompositeTypeId is null)
+        {
+            Snackbar.Add("组合类型列必须指定嵌套类型", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            if (_editingColumn is null)
+            {
+                var id = await Api.AddCustomTableColumnAsync(
+                    _currentTable.TableDefinitionId,
+                    new CreateTableColumnRequest
+                    {
+                        ColumnName = _columnForm.ColumnName,
+                        DisplayName = _columnForm.DisplayName,
+                        DataType = _columnForm.DataType,
+                        RefCompositeTypeId = _columnForm.RefCompositeTypeId,
+                        IsRequired = _columnForm.IsRequired,
+                        IsSearchable = _columnForm.IsSearchable,
+                        IsSortable = _columnForm.IsSortable,
+                        IsUnique = _columnForm.IsUnique,
+                        DisplayOrder = _columnForm.DisplayOrder
+                    });
+
+                if (id is null)
+                {
+                    Snackbar.Add("添加失败", Severity.Error);
+                    return;
+                }
+                Snackbar.Add($"添加成功：Id={id}", Severity.Success);
+            }
+            else
+            {
+                var (ok, error) = await Api.UpdateTableColumnAsync(
+                    _currentTable.TableDefinitionId,
+                    _editingColumn.ColumnId,
+                    new UpdateTableColumnRequest
+                    {
+                        DisplayName = _columnForm.DisplayName,
+                        IsRequired = _columnForm.IsRequired,
+                        IsSearchable = _columnForm.IsSearchable,
+                        IsSortable = _columnForm.IsSortable,
+                        IsUnique = _columnForm.IsUnique,
+                        DisplayOrder = _columnForm.DisplayOrder
+                    });
+
+                if (!ok)
+                {
+                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                    return;
+                }
+                Snackbar.Add("更新成功", Severity.Success);
+            }
+
+            _showColumnDialog = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 删除列 ----------
+
+    private async Task DeleteColumnAsync(
+        CustomTableDetailDto table, CustomTableColumnDto column)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除列「{column.DisplayName}」？\n\n" +
+            "如需恢复，勾选「显示已删除」后点击恢复按钮。",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteTableColumnAsync(
+            table.TableDefinitionId, column.ColumnId);
+
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    // ---------- ★ 恢复列 ----------
+
+    private async Task UndeleteColumnAsync(
+        CustomTableDetailDto table, CustomTableColumnDto column)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认恢复",
+            $"确定恢复列「{column.DisplayName}」({column.ColumnName})？",
+            yesText: "恢复", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.UndeleteTableColumnAsync(
+            table.TableDefinitionId, column.ColumnId);
+
+        if (ok)
+        {
+            Snackbar.Add("恢复成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    // ---------- 辅助 ----------
+
+    private static Color GetDataTypeColor(string dataType) => dataType switch
+    {
+        "string" => Color.Info,
+        "int" or "decimal" => Color.Primary,
+        "bool" => Color.Success,
+        "datetime" or "date" or "time" => Color.Warning,
+        "single_choice" => Color.Tertiary,
+        "composite" => Color.Dark,
+        _ => Color.Default
+    };
+
+    private class ColumnForm
+    {
+        public string ColumnName { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string DataType { get; set; } = "string";
+        public long? RefCompositeTypeId { get; set; }
+        public bool IsRequired { get; set; }
+        public bool IsSearchable { get; set; }
+        public bool IsSortable { get; set; }
+        public bool IsUnique { get; set; }
+        public int DisplayOrder { get; set; }
+    }
+}

@@ -3,7 +3,7 @@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-
+@* OptionSets.razor *@
 <PageTitle>选项集管理</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">选项集管理</MudText>
@@ -15,7 +15,13 @@
                           Variant="Variant.Outlined" Margin="Margin.Dense"
                           Placeholder="留空显示全部（含 Shared）" />
         </MudItem>
-        <MudItem xs="12" md="8" Class="d-flex align-center">
+        <MudItem xs="12" md="2" Class="d-flex align-center">
+            @* ★ 显示已删除开关 *@
+            <MudSwitch T="bool" @bind-Value="_includeDeleted"
+                       Label="显示已删除"
+                       Color="Color.Warning" />
+        </MudItem>
+        <MudItem xs="12" md="6" class="d-flex align-center">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        OnClick="LoadAsync" Disabled="_loading"
                        StartIcon="@Icons.Material.Filled.Refresh">
@@ -62,7 +68,8 @@ else
                 <TitleContent>
                     <div class="d-flex align-center" style="width: 100%;">
                         <MudIcon Icon="@Icons.Material.Filled.Checklist"
-                                 Color="Color.Primary" Class="mr-2" />
+                                 Color="@(currentSet.IsDeleted ? Color.Error : Color.Primary)"
+                                 Class="mr-2" />
                         <MudText Typo="Typo.subtitle1">
                             @currentSet.DisplayName
                         </MudText>
@@ -85,40 +92,73 @@ else
                                 @deletedCount 已删除
                             </MudChip>
                         }
+                        @* ★ 集合级已删除标记 *@
+                        @if (currentSet.IsDeleted)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error"
+                                     Class="ml-2">
+                                集合已删除
+                            </MudChip>
+                        }
                         <MudSpacer />
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                       Color="Color.Primary"
-                                       Size="Size.Small"
-                                       OnClick="@(() => OpenEditSetDialog(currentSet))"
-                                       title="编辑选项集" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Color="Color.Error"
-                                       Size="Size.Small"
-                                       OnClick="@(async () => await DeleteSetAsync(currentSet))"
-                                       title="删除选项集" />
+                        @if (!currentSet.IsDeleted)
+                        {
+                            @* 批量恢复选项（仅存在已删除项时显示） *@
+                            @if (deletedCount > 0)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                               Color="Color.Success"
+                                               Size="Size.Small"
+                                               OnClick="@(async () => await UndeleteAllItemsAsync(currentSet))"
+                                               title="@($"恢复全部 {deletedCount} 个已删除选项")" />
+                            }
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           OnClick="@(() => OpenEditSetDialog(currentSet))"
+                                           title="编辑选项集" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           OnClick="@(async () => await DeleteSetAsync(currentSet))"
+                                           title="删除选项集" />
+                        }
+                        else
+                        {
+                            @* ★ 集合级恢复 *@
+                            <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                           Color="Color.Success"
+                                           Size="Size.Small"
+                                           OnClick="@(async () => await UndeleteSetAsync(currentSet))"
+                                           title="恢复选项集（含全部选项）" />
+                        }
                     </div>
                 </TitleContent>
 
                 <ChildContent>
-                    <div class="d-flex mb-3">
-                        <MudButton Size="Size.Small"
-                                   Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.Add"
-                                   OnClick="@(() => OpenAddItemDialog(currentSet))">
-                            添加选项
-                        </MudButton>
-                    </div>
+                    @* 已删除集合不显示"添加选项" *@
+                    @if (!currentSet.IsDeleted)
+                    {
+                        <div class="d-flex mb-3">
+                            <MudButton Size="Size.Small"
+                                       Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       OnClick="@(() => OpenAddItemDialog(currentSet))">
+                                添加选项
+                            </MudButton>
+                        </div>
+                    }
 
                     @if (items.Count == 0)
                     {
-                        <MudAlert Severity="Severity.Info" Dense="true">
+                        <MudAlert Severity="Severity.Info">
                             该选项集暂无选项
                         </MudAlert>
                     }
                     else
                     {
-                        <MudTable Items="items" Dense="true" Bordered="true"
+                        <MudTable Items="items" Bordered="true"
                                   Hover="true">
                             <HeaderContent>
                                 <MudTh>Value</MudTh>
@@ -187,6 +227,14 @@ else
                                                        Color="Color.Error"
                                                        OnClick="@(async () => await DeleteItemAsync(currentSet, context))"
                                                        title="删除" />
+                                    }
+                                    else
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                                       Size="Size.Small"
+                                                       Color="Color.Success"
+                                                       OnClick="@(async () => await UndeleteItemAsync(currentSet, context))"
+                                                       title="恢复" />
                                     }
                                 </MudTd>
                             </RowTemplate>
@@ -282,7 +330,7 @@ else
                       Class="mb-3" />
         @if (_editingItem is not null)
         {
-            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+            <MudAlert Severity="Severity.Info" Class="mb-3">
                 Value 是存储的稳定标识，不可修改。如需变更，请新建选项并迁移数据。
             </MudAlert>
         }
@@ -315,6 +363,7 @@ else
 
 @code {
     private string? _entityType;
+    private bool _includeDeleted;               // ★ 新增
     private IReadOnlyList<OptionSetSummaryDto>? _sets;
     private readonly Dictionary<long, List<OptionItemDetailDto>> _itemsCache = new();
     private bool _loading;
@@ -339,7 +388,6 @@ else
     private OptionItemDetailDto? _editingItem;
     private OptionItemForm _itemForm = new();
 
-    // ★ P1-1：避免预渲染 + 交互式执行两次
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || _initialized) return;
@@ -354,7 +402,8 @@ else
         _loading = true;
         try
         {
-            _sets = await Api.ListOptionSetsAsync(_entityType);
+            // ★ 传 includeDeleted
+            _sets = await Api.ListOptionSetsAsync(_entityType, _includeDeleted);
             if (_sets is null)
             {
                 Snackbar.Add("加载失败，请检查后端服务", Severity.Error);
@@ -369,7 +418,6 @@ else
                 return;
             }
 
-            // 并行加载所有集合的选项（N 很小，可接受）
             var tasks = _sets.Select(async set =>
             {
                 var items = await Api.ListOptionItemsAsync(set.OptionSetId);
@@ -487,8 +535,8 @@ else
 
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除选项集「{set.DisplayName}」？" +
-            "此操作将软删除集合内所有选项，已有数据保留但不再被新业务使用。",
+            $"确定删除选项集「{set.DisplayName}」？\n\n" +
+            "集合与其所有选项将被软删除，可通过「显示已删除」+「恢复」还原。",
             yesText: "删除", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -505,6 +553,61 @@ else
         }
     }
 
+    // ---------- ★ 恢复选项集 ----------
+
+    private async Task UndeleteSetAsync(OptionSetSummaryDto set)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认恢复",
+            $"确定恢复选项集「{set.DisplayName}」({set.SetName})？\n\n" +
+            "恢复后其所有选项将一并恢复（「默认」标记需手动重设）。",
+            yesText: "恢复", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.UndeleteOptionSetAsync(set.OptionSetId);
+        if (ok)
+        {
+            Snackbar.Add("恢复成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    // ---------- 批量恢复已删除选项 ----------
+
+    private async Task UndeleteAllItemsAsync(OptionSetSummaryDto set)
+    {
+        if (!_itemsCache.TryGetValue(set.OptionSetId, out var items)) return;
+
+        var deletedCount = items.Count(i => i.IsDeleted);
+        if (deletedCount == 0) return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认批量恢复",
+            $"确定恢复选项集「{set.DisplayName}」中全部 {deletedCount} 个已删除选项？\n\n" +
+            "· 若有选项的 Value 与活动项冲突，整批恢复将被拒绝。\n" +
+            "· 恢复后「默认」标记需手动重设。",
+            yesText: "恢复全部", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.UndeleteOptionSetAsync(set.OptionSetId);
+
+        if (ok)
+        {
+            Snackbar.Add($"已恢复 {deletedCount} 个选项", Severity.Success);
+            await ReloadItemsAsync(set.OptionSetId);
+        }
+        else
+        {
+            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
     // ---------- 选项 CRUD ----------
 
     private void OpenAddItemDialog(OptionSetSummaryDto set)
@@ -514,10 +617,7 @@ else
         var existingCount = _itemsCache.TryGetValue(set.OptionSetId, out var items)
             ? items.Count(i => !i.IsDeleted)
             : 0;
-        _itemForm = new OptionItemForm
-        {
-            DisplayOrder = existingCount + 1
-        };
+        _itemForm = new OptionItemForm { DisplayOrder = existingCount + 1 };
         _showItemDialog = true;
     }
 
@@ -621,6 +721,32 @@ else
         }
     }
 
+    // ---------- ★ 恢复单个选项 ----------
+
+    private async Task UndeleteItemAsync(
+        OptionSetSummaryDto set, OptionItemDetailDto item)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认恢复",
+            $"确定恢复选项「{item.Label}」({item.Value})？",
+            yesText: "恢复", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.UndeleteOptionItemAsync(
+            set.OptionSetId, item.OptionItemId);
+
+        if (ok)
+        {
+            Snackbar.Add("恢复成功", Severity.Success);
+            await ReloadItemsAsync(set.OptionSetId);
+        }
+        else
+        {
+            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
     // ---------- 设为默认 ----------
 
     private async Task SetDefaultAsync(
@@ -641,8 +767,6 @@ else
     }
 
     // ---------- 重排序（上移 / 下移） ----------
-    // ★ P2-5：按 (DisplayOrder, OptionItemId) 稳定排序后，交换位置，
-    // 再把连续索引作为新 DisplayOrder 一次性提交，避免 DisplayOrder 相等导致无变化。
 
     private async Task MoveUpAsync(
         OptionSetSummaryDto set, OptionItemDetailDto item)
@@ -692,7 +816,6 @@ else
         if (!ok)
             Snackbar.Add($"重排序失败：{error ?? "未知错误"}", Severity.Error);
 
-        // 无论成功失败都重拉，保证 UI 与服务端一致
         await ReloadItemsAsync(optionSetId);
     }
 

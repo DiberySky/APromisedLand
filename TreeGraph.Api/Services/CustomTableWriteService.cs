@@ -70,7 +70,12 @@ public class CustomTableWriteService
         await _db.SaveChangesAsync(ct);
     }
 
-    /// <summary>新增或更新单行（RowId 为 null 时新增；更新时校验归属）</summary>
+    /// <summary>
+    /// 新增或更新单行（RowId 为 null 时新增；更新时校验归属）。
+    ///
+    /// ★ 修复：写入前必须走验证管道（必填/类型/行内唯一），
+    ///   并额外做一次跨行唯一性检查（DB 已存在的其它行）。
+    /// </summary>
     public async Task UpsertRowAsync(
         long parentEntityId, string parentEntityType,
         long attributeId, long tableDefinitionId,
@@ -78,6 +83,21 @@ public class CustomTableWriteService
     {
         var table = _tableCache.GetTable(tableDefinitionId);
         NormalizeRow(rowValue, table);
+
+        // ① 复用整表验证器：检查必填 / 类型 / 行内唯一
+        var validationValue = new CustomTableValue
+        {
+            TableName = table.TableName,
+            Rows = new List<CustomTableRowValue> { rowValue }
+        };
+        var validationResult = _validator.Validate(validationValue, tableDefinitionId);
+        if (!validationResult.IsValid)
+            throw new EavValidationException(validationResult.Errors);
+
+        // ② 跨行唯一性：与 DB 中同一父实体、同一属性下的其它行比对
+        await CheckCrossRowUniquenessAsync(
+            parentEntityId, parentEntityType, attributeId,
+            table, rowValue, ct);
 
         if (rowValue.RowId is null)
         {
@@ -127,6 +147,70 @@ public class CustomTableWriteService
         if (row is null) return;
         _db.CustomTableRows.Remove(row);
         await _db.SaveChangesAsync(ct);
+    }
+
+    // ---------- 跨行唯一性 ----------
+
+    /// <summary>
+    /// 对表定义中所有 IsUnique = true 的列，检查当前行值是否与
+    /// 同一父实体、同一属性下的其它行冲突。
+    ///
+    /// 实现要点：先把当前行按落库格式序列化为 JSON，再与 DB 中
+    /// 其它行的 RowData 逐字段做 JSON 字面量比较，保证与存储格式一致。
+    /// </summary>
+    private async Task CheckCrossRowUniquenessAsync(
+        long parentEntityId, string parentEntityType, long attributeId,
+        CustomTableDefinition table, CustomTableRowValue rowValue,
+        CancellationToken ct)
+    {
+        var uniqueCols = table.Columns.Where(c => c.IsUnique).ToList();
+        if (uniqueCols.Count == 0) return;
+
+        // 查询同一父实体、同一属性下、除当前行以外的其它行数据
+        IQueryable<CustomTableRow> query = _db.CustomTableRows
+            .Where(r => r.ParentEntityType == parentEntityType
+                     && r.ParentEntityId == parentEntityId
+                     && r.AttributeId == attributeId);
+
+        if (rowValue.RowId is long excludeId)
+            query = query.Where(r => r.RowId != excludeId);
+
+        var otherRows = await query
+            .Select(r => r.RowData)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        if (otherRows.Count == 0) return;
+
+        // 用与落库一致的格式序列化当前行，保证字面量比较可靠
+        using var currentDoc = SerializeRow(rowValue, table);
+        var currentRoot = currentDoc.RootElement;
+
+        var errors = new List<ValidationError>();
+        foreach (var col in uniqueCols)
+        {
+            if (!currentRoot.TryGetProperty(col.ColumnName, out var curElem))
+                continue;
+            if (curElem.ValueKind == JsonValueKind.Null) continue;
+
+            var key = curElem.GetRawText();  // JSON 字面量表示（含引号）
+
+            foreach (var otherDoc in otherRows)
+            {
+                if (otherDoc.RootElement.TryGetProperty(col.ColumnName, out var otherElem)
+                    && otherElem.ValueKind != JsonValueKind.Null
+                    && otherElem.GetRawText() == key)
+                {
+                    errors.Add(new ValidationError(
+                        col.ColumnName,
+                        $"值 {key} 在列中已存在（跨行唯一）"));
+                    break;
+                }
+            }
+        }
+
+        if (errors.Count > 0)
+            throw new EavValidationException(errors);
     }
 
     // ---------- 请求值规范化 ----------

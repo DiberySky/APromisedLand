@@ -51,7 +51,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseAuthorization();
+// ★ 研发阶段：暂不启用身份验证/授权管道
+//   UseAuthorization() 会解析 IAuthorizationPolicyProvider，
+//   未 AddAuthorization() 时首次请求抛 InvalidOperationException。
+// app.UseAuthorization();
 
 // ★ 全局异常处理
 app.UseExceptionHandler();
@@ -72,3 +75,6 @@ if (!EF.IsDesignTime)
 }
 
 app.Run();
+
+// ★ 让 WebApplicationFactory<Program> 可引用（集成测试）
+public partial class Program { }

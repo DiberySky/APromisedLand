@@ -10,6 +10,14 @@ public class OptionSet
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    /// <summary>
+    /// ★ 软删除标记。
+    /// 后端读取端（OptionSetCache.GetSet）**不按此过滤**：
+    /// 历史数据的 Value 仍需通过集合拿 Label。
+    /// 仅管理页列表 / GetAll 过滤此标记。
+    /// </summary>
+    public bool IsDeleted { get; set; }
+
     public List<OptionItem> Items { get; set; } = new();
 }
 

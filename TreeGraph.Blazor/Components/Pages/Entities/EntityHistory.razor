@@ -1,7 +1,7 @@
 @page "/entities/{EntityType}/{EntityId:long}/history"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @inject EavApiClient Api
-
+@* EntityHistory.razor *@
 <PageTitle>审计历史 - @EntityType #@EntityId</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">
@@ -76,9 +76,21 @@ else if (_history is not null)
         _loading = true;
         try
         {
-            var from = _from.HasValue
-                ? new DateTimeOffset(_from.Value, TimeSpan.Zero)
-                : (DateTimeOffset?)null;
+            // ★ P1-4：MudDatePicker 的 DateTime 是"本地日历时间"，
+            //   转 DateTimeOffset 时必须携带本地时区偏移，
+            //   否则服务端会当作 UTC，导致查询边界与用户预期不一致。
+            //
+            //   修复前：new DateTimeOffset(_from.Value, TimeSpan.Zero)
+            //           → 用户选 "2026-10-01 00:00" 会被当成 UTC 午夜，
+            //             在 +08:00 环境下等价于本地 "2026-10-01 08:00"。
+            DateTimeOffset? from = null;
+            if (_from.HasValue)
+            {
+                var localDate = _from.Value;   // Kind = Unspecified
+                var localOffset = TimeZoneInfo.Local.GetUtcOffset(localDate);
+                from = new DateTimeOffset(localDate, localOffset);
+            }
+
             _history = await Api.GetHistoryAsync(EntityType, EntityId, from);
         }
         finally

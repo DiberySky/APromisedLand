@@ -11,7 +11,7 @@
     <MudItem xs="12" sm="4">
         <MudSelect T="Guid?" Label="单位"
                    Value="_unitId" ValueChanged="OnUnitChanged"
-                   Variant="Variant.Outlined" Dense="true">
+                   Variant="Variant.Outlined">
             @foreach (var u in AvailableUnits)
             {
                 <MudSelectItem T="Guid?" Value="@u.Id">

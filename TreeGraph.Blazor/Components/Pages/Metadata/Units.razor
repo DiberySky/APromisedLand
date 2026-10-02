@@ -3,7 +3,7 @@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-
+@* Units.razor *@
 <PageTitle>单位管理</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">单位管理</MudText>
@@ -73,7 +73,7 @@ else
                     }
                 }
             </div>
-            <MudTable Items="c.Units" Hover="true" Bordered="true" Dense="true">
+            <MudTable Items="c.Units" Hover="true" Bordered="true">
                 <HeaderContent>
                     <MudTh>名称</MudTh>
                     <MudTh>符号</MudTh>
@@ -178,13 +178,13 @@ else
 
             @if (_editingUnit.IsBaseUnit)
             {
-                <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                <MudAlert Severity="Severity.Success" Class="mb-3">
                     该单位已是基准单位。若要更换基准，请在另一个单位上勾选"基准单位"。
                 </MudAlert>
             }
             else
             {
-                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                <MudAlert Severity="Severity.Info" Class="mb-3">
                     勾选后本分类的其它基准单位会自动降级。
                 </MudAlert>
             }
@@ -194,7 +194,7 @@ else
             @* ★ 高级操作 *@
             <MudExpansionPanels>
                 <MudExpansionPanel Text="高级操作">
-                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                    <MudAlert Severity="Severity.Warning" Class="mb-3">
                         以下操作会修改已有数据的语义或分类归属，请谨慎执行。建议先备份数据库。
                     </MudAlert>
 
@@ -206,7 +206,7 @@ else
                             迁移到其它分类
                         </MudButton>
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2 mb-2">
-                            仅当该单位未被任何属性绑定或被数值数据引用时可用。
+                            仅允许迁移无引用的单位；被属性或数值数据引用时服务端将拒绝。
                         </MudText>
 
                         <MudButton Variant="Variant.Outlined"
@@ -216,7 +216,7 @@ else
                             修改换算系数并重算数据
                         </MudButton>
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
-                            影响所有以该单位为输入单位或基准单位的历史数据。
+                            数据库端批量重算（通常几秒内完成）；预计超过 20 万行时服务端将拒绝。
                         </MudText>
                     </div>
                 </MudExpansionPanel>
@@ -247,7 +247,7 @@ else
         }
     </TitleContent>
     <DialogContent>
-        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+        <MudAlert Severity="Severity.Warning" Class="mb-3">
             迁移后 ToBaseFactor 的语义会变化，需要重新指定。
         </MudAlert>
 
@@ -271,7 +271,12 @@ else
         <MudNumericField T="decimal"
                          @bind-Value="_migrateForm.NewToBaseFactor"
                          Label="新的换算系数（相对新分类基准单位）"
-                         Variant="Variant.Outlined" />
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudAlert Severity="Severity.Info">
+            保守模式：单位被属性绑定或被数值数据引用时，服务端将拒绝迁移，请先解除引用。
+        </MudAlert>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => _showMigrateDialog = false)">取消</MudButton>
@@ -297,8 +302,8 @@ else
         }
     </TitleContent>
     <DialogContent>
-        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">
-            <b>危险操作。</b>将重算所有引用该单位的历史数据，请确认已备份数据库。
+        <MudAlert Severity="Severity.Error" Class="mb-3">
+            <b>危险操作。</b>将在数据库端批量重算所有引用该单位的历史数据，请确认已备份数据库。
         </MudAlert>
 
         @if (_editingUnit is not null)
@@ -318,7 +323,8 @@ else
             重算公式：<br />
             · 作为输入单位：值 × 新系数 / 旧系数<br />
             · 作为基准单位：值 × 旧系数 / 新系数<br />
-            · 同时命中两种角色：不变
+            · 同时命中两种角色：不变<br />
+            · 预计影响超过 20 万行时服务端将拒绝（请走离线脚本）
         </MudText>
     </DialogContent>
     <DialogActions>
@@ -345,7 +351,7 @@ else
         }
     </TitleContent>
     <DialogContent>
-        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+        <MudAlert Severity="Severity.Info" Class="mb-3">
             该分类当前无基准单位。请选择一个单位作为基准——此操作不会重算已有数据。
         </MudAlert>
 
@@ -624,7 +630,7 @@ else
             "确认迁移",
             $"将「{_editingUnit.Name}」从分类「{_editingUnit.Category}」" +
             $"迁移到「{_migrateForm.NewCategory}」，新系数 {_migrateForm.NewToBaseFactor}？\n\n" +
-            "此操作会改变该单位的分类归属，不可撤销。",
+            "此操作会改变该单位的分类归属，不可撤销。若单位仍被引用，服务端将拒绝。",
             yesText: "确认迁移", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -688,8 +694,8 @@ else
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认重算",
             $"将「{_editingUnit.Name}」的换算系数从 {_editingUnit.ToBaseFactor} " +
-            $"改为 {_recalcForm.NewToBaseFactor}，并重算所有引用该单位的历史数据？\n\n" +
-            "此操作不可撤销，请确认已备份数据库。",
+            $"改为 {_recalcForm.NewToBaseFactor}，并在数据库端批量重算所有引用该单位的历史数据？\n\n" +
+            "操作同步执行、整体事务提交，不可撤销，请确认已备份数据库。",
             yesText: "确认重算", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -710,9 +716,10 @@ else
                 return;
             }
 
+            var affected = result?.AffectedValues ?? 0;
+            var attrs = result?.AffectedAttributes ?? 0;
             Snackbar.Add(
-                $"重算成功：影响 {result?.AffectedValues ?? 0} 条数据、" +
-                $"{result?.AffectedAttributes ?? 0} 个属性",
+                $"重算完成：共更新 {affected} 行数值数据（涉及 {attrs} 个属性）",
                 Severity.Success);
 
             _showRecalculateDialog = false;

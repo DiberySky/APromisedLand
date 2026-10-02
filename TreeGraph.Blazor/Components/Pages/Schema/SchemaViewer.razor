@@ -2,6 +2,7 @@
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @inject EavApiClient Api
 
+@* SchemaViewer.razor *@
 <PageTitle>Schema 查看</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">Schema 查看</MudText>
@@ -21,7 +22,7 @@
 
 @if (_schema is not null)
 {
-    <MudTable Items="_schema" Hover="true" Bordered="true" Dense="true">
+    <MudTable Items="_schema" Hover="true" Bordered="true">
         <HeaderContent>
             <MudTh>属性名</MudTh>
             <MudTh>显示名</MudTh>

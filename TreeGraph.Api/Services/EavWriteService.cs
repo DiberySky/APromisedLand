@@ -37,24 +37,109 @@ public class EavWriteService
         _optionSetCache = optionSetCache;
     }
 
-    public async Task SaveAsync(
+    /// <summary>
+    /// 保存实体属性（全量替换语义）。
+    ///
+    /// 语义：
+    ///   - values 中出现的键：验证 + 写入
+    ///   - values 中值为 null 的键：删除该属性
+    ///   - values 中未出现的键（但 catalog 中定义的属性）：**删除**
+    ///
+    /// ★ 乐观锁：expectedUpdatedAt 非 null 时，比对 DB 中该实体的
+    ///   max(AttributeValue.UpdatedAt)。**用 UtcDateTime 比较**，
+    ///   避免客户端回传时携带不同 offset（如本地 +08:00）导致误判。
+    ///
+    /// ★ 未知属性：values 中出现 catalog 未定义的属性名时返回 400，
+    ///   而非静默丢弃（防客户端拼写错误导致数据丢失）。
+    /// </summary>
+    public Task SaveAsync(
         long entityId, string entityType,
         Dictionary<string, object?> values,
         string changedBy, string? correlationId = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DateTimeOffset? expectedUpdatedAt = null)
+        => SaveCoreAsync(entityId, entityType, values,
+            changedBy, correlationId, ct, expectedUpdatedAt,
+            fullReplace: true);
+
+    /// <summary>
+    /// 部分更新实体属性（PATCH 语义）。
+    ///
+    /// 语义：
+    ///   - values 中出现的键：验证 + 写入
+    ///   - values 中值为 null 的键：删除该属性
+    ///   - values 中未出现的键：**保持原值不动**
+    ///
+    /// 与 SaveAsync 的差异仅在"未提供的属性"处理上。
+    /// 乐观锁、未知属性检查、验证流程与 SaveAsync 完全一致。
+    /// </summary>
+    public Task PatchAsync(
+        long entityId, string entityType,
+        Dictionary<string, object?> values,
+        string changedBy, string? correlationId = null,
+        CancellationToken ct = default,
+        DateTimeOffset? expectedUpdatedAt = null)
+        => SaveCoreAsync(entityId, entityType, values,
+            changedBy, correlationId, ct, expectedUpdatedAt,
+            fullReplace: false);
+
+    /// <summary>
+    /// Save / Patch 的公共核心逻辑。
+    ///
+    /// - fullReplace = true  → 未提供的键（catalog 中定义）将被删除（PUT 语义）
+    /// - fullReplace = false → 未提供的键保持不动（PATCH 语义）
+    /// </summary>
+    private async Task SaveCoreAsync(
+        long entityId, string entityType,
+        Dictionary<string, object?> values,
+        string changedBy, string? correlationId,
+        CancellationToken ct,
+        DateTimeOffset? expectedUpdatedAt,
+        bool fullReplace)
     {
         var definitions = _attrCache.GetDefinitions(entityType)
             .ToDictionary(d => d.AttributeName);
 
-        // ★ 修复 P0-2：必填缺失也校验（不再只校验 values 提供的属性）
+        // ---- 0. 未知属性检查 ----
+        var unknownKeys = values.Keys
+            .Where(k => !definitions.ContainsKey(k))
+            .ToList();
+        if (unknownKeys.Count > 0)
+        {
+            throw new EavValidationException(unknownKeys
+                .Select(k => new ValidationError(k, "未知属性"))
+                .ToList());
+        }
+
+        // ---- 1. 乐观锁检测（用 UtcDateTime 语义比较）----
+        if (expectedUpdatedAt is { } expected)
+        {
+            var currentMax = await _db.AttributeValues
+                .Where(v => v.EntityType == entityType && v.EntityId == entityId)
+                .MaxAsync(v => (DateTimeOffset?)v.UpdatedAt, ct);
+
+            // ★ 修复：DateTimeOffset.!= 会比较 instant + offset，
+            //   同一瞬间但 offset 不同会误判冲突。改用 UtcDateTime。
+            if (currentMax is null
+                || currentMax.Value.UtcDateTime != expected.UtcDateTime)
+            {
+                throw new EavConcurrencyException(
+                    expected, currentMax ?? DateTimeOffset.MinValue);
+            }
+        }
+
+        // ---- 2. 验证提供的值 ----
         var validationErrors = new List<ValidationError>();
         foreach (var def in definitions.Values)
         {
             values.TryGetValue(def.AttributeName, out var rawValue);
 
+            // PATCH 模式下：未提供的键不参与必填检查
+            var provided = values.ContainsKey(def.AttributeName);
+            if (!fullReplace && !provided) continue;
+
             if (def.IsRequired && rawValue is null)
             {
-                // 单选类型有默认选项时放行（写入端稍后自动填充）
                 if (def.DataType == EavDataTypes.SingleChoice
                     && def.RefOptionSetId is { } sid
                     && _optionSetCache.GetSet(sid).Items.Any(i => i.IsDefault))
@@ -88,6 +173,7 @@ public class EavWriteService
         var audits = new List<AttributeAuditLog>();
         var now = DateTimeOffset.UtcNow;
 
+        // ---- 3. 处理显式提供的值 ----
         foreach (var (name, rawValue) in values)
         {
             if (!definitions.TryGetValue(name, out var def)) continue;
@@ -102,7 +188,7 @@ public class EavWriteService
 
             existingMap.TryGetValue(def.AttributeId, out var existingValue);
 
-            // ★ 修复 P0-4：显式 null 走删除路径，不留全空行
+            // 显式 null 走删除路径
             if (valueToWrite is null)
             {
                 if (existingValue is not null)
@@ -148,16 +234,19 @@ public class EavWriteService
             }
         }
 
-        // 处理未提供的属性（删除）
-        foreach (var def in definitions.Values)
+        // ---- 4. PUT 语义：未提供的属性 → 删除 ----
+        if (fullReplace)
         {
-            if (!values.ContainsKey(def.AttributeName)
-                && existingMap.TryGetValue(def.AttributeId, out var oldVal))
+            foreach (var def in definitions.Values)
             {
-                _db.AttributeValues.Remove(oldVal);
-                audits.Add(CreateAudit(entityId, entityType, def,
-                    SerializeForAudit(oldVal, def), null, "Delete",
-                    changedBy, correlationId, now));
+                if (!values.ContainsKey(def.AttributeName)
+                    && existingMap.TryGetValue(def.AttributeId, out var oldVal))
+                {
+                    _db.AttributeValues.Remove(oldVal);
+                    audits.Add(CreateAudit(entityId, entityType, def,
+                        SerializeForAudit(oldVal, def), null, "Delete",
+                        changedBy, correlationId, now));
+                }
             }
         }
 
@@ -341,5 +430,205 @@ public class EavWriteService
             ChangedAt = now,
             CorrelationId = correlationId
         };
+    }
+
+    /// <summary>删除实体（物理删除所有属性值 + 自定义表行，写审计）。</summary>
+    public async Task<bool> DeleteEntityAsync(
+        long entityId, string entityType,
+        string changedBy, string? correlationId = null,
+        CancellationToken ct = default)
+    {
+        var hasValues = await _db.AttributeValues
+            .AnyAsync(v => v.EntityType == entityType && v.EntityId == entityId, ct);
+
+        var hasRows = await _db.CustomTableRows
+            .AnyAsync(r => r.ParentEntityType == entityType
+                        && r.ParentEntityId == entityId, ct);
+
+        if (!hasValues && !hasRows)
+            return false;
+
+        var strategy = _db.Database.CreateExecutionStrategy();
+
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+            var now = DateTimeOffset.UtcNow;
+
+            var values = await _db.AttributeValues
+                .Where(v => v.EntityType == entityType && v.EntityId == entityId)
+                .ToListAsync(ct);
+
+            if (values.Count > 0)
+            {
+                var definitions = _attrCache.GetDefinitions(entityType)
+                    .ToDictionary(d => d.AttributeId);
+
+                var audits = new List<AttributeAuditLog>(values.Count);
+                foreach (var v in values)
+                {
+                    if (!definitions.TryGetValue(v.AttributeId, out var def)) continue;
+
+                    audits.Add(new AttributeAuditLog
+                    {
+                        EntityId = entityId,
+                        EntityType = entityType,
+                        AttributeId = def.AttributeId,
+                        AttributeName = def.AttributeName,
+                        OldValue = SerializeForAudit(v, def),
+                        NewValue = null,
+                        ChangeType = "Delete",
+                        ChangedBy = changedBy,
+                        ChangedAt = now,
+                        CorrelationId = correlationId
+                    });
+                }
+                _db.AttributeAuditLogs.AddRange(audits);
+            }
+
+            _db.AttributeValues.RemoveRange(values);
+
+            var rows = await _db.CustomTableRows
+                .Where(r => r.ParentEntityType == entityType
+                         && r.ParentEntityId == entityId)
+                .ToListAsync(ct);
+            _db.CustomTableRows.RemoveRange(rows);
+
+            await _db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
+
+        return true;
+    }
+
+    /// <summary>
+    /// 批量删除多个实体（硬删除：属性值 + 自定义表行）。
+    ///
+    /// 语义：
+    ///   - 请求的 ID 去重后处理
+    ///   - 不存在的 ID 计入 NotFound（不报错）
+    ///   - 单个事务内完成所有删除 + 审计
+    ///   - 与 DeleteEntityAsync 共享"删除 = 删两张表 + 写审计"的策略
+    /// </summary>
+    public async Task<BatchDeleteResult> DeleteEntitiesAsync(
+        IReadOnlyList<long> entityIds,
+        string entityType,
+        string changedBy,
+        string? correlationId = null,
+        CancellationToken ct = default)
+    {
+        if (entityIds.Count == 0)
+            return new BatchDeleteResult(
+                Array.Empty<long>(), Array.Empty<long>(), 0);
+
+        var requested = entityIds.Distinct().ToList();
+
+        // 存在性：任一表命中即认为存在
+        var hasValues = await _db.AttributeValues
+            .Where(v => v.EntityType == entityType && requested.Contains(v.EntityId))
+            .Select(v => v.EntityId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var hasRows = await _db.CustomTableRows
+            .Where(r => r.ParentEntityType == entityType
+                     && requested.Contains(r.ParentEntityId))
+            .Select(r => r.ParentEntityId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var existingSet = hasValues.Union(hasRows).ToHashSet();
+        var toDelete = requested.Where(id => existingSet.Contains(id)).ToList();
+        var notFound = requested.Where(id => !existingSet.Contains(id)).ToList();
+
+        if (toDelete.Count == 0)
+            return new BatchDeleteResult(
+                Array.Empty<long>(), notFound, 0);
+
+        var strategy = _db.Database.CreateExecutionStrategy();
+        int totalAttributesDeleted = 0;
+
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
+            var now = DateTimeOffset.UtcNow;
+
+            // 1. 加载待删属性值（用于审计 + 计数）
+            var values = await _db.AttributeValues
+                .Where(v => v.EntityType == entityType
+                         && toDelete.Contains(v.EntityId))
+                .ToListAsync(ct);
+
+            // 2. 写审计
+            if (values.Count > 0)
+            {
+                var definitions = _attrCache.GetDefinitions(entityType)
+                    .ToDictionary(d => d.AttributeId);
+
+                var audits = new List<AttributeAuditLog>(values.Count);
+                foreach (var v in values)
+                {
+                    if (!definitions.TryGetValue(v.AttributeId, out var def)) continue;
+                    audits.Add(new AttributeAuditLog
+                    {
+                        EntityId = v.EntityId,
+                        EntityType = entityType,
+                        AttributeId = def.AttributeId,
+                        AttributeName = def.AttributeName,
+                        OldValue = SerializeForAudit(v, def),
+                        NewValue = null,
+                        ChangeType = "Delete",
+                        ChangedBy = changedBy,
+                        ChangedAt = now,
+                        CorrelationId = correlationId
+                    });
+                }
+                _db.AttributeAuditLogs.AddRange(audits);
+            }
+
+            totalAttributesDeleted = values.Count;
+
+            // 3. 删除属性值
+            _db.AttributeValues.RemoveRange(values);
+
+            // 4. 删除自定义表行
+            var rows = await _db.CustomTableRows
+                .Where(r => r.ParentEntityType == entityType
+                         && toDelete.Contains(r.ParentEntityId))
+                .ToListAsync(ct);
+            _db.CustomTableRows.RemoveRange(rows);
+
+            await _db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
+
+        return new BatchDeleteResult(toDelete, notFound, totalAttributesDeleted);
+    }
+}
+
+/// <summary>
+/// 批量删除结果。
+/// </summary>
+public record BatchDeleteResult(
+    IReadOnlyList<long> Deleted,
+    IReadOnlyList<long> NotFound,
+    int TotalAttributesDeleted);
+
+/// <summary>
+/// 并发冲突异常。EavWriteService.SaveAsync 在乐观锁检测失败时抛出。
+/// EavController 捕获后返回 409 Conflict + 当前 UpdatedAt。
+/// </summary>
+public class EavConcurrencyException : Exception
+{
+    public DateTimeOffset ExpectedUpdatedAt { get; }
+    public DateTimeOffset CurrentUpdatedAt { get; }
+
+    public EavConcurrencyException(
+        DateTimeOffset expectedUpdatedAt, DateTimeOffset currentUpdatedAt)
+        : base("并发冲突：实体已被其他用户修改")
+    {
+        ExpectedUpdatedAt = expectedUpdatedAt;
+        CurrentUpdatedAt = currentUpdatedAt;
     }
 }

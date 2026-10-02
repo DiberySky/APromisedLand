@@ -62,7 +62,17 @@ public class EavDbContext : DbContext
     {
         mb.Entity<AttributeDefinition>(e =>
         {
-            e.ToTable("attribute_catalog");
+            // ★ 表级 CHECK 约束：int 类型不允许绑定单位
+            // 归一化到基准单位会产生小数（150 cm → 1.5 m），写入 bigint 会静默截断。
+            // 元数据层（Controller）与运行时层（EavValidationService）已双重拦截，
+            // 这里再加一道数据库层防线，杜绝直接 SQL / 旧工具绕过。
+            e.ToTable("attribute_catalog", t =>
+            {
+                t.HasCheckConstraint(
+                    "ck_attr_int_no_unit",
+                    "data_type <> 'int' OR unit_id IS NULL");
+            });
+
             e.HasKey(x => x.AttributeId);
             e.Property(x => x.AttributeId).HasColumnName("attribute_id").UseIdentityAlwaysColumn();
             e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
@@ -145,6 +155,11 @@ public class EavDbContext : DbContext
             e.HasIndex(x => new { x.EntityType, x.EntityId })
                 .HasDatabaseName("ix_av_entity");
 
+            // ★ #3 冲突检测：加速 max(UpdatedAt) 查询
+            e.HasIndex(x => new { x.EntityType, x.EntityId, x.UpdatedAt })
+                .HasDatabaseName("ix_av_entity_updated")
+                .IsDescending(false, false, true);
+
             e.HasIndex(x => new { x.AttributeId, x.ValueInt })
                 .HasDatabaseName("ix_av_attr_int").HasFilter("value_int IS NOT NULL");
             e.HasIndex(x => new { x.AttributeId, x.ValueDecimal })
@@ -195,7 +210,19 @@ public class EavDbContext : DbContext
 
         mb.Entity<CompositeFieldDefinition>(e =>
         {
-            e.ToTable("composite_field_definitions");
+            // CHECK：decimal 才能绑单位；single_choice 才能绑选项集
+            e.ToTable("composite_field_definitions", t =>
+            {
+                t.HasCheckConstraint(
+                    "ck_composite_field_decimal_unit",
+                    "data_type = 'decimal' OR unit_id IS NULL");
+
+                // ★ #8：single_choice 才能绑选项集
+                t.HasCheckConstraint(
+                    "ck_composite_field_single_choice_optionset",
+                    "data_type = 'single_choice' OR ref_option_set_id IS NULL");
+            });
+
             e.HasKey(x => x.FieldId);
             e.Property(x => x.FieldId).HasColumnName("field_id").UseIdentityAlwaysColumn();
             e.Property(x => x.CompositeTypeId).HasColumnName("composite_type_id");
@@ -203,6 +230,12 @@ public class EavDbContext : DbContext
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
             e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id");
+
+            // ★ #4：单位外键列
+            e.Property(x => x.UnitId).HasColumnName("unit_id");
+            // ★ #8：选项集外键列
+            e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id");
+
             e.Property(x => x.IsArray).HasColumnName("is_array");
             e.Property(x => x.IsRequired).HasColumnName("is_required");
             e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
@@ -220,6 +253,14 @@ public class EavDbContext : DbContext
                 .HasForeignKey(x => x.CompositeTypeId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.RefCompositeType).WithMany()
                 .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
+
+            // ★ #4：单位外键（Restrict）
+            e.HasOne(x => x.Unit).WithMany()
+                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
+
+            // ★ #8：选项集外键（Restrict）
+            e.HasOne(x => x.RefOptionSet).WithMany()
+                .HasForeignKey(x => x.RefOptionSetId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -235,9 +276,13 @@ public class EavDbContext : DbContext
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");   // ★ 新增
 
+            // ★ 改为 partial unique index：软删的集合不占用 SetName
             e.HasIndex(x => new { x.EntityType, x.SetName })
-                .IsUnique().HasDatabaseName("uq_option_set");
+                .IsUnique()
+                .HasDatabaseName("uq_option_set")
+                .HasFilter("is_deleted = false");
         });
 
         mb.Entity<OptionItem>(e =>

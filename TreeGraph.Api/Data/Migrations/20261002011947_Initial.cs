@@ -85,7 +85,8 @@ namespace TreeGraph.Api.Data.Migrations
                     set_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -110,44 +111,6 @@ namespace TreeGraph.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_units", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "composite_field_definitions",
-                columns: table => new
-                {
-                    field_id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    composite_type_id = table.Column<long>(type: "bigint", nullable: false),
-                    field_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    ref_composite_type_id = table.Column<long>(type: "bigint", nullable: true),
-                    is_array = table.Column<bool>(type: "boolean", nullable: false),
-                    is_required = table.Column<bool>(type: "boolean", nullable: false),
-                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_composite_field_definitions", x => x.field_id);
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_composite_type_definitions_comp~",
-                        column: x => x.composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_composite_type_definitions_ref_~",
-                        column: x => x.ref_composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -243,6 +206,7 @@ namespace TreeGraph.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_attribute_catalog", x => x.attribute_id);
+                    table.CheckConstraint("ck_attr_int_no_unit", "data_type <> 'int' OR unit_id IS NULL");
                     table.ForeignKey(
                         name: "FK_attribute_catalog_composite_type_definitions_ref_composite_~",
                         column: x => x.ref_composite_type_id,
@@ -263,6 +227,60 @@ namespace TreeGraph.Api.Data.Migrations
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_attribute_catalog_units_unit_id",
+                        column: x => x.unit_id,
+                        principalTable: "units",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "composite_field_definitions",
+                columns: table => new
+                {
+                    field_id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
+                    composite_type_id = table.Column<long>(type: "bigint", nullable: false),
+                    field_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    ref_composite_type_id = table.Column<long>(type: "bigint", nullable: true),
+                    unit_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    ref_option_set_id = table.Column<long>(type: "bigint", nullable: true),
+                    is_array = table.Column<bool>(type: "boolean", nullable: false),
+                    is_required = table.Column<bool>(type: "boolean", nullable: false),
+                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_composite_field_definitions", x => x.field_id);
+                    table.CheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
+                    table.CheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_composite_type_definitions_comp~",
+                        column: x => x.composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_composite_type_definitions_ref_~",
+                        column: x => x.ref_composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_option_sets_ref_option_set_id",
+                        column: x => x.ref_option_set_id,
+                        principalTable: "option_sets",
+                        principalColumn: "option_set_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_units_unit_id",
                         column: x => x.unit_id,
                         principalTable: "units",
                         principalColumn: "id",
@@ -436,6 +454,12 @@ namespace TreeGraph.Api.Data.Migrations
                 columns: new[] { "entity_type", "entity_id" });
 
             migrationBuilder.CreateIndex(
+                name: "ix_av_entity_updated",
+                table: "attribute_values",
+                columns: new[] { "entity_type", "entity_id", "updated_at" },
+                descending: new[] { false, false, true });
+
+            migrationBuilder.CreateIndex(
                 name: "ix_av_file_meta",
                 table: "attribute_values",
                 column: "value_file_meta",
@@ -459,6 +483,16 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "IX_composite_field_definitions_ref_composite_type_id",
                 table: "composite_field_definitions",
                 column: "ref_composite_type_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_composite_field_definitions_ref_option_set_id",
+                table: "composite_field_definitions",
+                column: "ref_option_set_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_composite_field_definitions_unit_id",
+                table: "composite_field_definitions",
+                column: "unit_id");
 
             migrationBuilder.CreateIndex(
                 name: "uq_composite_field",
@@ -530,7 +564,8 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "uq_option_set",
                 table: "option_sets",
                 columns: new[] { "entity_type", "set_name" },
-                unique: true);
+                unique: true,
+                filter: "is_deleted = false");
 
             migrationBuilder.CreateIndex(
                 name: "uq_unit_category_base",

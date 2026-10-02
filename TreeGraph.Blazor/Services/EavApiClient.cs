@@ -40,10 +40,76 @@ public class EavApiClient
         return await GetAsync<DynamicEntityDto>(url, ct);
     }
 
-    public async Task<(bool Ok, string? Error)> SaveEntityAsync(
+    /// <summary>
+    /// ★ #3：保存实体支持乐观锁 header。
+    /// expectedUpdatedAt 为 null 时不发 header（跳过冲突检测）。
+    /// </summary>
+    /// <summary>
+    /// ★ P1-1：409 冲突时返回服务端最新 UpdatedAt，供调用方提示用户刷新。
+    /// </summary>
+    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        SaveEntityAsync(
         string entityType, long entityId,
-        Dictionary<string, object?> values, CancellationToken ct = default)
-        => await PutAsync($"api/eav/{entityType}/entities/{entityId}", values, ct);
+        Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var url = $"api/eav/{entityType}/entities/{entityId}";
+            using var req = new HttpRequestMessage(HttpMethod.Put, url)
+            {
+                Content = JsonContent.Create(values, options: JsonOptions)
+            };
+
+            if (expectedUpdatedAt is { } expected)
+            {
+                req.Headers.Add("X-Expected-Updated-At",
+                    expected.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            var resp = await _http.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return (true, null, null);
+
+            // 409 特殊处理：解析后端返回的 currentUpdatedAt
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("PUT {Url} → 409 冲突：{Body}", url, text);
+
+                DateTimeOffset? currentUpdatedAt = null;
+                try
+                {
+                    var conflict = System.Text.Json.JsonSerializer
+                        .Deserialize<ConflictResponse>(text, JsonOptions);
+                    currentUpdatedAt = conflict?.CurrentUpdatedAt;
+                }
+                catch (Exception parseEx)
+                {
+                    _logger.LogWarning(parseEx, "解析 409 响应体失败");
+                }
+
+                return (false,
+                    "并发冲突：实体已被其他用户修改，请刷新后重试",
+                    currentUpdatedAt);
+            }
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            _logger.LogWarning("PUT {Url} → {Status}: {Error}", url, resp.StatusCode, msg);
+            return (false, msg, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PUT entities 失败");
+            return (false, ex.Message, null);
+        }
+    }
+
+    /// <summary>★ #7：DELETE api/eav/{entityType}/entities/{id}</summary>
+    public async Task<(bool Ok, string? Error)> DeleteEntityAsync(
+        string entityType, long entityId, CancellationToken ct = default)
+        => await DeleteWithErrorAsync(
+            $"api/eav/{entityType}/entities/{entityId}", ct);
 
     public async Task<PagedResult<DynamicEntityDto>?> QueryAsync(
         string entityType, EavQueryRequest request, CancellationToken ct = default)
@@ -136,12 +202,23 @@ public class EavApiClient
     // 组合类型
     // ============================================================
 
+    /// <summary>
+    /// 列出组合类型。
+    /// ★ 新增 includeDeleted：管理页可勾选"显示已删除"以提供恢复入口。
+    /// </summary>
     public async Task<IReadOnlyList<CompositeTypeDetailDto>?> ListCompositeTypesAsync(
-        string? entityType = null, CancellationToken ct = default)
+        string? entityType = null,
+        bool includeDeleted = false,
+        CancellationToken ct = default)
     {
-        var url = "api/eav/metadata/composite-types";
+        var query = new List<string>();
         if (!string.IsNullOrEmpty(entityType))
-            url += $"?entityType={Uri.EscapeDataString(entityType)}";
+            query.Add($"entityType={Uri.EscapeDataString(entityType)}");
+        if (includeDeleted) query.Add("includeDeleted=true");
+
+        var url = "api/eav/metadata/composite-types";
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+
         return await GetAsync<IReadOnlyList<CompositeTypeDetailDto>>(url, ct);
     }
 
@@ -174,11 +251,18 @@ public class EavApiClient
     // ============================================================
 
     public async Task<IReadOnlyList<CustomTableDetailDto>?> ListCustomTablesAsync(
-        string? entityType = null, CancellationToken ct = default)
+        string? entityType = null,
+        bool includeDeleted = false,
+        CancellationToken ct = default)
     {
-        var url = "api/eav/metadata/custom-tables";
+        var query = new List<string>();
         if (!string.IsNullOrEmpty(entityType))
-            url += $"?entityType={Uri.EscapeDataString(entityType)}";
+            query.Add($"entityType={Uri.EscapeDataString(entityType)}");
+        if (includeDeleted) query.Add("includeDeleted=true");
+
+        var url = "api/eav/metadata/custom-tables";
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+
         return await GetAsync<IReadOnlyList<CustomTableDetailDto>>(url, ct);
     }
 
@@ -229,6 +313,28 @@ public class EavApiClient
         long id, CancellationToken ct = default)
         => GetAsync<AttributeDetailDto>($"api/eav/metadata/attributes/{id}", ct);
 
+    /// <summary>★ GET api/eav/entity-types（侧边栏用，含属性计数）</summary>
+    public async Task<IReadOnlyList<EntityTypeSummaryDto>?> ListEntityTypesAsync(
+        CancellationToken ct = default)
+        => await GetAsync<IReadOnlyList<EntityTypeSummaryDto>>(
+            "api/eav/entity-types", ct);
+
+    /// <summary>★ 列出某实体类型的实体（复用 query 端点，空 filters）</summary>
+    public async Task<PagedResult<DynamicEntityDto>?> ListEntitiesAsync(
+        string entityType, int page = 1, int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        var request = new EavQueryRequest
+        {
+            EntityType = entityType,
+            Filters = new List<AttributeFilter>(),
+            Page = page,
+            PageSize = pageSize
+        };
+        return await PostAsync<PagedResult<DynamicEntityDto>>(
+            $"api/eav/{entityType}/entities/query", request, ct);
+    }
+
     public Task<(bool Ok, string? Error)> UpdateAttributeAsync(
         long id, UpdateAttributeRequest request, CancellationToken ct = default)
         => PutAsync($"api/eav/metadata/attributes/{id}", request, ct);
@@ -242,11 +348,17 @@ public class EavApiClient
         => PostForIdAsync("api/eav/metadata/option-sets", request, "optionSetId", ct);
 
     public async Task<IReadOnlyList<OptionSetSummaryDto>?> ListOptionSetsAsync(
-        string? entityType = null, CancellationToken ct = default)
+        string? entityType = null, bool includeDeleted = false, CancellationToken ct = default)
     {
         var url = "api/eav/metadata/option-sets";
+        var sep = '?';
         if (!string.IsNullOrEmpty(entityType))
-            url += $"?entityType={Uri.EscapeDataString(entityType)}";
+        {
+            url += $"{sep}entityType={Uri.EscapeDataString(entityType)}";
+            sep = '&';
+        }
+        if (includeDeleted)
+            url += $"{sep}includeDeleted=true";
         return await GetAsync<IReadOnlyList<OptionSetSummaryDto>>(url, ct);
     }
 
@@ -255,10 +367,13 @@ public class EavApiClient
         long optionSetId, CancellationToken ct = default)
         => DeleteWithErrorAsync($"api/eav/metadata/option-sets/{optionSetId}", ct);
 
-    public Task<OptionSetDetailDto?> GetOptionSetAsync(
-        long optionSetId, CancellationToken ct = default)
-        => GetAsync<OptionSetDetailDto>(
-            $"api/eav/metadata/option-sets/{optionSetId}", ct);
+    public async Task<OptionSetDetailDto?> GetOptionSetAsync(
+        long optionSetId, bool includeDeleted = false, CancellationToken ct = default)
+    {
+        var url = $"api/eav/metadata/option-sets/{optionSetId}";
+        if (includeDeleted) url += "?includeDeleted=true";
+        return await GetAsync<OptionSetDetailDto>(url, ct);
+    }
 
     public Task<(bool Ok, string? Error)> UpdateOptionSetAsync(
         long optionSetId, UpdateOptionSetRequest request, CancellationToken ct = default)
@@ -343,7 +458,7 @@ public class EavApiClient
         }
     }
 
-    /// <summary>★ 新增：POST api/units/{id}/migrate-category</summary>
+    /// <summary>POST api/units/{id}/migrate-category（保守策略，有引用时后端拒绝）</summary>
     public async Task<(bool Ok, string? Error)> MigrateUnitCategoryAsync(
         Guid unitId, MigrateUnitCategoryRequest request, CancellationToken ct = default)
     {
@@ -351,12 +466,14 @@ public class EavApiClient
         {
             var resp = await _http.PostAsJsonAsync(
                 $"api/units/{unitId}/migrate-category", request, JsonOptions, ct);
-            if (resp.IsSuccessStatusCode) return (true, null);
-
-            var msg = await ExtractErrorAsync(resp, ct);
-            _logger.LogWarning("POST migrate-category → {Status}: {Error}",
-                resp.StatusCode, msg);
-            return (false, msg);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var msg = await ExtractErrorAsync(resp, ct);
+                _logger.LogWarning("POST migrate-category → {Status}: {Error}",
+                    resp.StatusCode, msg);
+                return (false, msg);
+            }
+            return (true, null);
         }
         catch (Exception ex)
         {
@@ -365,7 +482,10 @@ public class EavApiClient
         }
     }
 
-    /// <summary>★ 新增：POST api/units/{id}/recalculate-factor</summary>
+    /// <summary>
+    /// POST api/units/{id}/recalculate-factor（同步：数据库端 3 条批量 UPDATE，
+    /// 超过阈值时后端返回 400，错误消息见 Error）。
+    /// </summary>
     public async Task<(bool Ok, RecalculateUnitFactorResult? Result, string? Error)>
         RecalculateUnitFactorAsync(
         Guid unitId, RecalculateUnitFactorRequest request, CancellationToken ct = default)
@@ -552,4 +672,136 @@ public class EavApiClient
         string? Error, List<ValidationErrorDto>? Errors);
 
     private sealed record ValidationErrorDto(string Field, string Message);
+
+    /// <summary>后端 409 Conflict 响应体：{ error, currentUpdatedAt, expectedUpdatedAt }</summary>
+    private sealed record ConflictResponse(
+        string? Error,
+        DateTimeOffset? CurrentUpdatedAt,
+        DateTimeOffset? ExpectedUpdatedAt);
+
+    /// <summary>
+    /// ★ PATCH 部分更新实体。
+    /// 语义：未提供的属性保持不动（与 PUT 的"未提供 = 删除"不同）。
+    /// </summary>
+    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        PatchEntityAsync(
+        string entityType, long entityId,
+        Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var url = $"api/eav/{entityType}/entities/{entityId}";
+            using var req = new HttpRequestMessage(HttpMethod.Patch, url)
+            {
+                Content = JsonContent.Create(values, options: JsonOptions)
+            };
+
+            if (expectedUpdatedAt is { } expected)
+            {
+                req.Headers.Add("X-Expected-Updated-At",
+                    expected.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            var resp = await _http.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return (true, null, null);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("PATCH {Url} → 409：{Body}", url, text);
+
+                DateTimeOffset? currentUpdatedAt = null;
+                try
+                {
+                    var conflict = System.Text.Json.JsonSerializer
+                        .Deserialize<ConflictResponse>(text, JsonOptions);
+                    currentUpdatedAt = conflict?.CurrentUpdatedAt;
+                }
+                catch { /* ignore */ }
+
+                return (false,
+                    "并发冲突：实体已被其他用户修改，请刷新后重试",
+                    currentUpdatedAt);
+            }
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            _logger.LogWarning("PATCH {Url} → {Status}: {Error}", url, resp.StatusCode, msg);
+            return (false, msg, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PATCH entities 失败");
+            return (false, ex.Message, null);
+        }
+    }
+
+    /// <summary>★ 批量删除实体。</summary>
+    public async Task<BatchDeleteResultDto?> BatchDeleteEntitiesAsync(
+        string entityType,
+        IReadOnlyList<long> entityIds,
+        CancellationToken ct = default)
+    {
+        var body = new BatchDeleteRequest { EntityIds = entityIds.ToList() };
+        return await PostAsync<BatchDeleteResultDto>(
+            $"api/eav/{entityType}/entities/batch-delete", body, ct);
+    }
+
+    // ---------- undelete（元数据恢复） ----------
+
+    public Task<(bool Ok, string? Error)> UndeleteAttributeAsync(
+        long attributeId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/attributes/{attributeId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteCompositeTypeAsync(
+        long compositeTypeId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/composite-types/{compositeTypeId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteCompositeFieldAsync(
+        long compositeTypeId, long fieldId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/composite-types/{compositeTypeId}/fields/{fieldId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteCustomTableAsync(
+        long tableId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/custom-tables/{tableId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteTableColumnAsync(
+        long tableId, long columnId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/custom-tables/{tableId}/columns/{columnId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteOptionSetAsync(
+        long optionSetId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/option-sets/{optionSetId}/undelete", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteOptionItemAsync(
+        long optionSetId, long itemId, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/eav/metadata/option-sets/{optionSetId}/items/{itemId}/undelete", ct);
+
+    private async Task<(bool Ok, string? Error)> PostNoBodyAsync(
+        string relativeUrl, CancellationToken ct)
+    {
+        try
+        {
+            var resp = await _http.PostAsync(relativeUrl, content: null, ct);
+            if (resp.IsSuccessStatusCode) return (true, null);
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            _logger.LogWarning("POST {Url} → {Status}: {Error}",
+                relativeUrl, resp.StatusCode, msg);
+            return (false, msg);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "POST {Url} 失败", relativeUrl);
+            return (false, ex.Message);
+        }
+    }
 }

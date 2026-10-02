@@ -1,33 +1,124 @@
-@page "/entities/{EntityType}/{EntityId:long}/edit"
+@page "/entities/{EntityType}/{EntityId:long}"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using System.Text.Json
+@using TreeGraph.Blazor.Components.Shared
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
-
-<PageTitle>编辑 @EntityType #@EntityId</PageTitle>
-
-<MudBreadcrumbs Items="_crumbs" Class="mb-4" />
+@inject IDialogService DialogService
+@inject IEavFieldValidator Validator
+@inject NavigationManager Nav
+@* EntityEdit.razor *@
+<PageTitle>编辑 @EntityType / @EntityId</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">
-    编辑 @EntityType #@EntityId
+    编辑实体：@EntityType / @EntityId
 </MudText>
 
 @if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" />
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
 }
-else if (_schema is null)
+else if (_schema is null || _schema.Count == 0)
 {
-    <MudAlert Severity="Severity.Error">无法加载 @EntityType 的 Schema</MudAlert>
+    <MudAlert Severity="Severity.Warning">
+        实体类型 @EntityType 没有属性定义。请先在元数据管理页配置。
+    </MudAlert>
 }
 else
 {
-    <MudPaper Class="pa-4">
-        <DynamicForm @ref="_form"
-                     EntityType="EntityType"
-                     EntityId="EntityId"
-                     Schema="_schema"
-                     OnSubmit="SaveAsync" />
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        <b>提示</b>：保存是<b>全量替换</b>——未在此页填写的属性会被删除。
+        如需保留已有值，请勿清空。自定义表走独立端点，不受影响。
+    </MudAlert>
+
+    @if (TotalErrorCount > 0)
+    {
+        <MudAlert Severity="Severity.Error" Dense="false" Class="mb-4">
+            <MudText Typo="Typo.body1">
+                有 <b>@TotalErrorCount</b> 项校验错误，请修正后再保存：
+            </MudText>
+            <ul style="margin: 6px 0 0 0; padding-left: 20px;">
+                @foreach (var (attrName, errs) in _errors.Where(kv => kv.Value.Count > 0))
+                {
+                    var attr = _regularAttributes.FirstOrDefault(a => a.AttributeName == attrName);
+                    var label = attr?.DisplayName ?? attrName;
+                    foreach (var e in errs)
+                    {
+                        var path = string.IsNullOrEmpty(e.Path) ? "" : $" [{e.Path}]";
+                        <li>@label@(path)：@e.Message</li>
+                    }
+                }
+            </ul>
+        </MudAlert>
+    }
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" Class="mb-3">属性值</MudText>
+
+        @foreach (var attr in _regularAttributes)
+        {
+            <div class="mb-4">
+                <DynamicFieldRenderer Attribute="attr"
+                                      Value="GetValue(attr.AttributeName)"
+                                      ValueChanged="@(v => SetValue(attr.AttributeName, v))"
+                                      Errors="GetFieldErrors(attr.AttributeName)" />
+            </div>
+        }
     </MudPaper>
+
+    @if (_tableAttributes.Count > 0)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">子表数据</MudText>
+            @foreach (var attr in _tableAttributes)
+            {
+                <CustomTableEditor EntityType="@EntityType"
+                                   EntityId="@EntityId"
+                                   AttributeName="@attr.AttributeName"
+                                   TableName="@attr.AttributeName"
+                                   DisplayName="@attr.DisplayName"
+                                   RefTableDefinitionId="@attr.RefTableDefinitionId" />
+            }
+        </MudPaper>
+    }
+
+    @* ★ #2：审计历史面板 *@
+    <EntityHistoryPanel EntityType="@EntityType"
+                        EntityId="@EntityId"
+                        RefreshToken="_historyRefreshToken" />
+
+    <div class="d-flex align-center" style="gap: 8px;">
+        <MudButton Variant="Variant.Text" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="BackToList">
+            返回列表
+        </MudButton>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="@(TotalErrorCount > 0 ? Color.Default : Color.Primary)"
+                   OnClick="SaveAsync" Disabled="@_saving"
+                   StartIcon="@Icons.Material.Filled.Save">
+            @(_saving ? "保存中..." : "保存")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   OnClick="ReloadAsync"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            重新加载
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                   OnClick="ClearAllAsync"
+                   StartIcon="@Icons.Material.Filled.Delete">
+            清空所有属性
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                   OnClick="DeleteEntityAsync"
+                   StartIcon="@Icons.Material.Filled.DeleteForever"
+                   Disabled="@_saving">
+            删除实体
+        </MudButton>
+    </div>
 }
 
 @code {
@@ -35,42 +126,319 @@ else
     [Parameter] public long EntityId { get; set; }
 
     private IReadOnlyList<AttributeSchemaDto>? _schema;
-    private DynamicForm? _form;
-    private bool _loading = true;
-    private bool _entityLoaded;
-    private List<BreadcrumbItem> _crumbs = [];
+    private readonly Dictionary<string, object?> _values = new();
+    private readonly Dictionary<string, IReadOnlyList<FieldValidationError>> _errors = new();
+    private List<AttributeSchemaDto> _regularAttributes = new();
+    private List<AttributeSchemaDto> _tableAttributes = new();
 
-    protected override async Task OnInitializedAsync()
-    {
-        _crumbs =
-        [
-            new BreadcrumbItem("实体列表", "/entities"),
-            new BreadcrumbItem(EntityType, null, disabled: true),
-            new BreadcrumbItem($"#{EntityId}", null, disabled: true)
-        ];
+    private bool _loading;
+    private bool _saving;
+    private bool _initialized;
 
-        // 端点 ①：Schema
-        _schema = await Api.GetSchemaAsync(EntityType);
-        _loading = false;
-    }
+    // ★ #3：记录加载时的 UpdatedAt（乐观锁版本）
+    private DateTimeOffset? _loadedUpdatedAt;
+    // ★ #2：保存成功后自增，触发审计历史面板刷新
+    private int _historyRefreshToken;
+
+    private int TotalErrorCount => _errors.Values.Sum(v => v.Count);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // DynamicForm 首次渲染完成后才能 LoadFrom（端点 ②：读取实体）
-        if (!_entityLoaded && _form is not null)
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private void BackToList()
+    {
+        Nav.NavigateTo($"/entities/{EntityType}");
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
         {
-            _entityLoaded = true;
+            var schema = await Api.GetSchemaAsync(EntityType);
+            _schema = schema ?? Array.Empty<AttributeSchemaDto>();
+
+            _regularAttributes = _schema.Where(a => a.DataType != "table").ToList();
+            _tableAttributes = _schema.Where(a => a.DataType == "table").ToList();
+
+            _values.Clear();
             var entity = await Api.GetEntityAsync(EntityType, EntityId);
             if (entity is not null)
-                _form.LoadFrom(entity.Properties);
+            {
+                _loadedUpdatedAt = entity.UpdatedAt;  // ★ #3：记录加载时版本
+                foreach (var attr in _regularAttributes)
+                {
+                    if (entity.Properties.TryGetValue(attr.AttributeName, out var elem))
+                        _values[attr.AttributeName] = JsonElementToValue(elem, attr);
+                }
+            }
+            else
+            {
+                _loadedUpdatedAt = null;  // 新建实体
+            }
+
+            RevalidateAll();
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 
-    // 端点 ③：PUT api/eav/{entityType}/entities/{id}
-    private async Task SaveAsync(Dictionary<string, object?> values)
+    private async Task ReloadAsync()
     {
-        var (ok, error) = await Api.SaveEntityAsync(EntityType, EntityId, values);
-        Snackbar.Add(ok ? "保存成功" : $"保存失败：{error}",
-            ok ? Severity.Success : Severity.Error);
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private object? GetValue(string name)
+        => _values.TryGetValue(name, out var v) ? v : null;
+
+    private IReadOnlyList<FieldValidationError>? GetFieldErrors(string name)
+        => _errors.TryGetValue(name, out var e) && e.Count > 0 ? e : null;
+
+    private void SetValue(string name, object? value)
+    {
+        if (value is null)
+            _values.Remove(name);
+        else
+            _values[name] = value;
+
+        RevalidateField(name);
+    }
+
+    private void RevalidateAll()
+    {
+        _errors.Clear();
+        foreach (var attr in _regularAttributes)
+        {
+            var errs = Validator.Validate(attr, GetValue(attr.AttributeName));
+            if (errs.Count > 0)
+                _errors[attr.AttributeName] = errs;
+        }
+    }
+
+    private void RevalidateField(string attributeName)
+    {
+        var attr = _regularAttributes.FirstOrDefault(a => a.AttributeName == attributeName);
+        if (attr is null) return;
+
+        var errs = Validator.Validate(attr, GetValue(attributeName));
+        if (errs.Count > 0)
+            _errors[attributeName] = errs;
+        else
+            _errors.Remove(attributeName);
+    }
+
+    private async Task SaveAsync()
+    {
+        RevalidateAll();
+
+        if (TotalErrorCount > 0)
+        {
+            Snackbar.Add(
+                $"有 {TotalErrorCount} 项校验错误未解决，请修正后再保存",
+                Severity.Warning);
+            StateHasChanged();
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var submitValues = BuildSubmitValues();
+            var (ok, error, currentUpdatedAt) = await Api.SaveEntityAsync(
+                EntityType, EntityId, submitValues,
+                expectedUpdatedAt: _loadedUpdatedAt);   // ★ #3 乐观锁
+
+            if (!ok)
+            {
+                // ★ P1-1：409 冲突时展示服务端最新时间，引导用户刷新
+                if (currentUpdatedAt is not null)
+                {
+                    var localTime = currentUpdatedAt.Value.ToLocalTime()
+                        .ToString("yyyy-MM-dd HH:mm:ss");
+                    Snackbar.Add(
+                        $"保存失败：{error ?? "并发冲突"}\n" +
+                        $"服务端最新时间：{localTime}\n请点击「重新加载」后再修改。",
+                        Severity.Error);
+                }
+                else
+                {
+                    Snackbar.Add($"保存失败：{error ?? "未知错误"}", Severity.Error);
+                }
+                return;
+            }
+
+            Snackbar.Add("保存成功", Severity.Success);
+            _historyRefreshToken++;   // ★ #2：触发历史面板刷新
+            await LoadAsync();        // 重新加载会同步刷新 _loadedUpdatedAt
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ClearAllAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认清空",
+            $"确定清空实体 {EntityType}/{EntityId} 的所有属性吗？此操作不可撤销。",
+            yesText: "清空", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        _values.Clear();
+        RevalidateAll();
+        await SaveAsync();
+    }
+
+    // ---------- 提交值转换 ----------
+
+    private Dictionary<string, object?> BuildSubmitValues()
+    {
+        var result = new Dictionary<string, object?>();
+        foreach (var (k, v) in _values)
+            result[k] = ConvertForSubmit(v);
+        return result;
+    }
+
+    private static object? ConvertForSubmit(object? v) => v switch
+    {
+        null => null,
+        NumericInput ni => ni.ToSubmitValue(),
+        Dictionary<string, object?> dict => dict.ToDictionary(
+            x => x.Key, x => ConvertForSubmit(x.Value)),
+        List<object?> list => list.Select(ConvertForSubmit).ToList(),
+        _ => v
+    };
+
+    // ---------- JSON -> 内部模型 ----------
+
+    private object? JsonElementToValue(JsonElement elem, AttributeSchemaDto schema)
+    {
+        if (elem.ValueKind == JsonValueKind.Null) return null;
+
+        return schema.DataType switch
+        {
+            "string" => elem.ValueKind == JsonValueKind.String ? elem.GetString() : elem.ToString(),
+            "int" => elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
+                   : elem.ValueKind == JsonValueKind.String
+                     && long.TryParse(elem.GetString(), out var l) ? l
+                   : (object?)null,
+            "decimal" => JsonToNumeric(elem),
+            "bool" => elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False
+                      ? elem.GetBoolean() : null,
+            "datetime" => elem.GetDateTimeOffset(),
+            "date" => elem.GetString(),
+            "time" => elem.GetString(),
+            "single_choice" => elem.GetString(),
+            "json" or "file" => elem.Clone(),
+            "composite" => schema.CompositeType is not null
+                ? JsonToComposite(elem, schema.CompositeType)
+                : null,
+            _ => elem.Clone()
+        };
+    }
+
+    private NumericInput JsonToNumeric(JsonElement elem)
+    {
+        if (elem.ValueKind == JsonValueKind.Object)
+        {
+            var val = elem.GetProperty("value").GetDecimal();
+            Guid? unitId = elem.TryGetProperty("unitId", out var u)
+                            && u.ValueKind == JsonValueKind.String
+                ? Guid.Parse(u.GetString()!)
+                : null;
+            return new NumericInput { Value = val, UnitId = unitId };
+        }
+        if (elem.ValueKind == JsonValueKind.Number)
+            return new NumericInput { Value = elem.GetDecimal(), UnitId = null };
+        return new NumericInput();
+    }
+
+    private Dictionary<string, object?> JsonToComposite(
+        JsonElement elem, CompositeTypeSchemaDto typeSchema)
+    {
+        var dict = new Dictionary<string, object?>();
+        foreach (var field in typeSchema.Fields)
+        {
+            if (!elem.TryGetProperty(field.FieldName, out var fv)) continue;
+            if (fv.ValueKind == JsonValueKind.Null) continue;
+
+            if (field.IsArray)
+            {
+                // ★ 数组转 List<object?>
+                var list = new List<object?>();
+                foreach (var item in fv.EnumerateArray())
+                {
+                    list.Add(field.DataType == "composite" && field.NestedType is not null
+                        ? JsonToComposite(item, field.NestedType)
+                        : JsonToFieldValue(item, field));
+                }
+                dict[field.FieldName] = list;
+            }
+            else
+            {
+                dict[field.FieldName] = JsonToFieldValue(fv, field);
+            }
+        }
+        return dict;
+    }
+
+    private object? JsonToFieldValue(JsonElement elem, CompositeFieldSchemaDto field)
+    {
+        if (elem.ValueKind == JsonValueKind.Null) return null;
+
+        if (field.DataType == "composite" && field.NestedType is not null)
+            return JsonToComposite(elem, field.NestedType);
+
+        return field.DataType switch
+        {
+            "string" => elem.ValueKind == JsonValueKind.String ? elem.GetString() : elem.ToString(),
+            "int" => elem.ValueKind == JsonValueKind.Number ? elem.GetInt64() : (object?)null,
+            "decimal" => elem.ValueKind == JsonValueKind.Number ? elem.GetDecimal() : (object?)null,
+            "bool" => elem.ValueKind is JsonValueKind.True or JsonValueKind.False
+                      ? elem.GetBoolean() : (object?)null,
+            "datetime" => elem.GetDateTimeOffset(),
+            "date" or "time" or "single_choice" => elem.GetString(),
+            "json" or "file" => elem.Clone(),
+            _ => elem.Clone()
+        };
+    }
+
+    private async Task DeleteEntityAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除实体",
+            $"确定删除实体 {EntityType}/{EntityId} 及其所有属性值和子表数据吗？\n\n" +
+            "此操作不可撤销。审计历史保留。",
+            yesText: "永久删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        _saving = true;
+        try
+        {
+            var (ok, error) = await Api.DeleteEntityAsync(EntityType, EntityId);
+            if (!ok)
+            {
+                Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("实体已删除", Severity.Success);
+            Nav.NavigateTo($"/entities/{EntityType}");
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
 }

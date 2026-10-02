@@ -1,0 +1,119 @@
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+
+@* QueryFilterBuilder.razor *@
+
+@* 多个过滤条件的组合管理。 *@
+
+<MudExpansionPanel Text="动态查询" Class="mb-3">
+    <TitleContent>
+        <div class="d-flex align-center" style="width: 100%;">
+            <MudIcon Icon="@Icons.Material.Filled.FilterAlt"
+                     Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.subtitle1">动态查询</MudText>
+            @if (Filters.Count > 0)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">
+                    @Filters.Count 个条件
+                </MudChip>
+            }
+        </div>
+    </TitleContent>
+
+    <ChildContent>
+        @if (SupportedAttributes.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">
+                该实体类型没有可搜索的属性。
+            </MudAlert>
+        }
+        else
+        {
+            @foreach (var filter in Filters.ToList())
+            {
+                var captured = filter;
+                <QueryFilterEditor Filter="captured"
+                                   SupportedAttributes="SupportedAttributes"
+                                   OnRemove="@(async () => await RemoveFilterAsync(captured))"
+                                   OnChanged="OnFilterChanged" />
+            }
+
+            <div class="d-flex" style="gap: 8px;">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AddFilter">
+                    添加条件
+                </MudButton>
+                @if (Filters.Count > 0)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Clear"
+                               OnClick="ClearAllAsync">
+                        清空条件
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Search"
+                               OnClick="@(async () => await OnApply.InvokeAsync())">
+                        应用查询
+                    </MudButton>
+                }
+            </div>
+        }
+    </ChildContent>
+</MudExpansionPanel>
+
+@code {
+    [Parameter, EditorRequired] public List<AttributeFilter> Filters { get; set; } = new();
+    [Parameter, EditorRequired] public IReadOnlyList<AttributeSchemaDto> SupportedAttributes { get; set; }
+        = Array.Empty<AttributeSchemaDto>();
+    [Parameter] public EventCallback OnApply { get; set; }
+
+    /// <summary>
+    /// ★ 修复 P0-NEW-2：Add/Remove/Clear 直接改 List 后必须 StateHasChanged，
+    ///   否则父级不会重渲染，UI 表现"点了没反应"。
+    /// </summary>
+    private void AddFilter()
+    {
+        var first = SupportedAttributes.FirstOrDefault();
+        var filter = new AttributeFilter();
+        if (first is not null)
+        {
+            filter.AttributeName = first.AttributeName;
+            var ops = FilterOperatorCatalog.For(first);
+            if (ops.Count > 0) filter.Operator = ops[0].Code;
+        }
+        Filters.Add(filter);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// 删除条件后立即触发查询：用户预期"移除条件 → 结果刷新"。
+    /// </summary>
+    private async Task RemoveFilterAsync(AttributeFilter filter)
+    {
+        Filters.Remove(filter);
+        StateHasChanged();
+        await OnApply.InvokeAsync();
+    }
+
+    /// <summary>
+    /// 清空全部条件后触发查询，回到"无过滤"的完整列表。
+    /// </summary>
+    private async Task ClearAllAsync()
+    {
+        Filters.Clear();
+        StateHasChanged();
+        await OnApply.InvokeAsync();
+    }
+
+    private async Task OnFilterChanged()
+    {
+        await OnApply.InvokeAsync();
+    }
+}

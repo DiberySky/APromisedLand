@@ -1,0 +1,115 @@
+@using System.Text.Json
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+
+@* CompositeFieldEditor.razor *@
+@* 组合类型编辑器：递归渲染所有字段，把错误按字段名 slice 后传给子组件。 *@
+
+@foreach (var field in TypeSchema.Fields.OrderBy(f => f.DisplayOrder))
+{
+    var fieldErrors = SliceErrors(field.FieldName);
+
+    @if (field.IsArray)
+    {
+        <div class="mb-3">
+            <ArrayFieldEditor Field="field"
+                              BasePath="@field.FieldName"
+                              Value="@GetArrayValue(field.FieldName)"
+                              ValueChanged="@(v => OnFieldChanged(field.FieldName, v))"
+                              Errors="@fieldErrors" />
+        </div>
+    }
+    else if (field.DataType == "composite" && field.NestedType is not null)
+    {
+        <div class="mb-3">
+            <MudText Typo="Typo.subtitle2" Class="mb-1">
+                @field.DisplayName
+            </MudText>
+            <MudPaper Class="pa-3" Outlined="true">
+                <CompositeFieldEditor TypeSchema="@field.NestedType"
+                                      BasePath="@field.FieldName"
+                                      Value="@GetNestedValue(field.FieldName)"
+                                      ValueChanged="@(v => OnFieldChanged(field.FieldName, v))"
+                                      Errors="@fieldErrors" />
+            </MudPaper>
+        </div>
+    }
+    else
+    {
+        <div class="mb-3">
+            <RenderLeafField Field="field"
+                             Value="@GetRaw(field.FieldName)"
+                             ValueChanged="@(v => OnFieldChanged(field.FieldName, v))"
+                             Errors="@fieldErrors" />
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public CompositeTypeSchemaDto TypeSchema { get; set; } = null!;
+
+    /// <summary>当前组合在完整路径中的位置（用于 slice）。根组合时为 ""。</summary>
+    [Parameter] public string BasePath { get; set; } = "";
+
+    [Parameter] public Dictionary<string, object?>? Value { get; set; }
+    [Parameter] public EventCallback<object?> ValueChanged { get; set; }
+
+    /// <summary>属于当前组合的错误（路径已剥离 BasePath）。</summary>
+    [Parameter] public IReadOnlyList<FieldValidationError>? Errors { get; set; }
+
+    private Dictionary<string, object?> _dict = new();
+
+    protected override void OnParametersSet()
+    {
+        _dict = Value ?? new Dictionary<string, object?>();
+    }
+
+    /// <summary>从当前组合的错误集里筛出属于某个字段的错误，并把字段名前缀剥离。</summary>
+    private IReadOnlyList<FieldValidationError> SliceErrors(string fieldName)
+    {
+        if (Errors is null || Errors.Count == 0)
+            return Array.Empty<FieldValidationError>();
+
+        var result = new List<FieldValidationError>();
+        foreach (var e in Errors)
+        {
+            if (string.IsNullOrEmpty(e.Path)) continue;
+
+            if (e.Path == fieldName)
+            {
+                // 错误直接属于该字段
+                result.Add(new FieldValidationError("", e.Message));
+            }
+            else if (e.Path.StartsWith(fieldName + "."))
+            {
+                result.Add(new FieldValidationError(
+                    e.Path.Substring(fieldName.Length + 1), e.Message));
+            }
+            else if (e.Path.StartsWith(fieldName + "["))
+            {
+                result.Add(new FieldValidationError(
+                    e.Path.Substring(fieldName.Length), e.Message));
+            }
+        }
+        return result;
+    }
+
+    private object? GetRaw(string name)
+        => _dict.TryGetValue(name, out var v) ? v : null;
+
+    private Dictionary<string, object?>? GetNestedValue(string name)
+        => GetRaw(name) as Dictionary<string, object?>;
+
+    private List<object?>? GetArrayValue(string name)
+        => GetRaw(name) as List<object?>;
+
+    private void OnFieldChanged(string name, object? v)
+    {
+        var newDict = new Dictionary<string, object?>(_dict);
+        if (v is null)
+            newDict.Remove(name);
+        else
+            newDict[name] = v;
+        ValueChanged.InvokeAsync(newDict);
+    }
+}

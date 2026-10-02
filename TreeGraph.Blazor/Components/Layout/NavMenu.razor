@@ -1,23 +1,95 @@
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+@inject EavApiClient Api
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@* NavMenu.razor *@
 <MudNavMenu>
     <MudNavLink Href="/" Match="NavLinkMatch.All"
-                Icon="@Icons.Material.Filled.Home">首页</MudNavLink>
+                Icon="@Icons.Material.Filled.Home">
+        首页
+    </MudNavLink>
 
-    <MudNavGroup Title="数据" Icon="@Icons.Material.Filled.Storage" Expanded="true">
-        <MudNavLink Href="/entities" Icon="@Icons.Material.Filled.List">实体列表</MudNavLink>
-        <MudNavLink Href="/query" Icon="@Icons.Material.Filled.Search">动态查询</MudNavLink>
-        <MudNavLink Href="/schema" Icon="@Icons.Material.Filled.Schema">Schema 查看</MudNavLink>
+    @* ★ 动态实体数据菜单 *@
+    <MudNavGroup Title="实体数据"
+                 Icon="@Icons.Material.Filled.Storage"
+                 Expanded="_entityGroupExpanded"
+                 ExpandedChanged="@(v => _entityGroupExpanded = v)">
+        @if (_entityTypes is null)
+        {
+            <MudNavLink Disabled="true">
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            </MudNavLink>
+        }
+        else if (_entityTypes.Count == 0)
+        {
+            <MudNavLink Disabled="true">（暂无实体类型）</MudNavLink>
+        }
+        else
+        {
+            @foreach (var et in _entityTypes)
+            {
+                <MudNavLink Href="@($"/entities/{et.EntityType}")"
+                            Icon="@Icons.Material.Filled.List"
+                            Match="NavLinkMatch.Prefix">
+                    @et.EntityType
+                    <MudChip T="string" Size="Size.Small" Class="ml-2">
+                        @et.AttributeCount
+                    </MudChip>
+                </MudNavLink>
+            }
+        }
     </MudNavGroup>
 
-    <MudNavGroup Title="元数据" Icon="@Icons.Material.Filled.Settings" Expanded="true">
+    @* 元数据管理 *@
+    <MudNavGroup Title="元数据管理"
+                 Icon="@Icons.Material.Filled.Settings">
         <MudNavLink Href="/metadata/attributes"
-                    Icon="@Icons.Material.Filled.ListAlt">属性定义</MudNavLink>
+                    Icon="@Icons.Material.Filled.EditAttributes"
+                    Match="NavLinkMatch.Prefix">
+            属性定义
+        </MudNavLink>
         <MudNavLink Href="/metadata/composite-types"
-                    Icon="@Icons.Material.Filled.AccountTree">组合类型</MudNavLink>
+                    Icon="@Icons.Material.Filled.AccountTree"
+                    Match="NavLinkMatch.Prefix">
+            组合类型
+        </MudNavLink>
         <MudNavLink Href="/metadata/custom-tables"
-                    Icon="@Icons.Material.Filled.TableChart">自定义表定义</MudNavLink>
+                    Icon="@Icons.Material.Filled.TableChart"
+                    Match="NavLinkMatch.Prefix">
+            自定义表
+        </MudNavLink>
         <MudNavLink Href="/metadata/option-sets"
-                    Icon="@Icons.Material.Filled.Checklist">选项集</MudNavLink>
+                    Icon="@Icons.Material.Filled.Checklist"
+                    Match="NavLinkMatch.Prefix">
+            选项集
+        </MudNavLink>
         <MudNavLink Href="/metadata/units"
-                    Icon="@Icons.Material.Filled.Straighten">单位</MudNavLink>
+                    Icon="@Icons.Material.Filled.Straighten"
+                    Match="NavLinkMatch.Prefix">
+            单位
+        </MudNavLink>
     </MudNavGroup>
 </MudNavMenu>
+
+@code {
+    private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
+    private bool _entityGroupExpanded = true;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        _entityTypes = await Api.ListEntityTypesAsync();
+
+        // ★ P1-3：加载失败提示用户，而不是静默显示空菜单
+        if (_entityTypes is null)
+        {
+            Snackbar.Add("实体类型加载失败，请检查后端服务是否可达", Severity.Warning);
+        }
+
+        StateHasChanged();
+    }
+}

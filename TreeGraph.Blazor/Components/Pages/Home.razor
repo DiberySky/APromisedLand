@@ -1,6 +1,7 @@
 @page "/"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @inject EavApiClient Api
+@* Home.razor *@
 
 <PageTitle>首页</PageTitle>
 
@@ -16,7 +17,7 @@
             }
             else
             {
-                <MudList T="string" Dense="true">
+                <MudList T="string">
                     @foreach (var c in _categories)
                     {
                         <MudListItem T="string">

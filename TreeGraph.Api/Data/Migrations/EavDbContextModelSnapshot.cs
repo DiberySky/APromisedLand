@@ -214,7 +214,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_attr_catalog");
 
-                    b.ToTable("attribute_catalog", (string)null);
+                    b.ToTable("attribute_catalog", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_attr_int_no_unit", "data_type <> 'int' OR unit_id IS NULL");
+                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Api.Entities.AttributeValue", b =>
@@ -341,6 +344,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_av_entity_attr");
 
+                    b.HasIndex("EntityType", "EntityId", "UpdatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_av_entity_updated");
+
                     b.ToTable("attribute_values", (string)null);
                 });
 
@@ -412,6 +419,14 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("ref_composite_type_id");
 
+                    b.Property<long?>("RefOptionSetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ref_option_set_id");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
                     b.Property<JsonDocument>("ValidationRule")
                         .HasColumnType("jsonb")
                         .HasColumnName("validation_rule");
@@ -420,11 +435,20 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("RefCompositeTypeId");
 
+                    b.HasIndex("RefOptionSetId");
+
+                    b.HasIndex("UnitId");
+
                     b.HasIndex("CompositeTypeId", "FieldName")
                         .IsUnique()
                         .HasDatabaseName("uq_composite_field");
 
-                    b.ToTable("composite_field_definitions", (string)null);
+                    b.ToTable("composite_field_definitions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
+
+                            t.HasCheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
+                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Api.Entities.CompositeTypeDefinition", b =>
@@ -761,6 +785,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("entity_type");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
                     b.Property<string>("SetName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -775,7 +803,8 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("EntityType", "SetName")
                         .IsUnique()
-                        .HasDatabaseName("uq_option_set");
+                        .HasDatabaseName("uq_option_set")
+                        .HasFilter("is_deleted = false");
 
                     b.ToTable("option_sets", (string)null);
                 });
@@ -906,9 +935,23 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasForeignKey("RefCompositeTypeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("TreeGraph.Api.Entities.OptionSet", "RefOptionSet")
+                        .WithMany()
+                        .HasForeignKey("RefOptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("CompositeType");
 
                     b.Navigation("RefCompositeType");
+
+                    b.Navigation("RefOptionSet");
+
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableColumn", b =>

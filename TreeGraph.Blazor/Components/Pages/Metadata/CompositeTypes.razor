@@ -1,9 +1,12 @@
+
+```razor
 @page "/metadata/composite-types"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
+@* CompositeTypes.razor *@
 <PageTitle>组合类型管理</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">组合类型管理</MudText>
@@ -15,7 +18,13 @@
                           Variant="Variant.Outlined" Margin="Margin.Dense"
                           Placeholder="留空显示全部" />
         </MudItem>
-        <MudItem xs="12" md="8" Class="d-flex align-center">
+        <MudItem xs="12" md="2" Class="d-flex align-center">
+            @* ★ 显示已删除开关 *@
+            <MudSwitch T="bool" @bind-Value="_includeDeleted"
+                       Label="显示已删除"
+                       Color="Color.Warning" />
+        </MudItem>
+        <MudItem xs="12" md="6" Class="d-flex align-center">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        OnClick="LoadAsync" Disabled="_loading"
                        StartIcon="@Icons.Material.Filled.Refresh">
@@ -55,7 +64,8 @@ else
                 <TitleContent>
                     <div class="d-flex align-center" style="width: 100%;">
                         <MudIcon Icon="@Icons.Material.Filled.AccountTree"
-                                 Color="Color.Primary" Class="mr-2" />
+                                 Color="@(type.IsDeleted ? Color.Error : Color.Primary)"
+                                 Class="mr-2" />
                         <MudText Typo="Typo.subtitle1">@type.DisplayName</MudText>
                         <MudChip T="string" Size="Size.Small" Color="Color.Info"
                                  Class="ml-2">
@@ -70,33 +80,55 @@ else
                         </MudChip>
                         <MudChip T="string" Size="Size.Small" Color="Color.Warning"
                                  Class="ml-2">
-                            @type.Fields.Count 字段
+                            @type.Fields.Count(f => !f.IsDeleted) 字段
                         </MudChip>
+                        @* ★ 已删除标记 *@
+                        @if (type.IsDeleted)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error"
+                                     Class="ml-2">
+                                已删除
+                            </MudChip>
+                        }
                         <MudSpacer />
-                        @* ★ 新增：编辑类型入口 *@
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                       Color="Color.Primary"
-                                       Size="Size.Small"
-                                       OnClick="@(() => OpenEditTypeDialog(type))"
-                                       title="编辑显示名" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Color="Color.Error"
-                                       Size="Size.Small"
-                                       OnClick="@(async () => await DeleteTypeAsync(type))"
-                                       title="删除组合类型" />
+                        @if (!type.IsDeleted)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           OnClick="@(() => OpenEditTypeDialog(type))"
+                                           title="编辑显示名" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           OnClick="@(async () => await DeleteTypeAsync(type))"
+                                           title="删除组合类型" />
+                        }
+                        else
+                        {
+                            @* ★ 已删除类型：提供恢复入口 *@
+                            <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                           Color="Color.Success"
+                                           Size="Size.Small"
+                                           OnClick="@(async () => await UndeleteTypeAsync(type))"
+                                           title="恢复" />
+                        }
                     </div>
                 </TitleContent>
 
                 <ChildContent>
-                    <div class="d-flex mb-3">
-                        <MudButton Size="Size.Small"
-                                   Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.Add"
-                                   OnClick="@(() => OpenAddFieldDialog(type))">
-                            添加字段
-                        </MudButton>
-                    </div>
+                    @if (!type.IsDeleted)
+                    {
+                        <div class="d-flex mb-3">
+                            <MudButton Size="Size.Small"
+                                       Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       OnClick="@(() => OpenAddFieldDialog(type))">
+                                添加字段
+                            </MudButton>
+                        </div>
+                    }
 
                     @if (type.Fields.Count == 0)
                     {
@@ -112,6 +144,7 @@ else
                                 <MudTh>字段名</MudTh>
                                 <MudTh>显示名</MudTh>
                                 <MudTh>类型</MudTh>
+                                <MudTh>引用</MudTh>
                                 <MudTh>数组</MudTh>
                                 <MudTh>必填</MudTh>
                                 <MudTh>可搜索</MudTh>
@@ -122,6 +155,14 @@ else
                             <RowTemplate>
                                 <MudTd>
                                     <code>@context.FieldName</code>
+                                    @* ★ 已删除字段标记 *@
+                                    @if (context.IsDeleted)
+                                    {
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="Color.Error" Class="ml-1">
+                                            已删除
+                                        </MudChip>
+                                    }
                                 </MudTd>
                                 <MudTd>@context.DisplayName</MudTd>
                                 <MudTd>
@@ -129,6 +170,30 @@ else
                                              Color="@GetDataTypeColor(context.DataType)">
                                         @context.DataType
                                     </MudChip>
+                                </MudTd>
+                                <MudTd>
+                                    @* 单位 / 选项集 / 嵌套组合引用 *@
+                                    @if (context.UnitId is not null)
+                                    {
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="Color.Warning" Class="mr-1">
+                                            单位
+                                        </MudChip>
+                                    }
+                                    @if (context.RefOptionSetId is not null)
+                                    {
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="Color.Secondary" Class="mr-1">
+                                            选项: @context.OptionSetName
+                                        </MudChip>
+                                    }
+                                    @if (context.RefCompositeTypeId is not null)
+                                    {
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="Color.Dark">
+                                            嵌套: @GetTypeName(context.RefCompositeTypeId.Value)
+                                        </MudChip>
+                                    }
                                 </MudTd>
                                 <MudTd>
                                     @if (context.IsArray)
@@ -160,14 +225,26 @@ else
                                 </MudTd>
                                 <MudTd>@context.DisplayOrder</MudTd>
                                 <MudTd>
-                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                                   Size="Size.Small"
-                                                   Color="Color.Primary"
-                                                   OnClick="@(() => OpenEditFieldDialog(type, context))" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                   Size="Size.Small"
-                                                   Color="Color.Error"
-                                                   OnClick="@(async () => await DeleteFieldAsync(type, context))" />
+                                    @if (!context.IsDeleted)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                       Size="Size.Small"
+                                                       Color="Color.Primary"
+                                                       OnClick="@(() => OpenEditFieldDialog(type, context))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Size="Size.Small"
+                                                       Color="Color.Error"
+                                                       OnClick="@(async () => await DeleteFieldAsync(type, context))" />
+                                    }
+                                    else
+                                    {
+                                        @* ★ 已删除字段：提供恢复入口 *@
+                                        <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                                       Size="Size.Small"
+                                                       Color="Color.Success"
+                                                       OnClick="@(async () => await UndeleteFieldAsync(type, context))"
+                                                       title="恢复" />
+                                    }
                                 </MudTd>
                             </RowTemplate>
                         </MudTable>
@@ -212,7 +289,7 @@ else
 </MudDialog>
 
 @* ============================================================ *@
-@* ★ 编辑组合类型（后端仅支持改 DisplayName） *@
+@* 编辑组合类型 *@
 @* ============================================================ *@
 <MudDialog @bind-Visible="_showEditTypeDialog" Options="_dialogOptions">
     <TitleContent>
@@ -285,6 +362,52 @@ else
             }
         </MudSelect>
 
+        @* decimal 类型的基准单位 *@
+        @if (_fieldForm.DataType == "decimal")
+        {
+            <MudSelect T="Guid?"
+                       Value="_fieldForm.UnitId"
+                       ValueChanged="@(v => _fieldForm.UnitId = v)"
+                       Label="基准单位（可选）"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">
+                    （不使用单位）
+                </MudSelectItem>
+                @foreach (var u in _units ?? (IReadOnlyList<UnitDto>)Array.Empty<UnitDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">
+                        @u.Name (@u.Symbol) - @u.Category
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @* single_choice 的选项集 *@
+        @if (_fieldForm.DataType == "single_choice")
+        {
+            <MudSelect T="long?"
+                       Value="_fieldForm.RefOptionSetId"
+                       ValueChanged="@(v => _fieldForm.RefOptionSetId = v)"
+                       Label="选项集"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                <MudSelectItem T="long?" Value="@((long?)null)">
+                    （不绑定，仅用 AllowedValues）
+                </MudSelectItem>
+                @foreach (var os in _optionSets ?? (IReadOnlyList<OptionSetSummaryDto>)Array.Empty<OptionSetSummaryDto>())
+                {
+                    <MudSelectItem T="long?" Value="@os.OptionSetId">
+                        @os.DisplayName (@os.SetName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                绑定选项集后，前端渲染为下拉并显示 Label；否则使用 AllowedValues。
+            </MudText>
+        }
+
+        @* composite 类型的嵌套引用 *@
         @if (_fieldForm.DataType == "composite")
         {
             <MudSelect T="long?"
@@ -350,9 +473,14 @@ else
 
 @code {
     private string? _entityType;
+    private bool _includeDeleted;               // ★ 新增
     private IReadOnlyList<CompositeTypeDetailDto>? _types;
     private bool _loading;
     private bool _initialized;
+
+    // 引用数据（供字段对话框使用）
+    private IReadOnlyList<UnitDto>? _units;
+    private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
 
     private bool _submitting;
     private readonly DialogOptions _dialogOptions = new()
@@ -365,7 +493,7 @@ else
     private bool _showCreateTypeDialog;
     private CreateCompositeTypeRequest _newType = new() { EntityType = "Shared" };
 
-    // ★ 编辑组合类型
+    // 编辑组合类型
     private bool _showEditTypeDialog;
     private CompositeTypeDetailDto? _editingType;
     private UpdateCompositeTypeRequest _editTypeForm = new();
@@ -395,8 +523,26 @@ else
         if (!firstRender || _initialized) return;
         _initialized = true;
 
+        await LoadReferencesAsync();
         await LoadAsync();
         StateHasChanged();
+    }
+
+    /// <summary>并行加载单位与选项集。</summary>
+    private async Task LoadReferencesAsync()
+    {
+        var unitsTask = Api.ListUnitsAsync();
+        var optTask = Api.ListOptionSetsAsync();
+        await Task.WhenAll(unitsTask, optTask);
+
+        _units = unitsTask.Result;
+        _optionSets = optTask.Result;
+
+        var failed = new List<string>();
+        if (_units is null) failed.Add("单位");
+        if (_optionSets is null) failed.Add("选项集");
+        if (failed.Count > 0)
+            Snackbar.Add($"引用加载失败：{string.Join("、", failed)}", Severity.Warning);
     }
 
     private async Task LoadAsync()
@@ -404,7 +550,8 @@ else
         _loading = true;
         try
         {
-            _types = await Api.ListCompositeTypesAsync(_entityType);
+            // ★ 传 includeDeleted
+            _types = await Api.ListCompositeTypesAsync(_entityType, _includeDeleted);
             if (_types is null)
             {
                 Snackbar.Add("加载失败，请检查后端服务", Severity.Error);
@@ -455,7 +602,7 @@ else
         }
     }
 
-    // ---------- ★ 编辑组合类型 ----------
+    // ---------- 编辑组合类型 ----------
 
     private void OpenEditTypeDialog(CompositeTypeDetailDto type)
     {
@@ -476,8 +623,6 @@ else
             Snackbar.Add("显示名不能为空", Severity.Warning);
             return;
         }
-
-        // 未变更则直接关闭
         if (_editTypeForm.DisplayName == _editingType.DisplayName)
         {
             _showEditTypeDialog = false;
@@ -488,8 +633,7 @@ else
         try
         {
             var (ok, error) = await Api.UpdateCompositeTypeAsync(
-                _editingType.CompositeTypeId,
-                _editTypeForm);
+                _editingType.CompositeTypeId, _editTypeForm);
 
             if (!ok)
             {
@@ -513,7 +657,8 @@ else
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除组合类型「{type.DisplayName}」？此操作将同时标记所有字段为删除。",
+            $"确定删除组合类型「{type.DisplayName}」？此操作将同时标记所有字段为删除。\n\n" +
+            "如需恢复，勾选上方「显示已删除」后点击恢复按钮。",
             yesText: "删除", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -530,6 +675,56 @@ else
         }
     }
 
+    // ---------- ★ 恢复组合类型 ----------
+
+    private async Task UndeleteTypeAsync(CompositeTypeDetailDto type)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认恢复",
+            $"确定恢复组合类型「{type.DisplayName}」({type.TypeName})？\n\n" +
+            "恢复后其所有字段将一并恢复。",
+            yesText: "恢复", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.UndeleteCompositeTypeAsync(type.CompositeTypeId);
+        if (ok)
+        {
+            Snackbar.Add("恢复成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    // ---------- ★ 恢复字段 ----------
+
+    private async Task UndeleteFieldAsync(
+        CompositeTypeDetailDto type, CompositeFieldDetailDto field)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认恢复",
+            $"确定恢复字段「{field.DisplayName}」({field.FieldName})？",
+            yesText: "恢复", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.UndeleteCompositeFieldAsync(
+            type.CompositeTypeId, field.FieldId);
+
+        if (ok)
+        {
+            Snackbar.Add("恢复成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
     // ---------- 添加 / 编辑字段 ----------
 
     private void OpenAddFieldDialog(CompositeTypeDetailDto type)
@@ -538,7 +733,8 @@ else
         _editingField = null;
         _fieldForm = new FieldForm
         {
-            DisplayOrder = type.Fields.Count + 1,
+            // ★ 只统计活动字段的显示顺序
+            DisplayOrder = type.Fields.Count(f => !f.IsDeleted) + 1,
             IsSearchable = true
         };
         _showFieldDialog = true;
@@ -555,6 +751,8 @@ else
             DisplayName = field.DisplayName,
             DataType = field.DataType,
             RefCompositeTypeId = field.RefCompositeTypeId,
+            UnitId = field.UnitId,
+            RefOptionSetId = field.RefOptionSetId,
             IsArray = field.IsArray,
             IsRequired = field.IsRequired,
             IsSearchable = field.IsSearchable,
@@ -564,21 +762,39 @@ else
         _showFieldDialog = true;
     }
 
+    /// <summary>
+    /// 切换类型时清空不适用的引用。
+    ///   - decimal 保留 UnitId，清空 RefOptionSetId / RefCompositeTypeId
+    ///   - single_choice 保留 RefOptionSetId，清空 UnitId / RefCompositeTypeId
+    ///   - composite 保留 RefCompositeTypeId，清空 UnitId / RefOptionSetId
+    ///   - 其它类型全部清空
+    /// </summary>
     private void OnFieldDataTypeChanged(string dt)
     {
         _fieldForm.DataType = dt;
+
+        if (dt != "decimal") _fieldForm.UnitId = null;
+        if (dt != "single_choice") _fieldForm.RefOptionSetId = null;
         if (dt != "composite") _fieldForm.RefCompositeTypeId = null;
     }
 
+    /// <summary>
+    /// 嵌套类型候选：排除当前类型自身，且排除已删除类型。
+    /// </summary>
     private IEnumerable<CompositeTypeDetailDto> GetNestedTypeOptions()
     {
         if (_types is null) yield break;
         foreach (var t in _types)
         {
             if (t.CompositeTypeId == _currentType?.CompositeTypeId) continue;
+            if (t.IsDeleted) continue;
             yield return t;
         }
     }
+
+    private string GetTypeName(long compositeTypeId)
+        => _types?.FirstOrDefault(t => t.CompositeTypeId == compositeTypeId)?.TypeName
+           ?? compositeTypeId.ToString();
 
     private async Task SaveFieldAsync()
     {
@@ -611,6 +827,8 @@ else
                         DisplayName = _fieldForm.DisplayName,
                         DataType = _fieldForm.DataType,
                         RefCompositeTypeId = _fieldForm.RefCompositeTypeId,
+                        UnitId = _fieldForm.UnitId,
+                        RefOptionSetId = _fieldForm.RefOptionSetId,
                         IsArray = _fieldForm.IsArray,
                         IsRequired = _fieldForm.IsRequired,
                         IsSearchable = _fieldForm.IsSearchable,
@@ -627,6 +845,12 @@ else
             }
             else
             {
+                // diff 计算 ClearRefOptionSetId / ClearUnitId
+                var (optId, clearOpt) = Diff(
+                    _fieldForm.RefOptionSetId, _editingField.RefOptionSetId);
+                var (unitId, clearUnit) = Diff(
+                    _fieldForm.UnitId, _editingField.UnitId);
+
                 var (ok, error) = await Api.UpdateCompositeFieldAsync(
                     _currentType.CompositeTypeId,
                     _editingField.FieldId,
@@ -636,7 +860,13 @@ else
                         IsRequired = _fieldForm.IsRequired,
                         IsSearchable = _fieldForm.IsSearchable,
                         IsSortable = _fieldForm.IsSortable,
-                        DisplayOrder = _fieldForm.DisplayOrder
+                        DisplayOrder = _fieldForm.DisplayOrder,
+
+                        RefOptionSetId = optId,
+                        ClearRefOptionSetId = clearOpt,
+
+                        UnitId = unitId,
+                        ClearUnitId = clearUnit
                     });
 
                 if (!ok)
@@ -656,6 +886,22 @@ else
         }
     }
 
+    /// <summary>计算 diff：返回 (要设置的值, 是否清除)。</summary>
+    private static (long? Value, bool Clear) Diff(long? current, long? original)
+    {
+        if (current is null && original is not null) return (null, true);
+        if (current is not null && current != original) return (current, false);
+        return (null, false);
+    }
+
+    /// <summary>Guid 版 diff（单位引用用）。</summary>
+    private static (Guid? Value, bool Clear) Diff(Guid? current, Guid? original)
+    {
+        if (current is null && original is not null) return (null, true);
+        if (current is not null && current != original) return (current, false);
+        return (null, false);
+    }
+
     // ---------- 删除字段 ----------
 
     private async Task DeleteFieldAsync(
@@ -663,7 +909,8 @@ else
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除字段「{field.DisplayName}」？",
+            $"确定删除字段「{field.DisplayName}」？\n\n" +
+            "如需恢复，勾选「显示已删除」后点击恢复按钮。",
             yesText: "删除", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -701,6 +948,8 @@ else
         public string DisplayName { get; set; } = "";
         public string DataType { get; set; } = "string";
         public long? RefCompositeTypeId { get; set; }
+        public Guid? UnitId { get; set; }
+        public long? RefOptionSetId { get; set; }
         public bool IsArray { get; set; }
         public bool IsRequired { get; set; }
         public bool IsSearchable { get; set; }
@@ -708,3 +957,4 @@ else
         public int DisplayOrder { get; set; }
     }
 }
+```

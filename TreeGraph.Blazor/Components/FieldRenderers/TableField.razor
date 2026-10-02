@@ -21,7 +21,7 @@
 
     @if (!CanEdit)
     {
-        <MudAlert Severity="Severity.Info" Dense="true">
+        <MudAlert Severity="Severity.Info">
             请先保存实体，然后再添加 @Attr.DisplayName 数据
         </MudAlert>
     }
@@ -31,7 +31,7 @@
     }
     else if (_rows.Count == 0)
     {
-        <MudAlert Severity="Severity.Info" Dense="true">
+        <MudAlert Severity="Severity.Info">
             暂无数据，点击"添加行"开始
         </MudAlert>
     }

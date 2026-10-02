@@ -1,0 +1,12 @@
+{
+  "filters": [
+    {
+      "attributeName": "specs",
+      "fieldPath": "weight",
+      "operator": "gt",
+      "value": 1.5
+    }
+  ],
+  "page": 1,
+  "pageSize": 10
+}

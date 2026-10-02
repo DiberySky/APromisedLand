@@ -34,6 +34,7 @@ public class CompositeTypeCache : ICompositeTypeCache
             var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
             return db.CompositeTypes
                 .Include(t => t.Fields)
+                    .ThenInclude(f => f.RefOptionSet)   // ★ #8
                 .AsNoTracking()
                 .First(t => t.CompositeTypeId == compositeTypeId);
         })!;

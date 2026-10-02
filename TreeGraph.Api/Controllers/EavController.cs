@@ -40,7 +40,10 @@ public class EavController : ControllerBase
         _jsonOptions = jsonOptions.Value.JsonSerializerOptions;
     }
 
-    /// <summary>★ 修复 P0-4：把 DynamicEntity 转成契约 DTO（Properties 为 JsonElement 字典）</summary>
+    /// <summary>
+    /// ★ #3：把 DynamicEntity 映射为 DTO 时带上 UpdatedAt。
+    /// UpdatedAt 由 EavReadService.LoadAsync 查询时一并填充到 DynamicEntity。
+    /// </summary>
     private DynamicEntityDto ToDto(DynamicEntity entity)
     {
         var dict = new Dictionary<string, JsonElement>();
@@ -50,7 +53,8 @@ public class EavController : ControllerBase
                 ? JsonDocument.Parse("null").RootElement.Clone()
                 : JsonSerializer.SerializeToElement(v, v.GetType(), _jsonOptions);
         }
-        return new DynamicEntityDto(entity.EntityId, entity.EntityType, dict);
+        return new DynamicEntityDto(
+            entity.EntityId, entity.EntityType, dict, entity.UpdatedAt);
     }
 
     [HttpGet("schema")]
@@ -72,22 +76,62 @@ public class EavController : ControllerBase
         return Ok(ToDto(entity));
     }
 
+    /// <summary>
+    /// ★ #3：PUT 支持乐观锁。
+    ///
+    /// 客户端从 GET 拿到的 UpdatedAt 通过 header 传回：
+    ///   X-Expected-Updated-At: 2026-10-01T10:30:00.0000000+00:00
+    ///
+    /// 服务端比对 DB 中最新 UpdatedAt，不符则 409 Conflict 并返回最新值。
+    /// header 缺失时跳过冲突检测（向后兼容）。
+    /// </summary>
     [HttpPut("entities/{id:long}")]
     public async Task<IActionResult> Put(
         long id, string entityType,
         [FromBody] Dictionary<string, JsonElement> values,
         CancellationToken ct)
     {
+        // ★ 修复：用 InvariantCulture + RoundtripKind 解析 header，
+        //   避免 CurrentCulture（如 zh-CN / de-DE）对 ISO 8601 的差异化解释。
+        DateTimeOffset? expectedUpdatedAt = null;
+        var headerValue = Request.Headers["X-Expected-Updated-At"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(headerValue)
+            && DateTimeOffset.TryParse(
+                headerValue,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind,
+                out var parsed))
+        {
+            expectedUpdatedAt = parsed;
+        }
+
         try
         {
             var typedValues = ConvertJsonValues(entityType, values);
             await _write.SaveAsync(id, entityType, typedValues,
-                User.Identity?.Name ?? "system", HttpContext.TraceIdentifier, ct);
+                User.Identity?.Name ?? "system",
+                HttpContext.TraceIdentifier,
+                ct,
+                expectedUpdatedAt);
             return NoContent();
+        }
+        catch (EavConcurrencyException ex)
+        {
+            return Conflict(new
+            {
+                error = "并发冲突：实体已被其他用户修改，请刷新后重试",
+                currentUpdatedAt = ex.CurrentUpdatedAt,
+                expectedUpdatedAt = ex.ExpectedUpdatedAt
+            });
         }
         catch (EavValidationException ex)
         {
             return BadRequest(new { errors = ex.Errors });
+        }
+        // ★ P2-3：table 类型属性误传时，ConvertJsonValues 抛 ArgumentException
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
     }
 
@@ -100,7 +144,6 @@ public class EavController : ControllerBase
         try
         {
             var result = await _query.QueryAsync(request, ct);
-            // ★ 修复 P0-4：转成 DTO 返回
             var dto = new PagedResult<DynamicEntityDto>
             {
                 Items = result.Items.Select(ToDto).ToList(),
@@ -141,7 +184,128 @@ public class EavController : ControllerBase
         CancellationToken ct)
     {
         var history = await _read.GetHistoryAsync(id, entityType, from, ct);
-        return Ok(history);
+
+        // ★ 显式映射为公开 DTO，避免泄漏实体内部结构
+        var result = history.Select(a => new EntityHistoryDto(
+            a.AuditId,
+            a.EntityId,
+            a.EntityType,
+            a.AttributeId,
+            a.AttributeName,
+            a.OldValue,
+            a.NewValue,
+            a.ChangeType,
+            a.ChangedBy,
+            a.ChangedAt,
+            a.CorrelationId,
+            a.ClientIp)).ToList();
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// ★ #7：删除实体（物理删除所有属性值 + 自定义表行）。
+    /// 实体不存在时返回 404。
+    /// </summary>
+    [HttpDelete("entities/{id:long}")]
+    public async Task<IActionResult> Delete(
+        long id, string entityType,
+        CancellationToken ct)
+    {
+        var deleted = await _write.DeleteEntityAsync(
+            id, entityType,
+            User.Identity?.Name ?? "system",
+            HttpContext.TraceIdentifier,
+            ct);
+
+        if (!deleted) return NotFound();
+        return NoContent();
+    }
+
+    /// <summary>
+    /// ★ PATCH 部分更新。
+    ///
+    /// 语义（与 PUT 的唯一差异）：
+    ///   - values 中未出现的属性：**保持不变**（PUT 是删除）
+    ///   - values 中值为 null 的属性：删除（与 PUT 一致）
+    ///
+    /// 乐观锁、未知属性检查、验证流程与 PUT 完全一致。
+    /// </summary>
+    [HttpPatch("entities/{id:long}")]
+    public async Task<IActionResult> Patch(
+        long id, string entityType,
+        [FromBody] Dictionary<string, JsonElement> values,
+        CancellationToken ct)
+    {
+        DateTimeOffset? expectedUpdatedAt = null;
+        var headerValue = Request.Headers["X-Expected-Updated-At"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(headerValue)
+            && DateTimeOffset.TryParse(
+                headerValue,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind,
+                out var parsed))
+        {
+            expectedUpdatedAt = parsed;
+        }
+
+        try
+        {
+            var typedValues = ConvertJsonValues(entityType, values);
+            await _write.PatchAsync(id, entityType, typedValues,
+                User.Identity?.Name ?? "system",
+                HttpContext.TraceIdentifier,
+                ct,
+                expectedUpdatedAt);
+            return NoContent();
+        }
+        catch (EavConcurrencyException ex)
+        {
+            return Conflict(new
+            {
+                error = "并发冲突：实体已被其他用户修改，请刷新后重试",
+                currentUpdatedAt = ex.CurrentUpdatedAt,
+                expectedUpdatedAt = ex.ExpectedUpdatedAt
+            });
+        }
+        catch (EavValidationException ex)
+        {
+            return BadRequest(new { errors = ex.Errors });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// ★ 批量删除实体。
+    ///
+    /// 用 POST（而非 DELETE with body）——某些代理会剥离 DELETE body。
+    /// 语义：
+    ///   - 请求体 { entityIds: [...] }
+    ///   - 不存在的 ID 计入 NotFound，不报错
+    ///   - 单事务完成所有删除 + 审计
+    /// </summary>
+    [HttpPost("entities/batch-delete")]
+    public async Task<IActionResult> BatchDelete(
+        string entityType, [FromBody] BatchDeleteRequest req,
+        CancellationToken ct)
+    {
+        if (req.EntityIds.Count == 0)
+        {
+            return Ok(new BatchDeleteResultDto(
+                Array.Empty<long>(), Array.Empty<long>(), 0));
+        }
+
+        var result = await _write.DeleteEntitiesAsync(
+            req.EntityIds, entityType,
+            User.Identity?.Name ?? "system",
+            HttpContext.TraceIdentifier,
+            ct);
+
+        return Ok(new BatchDeleteResultDto(
+            result.Deleted, result.NotFound, result.TotalAttributesDeleted));
     }
 
     // ---------- Schema 映射 ----------
@@ -163,10 +327,7 @@ public class EavController : ControllerBase
                 availableUnits = _unitCache.GetByCategory(baseUnit.Category)
                     .Select(ToUnitDto).ToList();
             }
-            catch (InvalidOperationException)
-            {
-                // 单位已被删除：schema 中返回 null，不阻塞其它属性
-            }
+            catch (InvalidOperationException) { }
         }
 
         OptionSetSchemaDto? optionSet = null;
@@ -193,6 +354,11 @@ public class EavController : ControllerBase
             d.RefTableDefinitionId);
     }
 
+    /// <summary>
+    /// 递归构造组合类型 Schema。
+    ///
+    /// ★ #4：字段的 Unit / AvailableUnits 一并下放（仅 decimal 字段可能非空）。
+    /// </summary>
     private CompositeTypeSchemaDto BuildCompositeSchema(long compositeTypeId)
     {
         var ct = _compositeCache.GetType(compositeTypeId);
@@ -200,16 +366,57 @@ public class EavController : ControllerBase
         var fields = ct.Fields
             .Where(f => !f.IsDeleted)
             .OrderBy(f => f.DisplayOrder)
-            .Select(f => new CompositeFieldSchemaDto(
-                f.FieldName, f.DisplayName, f.DataType,
-                f.IsArray, f.IsRequired, f.IsSearchable, f.DisplayOrder,
-                f.RefCompositeTypeId,
-                f.DataType == EavDataTypes.Composite && f.RefCompositeTypeId is { } rid
-                    ? BuildCompositeSchema(rid)
-                    : null))
+            .Select(BuildFieldSchema)
             .ToList();
 
         return new CompositeTypeSchemaDto(ct.TypeName, fields);
+    }
+
+    private CompositeFieldSchemaDto BuildFieldSchema(CompositeFieldDefinition f)
+    {
+        // ★ #4：解析单位
+        UnitSchemaDto? unit = null;
+        IReadOnlyList<UnitSchemaDto>? availableUnits = null;
+        if (f.UnitId is { } uid)
+        {
+            try
+            {
+                var baseUnit = _unitCache.Get(uid);
+                unit = ToUnitDto(baseUnit);
+                availableUnits = _unitCache.GetByCategory(baseUnit.Category)
+                    .Select(ToUnitDto).ToList();
+            }
+            catch (InvalidOperationException) { }
+        }
+
+        // ★ #8：选项集
+        OptionSetSchemaDto? optionSet = null;
+        if (f.DataType == EavDataTypes.SingleChoice && f.RefOptionSetId is { } osid)
+        {
+            try
+            {
+                var set = _optionSetCache.GetSet(osid);
+                optionSet = new OptionSetSchemaDto(
+                    set.OptionSetId, set.SetName, set.DisplayName,
+                    set.Items.Select(i => new OptionItemSchemaDto(
+                        i.OptionItemId, i.Value, i.Label, i.DisplayOrder, i.IsDefault))
+                        .ToList());
+            }
+            catch (KeyNotFoundException) { }
+        }
+
+        return new CompositeFieldSchemaDto(
+            f.FieldName, f.DisplayName, f.DataType,
+            f.IsArray, f.IsRequired, f.IsSearchable, f.DisplayOrder,
+            f.RefCompositeTypeId,
+            f.DataType == EavDataTypes.Composite && f.RefCompositeTypeId is { } rid
+                ? BuildCompositeSchema(rid)
+                : null,
+            f.ValidationRule?.RootElement.Clone(),
+            f.AllowedValues?.RootElement.Clone(),
+            unit,
+            availableUnits,
+            optionSet);   // ★ #8
     }
 
     private static UnitSchemaDto ToUnitDto(Unit u)
@@ -222,13 +429,41 @@ public class EavController : ControllerBase
     {
         var defs = _attrCache.GetDefinitions(entityType).ToDictionary(d => d.AttributeName);
         var result = new Dictionary<string, object?>();
+        var tableAttrs = new List<string>();
+
+        // ★ 未知属性不静默丢弃——收集后抛 400，防客户端拼写错误丢数据
+        var unknownKeys = values.Keys.Where(k => !defs.ContainsKey(k)).ToList();
+        if (unknownKeys.Count > 0)
+        {
+            throw new EavValidationException(unknownKeys
+                .Select(k => new ValidationError(k, "未知属性"))
+                .ToList());
+        }
 
         foreach (var (name, elem) in values)
         {
-            if (!defs.TryGetValue(name, out var def)) continue;
-            if (def.DataType == EavDataTypes.Table) continue;
+            var def = defs[name];
+
+            // ★ P2-3：table 类型属性不能通过 PUT entities 写入。
+            //   行数据必须走 CustomTableDataController（PUT .../tables/{tableName}）。
+            //   收集后统一抛错，避免静默忽略导致客户端误判"保存成功"。
+            if (def.DataType == EavDataTypes.Table)
+            {
+                tableAttrs.Add(name);
+                continue;
+            }
+
             result[name] = ConvertJsonElement(elem, def);
         }
+
+        if (tableAttrs.Count > 0)
+        {
+            throw new ArgumentException(
+                $"table 类型属性不能通过 PUT entities 写入，请使用 " +
+                $"PUT /api/eav/{{entityType}}/entities/{{entityId}}/tables/{{tableName}}。" +
+                $"涉及属性: {string.Join(", ", tableAttrs)}");
+        }
+
         return result;
     }
 
@@ -284,6 +519,7 @@ public class EavController : ControllerBase
         {
             if (!root.TryGetProperty(field.FieldName, out var fe)) continue;
             if (fe.ValueKind == JsonValueKind.Null) continue;
+
             result[field.FieldName] = fe.ValueKind == JsonValueKind.Array && field.IsArray
                 ? fe.EnumerateArray().Select(x => JsonElementToValue(x, field)).ToList()
                 : JsonElementToValue(fe, field);
@@ -291,6 +527,10 @@ public class EavController : ControllerBase
         return result;
     }
 
+    /// <summary>
+    /// ★ #4：组合内 decimal 字段支持带单位对象 {value, unitId}；
+    /// 其它字段保持原逻辑。
+    /// </summary>
     private object? JsonElementToValue(JsonElement elem, CompositeFieldDefinition field)
     {
         if (elem.ValueKind == JsonValueKind.Null) return null;
@@ -299,6 +539,17 @@ public class EavController : ControllerBase
         {
             using var nested = JsonDocument.Parse(elem.GetRawText());
             return CompositeFromDoc(nested, field.RefCompositeTypeId!.Value);
+        }
+
+        // decimal 且带单位对象：返回 NumericValue 让下游统一处理
+        if (field.DataType == EavDataTypes.Decimal && elem.ValueKind == JsonValueKind.Object)
+        {
+            var v = elem.GetProperty("value").GetDecimal();
+            Guid? unitId = elem.TryGetProperty("unitId", out var u)
+                            && u.ValueKind == JsonValueKind.String
+                ? Guid.Parse(u.GetString()!)
+                : null;
+            return new NumericValue(v, unitId);
         }
 
         return field.DataType switch

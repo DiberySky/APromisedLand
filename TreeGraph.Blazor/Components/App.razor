@@ -1,6 +1,6 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
-
+@* App.razor *@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -12,11 +12,16 @@
     <link rel="stylesheet" href="@Assets["TreeGraph.Blazor.styles.css"]"/>
     <ImportMap/>
     <link rel="icon" type="image/png" href="favicon.png"/>
-    <HeadOutlet/>
+
+    @* ★ HeadOutlet 也需 InteractiveServer，否则 HeadContent 内的动态改动不生效 *@
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
-<Routes/>
+@* ★ 关键修复：Routes 全树 InteractiveServer。
+       这样 MainLayout 里的 MudPopoverProvider / MudDialogProvider / MudSnackbarProvider
+       与页面内的 MudSelect / MudDialog / ISnackbar 处于同一渲染作用域。 *@
+<Routes @rendermode="InteractiveServer" />
 <ReconnectModal/>
 <script src="@Assets["_framework/blazor.web.js"]"></script>
 <script src="_content/MudBlazor/MudBlazor.min.js"></script>

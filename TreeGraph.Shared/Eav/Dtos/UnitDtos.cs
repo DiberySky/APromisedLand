@@ -50,11 +50,10 @@ public class UpdateUnitRequest
 }
 
 /// <summary>
-/// 迁移单位到其它分类（POST api/units/{id}/migrate-category）。
+/// 迁移单位到其它分类（POST api/units/{id}/migrate-category，保守策略）。
 ///
-/// 前置条件（服务端校验）：
-///   - 单位未被任何 AttributeDefinition.UnitId 绑定
-///   - 单位未被任何 AttributeValue.UnitId 引用为输入单位
+/// 单位被任何 AttributeDefinition.UnitId 绑定，或被 AttributeValue.UnitId
+/// 引用为输入单位时，请求被拒绝——请先解除引用。
 ///
 /// 迁移后 ToBaseFactor 语义变化，必须重设。
 /// </summary>
@@ -67,14 +66,14 @@ public class MigrateUnitCategoryRequest
 /// <summary>
 /// 修改换算系数并重算数据（POST api/units/{id}/recalculate-factor）。
 ///
-/// 影响范围（事务内处理）：
+/// 数据库端批量 UPDATE（同一事务 3 条 SQL）：
 ///   - 该单位作为 <b>输入单位</b> 引用（v.UnitId == id）的历史数据：
 ///     存储值 × newF / oldF（保持物理量不变）
 ///   - 该单位作为 <b>基准单位</b> 绑定（属性.UnitId == id）的历史数据：
 ///     存储值 × oldF / newF
 ///   - 同时命中两种角色的行：存储值不变
 ///
-/// 危险操作，建议先备份数据库。
+/// 预计影响行数超过 20 万时拒绝（阈值保护）。危险操作，建议先备份数据库。
 /// </summary>
 public class RecalculateUnitFactorRequest
 {

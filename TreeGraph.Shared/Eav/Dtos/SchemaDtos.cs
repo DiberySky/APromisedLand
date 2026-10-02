@@ -2,7 +2,14 @@ using System.Text.Json;
 
 namespace TreeGraph.Shared.Eav.Dtos;
 
-/// <summary>组合类型字段 Schema（动态表单用）</summary>
+/// <summary>
+/// 组合类型字段 Schema。
+///
+/// ★ #8：新增 OptionSet。
+///   - 仅 DataType = "single_choice" 且绑定了选项集时非空
+///   - 前端优先使用 OptionSet.Items（含 Value + Label）
+///   - 未绑定时回退到 AllowedValues（仅 Value 列表）
+/// </summary>
 public sealed record CompositeFieldSchemaDto(
     string FieldName,
     string DisplayName,
@@ -12,7 +19,12 @@ public sealed record CompositeFieldSchemaDto(
     bool IsSearchable,
     int DisplayOrder,
     long? RefCompositeTypeId = null,
-    CompositeTypeSchemaDto? NestedType = null);
+    CompositeTypeSchemaDto? NestedType = null,
+    JsonElement? ValidationRule = null,
+    JsonElement? AllowedValues = null,
+    UnitSchemaDto? Unit = null,
+    IReadOnlyList<UnitSchemaDto>? AvailableUnits = null,
+    OptionSetSchemaDto? OptionSet = null);
 
 /// <summary>组合类型 Schema</summary>
 public sealed record CompositeTypeSchemaDto(
@@ -27,7 +39,7 @@ public sealed record UnitSchemaDto(
     string Symbol,
     bool IsBaseUnit);
 
-/// <summary>选项项 Schema（动态表单下拉框用）</summary>
+/// <summary>选项项 Schema</summary>
 public sealed record OptionItemSchemaDto(
     long OptionItemId,
     string Value,
@@ -42,7 +54,7 @@ public sealed record OptionSetSchemaDto(
     string DisplayName,
     IReadOnlyList<OptionItemSchemaDto> Items);
 
-/// <summary>动态属性 Schema（GET schema 接口返回项）</summary>
+/// <summary>动态属性 Schema</summary>
 public sealed record AttributeSchemaDto(
     string AttributeName,
     string DisplayName,

@@ -1,0 +1,308 @@
+@using System.Text.Json
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+
+@* DynamicFieldRenderer.razor *@
+@* 属性字段渲染器。错误以结构化 FieldValidationError 传入，只取 Path=="" 的作为属性级错误。 *@
+
+@{
+    var selfErrors = FilterSelfErrors();
+}
+
+@if (Attribute.DataType == "string")
+{
+    <MudTextField T="string"
+                  Label="@DisplayLabel"
+                  Value="@(Value as string)"
+                  ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                  Variant="Variant.Outlined"
+                  Required="@Attribute.IsRequired"
+                  Error="@HasSelfErrors"
+                  ErrorText="@SelfErrorText"
+                  Immediate="true"
+                  FullWidth="true" />
+}
+else if (Attribute.DataType == "int")
+{
+    <MudNumericField T="long?"
+                     Label="@DisplayLabel"
+                     Value="@LongValue"
+                     ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                     Variant="Variant.Outlined"
+                     Required="@Attribute.IsRequired"
+                     Error="@HasSelfErrors"
+                     ErrorText="@SelfErrorText"
+                     FullWidth="true" />
+}
+else if (Attribute.DataType == "decimal")
+{
+    @if (Attribute.Unit is not null)
+    {
+        var numeric = Value as NumericInput ?? new NumericInput();
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudNumericField T="decimal?"
+                                 Label="@DisplayLabel"
+                                 Value="@numeric.Value"
+                                 ValueChanged="@(v =>
+                                 {
+                                     var n = Value as NumericInput ?? new NumericInput();
+                                     n.Value = v ?? 0;
+                                     ValueChanged.InvokeAsync(n);
+                                 })"
+                                 Variant="Variant.Outlined"
+                                 Required="@Attribute.IsRequired"
+                                 Error="@HasSelfErrors"
+                                 ErrorText="@SelfErrorText"
+                                 FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?"
+                           Label="单位"
+                           Value="@numeric.UnitId"
+                           ValueChanged="@(u =>
+                           {
+                               var n = Value as NumericInput ?? new NumericInput();
+                               n.UnitId = u;
+                               ValueChanged.InvokeAsync(n);
+                           })"
+                           Variant="Variant.Outlined"
+                           FullWidth="true">
+                    @foreach (var u in Attribute.AvailableUnits ?? Array.Empty<UnitSchemaDto>())
+                    {
+                        <MudSelectItem T="Guid?" Value="@u.Id">
+                            @u.Name (@u.Symbol)
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        <MudNumericField T="decimal?"
+                         Label="@DisplayLabel"
+                         Value="@DecimalValue"
+                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                         Variant="Variant.Outlined"
+                         Required="@Attribute.IsRequired"
+                         Error="@HasSelfErrors"
+                         ErrorText="@SelfErrorText"
+                         FullWidth="true" />
+    }
+}
+else if (Attribute.DataType == "bool")
+{
+    <MudSwitch T="bool"
+               Label="@DisplayLabel"
+               Value="@(Value is bool b && b)"
+               ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+               Color="Color.Primary" />
+}
+else if (Attribute.DataType == "datetime")
+{
+    <MudTextField T="string"
+                  Label="@(DisplayLabel + " (ISO 8601)")"
+                  Placeholder="2026-10-01T10:00:00+08:00"
+                  Value="@(Value is DateTimeOffset dto ? dto.ToString("O") : Value as string)"
+                  ValueChanged="@OnDatetimeTextChanged"
+                  Variant="Variant.Outlined"
+                  Required="@Attribute.IsRequired"
+                  Error="@HasSelfErrors"
+                  ErrorText="@SelfErrorText"
+                  Immediate="true"
+                  FullWidth="true" />
+}
+else if (Attribute.DataType == "date")
+{
+    <MudDatePicker Label="@DisplayLabel"
+                   Date="@DateValue"
+                   DateChanged="@OnDateChanged"
+                   Variant="Variant.Outlined"
+                   Required="@Attribute.IsRequired"
+                   Error="@HasSelfErrors"
+                   ErrorText="@SelfErrorText" />
+}
+else if (Attribute.DataType == "time")
+{
+    <MudTimePicker Label="@DisplayLabel"
+                   Time="@TimeValue"
+                   TimeChanged="@OnTimeChanged"
+                   Variant="Variant.Outlined"
+                   Required="@Attribute.IsRequired"
+                   Error="@HasSelfErrors"
+                   ErrorText="@SelfErrorText" />
+}
+else if (Attribute.DataType == "single_choice")
+{
+    <MudSelect T="string"
+               Label="@DisplayLabel"
+               Value="@(Value as string)"
+               ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+               Variant="Variant.Outlined"
+               Required="@Attribute.IsRequired"
+               Error="@HasSelfErrors"
+               ErrorText="@SelfErrorText"
+               FullWidth="true">
+        @if (!Attribute.IsRequired)
+        {
+            <MudSelectItem T="string" Value="@((string?)null)">（未选择）</MudSelectItem>
+        }
+        @foreach (var item in Attribute.OptionSet?.Items ?? Array.Empty<OptionItemSchemaDto>())
+        {
+            <MudSelectItem T="string" Value="@item.Value">
+                @item.Label
+            </MudSelectItem>
+        }
+    </MudSelect>
+}
+else if (Attribute.DataType is "json" or "file")
+{
+    <MudTextField T="string"
+                  Label="@(DisplayLabel + " (JSON)")"
+                  Value="@JsonText"
+                  ValueChanged="@OnJsonTextChanged"
+                  Variant="Variant.Outlined"
+                  Lines="4"
+                  Required="@Attribute.IsRequired"
+                  Error="@(_jsonParseError is not null || HasSelfErrors)"
+                  ErrorText="@(_jsonParseError ?? SelfErrorText)"
+                  Immediate="true"
+                  FullWidth="true" />
+}
+else if (Attribute.DataType == "composite")
+{
+    @if (Attribute.CompositeType is not null)
+    {
+        <MudText Typo="Typo.subtitle2" Class="mb-2">@DisplayLabel</MudText>
+
+        @if (HasSelfErrors)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-2">
+                <ul style="margin: 0; padding-left: 20px;">
+                    @foreach (var e in selfErrors)
+                    {
+                        <li>@e.Message</li>
+                    }
+                </ul>
+            </MudAlert>
+        }
+
+        <MudPaper Class="@CompositePaperClass" Outlined="true">
+            <CompositeFieldEditor TypeSchema="@Attribute.CompositeType"
+                                  BasePath=""
+                                  Value="@(Value as Dictionary<string, object?>)"
+                                  ValueChanged="@ValueChanged"
+                                  Errors="@NestedErrors" />
+        </MudPaper>
+    }
+}
+else if (Attribute.DataType == "table")
+{
+    <MudAlert Severity="Severity.Info">
+        @DisplayLabel 是自定义表——请使用下方的子表编辑区域
+    </MudAlert>
+}
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attribute { get; set; } = null!;
+    [Parameter] public object? Value { get; set; }
+    [Parameter] public EventCallback<object?> ValueChanged { get; set; }
+
+    /// <summary>该属性的全部错误（可能包含子路径）。</summary>
+    [Parameter] public IReadOnlyList<FieldValidationError>? Errors { get; set; }
+
+    private string? _jsonParseError;
+
+    private IReadOnlyList<FieldValidationError> FilterSelfErrors()
+        => Errors?.Where(e => string.IsNullOrEmpty(e.Path)).ToList()
+           ?? new List<FieldValidationError>();
+
+    private IReadOnlyList<FieldValidationError> NestedErrors
+        => Errors?.Where(e => !string.IsNullOrEmpty(e.Path)).ToList()
+           ?? new List<FieldValidationError>();
+
+    private bool HasSelfErrors => FilterSelfErrors().Count > 0;
+    private string? SelfErrorText => HasSelfErrors
+        ? string.Join("；", FilterSelfErrors().Select(e => e.Message))
+        : null;
+
+    private string DisplayLabel =>
+        Attribute.IsRequired ? $"{Attribute.DisplayName} *" : Attribute.DisplayName;
+
+    private string CompositePaperClass =>
+        NestedErrors.Count > 0 ? "pa-3 mud-border-error" : "pa-3";
+
+    private long? LongValue => Value switch
+    {
+        long l => l,
+        int i => i,
+        _ => null
+    };
+
+    private decimal? DecimalValue => Value switch
+    {
+        decimal d => d,
+        double db => (decimal)db,
+        int i => i,
+        long l => l,
+        _ => null
+    };
+
+    private DateTime? DateValue => Value is string s
+        && DateOnly.TryParse(s, out var d)
+            ? d.ToDateTime(TimeOnly.MinValue)
+            : null;
+
+    private TimeSpan? TimeValue => Value is string s
+        && TimeOnly.TryParse(s, out var t)
+            ? t.ToTimeSpan()
+            : null;
+
+    private string JsonText
+    {
+        get
+        {
+            if (Value is null) return "";
+            if (Value is JsonElement elem) return elem.GetRawText();
+            return JsonSerializer.Serialize(Value, JsonOpts);
+        }
+    }
+
+    private void OnDatetimeTextChanged(string? v)
+    {
+        if (string.IsNullOrWhiteSpace(v))
+            ValueChanged.InvokeAsync(null);
+        else if (DateTimeOffset.TryParse(v, out var parsed))
+            ValueChanged.InvokeAsync(parsed);
+    }
+
+    private void OnDateChanged(DateTime? v)
+        => ValueChanged.InvokeAsync(v.HasValue ? v.Value.ToString("yyyy-MM-dd") : null);
+
+    private void OnTimeChanged(TimeSpan? v)
+        => ValueChanged.InvokeAsync(v.HasValue
+            ? new TimeOnly(v.Value.Hours, v.Value.Minutes, v.Value.Seconds).ToString("HH:mm:ss")
+            : null);
+
+    private void OnJsonTextChanged(string? text)
+    {
+        _jsonParseError = null;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            ValueChanged.InvokeAsync(null);
+            return;
+        }
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            ValueChanged.InvokeAsync(doc.RootElement.Clone());
+        }
+        catch (JsonException ex)
+        {
+            _jsonParseError = $"JSON 格式错误：{ex.Message}";
+        }
+    }
+
+    private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = false };
+}
