@@ -31,9 +31,15 @@ builder.Services
     })
     .AddStandardResilienceHandler(options =>
     {
-        // ★ 关键：禁止重试。管理台操作由用户主动发起，失败时点击重试即可，
-        // 比自动重试导致数据损坏更安全。
-        options.Retry.MaxRetryAttempts = 0;
+        // ★ 禁止重试的正确写法：
+        //   MaxRetryAttempts 校验约束为 1–int.MaxValue（不接受 0），
+        //   因此置 1 通过校验，再用 ShouldHandle 恒 false 让重试永不触发。
+        //   管理台 PUT/POST 不幂等（如 recalculate-factor 重放会导致数据损坏）。
+        options.Retry.MaxRetryAttempts = 1;
+        options.Retry.ShouldHandle = _ => ValueTask.FromResult(false);
+
+        // ★ 熔断器采样窗口必须 ≥ 2 × AttemptTimeout（30s → 至少 60s）
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
 
         // 超时设置
         options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
@@ -57,3 +63,6 @@ app.MapRazorComponents<App>()
 app.MapDefaultEndpoints();
 
 app.Run();
+
+// ★ 供 WebApplicationFactory<Program> 引用（启动级 smoke 测试需要）
+public partial class Program { }

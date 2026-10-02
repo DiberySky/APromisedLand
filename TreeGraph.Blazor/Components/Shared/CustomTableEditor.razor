@@ -64,7 +64,8 @@
                     </div>
 
                     <MudGrid Spacing="2">
-                        @foreach (var col in _tableDef.Columns.OrderBy(c => c.DisplayOrder))
+                        @* 数据编辑器只渲染活动列；已删除列由管理页（CustomTables.razor）负责恢复 *@
+                        @foreach (var col in _tableDef.Columns.Where(c => !c.IsDeleted).OrderBy(c => c.DisplayOrder))
                         {
                             var colCaptured = col;
                             <MudItem xs="12" md="@(col.DataType == "composite" || col.DataType == "json" ? 12 : 6)">
@@ -164,6 +165,14 @@
 
             if (tableValue.Rows is not null)
             {
+                // 只保留活动列数据：已删除列既不渲染/校验，也不能回传
+                // （后端 CustomTableCache 加载表定义时会 RemoveAll(IsDeleted)，
+                //   回传已删除列的键会按未知列被拒绝）。
+                var activeColumnNames = _tableDef.Columns
+                    .Where(c => !c.IsDeleted)
+                    .Select(c => c.ColumnName)
+                    .ToHashSet();
+
                 foreach (var r in tableValue.Rows)
                 {
                     var rowState = new RowState
@@ -171,6 +180,8 @@
                         RowId = r.RowId,
                         RowOrder = r.RowOrder,
                         Fields = r.Fields
+                            .Where(kv => activeColumnNames.Contains(kv.Key))
+                            .ToDictionary(kv => kv.Key, kv => kv.Value)
                     };
                     _rows.Add(rowState);
                 }
@@ -504,12 +515,32 @@
         StateHasChanged();
     }
 
+    /// <summary>
+    /// 把 JsonElement 解包为 CLR 类型，便于后续校验统一处理。
+    /// 用户编辑后写入的是 CLR 类型，加载数据时是 JsonElement；
+    /// 校验路径必须先归一化，否则空串/数字检查会静默失效。
+    /// </summary>
+    private static object? UnwrapValue(object? value)
+    {
+        if (value is not JsonElement je) return value;
+        return je.ValueKind switch
+        {
+            JsonValueKind.Null => null,
+            JsonValueKind.String => je.GetString(),
+            JsonValueKind.Number => je.TryGetInt64(out var l) ? l : je.GetDecimal(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => value   // Object / Array 保持 JsonElement
+        };
+    }
+
     /// <summary>校验单行的单列。</summary>
     private void ValidateRowColumn(RowState row, CustomTableColumnDto col)
     {
         row.FieldErrors.Remove(col.ColumnName);
 
-        row.Fields.TryGetValue(col.ColumnName, out var value);
+        row.Fields.TryGetValue(col.ColumnName, out var rawValue);
+        var value = UnwrapValue(rawValue);   // ★ 归一化
 
         var errors = new List<string>();
 
@@ -548,10 +579,11 @@
         switch (col.DataType)
         {
             case "string":
-                yield return Range(FieldValidationRules.ValidateString(
+                foreach (var msg in FieldValidationRules.ValidateString(
                     value?.ToString() ?? "",
                     col.ValidationRule,
-                    allowedValues: null));   // AllowedValues 已由 ValidateString 覆盖
+                    allowedValues: null))
+                    yield return msg;
                 break;
 
             case "int":
@@ -559,9 +591,14 @@
                 if (TryGetDecimal(value, out var d))
                 {
                     if (col.DataType == "int" && d != Math.Truncate(d))
+                    {
                         yield return "int 类型不接受小数";
+                    }
                     else
-                        yield return Range(FieldValidationRules.ValidateNumeric(d, col.ValidationRule));
+                    {
+                        foreach (var msg in FieldValidationRules.ValidateNumeric(d, col.ValidationRule))
+                            yield return msg;
+                    }
                 }
                 else
                 {
@@ -571,29 +608,32 @@
 
             case "date":
                 if (value is string ds && DateOnly.TryParse(ds, out var dt))
-                    yield return Range(FieldValidationRules.ValidateDate(dt, col.ValidationRule));
+                {
+                    foreach (var msg in FieldValidationRules.ValidateDate(dt, col.ValidationRule))
+                        yield return msg;
+                }
                 else
+                {
                     yield return "日期格式错误（应为 yyyy-MM-dd）";
+                }
                 break;
 
             case "time":
                 if (value is string ts && TimeOnly.TryParse(ts, out var t))
-                    yield return Range(FieldValidationRules.ValidateTime(t, col.ValidationRule));
+                {
+                    foreach (var msg in FieldValidationRules.ValidateTime(t, col.ValidationRule))
+                        yield return msg;
+                }
                 else
+                {
                     yield return "时间格式错误（应为 HH:mm:ss）";
+                }
                 break;
 
             // bool / datetime / composite / json / file：控件层已保证格式，无额外规则
             default:
                 yield break;
         }
-    }
-
-    /// <summary>把多条错误折叠为一条 yield 项（避免 yield return 多条，用分隔符）。</summary>
-    private static string Range(IEnumerable<string> messages)
-    {
-        var list = messages.ToList();
-        return list.Count == 0 ? "" : string.Join("；", list);
     }
 
     /// <summary>整表校验。用于保存前和加载后。</summary>
@@ -603,9 +643,9 @@
 
         foreach (var row in _rows)
         {
-            // 清空（保留 JSON 错误，因为它们在 OnJsonChanged 里赋值）
+            // 保留 JSON 解析错误（在 OnJsonChanged 里赋值，不与规则校验重叠）
             var preservedJsonErrors = row.FieldErrors
-                .Where(kv => kv.Key.Any() && kv.Value.Any(v => v.StartsWith("JSON")))
+                .Where(kv => kv.Value.Any(v => v.StartsWith("JSON")))
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
 
             row.FieldErrors.Clear();
@@ -635,13 +675,16 @@
             }
         }
 
-        // 分组
+        // 分组（对 UnwrapValue 后的值做比较，JsonElement 与 CLR 能对齐）
         var groups = _rows
-            .Select((r, i) => new { Row = r, Index = i })
-            .Where(x => x.Row.Fields.TryGetValue(col.ColumnName, out var v)
-                     && v is not null
-                     && !(v is string s && string.IsNullOrWhiteSpace(s)))
-            .GroupBy(x => x.Row.Fields[col.ColumnName]!.ToString() ?? "")
+            .Select(r => new
+            {
+                Row = r,
+                Key = UnwrapValue(r.Fields.TryGetValue(col.ColumnName, out var v) ? v : null)
+            })
+            .Where(x => x.Key is not null
+                     && !(x.Key is string s && string.IsNullOrWhiteSpace(s)))
+            .GroupBy(x => x.Key!.ToString() ?? "")
             .Where(g => g.Count() > 1);
 
         foreach (var g in groups)
