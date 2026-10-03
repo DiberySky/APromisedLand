@@ -5,7 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
-  workflow_dispatch:   # 手动触发
+  workflow_dispatch:
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -16,6 +16,8 @@ env:
 jobs:
   # ============================================================
   # Job 1：编译 + 单元测试 + 集成测试
+  #
+  # ★ 只 build 具体项目，不 build sln（避免拉入 MAUI workload）
   # ============================================================
   build-and-test:
     name: Build & Test (Unit + Integration)
@@ -39,13 +41,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Restore
-        run: dotnet restore
+      - name: Restore (targeted)
+        run: |
+          dotnet restore TreeGraph.Api/TreeGraph.Api.csproj
+          dotnet restore TreeGraph.Blazor/TreeGraph.Blazor.csproj
+          dotnet restore TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj
+          dotnet restore TreeGraph.Blazor.Tests/TreeGraph.Blazor.Tests.csproj
 
-      - name: Build (Release)
-        run: dotnet build --no-restore -c Release
+      - name: Build (targeted)
+        run: |
+          dotnet build TreeGraph.Api/TreeGraph.Api.csproj              --no-restore -c Release
+          dotnet build TreeGraph.Blazor/TreeGraph.Blazor.csproj        --no-restore -c Release
+          dotnet build TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj  --no-restore -c Release
+          dotnet build TreeGraph.Blazor.Tests/TreeGraph.Blazor.Tests.csproj --no-restore -c Release
 
-      # Testcontainers 需要 Docker → ubuntu-latest 自带
       - name: Unit Tests (Blazor)
         run: |
           dotnet test TreeGraph.Blazor.Tests/TreeGraph.Blazor.Tests.csproj \
@@ -69,7 +78,7 @@ jobs:
           retention-days: 7
 
       - name: Test Report
-        if: always()
+        if: always() && hashFiles('./TestResults/**/*.trx') != ''
         uses: dorny/test-reporter@v1
         with:
           name: Unit + Integration
@@ -79,14 +88,15 @@ jobs:
 
   # ============================================================
   # Job 2：E2E 测试（Playwright + Aspire）
+  #
+  # ★ 已核实：AppHost 依赖闭包不含 MAUI 项目，targeted build 可行。
   # ============================================================
   e2e:
     name: E2E (Playwright + Aspire)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: build-and-test      # 依赖 Job 1 通过
-    # ⚠️ 首周：告警不 block。稳定后（通过率 ≥ 95%，连续 3 天全绿）改为 false。
-    continue-on-error: true
+    needs: build-and-test
+    continue-on-error: true    # ⚠️ 首周告警不 block
 
     steps:
       - name: Checkout
@@ -105,11 +115,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Restore
-        run: dotnet restore
+      # ★ 若 AppHost 报 MAUI workload 缺失，取消下面注释
+      # - name: Install MAUI workload (fallback)
+      #   run: dotnet workload install maui-android
 
-      - name: Build (Release)
-        run: dotnet build --no-restore -c Release
+      - name: Restore E2E + AppHost (targeted)
+        run: |
+          dotnet restore TreeGraph.Blazor.E2E.Tests/TreeGraph.Blazor.E2E.Tests.csproj
+          dotnet restore APromisedLand.AppHost/APromisedLand.AppHost.csproj
+
+      - name: Build E2E + AppHost (targeted)
+        run: |
+          dotnet build TreeGraph.Blazor.E2E.Tests/TreeGraph.Blazor.E2E.Tests.csproj --no-restore -c Release
+          dotnet build APromisedLand.AppHost/APromisedLand.AppHost.csproj            --no-restore -c Release
 
       # ---------- Playwright 浏览器缓存 ----------
       - name: Cache Playwright Browsers
@@ -126,7 +144,6 @@ jobs:
         run: |
           pwsh TreeGraph.Blazor.E2E.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
 
-      # 缓存命中时仍需装系统依赖（字体、库）
       - name: Install Playwright System Deps (cache hit)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: |
@@ -143,7 +160,7 @@ jobs:
           docker version
           docker info
 
-      # ---------- 启动 Aspire（后台） ----------
+      # ---------- 启动 Aspire ----------
       - name: Start Aspire AppHost (background)
         run: |
           dotnet run --project APromisedLand.AppHost \
@@ -196,7 +213,7 @@ jobs:
             --logger "trx;LogFileName=e2e.trx" \
             --results-directory ./TestResults
 
-      # ---------- 收集 artifacts ----------
+      # ---------- Artifacts ----------
       - name: Upload E2E Test Results
         if: always()
         uses: actions/upload-artifact@v4
@@ -230,7 +247,5 @@ jobs:
           if [ -n "${ASPIRE_PID:-}" ]; then
             kill $ASPIRE_PID 2>/dev/null || true
           fi
-          # 兜底：杀残留进程
           pkill -f "APromisedLand.AppHost" || true
-          # 清理容器
           docker ps -aq | xargs -r docker rm -f || true
