@@ -776,6 +776,70 @@ namespace TreeGraph.Api.Data.Migrations
                     b.ToTable("entity_type_catalog", (string)null);
                 });
 
+            modelBuilder.Entity("TreeGraph.Api.Entities.InodeEntity", b =>
+                {
+                    b.Property<string>("InodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("inode_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("AttachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attached_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.HasKey("InodeId", "EntityType");
+
+                    b.HasIndex("EntityId")
+                        .HasDatabaseName("ix_inode_entity_entity");
+
+                    b.HasIndex("InodeId")
+                        .HasDatabaseName("ix_inode_entity_inode");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_inode_entity_global");
+
+                    b.ToTable("inode_entity", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.Entities.InodeEntityType", b =>
+                {
+                    b.Property<string>("InodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("inode_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("AttachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attached_at");
+
+                    b.HasKey("InodeId", "EntityType");
+
+                    b.HasIndex("EntityType")
+                        .HasDatabaseName("ix_inode_et_type");
+
+                    b.HasIndex("InodeId")
+                        .HasDatabaseName("ix_inode_et_inode");
+
+                    b.ToTable("inode_entitytype", (string)null);
+                });
+
             modelBuilder.Entity("TreeGraph.Api.Entities.OptionItem", b =>
                 {
                     b.Property<string>("OptionItemId")

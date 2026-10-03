@@ -19,5 +19,5 @@
       <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
       <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
     </ItemGroup>
-
+    
 </Project>

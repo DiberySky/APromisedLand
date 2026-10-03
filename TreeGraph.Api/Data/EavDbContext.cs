@@ -18,11 +18,17 @@ public class EavDbContext : DbContext
     public DbSet<CustomTableColumn> CustomTableColumns => Set<CustomTableColumn>();
     public DbSet<CustomTableRow> CustomTableRows => Set<CustomTableRow>();
 
+    // iNode 关联（外挂表，不改动现有 EAV 表）
+    public DbSet<InodeEntityType> InodeEntityTypes => Set<InodeEntityType>();
+    public DbSet<InodeEntity> InodeEntities => Set<InodeEntity>();
+
     public EavDbContext(DbContextOptions<EavDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
         ConfigureEntityTypes(mb);
+        ConfigureInodeEntityTypes(mb);
+        ConfigureInodeEntities(mb);
         ConfigureUnits(mb);
         ConfigureOptionSets(mb);
         ConfigureAttributeCatalog(mb);
@@ -62,6 +68,59 @@ public class EavDbContext : DbContext
                 .IsUnique()
                 .HasDatabaseName("uq_entity_type")
                 .HasFilter("is_deleted = false");
+        });
+    }
+
+    // ============================================================
+    // iNode → EntityType 声明（N:N）
+    // ============================================================
+    private static void ConfigureInodeEntityTypes(ModelBuilder mb)
+    {
+        mb.Entity<InodeEntityType>(e =>
+        {
+            e.ToTable("inode_entitytype");
+
+            // 复合主键：每 (inode, entityType) 只 1 条
+            e.HasKey(x => new { x.InodeId, x.EntityType });
+
+            e.Property(x => x.InodeId).HasColumnName("inode_id")
+                .HasMaxLength(36).IsRequired();
+            e.Property(x => x.EntityType).HasColumnName("entity_type")
+                .HasMaxLength(100).IsRequired();
+            e.Property(x => x.AttachedAt).HasColumnName("attached_at");
+
+            e.HasIndex(x => x.InodeId).HasDatabaseName("ix_inode_et_inode");
+            e.HasIndex(x => x.EntityType).HasDatabaseName("ix_inode_et_type");
+        });
+    }
+
+    // ============================================================
+    // iNode ↔ 实体归属
+    // ============================================================
+    private static void ConfigureInodeEntities(ModelBuilder mb)
+    {
+        mb.Entity<InodeEntity>(e =>
+        {
+            e.ToTable("inode_entity");
+
+            // R2：每 iNode 每类型只 1 个实体
+            e.HasKey(x => new { x.InodeId, x.EntityType });
+
+            e.Property(x => x.InodeId).HasColumnName("inode_id")
+                .HasMaxLength(36).IsRequired();
+            e.Property(x => x.EntityType).HasColumnName("entity_type")
+                .HasMaxLength(100).IsRequired();
+            e.Property(x => x.EntityId).HasColumnName("entity_id")
+                .HasMaxLength(36).IsRequired();
+            e.Property(x => x.AttachedAt).HasColumnName("attached_at");
+
+            // R3：每个实体只属于 1 个 iNode
+            e.HasIndex(x => new { x.EntityType, x.EntityId })
+                .IsUnique()
+                .HasDatabaseName("uq_inode_entity_global");
+
+            e.HasIndex(x => x.InodeId).HasDatabaseName("ix_inode_entity_inode");
+            e.HasIndex(x => x.EntityId).HasDatabaseName("ix_inode_entity_entity");
         });
     }
 

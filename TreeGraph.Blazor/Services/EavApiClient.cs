@@ -783,6 +783,249 @@ public class EavApiClient
     }
 
     // ============================================================
+    // ★ iNode 声明层
+    // ============================================================
+
+    public async Task<IReadOnlyList<InodeTypeCardDto>?> ListInodeTypeCardsAsync(
+        string inodeId, CancellationToken ct = default)
+        => await GetAsync<IReadOnlyList<InodeTypeCardDto>>(
+            $"api/inode/{Uri.EscapeDataString(inodeId)}/types", ct);
+
+    public Task<(bool Ok, string? Error)> AttachInodeTypeAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/inode/{Uri.EscapeDataString(inodeId)}/types/" +
+            $"{Uri.EscapeDataString(entityType)}", ct);
+
+    public Task<(bool Ok, string? Error)> DetachInodeTypeAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+        => DeleteWithErrorAsync(
+            $"api/inode/{Uri.EscapeDataString(inodeId)}/types/" +
+            $"{Uri.EscapeDataString(entityType)}", ct);
+
+    // ============================================================
+    // ★ iNode 实体 CRUD
+    // ============================================================
+
+    public async Task<IReadOnlyList<DynamicEntityDto>?> ListInodeEntitiesAsync(
+        string inodeId, bool originalUnits = false, CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities";
+        if (originalUnits) url += "?unit=original";
+        return await GetAsync<IReadOnlyList<DynamicEntityDto>>(url, ct);
+    }
+
+    public async Task<DynamicEntityDto?> GetInodeEntityAsync(
+        string inodeId, string entityType,
+        bool originalUnits = false, CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+                  $"{Uri.EscapeDataString(entityType)}";
+        if (originalUnits) url += "?unit=original";
+        return await GetAsync<DynamicEntityDto>(url, ct);
+    }
+
+    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        SaveInodeEntityAsync(
+        string inodeId, string entityType,
+        Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt = null,
+        CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+                  $"{Uri.EscapeDataString(entityType)}";
+        return await PutWithConflictAsync(url, values, expectedUpdatedAt, ct);
+    }
+
+    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        PatchInodeEntityAsync(
+        string inodeId, string entityType,
+        Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt = null,
+        CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+                  $"{Uri.EscapeDataString(entityType)}";
+        return await PatchWithConflictAsync(url, values, expectedUpdatedAt, ct);
+    }
+
+    public Task<(bool Ok, string? Error)> DeleteInodeEntityAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+        => DeleteWithErrorAsync(
+            $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+            $"{Uri.EscapeDataString(entityType)}", ct);
+
+    public async Task<IReadOnlyList<EntityHistoryDto>?> GetInodeEntityHistoryAsync(
+        string inodeId, string entityType,
+        DateTimeOffset? from = null, CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+                  $"{Uri.EscapeDataString(entityType)}/history";
+        if (from.HasValue)
+            url += $"?from={Uri.EscapeDataString(from.Value.ToString("O"))}";
+        return await GetAsync<IReadOnlyList<EntityHistoryDto>>(url, ct);
+    }
+
+    // ============================================================
+    // ★ 跨 iNode 查询
+    // ============================================================
+
+    public async Task<PagedResult<InodeEntityDto>?> QueryInodesAsync(
+        InodeQueryRequest request, CancellationToken ct = default)
+        => await PostAsync<PagedResult<InodeEntityDto>>(
+            "api/inode/query", request, ct);
+
+    // ============================================================
+    // ★ iNode 全景 JSON
+    // ============================================================
+
+    /// <summary>
+    /// 拉取该 iNode 下所有实体的全景 JSON（字符串形式）。
+    ///
+    /// 用途：外部应用 / 缓存 / 转发第三方。
+    ///
+    /// 参数：
+    ///   displayName  - true 时属性 key 用中文 DisplayName
+    ///   includeNull  - true 时保留值为 null 的属性键
+    ///   units        - "default" | "base" | "original"
+    /// </summary>
+    public async Task<string?> GetInodeAllAsJsonAsync(
+        string inodeId,
+        bool displayName = false,
+        bool includeNull = false,
+        string? units = null,
+        CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/json";
+
+        var query = new List<string>();
+        if (displayName) query.Add("displayName=true");
+        if (includeNull) query.Add("includeNull=true");
+        if (!string.IsNullOrWhiteSpace(units))
+            query.Add($"units={Uri.EscapeDataString(units)}");
+
+        if (query.Count > 0)
+            url += "?" + string.Join("&", query);
+
+        try
+        {
+            var resp = await _http.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("GET {Url} → {Status}",
+                    url, resp.StatusCode);
+                return null;
+            }
+
+            // ★ 直接返回字符串，不反序列化
+            return await resp.Content.ReadAsStringAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GET {Url} 失败", url);
+            return null;
+        }
+    }
+
+    // ============================================================
+    // ★ 内部辅助：带乐观锁的 PUT / PATCH
+    // ============================================================
+
+    private async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        PutWithConflictAsync(
+        string url, Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Put, url)
+            {
+                Content = JsonContent.Create(values, options: JsonOptions)
+            };
+
+            if (expectedUpdatedAt is { } exp)
+                req.Headers.Add("X-Expected-Updated-At",
+                    exp.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+            var resp = await _http.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return (true, null, null);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("PUT {Url} → 409：{Body}", url, text);
+
+                DateTimeOffset? current = null;
+                try
+                {
+                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(
+                        text, JsonOptions);
+                    current = conflict?.CurrentUpdatedAt;
+                }
+                catch { }
+
+                return (false, "并发冲突：实体已被其他用户修改，请刷新后重试", current);
+            }
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            _logger.LogWarning("PUT {Url} → {Status}: {Error}",
+                url, resp.StatusCode, msg);
+            return (false, msg, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PUT {Url} 失败", url);
+            return (false, ex.Message, null);
+        }
+    }
+
+    private async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        PatchWithConflictAsync(
+        string url, Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Patch, url)
+            {
+                Content = JsonContent.Create(values, options: JsonOptions)
+            };
+
+            if (expectedUpdatedAt is { } exp)
+                req.Headers.Add("X-Expected-Updated-At",
+                    exp.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+            var resp = await _http.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return (true, null, null);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("PATCH {Url} → 409：{Body}", url, text);
+
+                DateTimeOffset? current = null;
+                try
+                {
+                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(
+                        text, JsonOptions);
+                    current = conflict?.CurrentUpdatedAt;
+                }
+                catch { }
+
+                return (false, "并发冲突：实体已被其他用户修改，请刷新后重试", current);
+            }
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            return (false, msg, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PATCH {Url} 失败", url);
+            return (false, ex.Message, null);
+        }
+    }
+
+    // ============================================================
     // 私有 record
     // ============================================================
 

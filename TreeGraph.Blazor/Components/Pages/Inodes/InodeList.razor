@@ -1,0 +1,113 @@
+@page "/inodes"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using TreeGraph.Shared.Eav.Dtos
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@* InodeList.razor *@
+<PageTitle>iNode 列表</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudIcon Icon="@Icons.Material.Filled.Hub"
+             Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h5">iNode 列表</MudText>
+</div>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    <b>说明</b>：iNode 由外部应用维护。本页仅提供开发调试入口。
+    输入 iNode GUID 即可访问其所有实体。
+</MudAlert>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+        快速访问
+    </MudText>
+    <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
+        <MudTextField T="string"
+                      @bind-Value="_quickInodeId"
+                      Label="iNode ID (GUID)"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      Style="min-width: 480px; max-width: 640px;"
+                      Immediate="true" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.ArrowForward"
+                   OnClick="GoToQuickInode"
+                   Disabled="@(!IsValidGuid(_quickInodeId))">
+            访问
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.Casino"
+                   OnClick="GenerateRandom">
+            随机 GUID
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_recentInodes.Count > 0)
+{
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">最近访问</MudText>
+        <MudList T="string">
+            @foreach (var inode in _recentInodes)
+            {
+                var captured = inode;
+                <MudListItem T="string" OnClick="@(() => GoToInode(captured))">
+                    <div class="d-flex align-center" style="width: 100%;">
+                        <MudIcon Icon="@Icons.Material.Filled.Hub"
+                                 Size="Size.Small" Class="mr-2" />
+                        <code>@inode</code>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                       Size="Size.Small"
+                                       OnClick="@(e => CopyId(inode))"
+                                       title="复制" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => RemoveRecent(inode))"
+                                       title="移除记录" />
+                    </div>
+                </MudListItem>
+            }
+        </MudList>
+    </MudPaper>
+}
+
+@code {
+    private string? _quickInodeId;
+    private readonly List<string> _recentInodes = new();
+
+    private void GoToQuickInode()
+    {
+        if (!Guid.TryParse(_quickInodeId, out var guid)) return;
+        var canonical = guid.ToString("D");
+
+        _recentInodes.Remove(canonical);
+        _recentInodes.Insert(0, canonical);
+        if (_recentInodes.Count > 20)
+            _recentInodes.RemoveRange(20, _recentInodes.Count - 20);
+
+        Nav.NavigateTo($"/inodes/{canonical}");
+    }
+
+    private void GoToInode(string inodeId)
+        => Nav.NavigateTo($"/inodes/{Uri.EscapeDataString(inodeId)}");
+
+    private void CopyId(string id)
+        => Snackbar.Add($"iNode ID: {id}", Severity.Info);
+
+    private void RemoveRecent(string id)
+    {
+        _recentInodes.Remove(id);
+        StateHasChanged();
+    }
+
+    private void GenerateRandom()
+    {
+        _quickInodeId = Guid.NewGuid().ToString("D");
+    }
+
+    private static bool IsValidGuid(string? s)
+        => !string.IsNullOrWhiteSpace(s) && Guid.TryParse(s, out _);
+}

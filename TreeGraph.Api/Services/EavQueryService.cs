@@ -784,4 +784,92 @@ public class EavQueryService
         bool b => b,
         _ => Convert.ToBoolean(value, CultureInfo.InvariantCulture)
     };
+
+    /// <summary>
+    /// 带 entity_id 预过滤的查询（iNode 场景用）。
+    ///
+    /// ★ 新增，不影响原有 QueryAsync。
+    ///
+    /// 逻辑：
+    ///   1. 走原有 FilterEntityIdsAsync 得到属性过滤后的候选 entity 集合
+    ///   2. 与 allowedEntityIds 求交集
+    ///   3. 内存分页 + 批量加载
+    /// </summary>
+    public async Task<PagedResult<DynamicEntity>> QueryWithAllowedIdsAsync(
+        string entityType,
+        IReadOnlyCollection<string>? allowedEntityIds,
+        EavQueryRequest request,
+        CancellationToken ct = default)
+    {
+        // 无限制 → 走原路径
+        if (allowedEntityIds is null)
+            return await QueryAsync(request, ct);
+
+        if (allowedEntityIds.Count == 0)
+        {
+            return new PagedResult<DynamicEntity>
+            {
+                Items = new List<DynamicEntity>(),
+                Total = 0,
+                Page = request.Page,
+                PageSize = request.PageSize
+            };
+        }
+
+        // 1. 属性过滤得到的 entityIds
+        var filtered = await FilterEntityIdsAsync(
+            new EavQueryRequest
+            {
+                EntityType = entityType,
+                Filters = request.Filters,
+                OrderByAttribute = request.OrderByAttribute,
+                OrderDescending = request.OrderDescending,
+                // 取全量后再交集分页，所以这里用大 pageSize
+                Page = 1,
+                PageSize = int.MaxValue
+            }, ct);
+
+        // 2. 交集
+        var allowed = allowedEntityIds.ToHashSet();
+        var intersected = filtered.Items
+            .Where(id => allowed.Contains(id))
+            .ToList();
+
+        // 3. 分页
+        var total = intersected.Count;
+        var skip = (request.Page - 1) * request.PageSize;
+        var pageIds = intersected.Skip(skip).Take(request.PageSize).ToList();
+
+        if (pageIds.Count == 0)
+        {
+            return new PagedResult<DynamicEntity>
+            {
+                Items = new List<DynamicEntity>(),
+                Total = total,
+                Page = request.Page,
+                PageSize = request.PageSize
+            };
+        }
+
+        // 4. 批量加载实体
+        var entities = await _readService.LoadBatchAsync(
+            pageIds, entityType, originalUnits: false, ct);
+
+        // 5. 保持 pageIds 的顺序
+        var inputOrder = pageIds
+            .Select((id, idx) => (id, idx))
+            .ToDictionary(x => x.id, x => x.idx);
+
+        var ordered = entities
+            .OrderBy(e => inputOrder.GetValueOrDefault(e.EntityId, int.MaxValue))
+            .ToList();
+
+        return new PagedResult<DynamicEntity>
+        {
+            Items = ordered,
+            Total = total,
+            Page = request.Page,
+            PageSize = request.PageSize
+        };
+    }
 }

@@ -1,0 +1,306 @@
+@page "/inodes/{InodeId}"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+@* InodeDetail.razor *@
+<PageTitle>iNode @InodeId</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudButton Variant="Variant.Text" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="BackToList">
+        返回
+    </MudButton>
+    <MudIcon Icon="@Icons.Material.Filled.Hub"
+             Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h5">iNode 详情</MudText>
+</div>
+
+<MudPaper Class="pa-3 mb-4">
+    <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">iNode ID</MudText>
+        <code>@InodeId</code>
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                       Size="Size.Small" OnClick="CopyId" title="复制" />
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAttachDialog">
+            声明新类型
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="ReloadAsync" Disabled="@_loading">
+            刷新
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_cards is null || _cards.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.Inbox"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">该 iNode 尚未声明任何类型</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            点击下方按钮，为该 iNode 声明它会使用的实体类型
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAttachDialog">
+            声明新类型
+        </MudButton>
+    </MudPaper>
+}
+else
+{
+    <MudText Typo="Typo.subtitle1" Class="mb-2">
+        类型卡片（@_cards.Count）
+    </MudText>
+
+    <MudGrid>
+        @foreach (var card in _cards)
+        {
+            var captured = card;
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="1" Style="height: 100%;">
+                    <MudCardContent>
+                        <div class="d-flex align-center mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Category"
+                                     Color="@(captured.HasEntity ? Color.Success : Color.Default)"
+                                     Size="Size.Medium" />
+                            <MudText Typo="Typo.h6" Class="ml-2">
+                                @captured.DisplayName
+                            </MudText>
+                            @if (captured.HasEntity)
+                            {
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="Color.Success" Class="ml-2">
+                                    已填写
+                                </MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="Color.Warning" Class="ml-2">
+                                    未填写
+                                </MudChip>
+                            }
+                        </div>
+
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            <code>@captured.EntityType</code>
+                        </MudText>
+
+                        @if (!string.IsNullOrEmpty(captured.Description))
+                        {
+                            <MudText Typo="Typo.caption" Class="mt-1">
+                                @captured.Description
+                            </MudText>
+                        }
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@(captured.HasEntity
+                                       ? Icons.Material.Filled.Edit
+                                       : Icons.Material.Filled.Add)"
+                                   OnClick="@(() => GoToEdit(captured.EntityType))">
+                            @(captured.HasEntity ? "编辑" : "填写")
+                        </MudButton>
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Text"
+                                   Color="Color.Default"
+                                   StartIcon="@Icons.Material.Filled.History"
+                                   OnClick="@(() => GoToHistory(captured.EntityType))"
+                                   Disabled="@(!captured.HasEntity)">
+                            历史
+                        </MudButton>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(async () => await DetachAsync(captured))"
+                                       title="取消声明" />
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+<MudDialog @bind-Visible="_showAttachDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">声明新类型</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_allTypes is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            var declared = _cards?.Select(c => c.EntityType).ToHashSet()
+                           ?? new HashSet<string>();
+            var available = _allTypes
+                .Where(t => !declared.Contains(t.EntityType))
+                .ToList();
+
+            if (available.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">
+                    所有可用的实体类型都已声明
+                </MudAlert>
+            }
+            else
+            {
+                <MudSelect T="string"
+                           @bind-Value="_newType"
+                           Label="实体类型"
+                           Variant="Variant.Outlined">
+                    @foreach (var t in available)
+                    {
+                        <MudSelectItem T="string" Value="@t.EntityType">
+                            @(string.IsNullOrWhiteSpace(t.DisplayName)
+                                ? t.EntityType
+                                : $"{t.DisplayName} ({t.EntityType})")
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showAttachDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="AttachAsync"
+                   Disabled="@(string.IsNullOrEmpty(_newType))">
+            声明
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public string InodeId { get; set; } = "";
+
+    private IReadOnlyList<InodeTypeCardDto>? _cards;
+    private IReadOnlyList<EntityTypeSummaryDto>? _allTypes;
+    private bool _loading;
+    private bool _initialized;
+
+    private bool _showAttachDialog;
+    private string? _newType;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _cards = await Api.ListInodeTypeCardsAsync(InodeId);
+            _allTypes = await Api.ListEntityTypesAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private void BackToList() => Nav.NavigateTo("/inodes");
+
+    private void CopyId() => Snackbar.Add($"iNode ID: {InodeId}", Severity.Info);
+
+    private void GoToEdit(string entityType)
+        => Nav.NavigateTo(
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
+            $"{Uri.EscapeDataString(entityType)}");
+
+    private void GoToHistory(string entityType)
+        => Nav.NavigateTo(
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
+            $"{Uri.EscapeDataString(entityType)}/history");
+
+    private void OpenAttachDialog()
+    {
+        _newType = null;
+        _showAttachDialog = true;
+    }
+
+    private async Task AttachAsync()
+    {
+        if (string.IsNullOrEmpty(_newType)) return;
+
+        var (ok, error) = await Api.AttachInodeTypeAsync(InodeId, _newType);
+        if (!ok)
+        {
+            Snackbar.Add($"声明失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("声明成功", Severity.Success);
+        _showAttachDialog = false;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task DetachAsync(InodeTypeCardDto card)
+    {
+        if (card.HasEntity)
+        {
+            Snackbar.Add("该类型下已有实体，请先删除实体", Severity.Warning);
+            return;
+        }
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认取消声明",
+            $"确定取消类型「{card.DisplayName}」的声明？",
+            yesText: "取消声明", cancelText: "关闭");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DetachInodeTypeAsync(
+            InodeId, card.EntityType);
+        if (!ok)
+        {
+            Snackbar.Add($"取消失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("已取消声明", Severity.Success);
+        await LoadAsync();
+        StateHasChanged();
+    }
+}

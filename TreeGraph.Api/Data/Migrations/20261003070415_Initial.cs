@@ -90,6 +90,33 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "inode_entity",
+                columns: table => new
+                {
+                    inode_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    attached_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_inode_entity", x => new { x.inode_id, x.entity_type });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "inode_entitytype",
+                columns: table => new
+                {
+                    inode_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    attached_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_inode_entitytype", x => new { x.inode_id, x.entity_type });
+                });
+
+            migrationBuilder.CreateTable(
                 name: "option_sets",
                 columns: table => new
                 {
@@ -562,6 +589,32 @@ namespace TreeGraph.Api.Data.Migrations
                 filter: "is_deleted = false");
 
             migrationBuilder.CreateIndex(
+                name: "ix_inode_entity_entity",
+                table: "inode_entity",
+                column: "entity_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_inode_entity_inode",
+                table: "inode_entity",
+                column: "inode_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_inode_entity_global",
+                table: "inode_entity",
+                columns: new[] { "entity_type", "entity_id" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_inode_et_inode",
+                table: "inode_entitytype",
+                column: "inode_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_inode_et_type",
+                table: "inode_entitytype",
+                column: "entity_type");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_option_items_set",
                 table: "option_items",
                 column: "option_set_id");
@@ -613,6 +666,12 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "entity_type_catalog");
+
+            migrationBuilder.DropTable(
+                name: "inode_entity");
+
+            migrationBuilder.DropTable(
+                name: "inode_entitytype");
 
             migrationBuilder.DropTable(
                 name: "option_items");

@@ -1,0 +1,443 @@
+@page "/inodes/{InodeId}/types/{EntityType}"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using System.Text.Json
+@using TreeGraph.Blazor.Components.Shared
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IEavFieldValidator Validator
+@inject NavigationManager Nav
+@* InodeEntityEdit.razor *@
+<PageTitle>编辑 @EntityType</PageTitle>
+
+<div class="d-flex align-center mb-3" style="gap: 8px; flex-wrap: wrap;">
+    <MudButton Variant="Variant.Text" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="BackToInode">
+        返回 iNode
+    </MudButton>
+    <MudText Typo="Typo.h5">@_displayTitle</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">
+        iNode: <code>@InodeId</code>
+    </MudText>
+</div>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_schema is null || _schema.Count == 0)
+{
+    <MudAlert Severity="Severity.Warning">
+        该类型尚未定义任何属性，请先在元数据管理中配置。
+    </MudAlert>
+}
+else
+{
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        <b>提示</b>：保存只更新您填写的属性，未填写的属性<b>保持不变</b>。
+        首次保存会自动创建实体。
+    </MudAlert>
+
+    @if (TotalErrorCount > 0)
+    {
+        <MudAlert Severity="Severity.Error" Dense="false" Class="mb-4">
+            <MudText Typo="Typo.body1">
+                有 <b>@TotalErrorCount</b> 项校验错误，请修正后再保存：
+            </MudText>
+            <ul style="margin: 6px 0 0 0; padding-left: 20px;">
+                @foreach (var (attrName, errs) in _errors.Where(kv => kv.Value.Count > 0))
+                {
+                    var attr = _regularAttributes.FirstOrDefault(
+                        a => a.AttributeName == attrName);
+                    var label = attr?.DisplayName ?? attrName;
+                    foreach (var e in errs)
+                    {
+                        var path = string.IsNullOrEmpty(e.Path) ? "" : $" [{e.Path}]";
+                        <li>@label@(path)：@e.Message</li>
+                    }
+                }
+            </ul>
+        </MudAlert>
+    }
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" Class="mb-3">属性值</MudText>
+
+        @foreach (var attr in _regularAttributes)
+        {
+            <div class="mb-4">
+                <DynamicFieldRenderer Attribute="attr"
+                                      Value="GetValue(attr.AttributeName)"
+                                      ValueChanged="@(v => SetValue(attr.AttributeName, v))"
+                                      Errors="GetFieldErrors(attr.AttributeName)" />
+            </div>
+        }
+    </MudPaper>
+
+    @if (_tableAttributes.Count > 0)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">子表数据</MudText>
+            @foreach (var attr in _tableAttributes)
+            {
+                <CustomTableEditor EntityType="@EntityType"
+                                   EntityId="@(_entityId ?? "")"
+                                   AttributeName="@attr.AttributeName"
+                                   TableName="@attr.AttributeName"
+                                   DisplayName="@attr.DisplayName"
+                                   RefTableDefinitionId="@attr.RefTableDefinitionId" />
+            }
+        </MudPaper>
+    }
+
+    <div class="d-flex align-center" style="gap: 8px;">
+        <MudButton Variant="Variant.Filled"
+                   Color="@(TotalErrorCount > 0 ? Color.Default : Color.Primary)"
+                   OnClick="SaveAsync" Disabled="@_saving"
+                   StartIcon="@Icons.Material.Filled.Save">
+            @(_saving ? "保存中..." : "保存")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   OnClick="ReloadAsync"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            重新加载
+        </MudButton>
+        <MudSpacer />
+        @if (_entityId is not null)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                       OnClick="DeleteAsync"
+                       StartIcon="@Icons.Material.Filled.DeleteForever"
+                       Disabled="@_saving">
+                删除实体
+            </MudButton>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string InodeId { get; set; } = "";
+    [Parameter] public string EntityType { get; set; } = "";
+
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private readonly Dictionary<string, object?> _values = new();
+    private readonly Dictionary<string, IReadOnlyList<FieldValidationError>> _errors = new();
+    private List<AttributeSchemaDto> _regularAttributes = new();
+    private List<AttributeSchemaDto> _tableAttributes = new();
+
+    private string _displayTitle = "";
+    private string? _entityId;
+    private DateTimeOffset? _loadedUpdatedAt;
+
+    private bool _loading;
+    private bool _saving;
+    private bool _initialized;
+
+    private int TotalErrorCount => _errors.Values.Sum(v => v.Count);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized) await LoadAsync();
+    }
+
+    private void BackToInode()
+        => Nav.NavigateTo($"/inodes/{Uri.EscapeDataString(InodeId)}");
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _displayTitle = EntityType;
+
+            var schema = await Api.GetSchemaAsync(EntityType);
+            _schema = schema ?? Array.Empty<AttributeSchemaDto>();
+
+            _regularAttributes = _schema.Where(a => a.DataType != "table").ToList();
+            _tableAttributes = _schema.Where(a => a.DataType == "table").ToList();
+
+            _values.Clear();
+            var entity = await Api.GetInodeEntityAsync(InodeId, EntityType);
+            if (entity is not null)
+            {
+                _entityId = entity.EntityId;
+                _loadedUpdatedAt = entity.UpdatedAt;
+
+                foreach (var attr in _regularAttributes)
+                {
+                    if (entity.Properties.TryGetValue(attr.AttributeName, out var elem))
+                        _values[attr.AttributeName] = JsonElementToValue(elem, attr);
+                }
+            }
+            else
+            {
+                _entityId = null;
+                _loadedUpdatedAt = null;
+            }
+
+            RevalidateAll();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private object? GetValue(string name)
+        => _values.TryGetValue(name, out var v) ? v : null;
+
+    private IReadOnlyList<FieldValidationError>? GetFieldErrors(string name)
+        => _errors.TryGetValue(name, out var e) && e.Count > 0 ? e : null;
+
+    private void SetValue(string name, object? value)
+    {
+        _values[name] = value;
+        RevalidateField(name);
+    }
+
+    private void RevalidateAll()
+    {
+        _errors.Clear();
+        foreach (var attr in _regularAttributes)
+        {
+            var errs = Validator.Validate(attr, GetValue(attr.AttributeName));
+            if (errs.Count > 0) _errors[attr.AttributeName] = errs;
+        }
+    }
+
+    private void RevalidateField(string name)
+    {
+        var attr = _regularAttributes.FirstOrDefault(a => a.AttributeName == name);
+        if (attr is null) return;
+
+        var errs = Validator.Validate(attr, GetValue(name));
+        if (errs.Count > 0) _errors[name] = errs;
+        else _errors.Remove(name);
+    }
+
+    private async Task SaveAsync()
+    {
+        RevalidateAll();
+        if (TotalErrorCount > 0)
+        {
+            Snackbar.Add($"有 {TotalErrorCount} 项校验错误未解决", Severity.Warning);
+            StateHasChanged();
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var submitValues = BuildSubmitValues();
+            if (submitValues.Count == 0)
+            {
+                Snackbar.Add("没有可保存的变更", Severity.Info);
+                return;
+            }
+
+            var (ok, error, current) = await Api.PatchInodeEntityAsync(
+                InodeId, EntityType, submitValues,
+                expectedUpdatedAt: _loadedUpdatedAt);
+
+            if (!ok)
+            {
+                if (current is not null)
+                {
+                    var local = current.Value.ToLocalTime()
+                        .ToString("yyyy-MM-dd HH:mm:ss");
+                    Snackbar.Add(
+                        $"保存失败：{error ?? "并发冲突"}\n服务端最新：{local}",
+                        Severity.Error);
+                }
+                else
+                {
+                    Snackbar.Add($"保存失败：{error ?? "未知错误"}", Severity.Error);
+                }
+                return;
+            }
+
+            Snackbar.Add("保存成功", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除实体 {InodeId}/{EntityType} 的所有属性值？",
+            yesText: "永久删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        _saving = true;
+        try
+        {
+            var (ok, error) = await Api.DeleteInodeEntityAsync(InodeId, EntityType);
+            if (!ok)
+            {
+                Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+            Snackbar.Add("已删除", Severity.Success);
+            BackToInode();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // ---------- 提交值转换 ----------
+
+    private Dictionary<string, object?> BuildSubmitValues()
+    {
+        var result = new Dictionary<string, object?>();
+        foreach (var (k, v) in _values)
+            result[k] = ConvertForSubmit(v);
+        return result;
+    }
+
+    private static object? ConvertForSubmit(object? v) => v switch
+    {
+        null => null,
+        NumericInput ni => ni.ToSubmitValue(),
+        Dictionary<string, object?> dict => dict.ToDictionary(
+            x => x.Key, x => ConvertForSubmit(x.Value)),
+        List<object?> list => list.Select(ConvertForSubmit).ToList(),
+        _ => v
+    };
+
+    // ---------- JSON → 内部模型 ----------
+
+    private object? JsonElementToValue(JsonElement elem, AttributeSchemaDto schema)
+    {
+        if (elem.ValueKind == JsonValueKind.Null) return null;
+
+        return schema.DataType switch
+        {
+            "string" => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString() : elem.ToString(),
+            "int" => schema.Unit is not null
+                ? JsonToNumeric(elem)
+                : (elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
+                  : elem.ValueKind == JsonValueKind.String
+                    && long.TryParse(elem.GetString(), out var l) ? l
+                  : (object?)null),
+            "decimal" => JsonToNumeric(elem),
+            "bool" => elem.ValueKind == JsonValueKind.True
+                      || elem.ValueKind == JsonValueKind.False
+                      ? elem.GetBoolean() : null,
+            "datetime" => elem.GetDateTimeOffset(),
+            "date" => elem.GetString(),
+            "time" => elem.GetString(),
+            "single_choice" => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString()
+                : elem.ValueKind == JsonValueKind.Object
+                  && elem.TryGetProperty("value", out var sc)
+                  && sc.ValueKind == JsonValueKind.String ? sc.GetString()
+                : elem.ToString(),
+            "json" or "file" => elem.Clone(),
+            "composite" => schema.CompositeType is not null
+                ? JsonToComposite(elem, schema.CompositeType)
+                : null,
+            _ => elem.Clone()
+        };
+    }
+
+    private NumericInput JsonToNumeric(JsonElement elem)
+    {
+        if (elem.ValueKind == JsonValueKind.Object)
+        {
+            var val = elem.GetProperty("value").GetDecimal();
+            Guid? unitId = elem.TryGetProperty("unitId", out var u)
+                            && u.ValueKind == JsonValueKind.String
+                ? Guid.Parse(u.GetString()!)
+                : null;
+            return new NumericInput { Value = val, UnitId = unitId };
+        }
+        if (elem.ValueKind == JsonValueKind.Number)
+            return new NumericInput { Value = elem.GetDecimal(), UnitId = null };
+        if (elem.ValueKind == JsonValueKind.String
+            && decimal.TryParse(elem.GetString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var d))
+        {
+            return new NumericInput { Value = d, UnitId = null };
+        }
+        return new NumericInput();
+    }
+
+    private Dictionary<string, object?> JsonToComposite(
+        JsonElement elem, CompositeTypeSchemaDto typeSchema)
+    {
+        var dict = new Dictionary<string, object?>();
+        foreach (var field in typeSchema.Fields)
+        {
+            if (!elem.TryGetProperty(field.FieldName, out var fv)) continue;
+            if (fv.ValueKind == JsonValueKind.Null) continue;
+
+            if (field.IsArray)
+            {
+                var list = new List<object?>();
+                foreach (var item in fv.EnumerateArray())
+                {
+                    list.Add(field.DataType == "composite" && field.NestedType is not null
+                        ? JsonToComposite(item, field.NestedType)
+                        : JsonToFieldValue(item, field));
+                }
+                dict[field.FieldName] = list;
+            }
+            else
+            {
+                dict[field.FieldName] = JsonToFieldValue(fv, field);
+            }
+        }
+        return dict;
+    }
+
+    private object? JsonToFieldValue(JsonElement elem, CompositeFieldSchemaDto field)
+    {
+        if (elem.ValueKind == JsonValueKind.Null) return null;
+        if (field.DataType == "composite" && field.NestedType is not null)
+            return JsonToComposite(elem, field.NestedType);
+
+        return field.DataType switch
+        {
+            "string" => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString() : elem.ToString(),
+            "int" => elem.ValueKind == JsonValueKind.Number
+                ? elem.GetInt64() : (object?)null,
+            "decimal" => elem.ValueKind == JsonValueKind.Number
+                ? elem.GetDecimal() : (object?)null,
+            "bool" => elem.ValueKind is JsonValueKind.True or JsonValueKind.False
+                ? elem.GetBoolean() : (object?)null,
+            "datetime" => elem.GetDateTimeOffset(),
+            "date" or "time" or "single_choice" => elem.GetString(),
+            "json" or "file" => elem.Clone(),
+            _ => elem.Clone()
+        };
+    }
+}

@@ -31,6 +31,8 @@ builder.Services.AddScoped<EavReadService>();
 builder.Services.AddScoped<EavQueryService>();
 builder.Services.AddScoped<EavValidationService>();
 builder.Services.AddScoped<CompositeValueService>();
+builder.Services.AddScoped<IInodeEntityService, InodeEntityService>();
+builder.Services.AddScoped<InodeEavFacade>();
 builder.Services.AddSingleton<IAttributeCache, AttributeCache>();
 builder.Services.AddSingleton<ICompositeTypeCache, CompositeTypeCache>();
 builder.Services.AddSingleton<IUnitCache, UnitCache>();
