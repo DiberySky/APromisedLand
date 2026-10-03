@@ -1,0 +1,150 @@
+@namespace TreeGraph.TreeSky.Components.Nodes
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@implements IDisposable
+
+<DialogSky Title="节点操作">
+    <ToolBarContent>
+        @if (IsBoot)
+        {
+            <MudText Color="Color.Info">根结点</MudText>
+        }
+        else
+        {
+            <MudText Color="Color.Info">@NodeTemplate.Node.Value!.Parent?.Text()</MudText>
+        }
+        <MudSpacer/>
+        @if (!IsBoot)
+        {
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Outlined.MoveUp"
+                       Color="Color.Warning"
+                       OnClick="@OnMove">
+                移动
+            </MudButton>
+        }
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
+            <MudStack Spacing="2">
+
+                <MudTextField T="string"
+                              Value="NodeTemplate.Node.Value!.Text()"
+                              Label="名称"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true"/>
+
+                <MudTextField T="string"
+                              Value="NodeTemplate.Node.Value!.Description"
+                              Label="描述"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true"
+                              Lines="3"/>
+
+                <BoolFieldSky Label="是否允许添加子节点" ReadOnly="true"
+                              @bind-Value="NodeTemplate.Node.Value!.CanHaveChildren" />
+
+            </MudStack>
+        </MudContainer>
+    </DialogContent>
+    <DialogLeftActions>
+        @if (!NodeTemplate.Node.HasChildren)
+        {
+            <MudButton OnClick="OnDelete"
+                       Variant="Variant.Text"
+                       Color="Color.Error"
+                       StartIcon="@Icons.Material.Outlined.Delete">
+                删除
+            </MudButton>
+        }
+    </DialogLeftActions>
+    <DialogRightActions>
+        @if (NodeTemplate.Node.Value!.CanHaveChildren
+             || NodeTemplate.Node.Children?.Count > 1)
+        {
+            <MudButton OnClick="OnSort"
+                       Variant="Variant.Text"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Outlined.ImportExport">
+                子项排序
+            </MudButton>
+        }
+
+        @if (!IsBoot)
+        {
+            <MudButton OnClick="OnEdit"
+                       Variant="Variant.Text"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Outlined.Edit">
+                设置修改
+            </MudButton>
+
+        }
+
+        @if (NodeTemplate.Node.Value!.CanHaveChildren)
+        {
+            <MudButton OnClick="OnAddChild"
+                       Variant="Variant.Text"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Outlined.Add">
+                创建子项
+            </MudButton>
+        }
+    </DialogRightActions>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
+    [Parameter] public TItem? ParentNode { get; set; }
+    [Parameter] public bool IsBoot { get; set; }
+
+    private void OnAttribute()
+    {
+        CloseWithAction(NodeAction.Attribute);
+    }
+
+    private void OnAddChild()
+    {
+        CloseWithAction(NodeAction.AddChild);
+    }
+
+    private void OnEdit()
+    {
+        CloseWithAction(NodeAction.Edit);
+    }
+
+    private void OnDelete()
+    {
+        CloseWithAction(NodeAction.Delete);
+    }
+
+    private void OnMove()
+    {
+        CloseWithAction(NodeAction.Move);
+    }
+
+    private void OnSort()
+    {
+        CloseWithAction(NodeAction.Sort);
+    }
+
+    private void CloseWithAction(NodeAction action)
+    {
+        MudDialog?.Close(DialogResult.Ok(new NodeActionResult<TItem>
+        {
+            Action = action,
+            Node = NodeTemplate.Node.Value!
+        }));
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    public void Dispose()
+    {
+    }
+}

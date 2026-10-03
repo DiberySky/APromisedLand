@@ -3,6 +3,10 @@ using MudBlazor.Services;
 using Polly;
 using TreeGraph.Blazor.Components;
 using TreeGraph.Blazor.Services;
+using TreeGraph.Blazor.Services.DemoTree;
+using TreeGraph.TreeSky;
+using TreeGraph.TreeSky.Models;
+using TreeGraph.TreeSky.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +18,21 @@ builder.Services.AddRazorComponents()
 
 // MudBlazor
 builder.Services.AddMudServices();
+
+// ★ TreeSky 树组件库（BlazorService/MessageService/TreeNodeDialogService/导航/泛型树 API 客户端 + MudExtensions）
+builder.Services.AddTreeSky();
+
+// ★ TreeSky 演示：StringTreeNode（string 名称节点）+ 进程内内存存储，无需真实后端。
+//   读取走 DemoTreeClientService；组件的写操作经 DiberyTreeApiClient<StringTreeNode>
+//   发出的 HTTP 被 DemoTreeApiHandler 拦截并转发到同一个 InMemoryTreeStore。
+builder.Services.AddSingleton<InMemoryTreeStore>();
+builder.Services.AddScoped<ITreeClientService<StringTreeNode>, DemoTreeClientService>();
+builder.Services.AddTransient<DemoTreeApiHandler>();
+builder.Services.AddHttpClient("TreeSky", client =>
+    {
+        client.BaseAddress = new Uri("http://treedemo.local/");
+    })
+    .AddHttpMessageHandler<DemoTreeApiHandler>();
 
 // ★ 前端字段校验器（单例，无状态）
 builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
@@ -67,3 +86,4 @@ app.Run();
 
 // ★ 供 WebApplicationFactory<Program> 引用（启动级 smoke 测试需要）
 public partial class Program { }
+

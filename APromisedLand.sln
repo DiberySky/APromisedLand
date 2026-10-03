@@ -113,6 +113,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Api.Tests", "Tree
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Blazor.E2E.Tests", "TreeGraph.Blazor.E2E.Tests\TreeGraph.Blazor.E2E.Tests.csproj", "{AA1168E1-C257-4C95-8C94-FA60AD500136}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.TreeSky", "TreeGraph.TreeSky\TreeGraph.TreeSky.csproj", "{FF2C109A-EA75-4FE7-8289-838CE4EB8797}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -689,6 +691,18 @@ Global
 		{AA1168E1-C257-4C95-8C94-FA60AD500136}.Release|x64.Build.0 = Release|Any CPU
 		{AA1168E1-C257-4C95-8C94-FA60AD500136}.Release|x86.ActiveCfg = Release|Any CPU
 		{AA1168E1-C257-4C95-8C94-FA60AD500136}.Release|x86.Build.0 = Release|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Debug|x64.Build.0 = Debug|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Debug|x86.Build.0 = Debug|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Release|x64.ActiveCfg = Release|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Release|x64.Build.0 = Release|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Release|x86.ActiveCfg = Release|Any CPU
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -741,6 +755,7 @@ Global
 		{C44A69D2-2C3A-47D1-A619-67E5CE67F5EE} = {27300449-A741-4AD0-89C8-99BA2EE87EA8}
 		{FA5EA510-32B6-4F9A-801E-80BD82005A14} = {27300449-A741-4AD0-89C8-99BA2EE87EA8}
 		{0AEFA5AD-C6DC-426F-A675-AD2BA5894B58} = {27300449-A741-4AD0-89C8-99BA2EE87EA8}
+		{FF2C109A-EA75-4FE7-8289-838CE4EB8797} = {27300449-A741-4AD0-89C8-99BA2EE87EA8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9647CF65-ABDB-4637-B56C-E0CDAC22FFFB}

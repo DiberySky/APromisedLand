@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 @* App.razor *@
 <head>
@@ -8,6 +8,7 @@
     <ResourcePreloader/>
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]"/>
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet"/>
+    <link href="_content/MudBlazor.Extensions/mudBlazorExtensions.min.css" rel="stylesheet"/>
     <link rel="stylesheet" href="@Assets["app.css"]"/>
     <link rel="stylesheet" href="@Assets["TreeGraph.Blazor.styles.css"]"/>
     <ImportMap/>
@@ -25,6 +26,7 @@
 <ReconnectModal/>
 <script src="@Assets["_framework/blazor.web.js"]"></script>
 <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+<script type="module" src="_content/MudBlazor.Extensions/MudBlazor.Extensions.lib.module.min.js"></script>
 </body>
 
 </html>

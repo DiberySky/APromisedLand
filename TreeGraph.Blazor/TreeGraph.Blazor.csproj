@@ -14,6 +14,7 @@
     <ItemGroup>
         <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
         <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
+        <ProjectReference Include="..\TreeGraph.TreeSky\TreeGraph.TreeSky.csproj" />
     </ItemGroup>
 
 </Project>
