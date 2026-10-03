@@ -80,6 +80,63 @@ public class EavEntityTypesController : ControllerBase
     }
 
     // ============================================================
+    // 批量详情（1 次 HTTP 替代 1+N 次）
+    // ============================================================
+
+    /// <summary>
+    /// 批量返回所有实体类型详情（含属性计数）。
+    ///
+    /// ★ 为什么需要这个端点：
+    ///   原 GET /api/eav/entity-types 只返回 SummaryDto，
+    ///   前端要拿详情（Description / DisplayOrder / CreatedAt / UpdatedAt）
+    ///   需逐个 GET /{id}，N 个类型 = 1+N 次 HTTP。
+    ///   N=145 时前端 LoadAsync 严重卡顿（>15s）。
+    ///
+    /// 本端点：1 次 HTTP 返回全量详情 + 属性计数（GroupBy 聚合，1 次 DB 查询）。
+    /// </summary>
+    [HttpGet("details")]
+    public async Task<IActionResult> ListDetails(
+        [FromQuery] bool includeDeleted = false,
+        CancellationToken ct = default)
+    {
+        // 1. 全量类型（1 次 DB）
+        var types = await _db.EntityTypes
+            .Where(t => includeDeleted || !t.IsDeleted)
+            .OrderBy(t => t.DisplayOrder)
+            .ThenBy(t => t.EntityType)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        if (types.Count == 0)
+            return Ok(Array.Empty<EntityTypeDetailDto>());
+
+        // 2. 属性计数（1 次 DB，GroupBy 聚合）
+        var typeNames = types.Select(t => t.EntityType).ToList();
+        var stats = await _db.AttributeCatalog
+            .Where(a => !a.IsDeleted && typeNames.Contains(a.EntityType))
+            .GroupBy(a => a.EntityType)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var statsMap = stats.ToDictionary(x => x.Type, x => x.Count);
+
+        // 3. 组装
+        var result = types.Select(t => new EntityTypeDetailDto(
+            t.EntityTypeId,
+            t.EntityType,
+            t.DisplayName,
+            t.Description,
+            t.DisplayOrder,
+            t.IsDeleted,
+            t.CreatedAt,
+            t.UpdatedAt,
+            statsMap.GetValueOrDefault(t.EntityType, 0)));
+
+        return Ok(result);
+    }
+
+    // ============================================================
     // 详情
     // ============================================================
 

@@ -5,3 +5,9 @@ riderModule.iml
 /_ReSharper.Caches/
 TestResults/
 test-results/
+
+# E2E 产物
+*.trx
+*.zip
+playwright-report/
+playwright-browsers/

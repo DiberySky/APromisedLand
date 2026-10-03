@@ -184,22 +184,9 @@ else
         _loading = true;
         try
         {
-            var summaries = await Api.ListEntityTypesAsync();
-            if (summaries is null)
-            {
-                Snackbar.Add("加载失败", Severity.Error);
-                _types = Array.Empty<EntityTypeDetailDto>();
-                return;
-            }
-
-            var list = new List<EntityTypeDetailDto>();
-            foreach (var s in summaries)
-            {
-                if (string.IsNullOrEmpty(s.EntityTypeId)) continue;
-                var detail = await Api.GetEntityTypeAsync(s.EntityTypeId);
-                if (detail is not null) list.Add(detail);
-            }
-            _types = list;
+            // ★ 1 次 HTTP 替代 1+N 次（原 foreach 串行 GetEntityTypeAsync）
+            _types = await Api.ListEntityTypeDetailsAsync()
+                     ?? Array.Empty<EntityTypeDetailDto>();
         }
         finally
         {

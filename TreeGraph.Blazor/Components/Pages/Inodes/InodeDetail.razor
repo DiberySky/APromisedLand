@@ -1,11 +1,13 @@
 @page "/inodes/{InodeId}"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using System.Text.Json
 @using TreeGraph.Blazor.Services
 @using TreeGraph.Shared.Eav.Dtos
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 @inject IDialogService DialogService
+@inject IJSRuntime JS
 @* InodeDetail.razor *@
 <PageTitle>iNode @InodeId</PageTitle>
 
@@ -27,6 +29,12 @@
         <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
                        Size="Size.Small" OnClick="CopyId" title="复制" />
         <MudSpacer />
+        @* ★ JSON 预览入口 *@
+        <MudButton Variant="Variant.Outlined" Color="Color.Info"
+                   StartIcon="@Icons.Material.Filled.DataObject"
+                   OnClick="OpenJsonDrawer">
+            JSON 预览
+        </MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="OpenAttachDialog">
@@ -138,6 +146,105 @@ else
     </MudGrid>
 }
 
+@* ============================================================ *@
+@* ★ JSON 预览抽屉（右侧滑出，600px 宽） *@
+@* ============================================================ *@
+<MudDrawer @bind-Open="_jsonDrawerOpen"
+           Anchor="Anchor.End"
+           Variant="DrawerVariant.Temporary"
+           Elevation="4"
+           Width="600px">
+    <MudPaper Class="pa-4" Style="height: 100%; display: flex; flex-direction: column;">
+
+        @* 标题区 *@
+        <div class="d-flex align-center mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.DataObject"
+                     Color="Color.Info" Class="mr-2" />
+            <MudText Typo="Typo.h6">原始 JSON 预览</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           Size="Size.Small"
+                           OnClick="@(() => _jsonDrawerOpen = false)"
+                           title="关闭" />
+        </div>
+
+        @* 选项开关 *@
+        <MudPaper Class="pa-3 mb-3" Outlined="true" Elevation="0">
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                选项（切换后自动刷新）
+            </MudText>
+            <div class="d-flex flex-wrap" style="gap: 12px;">
+                <MudSwitch T="bool"
+                           Value="_jsonIncludeNull"
+                           ValueChanged="OnIncludeNullChanged"
+                           Label="includeNull"
+                           Color="Color.Primary" />
+                <MudSwitch T="bool"
+                           Value="_jsonDisplayName"
+                           ValueChanged="OnDisplayNameChanged"
+                           Label="displayName"
+                           Color="Color.Primary" />
+                <MudSwitch T="bool"
+                           Value="_jsonOriginalUnits"
+                           ValueChanged="OnOriginalUnitsChanged"
+                           Label="originalUnits"
+                           Color="Color.Primary" />
+            </div>
+        </MudPaper>
+
+        @* 操作区 *@
+        <div class="d-flex align-center mb-3" style="gap: 8px;">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="LoadJsonAsync"
+                       Disabled="_jsonLoading">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ContentCopy"
+                       OnClick="CopyJsonToClipboard"
+                       Disabled="@(string.IsNullOrEmpty(_jsonText))">
+                复制
+            </MudButton>
+            <MudSpacer />
+            @if (!string.IsNullOrEmpty(_jsonText))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @(_jsonText.Length) 字符
+                </MudText>
+            }
+        </div>
+
+        @* JSON 内容区 *@
+        @if (_jsonLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (string.IsNullOrEmpty(_jsonText))
+        {
+            <MudAlert Severity="Severity.Info">
+                暂无数据。可能 iNode 下没有任何实体。
+            </MudAlert>
+        }
+        else
+        {
+            <MudPaper Class="pa-3" Outlined="true" Elevation="0"
+                      Style="flex: 1; overflow: auto;
+                             background: var(--mud-palette-background-gray);
+                             font-family: 'Consolas', 'Menlo', monospace;
+                             font-size: 12px;
+                             white-space: pre;">
+                <pre style="margin: 0;">@_jsonText</pre>
+            </MudPaper>
+        }
+    </MudPaper>
+</MudDrawer>
+
+@* ============================================================ *@
+@* 声明类型对话框                                                *@
+@* ============================================================ *@
 <MudDialog @bind-Visible="_showAttachDialog" Options="_dialogOptions">
     <TitleContent>
         <MudText Typo="Typo.h6">声明新类型</MudText>
@@ -200,6 +307,14 @@ else
     private bool _showAttachDialog;
     private string? _newType;
 
+    // ★ JSON 预览状态
+    private bool _jsonDrawerOpen;
+    private bool _jsonLoading;
+    private string? _jsonText;
+    private bool _jsonIncludeNull;
+    private bool _jsonDisplayName;
+    private bool _jsonOriginalUnits;
+
     private readonly DialogOptions _dialogOptions = new()
     {
         MaxWidth = MaxWidth.Small,
@@ -253,6 +368,92 @@ else
             $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
             $"{Uri.EscapeDataString(entityType)}/history");
 
+    // ============================================================
+    // ★ JSON 预览
+    // ============================================================
+
+    private async Task OpenJsonDrawer()
+    {
+        _jsonDrawerOpen = true;
+        await LoadJsonAsync();
+    }
+
+    private async Task LoadJsonAsync()
+    {
+        _jsonLoading = true;
+        try
+        {
+            var raw = await Api.GetInodeJsonAsync(
+                InodeId,
+                includeNull: _jsonIncludeNull,
+                displayName: _jsonDisplayName,
+                originalUnits: _jsonOriginalUnits);
+
+            _jsonText = PrettyPrint(raw);
+        }
+        finally
+        {
+            _jsonLoading = false;
+        }
+    }
+
+    // 注意：必须先写回字段再刷新。若只更新 UI 不写字段，
+    // 查询参数会静默保持旧值（CS0649 警告即此信号）。
+    private async Task OnIncludeNullChanged(bool value)
+    {
+        _jsonIncludeNull = value;
+        await LoadJsonAsync();
+    }
+
+    private async Task OnDisplayNameChanged(bool value)
+    {
+        _jsonDisplayName = value;
+        await LoadJsonAsync();
+    }
+
+    private async Task OnOriginalUnitsChanged(bool value)
+    {
+        _jsonOriginalUnits = value;
+        await LoadJsonAsync();
+    }
+
+    /// <summary>把单行 JSON 美化为缩进 2 空格的多行文本。</summary>
+    private static string? PrettyPrint(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return raw;
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            return JsonSerializer.Serialize(doc, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch (JsonException)
+        {
+            // 不是合法 JSON，原样返回
+            return raw;
+        }
+    }
+
+    private async Task CopyJsonToClipboard()
+    {
+        if (string.IsNullOrEmpty(_jsonText)) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _jsonText);
+            Snackbar.Add("已复制到剪贴板", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"复制失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    // ============================================================
+    // 声明类型
+    // ============================================================
+
     private void OpenAttachDialog()
     {
         _newType = null;
@@ -273,6 +474,10 @@ else
         Snackbar.Add("声明成功", Severity.Success);
         _showAttachDialog = false;
         await LoadAsync();
+
+        // 抽屉开着时也刷新 JSON
+        if (_jsonDrawerOpen) await LoadJsonAsync();
+
         StateHasChanged();
     }
 
@@ -301,6 +506,10 @@ else
 
         Snackbar.Add("已取消声明", Severity.Success);
         await LoadAsync();
+
+        // 抽屉开着时也刷新 JSON
+        if (_jsonDrawerOpen) await LoadJsonAsync();
+
         StateHasChanged();
     }
 }

@@ -365,6 +365,18 @@ public class EavApiClient
         => await GetAsync<IReadOnlyList<EntityTypeSummaryDto>>(
             "api/eav/entity-types", ct);
 
+    /// <summary>
+    /// 一次拉取所有实体类型详情（含属性计数）。
+    /// 替代"ListEntityTypesAsync + N 次 GetEntityTypeAsync"的 N+1 模式。
+    /// </summary>
+    public async Task<IReadOnlyList<EntityTypeDetailDto>?> ListEntityTypeDetailsAsync(
+        bool includeDeleted = false, CancellationToken ct = default)
+    {
+        var url = "api/eav/entity-types/details";
+        if (includeDeleted) url += "?includeDeleted=true";
+        return await GetAsync<IReadOnlyList<EntityTypeDetailDto>>(url, ct);
+    }
+
     // ============================================================
     // 实体类型 CRUD
     // ============================================================
@@ -918,6 +930,53 @@ public class EavApiClient
             }
 
             // ★ 直接返回字符串，不反序列化
+            return await resp.Content.ReadAsStringAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GET {Url} 失败", url);
+            return null;
+        }
+    }
+
+    // ============================================================
+    // ★ iNode 原始 JSON 预览
+    // ============================================================
+
+    /// <summary>
+    /// 拉取 iNode 的原始 JSON（未解析）。
+    ///
+    /// 参数：
+    ///   includeNull      - true 时未写入的属性也以 null 出现
+    ///   displayName      - true 时属性 key 用中文 DisplayName
+    ///   originalUnits    - true 时数量值按原始输入单位还原（?units=original）
+    ///
+    /// 返回原始 JSON 字符串；失败返回 null。
+    /// </summary>
+    public async Task<string?> GetInodeJsonAsync(
+        string inodeId,
+        bool includeNull = false,
+        bool displayName = false,
+        bool originalUnits = false,
+        CancellationToken ct = default)
+    {
+        var query = new List<string>();
+        if (includeNull) query.Add("includeNull=true");
+        if (displayName) query.Add("displayName=true");
+        if (originalUnits) query.Add("units=original");
+
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/json";
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+
+        try
+        {
+            var resp = await _http.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("GET {Url} → {Status}",
+                    url, resp.StatusCode);
+                return null;
+            }
             return await resp.Content.ReadAsStringAsync(ct);
         }
         catch (Exception ex)

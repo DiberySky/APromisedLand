@@ -182,6 +182,20 @@ public static class BlazorHelpers
         await button.ClickAsync(new LocatorClickOptions { Timeout = timeoutMs });
     }
 
+    /// <summary>
+    /// 用唯一文本锚定 MudDrawer。
+    ///
+    /// ★ MudBlazor Temporary 抽屉关闭后保留 DOM，页面上可能有多个 .mud-drawer，
+    ///   .First 会按 DOM 顺序命中不含内容的隐藏残留节点。
+    ///   用标题文本（恒渲染、唯一）锚定真抽屉。
+    /// </summary>
+    public static ILocator FindDrawerByTitle(IPage page, string title)
+    {
+        return page.Locator(".mud-drawer")
+            .Filter(new LocatorFilterOptions { HasText = title })
+            .First;
+    }
+
     // ============================================================
     // Snackbar
     // ============================================================

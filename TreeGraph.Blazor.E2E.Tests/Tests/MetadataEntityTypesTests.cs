@@ -36,31 +36,45 @@ public class MetadataEntityTypesTests : E2ETestBase
     public async Task Create_OnlyDisplayName_Succeeds()
     {
         var displayName = MetadataHelpers.Unique("E2E类型");
+        using var http = new HttpClient
+        {
+            BaseAddress = new Uri(Fixture.Settings.ApiBaseUrl)
+        };
 
-        await BlazorHelpers.GoToAsync(Page, "/metadata/entity-types");
+        try
+        {
+            await BlazorHelpers.GoToAsync(Page, "/metadata/entity-types");
 
-        // 点"新建实体类型"
-        await BlazorHelpers.ClickAsync(Page,
-            Page.Locator("button:has-text('新建实体类型')").First);
+            // 点"新建实体类型"
+            await BlazorHelpers.ClickAsync(Page,
+                Page.Locator("button:has-text('新建实体类型')").First);
 
-        var dlg = await BlazorHelpers.WaitForDialogAsync(Page);
+            var dlg = await BlazorHelpers.WaitForDialogAsync(Page);
 
-        // 只填名称，不填内部标识（新方案已隐藏）
-        var nameField = dlg.Locator(".mud-input-control:has-text('实体类型名称')").First;
-        await BlazorHelpers.FillMudTextFieldAsync(nameField, displayName);
+            // 只填名称，不填内部标识（新方案已隐藏）
+            var nameField = dlg.Locator(".mud-input-control:has-text('实体类型名称')").First;
+            await BlazorHelpers.FillMudTextFieldAsync(nameField, displayName);
 
-        // 点"保存"
-        var saveBtn = dlg.Locator("button:has-text('保存')").Last;
-        await saveBtn.ClickAsync();
+            // 点"保存"
+            var saveBtn = dlg.Locator("button:has-text('保存')").Last;
+            await saveBtn.ClickAsync();
 
-        var snackbar = await BlazorHelpers.WaitForSnackbarAsync(Page, "已创建");
-        Assert.Contains(displayName, snackbar);
+            var snackbar = await BlazorHelpers.WaitForSnackbarAsync(Page, "已创建");
+            Assert.Contains(displayName, snackbar);
 
-        await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
+            await BlazorHelpers.WaitForSnackbarGoneAsync(Page);
 
-        // 表格出现该名称
-        await Page.WaitForSelectorAsync(
-            $".mud-table-row:has-text('{displayName}')");
+            // 表格出现该名称
+            // ★ LoadAsync 现走批量详情接口（1 次 HTTP），仍给 30s 兜底防网络抖动。
+            await Page.WaitForSelectorAsync(
+                $".mud-table-row:has-text('{displayName}')",
+                new PageWaitForSelectorOptions { Timeout = 30000 });
+        }
+        finally
+        {
+            // ★ 自清理：按 DisplayName 反查删除，防止 DB 类型数无限膨胀
+            await MetadataHelpers.TryDeleteEntityTypeByNameAsync(http, displayName);
+        }
     }
 
     // ============================================================

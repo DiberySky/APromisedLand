@@ -65,3 +65,101 @@ Snackbar 默认 4 秒自动消失，但**同一时刻可能多条共存**（如"
 | `WaitForSnackbarAsync(page)` 不传文本 | 抓到旧 Snackbar | 传 `"保存成功"` 等期望文本 |
 | 不调用 `WaitForSnackbarGoneAsync` 就下一步 | 时序偶发失败 | 每步操作后调用 |
 | 依赖 `Task.Delay` 做等待 | 慢且不稳定 | 用 `WaitFor*` 显式等待 |
+
+## 串行化决策（xunit.runner.json）
+
+### 为什么 E2E 必须串行
+
+xUnit 默认**并行跑不同测试类**（`parallelizeTestCollections: true`）。对单元测试这是好事，但对 E2E 是风险源：
+
+| 并行的代价 | 说明 |
+|---|---|
+| **SignalR 连接竞争** | 多个测试同时操作浏览器 → 心跳/重连互相干扰 |
+| **Aspire 服务负载** | 并发 HTTP 请求拖慢 API，放大时序抖动 |
+| **DB 状态污染** | 测试间共享同一个 PostgreSQL，并行写可能互相影响 |
+| **收益极小** | 21 个测试并行只省 ~30 秒 |
+
+### 配置
+
+`TreeGraph.Blazor.E2E.Tests/xunit.runner.json`：
+
+```json
+{
+  "$schema": "https://xunit.net/schema/current/xunit.runner.schema.json",
+  "parallelizeTestCollections": false
+}
+```
+
+**关键**：在 csproj 里加 `CopyToOutputDirectory=PreserveNewest`，否则 runner.json 不会复制到 `bin/`，并行设置**静默不生效**（无警告）。
+
+### 耗时对比
+
+| 模式 | 21 个测试总耗时 |
+|---|---|
+| 并行 | ~4.2 分钟 |
+| 串行 | ~4.0 分钟 |
+
+串行几乎不慢，但稳定性显著提升。
+
+## UI 层 N+1 查询（性能陷阱）
+
+### 现象
+
+`EntityTypes.razor.LoadAsync` 原实现：
+
+```csharp
+foreach (var s in summaries)
+{
+    var detail = await Api.GetEntityTypeAsync(s.EntityTypeId);  // N 次 HTTP
+}
+```
+
+DB 累积到 145 个类型后，单次 `LoadAsync` 发 **146 次串行 HTTP**，耗时 12-20s，导致 E2E 表格断言 15s 超时（2/3 复现）。
+
+### 修复
+
+| 层 | 改动 |
+|---|---|
+| 后端 | 新增 `GET /api/eav/entity-types/details`（1 次 HTTP + GroupBy 聚合属性计数） |
+| 前端 | `LoadAsync` 改调 `Api.ListEntityTypeDetailsAsync()` |
+
+### 修复效果
+
+| 指标 | 修复前 | 修复后 |
+|---|---|---|
+| `LoadAsync` HTTP 次数 | 146 | **1** |
+| 测试耗时 | 20-24s | **9-10s** |
+| 复现率 | 2/3 失败 | **3/3 通过** |
+
+## 测试数据自清理
+
+E2E 每次建唯一类型（`E2E类型_xxxxxxxx`），若不清理 DB 会无限膨胀。
+
+规则：**每个建类型的测试，`finally` 里清理**。
+
+```csharp
+using var http = new HttpClient { BaseAddress = new Uri(Fixture.Settings.ApiBaseUrl) };
+try
+{
+    // ... UI 操作 ...
+}
+finally
+{
+    await MetadataHelpers.TryDeleteEntityTypeByNameAsync(http, displayName);
+}
+```
+
+- API 建的类型：用 `TryDeleteEntityTypeAsync(http, entityTypeId)`（有 ID）
+- UI 建的类型：用 `TryDeleteEntityTypeByNameAsync(http, displayName)`（反查删除）
+
+## MudDrawer 定位陷阱
+
+MudBlazor 9.9 `Temporary` 抽屉关闭后**保留 DOM**（`transform` 移出屏幕，无 `display:none`），页面上可能有多个 `.mud-drawer`。
+
+| 错误做法 | 正确做法 |
+|---|---|
+| `Page.Locator(".mud-drawer").First` | `BlazorHelpers.FindDrawerByTitle(Page, "标题文本")` |
+| `WaitForAsync(Hidden)` 等关闭 | 查 class 含 `mud-drawer--closed`（双横线） |
+| `document.querySelector('.mud-drawer pre')` | `querySelectorAll` + `some()` |
+
+同理适用于 Dialog / Popover（关闭后保留 DOM）。
