@@ -5,7 +5,9 @@
 ## 项目结构
 
 ```
-TreeGraph.Api/              # EAV API（实体类型/属性/单位/选项集/iNode）
+TreeGraph.Api/              # EAV API 薄宿主（Program.cs + 编排）
+  NodeEavSky/               # EAV 全部承载：Controllers/Services/Entities/Data/Infrastructure
+  TreeSky/                  # 树组件后端（ITreeService/TreeControllerBase/EfTreeService）
 TreeGraph.Blazor/           # Blazor Server 前端（MudBlazor 9.11）
 TreeGraph.Shared/           # 共享 DTO
 TreeGraph.TreeSky/          # 树组件库（TreeSky 精简移植，详见其 README）
@@ -41,11 +43,11 @@ APromisedLand.AppHost/      # Aspire 编排
 ## 测试
 
 ```
-API 集成:   87
-Blazor 单元: 88（含 TreeSky 演示树管道测试 7）
+API 集成:   100（含 TreeSky 后端测试 13）
+Blazor 单元: 81
 E2E:        21
 ─────────────
-总计:       196
+总计:       202
 ```
 
 ## TreeSky 树组件移植决策
@@ -58,9 +60,10 @@ E2E:        21
 | **精简闭包** | 只复制组件本身及真实依赖；外围 UI（Dialog/Loading/BoolField）新建薄包装承载 |
 | **裁剪重耦合模块** | Attributes 属性子系统、附件页面、UnitTree/CategoryTree 具体实现均不复制，裁剪点以占位提示处理 |
 | **内建 string 节点** | 库自带 `StringTreeNode`（string 为 sealed 且无 `new()`，不能直接作泛型参数） |
-| **离线演示** | `/tree-sky-demo` 页 + `InMemoryTreeStore` + `DemoTreeApiHandler` 拦截 HTTP，增删改/排序/移动全链路无需真实后端 |
+| **后端承载** | 泛型后端（`ITreeService<T>`/`TreeControllerBase<T>`/`EfTreeService<T>`）放 `TreeGraph.Api/TreeSky/`，类库保持纯前端 RCL；仅实现组件 9 端点调用面，CategoryTree/UnitTree 具体树不带 |
+| **真实演示** | `/tree-sky-demo` 页读写真实 Postgres（`string_tree_nodes` 表，Aspire 服务发现直连 `treegrapheavapi`） |
 
-移植过程修复的 3 个问题（库 DI `TryAddTransient` 失效、移动对话框无法确认、内存存储移动判定漏判）及裁剪清单详见 [TreeGraph.TreeSky/README.md](TreeGraph.TreeSky/README.md)。
+移植过程修复的问题（库 DI `TryAddTransient` 失效、移动对话框无法确认等）及裁剪清单详见 [TreeGraph.TreeSky/README.md](TreeGraph.TreeSky/README.md)。
 
 ### E2E 关键决策
 

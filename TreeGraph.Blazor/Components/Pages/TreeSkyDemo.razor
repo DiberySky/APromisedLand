@@ -6,8 +6,8 @@
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
     <MudText Typo="Typo.h4">TreeSky 树组件演示</MudText>
     <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
-        节点类型 <b>StringTreeNode</b>（以字符串 Name 为显示文本）。数据为进程内内存存储：
-        展开、新增、编辑、删除、排序、移动均可直接操作，重启应用后恢复初始演示数据。
+        节点类型 <b>StringTreeNode</b>（以字符串 Name 为显示文本）。数据存于 TreeGraph.Api 的
+        Postgres 表：展开、新增、编辑、删除、排序、移动均为真实 API 读写，重启后保留。
     </MudText>
 
     <MudPaper Class="pa-4" Elevation="2">

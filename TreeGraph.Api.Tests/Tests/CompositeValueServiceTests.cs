@@ -1,6 +1,6 @@
 using System.Text.Json;
-using TreeGraph.Api.Entities;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Shared.Eav;
 using Xunit;

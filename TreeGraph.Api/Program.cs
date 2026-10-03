@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Data.Seeding;
-using TreeGraph.Api.Infrastructure;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Data.Seeding;
+using TreeGraph.Api.NodeEavSky.Infrastructure;
+using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Api.TreeSky;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +46,10 @@ builder.Services.AddScoped<CustomTableWriteService>();
 builder.Services.AddScoped<CustomTableReadService>();
 builder.Services.AddScoped<CustomTableQueryService>();
 
+// ★ TreeSky 树组件后端：泛型 EF 实现 + StringTreeNode 字符串节点树
+builder.Services.AddScoped<TreeGraph.Api.TreeSky.ITreeService<TreeGraph.TreeSky.Models.StringTreeNode>,
+    TreeGraph.Api.TreeSky.EfTreeService<TreeGraph.TreeSky.Models.StringTreeNode>>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -74,6 +79,7 @@ if (!EF.IsDesignTime)
     await db.Database.MigrateAsync();
     await scope.ServiceProvider.GetRequiredService<UnitSeedService>().SeedAsync();
     await EavSeeder.SeedAsync(db);
+    await StringTreeNodeSeeder.SeedAsync(db);
 }
 
 app.Run();

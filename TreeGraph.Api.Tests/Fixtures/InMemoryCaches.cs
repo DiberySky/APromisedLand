@@ -1,5 +1,5 @@
-using TreeGraph.Api.Entities;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
 
 namespace TreeGraph.Api.Tests.Fixtures;
 

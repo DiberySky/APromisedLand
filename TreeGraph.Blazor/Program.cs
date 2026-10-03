@@ -22,17 +22,21 @@ builder.Services.AddMudServices();
 // ★ TreeSky 树组件库（BlazorService/MessageService/TreeNodeDialogService/导航/泛型树 API 客户端 + MudExtensions）
 builder.Services.AddTreeSky();
 
-// ★ TreeSky 演示：StringTreeNode（string 名称节点）+ 进程内内存存储，无需真实后端。
-//   读取走 DemoTreeClientService；组件的写操作经 DiberyTreeApiClient<StringTreeNode>
-//   发出的 HTTP 被 DemoTreeApiHandler 拦截并转发到同一个 InMemoryTreeStore。
-builder.Services.AddSingleton<InMemoryTreeStore>();
-builder.Services.AddScoped<ITreeClientService<StringTreeNode>, DemoTreeClientService>();
-builder.Services.AddTransient<DemoTreeApiHandler>();
+// ★ TreeSky 演示：StringTreeNode（string 名称节点），数据存于 TreeGraph.Api 的
+//   string_tree_nodes 表（Postgres）。读写都经 DiberyTreeApiClient<StringTreeNode>
+//   → /StringTreeNode/* 端点（TreeControllerBase<StringTreeNode> + EfTreeService）。
+builder.Services.AddScoped<ITreeClientService<StringTreeNode>, StringTreeClientService>();
 builder.Services.AddHttpClient("TreeSky", client =>
     {
-        client.BaseAddress = new Uri("http://treedemo.local/");
+        // Aspire 服务发现：与 EavApiClient 同一后端
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
     })
-    .AddHttpMessageHandler<DemoTreeApiHandler>();
+    // 写操作（POST/PUT/DELETE/move）不幂等，禁止自动重试
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = 1;
+        options.Retry.ShouldHandle = _ => ValueTask.FromResult(false);
+    });
 
 // ★ 前端字段校验器（单例，无状态）
 builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
