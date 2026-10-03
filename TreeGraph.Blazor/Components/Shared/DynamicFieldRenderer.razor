@@ -24,15 +24,61 @@
 }
 else if (Attribute.DataType == "int")
 {
-    <MudNumericField T="long?"
-                     Label="@DisplayLabel"
-                     Value="@LongValue"
-                     ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                     Variant="Variant.Outlined"
-                     Required="@Attribute.IsRequired"
-                     Error="@HasSelfErrors"
-                     ErrorText="@SelfErrorText"
-                     FullWidth="true" />
+    @* ★ int 有单位时走 NumericInput 路径（与 decimal 对齐）；无单位仍用 long? *@
+    @if (Attribute.Unit is not null)
+    {
+        var numeric = Value as NumericInput ?? new NumericInput();
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudNumericField T="decimal?"
+                                 Label="@DisplayLabel"
+                                 Value="@numeric.Value"
+                                 ValueChanged="@(v =>
+                                 {
+                                     var n = Value as NumericInput ?? new NumericInput();
+                                     n.Value = v ?? 0;
+                                     ValueChanged.InvokeAsync(n);
+                                 })"
+                                 Variant="Variant.Outlined"
+                                 Required="@Attribute.IsRequired"
+                                 Error="@HasSelfErrors"
+                                 ErrorText="@SelfErrorText"
+                                 FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?"
+                           Label="单位"
+                           Value="@numeric.UnitId"
+                           ValueChanged="@(u =>
+                           {
+                               var n = Value as NumericInput ?? new NumericInput();
+                               n.UnitId = u;
+                               ValueChanged.InvokeAsync(n);
+                           })"
+                           Variant="Variant.Outlined"
+                           FullWidth="true">
+                    @foreach (var u in Attribute.AvailableUnits ?? Array.Empty<UnitSchemaDto>())
+                    {
+                        <MudSelectItem T="Guid?" Value="@u.Id">
+                            @u.Name (@u.Symbol)
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        <MudNumericField T="long?"
+                         Label="@DisplayLabel"
+                         Value="@LongValue"
+                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                         Variant="Variant.Outlined"
+                         Required="@Attribute.IsRequired"
+                         Error="@HasSelfErrors"
+                         ErrorText="@SelfErrorText"
+                         FullWidth="true" />
+    }
 }
 else if (Attribute.DataType == "decimal")
 {

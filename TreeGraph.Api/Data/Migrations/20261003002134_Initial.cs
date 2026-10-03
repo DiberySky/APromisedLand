@@ -72,6 +72,24 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "entity_type_catalog",
+                columns: table => new
+                {
+                    entity_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_entity_type_catalog", x => x.entity_type_id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "option_sets",
                 columns: table => new
                 {
@@ -197,7 +215,6 @@ namespace TreeGraph.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_attribute_catalog", x => x.attribute_id);
-                    table.CheckConstraint("ck_attr_int_no_unit", "data_type <> 'int' OR unit_id IS NULL");
                     table.ForeignKey(
                         name: "FK_attribute_catalog_composite_type_definitions_ref_composite_~",
                         column: x => x.ref_composite_type_id,
@@ -538,6 +555,13 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "attribute_id");
 
             migrationBuilder.CreateIndex(
+                name: "uq_entity_type",
+                table: "entity_type_catalog",
+                column: "entity_type",
+                unique: true,
+                filter: "is_deleted = false");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_option_items_set",
                 table: "option_items",
                 column: "option_set_id");
@@ -586,6 +610,9 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "custom_table_rows");
+
+            migrationBuilder.DropTable(
+                name: "entity_type_catalog");
 
             migrationBuilder.DropTable(
                 name: "option_items");

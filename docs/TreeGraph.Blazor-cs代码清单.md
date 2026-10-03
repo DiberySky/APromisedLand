@@ -1,3 +1,102 @@
+# TreeGraph.Blazor C# 代码清单
+
+- 生成时间：2026-10-03 05:43:44
+- 文件总数：8
+- 排除：bin/、obj/
+- 项目状态：ID 到 GUID String 重构完成（EavApiClient 全部 ID string 化）
+
+## 文件 1/8 TreeGraph.Blazor/Components/FieldRenderers/NumericValueDto.cs
+
+```csharp
+namespace TreeGraph.Blazor.Components.FieldRenderers;
+
+/// <summary>
+/// 带单位的数值（DynamicForm 内部表单值）。
+/// 对应后端 JSON 形状 { value, unitId }，提交时由 DynamicForm 序列化。
+/// </summary>
+public class NumericValueDto
+{
+    public decimal? Value { get; set; }
+    public Guid? UnitId { get; set; }
+}
+```
+
+## 文件 2/8 TreeGraph.Blazor/Program.cs
+
+```csharp
+using Microsoft.Extensions.Http.Resilience;
+using MudBlazor.Services;
+using Polly;
+using TreeGraph.Blazor.Components;
+using TreeGraph.Blazor.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// ★ Aspire ServiceDefaults：服务发现、健康检查、OpenTelemetry、HttpClient 弹性
+builder.AddServiceDefaults();
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+// MudBlazor
+builder.Services.AddMudServices();
+
+// ★ 前端字段校验器（单例，无状态）
+builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
+
+// ★ EavApiClient：通过 Aspire 服务发现访问 treegrapheavapi
+// 弹性策略显式配置：
+//   - 关闭自动重试：元数据 PUT/POST 不幂等，自动重试会引发数据损坏
+//     （例如 recalculate-factor 被重放 → 值被平方调整）
+//   - 放宽超时：单次重算可能耗时几秒
+//   - 保留熔断器默认参数（保护后端）
+builder.Services
+    .AddHttpClient<EavApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .AddStandardResilienceHandler(options =>
+    {
+        // ★ 禁止重试的正确写法：
+        //   MaxRetryAttempts 校验约束为 1–int.MaxValue（不接受 0），
+        //   因此置 1 通过校验，再用 ShouldHandle 恒 false 让重试永不触发。
+        //   管理台 PUT/POST 不幂等（如 recalculate-factor 重放会导致数据损坏）。
+        options.Retry.MaxRetryAttempts = 1;
+        options.Retry.ShouldHandle = _ => ValueTask.FromResult(false);
+
+        // ★ 熔断器采样窗口必须 ≥ 2 × AttemptTimeout（30s → 至少 60s）
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+
+        // 超时设置
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
+        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
+    });
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+}
+
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseAntiforgery();
+
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+app.MapDefaultEndpoints();
+
+app.Run();
+
+// ★ 供 WebApplicationFactory<Program> 引用（启动级 smoke 测试需要）
+public partial class Program { }
+```
+
+## 文件 3/8 TreeGraph.Blazor/Services/EavApiClient.cs
+
+```csharp
 using System.Text.Json;
 using TreeGraph.Shared.Eav.Dtos;
 
@@ -364,30 +463,6 @@ public class EavApiClient
         CancellationToken ct = default)
         => await GetAsync<IReadOnlyList<EntityTypeSummaryDto>>(
             "api/eav/entity-types", ct);
-
-    // ============================================================
-    // 实体类型 CRUD
-    // ============================================================
-
-    public Task<string?> CreateEntityTypeAsync(
-        CreateEntityTypeRequest request, CancellationToken ct = default)
-        => PostForIdAsync("api/eav/entity-types", request, "entityTypeId", ct);
-
-    public Task<EntityTypeDetailDto?> GetEntityTypeAsync(
-        string id, CancellationToken ct = default)
-        => GetAsync<EntityTypeDetailDto>($"api/eav/entity-types/{id}", ct);
-
-    public Task<(bool Ok, string? Error)> UpdateEntityTypeAsync(
-        string id, UpdateEntityTypeRequest request, CancellationToken ct = default)
-        => PutAsync($"api/eav/entity-types/{id}", request, ct);
-
-    public Task<(bool Ok, string? Error)> DeleteEntityTypeAsync(
-        string id, CancellationToken ct = default)
-        => DeleteWithErrorAsync($"api/eav/entity-types/{id}", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteEntityTypeAsync(
-        string id, CancellationToken ct = default)
-        => PostNoBodyAsync($"api/eav/entity-types/{id}/undelete", ct);
 
     public async Task<PagedResult<DynamicEntityDto>?> ListEntitiesAsync(
         string entityType, int page = 1, int pageSize = 20,
@@ -803,3 +878,773 @@ public class EavApiClient
         DateTimeOffset? CurrentUpdatedAt,
         DateTimeOffset? ExpectedUpdatedAt);
 }
+```
+
+## 文件 4/8 TreeGraph.Blazor/Services/EavFieldValidator.cs
+
+```csharp
+using System.Collections;
+using System.Globalization;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using TreeGraph.Shared.Eav.Dtos;
+
+namespace TreeGraph.Blazor.Services;
+
+public interface IEavFieldValidator
+{
+    /// <summary>校验属性值，返回结构化错误（Path 相对该属性）。</summary>
+    IReadOnlyList<FieldValidationError> Validate(AttributeSchemaDto attr, object? value);
+
+    /// <summary>仅校验 JSON 文本格式，用于 json / file / 自定义表行输入框。</summary>
+    string? ValidateJsonText(string? text);
+}
+
+public class EavFieldValidator : IEavFieldValidator
+{
+    // ============================================================
+    // 入口
+    // ============================================================
+
+    public IReadOnlyList<FieldValidationError> Validate(
+        AttributeSchemaDto attr, object? value)
+    {
+        var errors = new List<FieldValidationError>();
+        ValidateAttribute(attr, value, "", errors);
+        return errors;
+    }
+
+    public string? ValidateJsonText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            return null;
+        }
+        catch (JsonException ex)
+        {
+            return $"JSON 格式错误：{ex.Message}";
+        }
+    }
+
+    // ============================================================
+    // 属性级
+    // ============================================================
+
+    private void ValidateAttribute(
+        AttributeSchemaDto attr, object? value, string path,
+        List<FieldValidationError> errors)
+    {
+        // 必填（单选有默认值时放行）
+        if (attr.IsRequired && IsEmpty(value))
+        {
+            if (!HasDefaultOption(attr.DataType, attr.OptionSet?.Items))
+            {
+                errors.Add(new FieldValidationError(path, "必填字段"));
+                return;
+            }
+        }
+
+        if (value is null || IsEmpty(value)) return;
+
+        switch (attr.DataType)
+        {
+            case "string":
+                ValidateStringRules(
+                    value.ToString() ?? "", attr.ValidationRule,
+                    attr.AllowedValues, path, errors);
+                break;
+
+            case "int":
+            case "decimal":
+                ValidateNumericAttribute(value, attr, path, errors);
+                break;
+
+            case "date":
+                if (value is string ds && DateOnly.TryParse(ds, out var d))
+                    ValidateDateRules(d, attr.ValidationRule, path, errors);
+                else
+                    errors.Add(new FieldValidationError(
+                        path, "日期格式错误（应为 yyyy-MM-dd）"));
+                break;
+
+            case "time":
+                if (value is string ts && TimeOnly.TryParse(ts, out var t))
+                    ValidateTimeRules(t, attr.ValidationRule, path, errors);
+                else
+                    errors.Add(new FieldValidationError(
+                        path, "时间格式错误（应为 HH:mm:ss）"));
+                break;
+
+            case "single_choice":
+                if (attr.OptionSet is null)
+                {
+                    errors.Add(new FieldValidationError(path, "属性未绑定选项集"));
+                }
+                else
+                {
+                    var v = value.ToString() ?? "";
+                    if (attr.OptionSet.Items.All(i => i.Value != v))
+                    {
+                        var valid = string.Join("、",
+                            attr.OptionSet.Items.Select(i => i.Value));
+                        errors.Add(new FieldValidationError(
+                            path, $"值 '{v}' 不在选项集中（有效值：{valid}）"));
+                    }
+                }
+                break;
+
+            case "composite":
+                if (attr.CompositeType is not null)
+                    ValidateComposite(attr.CompositeType, value, path, errors);
+                else
+                    errors.Add(new FieldValidationError(
+                        path, "组合类型未定义"));
+                break;
+
+            case "json":
+            case "file":
+                // 由控件层用 ValidateJsonText 保证文本合法性；这里只做非空检查
+                // （已在上方必填检查处理）。若 value 是原始字符串，可进一步解析。
+                if (value is string rawJson && !string.IsNullOrWhiteSpace(rawJson))
+                {
+                    var jsonErr = ValidateJsonText(rawJson);
+                    if (jsonErr is not null)
+                        errors.Add(new FieldValidationError(path, jsonErr));
+                }
+                break;
+
+            // table 类型不走 Validate（由 CustomTableEditor 处理）
+        }
+    }
+
+    /// <summary>
+    /// 顶层数值属性校验。
+    ///
+    /// ★ 修复 P0-3：int 类型拒绝小数。
+    /// ★ 修复 P0-5：未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内。
+    /// </summary>
+    private void ValidateNumericAttribute(
+        object value, AttributeSchemaDto attr, string path,
+        List<FieldValidationError> errors)
+    {
+        // 单位归属
+        if (value is NumericInput ni)
+        {
+            if (attr.Unit is null && ni.UnitId is not null)
+            {
+                errors.Add(new FieldValidationError(
+                    path, "该属性未绑定基准单位，不允许指定单位"));
+                return;
+            }
+
+            if (attr.Unit is not null && ni.UnitId is { } uid
+                && attr.AvailableUnits?.All(u => u.Id != uid) == true)
+            {
+                errors.Add(new FieldValidationError(
+                    path, "指定的单位不属于该属性的可用单位"));
+                return;
+            }
+        }
+
+        var d = ToDecimal(value);
+        if (d is null)
+        {
+            errors.Add(new FieldValidationError(path, "数值格式错误"));
+            return;
+        }
+
+        // ★ int 类型必须为整数
+        if (attr.DataType == "int" && d.Value != Math.Truncate(d.Value))
+        {
+            errors.Add(new FieldValidationError(path, "int 类型不接受小数"));
+            return;
+        }
+
+        ValidateNumericRules(d.Value, attr.ValidationRule, path, errors);
+    }
+
+    // ============================================================
+    // 组合类型递归（含数组）
+    // ============================================================
+
+    private void ValidateComposite(
+        CompositeTypeSchemaDto type, object? value, string basePath,
+        List<FieldValidationError> errors)
+    {
+        // ★ 修复 P0-1（组合结构非法时静默通过 → 现在显式报错）
+        if (value is not IReadOnlyDictionary<string, object?> dict)
+        {
+            errors.Add(new FieldValidationError(
+                basePath, "组合值期望字典结构"));
+            return;
+        }
+
+        foreach (var field in type.Fields)
+        {
+            dict.TryGetValue(field.FieldName, out var fieldValue);
+            var fieldPath = JoinPath(basePath, field.FieldName);
+
+            // 数组字段
+            if (field.IsArray)
+            {
+                ValidateArrayField(field, fieldValue, fieldPath, errors);
+                continue;
+            }
+
+            // 必填：single_choice 有默认值时放行（★ 修复 P0-4）
+            if (field.IsRequired && IsEmpty(fieldValue))
+            {
+                if (!HasDefaultOption(field.DataType, field.OptionSet?.Items))
+                    errors.Add(new FieldValidationError(fieldPath, "必填字段"));
+                continue;
+            }
+            if (fieldValue is null || IsEmpty(fieldValue)) continue;
+
+            // 嵌套组合
+            if (field.DataType == "composite" && field.NestedType is not null)
+            {
+                ValidateComposite(field.NestedType, fieldValue, fieldPath, errors);
+                continue;
+            }
+
+            // 叶子字段
+            ValidateLeafField(field, fieldValue, fieldPath, errors);
+        }
+    }
+
+    private void ValidateArrayField(
+        CompositeFieldSchemaDto field, object? value, string path,
+        List<FieldValidationError> errors)
+    {
+        if (field.IsRequired && IsEmpty(value))
+        {
+            if (!HasDefaultOption(field.DataType, field.OptionSet?.Items))
+                errors.Add(new FieldValidationError(path, "必填字段"));
+            return;
+        }
+        if (value is null) return;
+
+        // 期望 IEnumerable（排除 string）
+        if (value is not IEnumerable items || value is string)
+        {
+            errors.Add(new FieldValidationError(path, "期望数组"));
+            return;
+        }
+
+        int i = 0;
+        foreach (var item in items)
+        {
+            var itemPath = $"{path}[{i}]";
+
+            if (field.IsRequired && IsEmpty(item))
+            {
+                if (!HasDefaultOption(field.DataType, field.OptionSet?.Items))
+                    errors.Add(new FieldValidationError(itemPath, "必填字段"));
+            }
+            else if (!IsEmpty(item))
+            {
+                if (field.DataType == "composite" && field.NestedType is not null)
+                    ValidateComposite(field.NestedType, item, itemPath, errors);
+                else
+                    ValidateLeafField(field, item, itemPath, errors);
+            }
+            i++;
+        }
+    }
+
+    /// <summary>
+    /// 组合内叶子字段校验：value 保证非空。
+    ///
+    /// ★ 修复 P0-3：int 类型拒绝小数。
+    /// ★ 修复 P0-5：未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内。
+    /// </summary>
+    private void ValidateLeafField(
+        CompositeFieldSchemaDto field, object value, string path,
+        List<FieldValidationError> errors)
+    {
+        switch (field.DataType)
+        {
+            case "string":
+                ValidateStringRules(
+                    value.ToString() ?? "", field.ValidationRule,
+                    field.AllowedValues, path, errors);
+                break;
+
+            case "int":
+            case "decimal":
+            {
+                // 组合内 decimal 带单位（NumericInput 负载）
+                if (value is NumericInput ni)
+                {
+                    if (field.Unit is null && ni.UnitId is not null)
+                    {
+                        errors.Add(new FieldValidationError(
+                            path, "该字段未绑定基准单位，不允许指定单位"));
+                        break;
+                    }
+
+                    if (field.Unit is not null && ni.UnitId is { } uid
+                        && field.AvailableUnits?.All(u => u.Id != uid) == true)
+                    {
+                        errors.Add(new FieldValidationError(
+                            path, "指定的单位不属于该字段的可用单位"));
+                        break;
+                    }
+
+                    // ★ int 类型必须为整数
+                    if (field.DataType == "int"
+                        && ni.Value != Math.Truncate(ni.Value))
+                    {
+                        errors.Add(new FieldValidationError(
+                            path, "int 类型不接受小数"));
+                        break;
+                    }
+
+                    // 范围校验：前端不做单位归一化，按原始输入值近似
+                    // （严格的归一化范围校验由后端负责）
+                    if (field.ValidationRule is not null)
+                        ValidateNumericRules(ni.Value, field.ValidationRule, path, errors);
+                    break;
+                }
+
+                // 裸数值路径
+                var num = ToDecimal(value);
+                if (num is null)
+                {
+                    errors.Add(new FieldValidationError(path, "数值格式错误"));
+                    break;
+                }
+
+                // ★ int 类型必须为整数
+                if (field.DataType == "int"
+                    && num.Value != Math.Truncate(num.Value))
+                {
+                    errors.Add(new FieldValidationError(
+                        path, "int 类型不接受小数"));
+                    break;
+                }
+
+                ValidateNumericRules(num.Value, field.ValidationRule, path, errors);
+                break;
+            }
+
+            case "date":
+                if (value is string ds && DateOnly.TryParse(ds, out var d))
+                    ValidateDateRules(d, field.ValidationRule, path, errors);
+                else
+                    errors.Add(new FieldValidationError(
+                        path, "日期格式错误（应为 yyyy-MM-dd）"));
+                break;
+
+            case "time":
+                if (value is string ts && TimeOnly.TryParse(ts, out var t))
+                    ValidateTimeRules(t, field.ValidationRule, path, errors);
+                else
+                    errors.Add(new FieldValidationError(
+                        path, "时间格式错误（应为 HH:mm:ss）"));
+                break;
+
+            case "single_choice":
+                // 优先用选项集校验，无则回退到 AllowedValues
+                if (field.OptionSet is not null)
+                {
+                    var v = value.ToString() ?? "";
+                    if (field.OptionSet.Items.All(i => i.Value != v))
+                    {
+                        var valid = string.Join("、",
+                            field.OptionSet.Items.Select(i => i.Value));
+                        errors.Add(new FieldValidationError(
+                            path, $"值 '{v}' 不在选项集中（有效值：{valid}）"));
+                    }
+                }
+                else if (field.AllowedValues is JsonElement av
+                         && av.ValueKind == JsonValueKind.Array)
+                {
+                    var allowed = av.EnumerateArray()
+                        .Where(x => x.ValueKind == JsonValueKind.String)
+                        .Select(x => x.GetString()!)
+                        .ToList();
+
+                    if (allowed.Count > 0)
+                    {
+                        var v = value.ToString() ?? "";
+                        if (!allowed.Contains(v))
+                            errors.Add(new FieldValidationError(
+                                path, $"值必须是以下之一：{string.Join("、", allowed)}"));
+                    }
+                }
+                break;
+
+            case "json":
+            case "file":
+                if (value is string rawJson && !string.IsNullOrWhiteSpace(rawJson))
+                {
+                    var jsonErr = ValidateJsonText(rawJson);
+                    if (jsonErr is not null)
+                        errors.Add(new FieldValidationError(path, jsonErr));
+                }
+                break;
+        }
+    }
+
+    // ============================================================
+    // 规则方法
+    // ============================================================
+
+    private static void ValidateStringRules(
+        string s, JsonElement? validationRule, JsonElement? allowedValues,
+        string path, List<FieldValidationError> errors)
+    {
+        foreach (var msg in FieldValidationRules.ValidateString(s, validationRule, allowedValues))
+            errors.Add(new FieldValidationError(path, msg));
+    }
+
+    private static void ValidateNumericRules(
+        decimal value, JsonElement? validationRule,
+        string path, List<FieldValidationError> errors)
+    {
+        foreach (var msg in FieldValidationRules.ValidateNumeric(value, validationRule))
+            errors.Add(new FieldValidationError(path, msg));
+    }
+
+    private static void ValidateDateRules(
+        DateOnly d, JsonElement? validationRule,
+        string path, List<FieldValidationError> errors)
+    {
+        foreach (var msg in FieldValidationRules.ValidateDate(d, validationRule))
+            errors.Add(new FieldValidationError(path, msg));
+    }
+
+    private static void ValidateTimeRules(
+        TimeOnly t, JsonElement? validationRule,
+        string path, List<FieldValidationError> errors)
+    {
+        foreach (var msg in FieldValidationRules.ValidateTime(t, validationRule))
+            errors.Add(new FieldValidationError(path, msg));
+    }
+
+    // ============================================================
+    // 工具
+    // ============================================================
+
+    private static string JoinPath(string basePath, string name)
+        => string.IsNullOrEmpty(basePath) ? name : $"{basePath}.{name}";
+
+    private static bool IsEmpty(object? v) => v switch
+    {
+        null => true,
+        string s => string.IsNullOrWhiteSpace(s),
+        // 数组（List<object?> / object?[]）无元素视为空
+        ICollection c when c.Count == 0 => true,
+        _ => false
+    };
+
+    /// <summary>
+    /// ★ 修复 P0-4 的辅助：判断 single_choice 是否含默认选项（有默认值时必填放行）。
+    /// 与后端 EavValidationService.ValidateSingleChoice 语义一致。
+    /// </summary>
+    private static bool HasDefaultOption(
+        string dataType, IReadOnlyList<OptionItemSchemaDto>? items)
+        => dataType == "single_choice"
+        && items is { Count: > 0 }
+        && items.Any(i => i.IsDefault);
+
+    private static decimal? ToDecimal(object? v) => v switch
+    {
+        decimal d => d,
+        long l => l,
+        int i => i,
+        double db => (decimal)db,
+        NumericInput ni => ni.Value,
+        string s when decimal.TryParse(s, NumberStyles.Float,
+            CultureInfo.InvariantCulture, out var parsed) => parsed,
+        _ => null
+    };
+}
+```
+
+## 文件 5/8 TreeGraph.Blazor/Services/FieldValidationError.cs
+
+```csharp
+namespace TreeGraph.Blazor.Services;
+
+/// <summary>
+/// 结构化字段校验错误。
+///
+/// Path 语义：相对某个 AttributeSchemaDto 的路径。
+///   - ""                 → 属性本身
+///   - "brand"            → composite 内的 brand 子字段
+///   - "brand.name"       → brand 的 name 子字段
+///   - "tags[0]"          → 数组 tags 的第 0 个元素
+///   - "tags[0].sub"      → 数组 tags 的第 0 个元素的 sub 子字段
+///
+/// 父级组件按前缀筛选后，剥离前缀传给子组件；子组件只看它负责的部分。
+/// </summary>
+public sealed record FieldValidationError(string Path, string Message);
+```
+
+## 文件 6/8 TreeGraph.Blazor/Services/FieldValidationRules.cs
+
+```csharp
+using System.Globalization;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+
+namespace TreeGraph.Blazor.Services;
+
+/// <summary>
+/// 字段校验规则引擎（纯静态，无状态）。
+///
+/// 被 EavFieldValidator 与 CustomTableEditor 共用，
+/// 保证顶层属性 / 组合字段 / 自定义表列的规则语义一致。
+/// </summary>
+public static class FieldValidationRules
+{
+    /// <summary>数值 min/max。rule 为空或非对象 → 返回空列表。</summary>
+    public static List<string> ValidateNumeric(decimal value, JsonElement? rule)
+    {
+        var errors = new List<string>();
+        if (rule is not JsonElement r || r.ValueKind != JsonValueKind.Object)
+            return errors;
+
+        if (r.TryGetProperty("min", out var min) && TryGetDecimal(min, out var minVal)
+            && value < minVal)
+            errors.Add($"不能小于 {minVal}");
+
+        if (r.TryGetProperty("max", out var max) && TryGetDecimal(max, out var maxVal)
+            && value > maxVal)
+            errors.Add($"不能大于 {maxVal}");
+
+        return errors;
+    }
+
+    /// <summary>字符串：AllowedValues + minLength / maxLength / regex。</summary>
+    public static List<string> ValidateString(
+        string s, JsonElement? rule, JsonElement? allowedValues)
+    {
+        var errors = new List<string>();
+
+        // AllowedValues 优先
+        if (allowedValues is JsonElement av && av.ValueKind == JsonValueKind.Array)
+        {
+            var allowed = av.EnumerateArray()
+                .Where(x => x.ValueKind == JsonValueKind.String)
+                .Select(x => x.GetString()!)
+                .ToList();
+
+            if (allowed.Count > 0 && !allowed.Contains(s))
+                errors.Add($"值必须是以下之一：{string.Join("、", allowed)}");
+        }
+
+        if (rule is not JsonElement r || r.ValueKind != JsonValueKind.Object)
+            return errors;
+
+        if (r.TryGetProperty("minLength", out var minL) && minL.TryGetInt32(out var minLen)
+            && s.Length < minLen)
+            errors.Add($"长度不能少于 {minLen} 个字符");
+
+        if (r.TryGetProperty("maxLength", out var maxL) && maxL.TryGetInt32(out var maxLen)
+            && s.Length > maxLen)
+            errors.Add($"长度不能超过 {maxLen} 个字符");
+
+        if (r.TryGetProperty("regex", out var rx) && rx.ValueKind == JsonValueKind.String)
+        {
+            var pattern = rx.GetString();
+            if (!string.IsNullOrEmpty(pattern))
+            {
+                try
+                {
+                    if (!Regex.IsMatch(s, pattern))
+                        errors.Add(r.TryGetProperty("message", out var m)
+                            && m.ValueKind == JsonValueKind.String
+                            ? m.GetString()!
+                            : "格式不正确");
+                }
+                catch (ArgumentException) { /* 非法正则忽略 */ }
+            }
+        }
+
+        return errors;
+    }
+
+    /// <summary>日期 minDate / maxDate。</summary>
+    public static List<string> ValidateDate(DateOnly d, JsonElement? rule)
+    {
+        var errors = new List<string>();
+        if (rule is not JsonElement r || r.ValueKind != JsonValueKind.Object)
+            return errors;
+
+        if (r.TryGetProperty("minDate", out var minD)
+            && minD.ValueKind == JsonValueKind.String
+            && DateOnly.TryParse(minD.GetString(), out var minDate) && d < minDate)
+            errors.Add($"日期不能早于 {minDate:yyyy-MM-dd}");
+
+        if (r.TryGetProperty("maxDate", out var maxD)
+            && maxD.ValueKind == JsonValueKind.String
+            && DateOnly.TryParse(maxD.GetString(), out var maxDate) && d > maxDate)
+            errors.Add($"日期不能晚于 {maxDate:yyyy-MM-dd}");
+
+        return errors;
+    }
+
+    /// <summary>时间 minTime / maxTime。</summary>
+    public static List<string> ValidateTime(TimeOnly t, JsonElement? rule)
+    {
+        var errors = new List<string>();
+        if (rule is not JsonElement r || r.ValueKind != JsonValueKind.Object)
+            return errors;
+
+        if (r.TryGetProperty("minTime", out var minT)
+            && minT.ValueKind == JsonValueKind.String
+            && TimeOnly.TryParse(minT.GetString(), out var minTime) && t < minTime)
+            errors.Add($"时间不能早于 {minTime:HH:mm:ss}");
+
+        if (r.TryGetProperty("maxTime", out var maxT)
+            && maxT.ValueKind == JsonValueKind.String
+            && TimeOnly.TryParse(maxT.GetString(), out var maxTime) && t > maxTime)
+            errors.Add($"时间不能晚于 {maxTime:HH:mm:ss}");
+
+        return errors;
+    }
+
+    public static bool TryGetDecimal(JsonElement elem, out decimal value)
+    {
+        if (elem.ValueKind == JsonValueKind.Number && elem.TryGetDecimal(out value))
+            return true;
+        if (elem.ValueKind == JsonValueKind.String)
+            return decimal.TryParse(elem.GetString(), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out value);
+        value = 0;
+        return false;
+    }
+}
+```
+
+## 文件 7/8 TreeGraph.Blazor/Services/FilterOperatorCatalog.cs
+
+```csharp
+using TreeGraph.Shared.Eav.Dtos;
+
+namespace TreeGraph.Blazor.Services;
+
+/// <summary>
+/// 动态查询运算符的元数据。
+///
+/// 职责：
+///   1) 按属性类型列出可用运算符
+///   2) 提供运算符的显示名
+///   3) 标记运算符是否需要第二个值（between）或多个值（in/nin）
+///
+/// 与后端 EavQueryService 的运算符支持严格对应，见：
+///   TreeGraph.Api/Services/EavQueryService.cs
+/// </summary>
+public static class FilterOperatorCatalog
+{
+    public sealed record OperatorInfo(
+        string Code,
+        string DisplayName,
+        bool NeedsValue2 = false,
+        bool IsMultiValue = false);
+
+    private static readonly OperatorInfo[] _numeric = new[]
+    {
+        new OperatorInfo("eq", "等于"),
+        new OperatorInfo("neq", "不等于"),
+        new OperatorInfo("gt", "大于"),
+        new OperatorInfo("gte", "大于等于"),
+        new OperatorInfo("lt", "小于"),
+        new OperatorInfo("lte", "小于等于"),
+        new OperatorInfo("between", "区间", NeedsValue2: true),
+        new OperatorInfo("in", "包含于", IsMultiValue: true)
+    };
+
+    private static readonly OperatorInfo[] _string = new[]
+    {
+        new OperatorInfo("eq", "等于"),
+        new OperatorInfo("neq", "不等于"),
+        new OperatorInfo("like", "包含"),
+        new OperatorInfo("startswith", "开头是"),
+        new OperatorInfo("endswith", "结尾是"),
+        new OperatorInfo("in", "包含于", IsMultiValue: true)
+    };
+
+    private static readonly OperatorInfo[] _bool = new[]
+    {
+        new OperatorInfo("eq", "等于")
+    };
+
+    private static readonly OperatorInfo[] _datetime = new[]
+    {
+        new OperatorInfo("eq", "等于"),
+        new OperatorInfo("gt", "晚于"),
+        new OperatorInfo("gte", "不早于"),
+        new OperatorInfo("lt", "早于"),
+        new OperatorInfo("lte", "不晚于"),
+        new OperatorInfo("between", "区间", NeedsValue2: true)
+    };
+
+    private static readonly OperatorInfo[] _date = _datetime;
+    private static readonly OperatorInfo[] _time = _datetime;
+
+    private static readonly OperatorInfo[] _singleChoice = new[]
+    {
+        new OperatorInfo("eq", "等于"),
+        new OperatorInfo("neq", "不等于"),
+        new OperatorInfo("in", "包含于", IsMultiValue: true),
+        new OperatorInfo("nin", "不包含于", IsMultiValue: true)
+    };
+
+    /// <summary>属性的基准类型（忽略 unit 后缀）。</summary>
+    public static string BaseKind(string dataType) => dataType switch
+    {
+        "int" or "decimal" => "numeric",
+        "string" => "string",
+        "bool" => "bool",
+        "datetime" => "datetime",
+        "date" => "date",
+        "time" => "time",
+        "single_choice" => "single_choice",
+        _ => "unsupported"
+    };
+
+    /// <summary>按属性返回可用运算符列表。</summary>
+    public static IReadOnlyList<OperatorInfo> For(AttributeSchemaDto attr) => attr.DataType switch
+    {
+        "int" or "decimal" => _numeric,
+        "string" => _string,
+        "bool" => _bool,
+        "datetime" => _datetime,
+        "date" => _date,
+        "time" => _time,
+        "single_choice" => _singleChoice,
+        _ => Array.Empty<OperatorInfo>()
+    };
+
+    /// <summary>该属性是否支持动态查询。</summary>
+    public static bool IsSupported(AttributeSchemaDto attr) =>
+        attr.DataType is "int" or "decimal" or "string" or "bool"
+            or "datetime" or "date" or "time" or "single_choice";
+
+    /// <summary>根据 Code 取运算符元数据。</summary>
+    public static OperatorInfo? Get(AttributeSchemaDto attr, string code)
+        => For(attr).FirstOrDefault(o => o.Code == code);
+}
+```
+
+## 文件 8/8 TreeGraph.Blazor/Services/NumericInput.cs
+
+```csharp
+namespace TreeGraph.Blazor.Services;
+
+public class NumericInput
+{
+    public decimal Value { get; set; }
+    public Guid? UnitId { get; set; }
+
+    public object ToSubmitValue()
+        => UnitId is null ? Value : new { value = Value, unitId = UnitId.Value };
+}
+```
+

@@ -137,8 +137,9 @@ public class EavFieldValidator : IEavFieldValidator
     /// <summary>
     /// 顶层数值属性校验。
     ///
-    /// ★ 修复 P0-3：int 类型拒绝小数。
-    /// ★ 修复 P0-5：未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内。
+    /// ★ int 无单位：拒绝小数（写入 ValueInt 会截断）
+    /// ★ int 有单位：允许小数（归一化到基准单位可能产生小数，写 ValueDecimal）
+    /// ★ 未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内
     /// </summary>
     private void ValidateNumericAttribute(
         object value, AttributeSchemaDto attr, string path,
@@ -170,10 +171,12 @@ public class EavFieldValidator : IEavFieldValidator
             return;
         }
 
-        // ★ int 类型必须为整数
-        if (attr.DataType == "int" && d.Value != Math.Truncate(d.Value))
+        // ★ int 无单位时才拒绝小数
+        if (attr.DataType == "int"
+            && attr.Unit is null
+            && d.Value != Math.Truncate(d.Value))
         {
-            errors.Add(new FieldValidationError(path, "int 类型不接受小数"));
+            errors.Add(new FieldValidationError(path, "int 类型（无单位）不接受小数"));
             return;
         }
 
@@ -272,8 +275,9 @@ public class EavFieldValidator : IEavFieldValidator
     /// <summary>
     /// 组合内叶子字段校验：value 保证非空。
     ///
-    /// ★ 修复 P0-3：int 类型拒绝小数。
-    /// ★ 修复 P0-5：未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内。
+    /// ★ int 无单位：拒绝小数（写入 ValueInt 会截断）
+    /// ★ int 有单位：允许小数（归一化到基准单位可能产生小数，写 ValueDecimal）
+    /// ★ 未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内
     /// </summary>
     private void ValidateLeafField(
         CompositeFieldSchemaDto field, object value, string path,
@@ -308,12 +312,13 @@ public class EavFieldValidator : IEavFieldValidator
                         break;
                     }
 
-                    // ★ int 类型必须为整数
+                    // ★ int 无单位时才拒绝小数
                     if (field.DataType == "int"
+                        && field.Unit is null
                         && ni.Value != Math.Truncate(ni.Value))
                     {
                         errors.Add(new FieldValidationError(
-                            path, "int 类型不接受小数"));
+                            path, "int 类型（无单位）不接受小数"));
                         break;
                     }
 
@@ -332,12 +337,13 @@ public class EavFieldValidator : IEavFieldValidator
                     break;
                 }
 
-                // ★ int 类型必须为整数
+                // ★ int 无单位时才拒绝小数
                 if (field.DataType == "int"
+                    && field.Unit is null
                     && num.Value != Math.Truncate(num.Value))
                 {
                     errors.Add(new FieldValidationError(
-                        path, "int 类型不接受小数"));
+                        path, "int 类型（无单位）不接受小数"));
                     break;
                 }
 

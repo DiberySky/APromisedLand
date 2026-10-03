@@ -35,29 +35,41 @@ public class EavMetadataController : ControllerBase
     /// <summary>
     /// 创建属性定义。
     ///
-    /// ★ 单位绑定约束：只有 decimal 类型可以绑定 UnitId。
-    /// int 类型拒绝绑定，因为归一化到基准单位时会产生小数（如 150 cm → 1.5 m），
-    /// 写入 ValueInt (bigint) 会静默截断，造成数据损坏。
+    /// AttributeName 可选：
+    ///   - null / 空：自动生成 `attr_` + 12 位 hex
+    ///   - 非空：必须字母开头，字母/数字/下划线，且同一 EntityType 下唯一
+    ///
+    /// int / decimal 均可绑定单位（原 int 拒绝逻辑已移除）。
     /// </summary>
     [HttpPost("attributes")]
     public async Task<IActionResult> CreateAttribute(
         [FromBody] CreateAttributeRequest req, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(req.EntityType)
-            || string.IsNullOrWhiteSpace(req.AttributeName))
-            return BadRequest(new { error = "EntityType 与 AttributeName 必填" });
-
+        // ---- 基础校验 ----
+        if (string.IsNullOrWhiteSpace(req.EntityType))
+            return BadRequest(new { error = "EntityType 必填" });
+        if (string.IsNullOrWhiteSpace(req.DisplayName))
+            return BadRequest(new { error = "DisplayName 必填" });
         if (!EavDataTypes.All.Contains(req.DataType))
             return BadRequest(new { error = $"未知的 dataType: {req.DataType}" });
 
-        // 引用互斥
+        // ---- 实体类型存在性 ----
+        var entityTypeExists = await _db.EntityTypes
+            .AnyAsync(t => t.EntityType == req.EntityType && !t.IsDeleted, ct);
+        if (!entityTypeExists)
+            return BadRequest(new
+            {
+                error = $"实体类型不存在: {req.EntityType}。请先在「实体类型管理」中创建"
+            });
+
+        // ---- 引用互斥 ----
         var refCount = new[] {
             req.RefCompositeTypeId, req.RefTableDefinitionId, req.RefOptionSetId
         }.Count(x => x is not null);
         if (refCount > 1)
             return BadRequest(new { error = "组合类型 / 自定义表 / 选项集引用互斥" });
 
-        // 类型与引用匹配
+        // ---- 类型与引用匹配 ----
         if (req.DataType == EavDataTypes.Composite && req.RefCompositeTypeId is null)
             return BadRequest(new { error = "composite 必须指定 refCompositeTypeId" });
         if (req.DataType == EavDataTypes.Table && req.RefTableDefinitionId is null)
@@ -68,18 +80,7 @@ public class EavMetadataController : ControllerBase
             or EavDataTypes.SingleChoice) && refCount > 0)
             return BadRequest(new { error = "当前 dataType 不支持引用" });
 
-        // ★ 单位只允许 decimal
-        if (req.UnitId is not null && req.DataType != EavDataTypes.Decimal)
-        {
-            return BadRequest(new
-            {
-                error = "只有 decimal 类型可以绑定单位。" +
-                        "int 类型归一化到基准单位时会产生小数（如 150 cm → 1.5 m），" +
-                        "写入 bigint 列会静默截断，请改用 decimal。"
-            });
-        }
-
-        // 引用存在性
+        // ---- 引用存在性 ----
         if (req.UnitId is { } uid
             && !await _db.Units.AnyAsync(u => u.Id == uid && !u.IsDeleted, ct))
             return BadRequest(new { error = $"单位不存在: {uid}" });
@@ -95,11 +96,53 @@ public class EavMetadataController : ControllerBase
             && !await _db.OptionSets.AnyAsync(s => s.OptionSetId == sid, ct))
             return BadRequest(new { error = $"选项集不存在: {sid}" });
 
+        // ---- AttributeName 生成 / 校验 ----
+        string attributeName;
+        bool userSpecified = !string.IsNullOrWhiteSpace(req.AttributeName);
+
+        if (userSpecified)
+        {
+            attributeName = req.AttributeName!.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(
+                    attributeName, @"^[A-Za-z][A-Za-z0-9_]*$"))
+                return BadRequest(new
+                {
+                    error = "AttributeName 必须以字母开头，只含字母、数字、下划线"
+                });
+            if (attributeName.Length > 200)
+                return BadRequest(new { error = "AttributeName 过长（最大 200 字符）" });
+        }
+        else
+        {
+            attributeName = GenerateAttributeName();
+        }
+
+        // ---- 唯一性检查（用户指定的冲突直接 409，自动生成的碰撞重试最多 3 次）----
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            var conflict = await _db.AttributeCatalog.AnyAsync(
+                a => a.EntityType == req.EntityType
+                  && a.AttributeName == attributeName,
+                ct);
+
+            if (!conflict) break;
+
+            if (userSpecified)
+                return Conflict(new
+                {
+                    error = $"属性名已存在: {req.EntityType}.{attributeName}"
+                });
+
+            // 自动生成的碰撞：重新生成
+            attributeName = GenerateAttributeName();
+        }
+
+        // ---- 创建 ----
         var def = new AttributeDefinition
         {
             EntityType = req.EntityType,
-            AttributeName = req.AttributeName,
-            DisplayName = req.DisplayName,
+            AttributeName = attributeName,
+            DisplayName = req.DisplayName.Trim(),
             DataType = req.DataType,
             IsRequired = req.IsRequired,
             IsSearchable = req.IsSearchable,
@@ -120,8 +163,15 @@ public class EavMetadataController : ControllerBase
         await _db.SaveChangesAsync(ct);
         _attrCache.Invalidate(req.EntityType);
 
-        return Ok(new { def.AttributeId });
+        return Ok(new { def.AttributeId, def.AttributeName });
     }
+
+    /// <summary>
+    /// 生成属性内部标识：`attr_` + 12 位随机 hex（如 attr_3f9a2b1c8d4e）。
+    /// 48 bit 随机，同 EntityType 下碰撞概率可忽略；有重试保护。
+    /// </summary>
+    private static string GenerateAttributeName()
+        => "attr_" + Guid.NewGuid().ToString("N")[..12];
 
     [HttpPost("composite-types")]
     public async Task<IActionResult> CreateCompositeType(
@@ -659,7 +709,7 @@ public class EavMetadataController : ControllerBase
     /// <summary>
     /// 更新属性定义。
     ///
-    /// ★ 单位绑定约束：只有 decimal 类型可以绑定 UnitId。
+    /// ★ int / decimal 均可绑定单位。
     /// 不可修改：EntityType、AttributeName、DataType。
     /// </summary>
     [HttpPut("attributes/{id}")]
@@ -688,16 +738,6 @@ public class EavMetadataController : ControllerBase
         }
         else if (req.UnitId is not null)
         {
-            if (def.DataType != EavDataTypes.Decimal)
-            {
-                return BadRequest(new
-                {
-                    error = "只有 decimal 类型可以绑定单位。" +
-                            "int 类型归一化到基准单位时会产生小数（如 150 cm → 1.5 m），" +
-                            "写入 bigint 列会静默截断。"
-                });
-            }
-
             var exists = await _db.Units.AnyAsync(
                 u => u.Id == req.UnitId.Value && !u.IsDeleted, ct);
             if (!exists) return BadRequest(new { error = $"单位不存在: {req.UnitId}" });

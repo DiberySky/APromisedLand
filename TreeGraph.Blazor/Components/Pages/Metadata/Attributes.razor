@@ -3,6 +3,7 @@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject EntityTypeDisplayService EntityTypeDisplay
 @* Attributes.razor *@
 <PageTitle>属性定义管理</PageTitle>
 
@@ -11,9 +12,35 @@
 <MudPaper Class="pa-4 mb-4">
     <MudGrid>
         <MudItem xs="12" md="3" Class="d-flex align-center">
-            <MudTextField @bind-Value="_entityType" Label="实体类型"
-                          Variant="Variant.Outlined" Margin="Margin.Dense"
-                          Placeholder="如 Product" />
+            <MudSelect T="string"
+                       Value="_entityType"
+                       ValueChanged="OnEntityTypeChanged"
+                       Label="实体类型"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       FullWidth="true">
+                @if (_entityTypes is null)
+                {
+                    <MudSelectItem T="string" Value="@("")" Disabled="true">
+                        加载中...
+                    </MudSelectItem>
+                }
+                else if (_entityTypes.Count == 0)
+                {
+                    <MudSelectItem T="string" Value="@("")" Disabled="true">
+                        （暂无实体类型）
+                    </MudSelectItem>
+                }
+                else
+                {
+                    @foreach (var et in _entityTypes)
+                    {
+                        <MudSelectItem T="string" Value="@et.EntityType">
+                            @GetDisplayName(et) (@et.AttributeCount)
+                        </MudSelectItem>
+                    }
+                }
+            </MudSelect>
         </MudItem>
         <MudItem xs="12" md="3" Class="d-flex align-center">
             <MudSwitch T="bool" @bind-Value="_includeDeleted"
@@ -22,14 +49,15 @@
         </MudItem>
         <MudItem xs="12" md="6" Class="d-flex align-center">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       OnClick="LoadAsync" Disabled="_loading"
+                       OnClick="LoadAsync" Disabled="@_loading"
                        StartIcon="@Icons.Material.Filled.Refresh">
                 刷新
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Success"
                        OnClick="OpenCreateDialog"
                        StartIcon="@Icons.Material.Filled.Add"
-                       Class="ml-2">
+                       Class="ml-2"
+                       Disabled="@(string.IsNullOrEmpty(_entityType))">
                 新建属性
             </MudButton>
         </MudItem>
@@ -47,7 +75,14 @@ else if (_attributes is null || _attributes.Count == 0)
                  Size="Size.Large" Color="Color.Default" />
         <MudText Typo="Typo.h6" Class="mt-2">暂无属性定义</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            填写实体类型后点击"刷新"加载属性
+            @if (string.IsNullOrEmpty(_entityType))
+            {
+                <text>请先在上方选择一个实体类型</text>
+            }
+            else
+            {
+                <text>点击"新建属性"为该实体类型添加第一个属性</text>
+            }
         </MudText>
     </MudPaper>
 }
@@ -81,20 +116,16 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd>
-                <code>@context.AttributeName</code>
+                @* 主显中文，副显内部标识（小字） *@
+                <MudText Typo="Typo.body2">@context.DisplayName</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <code>@context.AttributeName</code>
+                </MudText>
                 @if (context.IsDeleted)
                 {
                     <MudChip T="string" Size="Size.Small" Color="Color.Error"
                              Class="ml-1">
                         已删除
-                    </MudChip>
-                }
-                @* ★ 数据一致性告警：int + UnitId 是非法组合 *@
-                @if (context.DataType == "int" && context.UnitId is not null)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Error"
-                             Class="ml-1">
-                        ⚠ 非法单位绑定
                     </MudChip>
                 }
             </MudTd>
@@ -108,19 +139,22 @@ else
             <MudTd>
                 @if (context.UnitId is not null)
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                             Class="mr-1">
                         单位: @context.UnitSymbol
                     </MudChip>
                 }
                 @if (context.RefCompositeTypeId is not null)
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Dark">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Dark"
+                             Class="mr-1">
                         组合: @context.CompositeTypeName
                     </MudChip>
                 }
                 @if (context.RefTableDefinitionId is not null)
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info"
+                             Class="mr-1">
                         表: @context.TableName
                     </MudChip>
                 }
@@ -169,7 +203,6 @@ else
                 }
                 else
                 {
-                    @* ★ 软删除的属性：提供恢复入口 *@
                     <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
                                    Size="Size.Small"
                                    Color="Color.Success"
@@ -192,16 +225,31 @@ else
         <MudText Typo="Typo.h6">新建属性</MudText>
     </TitleContent>
     <DialogContent>
-        <MudTextField @bind-Value="_createForm.EntityType"
-                      Label="实体类型" Placeholder="Product"
-                      Variant="Variant.Outlined" Class="mb-3" />
-        <MudTextField @bind-Value="_createForm.AttributeName"
-                      Label="属性名 (snake_case)" Placeholder="screen_size"
-                      Variant="Variant.Outlined" Class="mb-3" />
-        <MudTextField @bind-Value="_createForm.DisplayName"
-                      Label="显示名" Placeholder="屏幕尺寸"
-                      Variant="Variant.Outlined" Class="mb-3" />
+        @* 实体类型（下拉） *@
+        <MudSelect T="string"
+                   Value="_createForm.EntityType"
+                   ValueChanged="@(v => _createForm.EntityType = v)"
+                   Label="实体类型"
+                   Variant="Variant.Outlined"
+                   Class="mb-3"
+                   HelperText="如需新类型，请先到「实体类型管理」创建">
+            @foreach (var et in _entityTypes ?? Array.Empty<EntityTypeSummaryDto>())
+            {
+                <MudSelectItem T="string" Value="@et.EntityType">
+                    @GetDisplayName(et)
+                </MudSelectItem>
+            }
+        </MudSelect>
 
+        @* 显示名（必填，中文） *@
+        <MudTextField @bind-Value="_createForm.DisplayName"
+                      Label="显示名"
+                      Placeholder="屏幕尺寸"
+                      Variant="Variant.Outlined"
+                      Class="mb-3"
+                      HelperText="用户在界面上看到的名字" />
+
+        @* 数据类型 *@
         <MudSelect T="string"
                    Value="_createForm.DataType"
                    ValueChanged="OnCreateDataTypeChanged"
@@ -214,8 +262,8 @@ else
             }
         </MudSelect>
 
-        @* ★ 只有 decimal 显示单位选择。int 归一化会产生小数，禁止绑定单位。 *@
-        @if (_createForm.DataType == "decimal")
+        @* int / decimal：单位 *@
+        @if (_createForm.DataType is "decimal" or "int")
         {
             <MudSelect T="Guid?"
                        Value="_createForm.UnitId"
@@ -234,13 +282,8 @@ else
                 }
             </MudSelect>
         }
-        else if (_createForm.DataType == "int")
-        {
-            <MudAlert Severity="Severity.Info" Class="mb-3">
-                int 类型不支持绑定单位。若需要单位换算（如 cm ↔ m），请选择 decimal。
-            </MudAlert>
-        }
 
+        @* composite *@
         @if (_createForm.DataType == "composite")
         {
             <MudSelect T="string"
@@ -258,6 +301,7 @@ else
             </MudSelect>
         }
 
+        @* table *@
         @if (_createForm.DataType == "table")
         {
             <MudSelect T="string"
@@ -275,6 +319,7 @@ else
             </MudSelect>
         }
 
+        @* single_choice *@
         @if (_createForm.DataType == "single_choice")
         {
             <MudSelect T="string"
@@ -312,6 +357,26 @@ else
                            Label="可排序" Color="Color.Primary" />
             </MudItem>
         </MudGrid>
+
+        @* 高级选项：AttributeName 可选覆盖 *@
+        <MudExpansionPanels Class="mt-3">
+            <MudExpansionPanel Text="高级选项（内部标识）">
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                    <MudText Typo="Typo.caption">
+                        内部标识（AttributeName）会出现在 <b>JSON key</b>、
+                        查询过滤、审计日志、导出列名里。
+                        留空则系统自动生成（如 <code>attr_3f9a2b1c8d4e</code>）。
+                        如需与外部系统对接，建议手动指定可读的英文标识。
+                    </MudText>
+                </MudAlert>
+                <MudTextField @bind-Value="_createForm.AttributeName"
+                              Label="内部标识（可选）"
+                              Placeholder="screen_size"
+                              Variant="Variant.Outlined"
+                              HelperText="留空自动生成；填了则：字母开头，只含字母/数字/下划线"
+                              Immediate="true" />
+            </MudExpansionPanel>
+        </MudExpansionPanels>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => _showCreateDialog = false)">取消</MudButton>
@@ -343,8 +408,7 @@ else
                       Variant="Variant.Outlined"
                       Class="mb-3" />
 
-        @* ★ decimal：正常显示单位选择 *@
-        @if (_editingAttribute?.DataType == "decimal")
+        @if (_editingAttribute?.DataType is "decimal" or "int")
         {
             <MudSelect T="Guid?"
                        Value="_editForm.UnitId"
@@ -364,34 +428,6 @@ else
             </MudSelect>
             <MudAlert Severity="Severity.Warning" Class="mb-3">
                 修改基准单位不会自动转换已有数据。如需变更，请先规划数据迁移。
-            </MudAlert>
-        }
-        @* ★ int + 历史遗留 UnitId：只提供"清除"入口，不允许重设 *@
-        else if (_editingAttribute?.DataType == "int"
-                 && _editingAttribute.UnitId is not null)
-        {
-            <MudAlert Severity="Severity.Error" Class="mb-3">
-                <b>数据一致性告警</b>：该属性类型为 int，但仍绑定了单位
-                <code>@_editingAttribute.UnitSymbol</code>。
-                这是历史遗留的非法配置——归一化到基准单位时会产生小数
-                （如 150 cm → 1.5 m），写入 bigint 会静默截断。
-            </MudAlert>
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Error"
-                       StartIcon="@Icons.Material.Filled.LinkOff"
-                       OnClick="ClearLegacyUnitAsync"
-                       Disabled="@_submitting"
-                       Class="mb-3">
-                清除单位绑定
-            </MudButton>
-            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                清除后该属性不再有单位语义，已有数据保持原值不变。
-            </MudText>
-        }
-        else if (_editingAttribute?.DataType == "int")
-        {
-            <MudAlert Severity="Severity.Info" Class="mb-3">
-                int 类型不支持绑定单位。
             </MudAlert>
         }
 
@@ -485,6 +521,7 @@ else
     private bool _loading;
     private bool _initialized;
 
+    private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
     private IReadOnlyList<UnitDto>? _units;
     private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
     private IReadOnlyList<CustomTableDetailDto>? _customTables;
@@ -526,6 +563,7 @@ else
         _initialized = true;
 
         await LoadReferencesAsync();
+        await LoadEntityTypesAsync();
         await LoadAsync();
         StateHasChanged();
     }
@@ -552,11 +590,39 @@ else
             Snackbar.Add($"引用加载失败：{string.Join("、", failed)}", Severity.Warning);
     }
 
+    private async Task LoadEntityTypesAsync()
+    {
+        _entityTypes = await Api.ListEntityTypesAsync();
+
+        if (_entityTypes is null)
+        {
+            Snackbar.Add("实体类型加载失败，请检查后端服务", Severity.Warning);
+            _entityTypes = Array.Empty<EntityTypeSummaryDto>();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_entityType) && _entityTypes.Count > 0)
+        {
+            _entityType = _entityTypes[0].EntityType;
+        }
+    }
+
+    private static string GetDisplayName(EntityTypeSummaryDto et)
+        => string.IsNullOrWhiteSpace(et.DisplayName)
+            ? et.EntityType
+            : et.DisplayName;
+
+    private async Task OnEntityTypeChanged(string? value)
+    {
+        _entityType = value;
+        _searchString = null;
+        await LoadAsync();
+    }
+
     private async Task LoadAsync()
     {
         if (string.IsNullOrWhiteSpace(_entityType))
         {
-            Snackbar.Add("请先填写实体类型", Severity.Info);
             _attributes = Array.Empty<AttributeDetailDto>();
             return;
         }
@@ -576,23 +642,25 @@ else
 
     private void OpenCreateDialog()
     {
+        if (string.IsNullOrWhiteSpace(_entityType))
+        {
+            Snackbar.Add("请先选择实体类型", Severity.Warning);
+            return;
+        }
+
         _createForm = new CreateAttributeForm
         {
-            EntityType = _entityType ?? "Product",
+            EntityType = _entityType,
             DisplayOrder = (_attributes?.Count ?? 0) + 1,
             IsSearchable = true
         };
         _showCreateDialog = true;
     }
 
-    /// <summary>
-    /// ★ 切换数据类型时清空不适用的引用。
-    /// 关键点：只有 decimal 保留 UnitId。int 会被清空（数据库 CHECK 约束禁止）。
-    /// </summary>
     private void OnCreateDataTypeChanged(string dt)
     {
         _createForm.DataType = dt;
-        if (dt != "decimal") _createForm.UnitId = null;
+        if (dt is not ("decimal" or "int")) _createForm.UnitId = null;
         if (dt != "composite") _createForm.RefCompositeTypeId = null;
         if (dt != "table") _createForm.RefTableDefinitionId = null;
         if (dt != "single_choice") _createForm.RefOptionSetId = null;
@@ -602,10 +670,9 @@ else
     {
         var f = _createForm;
         if (string.IsNullOrWhiteSpace(f.EntityType) ||
-            string.IsNullOrWhiteSpace(f.AttributeName) ||
             string.IsNullOrWhiteSpace(f.DisplayName))
         {
-            Snackbar.Add("请填写实体类型、属性名、显示名", Severity.Warning);
+            Snackbar.Add("请填写实体类型、显示名", Severity.Warning);
             return;
         }
         if (f.DataType == "composite" && f.RefCompositeTypeId is null)
@@ -624,14 +691,31 @@ else
             return;
         }
 
+        // 高级选项校验（如填了 AttributeName）
+        if (!string.IsNullOrWhiteSpace(f.AttributeName))
+        {
+            var name = f.AttributeName.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(
+                    name, @"^[A-Za-z][A-Za-z0-9_]*$"))
+            {
+                Snackbar.Add(
+                    "内部标识必须以字母开头，只含字母、数字、下划线（或留空自动生成）",
+                    Severity.Warning);
+                return;
+            }
+        }
+
         _submitting = true;
         try
         {
             var id = await Api.CreateAttributeAsync(new CreateAttributeRequest
             {
                 EntityType = f.EntityType,
-                AttributeName = f.AttributeName,
-                DisplayName = f.DisplayName,
+                // null / 空 → 服务端自动生成
+                AttributeName = string.IsNullOrWhiteSpace(f.AttributeName)
+                    ? null
+                    : f.AttributeName.Trim(),
+                DisplayName = f.DisplayName.Trim(),
                 DataType = f.DataType,
                 IsRequired = f.IsRequired,
                 IsSearchable = f.IsSearchable,
@@ -649,7 +733,7 @@ else
                 return;
             }
 
-            Snackbar.Add($"创建成功：AttributeId={id}", Severity.Success);
+            Snackbar.Add($"创建成功：{f.DisplayName}", Severity.Success);
             _showCreateDialog = false;
             await LoadAsync();
         }
@@ -684,47 +768,6 @@ else
             RefOptionSetId = detail.RefOptionSetId
         };
         _showEditDialog = true;
-    }
-
-    /// <summary>
-    /// ★ 历史遗留的 int + UnitId 属性：一键清除单位绑定。
-    /// 走 UpdateAttribute 的 ClearUnitId = true 路径，不修改其它字段。
-    /// </summary>
-    private async Task ClearLegacyUnitAsync()
-    {
-        if (_editingAttribute is null) return;
-
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "清除单位绑定",
-            $"确定清除属性「{_editingAttribute.DisplayName}」的单位绑定？\n\n" +
-            "· 该属性类型为 int，不允许绑定单位。\n" +
-            "· 清除后属性不再有单位语义。\n" +
-            "· 已有数据的存储值保持不变（不换算）。",
-            yesText: "清除", cancelText: "取消");
-
-        if (confirmed != true) return;
-
-        _submitting = true;
-        try
-        {
-            var (ok, error) = await Api.UpdateAttributeAsync(
-                _editingAttribute.AttributeId,
-                new UpdateAttributeRequest { ClearUnitId = true });
-
-            if (!ok)
-            {
-                Snackbar.Add($"清除失败：{error ?? "未知错误"}", Severity.Error);
-                return;
-            }
-
-            Snackbar.Add("已清除单位绑定", Severity.Success);
-            _showEditDialog = false;
-            await LoadAsync();
-        }
-        finally
-        {
-            _submitting = false;
-        }
     }
 
     private async Task UpdateAsync()
@@ -785,7 +828,6 @@ else
         return (null, false);
     }
 
-    /// <summary>string 引用类型重载（ID 字符串化后 Diff 需要独立版本）。</summary>
     private static (string? Value, bool Clear) Diff(string? current, string? original)
     {
         if (current is null && original is not null) return (null, true);
@@ -799,7 +841,7 @@ else
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除属性「{attr.DisplayName}」({attr.AttributeName})？" +
+            $"确定删除属性「{attr.DisplayName}」？" +
             "此操作将软删除属性定义，已有数据保留但不再被新业务使用。",
             yesText: "删除", cancelText: "取消");
 
@@ -817,15 +859,11 @@ else
         }
     }
 
-    /// <summary>
-    /// ★ 恢复被软删除的属性。
-    /// 后端唯一约束不区分 IsDeleted：若已存在同名活动属性，返回 409。
-    /// </summary>
     private async Task UndeleteAsync(AttributeDetailDto attr)
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认恢复",
-            $"确定恢复属性「{attr.DisplayName}」({attr.AttributeName})？",
+            $"确定恢复属性「{attr.DisplayName}」？",
             yesText: "恢复", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -871,7 +909,7 @@ else
     private class CreateAttributeForm
     {
         public string EntityType { get; set; } = "";
-        public string AttributeName { get; set; } = "";
+        public string? AttributeName { get; set; }    // 可空
         public string DisplayName { get; set; } = "";
         public string DataType { get; set; } = "string";
         public bool IsRequired { get; set; }

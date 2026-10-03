@@ -5,6 +5,7 @@ namespace TreeGraph.Api.Data;
 
 public class EavDbContext : DbContext
 {
+    public DbSet<EntityTypeDefinition> EntityTypes => Set<EntityTypeDefinition>();
     public DbSet<AttributeDefinition> AttributeCatalog => Set<AttributeDefinition>();
     public DbSet<AttributeValue> AttributeValues => Set<AttributeValue>();
     public DbSet<CompositeTypeDefinition> CompositeTypes => Set<CompositeTypeDefinition>();
@@ -21,6 +22,7 @@ public class EavDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
+        ConfigureEntityTypes(mb);
         ConfigureUnits(mb);
         ConfigureOptionSets(mb);
         ConfigureAttributeCatalog(mb);
@@ -28,6 +30,39 @@ public class EavDbContext : DbContext
         ConfigureCompositeTypes(mb);
         ConfigureCustomTables(mb);
         ConfigureAuditLog(mb);
+    }
+
+    private static void ConfigureEntityTypes(ModelBuilder mb)
+    {
+        mb.Entity<EntityTypeDefinition>(e =>
+        {
+            e.ToTable("entity_type_catalog");
+            e.HasKey(x => x.EntityTypeId);
+            e.Property(x => x.EntityTypeId)
+                .HasColumnName("entity_type_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityType)
+                .HasColumnName("entity_type")
+                .HasMaxLength(100).IsRequired();
+            e.Property(x => x.DisplayName)
+                .HasColumnName("display_name")
+                .HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description)
+                .HasColumnName("description")
+                .HasMaxLength(1000);
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // partial unique：软删后同名可重建
+            e.HasIndex(x => x.EntityType)
+                .IsUnique()
+                .HasDatabaseName("uq_entity_type")
+                .HasFilter("is_deleted = false");
+        });
     }
 
     private static void ConfigureUnits(ModelBuilder mb)
@@ -62,16 +97,10 @@ public class EavDbContext : DbContext
     {
         mb.Entity<AttributeDefinition>(e =>
         {
-            // ★ 表级 CHECK 约束：int 类型不允许绑定单位
-            // 归一化到基准单位会产生小数（150 cm → 1.5 m），写入 bigint 会静默截断。
-            // 元数据层（Controller）与运行时层（EavValidationService）已双重拦截，
-            // 这里再加一道数据库层防线，杜绝直接 SQL / 旧工具绕过。
-            e.ToTable("attribute_catalog", t =>
-            {
-                t.HasCheckConstraint(
-                    "ck_attr_int_no_unit",
-                    "data_type <> 'int' OR unit_id IS NULL");
-            });
+            // ★ 移除原 ck_attr_int_no_unit CHECK 约束。
+            //   现在 int 类型也可以绑定单位：归一化到基准单位产生的小数
+            //   会写入 ValueDecimal 列（见 EavWriteService.SetTypedValue）。
+            e.ToTable("attribute_catalog");
 
             e.HasKey(x => x.AttributeId);
             e.Property(x => x.AttributeId)

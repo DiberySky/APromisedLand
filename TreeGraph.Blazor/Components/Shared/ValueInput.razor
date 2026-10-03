@@ -18,13 +18,51 @@
 }
 else if (Attribute.DataType == "int")
 {
-    <MudNumericField T="long?"
-                     Value="@(Value switch { long l => l, int i => i, _ => null })"
-                     ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                     Variant="Variant.Outlined"
-                     Margin="Margin.Dense"
-                     Placeholder="值"
-                     FullWidth="true" />
+    @* ★ int 有单位时走数值 + 单位双控件；无单位时保持 long? 输入 *@
+    @if (Attribute.Unit is not null)
+    {
+        var numeric = Value as NumericInput ?? new NumericInput();
+        <div class="d-flex" style="gap: 4px;">
+            <MudNumericField T="decimal?"
+                             Value="@numeric.Value"
+                             ValueChanged="@(v =>
+                             {
+                                 var n = Value as NumericInput ?? new NumericInput();
+                                 n.Value = v ?? 0;
+                                 ValueChanged.InvokeAsync(n);
+                             })"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             Placeholder="值"
+                             FullWidth="true" />
+            <MudSelect T="Guid?"
+                       Value="@numeric.UnitId"
+                       ValueChanged="@(u =>
+                       {
+                           var n = Value as NumericInput ?? new NumericInput();
+                           n.UnitId = u;
+                           ValueChanged.InvokeAsync(n);
+                       })"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="min-width: 100px;">
+                @foreach (var u in Attribute.AvailableUnits ?? Array.Empty<UnitSchemaDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">@u.Symbol</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    }
+    else
+    {
+        <MudNumericField T="long?"
+                         Value="@(Value switch { long l => l, int i => i, _ => null })"
+                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         Placeholder="值"
+                         FullWidth="true" />
+    }
 }
 else if (Attribute.DataType == "decimal")
 {

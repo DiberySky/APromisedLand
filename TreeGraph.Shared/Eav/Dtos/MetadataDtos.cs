@@ -5,7 +5,17 @@ namespace TreeGraph.Shared.Eav.Dtos;
 public class CreateAttributeRequest
 {
     public string EntityType { get; set; } = "";
-    public string AttributeName { get; set; } = "";
+
+    /// <summary>
+    /// 内部标识（JSON key）。可选：
+    ///   - null / 空：服务端自动生成 `attr_` + 12 位 hex（如 attr_3f9a2b1c8d4e）
+    ///   - 非空：必须以字母开头，只含字母、数字、下划线
+    ///
+    /// 提示：属性名会出现在 JSON key / 查询过滤 / 审计日志 / 导出列名里，
+    /// 如需与外部系统对接，建议显式指定可读的英文标识（如 screen_size）。
+    /// </summary>
+    public string? AttributeName { get; set; }
+
     public string DisplayName { get; set; } = "";
     public string DataType { get; set; } = "string";
     public bool IsRequired { get; set; }

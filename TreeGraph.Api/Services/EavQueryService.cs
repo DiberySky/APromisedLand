@@ -130,6 +130,12 @@ public class EavQueryService
 
         return def.DataType switch
         {
+            // ★ int + 单位：按 ValueDecimal 排序（归一化后的值）
+            EavDataTypes.Int when def.UnitId is not null => (await baseQuery
+                .Select(v => new { v.EntityId, v.ValueDecimal })
+                .ToListAsync(ct))
+                .ToDictionary(x => x.EntityId, x => (object?)x.ValueDecimal),
+
             EavDataTypes.Int => (await baseQuery
                 .Select(v => new { v.EntityId, v.ValueInt })
                 .ToListAsync(ct))
@@ -206,6 +212,10 @@ public class EavQueryService
 
         var filtered = def.DataType switch
         {
+            // ★ int + 单位：走 decimal 过滤路径（数据存于 ValueDecimal）
+            EavDataTypes.Int when def.UnitId is not null
+                => ApplyDecimalFilter(baseQuery, def, filter),
+
             EavDataTypes.Int => ApplyIntFilter(baseQuery, def, filter),
             EavDataTypes.Decimal => ApplyDecimalFilter(baseQuery, def, filter),
             EavDataTypes.String => ApplyStringFilter(baseQuery, filter),

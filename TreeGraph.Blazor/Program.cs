@@ -17,6 +17,7 @@ builder.Services.AddMudServices();
 
 // ★ 前端字段校验器（单例，无状态）
 builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
+builder.Services.AddScoped<EntityTypeDisplayService>();
 
 // ★ EavApiClient：通过 Aspire 服务发现访问 treegrapheavapi
 // 弹性策略显式配置：

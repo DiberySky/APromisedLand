@@ -30,23 +30,14 @@ public class EavValidationService
     /// <summary>
     /// 验证属性值（基础类型）。
     ///
-    /// ★ 防御性检查：
-    ///   - int 类型不允许绑定单位（元数据配置错误）。
-    ///   - int 类型不接受小数（否则写入 bigint 会静默截断）。
-    /// 即使数据库中被绕过（旧版本写入、直接 SQL），写入时也会在此处拦截。
+    /// ★ int / decimal 均可绑定单位。
+    ///   - int 无单位：必须为整数，写入 ValueInt
+    ///   - int 有单位：允许小数（归一化到基准单位可能产生），写入 ValueDecimal
+    ///   - decimal：无论有无单位，写入 ValueDecimal
     /// </summary>
     public ValidationResult ValidateBaseValue(AttributeDefinition def, object? value)
     {
         var errors = new List<ValidationError>();
-
-        // ★ 元数据一致性防御：int + UnitId 是非法配置
-        if (def.DataType == EavDataTypes.Int && def.UnitId is not null)
-        {
-            errors.Add(new(def.AttributeName,
-                "int 类型属性绑定了单位（元数据配置错误）。" +
-                "归一化到基准单位会产生小数并被截断，请改用 decimal 类型，或解除单位绑定。"));
-            return new ValidationResult(false, errors);
-        }
 
         // 单选类型：必填默认值放行逻辑与基础类型不同，走独立分支
         if (def.DataType == EavDataTypes.SingleChoice)
@@ -70,12 +61,13 @@ public class EavValidationService
                 return new ValidationResult(false, errors);
             }
 
-            // ★ int 类型必须为整数，否则写入 bigint 会静默截断
+            // ★ int 无单位时必须为整数（有单位时允许小数）
             if (def.DataType == EavDataTypes.Int
+                && def.UnitId is null
                 && numericValue.Value != Math.Truncate(numericValue.Value))
             {
                 errors.Add(new(def.AttributeName,
-                    $"int 类型不接受小数，收到 {numericValue.Value}"));
+                    $"int 类型（无单位）不接受小数，收到 {numericValue.Value}"));
                 return new ValidationResult(false, errors);
             }
 

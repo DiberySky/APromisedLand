@@ -23,6 +23,9 @@ public class MetadataUndeleteTests : IntegrationTestBase
     [Fact]
     public async Task UndeleteAttribute_AfterSoftDelete_Succeeds()
     {
+        // 先创建实体类型（否则 CreateAttribute 400）
+        await TestData.EnsureEntityTypeAsync("UndeleteTest", "恢复测试");
+
         // 先创建一个独立属性
         var createResp = await Client.PostAsJsonAsync(
             "/api/eav/metadata/attributes",

@@ -101,8 +101,15 @@ public class EavReadService
         {
             EavDataTypes.String => row.ValueString,
             EavDataTypes.SingleChoice => ExtractSingleChoice(row, def),
+
+            // ★ int + 单位：读 ValueDecimal（归一化后的值）
+            EavDataTypes.Int when def.UnitId is not null => ExtractNumericValue(
+                row.ValueDecimal, row.UnitId, def, originalUnits),
+
+            // int 无单位：读 ValueInt
             EavDataTypes.Int => ExtractNumericValue(
                 row.ValueInt is { } i ? i : null, row.UnitId, def, originalUnits),
+
             EavDataTypes.Decimal => ExtractNumericValue(
                 row.ValueDecimal, row.UnitId, def, originalUnits),
             EavDataTypes.Bool => row.ValueBool,

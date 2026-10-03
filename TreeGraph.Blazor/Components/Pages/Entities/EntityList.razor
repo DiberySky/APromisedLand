@@ -7,8 +7,9 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 @inject IDialogService DialogService
+@inject EntityTypeDisplayService EntityTypeDisplay
 @* EntityList.razor *@
-<PageTitle>@EntityType 实体列表</PageTitle>
+<PageTitle>@GetDisplayTitle() 实体列表</PageTitle>
 
 <div class="d-flex align-center mb-4" style="gap: 8px;">
     <MudButton Variant="Variant.Text" Color="Color.Default"
@@ -16,7 +17,7 @@
                OnClick="BackToHome">
         返回
     </MudButton>
-    <MudText Typo="Typo.h5">@EntityType 实体</MudText>
+    <MudText Typo="Typo.h5">@GetDisplayTitle() 实体</MudText>
 </div>
 
 @* ★ 动态查询过滤器 *@
@@ -37,28 +38,12 @@
 
         <MudSpacer />
 
-        <MudTextField T="string"
-                      Label="新建 EntityId (GUID)"
-                      Value="_newEntityId"
-                      ValueChanged="@(v => _newEntityId = v)"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Style="width: 320px;"
-                      Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-
-        <MudButton Variant="Variant.Outlined"
-                   Color="Color.Default"
-                   StartIcon="@Icons.Material.Filled.Autorenew"
-                   OnClick="GenerateNewGuid"
-                   Disabled="@_loading">
-            生成 GUID
-        </MudButton>
-
+        @* ★ 一键新建：自动生成 GUID 并直接进入编辑页 *@
         <MudButton Variant="Variant.Filled" Color="Color.Success"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="CreateNew"
-                   Disabled="@(!IsValidGuid(_newEntityId))">
-            新建
+                   Disabled="@_loading">
+            新建实体
         </MudButton>
     </div>
 </MudPaper>
@@ -84,9 +69,17 @@ else if (_result.Items.Count == 0)
             }
             else
             {
-                <text>在右上角输入 EntityId 后点击"新建"创建第一个</text>
+                <text>点击右上角"新建实体"创建第一个</text>
             }
         </MudText>
+        @if (_filters.Count == 0)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="CreateNew" Class="mt-3">
+                新建实体
+            </MudButton>
+        }
     </MudPaper>
 }
 else
@@ -162,6 +155,9 @@ else
 @code {
     [Parameter] public string EntityType { get; set; } = "";
 
+    /// <summary>显示用中文名；DisplayName 空时回退到 EntityType。</summary>
+    private string GetDisplayTitle() => EntityTypeDisplay.GetDisplayName(EntityType);
+
     private IReadOnlyList<AttributeSchemaDto>? _schema;
     private List<AttributeSchemaDto> _searchableAttributes = new();
     private List<string> _previewColumns = new();
@@ -173,8 +169,6 @@ else
     private bool _initialized;
     private int _page = 1;
     private int _pageSize = 20;
-    private string? _newEntityId;
-
     private int TotalPages => _result is null || _result.PageSize <= 0
         ? 1
         : Math.Max(1, (int)Math.Ceiling((double)_result.Total / _result.PageSize));
@@ -280,30 +274,16 @@ else
         StateHasChanged();
     }
 
+    /// <summary>
+    /// ★ 一键新建：自动生成 GUID 并直接进入编辑页。
+    /// 用户无需手动输入 / 生成 EntityId。
+    /// </summary>
     private void CreateNew()
     {
-        var id = _newEntityId?.Trim();
-        if (string.IsNullOrEmpty(id)) return;
-
-        // 校验 GUID 格式（后端也校验，但前端先给友好提示）
-        if (!Guid.TryParse(id, out var guid))
-        {
-            Snackbar.Add("EntityId 必须是 GUID 格式（36 字符，含连字符）", Severity.Warning);
-            return;
-        }
-
-        // 统一为小写带连字符的标准格式
-        Nav.NavigateTo($"/entities/{EntityType}/{guid:D}");
+        var newId = Guid.NewGuid().ToString("D");
+        Snackbar.Add($"已生成 EntityId：{newId}", Severity.Info);
+        Nav.NavigateTo($"/entities/{EntityType}/{newId}");
     }
-
-    /// <summary>一键生成新 GUID 填入输入框（免手打）。</summary>
-    private void GenerateNewGuid()
-    {
-        _newEntityId = Guid.NewGuid().ToString("D");
-    }
-
-    private static bool IsValidGuid(string? s)
-        => !string.IsNullOrWhiteSpace(s) && Guid.TryParse(s, out _);
 
     private void BackToHome()
     {

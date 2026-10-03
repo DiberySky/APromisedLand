@@ -27,6 +27,9 @@ public static class TestData
         if (_client is null)
             throw new InvalidOperationException("请先传入 HttpClient");
 
+        // ---- 先创建实体类型（否则 CreateAttribute 400）----
+        await EnsureEntityTypeAsync(EntityType, "测试商品");
+
         // ---- 属性：int / decimal / string / bool ----
         await CreateAttributeAsync("amount", "amount", "int",
             isRequired: true, isSearchable: true, isSortable: true);
@@ -36,6 +39,17 @@ public static class TestData
             isRequired: false, isSearchable: true, isSortable: false);
         await CreateAttributeAsync("flag", "flag", "bool",
             isRequired: false, isSearchable: true, isSortable: false);
+    }
+
+    /// <summary>确保实体类型存在（幂等：已存在时跳过）。</summary>
+    public static async Task EnsureEntityTypeAsync(string entityType, string displayName)
+    {
+        var body = new { entityType, displayName };
+        var resp = await _client!.PostAsJsonAsync("/api/eav/entity-types", body);
+
+        // 409 Conflict = 已存在，视为成功
+        if (resp.StatusCode == HttpStatusCode.Conflict) return;
+        resp.EnsureSuccessStatusCode();
     }
 
     private static async Task CreateAttributeAsync(

@@ -39,6 +39,9 @@ public class CrossRowUniqueTests : IntegrationTestBase
         {
             if (_schemaReady) return;
 
+            // 0. 先创建实体类型（否则后续 CreateAttribute 400）
+            await TestData.EnsureEntityTypeAsync(EntityType, "唯一性测试");
+
             // 1. 建表
             var tableResp = await Client.PostAsJsonAsync(
                 "/api/eav/metadata/custom-tables",

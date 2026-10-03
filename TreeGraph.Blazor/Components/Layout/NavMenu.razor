@@ -10,6 +10,20 @@
         首页
     </MudNavLink>
 
+    @* ★ 选择实体（两步式：选类型 → 选实体） *@
+    <MudNavLink Href="/entities"
+                Icon="@Icons.Material.Filled.TouchApp"
+                Match="NavLinkMatch.All">
+        选择实体
+    </MudNavLink>
+
+    @* ★ 属性列表（跨实体类型总览） *@
+    <MudNavLink Href="/attributes"
+                Icon="@Icons.Material.Filled.ListAlt"
+                Match="NavLinkMatch.All">
+        属性列表
+    </MudNavLink>
+
     @* ★ 动态实体数据菜单 *@
     <MudNavGroup Title="实体数据"
                  Icon="@Icons.Material.Filled.Storage"
@@ -29,10 +43,11 @@
         {
             @foreach (var et in _entityTypes)
             {
+                var display = EntityTypeDisplayService.GetDisplayName(et);
                 <MudNavLink Href="@($"/entities/{et.EntityType}")"
                             Icon="@Icons.Material.Filled.List"
                             Match="NavLinkMatch.Prefix">
-                    @et.EntityType
+                    @display
                     <MudChip T="string" Size="Size.Small" Class="ml-2">
                         @et.AttributeCount
                     </MudChip>
@@ -44,6 +59,12 @@
     @* 元数据管理 *@
     <MudNavGroup Title="元数据管理"
                  Icon="@Icons.Material.Filled.Settings">
+        @* 实体类型（最优先入口） *@
+        <MudNavLink Href="/metadata/entity-types"
+                    Icon="@Icons.Material.Filled.Category"
+                    Match="NavLinkMatch.Prefix">
+            实体类型
+        </MudNavLink>
         <MudNavLink Href="/metadata/attributes"
                     Icon="@Icons.Material.Filled.EditAttributes"
                     Match="NavLinkMatch.Prefix">

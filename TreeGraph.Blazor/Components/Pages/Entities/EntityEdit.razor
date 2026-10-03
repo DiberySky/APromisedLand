@@ -9,12 +9,25 @@
 @inject IDialogService DialogService
 @inject IEavFieldValidator Validator
 @inject NavigationManager Nav
+@inject EntityTypeDisplayService EntityTypeDisplay
 @* EntityEdit.razor *@
-<PageTitle>编辑 @EntityType / @EntityId</PageTitle>
+<PageTitle>编辑 @GetDisplayTitle()</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4">
-    编辑实体：@EntityType / @EntityId
-</MudText>
+<div class="d-flex align-center mb-3" style="gap: 8px;">
+    <MudButton Variant="Variant.Text" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="BackToList">
+        返回列表
+    </MudButton>
+    <MudText Typo="Typo.h5">编辑 @GetDisplayTitle()</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">
+        @EntityId
+    </MudText>
+    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                   Size="Size.Small"
+                   OnClick="CopyEntityId"
+                   title="复制 EntityId" />
+</div>
 
 @if (_loading)
 {
@@ -29,8 +42,8 @@ else if (_schema is null || _schema.Count == 0)
 else
 {
     <MudAlert Severity="Severity.Info" Class="mb-4">
-        <b>提示</b>：保存是<b>全量替换</b>——未在此页填写的属性会被删除。
-        如需保留已有值，请勿清空。自定义表走独立端点，不受影响。
+        <b>提示</b>：保存只更新您填写的属性，未填写的属性<b>保持不变</b>。
+        如需删除某个属性值，请显式清空该字段。自定义表走独立端点，不受影响。
     </MudAlert>
 
     @if (TotalErrorCount > 0)
@@ -84,7 +97,7 @@ else
         </MudPaper>
     }
 
-    @* ★ #2：审计历史面板 *@
+    @* ★ 审计历史面板 *@
     <EntityHistoryPanel EntityType="@EntityType"
                         EntityId="@EntityId"
                         RefreshToken="_historyRefreshToken" />
@@ -125,6 +138,8 @@ else
     [Parameter] public string EntityType { get; set; } = "";
     [Parameter] public string EntityId { get; set; } = "";
 
+    private string GetDisplayTitle() => EntityTypeDisplay.GetDisplayName(EntityType);
+
     private IReadOnlyList<AttributeSchemaDto>? _schema;
     private readonly Dictionary<string, object?> _values = new();
     private readonly Dictionary<string, IReadOnlyList<FieldValidationError>> _errors = new();
@@ -135,9 +150,9 @@ else
     private bool _saving;
     private bool _initialized;
 
-    // ★ #3：记录加载时的 UpdatedAt（乐观锁版本）
+    // 乐观锁版本
     private DateTimeOffset? _loadedUpdatedAt;
-    // ★ #2：保存成功后自增，触发审计历史面板刷新
+    // 保存成功后自增，触发审计历史面板刷新
     private int _historyRefreshToken;
 
     private int TotalErrorCount => _errors.Values.Sum(v => v.Count);
@@ -155,6 +170,13 @@ else
         Nav.NavigateTo($"/entities/{EntityType}");
     }
 
+    private async Task CopyEntityId()
+    {
+        // 简单通过 Snackbar 提示让用户复制；如需真正剪贴板可注入 IJSRuntime
+        Snackbar.Add($"EntityId: {EntityId}", Severity.Info);
+        await Task.CompletedTask;
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
@@ -170,7 +192,7 @@ else
             var entity = await Api.GetEntityAsync(EntityType, EntityId);
             if (entity is not null)
             {
-                _loadedUpdatedAt = entity.UpdatedAt;  // ★ #3：记录加载时版本
+                _loadedUpdatedAt = entity.UpdatedAt;
                 foreach (var attr in _regularAttributes)
                 {
                     if (entity.Properties.TryGetValue(attr.AttributeName, out var elem))
@@ -179,7 +201,7 @@ else
             }
             else
             {
-                _loadedUpdatedAt = null;  // 新建实体
+                _loadedUpdatedAt = null;
             }
 
             RevalidateAll();
@@ -202,13 +224,15 @@ else
     private IReadOnlyList<FieldValidationError>? GetFieldErrors(string name)
         => _errors.TryGetValue(name, out var e) && e.Count > 0 ? e : null;
 
+    /// <summary>
+    /// 更新表单值。
+    ///
+    /// ★ PATCH 语义：保留键（即使值为 null），让 PATCH 显式删除该属性；
+    ///   若从字典移除，PATCH 会视为"未提交"从而保持原值，用户清空操作失效。
+    /// </summary>
     private void SetValue(string name, object? value)
     {
-        if (value is null)
-            _values.Remove(name);
-        else
-            _values[name] = value;
-
+        _values[name] = value;
         RevalidateField(name);
     }
 
@@ -235,6 +259,14 @@ else
             _errors.Remove(attributeName);
     }
 
+    /// <summary>
+    /// 保存（PATCH 语义）。
+    ///
+    /// 语义：
+    ///   - values 中出现的键：更新
+    ///   - values 中值为 null 的键：删除该属性
+    ///   - values 中未出现的键：保持不变
+    /// </summary>
     private async Task SaveAsync()
     {
         RevalidateAll();
@@ -252,13 +284,19 @@ else
         try
         {
             var submitValues = BuildSubmitValues();
-            var (ok, error, currentUpdatedAt) = await Api.SaveEntityAsync(
+
+            if (submitValues.Count == 0)
+            {
+                Snackbar.Add("没有可保存的变更", Severity.Info);
+                return;
+            }
+
+            var (ok, error, currentUpdatedAt) = await Api.PatchEntityAsync(
                 EntityType, EntityId, submitValues,
-                expectedUpdatedAt: _loadedUpdatedAt);   // ★ #3 乐观锁
+                expectedUpdatedAt: _loadedUpdatedAt);
 
             if (!ok)
             {
-                // ★ P1-1：409 冲突时展示服务端最新时间，引导用户刷新
                 if (currentUpdatedAt is not null)
                 {
                     var localTime = currentUpdatedAt.Value.ToLocalTime()
@@ -276,8 +314,8 @@ else
             }
 
             Snackbar.Add("保存成功", Severity.Success);
-            _historyRefreshToken++;   // ★ #2：触发历史面板刷新
-            await LoadAsync();        // 重新加载会同步刷新 _loadedUpdatedAt
+            _historyRefreshToken++;
+            await LoadAsync();
         }
         finally
         {
@@ -285,6 +323,12 @@ else
         }
     }
 
+    /// <summary>
+    /// 清空所有属性。
+    ///
+    /// ★ PATCH 语义下，"清空"需要显式提交每个属性为 null（= 删除该属性）。
+    ///   提交空字典不会删除任何东西。
+    /// </summary>
     private async Task ClearAllAsync()
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
@@ -294,13 +338,60 @@ else
 
         if (confirmed != true) return;
 
-        _values.Clear();
-        RevalidateAll();
-        await SaveAsync();
+        var toClear = new Dictionary<string, object?>();
+        foreach (var attr in _regularAttributes)
+            toClear[attr.AttributeName] = null;
+
+        if (toClear.Count == 0)
+        {
+            Snackbar.Add("没有可清空的属性", Severity.Info);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var (ok, error, currentUpdatedAt) = await Api.PatchEntityAsync(
+                EntityType, EntityId, toClear,
+                expectedUpdatedAt: _loadedUpdatedAt);
+
+            if (!ok)
+            {
+                if (currentUpdatedAt is not null)
+                {
+                    var localTime = currentUpdatedAt.Value.ToLocalTime()
+                        .ToString("yyyy-MM-dd HH:mm:ss");
+                    Snackbar.Add(
+                        $"清空失败：{error ?? "并发冲突"}\n" +
+                        $"服务端最新时间：{localTime}",
+                        Severity.Error);
+                }
+                else
+                {
+                    Snackbar.Add($"清空失败：{error ?? "未知错误"}", Severity.Error);
+                }
+                return;
+            }
+
+            Snackbar.Add("已清空所有属性", Severity.Success);
+            _historyRefreshToken++;
+            await LoadAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
 
     // ---------- 提交值转换 ----------
 
+    /// <summary>
+    /// 把表单值转换为 PATCH 接口接受的 JSON 值字典。
+    ///
+    /// 语义：
+    ///   - _values 中存在的键（含 null）：提交
+    ///   - _values 中不存在的键：不提交（保持后端原值）
+    /// </summary>
     private Dictionary<string, object?> BuildSubmitValues()
     {
         var result = new Dictionary<string, object?>();
@@ -321,6 +412,12 @@ else
 
     // ---------- JSON -> 内部模型 ----------
 
+    /// <summary>
+    /// 后端返回的 JSON 属性值 → 前端内部模型。
+    ///
+    /// ★ int / decimal 有单位时，后端返回 { value, unitId } 对象，统一走
+    ///   JsonToNumeric → NumericInput；无单位时返回裸数字。
+    /// </summary>
     private object? JsonElementToValue(JsonElement elem, AttributeSchemaDto schema)
     {
         if (elem.ValueKind == JsonValueKind.Null) return null;
@@ -328,32 +425,49 @@ else
         return schema.DataType switch
         {
             "string" => elem.ValueKind == JsonValueKind.String ? elem.GetString() : elem.ToString(),
-            "int" => elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
-                   : elem.ValueKind == JsonValueKind.String
-                     && long.TryParse(elem.GetString(), out var l) ? l
-                   : (object?)null,
+
+            // int：有单位走 JsonToNumeric，无单位走裸数字 → long
+            "int" => schema.Unit is not null
+                ? JsonToNumeric(elem)
+                : (elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
+                  : elem.ValueKind == JsonValueKind.String
+                    && long.TryParse(elem.GetString(), out var l) ? l
+                  : (object?)null),
+
+            // decimal：统一走 JsonToNumeric
             "decimal" => JsonToNumeric(elem),
+
             "bool" => elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False
                       ? elem.GetBoolean() : null,
             "datetime" => elem.GetDateTimeOffset(),
             "date" => elem.GetString(),
             "time" => elem.GetString(),
-            // ★ 后端绑定选项集时返回 SingleChoiceValue 对象 {value,label}
-            //   （EavReadService.ExtractSingleChoice），未绑定时才是纯字符串
+
+            // single_choice：后端绑选项集时返回 { value, label }，未绑定时是纯字符串
             "single_choice" => elem.ValueKind == JsonValueKind.String
                 ? elem.GetString()
                 : elem.ValueKind == JsonValueKind.Object
                   && elem.TryGetProperty("value", out var sc)
                   && sc.ValueKind == JsonValueKind.String ? sc.GetString()
                 : elem.ToString(),
+
             "json" or "file" => elem.Clone(),
+
             "composite" => schema.CompositeType is not null
                 ? JsonToComposite(elem, schema.CompositeType)
                 : null,
+
             _ => elem.Clone()
         };
     }
 
+    /// <summary>
+    /// 数值 JSON → NumericInput。
+    ///
+    /// 支持两种形态：
+    ///   - { value: 1.5, unitId: "..." }  → 归一化后的值 + 原始输入单位
+    ///   - 裸数字                          → 视为基准单位值
+    /// </summary>
     private NumericInput JsonToNumeric(JsonElement elem)
     {
         if (elem.ValueKind == JsonValueKind.Object)
@@ -367,6 +481,14 @@ else
         }
         if (elem.ValueKind == JsonValueKind.Number)
             return new NumericInput { Value = elem.GetDecimal(), UnitId = null };
+        if (elem.ValueKind == JsonValueKind.String
+            && decimal.TryParse(elem.GetString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var d))
+        {
+            return new NumericInput { Value = d, UnitId = null };
+        }
         return new NumericInput();
     }
 
@@ -381,7 +503,6 @@ else
 
             if (field.IsArray)
             {
-                // ★ 数组转 List<object?>
                 var list = new List<object?>();
                 foreach (var item in fv.EnumerateArray())
                 {
@@ -419,6 +540,8 @@ else
             _ => elem.Clone()
         };
     }
+
+    // ---------- 删除实体 ----------
 
     private async Task DeleteEntityAsync()
     {

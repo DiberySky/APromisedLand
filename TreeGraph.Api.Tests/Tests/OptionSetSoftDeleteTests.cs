@@ -39,6 +39,9 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
         string entityType, string setName,
         params (string Value, string Label)[] items)
     {
+        // 确保实体类型存在（否则后续 CreateAttribute 400）
+        await TestData.EnsureEntityTypeAsync(entityType, entityType);
+
         var resp = await Client.PostAsJsonAsync(
             "/api/eav/metadata/option-sets",
             new { entityType, setName, displayName = setName });
@@ -247,6 +250,9 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
     {
         var setId = await CreateSetAsync("OptSoftRefs", "s", ("a", "A"));
 
+        // 确保属性引用的实体类型也存在
+        await TestData.EnsureEntityTypeAsync("OptSoftRefsEntity", "引用测试");
+
         // 建属性引用
         var attrResp = await Client.PostAsJsonAsync(
             "/api/eav/metadata/attributes",
@@ -281,6 +287,9 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
     public async Task DeleteSet_WhenReferencedByActiveAttribute_Returns400()
     {
         var setId = await CreateSetAsync("OptSoftRefGuard", "s", ("a", "A"));
+
+        // 确保属性引用的实体类型也存在
+        await TestData.EnsureEntityTypeAsync("OptSoftRefGuardEntity", "引用守卫");
 
         await Client.PostAsJsonAsync(
             "/api/eav/metadata/attributes",

@@ -217,10 +217,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_attr_catalog");
 
-                    b.ToTable("attribute_catalog", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_attr_int_no_unit", "data_type <> 'int' OR unit_id IS NULL");
-                        });
+                    b.ToTable("attribute_catalog", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.Entities.AttributeValue", b =>
@@ -725,6 +722,58 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("ix_ctr_parent");
 
                     b.ToTable("custom_table_rows", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.Entities.EntityTypeDefinition", b =>
+                {
+                    b.Property<string>("EntityTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_type_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("EntityTypeId");
+
+                    b.HasIndex("EntityType")
+                        .IsUnique()
+                        .HasDatabaseName("uq_entity_type")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("entity_type_catalog", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.Entities.OptionItem", b =>

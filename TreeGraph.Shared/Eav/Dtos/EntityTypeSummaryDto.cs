@@ -8,4 +8,6 @@ public record EntityTypeSummaryDto(
     string EntityType,
     int AttributeCount,
     int SearchableAttributeCount,
-    string? FirstDisplayName);
+    string? FirstDisplayName,
+    string? EntityTypeId = null,     // 新增
+    string? DisplayName = null);     // 新增

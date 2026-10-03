@@ -96,7 +96,7 @@ public class EavFieldValidatorTests
     {
         var errors = _validator.Validate(Attr("int"), 3.14m);
         Assert.Single(errors);
-        Assert.Contains("int 类型不接受小数", errors[0].Message);
+        Assert.Contains("int 类型（无单位）不接受小数", errors[0].Message);
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public class EavFieldValidatorTests
     {
         var errors = _validator.Validate(Attr("int"), "3.14");
         Assert.Single(errors);
-        Assert.Contains("int 类型不接受小数", errors[0].Message);
+        Assert.Contains("int 类型（无单位）不接受小数", errors[0].Message);
     }
 
     // ============================================================

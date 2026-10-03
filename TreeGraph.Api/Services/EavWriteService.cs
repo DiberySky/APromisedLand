@@ -291,7 +291,8 @@ public class EavWriteService
                     target.UnitId = null;
                 }
 
-                if (def.DataType == EavDataTypes.Int)
+                // ★ int 无单位 → ValueInt；int 有单位 → ValueDecimal；decimal → ValueDecimal
+                if (def.DataType == EavDataTypes.Int && def.UnitId is null)
                     target.ValueInt = (long)normalized;
                 else
                     target.ValueDecimal = normalized;
@@ -370,9 +371,16 @@ public class EavWriteService
         {
             EavDataTypes.String => v.ValueString,
             EavDataTypes.SingleChoice => FormatSingleChoice(v.ValueString, def),
-            EavDataTypes.Int when v.ValueInt is { } i => FormatNumeric(i, v.UnitId),
-            EavDataTypes.Decimal when v.ValueDecimal is { } d => FormatNumeric(d, v.UnitId),
+
+            // ★ int 无单位：ValueInt
+            EavDataTypes.Int when v.ValueInt is { } i && def.UnitId is null
+                => i.ToString(CultureInfo.InvariantCulture),
+            // ★ int 有单位：ValueDecimal（归一化后的值 + 原始单位符号）
+            EavDataTypes.Int when v.ValueDecimal is { } di
+                => FormatNumeric(di, v.UnitId),
             EavDataTypes.Int => null,
+
+            EavDataTypes.Decimal when v.ValueDecimal is { } d => FormatNumeric(d, v.UnitId),
             EavDataTypes.Decimal => null,
             EavDataTypes.Bool => v.ValueBool?.ToString(),
             EavDataTypes.Datetime => v.ValueDatetime?.ToString("o"),

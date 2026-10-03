@@ -21,6 +21,9 @@ public static class EavSeeder
 {
     public static async Task SeedAsync(EavDbContext db, CancellationToken ct = default)
     {
+        // 补 EntityTypeCatalog：即使旧数据已有 Product 属性，也能补齐类型记录
+        await EnsureEntityTypesAsync(db, ct);
+
         // ── 严格的幂等检查：所有关键实体都存在才跳过 ──
         if (await IsAlreadySeededAsync(db, ct))
             return;
@@ -44,6 +47,22 @@ public static class EavSeeder
                 throw;
             }
         });
+    }
+
+    /// <summary>补 EntityTypeCatalog：即使旧数据已有 Product 属性，也能补齐类型记录。</summary>
+    private static async Task EnsureEntityTypesAsync(EavDbContext db, CancellationToken ct)
+    {
+        if (await db.EntityTypes.AnyAsync(t => t.EntityType == "Product", ct))
+            return;
+
+        db.EntityTypes.Add(new EntityTypeDefinition
+        {
+            EntityType = "Product",
+            DisplayName = "商品",
+            Description = "示例：商品实体类型",
+            DisplayOrder = 1
+        });
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>
