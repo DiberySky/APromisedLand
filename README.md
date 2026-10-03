@@ -6,8 +6,9 @@
 
 ```
 TreeGraph.Api/              # EAV API（实体类型/属性/单位/选项集/iNode）
-TreeGraph.Blazor/           # Blazor Server 前端（MudBlazor 9.9）
+TreeGraph.Blazor/           # Blazor Server 前端（MudBlazor 9.11）
 TreeGraph.Shared/           # 共享 DTO
+TreeGraph.TreeSky/          # 树组件库（TreeSky 精简移植，详见其 README）
 TreeGraph.Api.Tests/        # API 集成测试（Testcontainers.PostgreSql）
 TreeGraph.Blazor.Tests/     # Blazor 单元测试（bUnit）
 TreeGraph.Blazor.E2E.Tests/ # Playwright E2E 测试
@@ -41,11 +42,25 @@ APromisedLand.AppHost/      # Aspire 编排
 
 ```
 API 集成:   87
-Blazor 单元: 81
+Blazor 单元: 88（含 TreeSky 演示树管道测试 7）
 E2E:        21
 ─────────────
-总计:       189
+总计:       196
 ```
+
+## TreeSky 树组件移植决策
+
+将 `APromisedLand.Razor/DiberyTree` 的 TreeSky 树组件移植到本仓库时，否决了「197 文件平铺复制 + 全局命名空间替换」方案（数据太乱、无法编译），改为：
+
+| 决策 | 内容 |
+|---|---|
+| **独立类库承载** | 新建 `TreeGraph.TreeSky`（Razor 类库），宿主仅 ProjectReference + `AddTreeSky()` 接入，源项目零改动 |
+| **精简闭包** | 只复制组件本身及真实依赖；外围 UI（Dialog/Loading/BoolField）新建薄包装承载 |
+| **裁剪重耦合模块** | Attributes 属性子系统、附件页面、UnitTree/CategoryTree 具体实现均不复制，裁剪点以占位提示处理 |
+| **内建 string 节点** | 库自带 `StringTreeNode`（string 为 sealed 且无 `new()`，不能直接作泛型参数） |
+| **离线演示** | `/tree-sky-demo` 页 + `InMemoryTreeStore` + `DemoTreeApiHandler` 拦截 HTTP，增删改/排序/移动全链路无需真实后端 |
+
+移植过程修复的 3 个问题（库 DI `TryAddTransient` 失效、移动对话框无法确认、内存存储移动判定漏判）及裁剪清单详见 [TreeGraph.TreeSky/README.md](TreeGraph.TreeSky/README.md)。
 
 ### E2E 关键决策
 
