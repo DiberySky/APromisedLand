@@ -1,0 +1,236 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:   # 手动触发
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  # ============================================================
+  # Job 1：编译 + 单元测试 + 集成测试
+  # ============================================================
+  build-and-test:
+    name: Build & Test (Unit + Integration)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (Release)
+        run: dotnet build --no-restore -c Release
+
+      # Testcontainers 需要 Docker → ubuntu-latest 自带
+      - name: Unit Tests (Blazor)
+        run: |
+          dotnet test TreeGraph.Blazor.Tests/TreeGraph.Blazor.Tests.csproj \
+            --no-build -c Release \
+            --logger "trx;LogFileName=blazor-unit.trx" \
+            --results-directory ./TestResults
+
+      - name: Integration Tests (API)
+        run: |
+          dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj \
+            --no-build -c Release \
+            --logger "trx;LogFileName=api-integration.trx" \
+            --results-directory ./TestResults
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./TestResults/**/*.trx
+          retention-days: 7
+
+      - name: Test Report
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Unit + Integration
+          path: './TestResults/**/*.trx'
+          reporter: dotnet-trx
+          fail-on-error: true
+
+  # ============================================================
+  # Job 2：E2E 测试（Playwright + Aspire）
+  # ============================================================
+  e2e:
+    name: E2E (Playwright + Aspire)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-and-test      # 依赖 Job 1 通过
+    # ⚠️ 首周：告警不 block。稳定后（通过率 ≥ 95%，连续 3 天全绿）改为 false。
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (Release)
+        run: dotnet build --no-restore -c Release
+
+      # ---------- Playwright 浏览器缓存 ----------
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/TreeGraph.Blazor.E2E.Tests.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          pwsh TreeGraph.Blazor.E2E.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      # 缓存命中时仍需装系统依赖（字体、库）
+      - name: Install Playwright System Deps (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
+            libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 \
+            libcairo2 libasound2t64
+
+      # ---------- 环境检查 ----------
+      - name: Check Docker
+        run: |
+          docker version
+          docker info
+
+      # ---------- 启动 Aspire（后台） ----------
+      - name: Start Aspire AppHost (background)
+        run: |
+          dotnet run --project APromisedLand.AppHost \
+            -c Release --no-build \
+            > /tmp/aspire.log 2>&1 &
+          ASPIRE_PID=$!
+          echo "ASPIRE_PID=$ASPIRE_PID" >> $GITHUB_ENV
+          echo "Aspire 启动 PID=$ASPIRE_PID"
+
+      # ---------- 等就绪 ----------
+      - name: Wait for API (5773)
+        timeout-minutes: 5
+        run: |
+          for i in {1..90}; do
+            if curl -sf http://localhost:5773/health > /dev/null 2>&1; then
+              echo "✅ API 就绪 (${i}s)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "❌ API 未就绪，Aspire 日志："
+          cat /tmp/aspire.log
+          exit 1
+
+      - name: Wait for Blazor (5783)
+        timeout-minutes: 3
+        run: |
+          for i in {1..90}; do
+            if curl -sf http://localhost:5783/ > /dev/null 2>&1; then
+              echo "✅ Blazor 就绪 (${i}s)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "❌ Blazor 未就绪，Aspire 日志："
+          cat /tmp/aspire.log
+          exit 1
+
+      # ---------- 跑 E2E ----------
+      - name: Run E2E Tests
+        env:
+          CI: 'true'
+          E2E_BlazorBaseUrl: 'http://localhost:5783'
+          E2E_ApiBaseUrl: 'http://localhost:5773'
+          E2E_HealthProbeTimeoutSeconds: '180'
+          E2E_DefaultTimeoutMs: '20000'
+        run: |
+          dotnet test TreeGraph.Blazor.E2E.Tests/TreeGraph.Blazor.E2E.Tests.csproj \
+            --no-build -c Release \
+            --logger "trx;LogFileName=e2e.trx" \
+            --results-directory ./TestResults
+
+      # ---------- 收集 artifacts ----------
+      - name: Upload E2E Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: ./TestResults/**/*.trx
+          retention-days: 7
+
+      - name: Upload Aspire Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aspire-logs
+          path: /tmp/aspire.log
+          retention-days: 7
+
+      - name: Upload Playwright Traces & Videos
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            **/test-results/**
+            **/traces/**
+          retention-days: 7
+
+      # ---------- 清理 ----------
+      - name: Stop Aspire & Cleanup
+        if: always()
+        run: |
+          if [ -n "${ASPIRE_PID:-}" ]; then
+            kill $ASPIRE_PID 2>/dev/null || true
+          fi
+          # 兜底：杀残留进程
+          pkill -f "APromisedLand.AppHost" || true
+          # 清理容器
+          docker ps -aq | xargs -r docker rm -f || true
