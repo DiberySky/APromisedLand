@@ -219,7 +219,7 @@ public class TreeNodeDialogService<TItem>(
         bool allowRoot = true,
         DialogConfig? config = null)
     {
-        var allItems = await treeSky.GetAllNodesAsync();
+        var allItems = await treeSky.EnsureAllNodesLoadedAsync();
         return await ShowParentSelectDialogAsync(
             allItems, currentNode, currentParent, allowRoot, null, null, config);
     }

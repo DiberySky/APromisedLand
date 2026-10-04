@@ -21,13 +21,10 @@ public partial class TreeSky<TItem>
     {
         try
         {
-            StateHasChanged();
-
             _items = await LoadInitialDataAsync();
 
-            StateHasChanged();
-
-            SetSelected();
+            // 恢复选中（深层节点会沿祖先路径懒加载展开）
+            await SetSelectedAsync();
 
             if (ShowDialogFunc == null)
             {
@@ -52,5 +49,15 @@ public partial class TreeSky<TItem>
         }
 
         if (RootId == null && _items != null) RootId = _items!.FirstOrDefault()?.Value?.Id;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // 深层书签/刷新直达：等 MudTreeView 挂载完成后再沿路径展开并选中
+        if (firstRender && _pendingDeepClickNodeId is { } targetId)
+        {
+            _pendingDeepClickNodeId = null;
+            await ExpandToNodeAsync(targetId, clearSelection: false);
+        }
     }
 }

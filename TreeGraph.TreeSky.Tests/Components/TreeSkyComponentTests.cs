@@ -1,6 +1,7 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.TreeSky;
 using TreeGraph.TreeSky.Components.Base;
@@ -134,4 +135,129 @@ public class TreeSkyComponentTests : TestContext
             s => s.LoadInitialDataAsync(It.IsAny<string?>()),
             Times.Once);
     }
+
+    // ============================================================
+    // 深路径：ClickNodeId 不在首屏节点中 → 沿祖先路径懒加载并选中
+    // ============================================================
+
+    [Fact]
+    public void DeepLink_ClickNodeIdNotLoaded_ExpandsAncestorPathAndSelects()
+    {
+        var root = new TreeNodeDto<StringTreeNode>
+        {
+            Id = "1",
+            Text = "根",
+            Value = new StringTreeNode { Id = "1", Name = "根" },
+            HasChildren = true,
+        };
+        _clientService
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>()))
+            .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>> { root });
+
+        _clientService
+            .Setup(s => s.GetAncestorPathFromApiAsync("3"))
+            .ReturnsAsync(["1", "2", "3"]);
+
+        _clientService
+            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1")))
+            .ReturnsAsync([NodeDto("2", hasChildren: true)]);
+        _clientService
+            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "2")))
+            .ReturnsAsync([NodeDto("3")]);
+
+        var cut = RenderComponent<TreeSky<StringTreeNode>>(
+            ("ClickNodeId", "3"));
+
+        cut.WaitForAssertion(
+            () => Assert.Equal("3", cut.Instance.SelectedValue?.Id),
+            TimeSpan.FromSeconds(2));
+
+        // 关键：初始恢复与 OnParametersSetAsync 不会重复展开（各层只加载一次）
+        _clientService.Verify(
+            s => s.GetAncestorPathFromApiAsync("3"), Times.Once);
+        _clientService.Verify(
+            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1")),
+            Times.Once);
+        _clientService.Verify(
+            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "2")),
+            Times.Once);
+    }
+
+    // ============================================================
+    // GetAllLoadedNodes 只读不触发懒加载；EnsureAllNodesLoadedAsync 显式加载
+    // ============================================================
+
+    [Fact]
+    public async Task GetAllLoadedNodes_DoesNotTriggerLazyLoad()
+    {
+        _clientService
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>()))
+            .ReturnsAsync([NodeDto("1", hasChildren: true)]);
+        _clientService
+            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1")))
+            .ReturnsAsync([NodeDto("2")]);
+
+        var cut = RenderComponent<TreeSky<StringTreeNode>>();
+        cut.WaitForState(() => cut.Instance.GetAllLoadedNodes().Count == 1,
+            TimeSpan.FromSeconds(2));
+
+        Assert.Single(cut.Instance.GetAllLoadedNodes());
+        _clientService.Verify(
+            s => s.LoadChildrenAsync(It.IsAny<StringTreeNode>()), Times.Never);
+
+        var all = await cut.Instance.EnsureAllNodesLoadedAsync();
+
+        Assert.Equal(2, all.Count);
+        _clientService.Verify(
+            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1")),
+            Times.Once);
+    }
+
+    // ============================================================
+    // RemoveNodeFromParent：深层移除必须回写父节点 Children 与 HasChildren
+    // ============================================================
+
+    [Fact]
+    public void RemoveNodeFromParent_DeepRemoval_WritesBackToOwner()
+    {
+        TreeItemData<StringTreeNode> Leaf(string id) => new()
+        {
+            Value = new StringTreeNode { Id = id, Name = id },
+        };
+
+        var root = new TreeItemData<StringTreeNode>
+        {
+            Value = new StringTreeNode { Id = "1", Name = "根", HasChildren = true },
+            Children = new List<ITreeItemData<StringTreeNode>>
+            {
+                new TreeItemData<StringTreeNode>
+                {
+                    Value = new StringTreeNode { Id = "2", Name = "父", HasChildren = true },
+                    Children = new List<ITreeItemData<StringTreeNode>> { Leaf("3"), Leaf("4") },
+                },
+            },
+        };
+        var roots = new List<TreeItemData<StringTreeNode>> { root };
+
+        var cut = RenderComponent<TreeSky<StringTreeNode>>();
+
+        Assert.True(cut.Instance.RemoveNodeFromParent(roots, "3"));
+
+        var parent = (TreeItemData<StringTreeNode>)root.Children!.Single();
+        Assert.Single(parent.Children!);
+        Assert.Equal("4", parent.Children!.Single().Value?.Id);
+        Assert.True(parent.Value!.HasChildren);
+
+        Assert.True(cut.Instance.RemoveNodeFromParent(roots, "4"));
+        Assert.Empty(parent.Children!);
+        Assert.False(parent.Value.HasChildren);
+    }
+
+    private static TreeNodeDto<StringTreeNode> NodeDto(string id, bool hasChildren = false) => new()
+    {
+        Id = id,
+        Text = id,
+        Value = new StringTreeNode { Id = id, Name = id, HasChildren = hasChildren },
+        HasChildren = hasChildren,
+    };
 }

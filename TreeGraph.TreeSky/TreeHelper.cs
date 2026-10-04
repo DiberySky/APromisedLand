@@ -4,7 +4,9 @@ using TreeGraph.TreeSky.Models;
 namespace TreeGraph.TreeSky;
 
 /// <summary>
-/// TreeSky 树节点图标与 TreeItemData 转换/查找扩展
+/// TreeSky 树节点图标与 TreeItemData 转换/查找扩展。
+///
+/// 遍历/查找全部使用显式栈/队列迭代，深树不会 StackOverflowException。
 /// </summary>
 public static class TreeHelper
 {
@@ -32,67 +34,96 @@ public static class TreeHelper
     }
 
     /// <summary>
-    /// 在树中查找指定 ID 的 TreeItemData 节点
+    /// 在树中查找指定 ID 的 TreeItemData 节点（显式栈 DFS）。
     /// </summary>
     public static TreeItemData<T>? FindTreeItem<T>(
         this IEnumerable<TreeItemData<T>> items,
         string id)
         where T : class, ITreeNodeBase<T>
     {
-        foreach (var item in items)
-        {
-            if (item.Value?.Id == id)
-                return item;
+        if (string.IsNullOrEmpty(id)) return null;
 
-            if (item.Children?.Count > 0)
-            {
-                var found = item.Children
-                    .OfType<TreeItemData<T>>()
-                    .ToList()
-                    .FindTreeItem(id);
-                if (found != null)
-                    return found;
-            }
+        var stack = new Stack<TreeItemData<T>>(items.Reverse());
+
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+
+            if (current.Value?.Id == id)
+                return current;
+
+            if (current.Children is not { Count: > 0 }) continue;
+
+            // 逆序压栈，保持与原递归一致的先左后右访问顺序
+            var children = current.Children.OfType<TreeItemData<T>>().ToList();
+            for (int i = children.Count - 1; i >= 0; i--)
+                stack.Push(children[i]);
         }
+
         return null;
     }
 
     /// <summary>
-    /// 获取从根到目标节点的 ID 路径
+    /// 获取从根到目标节点的 ID 路径（根在前）。BFS + 父指针回溯，不递归。
+    /// 节点若形成环，按已访问集合安全跳过。
     /// </summary>
     public static List<string>? GetPathToNode<T>(
         this IEnumerable<TreeItemData<T>> items,
         string targetId)
         where T : class, ITreeNodeBase<T>
     {
-        foreach (var item in items)
+        if (string.IsNullOrEmpty(targetId)) return null;
+
+        var parentMap = new Dictionary<string, string?>();
+        var queue = new Queue<TreeItemData<T>>();
+
+        foreach (var root in items)
         {
-            if (item.Value?.Id == targetId)
-                return new List<string> { targetId };
+            if (root.Value is null) continue;
+            parentMap.TryAdd(root.Value.Id, null);
+            queue.Enqueue(root);
+        }
 
-            if (item.Children?.Count > 0)
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (current.Value is null) continue;
+
+            if (current.Value.Id == targetId)
             {
-                var subPath = item.Children
-                    .OfType<TreeItemData<T>>()
-                    .ToList()
-                    .GetPathToNode(targetId);
-
-                if (subPath != null)
+                var path = new List<string>();
+                string? cursor = targetId;
+                while (cursor is not null)
                 {
-                    subPath.Insert(0, item.Value!.Id);
-                    return subPath;
+                    path.Add(cursor);
+                    cursor = parentMap.TryGetValue(cursor, out var parentId) ? parentId : null;
                 }
+                path.Reverse();
+                return path;
+            }
+
+            if (current.Children is not { Count: > 0 }) continue;
+
+            foreach (var child in current.Children)
+            {
+                if (child is not TreeItemData<T> { Value: not null } treeChild) continue;
+                if (parentMap.ContainsKey(treeChild.Value.Id)) continue; // 防环
+
+                parentMap[treeChild.Value.Id] = current.Value.Id;
+                queue.Enqueue(treeChild);
             }
         }
+
         return null;
     }
 
     /// <summary>
-    /// 展开指定节点并加载其子节点（单层）
+    /// 展开指定节点并加载其子节点（单层）。
     /// </summary>
     public static async Task ExpandAsync<T>(
         this TreeItemData<T> item,
-        Func<T?, Task<IReadOnlyCollection<TreeItemData<T>>>> loadChildren)
+        Func<T?, Task<IReadOnlyCollection<TreeItemData<T>>>> loadChildren,
+        CancellationToken ct = default)
         where T : class, ITreeNodeBase<T>
     {
         item.Expanded = true;
@@ -100,43 +131,47 @@ public static class TreeHelper
         if (item.Children == null || item.Children.Count == 0)
         {
             var children = await loadChildren(item.Value);
-            item.Children = children.ToList();
+            ct.ThrowIfCancellationRequested();
+
+            // TreeItemData<T> 未重写 Equals/GetHashCode，
+            // ToHashSet 退化为按引用去重，等价于 ToList。
+            item.Children = children.ToList<ITreeItemData<T>>();
         }
     }
 
     /// <summary>
-    /// 递归展开到指定节点（需要路径）
+    /// 沿给定路径逐层展开到目标节点（路径迭代，不递归）。
     /// </summary>
     public static async Task ExpandToNodeAsync<T>(
         this List<TreeItemData<T>> items,
         List<string> path,
         Func<T?, Task<IReadOnlyCollection<TreeItemData<T>>>> loadChildren,
-        Action<T?>? onSelected = null)
+        Action<T?>? onSelected = null,
+        CancellationToken ct = default)
         where T : class, ITreeNodeBase<T>
     {
         var currentItems = items;
 
         for (int i = 0; i < path.Count; i++)
         {
+            ct.ThrowIfCancellationRequested();
+
             var nodeId = path[i];
             var item = currentItems.FirstOrDefault(x => x.Value?.Id == nodeId);
             if (item == null) break;
 
-            // 展开并加载子节点
-            await item.ExpandAsync(loadChildren);
-
-            // 最后一个节点：触发选中回调
+            // 目标节点本身只选中，不展开/加载它的子节点
             if (i == path.Count - 1)
             {
                 onSelected?.Invoke(item.Value);
+                break;
             }
-            else
-            {
-                // 继续深入下一层
-                currentItems = item.Children?
-                    .OfType<TreeItemData<T>>()
-                    .ToList() ?? new List<TreeItemData<T>>();
-            }
+
+            await item.ExpandAsync(loadChildren, ct);
+
+            currentItems = item.Children?
+                .OfType<TreeItemData<T>>()
+                .ToList() ?? new List<TreeItemData<T>>();
         }
     }
 }

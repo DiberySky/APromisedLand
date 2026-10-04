@@ -285,45 +285,4 @@ public partial class TreeSky<TItem>
     }
 
     #endregion
-
-    #region 数据删除
-
-    /// <summary>
-    /// 根据 Id 递归删除树节点
-    /// </summary>
-    public bool RemoveById(IEnumerable<ITreeItemData<TItem>> treeItems, string id)
-    {
-        foreach (var item in treeItems)
-        {
-            // 命中当前节点
-            if (item.Value?.Id == id)
-            {
-                if (item is TreeItemData<TItem> concreteItem)
-                {
-                    _items!.Remove(concreteItem);
-                }
-
-                return true;
-            }
-
-            // 递归子节点
-            if (item.Children?.Count > 0)
-            {
-                if (RemoveById(item.Children, id))
-                {
-                    // 删除后检查父节点是否还有子节点，更新 HasChildren
-                    if (item.Value != null)
-                    {
-                        item.Value.HasChildren = item.Children.Count > 0;
-                    }
-
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    #endregion
 }

@@ -7,33 +7,36 @@ namespace TreeGraph.TreeSky.Components.Base;
 public partial class TreeSky<TItem>
 {
     // ========== 节点展开 ==========
-    private async Task ExpandToNodeAsync(string targetId)
+    private async Task ExpandToNodeAsync(string targetId, bool clearSelection = true)
     {
-        var path = _items!.GetPathToNode(targetId);
+        var path = _items?.GetPathToNode(targetId);
 
         if (path == null)
         {
             path = await GetAncestorPathFromApiAsync(targetId);
         }
 
-        if (path != null)
+        if (path is not { Count: > 0 }) return;
+
+        // 导航切换目标时清空旧选中；初始挂载沿路径恢复时不能清空
+        // （中间渲染会让 MudTreeView 在目标子树挂载前固化空选中并回写）
+        if (clearSelection)
         {
             SelectedValue = null;
             _ = SelectedValueChanged.InvokeAsync(null);
-
-            StateHasChanged();
-
-            await _items!.ExpandToNodeAsync(
-                path: path,
-                loadChildren: LoadChildrenAsync,
-                onSelected: value =>
-                {
-                    SelectedValue = value;
-                    _ = SelectedValueChanged.InvokeAsync(value);
-                });
-
             StateHasChanged();
         }
+
+        await _items!.ExpandToNodeAsync(
+            path: path,
+            loadChildren: LoadChildrenAsync,
+            onSelected: value =>
+            {
+                SelectedValue = value;
+                _ = SelectedValueChanged.InvokeAsync(value);
+            });
+
+        StateHasChanged();
     }
 
     private async Task<List<string>?> GetAncestorPathFromApiAsync(string nodeId)
@@ -74,89 +77,131 @@ public partial class TreeSky<TItem>
         await OnClickItemText.InvokeAsync(node);
     }
 
-    private void SetSelected()
+    private string? _pendingDeepClickNodeId;
+
+    /// <summary>
+    /// 从 ClickNodeId 恢复选中状态（首屏阶段）。
+    /// 目标已在首屏节点中时直接选中；深层节点登记到 <see cref="_pendingDeepClickNodeId"/>，
+    /// 等首帧渲染（MudTreeView 挂载）完成后再沿祖先路径懒加载展开，
+    /// 避免在树视图挂载边界内设置选中值被其初始化流程重置。
+    /// </summary>
+    private Task SetSelectedAsync()
     {
-        var rootValue = FindNodeById(_items!, ClickNodeId);
-        SelectedValue = rootValue;
+        if (string.IsNullOrEmpty(ClickNodeId)) return Task.CompletedTask;
+        if (_items is not { Count: > 0 }) return Task.CompletedTask;
+
+        var found = FindNodeById(_items, ClickNodeId);
+        if (found is not null)
+        {
+            SelectedValue = found;
+            _ = SelectedValueChanged.InvokeAsync(found);
+            _lastClickNodeId = ClickNodeId;
+            return Task.CompletedTask;
+        }
+
+        // 深层节点：延后到首帧渲染后处理；同时阻止 OnParametersSetAsync 重复展开
+        _pendingDeepClickNodeId = ClickNodeId;
+        _lastClickNodeId = ClickNodeId;
+        return Task.CompletedTask;
     }
 
-    // ========== 节点查找 ==========
+    // ========== 节点查找（显式栈迭代） ==========
     private TItem? FindNodeById(IEnumerable<ITreeItemData<TItem>> items, string? id)
     {
-        if (id == null) return null;
+        if (string.IsNullOrEmpty(id)) return null;
 
-        foreach (var item in items)
+        var stack = new Stack<ITreeItemData<TItem>>(items);
+
+        while (stack.Count > 0)
         {
-            if (item.Value?.Id == id)
-                return item.Value;
+            var current = stack.Pop();
+            if (current.Value?.Id == id) return current.Value;
 
-            if (item.Children?.Count > 0)
-            {
-                var found = FindNodeById(item.Children.ToList(), id);
-                if (found != null)
-                    return found;
-            }
+            if (current.Children is not { Count: > 0 }) continue;
+            foreach (var child in current.Children)
+                stack.Push(child);
         }
 
         return null;
     }
 
     /// <summary>
-    /// 从树中查找指定节点的父节点（泛型）
+    /// 从树中查找指定节点的父节点（显式栈 DFS）。
     /// </summary>
     private TItem? GetParentNode(string nodeId)
     {
-        foreach (var item in _items!)
-        {
-            if (item.Children?.Any(c => c.Value?.Id == nodeId) == true)
-                return item.Value;
+        if (string.IsNullOrEmpty(nodeId) || _items is null) return null;
 
-            if (item.Children?.Count > 0)
-            {
-                var found = FindParentInChildren(item.Children, nodeId);
-                if (found != null) return found;
-            }
+        var stack = new Stack<ITreeItemData<TItem>>(_items);
+
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+
+            if (current.Children?.Any(c => c.Value?.Id == nodeId) == true)
+                return current.Value;
+
+            if (current.Children is not { Count: > 0 }) continue;
+            foreach (var child in current.Children)
+                stack.Push(child);
         }
 
         return null;
     }
 
-    private TItem? FindParentInChildren(IEnumerable<ITreeItemData<TItem>> children, string nodeId)
-    {
-        foreach (var child in children)
-        {
-            if (child.Children?.Any(c => c.Value?.Id == nodeId) == true)
-                return child.Value;
-
-            if (child.Children?.Count > 0)
-            {
-                var found = FindParentInChildren(child.Children, nodeId);
-                if (found != null) return found;
-            }
-        }
-
-        return null;
-    }
-
-    // ========== 从树中移除节点 ==========
+    /// <summary>
+    /// 从树中移除指定节点（含从父节点 Children 集合摘除）。
+    /// 显式栈迭代；栈帧携带实际列表引用与属主节点，保证深层移除能回写父节点。
+    /// </summary>
     public bool RemoveNodeFromParent(List<TreeItemData<TItem>> items, string id)
     {
-        foreach (var item in items.ToList())
-        {
-            if (item.Value?.Id == id)
-            {
-                items.Remove(item);
-                return true;
-            }
+        if (string.IsNullOrEmpty(id) || items.Count == 0) return false;
 
-            if (item.Children?.Count > 0)
+        // 用非泛型 IList 作栈帧：根列表是 List<TreeItemData<T>>，
+        // 子层列表是 List<ITreeItemData<T>>，两者都实现非泛型 IList，
+        // 且帧内持有的是真实引用，深层移除可直接回写。
+        var stack = new Stack<(System.Collections.IList Level, ITreeItemData<TItem>? Owner)>();
+        stack.Push((items, null));
+
+        while (stack.Count > 0)
+        {
+            var (level, owner) = stack.Pop();
+
+            for (int i = 0; i < level.Count; i++)
             {
-                var childList = item.Children.OfType<TreeItemData<TItem>>().ToList();
-                if (RemoveNodeFromParent(childList, id))
+                var node = (ITreeItemData<TItem>)level[i]!;
+
+                if (node.Value?.Id == id)
                 {
-                    item.Children = childList;
+                    level.RemoveAt(i);
+
+                    // 回写属主（子层列表一定是 List<ITreeItemData>）并更新 HasChildren
+                    if (owner is not null)
+                    {
+                        owner.Children = (List<ITreeItemData<TItem>>)level;
+                        if (owner.Value is not null)
+                            owner.Value.HasChildren = level.Count > 0;
+                    }
                     return true;
                 }
+            }
+
+            // 逆序压栈保持先左后右
+            for (int i = level.Count - 1; i >= 0; i--)
+            {
+                var node = (ITreeItemData<TItem>)level[i]!;
+                if (node.Children is not { Count: > 0 }) continue;
+
+                if (node.Children is not System.Collections.IList childLevel)
+                {
+                    var materialized = node.Children
+                        .OfType<TreeItemData<TItem>>()
+                        .ToList<ITreeItemData<TItem>>();
+                    node.Children = materialized;
+                    childLevel = materialized;
+                }
+
+                stack.Push((childLevel, node));
             }
         }
 
@@ -166,41 +211,60 @@ public partial class TreeSky<TItem>
     #region 获取所有节点
 
     /// <summary>
-    /// 获取树中所有节点（扁平化）
+    /// 只读：返回当前已加载的全部节点值（扁平化），不触发任何懒加载。
     /// </summary>
-    public async Task<List<TItem>> GetAllNodesAsync()
+    public List<TItem> GetAllLoadedNodes()
     {
         var result = new List<TItem>();
+        if (_items is null) return result;
 
-        if (_items == null) return result;
+        var stack = new Stack<ITreeItemData<TItem>>(_items);
 
-        foreach (var item in _items)
+        while (stack.Count > 0)
         {
-            await CollectNodesAsync(item, result);
+            var current = stack.Pop();
+            if (current.Value is not null) result.Add(current.Value);
+
+            if (current.Children is not { Count: > 0 }) continue;
+            foreach (var child in current.Children)
+                stack.Push(child);
         }
 
         return result;
     }
 
-    private async Task CollectNodesAsync(TreeItemData<TItem> node, List<TItem> result)
+    /// <summary>
+    /// 确保全部节点已加载后返回扁平列表。会沿树触发懒加载 API 调用（有副作用）；
+    /// 只读场景请用 <see cref="GetAllLoadedNodes"/>。
+    /// </summary>
+    public async Task<List<TItem>> EnsureAllNodesLoadedAsync(CancellationToken ct = default)
     {
-        if (node.Value != null)
-            result.Add(node.Value);
+        var result = new List<TItem>();
+        if (_items is null) return result;
 
-        // 如果节点未展开但有子节点，先加载
-        if (node.Children?.Any() != true && node.Value?.HasChildren == true)
-        {
-            var children = await LoadChildrenAsync(node.Value);
-            node.Children = children.ToList();
-        }
+        var queue = new Queue<ITreeItemData<TItem>>(_items);
 
-        if (node.Children?.Any() == true)
+        while (queue.Count > 0)
         {
-            foreach (var child in node.Children.OfType<TreeItemData<TItem>>())
+            ct.ThrowIfCancellationRequested();
+
+            var current = queue.Dequeue();
+            if (current.Value is not null) result.Add(current.Value);
+
+            // 未展开但有子节点 → 触发懒加载
+            if (current.Children?.Any() != true && current.Value?.HasChildren == true)
             {
-                await CollectNodesAsync(child, result);
+                var children = await LoadChildrenAsync(current.Value);
+                ct.ThrowIfCancellationRequested();
+                current.Children = children.ToList<ITreeItemData<TItem>>();
             }
+
+            if (current.Children is not { Count: > 0 }) continue;
+            foreach (var child in current.Children)
+                queue.Enqueue(child);
         }
+
+        return result;
     }
 
     #endregion
