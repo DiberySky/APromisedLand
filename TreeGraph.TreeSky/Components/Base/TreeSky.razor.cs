@@ -20,6 +20,7 @@ public partial class TreeSky<TItem> : IDisposable
     private readonly CancellationTokenSource _cts = new();
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] private ITreeActionHandler<TItem> ActionHandler { get; set; } = default!;
 
     // ========== 生命周期 ==========
     protected override async Task OnInitializedAsync()

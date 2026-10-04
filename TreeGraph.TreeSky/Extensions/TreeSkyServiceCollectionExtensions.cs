@@ -33,6 +33,9 @@ public static class TreeSkyServiceCollectionExtensions
         // 泛型树 API 客户端（open generic，经命名 HttpClient 工厂获取 HttpClient）
         services.AddScoped(typeof(DiberyTreeApiClient<>));
 
+        // 默认树节点写操作 Handler（宿主可注册同接口实现覆盖）
+        services.AddScoped(typeof(ITreeActionHandler<>), typeof(DefaultTreeActionHandler<>));
+
         var builder = services.AddHttpClient(httpClientName);
         if (configureClient != null)
         {

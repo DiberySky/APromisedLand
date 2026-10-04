@@ -84,19 +84,13 @@ public partial class TreeSky<TItem>
 
         var formModel = await NodeDialogSvc.ShowCreateDialogAsync(nodeTemplate);
         if (formModel == null) return;
+        if (_cts.IsCancellationRequested) return;
 
         try
         {
-            var dto = new TreeNodeDto<TItem>
-            {
-                Id = formModel.Id,
-                Text = formModel.Text(),
-                Icon = TreeHelper.TreeItemIcons,
-                ParentId = parent.Value!.Id,
-                Value = formModel,
-            };
-
-            await ApiClient.CreateNodeAsync(dto, _cts.Token);
+            var created = await ActionHandler.CreateChildAsync(
+                parent.Value!, formModel, _cts.Token);
+            if (created is null) return;
 
             parent.Expanded = true;
             await RefreshNodeChildrenAsync(parent, _cts.Token);
@@ -122,16 +116,8 @@ public partial class TreeSky<TItem>
 
         try
         {
-            var dto = new TreeNodeDto<TItem>
-            {
-                Id = formModel.Id,
-                Text = formModel.Text(),
-                Icon = TreeHelper.TreeItemIcons,
-                ParentId = formModel.ParentId!,
-                Value = formModel,
-            };
-
-            await ApiClient.UpdateNodeAsync(dto.Id, dto, _cts.Token);
+            var updated = await ActionHandler.UpdateNodeAsync(formModel, _cts.Token);
+            if (updated is null) return;
 
             node.Text = formModel.Text();
             Message.Success("更新成功");
@@ -156,7 +142,12 @@ public partial class TreeSky<TItem>
 
         try
         {
-            await ApiClient.DeleteNodeAsync(node.Value!.Id, _cts.Token);
+            var ok = await ActionHandler.DeleteNodeAsync(node.Value!, _cts.Token);
+            if (!ok)
+            {
+                Message.Warning("删除失败，节点不存在");
+                return;
+            }
 
             var parent = _items?.FindTreeItem(node.Value!.ParentId!);
             await RefreshNodeChildrenAsync(parent!, _cts.Token);
@@ -198,19 +189,17 @@ public partial class TreeSky<TItem>
 
         try
         {
-            node.Value.ParentId = selectResult.Id;
-
-            var dto = new TreeNodeDto<TItem>
+            // 后端 Update 不改 ParentId，移动必须走专门的 move 路由（含防环校验）
+            var ok = await ActionHandler.MoveNodeAsync(
+                node.Value, selectResult, _cts.Token);
+            if (!ok)
             {
-                Id = node.Value.Id,
-                Text = node.Value.Text(),
-                Icon = TreeHelper.TreeItemIcons,
-                ParentId = selectResult.Id,
-                Value = node.Value,
-            };
+                Message.Warning("移动失败，可能节点不存在或试图移动到自身子节点下");
+                return;
+            }
 
-            await ApiClient.UpdateNodeAsync(dto.Id, dto, _cts.Token);
-
+            // API 成功后再同步内存（此前先改 ParentId 在失败时会造成内存与后端不一致）
+            node.Value.ParentId = selectResult.Id;
             node.Value.Parent = selectResult;
 
             await ReLoadingAsync(node, _cts.Token);
@@ -235,31 +224,17 @@ public partial class TreeSky<TItem>
 
     private async Task HandleSortAsync(ITreeItemData<TItem> node)
     {
+        // 返回列表的顺序即用户拖拽后的新顺序（后端按列表位置重新编号 SortOrder）
         var sortResult = await NodeDialogSvc.ShowSortDialogAsync(node);
 
         if (sortResult == null) return;
 
-        var nodeDto = new TreeNodeDto<TItem>
-        {
-            Id = node.Value!.Id,
-            Text = node.Value.Text(),
-            Icon = TreeHelper.TreeItemIcons,
-            ParentId = node.Value.ParentId!,
-            Value = node.Value,
-            Children = sortResult.Select(i => new TreeNodeDto<TItem>
-            {
-                Id = i.Id,
-                Text = i.Text(),
-                Icon = TreeHelper.TreeItemIcons,
-                ParentId = node.Value.Id,
-                Value = i,
-                SortOrder = i.SortOrder,
-            }).ToList()
-        };
-
         try
         {
-            await ApiClient.UpdateChildrenAsync(nodeDto, _cts.Token);
+            var ok = await ActionHandler.SortChildrenAsync(
+                node.Value!, sortResult, _cts.Token);
+            if (!ok) return;
+
             await RefreshNodeChildrenAsync(node, _cts.Token);
 
             Message.Success($"排序成功");

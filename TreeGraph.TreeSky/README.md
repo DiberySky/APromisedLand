@@ -188,4 +188,4 @@ services.AddTransient(sp =>
 
 - **泛型约束**：`TItem : class, ITreeNodeBase<TItem>, new()`。`System.String` 不满足（sealed、无 `new()`），库已内建 `StringTreeNode` 作为字符串承载类型。
 - **宿主需自行实现**：`ITreeClientService<TNode>`（数据读取/排序/标题配置）。
-- **Move 后端路由**：当前组件通过 `UpdateNodeAsync` 完成移动（旧 `MoveNodeAsync` 备用）。若后端 controller 实现了 `move` 路由，可直接调用 `ApiClient.MoveNodeAsync`。
+- **Move 后端路由**：移动走 `POST {T}/move`（组件 → `ITreeActionHandler.MoveNodeAsync` → `DiberyTreeApiClient.MoveNodeAsync`）；更新接口不修改 ParentId，后端 move 含防环校验，失败返回 400。
