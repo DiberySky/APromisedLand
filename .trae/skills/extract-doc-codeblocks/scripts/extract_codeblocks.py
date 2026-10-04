@@ -18,8 +18,8 @@ import re
 import sys
 from pathlib import Path
 
-# 兼容中英文冒号；路径在反引号内
-HEADER_RE = re.compile(r"^##\s*文件\s*(\d+)\s*/\s*\d+\s*[：:]\s*`([^`]+)`")
+# 兼容中英文冒号；路径在反引号内；标题层级兼容 ## 与 ###
+HEADER_RE = re.compile(r"^#{2,3}\s*文件\s*(\d+)\s*/\s*\d+\s*[：:]\s*`([^`]+)`")
 
 
 def parse_sections(lines):

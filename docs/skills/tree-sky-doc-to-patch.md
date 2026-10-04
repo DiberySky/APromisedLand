@@ -83,6 +83,19 @@ private async Task LoadAsync(CancellationToken ct = default) { ... }
 | 8 | "文件路径 X 有 bug"（未读该文件）| 凭记忆定位 | 先读源码再断言 |
 | 9 | tag/提交信息声称"E2E 21/21"但本会话没跑 | 把历史数字当现状 | 起栈实测拿到通过证据后再写入不可篡改的 tag |
 | 10 | 用"已被间接覆盖"作为"不必显式测试"的理由 | 间接覆盖往往"恰好"避开边界条件（bUnit 测试恰好先调了 AddMudServices，从不暴露 AddTreeSky 的顺序约束） | 关键前置条件（DI 顺序、生命周期、接口契约）应显式测试——显式测试同时是**约束发现机制**，不只是防 bug |
+| 13 | `ItemTemplate` / `BodyContent` 的 `context` 被当成具体类 | MudBlazor 契约注入接口 `ITreeItemData<T>` | Razor 回调边界用接口；内部遍历用具体类；显式分层 |
+
+---
+
+## MudBlazor 契约边界（必须核实）
+
+| 边界 | 类型 |
+|---|---|
+| `ItemTemplate` context | `ITreeItemData<T>`（接口） |
+| `BodyContent` context | `ITreeItemData<T>`（接口） |
+| `MudTreeView.SelectedValue` | `T?`（具体） |
+| `MudTreeViewItem.Value` | `T?`（具体） |
+| **规则** | **回调边界用接口，组件内部用具体类** |
 
 ---
 
