@@ -44,7 +44,7 @@ TreeGraph.Blazor.Shared/
 │   ├── TreeNavigationHistoryService.cs
 │   └── HistoryEntry.cs
 ├── Components/
-│   ├── Base/
+│   ├── Trees/
 │   │   ├── TreeSky.razor (+ 4 partial) # 核心树组件
 │   │   ├── TreeDialogPageSky.razor
 │   │   └── TreeSelectDialogSky.razor  # 节点/父节点选择对话框

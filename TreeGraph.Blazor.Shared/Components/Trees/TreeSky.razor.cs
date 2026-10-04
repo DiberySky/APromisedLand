@@ -4,7 +4,7 @@ using TreeGraph.Blazor.Shared.Models;
 using TreeGraph.Blazor.Shared.Navigation;
 using TreeGraph.Blazor.Shared.Services;
 
-namespace TreeGraph.Blazor.Shared.Components.Base;
+namespace TreeGraph.Blazor.Shared.Components.Trees;
 
 public partial class TreeSky<TItem> : IDisposable
 {

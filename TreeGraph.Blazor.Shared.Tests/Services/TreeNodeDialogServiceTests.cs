@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Moq;
 using MudBlazor;
 using TreeGraph.Blazor.Shared;
-using TreeGraph.Blazor.Shared.Components.Base;
+using TreeGraph.Blazor.Shared.Components.Trees;
 using TreeGraph.Blazor.Shared.Components.Nodes;
 using TreeGraph.Blazor.Shared.Models;
 using Xunit;

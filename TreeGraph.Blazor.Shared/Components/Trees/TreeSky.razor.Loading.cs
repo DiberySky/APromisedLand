@@ -1,7 +1,7 @@
 using MudBlazor;
 using TreeGraph.Blazor.Shared.Models;
 
-namespace TreeGraph.Blazor.Shared.Components.Base;
+namespace TreeGraph.Blazor.Shared.Components.Trees;
 
 public partial class TreeSky<TItem>
 {

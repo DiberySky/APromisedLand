@@ -1,6 +1,6 @@
 using MudBlazor;
 using MudBlazor.Extensions;
-using TreeGraph.Blazor.Shared.Components.Base;
+using TreeGraph.Blazor.Shared.Components.Trees;
 using TreeGraph.Blazor.Shared.Components.Nodes;
 using TreeGraph.Blazor.Shared.Models;
 
@@ -213,7 +213,7 @@ public class TreeNodeDialogService<TItem>(
         return selectResult;
     }
 
-    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(Components.Base.TreeSky<TItem> treeSky,
+    public async Task<ParentSelectResult<TItem>?> ShowParentSelectDialogAsync(Components.Trees.TreeSky<TItem> treeSky,
         TItem? currentNode = null,
         TItem? currentParent = null,
         bool allowRoot = true,

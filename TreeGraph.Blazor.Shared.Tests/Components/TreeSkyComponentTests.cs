@@ -4,7 +4,7 @@ using Moq;
 using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared;
-using TreeGraph.Blazor.Shared.Components.Base;
+using TreeGraph.Blazor.Shared.Components.Trees;
 using TreeGraph.Blazor.Shared.Models;
 using TreeGraph.Blazor.Shared.Services;
 using Xunit;
