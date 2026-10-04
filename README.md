@@ -45,11 +45,11 @@ APromisedLand.AppHost/      # Aspire 编排
 
 ```
 API 集成:   100（含 TreeSky 后端测试 13）
-TreeSky 单元: 63（纯逻辑 28 / Moq 服务 30 / bUnit 组件 5）
+TreeSky 单元: 87（含 DefaultTreeActionHandler/DI 冒烟/bUnit 组件）
 Blazor 单元: 81
-E2E:        21
+E2E:        24（iNode/元数据 21 + TreeSky 演示页 smoke 3）
 ─────────────
-总计:       265
+总计:       292
 ```
 
 ## TreeSky 树组件移植决策
