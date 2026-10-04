@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 using MudBlazor.Extensions;
-using TreeGraph.Blazor.Shared.Trees.Dialogs;
+using TreeGraph.Blazor.Shared.Trees.TreeSky.Dialogs;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Components;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Contracts;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Models;

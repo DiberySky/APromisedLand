@@ -23,7 +23,7 @@ public class EavDbContext : DbContext
     public DbSet<InodeEntity> InodeEntities => Set<InodeEntity>();
 
     // TreeSky 树组件（StringTreeNode 定义在 TreeGraph.Blazor.Shared 类库 Models 中）
-    public DbSet<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode> StringTreeNodes => Set<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode>();
+    public DbSet<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode> StringTreeNodes => Set<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode>();
 
     public EavDbContext(DbContextOptions<EavDbContext> options) : base(options) { }
 
@@ -48,7 +48,7 @@ public class EavDbContext : DbContext
     // ============================================================
     private static void ConfigureStringTreeNodes(ModelBuilder mb)
     {
-        mb.Entity<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode>(e =>
+        mb.Entity<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode>(e =>
         {
             e.ToTable("string_tree_nodes");
             e.HasKey(x => x.Id);

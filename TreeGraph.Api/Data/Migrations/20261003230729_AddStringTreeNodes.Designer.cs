@@ -1011,7 +1011,7 @@ namespace TreeGraph.Api.NodeEavSky.Data.Migrations
                     b.ToTable("units", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode", b =>
+            modelBuilder.Entity("TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(36)

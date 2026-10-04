@@ -4,9 +4,9 @@ using Polly;
 using TreeGraph.Blazor.Components;
 using TreeGraph.Blazor.Services;
 using TreeGraph.Blazor.Services.DemoTree;
-using TreeGraph.Blazor.Shared.Trees.Extensions;
-using TreeGraph.Blazor.Shared.Trees.Models;
-using TreeGraph.Blazor.Shared.Trees.Services;
+using TreeGraph.Blazor.Shared.Trees.TreeSky.Extensions;
+using TreeGraph.Blazor.Shared.Trees.TreeSky.Models;
+using TreeGraph.Blazor.Shared.Trees.TreeSky.Services;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Extensions;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Services;
 

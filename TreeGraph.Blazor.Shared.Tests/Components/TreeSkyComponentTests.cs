@@ -3,10 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using MudBlazor;
 using MudBlazor.Services;
-using TreeGraph.Blazor.Shared.Trees.Extensions;
-using TreeGraph.Blazor.Shared.Trees;
-using TreeGraph.Blazor.Shared.Trees.Models;
-using TreeGraph.Blazor.Shared.Trees.Services;
+using TreeGraph.Blazor.Shared.Trees.TreeSky.Extensions;
+using TreeGraph.Blazor.Shared.Trees.TreeSky;
+using TreeGraph.Blazor.Shared.Trees.TreeSky.Models;
+using TreeGraph.Blazor.Shared.Trees.TreeSky.Services;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Components;

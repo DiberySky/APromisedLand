@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MudBlazor;
 using MudBlazor.Services;
-using TreeGraph.Blazor.Shared.Trees.Dialogs;
+using TreeGraph.Blazor.Shared.Trees.TreeSky.Dialogs;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Components;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Extensions;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Models;
