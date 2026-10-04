@@ -119,15 +119,21 @@ else
     @* ============================================================ *@
     @* 步骤 2：选择具体实体                                         *@
     @* ============================================================ *@
-    <MudBreadcrumbs Class="mb-3">
-        <MudBreadcrumbItem OnClick="BackToTypes">
-            <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small"
-                     Class="mr-1" />
-            实体类型
-        </MudBreadcrumbItem>
-        <MudBreadcrumbItem>
-            @EntityTypeDisplay.GetDisplayName(_selectedEntityType)
-        </MudBreadcrumbItem>
+    <MudBreadcrumbs Items="Step2Crumbs" Class="mb-3">
+        <ItemTemplate>
+            @if (!context.Disabled)
+            {
+                <MudLink OnClick="BackToTypes"
+                         Color="Color.Primary"
+                         StartIcon="@context.Icon">
+                    @context.Text
+                </MudLink>
+            }
+            else
+            {
+                <MudText Color="Color.Inherit">@context.Text</MudText>
+            }
+        </ItemTemplate>
     </MudBreadcrumbs>
 
     <MudText Typo="Typo.subtitle1" Color="Color.Secondary" Class="mb-3">
@@ -257,6 +263,13 @@ else
     private int TotalPages => _entities is null || _entities.PageSize <= 0
         ? 1
         : Math.Max(1, (int)Math.Ceiling((double)_entities.Total / _entities.PageSize));
+
+    // MudBlazor 9：MudBreadcrumbs 只接受 Items + ItemTemplate，首项可点击返回第 1 步
+    private List<BreadcrumbItem> Step2Crumbs =>
+    [
+        new BreadcrumbItem("实体类型", null, false, Icons.Material.Filled.Storage),
+        new BreadcrumbItem(EntityTypeDisplay.GetDisplayName(_selectedEntityType), null, true, null),
+    ];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
