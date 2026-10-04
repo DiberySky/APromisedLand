@@ -1,4 +1,4 @@
-using TreeGraph.TreeSky.Models;
+using TreeGraph.Blazor.Shared.Models;
 
 namespace TreeGraph.Api.TreeSky;
 

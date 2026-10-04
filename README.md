@@ -10,9 +10,9 @@ TreeGraph.Api/              # EAV API 薄宿主（Program.cs + 编排）
   TreeSky/                  # 树组件后端（ITreeService/TreeControllerBase/EfTreeService）
 TreeGraph.Blazor/           # Blazor Server 前端（MudBlazor 9.11）
 TreeGraph.Shared/           # 共享 DTO
-TreeGraph.TreeSky/          # 树组件库（TreeSky 精简移植，详见其 README）
+TreeGraph.Blazor.Shared/          # 树组件库（TreeSky 精简移植，详见其 README）
 TreeGraph.Api.Tests/        # API 集成测试（Testcontainers.PostgreSql）
-TreeGraph.TreeSky.Tests/    # TreeSky 类库单元测试（xUnit）
+TreeGraph.Blazor.Shared.Tests/    # TreeSky 类库单元测试（xUnit）
 TreeGraph.Blazor.Tests/     # Blazor 单元测试（bUnit）
 TreeGraph.Blazor.E2E.Tests/ # Playwright E2E 测试
 APromisedLand.AppHost/      # Aspire 编排
@@ -58,14 +58,14 @@ E2E:        24（iNode/元数据 21 + TreeSky 演示页 smoke 3）
 
 | 决策 | 内容 |
 |---|---|
-| **独立类库承载** | 新建 `TreeGraph.TreeSky`（Razor 类库），宿主仅 ProjectReference + `AddTreeSky()` 接入，源项目零改动 |
+| **独立类库承载** | 新建 `TreeGraph.Blazor.Shared`（Razor 类库），宿主仅 ProjectReference + `AddTreeSky()` 接入，源项目零改动 |
 | **精简闭包** | 只复制组件本身及真实依赖；外围 UI（Dialog/Loading/BoolField）新建薄包装承载 |
 | **裁剪重耦合模块** | Attributes 属性子系统、附件页面、UnitTree/CategoryTree 具体实现均不复制，裁剪点以占位提示处理 |
 | **内建 string 节点** | 库自带 `StringTreeNode`（string 为 sealed 且无 `new()`，不能直接作泛型参数） |
 | **后端承载** | 泛型后端（`ITreeService<T>`/`TreeControllerBase<T>`/`EfTreeService<T>`）放 `TreeGraph.Api/TreeSky/`，类库保持纯前端 RCL；仅实现组件 9 端点调用面，CategoryTree/UnitTree 具体树不带 |
 | **真实演示** | `/tree-sky-demo` 页读写真实 Postgres（`string_tree_nodes` 表，Aspire 服务发现直连 `treegrapheavapi`） |
 
-移植过程修复的问题（库 DI `TryAddTransient` 失效、移动对话框无法确认等）及裁剪清单详见 [TreeGraph.TreeSky/README.md](TreeGraph.TreeSky/README.md)。
+移植过程修复的问题（库 DI `TryAddTransient` 失效、移动对话框无法确认等）及裁剪清单详见 [TreeGraph.Blazor.Shared/README.md](TreeGraph.Blazor.Shared/README.md)。
 
 ### E2E 关键决策
 

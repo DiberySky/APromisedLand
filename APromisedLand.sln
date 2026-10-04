@@ -113,9 +113,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Api.Tests", "Tree
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Blazor.E2E.Tests", "TreeGraph.Blazor.E2E.Tests\TreeGraph.Blazor.E2E.Tests.csproj", "{AA1168E1-C257-4C95-8C94-FA60AD500136}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.TreeSky", "TreeGraph.TreeSky\TreeGraph.TreeSky.csproj", "{FF2C109A-EA75-4FE7-8289-838CE4EB8797}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Blazor.Shared", "TreeGraph.Blazor.Shared\TreeGraph.Blazor.Shared.csproj", "{FF2C109A-EA75-4FE7-8289-838CE4EB8797}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.TreeSky.Tests", "TreeGraph.TreeSky.Tests\TreeGraph.TreeSky.Tests.csproj", "{287A1891-8FAE-4F48-9365-722814F73707}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Blazor.Shared.Tests", "TreeGraph.Blazor.Shared.Tests\TreeGraph.Blazor.Shared.Tests.csproj", "{287A1891-8FAE-4F48-9365-722814F73707}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

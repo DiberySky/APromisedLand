@@ -19,7 +19,7 @@
     <ItemGroup>
       <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
       <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
-      <ProjectReference Include="..\TreeGraph.TreeSky\TreeGraph.TreeSky.csproj" />
+      <ProjectReference Include="..\TreeGraph.Blazor.Shared\TreeGraph.Blazor.Shared.csproj" />
     </ItemGroup>
     
 </Project>

@@ -1,5 +1,5 @@
-using TreeGraph.TreeSky.Models;
-using TreeGraph.TreeSky.Services;
+using TreeGraph.Blazor.Shared.Models;
+using TreeGraph.Blazor.Shared.Services;
 
 namespace TreeGraph.Blazor.Services.DemoTree;
 
