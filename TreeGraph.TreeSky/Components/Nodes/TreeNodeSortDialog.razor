@@ -41,7 +41,13 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        _children = Node.Children?.Select(x => x.Value).ToList();
+
+        // Node.Children 可能为 null（节点未展开）；x.Value 可能为 null（懒加载占位）
+        _children = Node.Children?
+            .Where(x => x.Value is not null)
+            .Select(x => x.Value!)
+            .ToList()
+            ?? new List<TItem>();
     }
 
     private void Move(int currentIndex, int offset)

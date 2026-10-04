@@ -137,7 +137,7 @@ public partial class TreeSky<TItem>
         }
         catch (Exception e)
         {
-            Message.Details("创建失败", e.Message);
+            Message.Details("更新失败", e.Message);
         }
     }
 

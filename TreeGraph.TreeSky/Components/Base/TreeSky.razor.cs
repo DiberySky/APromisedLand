@@ -13,10 +13,8 @@ public partial class TreeSky<TItem>
     private string HighlightedText { get; set; } = string.Empty;
 
     private bool _loading = true;
-    private ITreeItemData<TItem>? _item;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
-    [Inject] private DiberyTreeApiClient<TItem> TreeClient { get; set; } = null!;
 
     // ========== 生命周期 ==========
     protected override async Task OnInitializedAsync()

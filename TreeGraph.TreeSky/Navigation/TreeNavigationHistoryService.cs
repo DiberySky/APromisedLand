@@ -46,7 +46,7 @@ public class TreeNavigationHistoryService : ITreeNavigationHistoryService
             return entry;
         }
 
-        return null;
+        return new HistoryEntry { Url = defaultUrl };
     }
 
     public void Clear() => _stack.Clear();

@@ -64,7 +64,7 @@ public partial class TreeSky<TItem>
             Expandable = c.HasChildren,
             Expanded = false,
             Children = c.Children?.Select(x => x.ToTreeItemData<TItem>()).ToList()
-        }).ToHashSet<ITreeItemData<TItem>>();
+        }).ToList();
 
         node.Expanded = true;
         SelectedValue = node.Value;

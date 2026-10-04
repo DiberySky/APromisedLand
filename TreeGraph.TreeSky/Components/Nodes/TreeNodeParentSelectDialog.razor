@@ -72,6 +72,9 @@
     [Parameter] public bool AllowRootSelection { get; set; } = true;
     [Parameter] public Func<TItem, bool>? CanSelectNode { get; set; }
 
+    /// <summary>子节点访问器（可选）。不传时使用反射读取 TItem 的 "Children" 属性。</summary>
+    [Parameter] public Func<TItem, IEnumerable<TItem>>? ChildrenAccessor { get; set; }
+
     private string _searchText = string.Empty;
     private bool _isLoading = false;
 
@@ -155,7 +158,11 @@
 
     private List<TItem> GetChildren(TItem node)
     {
-        // 通过反射获取 Children 属性
+        // 1. 显式访问器优先
+        if (ChildrenAccessor is not null)
+            return ChildrenAccessor(node).ToList();
+
+        // 2. 反射兜底
         var childrenProperty = node.GetType().GetProperty("Children");
         if (childrenProperty == null) return new List<TItem>();
 

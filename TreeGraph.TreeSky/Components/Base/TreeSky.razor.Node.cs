@@ -76,7 +76,7 @@ public partial class TreeSky<TItem>
 
     private void SetSelected()
     {
-        var rootValue = FindNodeById(_items!.ToHashSet(), ClickNodeId);
+        var rootValue = FindNodeById(_items!, ClickNodeId);
         SelectedValue = rootValue;
     }
 
@@ -154,7 +154,7 @@ public partial class TreeSky<TItem>
                 var childList = item.Children.OfType<TreeItemData<TItem>>().ToList();
                 if (RemoveNodeFromParent(childList, id))
                 {
-                    item.Children = childList.ToHashSet<ITreeItemData<TItem>>();
+                    item.Children = childList;
                     return true;
                 }
             }
@@ -191,7 +191,7 @@ public partial class TreeSky<TItem>
         if (node.Children?.Any() != true && node.Value?.HasChildren == true)
         {
             var children = await LoadChildrenAsync(node.Value);
-            node.Children = children.ToHashSet<ITreeItemData<TItem>>();
+            node.Children = children.ToList();
         }
 
         if (node.Children?.Any() == true)

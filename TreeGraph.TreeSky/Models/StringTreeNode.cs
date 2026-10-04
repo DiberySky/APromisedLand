@@ -25,6 +25,8 @@ public class StringTreeNode : ITreeNodeBase<StringTreeNode>
 
     public string? ParentId { get; set; }
 
+    /// <summary>父节点导航属性：仅前端组件内部赋值；JSON 传输时忽略，避免循环引用。</summary>
+    [JsonIgnore]
     public StringTreeNode? Parent { get; set; }
 
     /// <summary>

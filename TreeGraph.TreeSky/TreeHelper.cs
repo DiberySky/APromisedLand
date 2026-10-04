@@ -24,7 +24,10 @@ public static class TreeHelper
             Children = dto.Children?.Select(i => i.ToTreeItemData<T>()).ToList(),
         };
 
-        item.Value!.Parent = dto.Parent;
+        // dto.Value 可能为 null（懒加载占位 / 后端返回空值）
+        if (item.Value is not null)
+            item.Value.Parent = dto.Parent;
+
         return item;
     }
 
@@ -97,7 +100,7 @@ public static class TreeHelper
         if (item.Children == null || item.Children.Count == 0)
         {
             var children = await loadChildren(item.Value);
-            item.Children = children.ToHashSet<ITreeItemData<T>>();
+            item.Children = children.ToList();
         }
     }
 
