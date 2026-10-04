@@ -84,6 +84,7 @@ private async Task LoadAsync(CancellationToken ct = default) { ... }
 | 9 | tag/提交信息声称"E2E 21/21"但本会话没跑 | 把历史数字当现状 | 起栈实测拿到通过证据后再写入不可篡改的 tag |
 | 10 | 用"已被间接覆盖"作为"不必显式测试"的理由 | 间接覆盖往往"恰好"避开边界条件（bUnit 测试恰好先调了 AddMudServices，从不暴露 AddTreeSky 的顺序约束） | 关键前置条件（DI 顺序、生命周期、接口契约）应显式测试——显式测试同时是**约束发现机制**，不只是防 bug |
 | 13 | `ItemTemplate` / `BodyContent` 的 `context` 被当成具体类 | MudBlazor 契约注入接口 `ITreeItemData<T>` | Razor 回调边界用接口；内部遍历用具体类；显式分层 |
+| 14 | 测试中用反射调用被测组件的私有成员（`GetField`/`GetMethod` + `SetValue`/`Invoke`） | 实现细节耦合到测试，重命名/重构时静默失效 | 用真实 UI 交互触发（bUnit `input.Change` + 等待防抖）；或暴露 `internal` 测试钩子 + `InternalsVisibleTo`；生产代码零修改 |
 
 ---
 
@@ -167,3 +168,4 @@ ServerData 完全接管，Items 被忽略。
 
 - 2026-10-04 初版：源于 TreeSky 批次 1-2 优化过程中 8 次文档 vs 代码偏差；#6/#8 落地时追加排序直传、move 路由、TreeRoute 与 E2E 实证条目
 - 2026-10-04 增补 #10：DI 冒烟测试首跑即暴露"AddTreeSky 必须在 AddMudServices 之后"的隐式约束——间接覆盖 ≠ 充分覆盖
+- 2026-10-04 增补 #14：C 批次单测中误用反射调用 StringParentSelectDialog 私有成员（_searchText/OnSearchAsync），改为真实 UI 交互触发（input.Change + 等待防抖），零反射零生产代码修改
