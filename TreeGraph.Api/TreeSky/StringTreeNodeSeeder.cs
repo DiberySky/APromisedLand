@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Data;
-using TreeGraph.Blazor.Shared.Models;
+using TreeGraph.Blazor.Shared.Trees.Models;
 
 namespace TreeGraph.Api.TreeSky;
 

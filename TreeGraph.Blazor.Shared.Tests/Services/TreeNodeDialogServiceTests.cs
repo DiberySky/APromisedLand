@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Components;
 using Moq;
 using MudBlazor;
-using TreeGraph.Blazor.Shared;
-using TreeGraph.Blazor.Shared.Components.Trees;
-using TreeGraph.Blazor.Shared.Components.Nodes;
-using TreeGraph.Blazor.Shared.Models;
+using TreeGraph.Blazor.Shared.Trees;
+using TreeGraph.Blazor.Shared.Trees.Contracts;
+using TreeGraph.Blazor.Shared.Trees.Dialogs;
+using TreeGraph.Blazor.Shared.Trees.Nodes;
+using TreeGraph.Blazor.Shared.Trees.Models;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Services;

@@ -1,6 +1,6 @@
 using Moq;
 using MudBlazor;
-using TreeGraph.Blazor.Shared;
+using TreeGraph.Blazor.Shared.Trees.Dialogs;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Services;

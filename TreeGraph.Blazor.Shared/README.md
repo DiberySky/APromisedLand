@@ -28,46 +28,50 @@ Blazor 树组件库，从 `APromisedLand.Razor` 的 `TreeSky` 组件精简移植
 ```
 TreeGraph.Blazor.Shared/
 ├── _Imports.razor                     # 公共命名空间
-├── Models/
-│   ├── ITreeNodeBase.cs               # 树节点核心接口
-│   ├── IHierarchyTreeNodeBase.cs
-│   ├── IArchivableTreeNodeBase.cs
-│   ├── StringTreeNode.cs              # ★ 内建字符串节点（Name 即显示文本，开箱即用）
-│   ├── TreeNodeDto.cs                 # 泛型节点 DTO
-│   ├── TreeQueryParams.cs
-│   └── ApiResponse.cs                 # 统一 API 响应壳
-├── Services/
-│   ├── ITreeClientService.cs          # 宿主需实现的客户端服务接口
-│   └── DiberyTreeApiClient.cs         # 泛型 HTTP API 客户端（增删改/排序/移动）
-├── Navigation/
-│   ├── ITreeNavigationHistoryService.cs
-│   ├── TreeNavigationHistoryService.cs
-│   └── HistoryEntry.cs
-├── Components/
-│   ├── Trees/
-│   │   ├── TreeSky.razor (+ 4 partial) # 核心树组件
-│   │   ├── TreeDialogPageSky.razor
-│   │   └── TreeSelectDialogSky.razor  # 节点/父节点选择对话框
-│   ├── Nodes/
-│   │   ├── DialogTreeSky.razor         # 树节点操作外壳
-│   │   ├── TreeNodeActionsDialog.razor # 操作菜单（移动/编辑/删除/排序）
-│   │   ├── TreeNodeViewDialog.razor
-│   │   ├── TreeNodeEditDialog.razor    # 编辑表单
-│   │   ├── TreeNodeParentSelectDialog.razor
-│   │   └── TreeNodeSortDialog.razor    # 拖拽排序
-│   └── Shared/
-│       ├── DialogSky.razor             # MudDialog 薄包装
-│       ├── DialogPageSky.razor         # 工具栏/取消/提交按钮
-│       ├── ProgressCircularSky.razor
-│       └── BoolFieldSky.razor
-├── Extensions/
-│   └── TreeSkyServiceCollectionExtensions.cs   # AddTreeSky()
-└── 根目录工具类
-    ├── TreeHelper.cs                   # TreeItemData 扩展 + 常量
-    ├── BlazorService.cs                # DialogOptionsEx 单例
-    ├── MessageService.cs               # DeleteBox/BoolBoxAsync/Details/Success/Warning/Info/Error
-    ├── TreeNodeDialogService.cs        # 对话框编排（ShowDialogPage/ShowTreeSelect/ShowCreate/ShowEdit/ShowSort/ShowMove）
-    └── 数据模型（NodeAction、NodeTemplate、NodeActionResult、ParentSelectResult、SortResult、DialogConfig）
+├── Common/                            # 与树无关的通用 UI 薄包装（命名空间 ...Common）
+│   ├── DialogSky.razor                # MudDialog 薄包装
+│   ├── DialogPageSky.razor            # 工具栏/取消/提交按钮
+│   ├── ProgressCircularSky.razor
+│   └── BoolFieldSky.razor
+└── Trees/                             # TreeSky 组件的全部闭包（命名空间 ...Trees.*）
+    ├── TreeSky.razor (+ 4 partial)    # 核心树组件
+    ├── TreeDialogPageSky.razor
+    ├── TreeSelectDialogSky.razor      # 节点/父节点选择对话框
+    ├── TreeHelper.cs                  # TreeItemData 扩展 + 常量
+    ├── Nodes/
+    │   ├── DialogTreeSky.razor         # 树节点操作外壳
+    │   ├── TreeNodeActionsDialog.razor # 操作菜单（移动/编辑/删除/排序）
+    │   ├── TreeNodeViewDialog.razor
+    │   ├── TreeNodeEditDialog.razor    # 编辑表单
+    │   ├── TreeNodeParentSelectDialog.razor
+    │   └── TreeNodeSortDialog.razor    # 拖拽排序
+    ├── Dialogs/
+    │   ├── TreeNodeDialogService.cs   # 对话框编排（ShowDialogPage/ShowTreeSelect/ShowCreate/ShowEdit/ShowSort/ShowMove）
+    │   ├── DialogConfig.cs            # 对话框配置
+    │   ├── BlazorService.cs           # DialogOptionsEx 单例
+    │   └── MessageService.cs          # DeleteBox/BoolBoxAsync/Details/Success/Warning/Info/Error
+    ├── Contracts/                     # 操作契约（NodeAction/NodeActionResult/NodeOperationOutcome/NodeTemplate/ParentSelectResult/SortResult）
+    ├── Models/
+    │   ├── ITreeNodeBase.cs           # 树节点核心接口
+    │   ├── IHierarchyTreeNodeBase.cs
+    │   ├── IArchivableTreeNodeBase.cs
+    │   ├── StringTreeNode.cs          # ★ 内建字符串节点（Name 即显示文本，开箱即用）
+    │   ├── TreeNodeDto.cs             # 泛型节点 DTO
+    │   ├── TreeQueryParams.cs
+    │   └── ApiResponse.cs             # 统一 API 响应壳
+    ├── Services/
+    │   ├── ITreeClientService.cs      # 宿主需实现的客户端服务接口
+    │   ├── ITreeActionHandler.cs      # 写操作 Handler 接口
+    │   ├── DefaultTreeActionHandler.cs
+    │   └── DiberyTreeApiClient.cs     # 泛型 HTTP API 客户端（增删改/排序/移动）
+    ├── Navigation/
+    │   ├── ITreeNavigationHistoryService.cs
+    │   ├── TreeNavigationHistoryService.cs
+    │   └── HistoryEntry.cs
+    ├── Attributes/
+    │   └── TreeRouteAttribute.cs      # 树节点路由标注（API 端控制器/客户端共用）
+    └── Extensions/
+        └── TreeSkyServiceCollectionExtensions.cs   # AddTreeSky()
 ```
 
 ## 使用方法
@@ -139,7 +143,7 @@ builder.Services.AddTreeSky(configureClient: c => c.BaseAddress = new Uri("https
 
 **问题**：`AddHttpClient("TreeSky")` 内部通过 `TryAddTransient<HttpClient>()` 注册了一个无名 HttpClient。库内若同样用 `TryAddTransient` 注册 `HttpClient`，会因服务已存在而静默失效，导致 `DiberyTreeApiClient<>` 注入的 `HttpClient` 没有 `BaseAddress`，也无任何消息处理器。
 
-**修复**（`Extensions/TreeSkyServiceCollectionExtensions.cs`）：将 `TryAddTransient` 改为 `AddTransient`：
+**修复**（`Trees/Extensions/TreeSkyServiceCollectionExtensions.cs`）：将 `TryAddTransient` 改为 `AddTransient`：
 
 ```csharp
 services.AddTransient(sp =>
@@ -163,7 +167,7 @@ services.AddTransient(sp =>
 
 ### 内建 string 节点类型
 
-库自带 `StringTreeNode`（`TreeGraph.Blazor.Shared.Models`）：以 `Name` 字符串为显示文本，满足泛型约束 `class, ITreeNodeBase<T>, new()`。`System.String` 本身不可用作 `TItem`（sealed、无无参构造），需要字符串节点时直接用 `StringTreeNode` 即可，也可继承扩展字段。
+库自带 `StringTreeNode`（`TreeGraph.Blazor.Shared.Trees.Models`）：以 `Name` 字符串为显示文本，满足泛型约束 `class, ITreeNodeBase<T>, new()`。`System.String` 本身不可用作 `TItem`（sealed、无无参构造），需要字符串节点时直接用 `StringTreeNode` 即可，也可继承扩展字段。
 
 ```razor
 <TreeSky TItem="StringTreeNode">

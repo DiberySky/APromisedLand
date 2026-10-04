@@ -4,9 +4,9 @@ using Polly;
 using TreeGraph.Blazor.Components;
 using TreeGraph.Blazor.Services;
 using TreeGraph.Blazor.Services.DemoTree;
-using TreeGraph.Blazor.Shared;
-using TreeGraph.Blazor.Shared.Models;
-using TreeGraph.Blazor.Shared.Services;
+using TreeGraph.Blazor.Shared.Trees.Extensions;
+using TreeGraph.Blazor.Shared.Trees.Models;
+using TreeGraph.Blazor.Shared.Trees.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

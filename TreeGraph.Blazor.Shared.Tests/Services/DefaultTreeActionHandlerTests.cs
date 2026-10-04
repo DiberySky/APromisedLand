@@ -1,8 +1,8 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using TreeGraph.Blazor.Shared.Models;
-using TreeGraph.Blazor.Shared.Services;
+using TreeGraph.Blazor.Shared.Trees.Models;
+using TreeGraph.Blazor.Shared.Trees.Services;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Services;

@@ -47,8 +47,8 @@ builder.Services.AddScoped<CustomTableReadService>();
 builder.Services.AddScoped<CustomTableQueryService>();
 
 // ★ TreeSky 树组件后端：泛型 EF 实现 + StringTreeNode 字符串节点树
-builder.Services.AddScoped<TreeGraph.Api.TreeSky.ITreeService<TreeGraph.Blazor.Shared.Models.StringTreeNode>,
-    TreeGraph.Api.TreeSky.EfTreeService<TreeGraph.Blazor.Shared.Models.StringTreeNode>>();
+builder.Services.AddScoped<TreeGraph.Api.TreeSky.ITreeService<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode>,
+    TreeGraph.Api.TreeSky.EfTreeService<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode>>();
 
 var app = builder.Build();
 

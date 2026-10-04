@@ -1,7 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
-using TreeGraph.Blazor.Shared.Models;
-using TreeGraph.Blazor.Shared.Services;
+using TreeGraph.Blazor.Shared.Trees.Extensions;
+using TreeGraph.Blazor.Shared.Trees.Models;
+using TreeGraph.Blazor.Shared.Trees.Services;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Extensions;

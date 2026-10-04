@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using TreeGraph.Blazor.Shared.Models;
+using TreeGraph.Blazor.Shared.Trees.Models;
 
 namespace TreeGraph.Api.TreeSky;
 
