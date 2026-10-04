@@ -1,10 +1,11 @@
-# TreeGraph.Blazor Razor 组件代码清单
+# TreeGraph.Blazor Razor 代码清单
 
-- 生成时间：2026-10-02 21:04:14
-- 文件总数：46
-- 项目状态：ID→GUID String 重构完成；EntityEdit single_choice 对象形态修复；EntityList 列表预览对象修复
+- 生成时间：2026-10-04 21:37:24
+- 文件总数：55
+- 排除：bin/、obj/、csproj、README.md
+- 项目状态：含 TreeSkyDemo 与 StringTreeDemo 演示页；Services/DemoTree 为 StringTree 内存示例（Store/DataSource/Handler）；DI：AddTreeSky + AddStringTreeSky
 
-## 文件 1/46 TreeGraph.Blazor/Components/_Imports.razor
+## 文件 1/55 TreeGraph.Blazor/Components/_Imports.razor
 
 ```razor
 @* _Imports.razor *@
@@ -21,14 +22,34 @@
 @using TreeGraph.Blazor.Components.Layout
 @using TreeGraph.Blazor.Components.Shared
 @using TreeGraph.Blazor.Services
+@using TreeGraph.Blazor.Services.DemoTree
 @using TreeGraph.Shared.Eav
 @using TreeGraph.Shared.Eav.Dtos
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.Trees
+@using TreeGraph.Blazor.Shared.Trees.Models
+@using TreeGraph.Blazor.Shared.Trees.Services
+@using TreeGraph.Blazor.Shared.Trees.Navigation
+@using TreeGraph.Blazor.Shared.Trees.Nodes
 @using MudBlazor
 
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
 ```
 
-## 文件 2/46 TreeGraph.Blazor/Components/App.razor
+## 文件 2/55 TreeGraph.Blazor/Components/FieldRenderers/_Imports.razor
+
+```razor
+@* 字段渲染器目录级 Imports：确保 Razor 语言服务器能正确解析
+   MudBlazor 组件与 AttributeSchemaDto，避免"无法解析符号"误报 *@
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Rendering
+@using MudBlazor
+@using TreeGraph.Shared.Eav.Dtos
+@using TreeGraph.Blazor.Services
+```
+
+## 文件 3/55 TreeGraph.Blazor/Components/App.razor
 
 ```razor
 <!DOCTYPE html>
@@ -41,6 +62,7 @@
     <ResourcePreloader/>
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]"/>
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet"/>
+    <link href="_content/MudBlazor.Extensions/mudBlazorExtensions.min.css" rel="stylesheet"/>
     <link rel="stylesheet" href="@Assets["app.css"]"/>
     <link rel="stylesheet" href="@Assets["TreeGraph.Blazor.styles.css"]"/>
     <ImportMap/>
@@ -58,12 +80,13 @@
 <ReconnectModal/>
 <script src="@Assets["_framework/blazor.web.js"]"></script>
 <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+<script type="module" src="_content/MudBlazor.Extensions/MudBlazor.Extensions.lib.module.min.js"></script>
 </body>
 
 </html>
 ```
 
-## 文件 3/46 TreeGraph.Blazor/Components/DynamicForm.razor
+## 文件 4/55 TreeGraph.Blazor/Components/DynamicForm.razor
 
 ```razor
 @using System.Text.Json
@@ -349,20 +372,7 @@
 }
 ```
 
-## 文件 4/46 TreeGraph.Blazor/Components/FieldRenderers/_Imports.razor
-
-```razor
-@* 字段渲染器目录级 Imports：确保 Razor 语言服务器能正确解析
-   MudBlazor 组件与 AttributeSchemaDto，避免"无法解析符号"误报 *@
-@using System.Text.Json
-@using Microsoft.AspNetCore.Components
-@using Microsoft.AspNetCore.Components.Rendering
-@using MudBlazor
-@using TreeGraph.Shared.Eav.Dtos
-@using TreeGraph.Blazor.Services
-```
-
-## 文件 5/46 TreeGraph.Blazor/Components/FieldRenderers/ArrayFieldRenderer.razor
+## 文件 5/55 TreeGraph.Blazor/Components/FieldRenderers/ArrayFieldRenderer.razor
 
 ```razor
 @* 数组字段渲染器：组合字段 IsArray=true 时的多行编辑 *@
@@ -455,7 +465,7 @@
 }
 ```
 
-## 文件 6/46 TreeGraph.Blazor/Components/FieldRenderers/BoolField.razor
+## 文件 6/55 TreeGraph.Blazor/Components/FieldRenderers/BoolField.razor
 
 ```razor
 @* 布尔字段渲染器（按文档 6.x 同模式实现） *@
@@ -472,7 +482,7 @@
 }
 ```
 
-## 文件 7/46 TreeGraph.Blazor/Components/FieldRenderers/CompositeField.razor
+## 文件 7/55 TreeGraph.Blazor/Components/FieldRenderers/CompositeField.razor
 
 ```razor
 @* 组合类型字段渲染器：按 Schema 递归渲染字段，嵌套 composite 递归自身 *@
@@ -772,7 +782,7 @@
 }
 ```
 
-## 文件 8/46 TreeGraph.Blazor/Components/FieldRenderers/DateField.razor
+## 文件 8/55 TreeGraph.Blazor/Components/FieldRenderers/DateField.razor
 
 ```razor
 @* 日期字段渲染器（按文档 6.x 同模式实现） *@
@@ -789,7 +799,7 @@
 }
 ```
 
-## 文件 9/46 TreeGraph.Blazor/Components/FieldRenderers/DateTimeField.razor
+## 文件 9/55 TreeGraph.Blazor/Components/FieldRenderers/DateTimeField.razor
 
 ```razor
 @* 日期时间字段渲染器（按文档 6.x 同模式实现）：日期 + 时间组合为 DateTime *@
@@ -846,7 +856,7 @@
 }
 ```
 
-## 文件 10/46 TreeGraph.Blazor/Components/FieldRenderers/FileField.razor
+## 文件 10/55 TreeGraph.Blazor/Components/FieldRenderers/FileField.razor
 
 ```razor
 @* 文件字段渲染器（基础版）：URL 输入 + JSON 元数据展示 *@
@@ -933,7 +943,7 @@
 }
 ```
 
-## 文件 11/46 TreeGraph.Blazor/Components/FieldRenderers/NumberField.razor
+## 文件 11/55 TreeGraph.Blazor/Components/FieldRenderers/NumberField.razor
 
 ```razor
 @* 数值字段渲染器（文档 6.2），int / decimal（无单位）共用 *@
@@ -950,7 +960,7 @@
 }
 ```
 
-## 文件 12/46 TreeGraph.Blazor/Components/FieldRenderers/SingleChoiceField.razor
+## 文件 12/55 TreeGraph.Blazor/Components/FieldRenderers/SingleChoiceField.razor
 
 ```razor
 @* 单选字段渲染器（文档 6.4） *@
@@ -978,7 +988,7 @@
 }
 ```
 
-## 文件 13/46 TreeGraph.Blazor/Components/FieldRenderers/StringField.razor
+## 文件 13/55 TreeGraph.Blazor/Components/FieldRenderers/StringField.razor
 
 ```razor
 @* 字符串字段渲染器（文档 6.1） *@
@@ -996,7 +1006,7 @@
 }
 ```
 
-## 文件 14/46 TreeGraph.Blazor/Components/FieldRenderers/TableField.razor
+## 文件 14/55 TreeGraph.Blazor/Components/FieldRenderers/TableField.razor
 
 ```razor
 @* 自定义表字段渲染器：内嵌行编辑器，数据走 CustomTableData 端点独立保存 *@
@@ -1236,7 +1246,7 @@
 }
 ```
 
-## 文件 15/46 TreeGraph.Blazor/Components/FieldRenderers/TimeField.razor
+## 文件 15/55 TreeGraph.Blazor/Components/FieldRenderers/TimeField.razor
 
 ```razor
 @* 时间字段渲染器（按文档 6.x 同模式实现） *@
@@ -1253,7 +1263,7 @@
 }
 ```
 
-## 文件 16/46 TreeGraph.Blazor/Components/FieldRenderers/UnitNumberField.razor
+## 文件 16/55 TreeGraph.Blazor/Components/FieldRenderers/UnitNumberField.razor
 
 ```razor
 @* 带单位数值字段渲染器（文档 6.3）。
@@ -1323,10 +1333,11 @@
 }
 ```
 
-## 文件 17/46 TreeGraph.Blazor/Components/Layout/MainLayout.razor
+## 文件 17/55 TreeGraph.Blazor/Components/Layout/MainLayout.razor
 
 ```razor
 @inherits LayoutComponentBase
+@inject EntityTypeDisplayService EntityTypeDisplay
 @* MainLayout.razor *@
 
 @* MudBlazor 必需的全局 Provider *@
@@ -1366,10 +1377,16 @@
 
 @code {
     private bool _drawerOpen = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 预加载实体类型映射，供各页面同步查 DisplayName
+        await EntityTypeDisplay.EnsureLoadedAsync();
+    }
 }
 ```
 
-## 文件 18/46 TreeGraph.Blazor/Components/Layout/NavMenu.razor
+## 文件 18/55 TreeGraph.Blazor/Components/Layout/NavMenu.razor
 
 ```razor
 @using TreeGraph.Blazor.Services
@@ -1382,6 +1399,34 @@
     <MudNavLink Href="/" Match="NavLinkMatch.All"
                 Icon="@Icons.Material.Filled.Home">
         首页
+    </MudNavLink>
+
+    @* ★ TreeSky 树组件演示（内存数据，可增删改/排序/移动） *@
+    <MudNavLink Href="/tree-sky-demo"
+                Icon="@Icons.Material.Filled.AccountTree"
+                Match="NavLinkMatch.All">
+        TreeSky 演示
+    </MudNavLink>
+
+    @* ★ iNode 入口 *@
+    <MudNavLink Href="/inodes"
+                Icon="@Icons.Material.Filled.Hub"
+                Match="NavLinkMatch.Prefix">
+        iNode 列表
+    </MudNavLink>
+
+    @* ★ 选择实体（两步式：选类型 → 选实体） *@
+    <MudNavLink Href="/entities"
+                Icon="@Icons.Material.Filled.TouchApp"
+                Match="NavLinkMatch.All">
+        选择实体
+    </MudNavLink>
+
+    @* ★ 属性列表（跨实体类型总览） *@
+    <MudNavLink Href="/attributes"
+                Icon="@Icons.Material.Filled.ListAlt"
+                Match="NavLinkMatch.All">
+        属性列表
     </MudNavLink>
 
     @* ★ 动态实体数据菜单 *@
@@ -1403,10 +1448,11 @@
         {
             @foreach (var et in _entityTypes)
             {
+                var display = EntityTypeDisplayService.GetDisplayName(et);
                 <MudNavLink Href="@($"/entities/{et.EntityType}")"
                             Icon="@Icons.Material.Filled.List"
                             Match="NavLinkMatch.Prefix">
-                    @et.EntityType
+                    @display
                     <MudChip T="string" Size="Size.Small" Class="ml-2">
                         @et.AttributeCount
                     </MudChip>
@@ -1418,6 +1464,12 @@
     @* 元数据管理 *@
     <MudNavGroup Title="元数据管理"
                  Icon="@Icons.Material.Filled.Settings">
+        @* 实体类型（最优先入口） *@
+        <MudNavLink Href="/metadata/entity-types"
+                    Icon="@Icons.Material.Filled.Category"
+                    Match="NavLinkMatch.Prefix">
+            实体类型
+        </MudNavLink>
         <MudNavLink Href="/metadata/attributes"
                     Icon="@Icons.Material.Filled.EditAttributes"
                     Match="NavLinkMatch.Prefix">
@@ -1469,7 +1521,7 @@
 }
 ```
 
-## 文件 19/46 TreeGraph.Blazor/Components/Layout/ReconnectModal.razor
+## 文件 19/55 TreeGraph.Blazor/Components/Layout/ReconnectModal.razor
 
 ```razor
 @* ReconnectModal.razor *@
@@ -1506,7 +1558,383 @@
 </dialog>
 ```
 
-## 文件 20/46 TreeGraph.Blazor/Components/Pages/Counter.razor
+## 文件 20/55 TreeGraph.Blazor/Components/Pages/Attributes/AttributesList.razor
+
+```razor
+@page "/attributes"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject EntityTypeDisplayService EntityTypeDisplay
+@* AttributesList.razor *@
+@* 全局属性列表（跨实体类型）：只读浏览 + 快速过滤 + 分页。 *@
+
+<PageTitle>属性列表</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudIcon Icon="@Icons.Material.Filled.ListAlt"
+             Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h5">属性列表</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="LoadAsync" Disabled="@_loading">
+        刷新
+    </MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Settings"
+               OnClick="GoToManage">
+        进入管理页
+    </MudButton>
+</div>
+
+@* ---------- 统计卡 ---------- *@
+<MudGrid Class="mb-4">
+    <MudItem xs="6" md="3">
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">实体类型</MudText>
+            <MudText Typo="Typo.h5">@_entityTypeCount</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" md="3">
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">属性总数</MudText>
+            <MudText Typo="Typo.h5">@_filteredAll.Count</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" md="3">
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">可搜索</MudText>
+            <MudText Typo="Typo.h5" Color="Color.Info">
+                @_filteredAll.Count(a => a.IsSearchable)
+            </MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" md="3">
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">可排序</MudText>
+            <MudText Typo="Typo.h5" Color="Color.Warning">
+                @_filteredAll.Count(a => a.IsSortable)
+            </MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@* ---------- 过滤区 ---------- *@
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudSelect T="string?"
+                       Value="_filterEntityType"
+                       ValueChanged="OnFilterEntityTypeChanged"
+                       Label="实体类型"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       FullWidth="true">
+                @foreach (var et in _entityTypes ?? Array.Empty<EntityTypeSummaryDto>())
+                {
+                    <MudSelectItem T="string?" Value="@et.EntityType">
+                        @GetDisplayName(et) (@et.AttributeCount)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudTextField T="string"
+                          Value="_searchText"
+                          ValueChanged="OnSearchChanged"
+                          Label="搜索属性名 / 显示名"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Immediate="true"
+                          FullWidth="true" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudSwitch T="bool" @bind-Value="_includeDeleted"
+                       Label="显示已删除"
+                       Color="Color.Warning" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@* ---------- 列表 ---------- *@
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_filteredAll.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.ListAlt"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">无匹配属性</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            试试清空过滤条件，或前往管理页新建属性
+        </MudText>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            共 <b>@_filteredAll.Count</b> 个属性，第 @_page / @TotalPages 页
+        </MudText>
+
+        <MudTable Items="_pagedItems" Hover="true" Bordered="true" Dense="true">
+            <HeaderContent>
+                <MudTh>实体类型</MudTh>
+                <MudTh>属性名</MudTh>
+                <MudTh>显示名</MudTh>
+                <MudTh>类型</MudTh>
+                <MudTh>单位 / 引用</MudTh>
+                <MudTh>必填</MudTh>
+                <MudTh>可搜索</MudTh>
+                <MudTh>可排序</MudTh>
+                <MudTh>顺序</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                        @GetDisplayName(context.EntityType)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <code>@context.AttributeName</code>
+                    @if (context.IsDeleted)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error"
+                                 Class="ml-1">
+                            已删除
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd>@context.DisplayName</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@GetDataTypeColor(context.DataType)">
+                        @context.DataType
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    @if (context.UnitId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                                 Class="mr-1">
+                            单位: @context.UnitSymbol
+                        </MudChip>
+                    }
+                    @if (context.RefCompositeTypeId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Dark"
+                                 Class="mr-1">
+                            组合: @context.CompositeTypeName
+                        </MudChip>
+                    }
+                    @if (context.RefTableDefinitionId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info"
+                                 Class="mr-1">
+                            表: @context.TableName
+                        </MudChip>
+                    }
+                    @if (context.RefOptionSetId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                            选项: @context.OptionSetName
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.IsRequired)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                 Color="Color.Success" Size="Size.Small" />
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.IsSearchable)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                 Color="Color.Success" Size="Size.Small" />
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.IsSortable)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                 Color="Color.Success" Size="Size.Small" />
+                    }
+                </MudTd>
+                <MudTd>@context.DisplayOrder</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => GoToManage(context.EntityType))"
+                                   title="在管理页打开" />
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <div class="d-flex align-center pa-2" style="gap: 8px;">
+                    <MudSelect T="int"
+                               Value="_pageSize"
+                               ValueChanged="OnPageSizeChanged"
+                               Label="每页"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Style="width: 120px;">
+                        <MudSelectItem T="int" Value="20">20</MudSelectItem>
+                        <MudSelectItem T="int" Value="50">50</MudSelectItem>
+                        <MudSelectItem T="int" Value="100">100</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSpacer />
+
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                                   Size="Size.Small"
+                                   Disabled="@(_page <= 1)"
+                                   OnClick="@(() => GoToPage(_page - 1))" />
+                    <MudText Typo="Typo.body2">@_page / @TotalPages</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                                   Size="Size.Small"
+                                   Disabled="@(_page >= TotalPages)"
+                                   OnClick="@(() => GoToPage(_page + 1))" />
+                </div>
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private IReadOnlyList<AttributeDetailDto> _all = Array.Empty<AttributeDetailDto>();
+    private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
+
+    private string? _filterEntityType;
+    private string? _searchText;
+    private bool _includeDeleted;
+
+    private int _page = 1;
+    private int _pageSize = 20;
+    private bool _loading;
+    private bool _initialized;
+
+    private int _entityTypeCount => _entityTypes?.Count ?? 0;
+
+    /// <summary>应用过滤后的全量列表（用于统计 + 分页）。</summary>
+    private List<AttributeDetailDto> _filteredAll => _all
+        .Where(a => _includeDeleted || !a.IsDeleted)
+        .Where(a => string.IsNullOrEmpty(_filterEntityType)
+                 || a.EntityType == _filterEntityType)
+        .Where(a => string.IsNullOrWhiteSpace(_searchText)
+                 || a.AttributeName.Contains(_searchText, StringComparison.OrdinalIgnoreCase)
+                 || a.DisplayName.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(a => a.EntityType)
+        .ThenBy(a => a.DisplayOrder)
+        .ThenBy(a => a.AttributeId)
+        .ToList();
+
+    private int TotalPages => _filteredAll.Count == 0
+        ? 1
+        : (int)Math.Ceiling((double)_filteredAll.Count / _pageSize);
+
+    private List<AttributeDetailDto> _pagedItems => _filteredAll
+        .Skip((_page - 1) * _pageSize)
+        .Take(_pageSize)
+        .ToList();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            // 并行加载实体类型 + 全部属性（含已删除，前端过滤）
+            var entityTypesTask = Api.ListEntityTypesAsync();
+            var attributesTask = Api.ListAttributesAsync(
+                entityType: null, includeDeleted: true);
+
+            await Task.WhenAll(entityTypesTask, attributesTask);
+
+            _entityTypes = entityTypesTask.Result;
+            _all = attributesTask.Result ?? Array.Empty<AttributeDetailDto>();
+
+            if (_entityTypes is null)
+                Snackbar.Add("实体类型加载失败", Severity.Warning);
+
+            _page = 1;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnFilterEntityTypeChanged(string? value)
+    {
+        _filterEntityType = value;
+        _page = 1;
+    }
+
+    private void OnSearchChanged(string? value)
+    {
+        _searchText = value;
+        _page = 1;
+    }
+
+    private void OnPageSizeChanged(int size)
+    {
+        _pageSize = size;
+        _page = 1;
+    }
+
+    private void GoToPage(int page)
+    {
+        if (page < 1 || page > TotalPages) return;
+        _page = page;
+    }
+
+    private void GoToManage() => Nav.NavigateTo("/metadata/attributes");
+
+    private void GoToManage(string entityType)
+        => Nav.NavigateTo("/metadata/attributes");
+
+    private static Color GetDataTypeColor(string dataType) => dataType switch
+    {
+        "string" => Color.Info,
+        "int" or "decimal" => Color.Primary,
+        "bool" => Color.Success,
+        "datetime" or "date" or "time" => Color.Warning,
+        "single_choice" => Color.Tertiary,
+        "composite" => Color.Dark,
+        "table" => Color.Info,
+        "file" => Color.Default,
+        _ => Color.Default
+    };
+
+    private string GetDisplayName(string entityType)
+        => EntityTypeDisplay.GetDisplayName(entityType);
+
+    private static string GetDisplayName(EntityTypeSummaryDto et)
+        => EntityTypeDisplayService.GetDisplayName(et);
+}
+```
+
+## 文件 21/55 TreeGraph.Blazor/Components/Pages/Counter.razor
 
 ```razor
 @page "/counter"
@@ -1531,7 +1959,7 @@
 }
 ```
 
-## 文件 21/46 TreeGraph.Blazor/Components/Pages/CustomTable/CustomTableEditor.razor
+## 文件 22/55 TreeGraph.Blazor/Components/Pages/CustomTable/CustomTableEditor.razor
 
 ```razor
 @page "/custom-table/{EntityType}/{EntityId}/{TableName}"
@@ -1667,7 +2095,7 @@ else
 }
 ```
 
-## 文件 22/46 TreeGraph.Blazor/Components/Pages/CustomTables.razor
+## 文件 23/55 TreeGraph.Blazor/Components/Pages/CustomTables.razor
 
 ```razor
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
@@ -2494,7 +2922,7 @@ else
 }
 ```
 
-## 文件 23/46 TreeGraph.Blazor/Components/Pages/Entities/EntityEdit.razor
+## 文件 24/55 TreeGraph.Blazor/Components/Pages/Entities/EntityEdit.razor
 
 ```razor
 @page "/entities/{EntityType}/{EntityId}"
@@ -2508,12 +2936,25 @@ else
 @inject IDialogService DialogService
 @inject IEavFieldValidator Validator
 @inject NavigationManager Nav
+@inject EntityTypeDisplayService EntityTypeDisplay
 @* EntityEdit.razor *@
-<PageTitle>编辑 @EntityType / @EntityId</PageTitle>
+<PageTitle>编辑 @GetDisplayTitle()</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4">
-    编辑实体：@EntityType / @EntityId
-</MudText>
+<div class="d-flex align-center mb-3" style="gap: 8px;">
+    <MudButton Variant="Variant.Text" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="BackToList">
+        返回列表
+    </MudButton>
+    <MudText Typo="Typo.h5">编辑 @GetDisplayTitle()</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">
+        @EntityId
+    </MudText>
+    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                   Size="Size.Small"
+                   OnClick="CopyEntityId"
+                   title="复制 EntityId" />
+</div>
 
 @if (_loading)
 {
@@ -2528,8 +2969,8 @@ else if (_schema is null || _schema.Count == 0)
 else
 {
     <MudAlert Severity="Severity.Info" Class="mb-4">
-        <b>提示</b>：保存是<b>全量替换</b>——未在此页填写的属性会被删除。
-        如需保留已有值，请勿清空。自定义表走独立端点，不受影响。
+        <b>提示</b>：保存只更新您填写的属性，未填写的属性<b>保持不变</b>。
+        如需删除某个属性值，请显式清空该字段。自定义表走独立端点，不受影响。
     </MudAlert>
 
     @if (TotalErrorCount > 0)
@@ -2583,7 +3024,7 @@ else
         </MudPaper>
     }
 
-    @* ★ #2：审计历史面板 *@
+    @* ★ 审计历史面板 *@
     <EntityHistoryPanel EntityType="@EntityType"
                         EntityId="@EntityId"
                         RefreshToken="_historyRefreshToken" />
@@ -2624,6 +3065,8 @@ else
     [Parameter] public string EntityType { get; set; } = "";
     [Parameter] public string EntityId { get; set; } = "";
 
+    private string GetDisplayTitle() => EntityTypeDisplay.GetDisplayName(EntityType);
+
     private IReadOnlyList<AttributeSchemaDto>? _schema;
     private readonly Dictionary<string, object?> _values = new();
     private readonly Dictionary<string, IReadOnlyList<FieldValidationError>> _errors = new();
@@ -2634,9 +3077,9 @@ else
     private bool _saving;
     private bool _initialized;
 
-    // ★ #3：记录加载时的 UpdatedAt（乐观锁版本）
+    // 乐观锁版本
     private DateTimeOffset? _loadedUpdatedAt;
-    // ★ #2：保存成功后自增，触发审计历史面板刷新
+    // 保存成功后自增，触发审计历史面板刷新
     private int _historyRefreshToken;
 
     private int TotalErrorCount => _errors.Values.Sum(v => v.Count);
@@ -2654,6 +3097,13 @@ else
         Nav.NavigateTo($"/entities/{EntityType}");
     }
 
+    private async Task CopyEntityId()
+    {
+        // 简单通过 Snackbar 提示让用户复制；如需真正剪贴板可注入 IJSRuntime
+        Snackbar.Add($"EntityId: {EntityId}", Severity.Info);
+        await Task.CompletedTask;
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
@@ -2669,7 +3119,7 @@ else
             var entity = await Api.GetEntityAsync(EntityType, EntityId);
             if (entity is not null)
             {
-                _loadedUpdatedAt = entity.UpdatedAt;  // ★ #3：记录加载时版本
+                _loadedUpdatedAt = entity.UpdatedAt;
                 foreach (var attr in _regularAttributes)
                 {
                     if (entity.Properties.TryGetValue(attr.AttributeName, out var elem))
@@ -2678,7 +3128,7 @@ else
             }
             else
             {
-                _loadedUpdatedAt = null;  // 新建实体
+                _loadedUpdatedAt = null;
             }
 
             RevalidateAll();
@@ -2701,13 +3151,15 @@ else
     private IReadOnlyList<FieldValidationError>? GetFieldErrors(string name)
         => _errors.TryGetValue(name, out var e) && e.Count > 0 ? e : null;
 
+    /// <summary>
+    /// 更新表单值。
+    ///
+    /// ★ PATCH 语义：保留键（即使值为 null），让 PATCH 显式删除该属性；
+    ///   若从字典移除，PATCH 会视为"未提交"从而保持原值，用户清空操作失效。
+    /// </summary>
     private void SetValue(string name, object? value)
     {
-        if (value is null)
-            _values.Remove(name);
-        else
-            _values[name] = value;
-
+        _values[name] = value;
         RevalidateField(name);
     }
 
@@ -2734,6 +3186,14 @@ else
             _errors.Remove(attributeName);
     }
 
+    /// <summary>
+    /// 保存（PATCH 语义）。
+    ///
+    /// 语义：
+    ///   - values 中出现的键：更新
+    ///   - values 中值为 null 的键：删除该属性
+    ///   - values 中未出现的键：保持不变
+    /// </summary>
     private async Task SaveAsync()
     {
         RevalidateAll();
@@ -2751,13 +3211,19 @@ else
         try
         {
             var submitValues = BuildSubmitValues();
-            var (ok, error, currentUpdatedAt) = await Api.SaveEntityAsync(
+
+            if (submitValues.Count == 0)
+            {
+                Snackbar.Add("没有可保存的变更", Severity.Info);
+                return;
+            }
+
+            var (ok, error, currentUpdatedAt) = await Api.PatchEntityAsync(
                 EntityType, EntityId, submitValues,
-                expectedUpdatedAt: _loadedUpdatedAt);   // ★ #3 乐观锁
+                expectedUpdatedAt: _loadedUpdatedAt);
 
             if (!ok)
             {
-                // ★ P1-1：409 冲突时展示服务端最新时间，引导用户刷新
                 if (currentUpdatedAt is not null)
                 {
                     var localTime = currentUpdatedAt.Value.ToLocalTime()
@@ -2775,8 +3241,8 @@ else
             }
 
             Snackbar.Add("保存成功", Severity.Success);
-            _historyRefreshToken++;   // ★ #2：触发历史面板刷新
-            await LoadAsync();        // 重新加载会同步刷新 _loadedUpdatedAt
+            _historyRefreshToken++;
+            await LoadAsync();
         }
         finally
         {
@@ -2784,6 +3250,12 @@ else
         }
     }
 
+    /// <summary>
+    /// 清空所有属性。
+    ///
+    /// ★ PATCH 语义下，"清空"需要显式提交每个属性为 null（= 删除该属性）。
+    ///   提交空字典不会删除任何东西。
+    /// </summary>
     private async Task ClearAllAsync()
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
@@ -2793,13 +3265,60 @@ else
 
         if (confirmed != true) return;
 
-        _values.Clear();
-        RevalidateAll();
-        await SaveAsync();
+        var toClear = new Dictionary<string, object?>();
+        foreach (var attr in _regularAttributes)
+            toClear[attr.AttributeName] = null;
+
+        if (toClear.Count == 0)
+        {
+            Snackbar.Add("没有可清空的属性", Severity.Info);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var (ok, error, currentUpdatedAt) = await Api.PatchEntityAsync(
+                EntityType, EntityId, toClear,
+                expectedUpdatedAt: _loadedUpdatedAt);
+
+            if (!ok)
+            {
+                if (currentUpdatedAt is not null)
+                {
+                    var localTime = currentUpdatedAt.Value.ToLocalTime()
+                        .ToString("yyyy-MM-dd HH:mm:ss");
+                    Snackbar.Add(
+                        $"清空失败：{error ?? "并发冲突"}\n" +
+                        $"服务端最新时间：{localTime}",
+                        Severity.Error);
+                }
+                else
+                {
+                    Snackbar.Add($"清空失败：{error ?? "未知错误"}", Severity.Error);
+                }
+                return;
+            }
+
+            Snackbar.Add("已清空所有属性", Severity.Success);
+            _historyRefreshToken++;
+            await LoadAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
 
     // ---------- 提交值转换 ----------
 
+    /// <summary>
+    /// 把表单值转换为 PATCH 接口接受的 JSON 值字典。
+    ///
+    /// 语义：
+    ///   - _values 中存在的键（含 null）：提交
+    ///   - _values 中不存在的键：不提交（保持后端原值）
+    /// </summary>
     private Dictionary<string, object?> BuildSubmitValues()
     {
         var result = new Dictionary<string, object?>();
@@ -2820,6 +3339,12 @@ else
 
     // ---------- JSON -> 内部模型 ----------
 
+    /// <summary>
+    /// 后端返回的 JSON 属性值 → 前端内部模型。
+    ///
+    /// ★ int / decimal 有单位时，后端返回 { value, unitId } 对象，统一走
+    ///   JsonToNumeric → NumericInput；无单位时返回裸数字。
+    /// </summary>
     private object? JsonElementToValue(JsonElement elem, AttributeSchemaDto schema)
     {
         if (elem.ValueKind == JsonValueKind.Null) return null;
@@ -2827,32 +3352,49 @@ else
         return schema.DataType switch
         {
             "string" => elem.ValueKind == JsonValueKind.String ? elem.GetString() : elem.ToString(),
-            "int" => elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
-                   : elem.ValueKind == JsonValueKind.String
-                     && long.TryParse(elem.GetString(), out var l) ? l
-                   : (object?)null,
+
+            // int：有单位走 JsonToNumeric，无单位走裸数字 → long
+            "int" => schema.Unit is not null
+                ? JsonToNumeric(elem)
+                : (elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
+                  : elem.ValueKind == JsonValueKind.String
+                    && long.TryParse(elem.GetString(), out var l) ? l
+                  : (object?)null),
+
+            // decimal：统一走 JsonToNumeric
             "decimal" => JsonToNumeric(elem),
+
             "bool" => elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False
                       ? elem.GetBoolean() : null,
             "datetime" => elem.GetDateTimeOffset(),
             "date" => elem.GetString(),
             "time" => elem.GetString(),
-            // ★ 后端绑定选项集时返回 SingleChoiceValue 对象 {value,label}
-            //   （EavReadService.ExtractSingleChoice），未绑定时才是纯字符串
+
+            // single_choice：后端绑选项集时返回 { value, label }，未绑定时是纯字符串
             "single_choice" => elem.ValueKind == JsonValueKind.String
                 ? elem.GetString()
                 : elem.ValueKind == JsonValueKind.Object
                   && elem.TryGetProperty("value", out var sc)
                   && sc.ValueKind == JsonValueKind.String ? sc.GetString()
                 : elem.ToString(),
+
             "json" or "file" => elem.Clone(),
+
             "composite" => schema.CompositeType is not null
                 ? JsonToComposite(elem, schema.CompositeType)
                 : null,
+
             _ => elem.Clone()
         };
     }
 
+    /// <summary>
+    /// 数值 JSON → NumericInput。
+    ///
+    /// 支持两种形态：
+    ///   - { value: 1.5, unitId: "..." }  → 归一化后的值 + 原始输入单位
+    ///   - 裸数字                          → 视为基准单位值
+    /// </summary>
     private NumericInput JsonToNumeric(JsonElement elem)
     {
         if (elem.ValueKind == JsonValueKind.Object)
@@ -2866,6 +3408,14 @@ else
         }
         if (elem.ValueKind == JsonValueKind.Number)
             return new NumericInput { Value = elem.GetDecimal(), UnitId = null };
+        if (elem.ValueKind == JsonValueKind.String
+            && decimal.TryParse(elem.GetString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var d))
+        {
+            return new NumericInput { Value = d, UnitId = null };
+        }
         return new NumericInput();
     }
 
@@ -2880,7 +3430,6 @@ else
 
             if (field.IsArray)
             {
-                // ★ 数组转 List<object?>
                 var list = new List<object?>();
                 foreach (var item in fv.EnumerateArray())
                 {
@@ -2919,6 +3468,8 @@ else
         };
     }
 
+    // ---------- 删除实体 ----------
+
     private async Task DeleteEntityAsync()
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
@@ -2950,7 +3501,7 @@ else
 }
 ```
 
-## 文件 24/46 TreeGraph.Blazor/Components/Pages/Entities/EntityHistory.razor
+## 文件 25/55 TreeGraph.Blazor/Components/Pages/Entities/EntityHistory.razor
 
 ```razor
 @page "/entities/{EntityType}/{EntityId}/history"
@@ -3064,7 +3615,7 @@ else if (_history is not null)
 }
 ```
 
-## 文件 25/46 TreeGraph.Blazor/Components/Pages/Entities/EntityList.razor
+## 文件 26/55 TreeGraph.Blazor/Components/Pages/Entities/EntityList.razor
 
 ```razor
 @page "/entities/{EntityType}"
@@ -3076,8 +3627,9 @@ else if (_history is not null)
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 @inject IDialogService DialogService
+@inject EntityTypeDisplayService EntityTypeDisplay
 @* EntityList.razor *@
-<PageTitle>@EntityType 实体列表</PageTitle>
+<PageTitle>@GetDisplayTitle() 实体列表</PageTitle>
 
 <div class="d-flex align-center mb-4" style="gap: 8px;">
     <MudButton Variant="Variant.Text" Color="Color.Default"
@@ -3085,7 +3637,7 @@ else if (_history is not null)
                OnClick="BackToHome">
         返回
     </MudButton>
-    <MudText Typo="Typo.h5">@EntityType 实体</MudText>
+    <MudText Typo="Typo.h5">@GetDisplayTitle() 实体</MudText>
 </div>
 
 @* ★ 动态查询过滤器 *@
@@ -3106,28 +3658,12 @@ else if (_history is not null)
 
         <MudSpacer />
 
-        <MudTextField T="string"
-                      Label="新建 EntityId (GUID)"
-                      Value="_newEntityId"
-                      ValueChanged="@(v => _newEntityId = v)"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Style="width: 320px;"
-                      Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-
-        <MudButton Variant="Variant.Outlined"
-                   Color="Color.Default"
-                   StartIcon="@Icons.Material.Filled.Autorenew"
-                   OnClick="GenerateNewGuid"
-                   Disabled="@_loading">
-            生成 GUID
-        </MudButton>
-
+        @* ★ 一键新建：自动生成 GUID 并直接进入编辑页 *@
         <MudButton Variant="Variant.Filled" Color="Color.Success"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="CreateNew"
-                   Disabled="@(!IsValidGuid(_newEntityId))">
-            新建
+                   Disabled="@_loading">
+            新建实体
         </MudButton>
     </div>
 </MudPaper>
@@ -3153,9 +3689,17 @@ else if (_result.Items.Count == 0)
             }
             else
             {
-                <text>在右上角输入 EntityId 后点击"新建"创建第一个</text>
+                <text>点击右上角"新建实体"创建第一个</text>
             }
         </MudText>
+        @if (_filters.Count == 0)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="CreateNew" Class="mt-3">
+                新建实体
+            </MudButton>
+        }
     </MudPaper>
 }
 else
@@ -3231,6 +3775,9 @@ else
 @code {
     [Parameter] public string EntityType { get; set; } = "";
 
+    /// <summary>显示用中文名；DisplayName 空时回退到 EntityType。</summary>
+    private string GetDisplayTitle() => EntityTypeDisplay.GetDisplayName(EntityType);
+
     private IReadOnlyList<AttributeSchemaDto>? _schema;
     private List<AttributeSchemaDto> _searchableAttributes = new();
     private List<string> _previewColumns = new();
@@ -3242,8 +3789,6 @@ else
     private bool _initialized;
     private int _page = 1;
     private int _pageSize = 20;
-    private string? _newEntityId;
-
     private int TotalPages => _result is null || _result.PageSize <= 0
         ? 1
         : Math.Max(1, (int)Math.Ceiling((double)_result.Total / _result.PageSize));
@@ -3349,30 +3894,16 @@ else
         StateHasChanged();
     }
 
+    /// <summary>
+    /// ★ 一键新建：自动生成 GUID 并直接进入编辑页。
+    /// 用户无需手动输入 / 生成 EntityId。
+    /// </summary>
     private void CreateNew()
     {
-        var id = _newEntityId?.Trim();
-        if (string.IsNullOrEmpty(id)) return;
-
-        // 校验 GUID 格式（后端也校验，但前端先给友好提示）
-        if (!Guid.TryParse(id, out var guid))
-        {
-            Snackbar.Add("EntityId 必须是 GUID 格式（36 字符，含连字符）", Severity.Warning);
-            return;
-        }
-
-        // 统一为小写带连字符的标准格式
-        Nav.NavigateTo($"/entities/{EntityType}/{guid:D}");
+        var newId = Guid.NewGuid().ToString("D");
+        Snackbar.Add($"已生成 EntityId：{newId}", Severity.Info);
+        Nav.NavigateTo($"/entities/{EntityType}/{newId}");
     }
-
-    /// <summary>一键生成新 GUID 填入输入框（免手打）。</summary>
-    private void GenerateNewGuid()
-    {
-        _newEntityId = Guid.NewGuid().ToString("D");
-    }
-
-    private static bool IsValidGuid(string? s)
-        => !string.IsNullOrWhiteSpace(s) && Guid.TryParse(s, out _);
 
     private void BackToHome()
     {
@@ -3420,7 +3951,401 @@ else
 }
 ```
 
-## 文件 26/46 TreeGraph.Blazor/Components/Pages/Error.razor
+## 文件 27/55 TreeGraph.Blazor/Components/Pages/Entities/EntitySelector.razor
+
+```razor
+@page "/entities"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject EntityTypeDisplayService EntityTypeDisplay
+@* EntitySelector.razor *@
+@* 两步式实体选择器：先选实体类型，再选具体实体。 *@
+
+<PageTitle>选择实体</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudIcon Icon="@Icons.Material.Filled.TouchApp"
+             Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h5">选择实体</MudText>
+    <MudSpacer />
+    @if (_selectedEntityType is not null)
+    {
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="BackToTypes">
+            返回类型
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.List"
+                   OnClick="@(() => Nav.NavigateTo($"/entities/{_selectedEntityType}"))">
+            进入完整列表页
+        </MudButton>
+    }
+    <MudButton Variant="Variant.Outlined" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="ReloadAsync" Disabled="@_loading">
+        刷新
+    </MudButton>
+</div>
+
+@* ============================================================ *@
+@* 步骤 1：选择实体类型                                           *@
+@* ============================================================ *@
+@if (_selectedEntityType is null)
+{
+    <MudText Typo="Typo.subtitle1" Color="Color.Secondary" Class="mb-3">
+        第 1 步 · 选择一个实体类型
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_entityTypes is null || _entityTypes.Count == 0)
+    {
+        <MudPaper Class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Inbox"
+                     Size="Size.Large" Color="Color.Default" />
+            <MudText Typo="Typo.h6" Class="mt-2">暂无实体类型</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                请先在「元数据管理 → 属性定义」中创建属性
+            </MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var et in _entityTypes)
+            {
+                var captured = et;
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard @onclick="@(() => SelectEntityTypeAsync(captured.EntityType))"
+                             Style="cursor: pointer; height: 100%;"
+                             Elevation="1">
+                        <MudCardContent>
+                            <div class="d-flex align-center mb-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Storage"
+                                         Color="Color.Primary" Size="Size.Medium" />
+                                <MudText Typo="Typo.h6" Class="ml-2">
+                                    @GetDisplayName(captured)
+                                </MudText>
+                            </div>
+
+                            <div class="d-flex flex-wrap mb-1" style="gap: 4px;">
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="Color.Secondary">
+                                    @captured.AttributeCount 属性
+                                </MudChip>
+                                @if (captured.SearchableAttributeCount > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small"
+                                             Color="Color.Info">
+                                        @captured.SearchableAttributeCount 可搜索
+                                    </MudChip>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(captured.FirstDisplayName))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    示例：@captured.FirstDisplayName
+                                </MudText>
+                            }
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Size="Size.Small"
+                                       Variant="Variant.Text"
+                                       Color="Color.Primary"
+                                       EndIcon="@Icons.Material.Filled.ChevronRight">
+                                浏览
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+}
+else
+{
+    @* ============================================================ *@
+    @* 步骤 2：选择具体实体                                         *@
+    @* ============================================================ *@
+    <MudBreadcrumbs Items="Step2Crumbs" Class="mb-3">
+        <ItemTemplate>
+            @if (!context.Disabled)
+            {
+                <MudLink OnClick="BackToTypes"
+                         Color="Color.Primary"
+                         StartIcon="@context.Icon">
+                    @context.Text
+                </MudLink>
+            }
+            else
+            {
+                <MudText Color="Color.Inherit">@context.Text</MudText>
+            }
+        </ItemTemplate>
+    </MudBreadcrumbs>
+
+    <MudText Typo="Typo.subtitle1" Color="Color.Secondary" Class="mb-3">
+        第 2 步 · 选择 @EntityTypeDisplay.GetDisplayName(_selectedEntityType) 下的一个实体
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_entities is null)
+    {
+        <MudAlert Severity="Severity.Error">实体加载失败，请检查后端服务</MudAlert>
+    }
+    else if (_entities.Items.Count == 0)
+    {
+        <MudPaper Class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Inbox"
+                     Size="Size.Large" Color="Color.Default" />
+            <MudText Typo="Typo.h6" Class="mt-2">
+                @_selectedEntityType 下暂无实体
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Href="@($"/entities/{_selectedEntityType}")"
+                       StartIcon="@Icons.Material.Filled.Add" Class="mt-3">
+                前往列表页新建
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                共 <b>@_entities.Total</b> 个实体，第 @_page / @TotalPages 页
+            </MudText>
+
+            <MudTable Items="_entities.Items" Hover="true" Bordered="true"
+                      Dense="true">
+                <HeaderContent>
+                    <MudTh>EntityId</MudTh>
+                    <MudTh>属性预览</MudTh>
+                    <MudTh>更新时间</MudTh>
+                    <MudTh>操作</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <code>@context.EntityId</code>
+                    </MudTd>
+                    <MudTd>
+                        @foreach (var (k, v) in context.Properties.Take(3))
+                        {
+                            <MudChip T="string" Size="Size.Small" Class="mr-1">
+                                @k=@FormatPreview(v)
+                            </MudChip>
+                        }
+                        @if (context.Properties.Count > 3)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                +@(context.Properties.Count - 3) 更多
+                            </MudText>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        @if (context.UpdatedAt is { } dt)
+                        {
+                            <MudText Typo="Typo.caption">
+                                @dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                            </MudText>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => EditEntity(context.EntityId))"
+                                       title="编辑" />
+                        <MudIconButton Icon="@Icons.Material.Filled.History"
+                                       Size="Size.Small"
+                                       Color="Color.Info"
+                                       OnClick="@(() => ViewHistory(context.EntityId))"
+                                       title="审计历史" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <div class="d-flex align-center pa-2" style="gap: 8px;">
+                        <MudSelect T="int"
+                                   Value="_pageSize"
+                                   ValueChanged="OnPageSizeChanged"
+                                   Label="每页"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Style="width: 120px;">
+                            <MudSelectItem T="int" Value="10">10</MudSelectItem>
+                            <MudSelectItem T="int" Value="20">20</MudSelectItem>
+                            <MudSelectItem T="int" Value="50">50</MudSelectItem>
+                            <MudSelectItem T="int" Value="100">100</MudSelectItem>
+                        </MudSelect>
+
+                        <MudSpacer />
+
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                                       Size="Size.Small"
+                                       Disabled="@(_page <= 1)"
+                                       OnClick="@(() => GoToPageAsync(_page - 1))" />
+                        <MudText Typo="Typo.body2">@_page / @TotalPages</MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                                       Size="Size.Small"
+                                       Disabled="@(_page >= TotalPages)"
+                                       OnClick="@(() => GoToPageAsync(_page + 1))" />
+                    </div>
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    }
+}
+
+@code {
+    private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
+    private string? _selectedEntityType;
+    private PagedResult<DynamicEntityDto>? _entities;
+
+    private int _page = 1;
+    private int _pageSize = 20;
+    private bool _loading;
+    private bool _initialized;
+
+    private int TotalPages => _entities is null || _entities.PageSize <= 0
+        ? 1
+        : Math.Max(1, (int)Math.Ceiling((double)_entities.Total / _entities.PageSize));
+
+    // MudBlazor 9：MudBreadcrumbs 只接受 Items + ItemTemplate，首项可点击返回第 1 步
+    private List<BreadcrumbItem> Step2Crumbs =>
+    [
+        new BreadcrumbItem("实体类型", null, false, Icons.Material.Filled.Storage),
+        new BreadcrumbItem(EntityTypeDisplay.GetDisplayName(_selectedEntityType), null, true, null),
+    ];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadEntityTypesAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadEntityTypesAsync()
+    {
+        _loading = true;
+        try
+        {
+            _entityTypes = await Api.ListEntityTypesAsync();
+            if (_entityTypes is null)
+                Snackbar.Add("实体类型加载失败，请检查后端服务", Severity.Warning);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (_selectedEntityType is null)
+            await LoadEntityTypesAsync();
+        else
+            await LoadEntitiesAsync();
+        StateHasChanged();
+    }
+
+    private async Task SelectEntityTypeAsync(string entityType)
+    {
+        _selectedEntityType = entityType;
+        _page = 1;
+        await LoadEntitiesAsync();
+    }
+
+    private void BackToTypes()
+    {
+        _selectedEntityType = null;
+        _entities = null;
+        _page = 1;
+    }
+
+    private async Task LoadEntitiesAsync()
+    {
+        if (_selectedEntityType is null) return;
+
+        _loading = true;
+        try
+        {
+            _entities = await Api.ListEntitiesAsync(
+                _selectedEntityType, _page, _pageSize);
+
+            if (_entities is null)
+                Snackbar.Add("实体加载失败，请检查后端服务", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnPageSizeChanged(int size)
+    {
+        _pageSize = size;
+        _page = 1;
+        await LoadEntitiesAsync();
+    }
+
+    private async Task GoToPageAsync(int page)
+    {
+        if (page < 1 || page > TotalPages) return;
+        _page = page;
+        await LoadEntitiesAsync();
+    }
+
+    private void EditEntity(string entityId)
+        => Nav.NavigateTo($"/entities/{_selectedEntityType}/{entityId}");
+
+    private void ViewHistory(string entityId)
+        => Nav.NavigateTo($"/entities/{_selectedEntityType}/{entityId}/history");
+
+    private static string FormatPreview(System.Text.Json.JsonElement elem)
+    {
+        return elem.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.Null => "",
+            System.Text.Json.JsonValueKind.String => elem.GetString() ?? "",
+            System.Text.Json.JsonValueKind.Number => elem.ToString(),
+            System.Text.Json.JsonValueKind.True => "✓",
+            System.Text.Json.JsonValueKind.False => "✗",
+            System.Text.Json.JsonValueKind.Object => FormatObjectPreview(elem),
+            System.Text.Json.JsonValueKind.Array => $"[{elem.GetArrayLength()}]",
+            _ => elem.ToString()
+        };
+    }
+
+    private static string FormatObjectPreview(System.Text.Json.JsonElement e)
+    {
+        if (e.TryGetProperty("label", out var lbl)
+            && lbl.ValueKind == System.Text.Json.JsonValueKind.String)
+            return lbl.GetString() ?? "";
+
+        if (e.TryGetProperty("value", out var v)
+            && v.ValueKind == System.Text.Json.JsonValueKind.Number)
+            return v.ToString();
+
+        return "{…}";
+    }
+
+    private static string GetDisplayName(EntityTypeSummaryDto et)
+        => EntityTypeDisplayService.GetDisplayName(et);
+}
+```
+
+## 文件 28/55 TreeGraph.Blazor/Components/Pages/Error.razor
 
 ```razor
 @page "/Error"
@@ -3462,7 +4387,7 @@ else
 }
 ```
 
-## 文件 27/46 TreeGraph.Blazor/Components/Pages/Home.razor
+## 文件 29/55 TreeGraph.Blazor/Components/Pages/Home.razor
 
 ```razor
 @page "/"
@@ -3530,7 +4455,1235 @@ else
 }
 ```
 
-## 文件 28/46 TreeGraph.Blazor/Components/Pages/Metadata/Attributes.razor
+## 文件 30/55 TreeGraph.Blazor/Components/Pages/Inodes/InodeDetail.razor
+
+```razor
+@page "/inodes/{InodeId}"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using System.Text.Json
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+@inject IJSRuntime JS
+@* InodeDetail.razor *@
+<PageTitle>iNode @InodeId</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudButton Variant="Variant.Text" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="BackToList">
+        返回
+    </MudButton>
+    <MudIcon Icon="@Icons.Material.Filled.Hub"
+             Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h5">iNode 详情</MudText>
+</div>
+
+<MudPaper Class="pa-3 mb-4">
+    <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">iNode ID</MudText>
+        <code>@InodeId</code>
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                       Size="Size.Small" OnClick="CopyId" title="复制" />
+        <MudSpacer />
+        @* ★ JSON 预览入口 *@
+        <MudButton Variant="Variant.Outlined" Color="Color.Info"
+                   StartIcon="@Icons.Material.Filled.DataObject"
+                   OnClick="OpenJsonDrawer">
+            JSON 预览
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAttachDialog">
+            声明新类型
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="ReloadAsync" Disabled="@_loading">
+            刷新
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_cards is null || _cards.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.Inbox"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">该 iNode 尚未声明任何类型</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            点击下方按钮，为该 iNode 声明它会使用的实体类型
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAttachDialog">
+            声明新类型
+        </MudButton>
+    </MudPaper>
+}
+else
+{
+    <MudText Typo="Typo.subtitle1" Class="mb-2">
+        类型卡片（@_cards.Count）
+    </MudText>
+
+    <MudGrid>
+        @foreach (var card in _cards)
+        {
+            var captured = card;
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="1" Style="height: 100%;">
+                    <MudCardContent>
+                        <div class="d-flex align-center mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Category"
+                                     Color="@(captured.HasEntity ? Color.Success : Color.Default)"
+                                     Size="Size.Medium" />
+                            <MudText Typo="Typo.h6" Class="ml-2">
+                                @captured.DisplayName
+                            </MudText>
+                            @if (captured.HasEntity)
+                            {
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="Color.Success" Class="ml-2">
+                                    已填写
+                                </MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="Color.Warning" Class="ml-2">
+                                    未填写
+                                </MudChip>
+                            }
+                        </div>
+
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            <code>@captured.EntityType</code>
+                        </MudText>
+
+                        @if (!string.IsNullOrEmpty(captured.Description))
+                        {
+                            <MudText Typo="Typo.caption" Class="mt-1">
+                                @captured.Description
+                            </MudText>
+                        }
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@(captured.HasEntity
+                                       ? Icons.Material.Filled.Edit
+                                       : Icons.Material.Filled.Add)"
+                                   OnClick="@(() => GoToEdit(captured.EntityType))">
+                            @(captured.HasEntity ? "编辑" : "填写")
+                        </MudButton>
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Text"
+                                   Color="Color.Default"
+                                   StartIcon="@Icons.Material.Filled.History"
+                                   OnClick="@(() => GoToHistory(captured.EntityType))"
+                                   Disabled="@(!captured.HasEntity)">
+                            历史
+                        </MudButton>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(async () => await DetachAsync(captured))"
+                                       title="取消声明" />
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@* ============================================================ *@
+@* ★ JSON 预览抽屉（右侧滑出，600px 宽） *@
+@* ============================================================ *@
+<MudDrawer @bind-Open="_jsonDrawerOpen"
+           Anchor="Anchor.End"
+           Variant="DrawerVariant.Temporary"
+           Elevation="4"
+           Width="600px">
+    <MudPaper Class="pa-4" Style="height: 100%; display: flex; flex-direction: column;">
+
+        @* 标题区 *@
+        <div class="d-flex align-center mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.DataObject"
+                     Color="Color.Info" Class="mr-2" />
+            <MudText Typo="Typo.h6">原始 JSON 预览</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           Size="Size.Small"
+                           OnClick="@(() => _jsonDrawerOpen = false)"
+                           title="关闭" />
+        </div>
+
+        @* 选项开关 *@
+        <MudPaper Class="pa-3 mb-3" Outlined="true" Elevation="0">
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                选项（切换后自动刷新）
+            </MudText>
+            <div class="d-flex flex-wrap" style="gap: 12px;">
+                <MudSwitch T="bool"
+                           Value="_jsonIncludeNull"
+                           ValueChanged="OnIncludeNullChanged"
+                           Label="includeNull"
+                           Color="Color.Primary" />
+                <MudSwitch T="bool"
+                           Value="_jsonDisplayName"
+                           ValueChanged="OnDisplayNameChanged"
+                           Label="displayName"
+                           Color="Color.Primary" />
+                <MudSwitch T="bool"
+                           Value="_jsonOriginalUnits"
+                           ValueChanged="OnOriginalUnitsChanged"
+                           Label="originalUnits"
+                           Color="Color.Primary" />
+            </div>
+        </MudPaper>
+
+        @* 操作区 *@
+        <div class="d-flex align-center mb-3" style="gap: 8px;">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="LoadJsonAsync"
+                       Disabled="_jsonLoading">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ContentCopy"
+                       OnClick="CopyJsonToClipboard"
+                       Disabled="@(string.IsNullOrEmpty(_jsonText))">
+                复制
+            </MudButton>
+            <MudSpacer />
+            @if (!string.IsNullOrEmpty(_jsonText))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @(_jsonText.Length) 字符
+                </MudText>
+            }
+        </div>
+
+        @* JSON 内容区 *@
+        @if (_jsonLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (string.IsNullOrEmpty(_jsonText))
+        {
+            <MudAlert Severity="Severity.Info">
+                暂无数据。可能 iNode 下没有任何实体。
+            </MudAlert>
+        }
+        else
+        {
+            <MudPaper Class="pa-3" Outlined="true" Elevation="0"
+                      Style="flex: 1; overflow: auto;
+                             background: var(--mud-palette-background-gray);
+                             font-family: 'Consolas', 'Menlo', monospace;
+                             font-size: 12px;
+                             white-space: pre;">
+                <pre style="margin: 0;">@_jsonText</pre>
+            </MudPaper>
+        }
+    </MudPaper>
+</MudDrawer>
+
+@* ============================================================ *@
+@* 声明类型对话框                                                *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showAttachDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">声明新类型</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_allTypes is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            var declared = _cards?.Select(c => c.EntityType).ToHashSet()
+                           ?? new HashSet<string>();
+            var available = _allTypes
+                .Where(t => !declared.Contains(t.EntityType))
+                .ToList();
+
+            if (available.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">
+                    所有可用的实体类型都已声明
+                </MudAlert>
+            }
+            else
+            {
+                <MudSelect T="string"
+                           @bind-Value="_newType"
+                           Label="实体类型"
+                           Variant="Variant.Outlined">
+                    @foreach (var t in available)
+                    {
+                        <MudSelectItem T="string" Value="@t.EntityType">
+                            @(string.IsNullOrWhiteSpace(t.DisplayName)
+                                ? t.EntityType
+                                : $"{t.DisplayName} ({t.EntityType})")
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showAttachDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="AttachAsync"
+                   Disabled="@(string.IsNullOrEmpty(_newType))">
+            声明
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public string InodeId { get; set; } = "";
+
+    private IReadOnlyList<InodeTypeCardDto>? _cards;
+    private IReadOnlyList<EntityTypeSummaryDto>? _allTypes;
+    private bool _loading;
+    private bool _initialized;
+
+    private bool _showAttachDialog;
+    private string? _newType;
+
+    // ★ JSON 预览状态
+    private bool _jsonDrawerOpen;
+    private bool _jsonLoading;
+    private string? _jsonText;
+    private bool _jsonIncludeNull;
+    private bool _jsonDisplayName;
+    private bool _jsonOriginalUnits;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _cards = await Api.ListInodeTypeCardsAsync(InodeId);
+            _allTypes = await Api.ListEntityTypesAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private void BackToList() => Nav.NavigateTo("/inodes");
+
+    private void CopyId() => Snackbar.Add($"iNode ID: {InodeId}", Severity.Info);
+
+    private void GoToEdit(string entityType)
+        => Nav.NavigateTo(
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
+            $"{Uri.EscapeDataString(entityType)}");
+
+    private void GoToHistory(string entityType)
+        => Nav.NavigateTo(
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
+            $"{Uri.EscapeDataString(entityType)}/history");
+
+    // ============================================================
+    // ★ JSON 预览
+    // ============================================================
+
+    private async Task OpenJsonDrawer()
+    {
+        _jsonDrawerOpen = true;
+        await LoadJsonAsync();
+    }
+
+    private async Task LoadJsonAsync()
+    {
+        _jsonLoading = true;
+        try
+        {
+            var raw = await Api.GetInodeJsonAsync(
+                InodeId,
+                includeNull: _jsonIncludeNull,
+                displayName: _jsonDisplayName,
+                originalUnits: _jsonOriginalUnits);
+
+            _jsonText = PrettyPrint(raw);
+        }
+        finally
+        {
+            _jsonLoading = false;
+        }
+    }
+
+    // 注意：必须先写回字段再刷新。若只更新 UI 不写字段，
+    // 查询参数会静默保持旧值（CS0649 警告即此信号）。
+    private async Task OnIncludeNullChanged(bool value)
+    {
+        _jsonIncludeNull = value;
+        await LoadJsonAsync();
+    }
+
+    private async Task OnDisplayNameChanged(bool value)
+    {
+        _jsonDisplayName = value;
+        await LoadJsonAsync();
+    }
+
+    private async Task OnOriginalUnitsChanged(bool value)
+    {
+        _jsonOriginalUnits = value;
+        await LoadJsonAsync();
+    }
+
+    /// <summary>把单行 JSON 美化为缩进 2 空格的多行文本。</summary>
+    private static string? PrettyPrint(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return raw;
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            return JsonSerializer.Serialize(doc, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch (JsonException)
+        {
+            // 不是合法 JSON，原样返回
+            return raw;
+        }
+    }
+
+    private async Task CopyJsonToClipboard()
+    {
+        if (string.IsNullOrEmpty(_jsonText)) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _jsonText);
+            Snackbar.Add("已复制到剪贴板", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"复制失败：{ex.Message}", Severity.Error);
+        }
+    }
+
+    // ============================================================
+    // 声明类型
+    // ============================================================
+
+    private void OpenAttachDialog()
+    {
+        _newType = null;
+        _showAttachDialog = true;
+    }
+
+    private async Task AttachAsync()
+    {
+        if (string.IsNullOrEmpty(_newType)) return;
+
+        var (ok, error) = await Api.AttachInodeTypeAsync(InodeId, _newType);
+        if (!ok)
+        {
+            Snackbar.Add($"声明失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("声明成功", Severity.Success);
+        _showAttachDialog = false;
+        await LoadAsync();
+
+        // 抽屉开着时也刷新 JSON
+        if (_jsonDrawerOpen) await LoadJsonAsync();
+
+        StateHasChanged();
+    }
+
+    private async Task DetachAsync(InodeTypeCardDto card)
+    {
+        if (card.HasEntity)
+        {
+            Snackbar.Add("该类型下已有实体，请先删除实体", Severity.Warning);
+            return;
+        }
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认取消声明",
+            $"确定取消类型「{card.DisplayName}」的声明？",
+            yesText: "取消声明", cancelText: "关闭");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DetachInodeTypeAsync(
+            InodeId, card.EntityType);
+        if (!ok)
+        {
+            Snackbar.Add($"取消失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("已取消声明", Severity.Success);
+        await LoadAsync();
+
+        // 抽屉开着时也刷新 JSON
+        if (_jsonDrawerOpen) await LoadJsonAsync();
+
+        StateHasChanged();
+    }
+}
+```
+
+## 文件 31/55 TreeGraph.Blazor/Components/Pages/Inodes/InodeEntityEdit.razor
+
+```razor
+@page "/inodes/{InodeId}/types/{EntityType}"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using System.Text.Json
+@using TreeGraph.Blazor.Components.Shared
+@using TreeGraph.Blazor.Services
+@using TreeGraph.Shared.Eav.Dtos
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IEavFieldValidator Validator
+@inject NavigationManager Nav
+@* InodeEntityEdit.razor *@
+<PageTitle>编辑 @EntityType</PageTitle>
+
+<div class="d-flex align-center mb-3" style="gap: 8px; flex-wrap: wrap;">
+    <MudButton Variant="Variant.Text" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="BackToInode">
+        返回 iNode
+    </MudButton>
+    <MudText Typo="Typo.h5">@_displayTitle</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">
+        iNode: <code>@InodeId</code>
+    </MudText>
+</div>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_schema is null || _schema.Count == 0)
+{
+    <MudAlert Severity="Severity.Warning">
+        该类型尚未定义任何属性，请先在元数据管理中配置。
+    </MudAlert>
+}
+else
+{
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        <b>提示</b>：保存只更新您填写的属性，未填写的属性<b>保持不变</b>。
+        首次保存会自动创建实体。
+    </MudAlert>
+
+    @if (TotalErrorCount > 0)
+    {
+        <MudAlert Severity="Severity.Error" Dense="false" Class="mb-4">
+            <MudText Typo="Typo.body1">
+                有 <b>@TotalErrorCount</b> 项校验错误，请修正后再保存：
+            </MudText>
+            <ul style="margin: 6px 0 0 0; padding-left: 20px;">
+                @foreach (var (attrName, errs) in _errors.Where(kv => kv.Value.Count > 0))
+                {
+                    var attr = _regularAttributes.FirstOrDefault(
+                        a => a.AttributeName == attrName);
+                    var label = attr?.DisplayName ?? attrName;
+                    foreach (var e in errs)
+                    {
+                        var path = string.IsNullOrEmpty(e.Path) ? "" : $" [{e.Path}]";
+                        <li>@label@(path)：@e.Message</li>
+                    }
+                }
+            </ul>
+        </MudAlert>
+    }
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" Class="mb-3">属性值</MudText>
+
+        @foreach (var attr in _regularAttributes)
+        {
+            <div class="mb-4">
+                <DynamicFieldRenderer Attribute="attr"
+                                      Value="GetValue(attr.AttributeName)"
+                                      ValueChanged="@(v => SetValue(attr.AttributeName, v))"
+                                      Errors="GetFieldErrors(attr.AttributeName)" />
+            </div>
+        }
+    </MudPaper>
+
+    @if (_tableAttributes.Count > 0)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">子表数据</MudText>
+            @foreach (var attr in _tableAttributes)
+            {
+                <CustomTableEditor EntityType="@EntityType"
+                                   EntityId="@(_entityId ?? "")"
+                                   AttributeName="@attr.AttributeName"
+                                   TableName="@attr.AttributeName"
+                                   DisplayName="@attr.DisplayName"
+                                   RefTableDefinitionId="@attr.RefTableDefinitionId" />
+            }
+        </MudPaper>
+    }
+
+    <div class="d-flex align-center" style="gap: 8px;">
+        <MudButton Variant="Variant.Filled"
+                   Color="@(TotalErrorCount > 0 ? Color.Default : Color.Primary)"
+                   OnClick="SaveAsync" Disabled="@_saving"
+                   StartIcon="@Icons.Material.Filled.Save">
+            @(_saving ? "保存中..." : "保存")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   OnClick="ReloadAsync"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            重新加载
+        </MudButton>
+        <MudSpacer />
+        @if (_entityId is not null)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                       OnClick="DeleteAsync"
+                       StartIcon="@Icons.Material.Filled.DeleteForever"
+                       Disabled="@_saving">
+                删除实体
+            </MudButton>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string InodeId { get; set; } = "";
+    [Parameter] public string EntityType { get; set; } = "";
+
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private readonly Dictionary<string, object?> _values = new();
+    private readonly Dictionary<string, IReadOnlyList<FieldValidationError>> _errors = new();
+    private List<AttributeSchemaDto> _regularAttributes = new();
+    private List<AttributeSchemaDto> _tableAttributes = new();
+
+    private string _displayTitle = "";
+    private string? _entityId;
+    private DateTimeOffset? _loadedUpdatedAt;
+
+    private bool _loading;
+    private bool _saving;
+    private bool _initialized;
+
+    private int TotalErrorCount => _errors.Values.Sum(v => v.Count);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized) await LoadAsync();
+    }
+
+    private void BackToInode()
+        => Nav.NavigateTo($"/inodes/{Uri.EscapeDataString(InodeId)}");
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _displayTitle = EntityType;
+
+            var schema = await Api.GetSchemaAsync(EntityType);
+            _schema = schema ?? Array.Empty<AttributeSchemaDto>();
+
+            _regularAttributes = _schema.Where(a => a.DataType != "table").ToList();
+            _tableAttributes = _schema.Where(a => a.DataType == "table").ToList();
+
+            _values.Clear();
+            var entity = await Api.GetInodeEntityAsync(InodeId, EntityType);
+            if (entity is not null)
+            {
+                _entityId = entity.EntityId;
+                _loadedUpdatedAt = entity.UpdatedAt;
+
+                foreach (var attr in _regularAttributes)
+                {
+                    if (entity.Properties.TryGetValue(attr.AttributeName, out var elem))
+                        _values[attr.AttributeName] = JsonElementToValue(elem, attr);
+                }
+            }
+            else
+            {
+                _entityId = null;
+                _loadedUpdatedAt = null;
+            }
+
+            RevalidateAll();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private object? GetValue(string name)
+        => _values.TryGetValue(name, out var v) ? v : null;
+
+    private IReadOnlyList<FieldValidationError>? GetFieldErrors(string name)
+        => _errors.TryGetValue(name, out var e) && e.Count > 0 ? e : null;
+
+    private void SetValue(string name, object? value)
+    {
+        _values[name] = value;
+        RevalidateField(name);
+    }
+
+    private void RevalidateAll()
+    {
+        _errors.Clear();
+        foreach (var attr in _regularAttributes)
+        {
+            var errs = Validator.Validate(attr, GetValue(attr.AttributeName));
+            if (errs.Count > 0) _errors[attr.AttributeName] = errs;
+        }
+    }
+
+    private void RevalidateField(string name)
+    {
+        var attr = _regularAttributes.FirstOrDefault(a => a.AttributeName == name);
+        if (attr is null) return;
+
+        var errs = Validator.Validate(attr, GetValue(name));
+        if (errs.Count > 0) _errors[name] = errs;
+        else _errors.Remove(name);
+    }
+
+    private async Task SaveAsync()
+    {
+        RevalidateAll();
+        if (TotalErrorCount > 0)
+        {
+            Snackbar.Add($"有 {TotalErrorCount} 项校验错误未解决", Severity.Warning);
+            StateHasChanged();
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var submitValues = BuildSubmitValues();
+            if (submitValues.Count == 0)
+            {
+                Snackbar.Add("没有可保存的变更", Severity.Info);
+                return;
+            }
+
+            var (ok, error, current) = await Api.PatchInodeEntityAsync(
+                InodeId, EntityType, submitValues,
+                expectedUpdatedAt: _loadedUpdatedAt);
+
+            if (!ok)
+            {
+                if (current is not null)
+                {
+                    var local = current.Value.ToLocalTime()
+                        .ToString("yyyy-MM-dd HH:mm:ss");
+                    Snackbar.Add(
+                        $"保存失败：{error ?? "并发冲突"}\n服务端最新：{local}",
+                        Severity.Error);
+                }
+                else
+                {
+                    Snackbar.Add($"保存失败：{error ?? "未知错误"}", Severity.Error);
+                }
+                return;
+            }
+
+            Snackbar.Add("保存成功", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除实体 {InodeId}/{EntityType} 的所有属性值？",
+            yesText: "永久删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        _saving = true;
+        try
+        {
+            var (ok, error) = await Api.DeleteInodeEntityAsync(InodeId, EntityType);
+            if (!ok)
+            {
+                Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+            Snackbar.Add("已删除", Severity.Success);
+            BackToInode();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // ---------- 提交值转换 ----------
+
+    private Dictionary<string, object?> BuildSubmitValues()
+    {
+        var result = new Dictionary<string, object?>();
+        foreach (var (k, v) in _values)
+            result[k] = ConvertForSubmit(v);
+        return result;
+    }
+
+    private static object? ConvertForSubmit(object? v) => v switch
+    {
+        null => null,
+        NumericInput ni => ni.ToSubmitValue(),
+        Dictionary<string, object?> dict => dict.ToDictionary(
+            x => x.Key, x => ConvertForSubmit(x.Value)),
+        List<object?> list => list.Select(ConvertForSubmit).ToList(),
+        _ => v
+    };
+
+    // ---------- JSON → 内部模型 ----------
+
+    private object? JsonElementToValue(JsonElement elem, AttributeSchemaDto schema)
+    {
+        if (elem.ValueKind == JsonValueKind.Null) return null;
+
+        return schema.DataType switch
+        {
+            "string" => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString() : elem.ToString(),
+            "int" => schema.Unit is not null
+                ? JsonToNumeric(elem)
+                : (elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
+                  : elem.ValueKind == JsonValueKind.String
+                    && long.TryParse(elem.GetString(), out var l) ? l
+                  : (object?)null),
+            "decimal" => JsonToNumeric(elem),
+            "bool" => elem.ValueKind == JsonValueKind.True
+                      || elem.ValueKind == JsonValueKind.False
+                      ? elem.GetBoolean() : null,
+            "datetime" => elem.GetDateTimeOffset(),
+            "date" => elem.GetString(),
+            "time" => elem.GetString(),
+            "single_choice" => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString()
+                : elem.ValueKind == JsonValueKind.Object
+                  && elem.TryGetProperty("value", out var sc)
+                  && sc.ValueKind == JsonValueKind.String ? sc.GetString()
+                : elem.ToString(),
+            "json" or "file" => elem.Clone(),
+            "composite" => schema.CompositeType is not null
+                ? JsonToComposite(elem, schema.CompositeType)
+                : null,
+            _ => elem.Clone()
+        };
+    }
+
+    private NumericInput JsonToNumeric(JsonElement elem)
+    {
+        if (elem.ValueKind == JsonValueKind.Object)
+        {
+            var val = elem.GetProperty("value").GetDecimal();
+            Guid? unitId = elem.TryGetProperty("unitId", out var u)
+                            && u.ValueKind == JsonValueKind.String
+                ? Guid.Parse(u.GetString()!)
+                : null;
+            return new NumericInput { Value = val, UnitId = unitId };
+        }
+        if (elem.ValueKind == JsonValueKind.Number)
+            return new NumericInput { Value = elem.GetDecimal(), UnitId = null };
+        if (elem.ValueKind == JsonValueKind.String
+            && decimal.TryParse(elem.GetString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var d))
+        {
+            return new NumericInput { Value = d, UnitId = null };
+        }
+        return new NumericInput();
+    }
+
+    private Dictionary<string, object?> JsonToComposite(
+        JsonElement elem, CompositeTypeSchemaDto typeSchema)
+    {
+        var dict = new Dictionary<string, object?>();
+        foreach (var field in typeSchema.Fields)
+        {
+            if (!elem.TryGetProperty(field.FieldName, out var fv)) continue;
+            if (fv.ValueKind == JsonValueKind.Null) continue;
+
+            if (field.IsArray)
+            {
+                var list = new List<object?>();
+                foreach (var item in fv.EnumerateArray())
+                {
+                    list.Add(field.DataType == "composite" && field.NestedType is not null
+                        ? JsonToComposite(item, field.NestedType)
+                        : JsonToFieldValue(item, field));
+                }
+                dict[field.FieldName] = list;
+            }
+            else
+            {
+                dict[field.FieldName] = JsonToFieldValue(fv, field);
+            }
+        }
+        return dict;
+    }
+
+    private object? JsonToFieldValue(JsonElement elem, CompositeFieldSchemaDto field)
+    {
+        if (elem.ValueKind == JsonValueKind.Null) return null;
+        if (field.DataType == "composite" && field.NestedType is not null)
+            return JsonToComposite(elem, field.NestedType);
+
+        return field.DataType switch
+        {
+            "string" => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString() : elem.ToString(),
+            "int" => elem.ValueKind == JsonValueKind.Number
+                ? elem.GetInt64() : (object?)null,
+            "decimal" => elem.ValueKind == JsonValueKind.Number
+                ? elem.GetDecimal() : (object?)null,
+            "bool" => elem.ValueKind is JsonValueKind.True or JsonValueKind.False
+                ? elem.GetBoolean() : (object?)null,
+            "datetime" => elem.GetDateTimeOffset(),
+            "date" or "time" or "single_choice" => elem.GetString(),
+            "json" or "file" => elem.Clone(),
+            _ => elem.Clone()
+        };
+    }
+}
+```
+
+## 文件 32/55 TreeGraph.Blazor/Components/Pages/Inodes/InodeEntityHistory.razor
+
+```razor
+@page "/inodes/{InodeId}/types/{EntityType}/history"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using TreeGraph.Shared.Eav.Dtos
+@inject EavApiClient Api
+@inject NavigationManager Nav
+@* InodeEntityHistory.razor *@
+<PageTitle>审计历史</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudButton Variant="Variant.Text" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="BackToEdit">
+        返回
+    </MudButton>
+    <MudText Typo="Typo.h5">审计历史</MudText>
+</div>
+
+<MudPaper Class="pa-3 mb-4">
+    <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">iNode</MudText>
+        <code>@InodeId</code>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-4">类型</MudText>
+        <code>@EntityType</code>
+    </div>
+</MudPaper>
+
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="4">
+        <MudDatePicker @bind-Date="_from" Label="起始时间"
+                       Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" md="4" Class="d-flex align-center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LoadAsync" Disabled="@_loading"
+                   StartIcon="@Icons.Material.Filled.Search">
+            查询
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_history is { Count: > 0 })
+{
+    <MudTimeline TimelinePosition="TimelinePosition.Start">
+        @foreach (var h in _history)
+        {
+            <MudTimelineItem Color="@GetColor(h.ChangeType)" Elevation="0">
+                <MudText Typo="Typo.subtitle2">
+                    @h.ChangedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                </MudText>
+                <MudText Typo="Typo.caption" Class="mb-2">
+                    @h.AttributeName · @h.ChangeType · @h.ChangedBy
+                </MudText>
+                <MudPaper Class="pa-2" Elevation="1">
+                    @if (!string.IsNullOrEmpty(h.OldValue))
+                    {
+                        <MudText Typo="Typo.body2"
+                                 Class="text-decoration-line-through">
+                            旧值: @h.OldValue
+                        </MudText>
+                    }
+                    @if (!string.IsNullOrEmpty(h.NewValue))
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Success">
+                            新值: @h.NewValue
+                        </MudText>
+                    }
+                </MudPaper>
+            </MudTimelineItem>
+        }
+    </MudTimeline>
+}
+else if (_history is not null)
+{
+    <MudAlert Severity="Severity.Info">暂无历史记录</MudAlert>
+}
+
+@code {
+    [Parameter] public string InodeId { get; set; } = "";
+    [Parameter] public string EntityType { get; set; } = "";
+
+    private IReadOnlyList<EntityHistoryDto>? _history;
+    private DateTime? _from;
+    private bool _loading = true;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized) await LoadAsync();
+    }
+
+    private void BackToEdit()
+        => Nav.NavigateTo(
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
+            $"{Uri.EscapeDataString(EntityType)}");
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            DateTimeOffset? from = null;
+            if (_from.HasValue)
+            {
+                var local = _from.Value;
+                var offset = TimeZoneInfo.Local.GetUtcOffset(local);
+                from = new DateTimeOffset(local, offset);
+            }
+
+            _history = await Api.GetInodeEntityHistoryAsync(
+                InodeId, EntityType, from);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static Color GetColor(string changeType) => changeType switch
+    {
+        "Insert" => Color.Success,
+        "Update" => Color.Info,
+        "Delete" => Color.Error,
+        _ => Color.Default
+    };
+}
+```
+
+## 文件 33/55 TreeGraph.Blazor/Components/Pages/Inodes/InodeList.razor
+
+```razor
+@page "/inodes"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@using TreeGraph.Shared.Eav.Dtos
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@* InodeList.razor *@
+<PageTitle>iNode 列表</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudIcon Icon="@Icons.Material.Filled.Hub"
+             Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h5">iNode 列表</MudText>
+</div>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    <b>说明</b>：iNode 由外部应用维护。本页仅提供开发调试入口。
+    输入 iNode GUID 即可访问其所有实体。
+</MudAlert>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+        快速访问
+    </MudText>
+    <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
+        <MudTextField T="string"
+                      @bind-Value="_quickInodeId"
+                      Label="iNode ID (GUID)"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      Style="min-width: 480px; max-width: 640px;"
+                      Immediate="true" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.ArrowForward"
+                   OnClick="GoToQuickInode"
+                   Disabled="@(!IsValidGuid(_quickInodeId))">
+            访问
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.Casino"
+                   OnClick="GenerateRandom">
+            随机 GUID
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_recentInodes.Count > 0)
+{
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">最近访问</MudText>
+        <MudList T="string">
+            @foreach (var inode in _recentInodes)
+            {
+                var captured = inode;
+                <MudListItem T="string" OnClick="@(() => GoToInode(captured))">
+                    <div class="d-flex align-center" style="width: 100%;">
+                        <MudIcon Icon="@Icons.Material.Filled.Hub"
+                                 Size="Size.Small" Class="mr-2" />
+                        <code>@inode</code>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                       Size="Size.Small"
+                                       OnClick="@(e => CopyId(inode))"
+                                       title="复制" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => RemoveRecent(inode))"
+                                       title="移除记录" />
+                    </div>
+                </MudListItem>
+            }
+        </MudList>
+    </MudPaper>
+}
+
+@code {
+    private string? _quickInodeId;
+    private readonly List<string> _recentInodes = new();
+
+    private void GoToQuickInode()
+    {
+        if (!Guid.TryParse(_quickInodeId, out var guid)) return;
+        var canonical = guid.ToString("D");
+
+        _recentInodes.Remove(canonical);
+        _recentInodes.Insert(0, canonical);
+        if (_recentInodes.Count > 20)
+            _recentInodes.RemoveRange(20, _recentInodes.Count - 20);
+
+        Nav.NavigateTo($"/inodes/{canonical}");
+    }
+
+    private void GoToInode(string inodeId)
+        => Nav.NavigateTo($"/inodes/{Uri.EscapeDataString(inodeId)}");
+
+    private void CopyId(string id)
+        => Snackbar.Add($"iNode ID: {id}", Severity.Info);
+
+    private void RemoveRecent(string id)
+    {
+        _recentInodes.Remove(id);
+        StateHasChanged();
+    }
+
+    private void GenerateRandom()
+    {
+        _quickInodeId = Guid.NewGuid().ToString("D");
+    }
+
+    private static bool IsValidGuid(string? s)
+        => !string.IsNullOrWhiteSpace(s) && Guid.TryParse(s, out _);
+}
+```
+
+## 文件 34/55 TreeGraph.Blazor/Components/Pages/Metadata/Attributes.razor
 
 ```razor
 @page "/metadata/attributes"
@@ -3538,6 +5691,7 @@ else
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject EntityTypeDisplayService EntityTypeDisplay
 @* Attributes.razor *@
 <PageTitle>属性定义管理</PageTitle>
 
@@ -3546,9 +5700,35 @@ else
 <MudPaper Class="pa-4 mb-4">
     <MudGrid>
         <MudItem xs="12" md="3" Class="d-flex align-center">
-            <MudTextField @bind-Value="_entityType" Label="实体类型"
-                          Variant="Variant.Outlined" Margin="Margin.Dense"
-                          Placeholder="如 Product" />
+            <MudSelect T="string"
+                       Value="_entityType"
+                       ValueChanged="OnEntityTypeChanged"
+                       Label="实体类型"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       FullWidth="true">
+                @if (_entityTypes is null)
+                {
+                    <MudSelectItem T="string" Value="@("")" Disabled="true">
+                        加载中...
+                    </MudSelectItem>
+                }
+                else if (_entityTypes.Count == 0)
+                {
+                    <MudSelectItem T="string" Value="@("")" Disabled="true">
+                        （暂无实体类型）
+                    </MudSelectItem>
+                }
+                else
+                {
+                    @foreach (var et in _entityTypes)
+                    {
+                        <MudSelectItem T="string" Value="@et.EntityType">
+                            @GetDisplayName(et) (@et.AttributeCount)
+                        </MudSelectItem>
+                    }
+                }
+            </MudSelect>
         </MudItem>
         <MudItem xs="12" md="3" Class="d-flex align-center">
             <MudSwitch T="bool" @bind-Value="_includeDeleted"
@@ -3557,14 +5737,15 @@ else
         </MudItem>
         <MudItem xs="12" md="6" Class="d-flex align-center">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       OnClick="LoadAsync" Disabled="_loading"
+                       OnClick="LoadAsync" Disabled="@_loading"
                        StartIcon="@Icons.Material.Filled.Refresh">
                 刷新
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Success"
                        OnClick="OpenCreateDialog"
                        StartIcon="@Icons.Material.Filled.Add"
-                       Class="ml-2">
+                       Class="ml-2"
+                       Disabled="@(string.IsNullOrEmpty(_entityType))">
                 新建属性
             </MudButton>
         </MudItem>
@@ -3582,7 +5763,14 @@ else if (_attributes is null || _attributes.Count == 0)
                  Size="Size.Large" Color="Color.Default" />
         <MudText Typo="Typo.h6" Class="mt-2">暂无属性定义</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            填写实体类型后点击"刷新"加载属性
+            @if (string.IsNullOrEmpty(_entityType))
+            {
+                <text>请先在上方选择一个实体类型</text>
+            }
+            else
+            {
+                <text>点击"新建属性"为该实体类型添加第一个属性</text>
+            }
         </MudText>
     </MudPaper>
 }
@@ -3616,20 +5804,16 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd>
-                <code>@context.AttributeName</code>
+                @* 主显中文，副显内部标识（小字） *@
+                <MudText Typo="Typo.body2">@context.DisplayName</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <code>@context.AttributeName</code>
+                </MudText>
                 @if (context.IsDeleted)
                 {
                     <MudChip T="string" Size="Size.Small" Color="Color.Error"
                              Class="ml-1">
                         已删除
-                    </MudChip>
-                }
-                @* ★ 数据一致性告警：int + UnitId 是非法组合 *@
-                @if (context.DataType == "int" && context.UnitId is not null)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Error"
-                             Class="ml-1">
-                        ⚠ 非法单位绑定
                     </MudChip>
                 }
             </MudTd>
@@ -3643,19 +5827,22 @@ else
             <MudTd>
                 @if (context.UnitId is not null)
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                             Class="mr-1">
                         单位: @context.UnitSymbol
                     </MudChip>
                 }
                 @if (context.RefCompositeTypeId is not null)
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Dark">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Dark"
+                             Class="mr-1">
                         组合: @context.CompositeTypeName
                     </MudChip>
                 }
                 @if (context.RefTableDefinitionId is not null)
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info"
+                             Class="mr-1">
                         表: @context.TableName
                     </MudChip>
                 }
@@ -3704,7 +5891,6 @@ else
                 }
                 else
                 {
-                    @* ★ 软删除的属性：提供恢复入口 *@
                     <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
                                    Size="Size.Small"
                                    Color="Color.Success"
@@ -3727,16 +5913,31 @@ else
         <MudText Typo="Typo.h6">新建属性</MudText>
     </TitleContent>
     <DialogContent>
-        <MudTextField @bind-Value="_createForm.EntityType"
-                      Label="实体类型" Placeholder="Product"
-                      Variant="Variant.Outlined" Class="mb-3" />
-        <MudTextField @bind-Value="_createForm.AttributeName"
-                      Label="属性名 (snake_case)" Placeholder="screen_size"
-                      Variant="Variant.Outlined" Class="mb-3" />
-        <MudTextField @bind-Value="_createForm.DisplayName"
-                      Label="显示名" Placeholder="屏幕尺寸"
-                      Variant="Variant.Outlined" Class="mb-3" />
+        @* 实体类型（下拉） *@
+        <MudSelect T="string"
+                   Value="_createForm.EntityType"
+                   ValueChanged="@(v => _createForm.EntityType = v)"
+                   Label="实体类型"
+                   Variant="Variant.Outlined"
+                   Class="mb-3"
+                   HelperText="如需新类型，请先到「实体类型管理」创建">
+            @foreach (var et in _entityTypes ?? Array.Empty<EntityTypeSummaryDto>())
+            {
+                <MudSelectItem T="string" Value="@et.EntityType">
+                    @GetDisplayName(et)
+                </MudSelectItem>
+            }
+        </MudSelect>
 
+        @* 显示名（必填，中文） *@
+        <MudTextField @bind-Value="_createForm.DisplayName"
+                      Label="显示名"
+                      Placeholder="屏幕尺寸"
+                      Variant="Variant.Outlined"
+                      Class="mb-3"
+                      HelperText="用户在界面上看到的名字" />
+
+        @* 数据类型 *@
         <MudSelect T="string"
                    Value="_createForm.DataType"
                    ValueChanged="OnCreateDataTypeChanged"
@@ -3749,8 +5950,8 @@ else
             }
         </MudSelect>
 
-        @* ★ 只有 decimal 显示单位选择。int 归一化会产生小数，禁止绑定单位。 *@
-        @if (_createForm.DataType == "decimal")
+        @* int / decimal：单位 *@
+        @if (_createForm.DataType is "decimal" or "int")
         {
             <MudSelect T="Guid?"
                        Value="_createForm.UnitId"
@@ -3769,13 +5970,8 @@ else
                 }
             </MudSelect>
         }
-        else if (_createForm.DataType == "int")
-        {
-            <MudAlert Severity="Severity.Info" Class="mb-3">
-                int 类型不支持绑定单位。若需要单位换算（如 cm ↔ m），请选择 decimal。
-            </MudAlert>
-        }
 
+        @* composite *@
         @if (_createForm.DataType == "composite")
         {
             <MudSelect T="string"
@@ -3793,6 +5989,7 @@ else
             </MudSelect>
         }
 
+        @* table *@
         @if (_createForm.DataType == "table")
         {
             <MudSelect T="string"
@@ -3810,6 +6007,7 @@ else
             </MudSelect>
         }
 
+        @* single_choice *@
         @if (_createForm.DataType == "single_choice")
         {
             <MudSelect T="string"
@@ -3847,6 +6045,26 @@ else
                            Label="可排序" Color="Color.Primary" />
             </MudItem>
         </MudGrid>
+
+        @* 高级选项：AttributeName 可选覆盖 *@
+        <MudExpansionPanels Class="mt-3">
+            <MudExpansionPanel Text="高级选项（内部标识）">
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                    <MudText Typo="Typo.caption">
+                        内部标识（AttributeName）会出现在 <b>JSON key</b>、
+                        查询过滤、审计日志、导出列名里。
+                        留空则系统自动生成（如 <code>attr_3f9a2b1c8d4e</code>）。
+                        如需与外部系统对接，建议手动指定可读的英文标识。
+                    </MudText>
+                </MudAlert>
+                <MudTextField @bind-Value="_createForm.AttributeName"
+                              Label="内部标识（可选）"
+                              Placeholder="screen_size"
+                              Variant="Variant.Outlined"
+                              HelperText="留空自动生成；填了则：字母开头，只含字母/数字/下划线"
+                              Immediate="true" />
+            </MudExpansionPanel>
+        </MudExpansionPanels>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => _showCreateDialog = false)">取消</MudButton>
@@ -3878,8 +6096,7 @@ else
                       Variant="Variant.Outlined"
                       Class="mb-3" />
 
-        @* ★ decimal：正常显示单位选择 *@
-        @if (_editingAttribute?.DataType == "decimal")
+        @if (_editingAttribute?.DataType is "decimal" or "int")
         {
             <MudSelect T="Guid?"
                        Value="_editForm.UnitId"
@@ -3899,34 +6116,6 @@ else
             </MudSelect>
             <MudAlert Severity="Severity.Warning" Class="mb-3">
                 修改基准单位不会自动转换已有数据。如需变更，请先规划数据迁移。
-            </MudAlert>
-        }
-        @* ★ int + 历史遗留 UnitId：只提供"清除"入口，不允许重设 *@
-        else if (_editingAttribute?.DataType == "int"
-                 && _editingAttribute.UnitId is not null)
-        {
-            <MudAlert Severity="Severity.Error" Class="mb-3">
-                <b>数据一致性告警</b>：该属性类型为 int，但仍绑定了单位
-                <code>@_editingAttribute.UnitSymbol</code>。
-                这是历史遗留的非法配置——归一化到基准单位时会产生小数
-                （如 150 cm → 1.5 m），写入 bigint 会静默截断。
-            </MudAlert>
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Error"
-                       StartIcon="@Icons.Material.Filled.LinkOff"
-                       OnClick="ClearLegacyUnitAsync"
-                       Disabled="@_submitting"
-                       Class="mb-3">
-                清除单位绑定
-            </MudButton>
-            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                清除后该属性不再有单位语义，已有数据保持原值不变。
-            </MudText>
-        }
-        else if (_editingAttribute?.DataType == "int")
-        {
-            <MudAlert Severity="Severity.Info" Class="mb-3">
-                int 类型不支持绑定单位。
             </MudAlert>
         }
 
@@ -4020,6 +6209,7 @@ else
     private bool _loading;
     private bool _initialized;
 
+    private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
     private IReadOnlyList<UnitDto>? _units;
     private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
     private IReadOnlyList<CustomTableDetailDto>? _customTables;
@@ -4061,6 +6251,7 @@ else
         _initialized = true;
 
         await LoadReferencesAsync();
+        await LoadEntityTypesAsync();
         await LoadAsync();
         StateHasChanged();
     }
@@ -4087,11 +6278,39 @@ else
             Snackbar.Add($"引用加载失败：{string.Join("、", failed)}", Severity.Warning);
     }
 
+    private async Task LoadEntityTypesAsync()
+    {
+        _entityTypes = await Api.ListEntityTypesAsync();
+
+        if (_entityTypes is null)
+        {
+            Snackbar.Add("实体类型加载失败，请检查后端服务", Severity.Warning);
+            _entityTypes = Array.Empty<EntityTypeSummaryDto>();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_entityType) && _entityTypes.Count > 0)
+        {
+            _entityType = _entityTypes[0].EntityType;
+        }
+    }
+
+    private static string GetDisplayName(EntityTypeSummaryDto et)
+        => string.IsNullOrWhiteSpace(et.DisplayName)
+            ? et.EntityType
+            : et.DisplayName;
+
+    private async Task OnEntityTypeChanged(string? value)
+    {
+        _entityType = value;
+        _searchString = null;
+        await LoadAsync();
+    }
+
     private async Task LoadAsync()
     {
         if (string.IsNullOrWhiteSpace(_entityType))
         {
-            Snackbar.Add("请先填写实体类型", Severity.Info);
             _attributes = Array.Empty<AttributeDetailDto>();
             return;
         }
@@ -4111,23 +6330,25 @@ else
 
     private void OpenCreateDialog()
     {
+        if (string.IsNullOrWhiteSpace(_entityType))
+        {
+            Snackbar.Add("请先选择实体类型", Severity.Warning);
+            return;
+        }
+
         _createForm = new CreateAttributeForm
         {
-            EntityType = _entityType ?? "Product",
+            EntityType = _entityType,
             DisplayOrder = (_attributes?.Count ?? 0) + 1,
             IsSearchable = true
         };
         _showCreateDialog = true;
     }
 
-    /// <summary>
-    /// ★ 切换数据类型时清空不适用的引用。
-    /// 关键点：只有 decimal 保留 UnitId。int 会被清空（数据库 CHECK 约束禁止）。
-    /// </summary>
     private void OnCreateDataTypeChanged(string dt)
     {
         _createForm.DataType = dt;
-        if (dt != "decimal") _createForm.UnitId = null;
+        if (dt is not ("decimal" or "int")) _createForm.UnitId = null;
         if (dt != "composite") _createForm.RefCompositeTypeId = null;
         if (dt != "table") _createForm.RefTableDefinitionId = null;
         if (dt != "single_choice") _createForm.RefOptionSetId = null;
@@ -4137,10 +6358,9 @@ else
     {
         var f = _createForm;
         if (string.IsNullOrWhiteSpace(f.EntityType) ||
-            string.IsNullOrWhiteSpace(f.AttributeName) ||
             string.IsNullOrWhiteSpace(f.DisplayName))
         {
-            Snackbar.Add("请填写实体类型、属性名、显示名", Severity.Warning);
+            Snackbar.Add("请填写实体类型、显示名", Severity.Warning);
             return;
         }
         if (f.DataType == "composite" && f.RefCompositeTypeId is null)
@@ -4159,14 +6379,31 @@ else
             return;
         }
 
+        // 高级选项校验（如填了 AttributeName）
+        if (!string.IsNullOrWhiteSpace(f.AttributeName))
+        {
+            var name = f.AttributeName.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(
+                    name, @"^[A-Za-z][A-Za-z0-9_]*$"))
+            {
+                Snackbar.Add(
+                    "内部标识必须以字母开头，只含字母、数字、下划线（或留空自动生成）",
+                    Severity.Warning);
+                return;
+            }
+        }
+
         _submitting = true;
         try
         {
             var id = await Api.CreateAttributeAsync(new CreateAttributeRequest
             {
                 EntityType = f.EntityType,
-                AttributeName = f.AttributeName,
-                DisplayName = f.DisplayName,
+                // null / 空 → 服务端自动生成
+                AttributeName = string.IsNullOrWhiteSpace(f.AttributeName)
+                    ? null
+                    : f.AttributeName.Trim(),
+                DisplayName = f.DisplayName.Trim(),
                 DataType = f.DataType,
                 IsRequired = f.IsRequired,
                 IsSearchable = f.IsSearchable,
@@ -4184,7 +6421,7 @@ else
                 return;
             }
 
-            Snackbar.Add($"创建成功：AttributeId={id}", Severity.Success);
+            Snackbar.Add($"创建成功：{f.DisplayName}", Severity.Success);
             _showCreateDialog = false;
             await LoadAsync();
         }
@@ -4219,47 +6456,6 @@ else
             RefOptionSetId = detail.RefOptionSetId
         };
         _showEditDialog = true;
-    }
-
-    /// <summary>
-    /// ★ 历史遗留的 int + UnitId 属性：一键清除单位绑定。
-    /// 走 UpdateAttribute 的 ClearUnitId = true 路径，不修改其它字段。
-    /// </summary>
-    private async Task ClearLegacyUnitAsync()
-    {
-        if (_editingAttribute is null) return;
-
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "清除单位绑定",
-            $"确定清除属性「{_editingAttribute.DisplayName}」的单位绑定？\n\n" +
-            "· 该属性类型为 int，不允许绑定单位。\n" +
-            "· 清除后属性不再有单位语义。\n" +
-            "· 已有数据的存储值保持不变（不换算）。",
-            yesText: "清除", cancelText: "取消");
-
-        if (confirmed != true) return;
-
-        _submitting = true;
-        try
-        {
-            var (ok, error) = await Api.UpdateAttributeAsync(
-                _editingAttribute.AttributeId,
-                new UpdateAttributeRequest { ClearUnitId = true });
-
-            if (!ok)
-            {
-                Snackbar.Add($"清除失败：{error ?? "未知错误"}", Severity.Error);
-                return;
-            }
-
-            Snackbar.Add("已清除单位绑定", Severity.Success);
-            _showEditDialog = false;
-            await LoadAsync();
-        }
-        finally
-        {
-            _submitting = false;
-        }
     }
 
     private async Task UpdateAsync()
@@ -4320,7 +6516,6 @@ else
         return (null, false);
     }
 
-    /// <summary>string 引用类型重载（ID 字符串化后 Diff 需要独立版本）。</summary>
     private static (string? Value, bool Clear) Diff(string? current, string? original)
     {
         if (current is null && original is not null) return (null, true);
@@ -4334,7 +6529,7 @@ else
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除属性「{attr.DisplayName}」({attr.AttributeName})？" +
+            $"确定删除属性「{attr.DisplayName}」？" +
             "此操作将软删除属性定义，已有数据保留但不再被新业务使用。",
             yesText: "删除", cancelText: "取消");
 
@@ -4352,15 +6547,11 @@ else
         }
     }
 
-    /// <summary>
-    /// ★ 恢复被软删除的属性。
-    /// 后端唯一约束不区分 IsDeleted：若已存在同名活动属性，返回 409。
-    /// </summary>
     private async Task UndeleteAsync(AttributeDetailDto attr)
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认恢复",
-            $"确定恢复属性「{attr.DisplayName}」({attr.AttributeName})？",
+            $"确定恢复属性「{attr.DisplayName}」？",
             yesText: "恢复", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -4406,7 +6597,7 @@ else
     private class CreateAttributeForm
     {
         public string EntityType { get; set; } = "";
-        public string AttributeName { get; set; } = "";
+        public string? AttributeName { get; set; }    // 可空
         public string DisplayName { get; set; } = "";
         public string DataType { get; set; } = "string";
         public bool IsRequired { get; set; }
@@ -4434,9 +6625,9 @@ else
 }
 ```
 
-## 文件 29/46 TreeGraph.Blazor/Components/Pages/Metadata/CompositeTypes.razor
+## 文件 35/55 TreeGraph.Blazor/Components/Pages/Metadata/CompositeTypes.razor
 
-```razor
+````razor
 
 ```razor
 @page "/metadata/composite-types"
@@ -5405,9 +7596,9 @@ else
     }
 }
 ```
-```
+````
 
-## 文件 30/46 TreeGraph.Blazor/Components/Pages/Metadata/CustomTables.razor
+## 文件 36/55 TreeGraph.Blazor/Components/Pages/Metadata/CustomTables.razor
 
 ```razor
 @page "/metadata/custom-tables"
@@ -6134,7 +8325,349 @@ else
 }
 ```
 
-## 文件 31/46 TreeGraph.Blazor/Components/Pages/Metadata/OptionSets.razor
+## 文件 37/55 TreeGraph.Blazor/Components/Pages/Metadata/EntityTypes.razor
+
+```razor
+@page "/metadata/entity-types"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject EntityTypeDisplayService EntityTypeDisplay
+@using TreeGraph.Shared.Eav.Dtos
+@* EntityTypes.razor *@
+<PageTitle>实体类型管理</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">实体类型管理</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <div class="d-flex align-center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LoadAsync" Disabled="@_loading"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            刷新
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   OnClick="OpenCreateDialog"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Class="ml-2">
+            新建实体类型
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_types is null || _types.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.Category"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">暂无实体类型</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            点击"新建实体类型"创建第一个
+        </MudText>
+    </MudPaper>
+}
+else
+{
+    <MudTable Items="_types" Hover="true" Bordered="true">
+        <HeaderContent>
+            <MudTh>名称</MudTh>
+            <MudTh>说明</MudTh>
+            <MudTh>属性数</MudTh>
+            <MudTh>顺序</MudTh>
+            <MudTh>状态</MudTh>
+            <MudTh>操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
+                <MudText Typo="Typo.body1">@context.DisplayName</MudText>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @(string.IsNullOrEmpty(context.Description) ? "—" : context.Description)
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                    @context.AttributeCount
+                </MudChip>
+            </MudTd>
+            <MudTd>@context.DisplayOrder</MudTd>
+            <MudTd>
+                @if (context.IsDeleted)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error">已删除</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">活动</MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                @if (!context.IsDeleted)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))"
+                                   title="编辑" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   OnClick="@(async () => await DeleteAsync(context))"
+                                   title="删除" />
+                }
+                else
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                   Size="Size.Small"
+                                   Color="Color.Success"
+                                   OnClick="@(async () => await UndeleteAsync(context))"
+                                   title="恢复" />
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@* ============================================================ *@
+@* 新建 / 编辑对话框                                             *@
+@* ============================================================ *@
+<MudDialog @bind-Visible="_showDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(_editing is null ? "新建实体类型" : "编辑实体类型")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @* 编辑时展示内部标识（供调试，用户平时看不到） *@
+        @if (_editing is not null)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                <MudText Typo="Typo.caption">
+                    内部标识：<code>@_editing.EntityType</code>
+                </MudText>
+            </MudAlert>
+        }
+
+        <MudTextField @bind-Value="_form.DisplayName"
+                      Label="实体类型名称"
+                      Placeholder="商品"
+                      Variant="Variant.Outlined"
+                      Class="mb-3"
+                      HelperText="@(_editing is null
+                          ? "例如：商品、订单、客户"
+                          : "创建后名称不可修改")" />
+
+        <MudTextField @bind-Value="_form.Description"
+                      Label="说明（可选）"
+                      Variant="Variant.Outlined"
+                      Lines="2"
+                      Class="mb-3" />
+
+        <MudNumericField T="int"
+                         @bind-Value="_form.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showDialog = false)">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   OnClick="SaveAsync"
+                   Disabled="@_submitting">
+            @(_submitting ? "保存中..." : "保存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private IReadOnlyList<EntityTypeDetailDto>? _types;
+    private bool _loading;
+    private bool _initialized;
+    private bool _submitting;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true
+    };
+
+    private bool _showDialog;
+    private EntityTypeDetailDto? _editing;
+    private FormModel _form = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            // ★ 1 次 HTTP 替代 1+N 次（原 foreach 串行 GetEntityTypeAsync）
+            _types = await Api.ListEntityTypeDetailsAsync()
+                     ?? Array.Empty<EntityTypeDetailDto>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        _editing = null;
+        _form = new FormModel
+        {
+            DisplayOrder = (_types?.Count ?? 0) + 1
+        };
+        _showDialog = true;
+    }
+
+    private void OpenEditDialog(EntityTypeDetailDto dto)
+    {
+        _editing = dto;
+        _form = new FormModel
+        {
+            DisplayName = dto.DisplayName,
+            Description = dto.Description ?? "",
+            DisplayOrder = dto.DisplayOrder
+        };
+        _showDialog = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_form.DisplayName))
+        {
+            Snackbar.Add("请填写名称", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            if (_editing is null)
+            {
+                // 新建：不传 EntityType，服务端自动生成 et_xxxx
+                var id = await Api.CreateEntityTypeAsync(new CreateEntityTypeRequest
+                {
+                    DisplayName = _form.DisplayName.Trim(),
+                    Description = string.IsNullOrWhiteSpace(_form.Description)
+                        ? null : _form.Description,
+                    DisplayOrder = _form.DisplayOrder
+                });
+
+                if (id is null)
+                {
+                    Snackbar.Add("创建失败", Severity.Error);
+                    return;
+                }
+
+                Snackbar.Add($"已创建「{_form.DisplayName.Trim()}」", Severity.Success);
+            }
+            else
+            {
+                // 编辑
+                var (ok, error) = await Api.UpdateEntityTypeAsync(
+                    _editing.EntityTypeId,
+                    new UpdateEntityTypeRequest
+                    {
+                        DisplayName = _form.DisplayName,
+                        Description = _form.Description,
+                        DisplayOrder = _form.DisplayOrder
+                    });
+
+                if (!ok)
+                {
+                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                    return;
+                }
+
+                Snackbar.Add("更新成功", Severity.Success);
+            }
+
+            _showDialog = false;
+            await LoadAsync();
+
+            // 刷新全局 DisplayName 映射，让 NavMenu 等页面立即生效
+            EntityTypeDisplay.Invalidate();
+            await EntityTypeDisplay.EnsureLoadedAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private async Task DeleteAsync(EntityTypeDetailDto dto)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除实体类型「{dto.DisplayName}」？\n\n" +
+            "· 仍有活动属性时将被拒绝。\n" +
+            "· 删除后可通过恢复按钮还原。",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteEntityTypeAsync(dto.EntityTypeId);
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await LoadAsync();
+            EntityTypeDisplay.Invalidate();
+            await EntityTypeDisplay.EnsureLoadedAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    private async Task UndeleteAsync(EntityTypeDetailDto dto)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认恢复",
+            $"确定恢复实体类型「{dto.DisplayName}」？",
+            yesText: "恢复", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.UndeleteEntityTypeAsync(dto.EntityTypeId);
+        if (ok)
+        {
+            Snackbar.Add("恢复成功", Severity.Success);
+            await LoadAsync();
+            EntityTypeDisplay.Invalidate();
+            await EntityTypeDisplay.EnsureLoadedAsync();
+        }
+        else
+        {
+            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    private class FormModel
+    {
+        public string DisplayName { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int DisplayOrder { get; set; }
+    }
+}
+```
+
+## 文件 38/55 TreeGraph.Blazor/Components/Pages/Metadata/OptionSets.razor
 
 ```razor
 @page "/metadata/option-sets"
@@ -6970,7 +9503,7 @@ else
 }
 ```
 
-## 文件 32/46 TreeGraph.Blazor/Components/Pages/Metadata/Units.razor
+## 文件 39/55 TreeGraph.Blazor/Components/Pages/Metadata/Units.razor
 
 ```razor
 @page "/metadata/units"
@@ -7793,7 +10326,7 @@ else
 }
 ```
 
-## 文件 33/46 TreeGraph.Blazor/Components/Pages/NotFound.razor
+## 文件 40/55 TreeGraph.Blazor/Components/Pages/NotFound.razor
 
 ```razor
 @page "/not-found"
@@ -7804,7 +10337,7 @@ else
 <p>Sorry, the content you are looking for does not exist.</p>
 ```
 
-## 文件 34/46 TreeGraph.Blazor/Components/Pages/Query/DynamicQuery.razor
+## 文件 41/55 TreeGraph.Blazor/Components/Pages/Query/DynamicQuery.razor
 
 ```razor
 @page "/query"
@@ -7994,7 +10527,7 @@ else if (_entities is not null)
 }
 ```
 
-## 文件 35/46 TreeGraph.Blazor/Components/Pages/Schema/SchemaViewer.razor
+## 文件 42/55 TreeGraph.Blazor/Components/Pages/Schema/SchemaViewer.razor
 
 ```razor
 @page "/schema"
@@ -8109,7 +10642,147 @@ else if (!_loading && _loaded)
 }
 ```
 
-## 文件 36/46 TreeGraph.Blazor/Components/Pages/Weather.razor
+## 文件 43/55 TreeGraph.Blazor/Components/Pages/StringTreeDemo.razor
+
+```razor
+@page "/string-tree-demo"
+@rendermode InteractiveServer
+@using TreeGraph.Blazor.Shared.Trees.StringTree.Components
+@using TreeGraph.Blazor.Shared.Trees.StringTree.Models
+@using TreeGraph.Blazor.Shared.Trees.StringTree.Services
+@using TreeGraph.Blazor.Shared.Trees.Dialogs
+@inject IDialogService DialogService
+@inject MessageService Message
+
+<PageTitle>StringTreeSky 演示</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudIcon Icon="@Icons.Material.Filled.AccountTree"
+             Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h5">StringTreeSky 演示（内存数据）</MudText>
+    <MudSpacer />
+    <MudChip T="string" Size="Size.Small" Color="Color.Info">
+        无后端 · 数据重启即重置
+    </MudChip>
+    <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+               StartIcon="@Icons.Material.Filled.OpenInNew"
+               OnClick="OpenAsDialogAsync">
+        以对话框打开（壳组件）
+    </MudButton>
+</div>
+
+<MudGrid>
+    <MudItem xs="12" md="7">
+        <MudPaper Class="pa-3" Elevation="1" Style="min-height: 500px;">
+            <StringTreeSky SelectedValueChanged="OnSelected"
+                           OnClickItemText="OnClicked"
+                           EditTemplate="EditTemplate" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="5">
+        <MudPaper Class="pa-4" Elevation="1" Style="min-height: 500px;">
+            <MudText Typo="Typo.h6" Class="mb-3">选中详情</MudText>
+            @if (_selectedMeta is null)
+            {
+                <MudAlert Severity="Severity.Info">点击左侧节点查看详情</MudAlert>
+            }
+            else
+            {
+                <MudList T="string">
+                    <MudListItem T="string"><b>Id</b>：<code>@_selectedMeta.Id</code></MudListItem>
+                    <MudListItem T="string"><b>Text</b>：@_selectedMeta.Text</MudListItem>
+                    <MudListItem T="string"><b>父 Id</b>：<code>@(_selectedMeta.ParentId ?? "(根)")</code></MudListItem>
+                    <MudListItem T="string"><b>允许子节点</b>：@(_selectedMeta.CanHaveChildren ? "是" : "否")</MudListItem>
+                    <MudListItem T="string"><b>排序</b>：@_selectedMeta.SortOrder</MudListItem>
+                </MudList>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Inject] private IStringTreeDataSource DataSource { get; set; } = null!;
+
+    private StringNodeMeta? _selectedMeta;
+
+    private RenderFragment<StringNodeMeta> EditTemplate => node => @<MudStack Spacing="2">
+        <MudTextField T="string" @bind-Value="node.Text" Label="名称" Immediate="true" />
+        <MudTextField T="string" @bind-Value="node.Description" Label="描述" Lines="3" Immediate="true" />
+        <MudSwitch T="bool" @bind-Value="node.CanHaveChildren" Label="允许子节点" />
+    </MudStack>;
+
+    private async Task OnSelected(string? id)
+    {
+        _selectedMeta = string.IsNullOrEmpty(id)
+            ? null
+            : await DataSource.GetByIdAsync(id);
+        StateHasChanged();
+    }
+
+    private void OnClicked(ITreeItemData<string>? node)
+    {
+        // 详情面板在 OnSelected 里刷新
+    }
+
+    private async Task OpenAsDialogAsync()
+    {
+        var parameters = new DialogParameters<StringTreeDialogPageSky>
+        {
+            { x => x.Title, "内存树（壳组件演示）" },
+        };
+        await DialogService.ShowAsync<StringTreeDialogPageSky>("内存树", parameters);
+    }
+}
+```
+
+## 文件 44/55 TreeGraph.Blazor/Components/Pages/TreeSkyDemo.razor
+
+```razor
+@page "/tree-sky-demo"
+@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
+
+<PageTitle>TreeSky 演示</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <MudText Typo="Typo.h4">TreeSky 树组件演示</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        节点类型 <b>StringTreeNode</b>（以字符串 Name 为显示文本）。数据存于 TreeGraph.Api 的
+        Postgres 表：展开、新增、编辑、删除、排序、移动均为真实 API 读写，重启后保留。
+    </MudText>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <TreeSky TItem="StringTreeNode">
+            <EditTemplate>
+                <MudStack Spacing="3">
+                    <MudTextField T="string"
+                                  @bind-Value="context.Name"
+                                  Label="名称（string）"
+                                  Required="true"
+                                  RequiredError="名称必填"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Label"/>
+                    <MudTextField T="string"
+                                  @bind-Value="context.Description"
+                                  Label="描述"
+                                  Lines="2"/>
+                    <MudNumericField T="int"
+                                     @bind-Value="context.SortOrder"
+                                     Label="排序序号"
+                                     Min="0"
+                                     HideSpinButtons="false"/>
+                    <MudSwitch T="bool"
+                               @bind-Value="context.CanHaveChildren"
+                               Label="允许包含子节点"
+                               Color="Color.Primary"/>
+                </MudStack>
+            </EditTemplate>
+        </TreeSky>
+    </MudPaper>
+</MudContainer>
+```
+
+## 文件 45/55 TreeGraph.Blazor/Components/Pages/Weather.razor
 
 ```razor
 @page "/weather"
@@ -8181,7 +10854,7 @@ else
 }
 ```
 
-## 文件 37/46 TreeGraph.Blazor/Components/Routes.razor
+## 文件 46/55 TreeGraph.Blazor/Components/Routes.razor
 
 ```razor
 @* Routes.razor *@
@@ -8193,7 +10866,7 @@ else
 </Router>
 ```
 
-## 文件 38/46 TreeGraph.Blazor/Components/Shared/ArrayFieldEditor.razor
+## 文件 47/55 TreeGraph.Blazor/Components/Shared/ArrayFieldEditor.razor
 
 ```razor
 @using TreeGraph.Blazor.Services
@@ -8335,7 +11008,7 @@ else
 }
 ```
 
-## 文件 39/46 TreeGraph.Blazor/Components/Shared/CompositeFieldEditor.razor
+## 文件 48/55 TreeGraph.Blazor/Components/Shared/CompositeFieldEditor.razor
 
 ```razor
 @using System.Text.Json
@@ -8455,7 +11128,7 @@ else
 }
 ```
 
-## 文件 40/46 TreeGraph.Blazor/Components/Shared/CustomTableEditor.razor
+## 文件 49/55 TreeGraph.Blazor/Components/Shared/CustomTableEditor.razor
 
 ```razor
 @using System.Text.Json
@@ -9271,7 +11944,7 @@ else
 }
 ```
 
-## 文件 41/46 TreeGraph.Blazor/Components/Shared/DynamicFieldRenderer.razor
+## 文件 50/55 TreeGraph.Blazor/Components/Shared/DynamicFieldRenderer.razor
 
 ```razor
 @using System.Text.Json
@@ -9300,15 +11973,61 @@ else
 }
 else if (Attribute.DataType == "int")
 {
-    <MudNumericField T="long?"
-                     Label="@DisplayLabel"
-                     Value="@LongValue"
-                     ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                     Variant="Variant.Outlined"
-                     Required="@Attribute.IsRequired"
-                     Error="@HasSelfErrors"
-                     ErrorText="@SelfErrorText"
-                     FullWidth="true" />
+    @* ★ int 有单位时走 NumericInput 路径（与 decimal 对齐）；无单位仍用 long? *@
+    @if (Attribute.Unit is not null)
+    {
+        var numeric = Value as NumericInput ?? new NumericInput();
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudNumericField T="decimal?"
+                                 Label="@DisplayLabel"
+                                 Value="@numeric.Value"
+                                 ValueChanged="@(v =>
+                                 {
+                                     var n = Value as NumericInput ?? new NumericInput();
+                                     n.Value = v ?? 0;
+                                     ValueChanged.InvokeAsync(n);
+                                 })"
+                                 Variant="Variant.Outlined"
+                                 Required="@Attribute.IsRequired"
+                                 Error="@HasSelfErrors"
+                                 ErrorText="@SelfErrorText"
+                                 FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?"
+                           Label="单位"
+                           Value="@numeric.UnitId"
+                           ValueChanged="@(u =>
+                           {
+                               var n = Value as NumericInput ?? new NumericInput();
+                               n.UnitId = u;
+                               ValueChanged.InvokeAsync(n);
+                           })"
+                           Variant="Variant.Outlined"
+                           FullWidth="true">
+                    @foreach (var u in Attribute.AvailableUnits ?? Array.Empty<UnitSchemaDto>())
+                    {
+                        <MudSelectItem T="Guid?" Value="@u.Id">
+                            @u.Name (@u.Symbol)
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        <MudNumericField T="long?"
+                         Label="@DisplayLabel"
+                         Value="@LongValue"
+                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                         Variant="Variant.Outlined"
+                         Required="@Attribute.IsRequired"
+                         Error="@HasSelfErrors"
+                         ErrorText="@SelfErrorText"
+                         FullWidth="true" />
+    }
 }
 else if (Attribute.DataType == "decimal")
 {
@@ -9584,7 +12303,7 @@ else if (Attribute.DataType == "table")
 }
 ```
 
-## 文件 42/46 TreeGraph.Blazor/Components/Shared/EntityHistoryPanel.razor
+## 文件 51/55 TreeGraph.Blazor/Components/Shared/EntityHistoryPanel.razor
 
 ```razor
 @using TreeGraph.Blazor.Services
@@ -9776,7 +12495,7 @@ else if (Attribute.DataType == "table")
 }
 ```
 
-## 文件 43/46 TreeGraph.Blazor/Components/Shared/QueryFilterBuilder.razor
+## 文件 52/55 TreeGraph.Blazor/Components/Shared/QueryFilterBuilder.razor
 
 ```razor
 @using TreeGraph.Blazor.Services
@@ -9900,7 +12619,7 @@ else if (Attribute.DataType == "table")
 }
 ```
 
-## 文件 44/46 TreeGraph.Blazor/Components/Shared/QueryFilterEditor.razor
+## 文件 53/55 TreeGraph.Blazor/Components/Shared/QueryFilterEditor.razor
 
 ```razor
 @using System.Globalization
@@ -10087,7 +12806,7 @@ else if (Attribute.DataType == "table")
 }
 ```
 
-## 文件 45/46 TreeGraph.Blazor/Components/Shared/RenderLeafField.razor
+## 文件 54/55 TreeGraph.Blazor/Components/Shared/RenderLeafField.razor
 
 ```razor
 @using System.Text.Json
@@ -10369,7 +13088,7 @@ else
 }
 ```
 
-## 文件 46/46 TreeGraph.Blazor/Components/Shared/ValueInput.razor
+## 文件 55/55 TreeGraph.Blazor/Components/Shared/ValueInput.razor
 
 ```razor
 @using System.Globalization
@@ -10392,13 +13111,51 @@ else
 }
 else if (Attribute.DataType == "int")
 {
-    <MudNumericField T="long?"
-                     Value="@(Value switch { long l => l, int i => i, _ => null })"
-                     ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                     Variant="Variant.Outlined"
-                     Margin="Margin.Dense"
-                     Placeholder="值"
-                     FullWidth="true" />
+    @* ★ int 有单位时走数值 + 单位双控件；无单位时保持 long? 输入 *@
+    @if (Attribute.Unit is not null)
+    {
+        var numeric = Value as NumericInput ?? new NumericInput();
+        <div class="d-flex" style="gap: 4px;">
+            <MudNumericField T="decimal?"
+                             Value="@numeric.Value"
+                             ValueChanged="@(v =>
+                             {
+                                 var n = Value as NumericInput ?? new NumericInput();
+                                 n.Value = v ?? 0;
+                                 ValueChanged.InvokeAsync(n);
+                             })"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             Placeholder="值"
+                             FullWidth="true" />
+            <MudSelect T="Guid?"
+                       Value="@numeric.UnitId"
+                       ValueChanged="@(u =>
+                       {
+                           var n = Value as NumericInput ?? new NumericInput();
+                           n.UnitId = u;
+                           ValueChanged.InvokeAsync(n);
+                       })"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="min-width: 100px;">
+                @foreach (var u in Attribute.AvailableUnits ?? Array.Empty<UnitSchemaDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">@u.Symbol</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    }
+    else
+    {
+        <MudNumericField T="long?"
+                         Value="@(Value switch { long l => l, int i => i, _ => null })"
+                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         Placeholder="值"
+                         FullWidth="true" />
+    }
 }
 else if (Attribute.DataType == "decimal")
 {

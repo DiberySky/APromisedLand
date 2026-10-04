@@ -1,11 +1,11 @@
 # TreeGraph.Shared C# 代码清单
 
-- 生成时间：2026-10-03 05:43:01
-- 文件总数：12
-- 排除：bin/、obj/
-- 项目状态：ID 到 GUID String 重构完成（全部 DTO 的 ID 字段已 string 化）
+- 生成时间：2026-10-04 21:37:23
+- 文件总数：14
+- 排除：bin/、obj/、csproj、README.md
+- 项目状态：EAV 共享层（Dtos/Validators 等）；GUID String 主键形态
 
-## 文件 1/12 TreeGraph.Shared/Eav/Dtos/AttributeFilter.cs
+## 文件 1/14 TreeGraph.Shared/Eav/Dtos/AttributeFilter.cs
 
 ```csharp
 namespace TreeGraph.Shared.Eav.Dtos;
@@ -28,7 +28,7 @@ public class AttributeFilter
 }
 ```
 
-## 文件 2/12 TreeGraph.Shared/Eav/Dtos/CustomTableDtos.cs
+## 文件 2/14 TreeGraph.Shared/Eav/Dtos/CustomTableDtos.cs
 
 ```csharp
 namespace TreeGraph.Shared.Eav.Dtos;
@@ -49,7 +49,7 @@ public class CustomTableRowValue
 }
 ```
 
-## 文件 3/12 TreeGraph.Shared/Eav/Dtos/EavQueryRequest.cs
+## 文件 3/14 TreeGraph.Shared/Eav/Dtos/EavQueryRequest.cs
 
 ```csharp
 namespace TreeGraph.Shared.Eav.Dtos;
@@ -72,7 +72,7 @@ public class EavQueryRequest
 }
 ```
 
-## 文件 4/12 TreeGraph.Shared/Eav/Dtos/EntityDtos.cs
+## 文件 4/14 TreeGraph.Shared/Eav/Dtos/EntityDtos.cs
 
 ```csharp
 using System.Text.Json;
@@ -127,7 +127,49 @@ public record BatchDeleteResultDto(
     int TotalAttributesDeleted);
 ```
 
-## 文件 5/12 TreeGraph.Shared/Eav/Dtos/EntityTypeSummaryDto.cs
+## 文件 5/14 TreeGraph.Shared/Eav/Dtos/EntityTypeDtos.cs
+
+```csharp
+using System.Text.Json;
+
+namespace TreeGraph.Shared.Eav.Dtos;
+
+/// <summary>创建实体类型（POST api/eav/entity-types）</summary>
+public class CreateEntityTypeRequest
+{
+    /// <summary>
+    /// 可选。不传时服务端自动生成 `et_` + 12 位 hex（如 et_3f9a2b1c8d4e）。
+    /// 保留字段用于脚本 / 工具导入时指定标识。
+    /// </summary>
+    public string? EntityType { get; set; }
+
+    public string DisplayName { get; set; } = "";
+    public string? Description { get; set; }
+    public int DisplayOrder { get; set; }
+}
+
+/// <summary>更新实体类型（PUT api/eav/entity-types/{id}）</summary>
+public class UpdateEntityTypeRequest
+{
+    public string? DisplayName { get; set; }
+    public string? Description { get; set; }
+    public int? DisplayOrder { get; set; }
+}
+
+/// <summary>实体类型详情（GET api/eav/entity-types/{id}）</summary>
+public record EntityTypeDetailDto(
+    string EntityTypeId,
+    string EntityType,
+    string DisplayName,
+    string? Description,
+    int DisplayOrder,
+    bool IsDeleted,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    int AttributeCount);
+```
+
+## 文件 6/14 TreeGraph.Shared/Eav/Dtos/EntityTypeSummaryDto.cs
 
 ```csharp
 namespace TreeGraph.Shared.Eav.Dtos;
@@ -140,10 +182,72 @@ public record EntityTypeSummaryDto(
     string EntityType,
     int AttributeCount,
     int SearchableAttributeCount,
-    string? FirstDisplayName);
+    string? FirstDisplayName,
+    string? EntityTypeId = null,     // 新增
+    string? DisplayName = null);     // 新增
 ```
 
-## 文件 6/12 TreeGraph.Shared/Eav/Dtos/MetadataDtos.cs
+## 文件 7/14 TreeGraph.Shared/Eav/Dtos/InodeDtos.cs
+
+```csharp
+using System.Text.Json;
+
+namespace TreeGraph.Shared.Eav.Dtos;
+
+/// <summary>
+/// iNode 下的类型卡片（UI 展示用）。
+/// </summary>
+public record InodeTypeCardDto(
+    string EntityType,                    // 类型名，如 "Product"
+    string DisplayName,                   // 中文显示名
+    string? EntityTypeId,                 // 对应 entity_type_catalog 的 ID（可空）
+    string? Description,
+    bool Declared,                        // 是否已声明
+    bool HasEntity,                       // 该类型下是否已创建实体
+    DateTimeOffset? EntityUpdatedAt);
+
+/// <summary>
+/// iNode 下的实体概要（列表项）。
+/// </summary>
+public record InodeEntitySummaryDto(
+    string InodeId,
+    string EntityId,
+    string EntityType,
+    string? DisplayName,
+    DateTimeOffset? UpdatedAt,
+    int PropertyCount);
+
+/// <summary>
+/// 跨 iNode 查询请求。
+/// </summary>
+public class InodeQueryRequest
+{
+    /// <summary>可选：限定 iNode。null = 跨所有 iNode 查询。</summary>
+    public string? InodeId { get; set; }
+
+    /// <summary>必填：实体类型名（如 "Product"）。</summary>
+    public string EntityType { get; set; } = "";
+
+    public List<AttributeFilter> Filters { get; set; } = new();
+
+    public string? OrderByAttribute { get; set; }
+    public bool OrderDescending { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+}
+
+/// <summary>
+/// 跨 iNode 查询结果项。
+/// </summary>
+public record InodeEntityDto(
+    string InodeId,
+    string EntityId,
+    string EntityType,
+    Dictionary<string, JsonElement> Properties,
+    DateTimeOffset? UpdatedAt);
+```
+
+## 文件 8/14 TreeGraph.Shared/Eav/Dtos/MetadataDtos.cs
 
 ```csharp
 using System.Text.Json;
@@ -153,7 +257,17 @@ namespace TreeGraph.Shared.Eav.Dtos;
 public class CreateAttributeRequest
 {
     public string EntityType { get; set; } = "";
-    public string AttributeName { get; set; } = "";
+
+    /// <summary>
+    /// 内部标识（JSON key）。可选：
+    ///   - null / 空：服务端自动生成 `attr_` + 12 位 hex（如 attr_3f9a2b1c8d4e）
+    ///   - 非空：必须以字母开头，只含字母、数字、下划线
+    ///
+    /// 提示：属性名会出现在 JSON key / 查询过滤 / 审计日志 / 导出列名里，
+    /// 如需与外部系统对接，建议显式指定可读的英文标识（如 screen_size）。
+    /// </summary>
+    public string? AttributeName { get; set; }
+
     public string DisplayName { get; set; } = "";
     public string DataType { get; set; } = "string";
     public bool IsRequired { get; set; }
@@ -369,7 +483,7 @@ public class UpdateAttributeRequest
 }
 ```
 
-## 文件 7/12 TreeGraph.Shared/Eav/Dtos/OptionSetDtos.cs
+## 文件 9/14 TreeGraph.Shared/Eav/Dtos/OptionSetDtos.cs
 
 ```csharp
 namespace TreeGraph.Shared.Eav.Dtos;
@@ -440,7 +554,7 @@ public class UpdateOptionSetRequest
 }
 ```
 
-## 文件 8/12 TreeGraph.Shared/Eav/Dtos/PagedResult.cs
+## 文件 10/14 TreeGraph.Shared/Eav/Dtos/PagedResult.cs
 
 ```csharp
 namespace TreeGraph.Shared.Eav.Dtos;
@@ -454,7 +568,7 @@ public class PagedResult<T>
 }
 ```
 
-## 文件 9/12 TreeGraph.Shared/Eav/Dtos/SchemaDtos.cs
+## 文件 11/14 TreeGraph.Shared/Eav/Dtos/SchemaDtos.cs
 
 ```csharp
 using System.Text.Json;
@@ -518,7 +632,7 @@ public sealed record AttributeSchemaDto(
     string? RefTableDefinitionId = null);
 ```
 
-## 文件 10/12 TreeGraph.Shared/Eav/Dtos/UnitDtos.cs
+## 文件 12/14 TreeGraph.Shared/Eav/Dtos/UnitDtos.cs
 
 ```csharp
 namespace TreeGraph.Shared.Eav.Dtos;
@@ -611,7 +725,7 @@ public record RecalculateUnitFactorResult(
     decimal NewFactor);
 ```
 
-## 文件 11/12 TreeGraph.Shared/Eav/Dtos/ValidationModels.cs
+## 文件 13/14 TreeGraph.Shared/Eav/Dtos/ValidationModels.cs
 
 ```csharp
 namespace TreeGraph.Shared.Eav.Dtos;
@@ -621,7 +735,7 @@ public record ValidationError(string Field, string Message);
 public record ValidationResult(bool IsValid, List<ValidationError> Errors);
 ```
 
-## 文件 12/12 TreeGraph.Shared/Eav/EavDataTypes.cs
+## 文件 14/14 TreeGraph.Shared/Eav/EavDataTypes.cs
 
 ```csharp
 namespace TreeGraph.Shared.Eav;

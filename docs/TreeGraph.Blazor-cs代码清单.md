@@ -1,27 +1,11 @@
 # TreeGraph.Blazor C# 代码清单
 
-- 生成时间：2026-10-03 05:43:44
-- 文件总数：8
-- 排除：bin/、obj/
-- 项目状态：ID 到 GUID String 重构完成（EavApiClient 全部 ID string 化）
+- 生成时间：2026-10-04 21:37:23
+- 文件总数：13
+- 排除：bin/、obj/、csproj、README.md
+- 项目状态：含 TreeSkyDemo 与 StringTreeDemo 演示页；Services/DemoTree 为 StringTree 内存示例（Store/DataSource/Handler）；DI：AddTreeSky + AddStringTreeSky
 
-## 文件 1/8 TreeGraph.Blazor/Components/FieldRenderers/NumericValueDto.cs
-
-```csharp
-namespace TreeGraph.Blazor.Components.FieldRenderers;
-
-/// <summary>
-/// 带单位的数值（DynamicForm 内部表单值）。
-/// 对应后端 JSON 形状 { value, unitId }，提交时由 DynamicForm 序列化。
-/// </summary>
-public class NumericValueDto
-{
-    public decimal? Value { get; set; }
-    public Guid? UnitId { get; set; }
-}
-```
-
-## 文件 2/8 TreeGraph.Blazor/Program.cs
+## 文件 1/13 TreeGraph.Blazor/Program.cs
 
 ```csharp
 using Microsoft.Extensions.Http.Resilience;
@@ -29,6 +13,12 @@ using MudBlazor.Services;
 using Polly;
 using TreeGraph.Blazor.Components;
 using TreeGraph.Blazor.Services;
+using TreeGraph.Blazor.Services.DemoTree;
+using TreeGraph.Blazor.Shared.Trees.Extensions;
+using TreeGraph.Blazor.Shared.Trees.Models;
+using TreeGraph.Blazor.Shared.Trees.Services;
+using TreeGraph.Blazor.Shared.Trees.StringTree.Extensions;
+using TreeGraph.Blazor.Shared.Trees.StringTree.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,8 +31,38 @@ builder.Services.AddRazorComponents()
 // MudBlazor
 builder.Services.AddMudServices();
 
+// ★ TreeSky 树组件库（BlazorService/MessageService/TreeNodeDialogService/导航/泛型树 API 客户端 + MudExtensions）
+builder.Services.AddTreeSky();
+
+// ★ TreeSky 演示：StringTreeNode（string 名称节点），数据存于 TreeGraph.Api 的
+//   string_tree_nodes 表（Postgres）。读写都经 DiberyTreeApiClient<StringTreeNode>
+//   → /StringTreeNode/* 端点（TreeControllerBase<StringTreeNode> + EfTreeService）。
+builder.Services.AddScoped<ITreeClientService<StringTreeNode>, StringTreeClientService>();
+builder.Services.AddHttpClient("TreeSky", client =>
+    {
+        // Aspire 服务发现：与 EavApiClient 同一后端
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    // 写操作（POST/PUT/DELETE/move）不幂等，禁止自动重试
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = 1;
+        options.Retry.ShouldHandle = _ => ValueTask.FromResult(false);
+    });
+
+// ★ StringTreeSky（T=string 树）：Noop Handler 用 TryAdd 注册，
+//   必须在宿主自定义 Handler 之前，下面的 AddScoped 才能覆盖默认值。
+builder.Services.AddStringTreeSky();
+
+// ★ StringTreeSky 内存演示：单例 store 与接口实现共享同一份内存数据
+//   （与上方 API 版 StringTreeClientService 并存，服务不同接口，互不影响）。
+builder.Services.AddSingleton<InMemoryStringTreeStore>();
+builder.Services.AddScoped<IStringTreeDataSource, InMemoryStringTreeDataSource>();
+builder.Services.AddScoped<IStringTreeActionHandler, InMemoryStringTreeActionHandler>();
+
 // ★ 前端字段校验器（单例，无状态）
 builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
+builder.Services.AddScoped<EntityTypeDisplayService>();
 
 // ★ EavApiClient：通过 Aspire 服务发现访问 treegrapheavapi
 // 弹性策略显式配置：
@@ -94,7 +114,356 @@ app.Run();
 public partial class Program { }
 ```
 
-## 文件 3/8 TreeGraph.Blazor/Services/EavApiClient.cs
+## 文件 2/13 TreeGraph.Blazor/Components/FieldRenderers/NumericValueDto.cs
+
+```csharp
+namespace TreeGraph.Blazor.Components.FieldRenderers;
+
+/// <summary>
+/// 带单位的数值（DynamicForm 内部表单值）。
+/// 对应后端 JSON 形状 { value, unitId }，提交时由 DynamicForm 序列化。
+/// </summary>
+public class NumericValueDto
+{
+    public decimal? Value { get; set; }
+    public Guid? UnitId { get; set; }
+}
+```
+
+## 文件 3/13 TreeGraph.Blazor/Services/DemoTree/InMemoryStringTreeActionHandler.cs
+
+```csharp
+using TreeGraph.Blazor.Shared.Trees.StringTree.Models;
+using TreeGraph.Blazor.Shared.Trees.StringTree.Services;
+
+namespace TreeGraph.Blazor.Services.DemoTree;
+
+public class InMemoryStringTreeActionHandler(InMemoryStringTreeStore store)
+    : IStringTreeActionHandler
+{
+    public Task<StringNodeMeta?> CreateChildAsync(
+        string parentId, StringNodeMeta newChild, CancellationToken ct = default)
+        => Task.FromResult(store.Create(parentId, newChild));
+
+    public Task<StringNodeMeta?> UpdateNodeAsync(
+        StringNodeMeta node, CancellationToken ct = default)
+        => Task.FromResult(store.Update(node) ? node : null);
+
+    public Task<bool> DeleteNodeAsync(
+        string id, CancellationToken ct = default)
+        => Task.FromResult(store.Delete(id));
+
+    public Task<bool> MoveNodeAsync(
+        string id, string? newParentId, CancellationToken ct = default)
+        => Task.FromResult(store.Move(id, newParentId));
+
+    public Task<bool> SortChildrenAsync(
+        string parentId, IReadOnlyList<string> orderedChildIds,
+        CancellationToken ct = default)
+        => Task.FromResult(store.Sort(parentId, orderedChildIds));
+}
+```
+
+## 文件 4/13 TreeGraph.Blazor/Services/DemoTree/InMemoryStringTreeDataSource.cs
+
+```csharp
+using TreeGraph.Blazor.Shared.Trees.StringTree.Models;
+using TreeGraph.Blazor.Shared.Trees.StringTree.Services;
+
+namespace TreeGraph.Blazor.Services.DemoTree;
+
+public class InMemoryStringTreeDataSource(InMemoryStringTreeStore store)
+    : IStringTreeDataSource
+{
+    public Task<IReadOnlyList<StringNodeMeta>> GetRootsAsync(CancellationToken ct = default)
+        => Task.FromResult(store.GetRoots());
+
+    public Task<IReadOnlyList<StringNodeMeta>> GetChildrenAsync(
+        string parentId, CancellationToken ct = default)
+        => Task.FromResult(store.GetChildren(parentId));
+
+    public Task<StringNodeMeta?> GetByIdAsync(string id, CancellationToken ct = default)
+        => Task.FromResult(store.GetById(id));
+
+    public Task<List<string>?> GetAncestorPathAsync(
+        string id, CancellationToken ct = default)
+        => Task.FromResult(store.GetAncestorPath(id));
+}
+```
+
+## 文件 5/13 TreeGraph.Blazor/Services/DemoTree/InMemoryStringTreeStore.cs
+
+```csharp
+using MudBlazor;
+using TreeGraph.Blazor.Shared.Trees.StringTree.Models;
+
+namespace TreeGraph.Blazor.Services.DemoTree;
+
+/// <summary>
+/// 内存树共享存储：DataSource 与 ActionHandler 共用同一份数据。
+/// 演示用途，非线程安全（UI 单线程访问）。
+/// </summary>
+public class InMemoryStringTreeStore
+{
+    private readonly Dictionary<string, StringNodeMeta> _nodes = new();
+    private readonly object _lock = new();
+
+    public InMemoryStringTreeStore()
+    {
+        Seed();
+    }
+
+    // ============================================================
+    // 种子数据（3 层 8 节点）
+    // ============================================================
+
+    private void Seed()
+    {
+        AddRoot("电子产品", Icons.Material.Filled.Folder, order: 10, hasChildren: true);
+        AddRoot("服装", Icons.Material.Filled.Checkroom, order: 20, hasChildren: true);
+
+        var electronics = FindByName("电子产品")!;
+        AddChild(electronics.Id, "手机", Icons.Material.Filled.Smartphone, order: 10, canHaveChildren: true);
+        AddChild(electronics.Id, "电脑", Icons.Material.Filled.Laptop, order: 20, canHaveChildren: true);
+
+        var phones = FindByName("手机")!;
+        AddChild(phones.Id, "安卓手机", Icons.Material.Filled.PhoneAndroid, order: 10, canHaveChildren: false);
+        AddChild(phones.Id, "iPhone", Icons.Material.Filled.PhoneIphone, order: 20, canHaveChildren: false);
+
+        var computers = FindByName("电脑")!;
+        AddChild(computers.Id, "笔记本", Icons.Material.Filled.LaptopMac, order: 10, canHaveChildren: false);
+
+        var clothing = FindByName("服装")!;
+        AddChild(clothing.Id, "男装", Icons.Material.Filled.Man, order: 10, canHaveChildren: false);
+    }
+
+    // ============================================================
+    // 查询
+    // ============================================================
+
+    public IReadOnlyList<StringNodeMeta> GetRoots() => Snapshot()
+        .Where(n => n.ParentId is null)
+        .OrderBy(n => n.SortOrder).ThenBy(n => n.Text)
+        .ToList();
+
+    public IReadOnlyList<StringNodeMeta> GetChildren(string parentId) => Snapshot()
+        .Where(n => n.ParentId == parentId)
+        .OrderBy(n => n.SortOrder).ThenBy(n => n.Text)
+        .ToList();
+
+    public StringNodeMeta? GetById(string id)
+        => _nodes.GetValueOrDefault(id);
+
+    public List<string>? GetAncestorPath(string id)
+    {
+        var path = new List<string>();
+        var cursor = _nodes.GetValueOrDefault(id);
+        while (cursor is not null)
+        {
+            path.Insert(0, cursor.Id);
+            cursor = cursor.ParentId is null
+                ? null
+                : _nodes.GetValueOrDefault(cursor.ParentId);
+        }
+        return path.Count > 0 ? path : null;
+    }
+
+    // ============================================================
+    // 写入
+    // ============================================================
+
+    public StringNodeMeta? Create(string parentId, StringNodeMeta template)
+    {
+        var parent = _nodes.GetValueOrDefault(parentId);
+        if (parent is null || !parent.CanHaveChildren) return null;
+
+        var created = template.Clone();
+        created.Id = Guid.NewGuid().ToString("D");
+        created.ParentId = parentId;
+        created.SortOrder = NextSortOrder(parentId);
+        _nodes[created.Id] = created;
+
+        parent.HasChildren = true;
+        return created;
+    }
+
+    public bool Update(StringNodeMeta node)
+    {
+        var existing = _nodes.GetValueOrDefault(node.Id);
+        if (existing is null) return false;
+
+        existing.Text = node.Text;
+        existing.Description = node.Description;
+        existing.Subtitle = node.Subtitle;
+        existing.Icon = node.Icon;
+        existing.CanHaveChildren = node.CanHaveChildren;
+        existing.ExtraData = node.ExtraData;
+        return true;
+    }
+
+    public bool Delete(string id)
+    {
+        var node = _nodes.GetValueOrDefault(id);
+        if (node is null) return false;
+
+        // 级联删后代
+        var queue = new Queue<string>();
+        queue.Enqueue(id);
+        while (queue.Count > 0)
+        {
+            var cur = queue.Dequeue();
+            foreach (var child in _nodes.Values.Where(n => n.ParentId == cur).ToList())
+                queue.Enqueue(child.Id);
+            _nodes.Remove(cur);
+        }
+
+        // 更新父的 HasChildren
+        if (node.ParentId is { } pid && _nodes.GetValueOrDefault(pid) is { } parent)
+            parent.HasChildren = _nodes.Values.Any(n => n.ParentId == pid);
+
+        return true;
+    }
+
+    public bool Move(string id, string? newParentId)
+    {
+        var node = _nodes.GetValueOrDefault(id);
+        if (node is null) return false;
+
+        // 防环：newParent 不能是自己或后代
+        var cursor = newParentId;
+        while (cursor is not null)
+        {
+            if (cursor == id) return false;
+            cursor = _nodes.GetValueOrDefault(cursor)?.ParentId;
+        }
+
+        if (newParentId is not null)
+        {
+            var np = _nodes.GetValueOrDefault(newParentId);
+            if (np is null || !np.CanHaveChildren) return false;
+        }
+
+        var oldParentId = node.ParentId;
+        node.ParentId = newParentId;
+        node.SortOrder = NextSortOrder(newParentId);
+
+        // 更新新旧父的 HasChildren
+        if (oldParentId is { } op && _nodes.GetValueOrDefault(op) is { } opNode)
+            opNode.HasChildren = _nodes.Values.Any(n => n.ParentId == op);
+        if (newParentId is { } np2 && _nodes.GetValueOrDefault(np2) is { } npNode)
+            npNode.HasChildren = true;
+
+        return true;
+    }
+
+    public bool Sort(string parentId, IReadOnlyList<string> orderedIds)
+    {
+        // 按列表位置重编号（★ 不按 SortOrder 排序，避免撤销拖拽结果）
+        for (int i = 0; i < orderedIds.Count; i++)
+        {
+            var node = _nodes.GetValueOrDefault(orderedIds[i]);
+            if (node is null || node.ParentId != parentId) continue;
+            node.SortOrder = (i + 1) * 10;
+        }
+        return true;
+    }
+
+    // ============================================================
+    // 辅助
+    // ============================================================
+
+    private List<StringNodeMeta> Snapshot()
+    {
+        lock (_lock) return _nodes.Values.ToList();
+    }
+
+    private StringNodeMeta? FindByName(string text)
+        => _nodes.Values.FirstOrDefault(n => n.Text == text);
+
+    private int NextSortOrder(string? parentId)
+    {
+        var siblings = _nodes.Values.Where(n => n.ParentId == parentId).ToList();
+        return siblings.Count == 0 ? 10 : siblings.Max(n => n.SortOrder) + 10;
+    }
+
+    // 种子构造辅助
+    private void AddRoot(string text, string? icon, int order, bool hasChildren)
+    {
+        var id = Guid.NewGuid().ToString("D");
+        _nodes[id] = new StringNodeMeta
+        {
+            Id = id,
+            ParentId = null,
+            Text = text,
+            Icon = icon,
+            HasChildren = hasChildren,
+            CanHaveChildren = true,
+            SortOrder = order,
+        };
+    }
+
+    private void AddChild(string parentId, string text, string? icon,
+        int order, bool canHaveChildren)
+    {
+        var id = Guid.NewGuid().ToString("D");
+        _nodes[id] = new StringNodeMeta
+        {
+            Id = id,
+            ParentId = parentId,
+            Text = text,
+            Icon = icon,
+            HasChildren = false,
+            CanHaveChildren = canHaveChildren,
+            SortOrder = order,
+        };
+
+        // ★ 与 Create() 语义对齐：子节点存在 ⇒ 父节点 HasChildren=true，
+        //   否则父节点 Expandable=false，UI 上永远没有展开箭头
+        var parent = _nodes.GetValueOrDefault(parentId);
+        if (parent is not null) parent.HasChildren = true;
+    }
+}
+```
+
+## 文件 6/13 TreeGraph.Blazor/Services/DemoTree/StringTreeClientService.cs
+
+```csharp
+using TreeGraph.Blazor.Shared.Trees.Models;
+using TreeGraph.Blazor.Shared.Trees.Services;
+
+namespace TreeGraph.Blazor.Services.DemoTree;
+
+/// <summary>
+/// 字符串节点的 <see cref="ITreeClientService{TTree}"/> 实现：
+/// 通过 <see cref="DiberyTreeApiClient{T}"/> 访问 TreeGraph.Api 的 StringTreeNodeController。
+/// </summary>
+public class StringTreeClientService(DiberyTreeApiClient<StringTreeNode> api) : ITreeClientService<StringTreeNode>
+{
+    public string Title { get; set; } = "字符串节点演示树";
+
+    /// <summary>关闭"新页面打开"：演示中点击目录不触发 forceLoad 整页跳转。</summary>
+    public bool NewPageShow { get; set; }
+
+    /// <summary>移动/选择对话框中只能选中叶子（与源计量单位树语义一致）。</summary>
+    public bool SelectLeaf { get; set; } = true;
+
+    public async Task<IReadOnlyList<TreeNodeDto<StringTreeNode>>> LoadInitialDataAsync(
+        string? rootId, CancellationToken ct = default)
+        => await api.GetRootNodesAsync(rootId, ct);
+
+    public async Task<IReadOnlyList<TreeNodeDto<StringTreeNode>>> LoadChildrenAsync(
+        StringTreeNode? parent = null, CancellationToken ct = default)
+        => parent == null
+            ? await api.GetRootNodesAsync(null, ct)
+            : await api.GetChildrenAsync(parent.Id, ct);
+
+    public async Task<List<string>?> GetAncestorPathFromApiAsync(
+        string nodeId, CancellationToken ct = default)
+        => [.. await api.GetAncestorPathAsync(nodeId, ct)];
+}
+```
+
+## 文件 7/13 TreeGraph.Blazor/Services/EavApiClient.cs
 
 ```csharp
 using System.Text.Json;
@@ -463,6 +832,42 @@ public class EavApiClient
         CancellationToken ct = default)
         => await GetAsync<IReadOnlyList<EntityTypeSummaryDto>>(
             "api/eav/entity-types", ct);
+
+    /// <summary>
+    /// 一次拉取所有实体类型详情（含属性计数）。
+    /// 替代"ListEntityTypesAsync + N 次 GetEntityTypeAsync"的 N+1 模式。
+    /// </summary>
+    public async Task<IReadOnlyList<EntityTypeDetailDto>?> ListEntityTypeDetailsAsync(
+        bool includeDeleted = false, CancellationToken ct = default)
+    {
+        var url = "api/eav/entity-types/details";
+        if (includeDeleted) url += "?includeDeleted=true";
+        return await GetAsync<IReadOnlyList<EntityTypeDetailDto>>(url, ct);
+    }
+
+    // ============================================================
+    // 实体类型 CRUD
+    // ============================================================
+
+    public Task<string?> CreateEntityTypeAsync(
+        CreateEntityTypeRequest request, CancellationToken ct = default)
+        => PostForIdAsync("api/eav/entity-types", request, "entityTypeId", ct);
+
+    public Task<EntityTypeDetailDto?> GetEntityTypeAsync(
+        string id, CancellationToken ct = default)
+        => GetAsync<EntityTypeDetailDto>($"api/eav/entity-types/{id}", ct);
+
+    public Task<(bool Ok, string? Error)> UpdateEntityTypeAsync(
+        string id, UpdateEntityTypeRequest request, CancellationToken ct = default)
+        => PutAsync($"api/eav/entity-types/{id}", request, ct);
+
+    public Task<(bool Ok, string? Error)> DeleteEntityTypeAsync(
+        string id, CancellationToken ct = default)
+        => DeleteWithErrorAsync($"api/eav/entity-types/{id}", ct);
+
+    public Task<(bool Ok, string? Error)> UndeleteEntityTypeAsync(
+        string id, CancellationToken ct = default)
+        => PostNoBodyAsync($"api/eav/entity-types/{id}/undelete", ct);
 
     public async Task<PagedResult<DynamicEntityDto>?> ListEntitiesAsync(
         string entityType, int page = 1, int pageSize = 20,
@@ -858,6 +1263,296 @@ public class EavApiClient
     }
 
     // ============================================================
+    // ★ iNode 声明层
+    // ============================================================
+
+    public async Task<IReadOnlyList<InodeTypeCardDto>?> ListInodeTypeCardsAsync(
+        string inodeId, CancellationToken ct = default)
+        => await GetAsync<IReadOnlyList<InodeTypeCardDto>>(
+            $"api/inode/{Uri.EscapeDataString(inodeId)}/types", ct);
+
+    public Task<(bool Ok, string? Error)> AttachInodeTypeAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+        => PostNoBodyAsync(
+            $"api/inode/{Uri.EscapeDataString(inodeId)}/types/" +
+            $"{Uri.EscapeDataString(entityType)}", ct);
+
+    public Task<(bool Ok, string? Error)> DetachInodeTypeAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+        => DeleteWithErrorAsync(
+            $"api/inode/{Uri.EscapeDataString(inodeId)}/types/" +
+            $"{Uri.EscapeDataString(entityType)}", ct);
+
+    // ============================================================
+    // ★ iNode 实体 CRUD
+    // ============================================================
+
+    public async Task<IReadOnlyList<DynamicEntityDto>?> ListInodeEntitiesAsync(
+        string inodeId, bool originalUnits = false, CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities";
+        if (originalUnits) url += "?unit=original";
+        return await GetAsync<IReadOnlyList<DynamicEntityDto>>(url, ct);
+    }
+
+    public async Task<DynamicEntityDto?> GetInodeEntityAsync(
+        string inodeId, string entityType,
+        bool originalUnits = false, CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+                  $"{Uri.EscapeDataString(entityType)}";
+        if (originalUnits) url += "?unit=original";
+        return await GetAsync<DynamicEntityDto>(url, ct);
+    }
+
+    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        SaveInodeEntityAsync(
+        string inodeId, string entityType,
+        Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt = null,
+        CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+                  $"{Uri.EscapeDataString(entityType)}";
+        return await PutWithConflictAsync(url, values, expectedUpdatedAt, ct);
+    }
+
+    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        PatchInodeEntityAsync(
+        string inodeId, string entityType,
+        Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt = null,
+        CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+                  $"{Uri.EscapeDataString(entityType)}";
+        return await PatchWithConflictAsync(url, values, expectedUpdatedAt, ct);
+    }
+
+    public Task<(bool Ok, string? Error)> DeleteInodeEntityAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+        => DeleteWithErrorAsync(
+            $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+            $"{Uri.EscapeDataString(entityType)}", ct);
+
+    public async Task<IReadOnlyList<EntityHistoryDto>?> GetInodeEntityHistoryAsync(
+        string inodeId, string entityType,
+        DateTimeOffset? from = null, CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+                  $"{Uri.EscapeDataString(entityType)}/history";
+        if (from.HasValue)
+            url += $"?from={Uri.EscapeDataString(from.Value.ToString("O"))}";
+        return await GetAsync<IReadOnlyList<EntityHistoryDto>>(url, ct);
+    }
+
+    // ============================================================
+    // ★ 跨 iNode 查询
+    // ============================================================
+
+    public async Task<PagedResult<InodeEntityDto>?> QueryInodesAsync(
+        InodeQueryRequest request, CancellationToken ct = default)
+        => await PostAsync<PagedResult<InodeEntityDto>>(
+            "api/inode/query", request, ct);
+
+    // ============================================================
+    // ★ iNode 全景 JSON
+    // ============================================================
+
+    /// <summary>
+    /// 拉取该 iNode 下所有实体的全景 JSON（字符串形式）。
+    ///
+    /// 用途：外部应用 / 缓存 / 转发第三方。
+    ///
+    /// 参数：
+    ///   displayName  - true 时属性 key 用中文 DisplayName
+    ///   includeNull  - true 时保留值为 null 的属性键
+    ///   units        - "default" | "base" | "original"
+    /// </summary>
+    public async Task<string?> GetInodeAllAsJsonAsync(
+        string inodeId,
+        bool displayName = false,
+        bool includeNull = false,
+        string? units = null,
+        CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/json";
+
+        var query = new List<string>();
+        if (displayName) query.Add("displayName=true");
+        if (includeNull) query.Add("includeNull=true");
+        if (!string.IsNullOrWhiteSpace(units))
+            query.Add($"units={Uri.EscapeDataString(units)}");
+
+        if (query.Count > 0)
+            url += "?" + string.Join("&", query);
+
+        try
+        {
+            var resp = await _http.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("GET {Url} → {Status}",
+                    url, resp.StatusCode);
+                return null;
+            }
+
+            // ★ 直接返回字符串，不反序列化
+            return await resp.Content.ReadAsStringAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GET {Url} 失败", url);
+            return null;
+        }
+    }
+
+    // ============================================================
+    // ★ iNode 原始 JSON 预览
+    // ============================================================
+
+    /// <summary>
+    /// 拉取 iNode 的原始 JSON（未解析）。
+    ///
+    /// 参数：
+    ///   includeNull      - true 时未写入的属性也以 null 出现
+    ///   displayName      - true 时属性 key 用中文 DisplayName
+    ///   originalUnits    - true 时数量值按原始输入单位还原（?units=original）
+    ///
+    /// 返回原始 JSON 字符串；失败返回 null。
+    /// </summary>
+    public async Task<string?> GetInodeJsonAsync(
+        string inodeId,
+        bool includeNull = false,
+        bool displayName = false,
+        bool originalUnits = false,
+        CancellationToken ct = default)
+    {
+        var query = new List<string>();
+        if (includeNull) query.Add("includeNull=true");
+        if (displayName) query.Add("displayName=true");
+        if (originalUnits) query.Add("units=original");
+
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/json";
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+
+        try
+        {
+            var resp = await _http.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("GET {Url} → {Status}",
+                    url, resp.StatusCode);
+                return null;
+            }
+            return await resp.Content.ReadAsStringAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GET {Url} 失败", url);
+            return null;
+        }
+    }
+
+    // ============================================================
+    // ★ 内部辅助：带乐观锁的 PUT / PATCH
+    // ============================================================
+
+    private async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        PutWithConflictAsync(
+        string url, Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Put, url)
+            {
+                Content = JsonContent.Create(values, options: JsonOptions)
+            };
+
+            if (expectedUpdatedAt is { } exp)
+                req.Headers.Add("X-Expected-Updated-At",
+                    exp.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+            var resp = await _http.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return (true, null, null);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("PUT {Url} → 409：{Body}", url, text);
+
+                DateTimeOffset? current = null;
+                try
+                {
+                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(
+                        text, JsonOptions);
+                    current = conflict?.CurrentUpdatedAt;
+                }
+                catch { }
+
+                return (false, "并发冲突：实体已被其他用户修改，请刷新后重试", current);
+            }
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            _logger.LogWarning("PUT {Url} → {Status}: {Error}",
+                url, resp.StatusCode, msg);
+            return (false, msg, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PUT {Url} 失败", url);
+            return (false, ex.Message, null);
+        }
+    }
+
+    private async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        PatchWithConflictAsync(
+        string url, Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Patch, url)
+            {
+                Content = JsonContent.Create(values, options: JsonOptions)
+            };
+
+            if (expectedUpdatedAt is { } exp)
+                req.Headers.Add("X-Expected-Updated-At",
+                    exp.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+            var resp = await _http.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return (true, null, null);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("PATCH {Url} → 409：{Body}", url, text);
+
+                DateTimeOffset? current = null;
+                try
+                {
+                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(
+                        text, JsonOptions);
+                    current = conflict?.CurrentUpdatedAt;
+                }
+                catch { }
+
+                return (false, "并发冲突：实体已被其他用户修改，请刷新后重试", current);
+            }
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            return (false, msg, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PATCH {Url} 失败", url);
+            return (false, ex.Message, null);
+        }
+    }
+
+    // ============================================================
     // 私有 record
     // ============================================================
 
@@ -880,7 +1575,7 @@ public class EavApiClient
 }
 ```
 
-## 文件 4/8 TreeGraph.Blazor/Services/EavFieldValidator.cs
+## 文件 8/13 TreeGraph.Blazor/Services/EavFieldValidator.cs
 
 ```csharp
 using System.Collections;
@@ -1022,8 +1717,9 @@ public class EavFieldValidator : IEavFieldValidator
     /// <summary>
     /// 顶层数值属性校验。
     ///
-    /// ★ 修复 P0-3：int 类型拒绝小数。
-    /// ★ 修复 P0-5：未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内。
+    /// ★ int 无单位：拒绝小数（写入 ValueInt 会截断）
+    /// ★ int 有单位：允许小数（归一化到基准单位可能产生小数，写 ValueDecimal）
+    /// ★ 未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内
     /// </summary>
     private void ValidateNumericAttribute(
         object value, AttributeSchemaDto attr, string path,
@@ -1055,10 +1751,12 @@ public class EavFieldValidator : IEavFieldValidator
             return;
         }
 
-        // ★ int 类型必须为整数
-        if (attr.DataType == "int" && d.Value != Math.Truncate(d.Value))
+        // ★ int 无单位时才拒绝小数
+        if (attr.DataType == "int"
+            && attr.Unit is null
+            && d.Value != Math.Truncate(d.Value))
         {
-            errors.Add(new FieldValidationError(path, "int 类型不接受小数"));
+            errors.Add(new FieldValidationError(path, "int 类型（无单位）不接受小数"));
             return;
         }
 
@@ -1157,8 +1855,9 @@ public class EavFieldValidator : IEavFieldValidator
     /// <summary>
     /// 组合内叶子字段校验：value 保证非空。
     ///
-    /// ★ 修复 P0-3：int 类型拒绝小数。
-    /// ★ 修复 P0-5：未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内。
+    /// ★ int 无单位：拒绝小数（写入 ValueInt 会截断）
+    /// ★ int 有单位：允许小数（归一化到基准单位可能产生小数，写 ValueDecimal）
+    /// ★ 未绑定单位时不允许指定 UnitId；绑定单位时 UnitId 必须在可用范围内
     /// </summary>
     private void ValidateLeafField(
         CompositeFieldSchemaDto field, object value, string path,
@@ -1193,12 +1892,13 @@ public class EavFieldValidator : IEavFieldValidator
                         break;
                     }
 
-                    // ★ int 类型必须为整数
+                    // ★ int 无单位时才拒绝小数
                     if (field.DataType == "int"
+                        && field.Unit is null
                         && ni.Value != Math.Truncate(ni.Value))
                     {
                         errors.Add(new FieldValidationError(
-                            path, "int 类型不接受小数"));
+                            path, "int 类型（无单位）不接受小数"));
                         break;
                     }
 
@@ -1217,12 +1917,13 @@ public class EavFieldValidator : IEavFieldValidator
                     break;
                 }
 
-                // ★ int 类型必须为整数
+                // ★ int 无单位时才拒绝小数
                 if (field.DataType == "int"
+                    && field.Unit is null
                     && num.Value != Math.Truncate(num.Value))
                 {
                     errors.Add(new FieldValidationError(
-                        path, "int 类型不接受小数"));
+                        path, "int 类型（无单位）不接受小数"));
                     break;
                 }
 
@@ -1365,7 +2066,89 @@ public class EavFieldValidator : IEavFieldValidator
 }
 ```
 
-## 文件 5/8 TreeGraph.Blazor/Services/FieldValidationError.cs
+## 文件 9/13 TreeGraph.Blazor/Services/EntityTypeDisplayService.cs
+
+```csharp
+using TreeGraph.Shared.Eav.Dtos;
+
+namespace TreeGraph.Blazor.Services;
+
+/// <summary>
+/// 实体类型"显示名"解析器。
+///
+/// 缓存 EntityType → DisplayName 映射。
+/// UI 中只显示 DisplayName（中文），EntityType（英文标识）仅用于 URL / API。
+///
+/// Scoped 生命周期：每个 Blazor Circuit 一份缓存。
+/// </summary>
+public class EntityTypeDisplayService
+{
+    private readonly EavApiClient _api;
+    private Dictionary<string, EntityTypeSummaryDto>? _map;
+    private SemaphoreSlim? _loadLock;
+    private bool _loaded;
+
+    public EntityTypeDisplayService(EavApiClient api)
+    {
+        _api = api;
+    }
+
+    public async Task EnsureLoadedAsync()
+    {
+        if (_loaded) return;
+
+        _loadLock ??= new SemaphoreSlim(1, 1);
+        await _loadLock.WaitAsync();
+        try
+        {
+            if (_loaded) return;
+
+            var list = await _api.ListEntityTypesAsync()
+                       ?? new List<EntityTypeSummaryDto>();
+            _map = list
+                .GroupBy(x => x.EntityType)
+                .ToDictionary(g => g.Key, g => g.First());
+            _loaded = true;
+        }
+        finally
+        {
+            _loadLock.Release();
+        }
+    }
+
+    public void Invalidate()
+    {
+        _loaded = false;
+        _map = null;
+    }
+
+    /// <summary>
+    /// 获取显示名。
+    /// DisplayName 为空时回退到 EntityType。
+    /// </summary>
+    public string GetDisplayName(string? entityType)
+    {
+        if (string.IsNullOrEmpty(entityType)) return entityType ?? "";
+
+        if (_map is not null
+            && _map.TryGetValue(entityType, out var dto)
+            && !string.IsNullOrWhiteSpace(dto.DisplayName))
+        {
+            return dto.DisplayName;
+        }
+
+        return entityType;
+    }
+
+    /// <summary>从 SummaryDto 直接取显示名（不需要查表）。</summary>
+    public static string GetDisplayName(EntityTypeSummaryDto dto)
+        => string.IsNullOrWhiteSpace(dto.DisplayName)
+            ? dto.EntityType
+            : dto.DisplayName;
+}
+```
+
+## 文件 10/13 TreeGraph.Blazor/Services/FieldValidationError.cs
 
 ```csharp
 namespace TreeGraph.Blazor.Services;
@@ -1385,7 +2168,7 @@ namespace TreeGraph.Blazor.Services;
 public sealed record FieldValidationError(string Path, string Message);
 ```
 
-## 文件 6/8 TreeGraph.Blazor/Services/FieldValidationRules.cs
+## 文件 11/13 TreeGraph.Blazor/Services/FieldValidationRules.cs
 
 ```csharp
 using System.Globalization;
@@ -1522,7 +2305,7 @@ public static class FieldValidationRules
 }
 ```
 
-## 文件 7/8 TreeGraph.Blazor/Services/FilterOperatorCatalog.cs
+## 文件 12/13 TreeGraph.Blazor/Services/FilterOperatorCatalog.cs
 
 ```csharp
 using TreeGraph.Shared.Eav.Dtos;
@@ -1633,7 +2416,7 @@ public static class FilterOperatorCatalog
 }
 ```
 
-## 文件 8/8 TreeGraph.Blazor/Services/NumericInput.cs
+## 文件 13/13 TreeGraph.Blazor/Services/NumericInput.cs
 
 ```csharp
 namespace TreeGraph.Blazor.Services;

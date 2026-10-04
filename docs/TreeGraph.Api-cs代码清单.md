@@ -1,18 +1,5502 @@
 # TreeGraph.Api C# 代码清单
 
-- 生成时间：2026-10-03 05:42:16
-- 文件总数：41
-- 排除：bin/、obj/
-- 项目状态：ID 到 GUID String 重构完成（主键 HasSentinel 空串 + DB DEFAULT gen_random_uuid()::text）；GUID String 形态已包含在 Initial 迁移中，迁移链：20261003070415_Initial → 20261003230729_AddStringTreeNodes
+- 生成时间：2026-10-04 21:37:23
+- 文件总数：56
+- 排除：bin/、obj/、csproj、README.md
+- 项目状态：ID 到 GUID String 重构完成（主键 HasSentinel 空串 + DB DEFAULT gen_random_uuid()::text）；迁移链：20261003070415_Initial → 20261003230729_AddStringTreeNodes
 
-## 文件 1/41 TreeGraph.Api/Controllers/CustomTableDataController.cs
+## 文件 1/56 TreeGraph.Api/Program.cs
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Data.Seeding;
+using TreeGraph.Api.NodeEavSky.Infrastructure;
+using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Api.TreeSky;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// ★ Aspire ServiceDefaults：服务发现、健康检查、OpenTelemetry
+builder.AddServiceDefaults();
+
+// Add services to the container.
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new NumericValueJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new DynamicCompositeValueJsonConverter());
+    });
+builder.Services.AddOpenApi();
+
+// ★ 全局异常处理：把 EF/Npgsql 已知异常映射为 409/400
+builder.Services.AddExceptionHandler<DbExceptionHandler>();
+builder.Services.AddProblemDetails();
+
+// .NET Aspire 集成:自动从 ConnectionStrings:TreeGraphDb 注入连接字符串
+builder.AddNpgsqlDbContext<EavDbContext>("TreeGraphDb");
+
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<EavWriteService>();
+builder.Services.AddScoped<EavReadService>();
+builder.Services.AddScoped<EavQueryService>();
+builder.Services.AddScoped<EavValidationService>();
+builder.Services.AddScoped<CompositeValueService>();
+builder.Services.AddScoped<IInodeEntityService, InodeEntityService>();
+builder.Services.AddScoped<InodeEavFacade>();
+builder.Services.AddSingleton<IAttributeCache, AttributeCache>();
+builder.Services.AddSingleton<ICompositeTypeCache, CompositeTypeCache>();
+builder.Services.AddSingleton<IUnitCache, UnitCache>();
+builder.Services.AddSingleton<UnitConverter>();
+builder.Services.AddSingleton<ICustomTableCache, CustomTableCache>();
+builder.Services.AddSingleton<IOptionSetCache, OptionSetCache>();
+builder.Services.AddScoped<UnitSeedService>();
+builder.Services.AddScoped<CustomTableValidationService>();
+builder.Services.AddScoped<CustomTableWriteService>();
+builder.Services.AddScoped<CustomTableReadService>();
+builder.Services.AddScoped<CustomTableQueryService>();
+
+// ★ TreeSky 树组件后端：泛型 EF 实现 + StringTreeNode 字符串节点树
+builder.Services.AddScoped<TreeGraph.Api.TreeSky.ITreeService<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode>,
+    TreeGraph.Api.TreeSky.EfTreeService<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode>>();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+// ★ 研发阶段：暂不启用身份验证/授权管道
+//   UseAuthorization() 会解析 IAuthorizationPolicyProvider，
+//   未 AddAuthorization() 时首次请求抛 InvalidOperationException。
+// app.UseAuthorization();
+
+// ★ 全局异常处理
+app.UseExceptionHandler();
+
+app.MapControllers();
+
+// ★ Aspire 默认端点（/health、/alive），供 Dashboard 探测
+app.MapDefaultEndpoints();
+
+// 启动时应用迁移并注入种子数据（EF 设计期跳过，避免 dotnet-ef 连接数据库）
+if (!EF.IsDesignTime)
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
+    await db.Database.MigrateAsync();
+    await scope.ServiceProvider.GetRequiredService<UnitSeedService>().SeedAsync();
+    await EavSeeder.SeedAsync(db);
+    await StringTreeNodeSeeder.SeedAsync(db);
+}
+
+app.Run();
+
+// ★ 让 WebApplicationFactory<Program> 可引用（集成测试）
+public partial class Program { }
+```
+
+## 文件 2/56 TreeGraph.Api/Data/EavDbContext.cs
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using TreeGraph.Api.NodeEavSky.Entities;
+
+namespace TreeGraph.Api.NodeEavSky.Data;
+
+public class EavDbContext : DbContext
+{
+    public DbSet<EntityTypeDefinition> EntityTypes => Set<EntityTypeDefinition>();
+    public DbSet<AttributeDefinition> AttributeCatalog => Set<AttributeDefinition>();
+    public DbSet<AttributeValue> AttributeValues => Set<AttributeValue>();
+    public DbSet<CompositeTypeDefinition> CompositeTypes => Set<CompositeTypeDefinition>();
+    public DbSet<CompositeFieldDefinition> CompositeFields => Set<CompositeFieldDefinition>();
+    public DbSet<AttributeAuditLog> AttributeAuditLogs => Set<AttributeAuditLog>();
+    public DbSet<Unit> Units => Set<Unit>();
+    public DbSet<OptionSet> OptionSets => Set<OptionSet>();
+    public DbSet<OptionItem> OptionItems => Set<OptionItem>();
+    public DbSet<CustomTableDefinition> CustomTables => Set<CustomTableDefinition>();
+    public DbSet<CustomTableColumn> CustomTableColumns => Set<CustomTableColumn>();
+    public DbSet<CustomTableRow> CustomTableRows => Set<CustomTableRow>();
+
+    // iNode 关联（外挂表，不改动现有 EAV 表）
+    public DbSet<InodeEntityType> InodeEntityTypes => Set<InodeEntityType>();
+    public DbSet<InodeEntity> InodeEntities => Set<InodeEntity>();
+
+    // TreeSky 树组件（StringTreeNode 定义在 TreeGraph.Blazor.Shared 类库 Models 中）
+    public DbSet<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode> StringTreeNodes => Set<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode>();
+
+    public EavDbContext(DbContextOptions<EavDbContext> options) : base(options) { }
+
+    protected override void OnModelCreating(ModelBuilder mb)
+    {
+        ConfigureEntityTypes(mb);
+        ConfigureInodeEntityTypes(mb);
+        ConfigureInodeEntities(mb);
+        ConfigureUnits(mb);
+        ConfigureOptionSets(mb);
+        ConfigureAttributeCatalog(mb);
+        ConfigureAttributeValues(mb);
+        ConfigureCompositeTypes(mb);
+        ConfigureCustomTables(mb);
+        ConfigureAuditLog(mb);
+        ConfigureStringTreeNodes(mb);
+    }
+
+    // ============================================================
+    // TreeSky：StringTreeNode 树节点
+    // HasChildren/Parent/Children 为运行时导航属性，不落库
+    // ============================================================
+    private static void ConfigureStringTreeNodes(ModelBuilder mb)
+    {
+        mb.Entity<TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode>(e =>
+        {
+            e.ToTable("string_tree_nodes");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(300).IsRequired();
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
+
+            e.Ignore(x => x.HasChildren);
+            e.Ignore(x => x.Parent);
+            e.Ignore(x => x.Children);
+
+            e.HasIndex(x => x.ParentId).HasDatabaseName("ix_string_tree_nodes_parent_id");
+        });
+    }
+
+    private static void ConfigureEntityTypes(ModelBuilder mb)
+    {
+        mb.Entity<EntityTypeDefinition>(e =>
+        {
+            e.ToTable("entity_type_catalog");
+            e.HasKey(x => x.EntityTypeId);
+            e.Property(x => x.EntityTypeId)
+                .HasColumnName("entity_type_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityType)
+                .HasColumnName("entity_type")
+                .HasMaxLength(100).IsRequired();
+            e.Property(x => x.DisplayName)
+                .HasColumnName("display_name")
+                .HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description)
+                .HasColumnName("description")
+                .HasMaxLength(1000);
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // partial unique：软删后同名可重建
+            e.HasIndex(x => x.EntityType)
+                .IsUnique()
+                .HasDatabaseName("uq_entity_type")
+                .HasFilter("is_deleted = false");
+        });
+    }
+
+    // ============================================================
+    // iNode → EntityType 声明（N:N）
+    // ============================================================
+    private static void ConfigureInodeEntityTypes(ModelBuilder mb)
+    {
+        mb.Entity<InodeEntityType>(e =>
+        {
+            e.ToTable("inode_entitytype");
+
+            // 复合主键：每 (inode, entityType) 只 1 条
+            e.HasKey(x => new { x.InodeId, x.EntityType });
+
+            e.Property(x => x.InodeId).HasColumnName("inode_id")
+                .HasMaxLength(36).IsRequired();
+            e.Property(x => x.EntityType).HasColumnName("entity_type")
+                .HasMaxLength(100).IsRequired();
+            e.Property(x => x.AttachedAt).HasColumnName("attached_at");
+
+            e.HasIndex(x => x.InodeId).HasDatabaseName("ix_inode_et_inode");
+            e.HasIndex(x => x.EntityType).HasDatabaseName("ix_inode_et_type");
+        });
+    }
+
+    // ============================================================
+    // iNode ↔ 实体归属
+    // ============================================================
+    private static void ConfigureInodeEntities(ModelBuilder mb)
+    {
+        mb.Entity<InodeEntity>(e =>
+        {
+            e.ToTable("inode_entity");
+
+            // R2：每 iNode 每类型只 1 个实体
+            e.HasKey(x => new { x.InodeId, x.EntityType });
+
+            e.Property(x => x.InodeId).HasColumnName("inode_id")
+                .HasMaxLength(36).IsRequired();
+            e.Property(x => x.EntityType).HasColumnName("entity_type")
+                .HasMaxLength(100).IsRequired();
+            e.Property(x => x.EntityId).HasColumnName("entity_id")
+                .HasMaxLength(36).IsRequired();
+            e.Property(x => x.AttachedAt).HasColumnName("attached_at");
+
+            // R3：每个实体只属于 1 个 iNode
+            e.HasIndex(x => new { x.EntityType, x.EntityId })
+                .IsUnique()
+                .HasDatabaseName("uq_inode_entity_global");
+
+            e.HasIndex(x => x.InodeId).HasDatabaseName("ix_inode_entity_inode");
+            e.HasIndex(x => x.EntityId).HasDatabaseName("ix_inode_entity_entity");
+        });
+    }
+
+    private static void ConfigureUnits(ModelBuilder mb)
+    {
+        mb.Entity<Unit>(e =>
+        {
+            e.ToTable("units");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Category).HasColumnName("category").HasMaxLength(50).IsRequired();
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
+            e.Property(x => x.Symbol).HasColumnName("symbol").HasMaxLength(20).IsRequired();
+            e.Property(x => x.ToBaseFactor).HasColumnName("to_base_factor").HasPrecision(38, 15);
+            e.Property(x => x.IsBaseUnit).HasColumnName("is_base_unit");
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasIndex(x => new { x.Category, x.Name })
+                .IsUnique()
+                .HasDatabaseName("uq_unit_category_name");
+
+            e.HasIndex(x => x.Category)
+                .IsUnique()
+                .HasDatabaseName("uq_unit_category_base")
+                .HasFilter("is_base_unit = true");
+        });
+    }
+
+    private static void ConfigureAttributeCatalog(ModelBuilder mb)
+    {
+        mb.Entity<AttributeDefinition>(e =>
+        {
+            // ★ 移除原 ck_attr_int_no_unit CHECK 约束。
+            //   现在 int 类型也可以绑定单位：归一化到基准单位产生的小数
+            //   会写入 ValueDecimal 列（见 EavWriteService.SetTypedValue）。
+            e.ToTable("attribute_catalog");
+
+            e.HasKey(x => x.AttributeId);
+            e.Property(x => x.AttributeId)
+                .HasColumnName("attribute_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
+            e.Property(x => x.IsRequired).HasColumnName("is_required");
+            e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
+            e.Property(x => x.IsSortable).HasColumnName("is_sortable");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            e.Property(x => x.Version).HasColumnName("version");
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.DefaultValue).HasColumnName("default_value").HasMaxLength(500);
+
+            e.Property(x => x.AllowedValues).HasColumnName("allowed_values").HasColumnType("jsonb");
+            e.Property(x => x.ValidationRule).HasColumnName("validation_rule").HasColumnType("jsonb");
+            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
+            e.Property(x => x.RefTableDefinitionId).HasColumnName("ref_table_definition_id").HasMaxLength(36);
+            e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
+            e.Property(x => x.UnitId).HasColumnName("unit_id");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasIndex(x => new { x.EntityType, x.AttributeName })
+                .IsUnique()
+                .HasDatabaseName("uq_attr_catalog");
+
+            e.HasIndex(x => x.EntityType)
+                .HasDatabaseName("ix_attr_catalog_entity")
+                .HasFilter("is_deleted = false");
+
+            e.HasOne(x => x.RefCompositeType)
+                .WithMany().HasForeignKey(x => x.RefCompositeTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.Unit).WithMany()
+                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.RefTableDefinition).WithMany()
+                .HasForeignKey(x => x.RefTableDefinitionId).OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.RefOptionSet).WithMany()
+                .HasForeignKey(x => x.RefOptionSetId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureAttributeValues(ModelBuilder mb)
+    {
+        mb.Entity<AttributeValue>(e =>
+        {
+            e.ToTable("attribute_values");
+            e.HasKey(x => x.ValueId);
+            e.Property(x => x.ValueId)
+                .HasColumnName("value_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.ValueString).HasColumnName("value_string").HasMaxLength(2000);
+            e.Property(x => x.ValueInt).HasColumnName("value_int");
+
+            // ★ 修复 P1-1：value_decimal 精度从 (18,4) 提升到 (38,15)，
+            // 与 units.to_base_factor 一致，避免单位换算（如 1 mg → kg）截断为 0
+            e.Property(x => x.ValueDecimal)
+                .HasColumnName("value_decimal")
+                .HasPrecision(38, 15);
+
+            e.Property(x => x.ValueBool).HasColumnName("value_bool");
+            e.Property(x => x.ValueDatetime).HasColumnName("value_datetime").HasColumnType("timestamptz");
+            e.Property(x => x.ValueDateOnly).HasColumnName("value_dateonly").HasColumnType("date");
+            e.Property(x => x.ValueTime).HasColumnName("value_time").HasColumnType("time(0)");
+            e.Property(x => x.ValueFileMeta).HasColumnName("value_file_meta").HasColumnType("jsonb");
+            e.Property(x => x.ValueJsonb).HasColumnName("value_jsonb").HasColumnType("jsonb");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.UnitId).HasColumnName("unit_id");
+
+            e.HasIndex(x => new { x.EntityId, x.EntityType, x.AttributeId })
+                .IsUnique().HasDatabaseName("uq_av_entity_attr");
+
+            e.HasIndex(x => new { x.EntityType, x.EntityId })
+                .HasDatabaseName("ix_av_entity");
+
+            // ★ #3 冲突检测：加速 max(UpdatedAt) 查询
+            e.HasIndex(x => new { x.EntityType, x.EntityId, x.UpdatedAt })
+                .HasDatabaseName("ix_av_entity_updated")
+                .IsDescending(false, false, true);
+
+            e.HasIndex(x => new { x.AttributeId, x.ValueInt })
+                .HasDatabaseName("ix_av_attr_int").HasFilter("value_int IS NOT NULL");
+            e.HasIndex(x => new { x.AttributeId, x.ValueDecimal })
+                .HasDatabaseName("ix_av_attr_decimal").HasFilter("value_decimal IS NOT NULL");
+            e.HasIndex(x => new { x.AttributeId, x.ValueString })
+                .HasDatabaseName("ix_av_attr_string").HasFilter("value_string IS NOT NULL");
+            e.HasIndex(x => new { x.AttributeId, x.ValueBool })
+                .HasDatabaseName("ix_av_attr_bool").HasFilter("value_bool IS NOT NULL");
+            e.HasIndex(x => new { x.AttributeId, x.ValueDatetime })
+                .HasDatabaseName("ix_av_attr_datetime").HasFilter("value_datetime IS NOT NULL");
+            e.HasIndex(x => new { x.AttributeId, x.ValueDateOnly })
+                .HasDatabaseName("ix_av_attr_dateonly").HasFilter("value_dateonly IS NOT NULL");
+            e.HasIndex(x => new { x.AttributeId, x.ValueTime })
+                .HasDatabaseName("ix_av_attr_time").HasFilter("value_time IS NOT NULL");
+
+            e.HasIndex(x => x.ValueJsonb)
+                .HasDatabaseName("ix_av_jsonb").HasMethod("GIN")
+                .HasFilter("value_jsonb IS NOT NULL");
+            e.HasIndex(x => x.ValueFileMeta)
+                .HasDatabaseName("ix_av_file_meta").HasMethod("GIN")
+                .HasFilter("value_file_meta IS NOT NULL");
+
+            e.HasOne(x => x.Attribute).WithMany()
+                .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Unit).WithMany()
+                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureCompositeTypes(ModelBuilder mb)
+    {
+        mb.Entity<CompositeTypeDefinition>(e =>
+        {
+            e.ToTable("composite_type_definitions");
+            e.HasKey(x => x.CompositeTypeId);
+            e.Property(x => x.CompositeTypeId)
+                .HasColumnName("composite_type_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Version).HasColumnName("version");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasIndex(x => new { x.EntityType, x.TypeName, x.Version })
+                .IsUnique().HasDatabaseName("uq_composite_type");
+        });
+
+        mb.Entity<CompositeFieldDefinition>(e =>
+        {
+            // CHECK：decimal 才能绑单位；single_choice 才能绑选项集
+            e.ToTable("composite_field_definitions", t =>
+            {
+                t.HasCheckConstraint(
+                    "ck_composite_field_decimal_unit",
+                    "data_type = 'decimal' OR unit_id IS NULL");
+
+                // ★ #8：single_choice 才能绑选项集
+                t.HasCheckConstraint(
+                    "ck_composite_field_single_choice_optionset",
+                    "data_type = 'single_choice' OR ref_option_set_id IS NULL");
+            });
+
+            e.HasKey(x => x.FieldId);
+            e.Property(x => x.FieldId)
+                .HasColumnName("field_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.CompositeTypeId).HasColumnName("composite_type_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.FieldName).HasColumnName("field_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
+            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
+
+            // ★ #4：单位外键列
+            e.Property(x => x.UnitId).HasColumnName("unit_id");
+            // ★ #8：选项集外键列
+            e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
+
+            e.Property(x => x.IsArray).HasColumnName("is_array");
+            e.Property(x => x.IsRequired).HasColumnName("is_required");
+            e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
+            e.Property(x => x.IsSortable).HasColumnName("is_sortable");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.DefaultValue).HasColumnName("default_value").HasMaxLength(500);
+            e.Property(x => x.ValidationRule).HasColumnName("validation_rule").HasColumnType("jsonb");
+            e.Property(x => x.AllowedValues).HasColumnName("allowed_values").HasColumnType("jsonb");
+
+            e.HasIndex(x => new { x.CompositeTypeId, x.FieldName })
+                .IsUnique().HasDatabaseName("uq_composite_field");
+
+            e.HasOne(x => x.CompositeType).WithMany(t => t.Fields)
+                .HasForeignKey(x => x.CompositeTypeId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.RefCompositeType).WithMany()
+                .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
+
+            // ★ #4：单位外键（Restrict）
+            e.HasOne(x => x.Unit).WithMany()
+                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
+
+            // ★ #8：选项集外键（Restrict）
+            e.HasOne(x => x.RefOptionSet).WithMany()
+                .HasForeignKey(x => x.RefOptionSetId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureOptionSets(ModelBuilder mb)
+    {
+        mb.Entity<OptionSet>(e =>
+        {
+            e.ToTable("option_sets");
+            e.HasKey(x => x.OptionSetId);
+            e.Property(x => x.OptionSetId)
+                .HasColumnName("option_set_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.SetName).HasColumnName("set_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");   // ★ 新增
+
+            // ★ 改为 partial unique index：软删的集合不占用 SetName
+            e.HasIndex(x => new { x.EntityType, x.SetName })
+                .IsUnique()
+                .HasDatabaseName("uq_option_set")
+                .HasFilter("is_deleted = false");
+        });
+
+        mb.Entity<OptionItem>(e =>
+        {
+            e.ToTable("option_items");
+            e.HasKey(x => x.OptionItemId);
+            e.Property(x => x.OptionItemId)
+                .HasColumnName("option_item_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.OptionSetId).HasColumnName("option_set_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.Value).HasColumnName("value").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Label).HasColumnName("label").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.IsDefault).HasColumnName("is_default");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+
+            e.HasIndex(x => new { x.OptionSetId, x.Value })
+                .IsUnique().HasDatabaseName("uq_option_item_value");
+            e.HasIndex(x => x.OptionSetId).HasDatabaseName("ix_option_items_set");
+
+            e.HasOne(x => x.OptionSet).WithMany(s => s.Items)
+                .HasForeignKey(x => x.OptionSetId).OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureCustomTables(ModelBuilder mb)
+    {
+        mb.Entity<CustomTableDefinition>(e =>
+        {
+            e.ToTable("custom_table_definitions");
+            e.HasKey(x => x.TableDefinitionId);
+            e.Property(x => x.TableDefinitionId)
+                .HasColumnName("table_definition_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.TableName).HasColumnName("table_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Version).HasColumnName("version");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasIndex(x => new { x.EntityType, x.TableName, x.Version })
+                .IsUnique().HasDatabaseName("uq_custom_table");
+        });
+
+        mb.Entity<CustomTableColumn>(e =>
+        {
+            e.ToTable("custom_table_columns");
+            e.HasKey(x => x.ColumnId);
+            e.Property(x => x.ColumnId)
+                .HasColumnName("column_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.TableDefinitionId).HasColumnName("table_definition_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.ColumnName).HasColumnName("column_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
+            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
+            e.Property(x => x.IsRequired).HasColumnName("is_required");
+            e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
+            e.Property(x => x.IsSortable).HasColumnName("is_sortable");
+            e.Property(x => x.IsUnique).HasColumnName("is_unique");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.DefaultValue).HasColumnName("default_value").HasMaxLength(500);
+            e.Property(x => x.ValidationRule).HasColumnName("validation_rule").HasColumnType("jsonb");
+            e.Property(x => x.AllowedValues).HasColumnName("allowed_values").HasColumnType("jsonb");
+
+            e.HasIndex(x => new { x.TableDefinitionId, x.ColumnName })
+                .IsUnique().HasDatabaseName("uq_custom_table_column");
+
+            e.HasOne(x => x.Table).WithMany(t => t.Columns)
+                .HasForeignKey(x => x.TableDefinitionId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.RefCompositeType).WithMany()
+                .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        mb.Entity<CustomTableRow>(e =>
+        {
+            e.ToTable("custom_table_rows");
+            e.HasKey(x => x.RowId);
+            e.Property(x => x.RowId)
+                .HasColumnName("row_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.TableDefinitionId).HasColumnName("table_definition_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.ParentEntityId).HasColumnName("parent_entity_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.ParentEntityType).HasColumnName("parent_entity_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.RowData).HasColumnName("row_data").HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.RowOrder).HasColumnName("row_order");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasIndex(x => new { x.ParentEntityType, x.ParentEntityId, x.AttributeId })
+                .HasDatabaseName("ix_ctr_parent");
+            e.HasIndex(x => x.TableDefinitionId).HasDatabaseName("ix_ctr_table");
+            e.HasIndex(x => x.RowData).HasDatabaseName("ix_ctr_rowdata").HasMethod("GIN");
+            e.HasIndex(x => new { x.ParentEntityId, x.AttributeId, x.RowOrder })
+                .HasDatabaseName("ix_ctr_order");
+
+            e.HasOne(x => x.Attribute).WithMany()
+                .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Table).WithMany()
+                .HasForeignKey(x => x.TableDefinitionId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureAuditLog(ModelBuilder mb)
+    {
+        mb.Entity<AttributeAuditLog>(e =>
+        {
+            e.ToTable("attribute_audit_log");
+            e.HasKey(x => x.AuditId);
+            e.Property(x => x.AuditId)
+                .HasColumnName("audit_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.OldValue).HasColumnName("old_value");
+            e.Property(x => x.NewValue).HasColumnName("new_value");
+            e.Property(x => x.ChangeType).HasColumnName("change_type").HasMaxLength(20).IsRequired();
+            e.Property(x => x.ChangedBy).HasColumnName("changed_by").HasMaxLength(200).IsRequired();
+            e.Property(x => x.ChangedAt).HasColumnName("changed_at");
+            e.Property(x => x.CorrelationId).HasColumnName("correlation_id").HasMaxLength(100);
+            e.Property(x => x.ClientIp).HasColumnName("client_ip").HasMaxLength(50);
+
+            e.HasIndex(x => new { x.EntityType, x.EntityId, x.ChangedAt })
+                .HasDatabaseName("ix_audit_entity")
+                .IsDescending(false, false, true);
+            e.HasIndex(x => x.ChangedAt).HasDatabaseName("ix_audit_time");
+        });
+    }
+}
+```
+
+## 文件 3/56 TreeGraph.Api/Data/Migrations/20261003070415_Initial.cs
+
+```csharp
+using System;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace TreeGraph.Api.NodeEavSky.Data.Migrations
+{
+    /// <inheritdoc />
+    public partial class Initial : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.CreateTable(
+                name: "attribute_audit_log",
+                columns: table => new
+                {
+                    audit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    old_value = table.Column<string>(type: "text", nullable: true),
+                    new_value = table.Column<string>(type: "text", nullable: true),
+                    change_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    changed_by = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    changed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    correlation_id = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    client_ip = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_attribute_audit_log", x => x.audit_id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "composite_type_definitions",
+                columns: table => new
+                {
+                    composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    type_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    version = table.Column<int>(type: "integer", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_composite_type_definitions", x => x.composite_type_id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "custom_table_definitions",
+                columns: table => new
+                {
+                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    table_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    version = table.Column<int>(type: "integer", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_custom_table_definitions", x => x.table_definition_id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "entity_type_catalog",
+                columns: table => new
+                {
+                    entity_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_entity_type_catalog", x => x.entity_type_id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "inode_entity",
+                columns: table => new
+                {
+                    inode_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    attached_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_inode_entity", x => new { x.inode_id, x.entity_type });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "inode_entitytype",
+                columns: table => new
+                {
+                    inode_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    attached_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_inode_entitytype", x => new { x.inode_id, x.entity_type });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "option_sets",
+                columns: table => new
+                {
+                    option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    set_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_option_sets", x => x.option_set_id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "units",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    category = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    symbol = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    to_base_factor = table.Column<decimal>(type: "numeric(38,15)", precision: 38, scale: 15, nullable: false),
+                    is_base_unit = table.Column<bool>(type: "boolean", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_units", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "custom_table_columns",
+                columns: table => new
+                {
+                    column_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    column_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    is_required = table.Column<bool>(type: "boolean", nullable: false),
+                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_unique = table.Column<bool>(type: "boolean", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_custom_table_columns", x => x.column_id);
+                    table.ForeignKey(
+                        name: "FK_custom_table_columns_composite_type_definitions_ref_composi~",
+                        column: x => x.ref_composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_custom_table_columns_custom_table_definitions_table_definit~",
+                        column: x => x.table_definition_id,
+                        principalTable: "custom_table_definitions",
+                        principalColumn: "table_definition_id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "option_items",
+                columns: table => new
+                {
+                    option_item_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    value = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    label = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    is_default = table.Column<bool>(type: "boolean", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_option_items", x => x.option_item_id);
+                    table.ForeignKey(
+                        name: "FK_option_items_option_sets_option_set_id",
+                        column: x => x.option_set_id,
+                        principalTable: "option_sets",
+                        principalColumn: "option_set_id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "attribute_catalog",
+                columns: table => new
+                {
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    is_required = table.Column<bool>(type: "boolean", nullable: false),
+                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    version = table.Column<int>(type: "integer", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    ref_table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    unit_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_attribute_catalog", x => x.attribute_id);
+                    table.ForeignKey(
+                        name: "FK_attribute_catalog_composite_type_definitions_ref_composite_~",
+                        column: x => x.ref_composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_attribute_catalog_custom_table_definitions_ref_table_defini~",
+                        column: x => x.ref_table_definition_id,
+                        principalTable: "custom_table_definitions",
+                        principalColumn: "table_definition_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_attribute_catalog_option_sets_ref_option_set_id",
+                        column: x => x.ref_option_set_id,
+                        principalTable: "option_sets",
+                        principalColumn: "option_set_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_attribute_catalog_units_unit_id",
+                        column: x => x.unit_id,
+                        principalTable: "units",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "composite_field_definitions",
+                columns: table => new
+                {
+                    field_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    field_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    unit_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    is_array = table.Column<bool>(type: "boolean", nullable: false),
+                    is_required = table.Column<bool>(type: "boolean", nullable: false),
+                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
+                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_composite_field_definitions", x => x.field_id);
+                    table.CheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
+                    table.CheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_composite_type_definitions_comp~",
+                        column: x => x.composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_composite_type_definitions_ref_~",
+                        column: x => x.ref_composite_type_id,
+                        principalTable: "composite_type_definitions",
+                        principalColumn: "composite_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_option_sets_ref_option_set_id",
+                        column: x => x.ref_option_set_id,
+                        principalTable: "option_sets",
+                        principalColumn: "option_set_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_composite_field_definitions_units_unit_id",
+                        column: x => x.unit_id,
+                        principalTable: "units",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "attribute_values",
+                columns: table => new
+                {
+                    value_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    value_string = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    value_int = table.Column<long>(type: "bigint", nullable: true),
+                    value_decimal = table.Column<decimal>(type: "numeric(38,15)", precision: 38, scale: 15, nullable: true),
+                    value_bool = table.Column<bool>(type: "boolean", nullable: true),
+                    value_datetime = table.Column<DateTimeOffset>(type: "timestamptz", nullable: true),
+                    value_dateonly = table.Column<DateOnly>(type: "date", nullable: true),
+                    value_time = table.Column<TimeOnly>(type: "time(0) without time zone", nullable: true),
+                    value_file_meta = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    value_jsonb = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    unit_id = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_attribute_values", x => x.value_id);
+                    table.ForeignKey(
+                        name: "FK_attribute_values_attribute_catalog_attribute_id",
+                        column: x => x.attribute_id,
+                        principalTable: "attribute_catalog",
+                        principalColumn: "attribute_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_attribute_values_units_unit_id",
+                        column: x => x.unit_id,
+                        principalTable: "units",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "custom_table_rows",
+                columns: table => new
+                {
+                    row_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    parent_entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    parent_entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    row_data = table.Column<JsonDocument>(type: "jsonb", nullable: false),
+                    row_order = table.Column<int>(type: "integer", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_custom_table_rows", x => x.row_id);
+                    table.ForeignKey(
+                        name: "FK_custom_table_rows_attribute_catalog_attribute_id",
+                        column: x => x.attribute_id,
+                        principalTable: "attribute_catalog",
+                        principalColumn: "attribute_id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_custom_table_rows_custom_table_definitions_table_definition~",
+                        column: x => x.table_definition_id,
+                        principalTable: "custom_table_definitions",
+                        principalColumn: "table_definition_id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_audit_entity",
+                table: "attribute_audit_log",
+                columns: new[] { "entity_type", "entity_id", "changed_at" },
+                descending: new[] { false, false, true });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_audit_time",
+                table: "attribute_audit_log",
+                column: "changed_at");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_attr_catalog_entity",
+                table: "attribute_catalog",
+                column: "entity_type",
+                filter: "is_deleted = false");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_attribute_catalog_ref_composite_type_id",
+                table: "attribute_catalog",
+                column: "ref_composite_type_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_attribute_catalog_ref_option_set_id",
+                table: "attribute_catalog",
+                column: "ref_option_set_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_attribute_catalog_ref_table_definition_id",
+                table: "attribute_catalog",
+                column: "ref_table_definition_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_attribute_catalog_unit_id",
+                table: "attribute_catalog",
+                column: "unit_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_attr_catalog",
+                table: "attribute_catalog",
+                columns: new[] { "entity_type", "attribute_name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_attribute_values_unit_id",
+                table: "attribute_values",
+                column: "unit_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_attr_bool",
+                table: "attribute_values",
+                columns: new[] { "attribute_id", "value_bool" },
+                filter: "value_bool IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_attr_dateonly",
+                table: "attribute_values",
+                columns: new[] { "attribute_id", "value_dateonly" },
+                filter: "value_dateonly IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_attr_datetime",
+                table: "attribute_values",
+                columns: new[] { "attribute_id", "value_datetime" },
+                filter: "value_datetime IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_attr_decimal",
+                table: "attribute_values",
+                columns: new[] { "attribute_id", "value_decimal" },
+                filter: "value_decimal IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_attr_int",
+                table: "attribute_values",
+                columns: new[] { "attribute_id", "value_int" },
+                filter: "value_int IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_attr_string",
+                table: "attribute_values",
+                columns: new[] { "attribute_id", "value_string" },
+                filter: "value_string IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_attr_time",
+                table: "attribute_values",
+                columns: new[] { "attribute_id", "value_time" },
+                filter: "value_time IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_entity",
+                table: "attribute_values",
+                columns: new[] { "entity_type", "entity_id" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_entity_updated",
+                table: "attribute_values",
+                columns: new[] { "entity_type", "entity_id", "updated_at" },
+                descending: new[] { false, false, true });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_file_meta",
+                table: "attribute_values",
+                column: "value_file_meta",
+                filter: "value_file_meta IS NOT NULL")
+                .Annotation("Npgsql:IndexMethod", "GIN");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_av_jsonb",
+                table: "attribute_values",
+                column: "value_jsonb",
+                filter: "value_jsonb IS NOT NULL")
+                .Annotation("Npgsql:IndexMethod", "GIN");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_av_entity_attr",
+                table: "attribute_values",
+                columns: new[] { "entity_id", "entity_type", "attribute_id" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_composite_field_definitions_ref_composite_type_id",
+                table: "composite_field_definitions",
+                column: "ref_composite_type_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_composite_field_definitions_ref_option_set_id",
+                table: "composite_field_definitions",
+                column: "ref_option_set_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_composite_field_definitions_unit_id",
+                table: "composite_field_definitions",
+                column: "unit_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_composite_field",
+                table: "composite_field_definitions",
+                columns: new[] { "composite_type_id", "field_name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "uq_composite_type",
+                table: "composite_type_definitions",
+                columns: new[] { "entity_type", "type_name", "version" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_custom_table_columns_ref_composite_type_id",
+                table: "custom_table_columns",
+                column: "ref_composite_type_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_custom_table_column",
+                table: "custom_table_columns",
+                columns: new[] { "table_definition_id", "column_name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "uq_custom_table",
+                table: "custom_table_definitions",
+                columns: new[] { "entity_type", "table_name", "version" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_ctr_order",
+                table: "custom_table_rows",
+                columns: new[] { "parent_entity_id", "attribute_id", "row_order" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_ctr_parent",
+                table: "custom_table_rows",
+                columns: new[] { "parent_entity_type", "parent_entity_id", "attribute_id" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_ctr_rowdata",
+                table: "custom_table_rows",
+                column: "row_data")
+                .Annotation("Npgsql:IndexMethod", "GIN");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_ctr_table",
+                table: "custom_table_rows",
+                column: "table_definition_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_custom_table_rows_attribute_id",
+                table: "custom_table_rows",
+                column: "attribute_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_entity_type",
+                table: "entity_type_catalog",
+                column: "entity_type",
+                unique: true,
+                filter: "is_deleted = false");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_inode_entity_entity",
+                table: "inode_entity",
+                column: "entity_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_inode_entity_inode",
+                table: "inode_entity",
+                column: "inode_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_inode_entity_global",
+                table: "inode_entity",
+                columns: new[] { "entity_type", "entity_id" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_inode_et_inode",
+                table: "inode_entitytype",
+                column: "inode_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_inode_et_type",
+                table: "inode_entitytype",
+                column: "entity_type");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_option_items_set",
+                table: "option_items",
+                column: "option_set_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_option_item_value",
+                table: "option_items",
+                columns: new[] { "option_set_id", "value" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "uq_option_set",
+                table: "option_sets",
+                columns: new[] { "entity_type", "set_name" },
+                unique: true,
+                filter: "is_deleted = false");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_unit_category_base",
+                table: "units",
+                column: "category",
+                unique: true,
+                filter: "is_base_unit = true");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_unit_category_name",
+                table: "units",
+                columns: new[] { "category", "name" },
+                unique: true);
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "attribute_audit_log");
+
+            migrationBuilder.DropTable(
+                name: "attribute_values");
+
+            migrationBuilder.DropTable(
+                name: "composite_field_definitions");
+
+            migrationBuilder.DropTable(
+                name: "custom_table_columns");
+
+            migrationBuilder.DropTable(
+                name: "custom_table_rows");
+
+            migrationBuilder.DropTable(
+                name: "entity_type_catalog");
+
+            migrationBuilder.DropTable(
+                name: "inode_entity");
+
+            migrationBuilder.DropTable(
+                name: "inode_entitytype");
+
+            migrationBuilder.DropTable(
+                name: "option_items");
+
+            migrationBuilder.DropTable(
+                name: "attribute_catalog");
+
+            migrationBuilder.DropTable(
+                name: "composite_type_definitions");
+
+            migrationBuilder.DropTable(
+                name: "custom_table_definitions");
+
+            migrationBuilder.DropTable(
+                name: "option_sets");
+
+            migrationBuilder.DropTable(
+                name: "units");
+        }
+    }
+}
+```
+
+## 文件 4/56 TreeGraph.Api/Data/Migrations/20261003070415_Initial.Designer.cs
+
+```csharp
+// <auto-generated />
+using System;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using TreeGraph.Api.NodeEavSky.Data;
+
+#nullable disable
+
+namespace TreeGraph.Api.NodeEavSky.Data.Migrations
+{
+    [DbContext(typeof(EavDbContext))]
+    [Migration("20261003070415_Initial")]
+    partial class Initial
+    {
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeAuditLog", b =>
+                {
+                    b.Property<string>("AuditId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("audit_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<string>("AttributeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("attribute_name");
+
+                    b.Property<string>("ChangeType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("change_type");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("changed_by");
+
+                    b.Property<string>("ClientIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("client_ip");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("text")
+                        .HasColumnName("new_value");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("text")
+                        .HasColumnName("old_value");
+
+                    b.HasKey("AuditId");
+
+                    b.HasIndex("ChangedAt")
+                        .HasDatabaseName("ix_audit_time");
+
+                    b.HasIndex("EntityType", "EntityId", "ChangedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_audit_entity");
+
+                    b.ToTable("attribute_audit_log", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
+                {
+                    b.Property<string>("AttributeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<JsonDocument>("AllowedValues")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_values");
+
+                    b.Property<string>("AttributeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("attribute_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsSearchable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_searchable");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sortable");
+
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_composite_type_id");
+
+                    b.Property<string>("RefOptionSetId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_option_set_id");
+
+                    b.Property<string>("RefTableDefinitionId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_table_definition_id");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<JsonDocument>("ValidationRule")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_rule");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("AttributeId");
+
+                    b.HasIndex("EntityType")
+                        .HasDatabaseName("ix_attr_catalog_entity")
+                        .HasFilter("is_deleted = false");
+
+                    b.HasIndex("RefCompositeTypeId");
+
+                    b.HasIndex("RefOptionSetId");
+
+                    b.HasIndex("RefTableDefinitionId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("EntityType", "AttributeName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attr_catalog");
+
+                    b.ToTable("attribute_catalog", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
+                {
+                    b.Property<string>("ValueId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("value_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<bool?>("ValueBool")
+                        .HasColumnType("boolean")
+                        .HasColumnName("value_bool");
+
+                    b.Property<DateOnly?>("ValueDateOnly")
+                        .HasColumnType("date")
+                        .HasColumnName("value_dateonly");
+
+                    b.Property<DateTimeOffset?>("ValueDatetime")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("value_datetime");
+
+                    b.Property<decimal?>("ValueDecimal")
+                        .HasPrecision(38, 15)
+                        .HasColumnType("numeric(38,15)")
+                        .HasColumnName("value_decimal");
+
+                    b.Property<JsonDocument>("ValueFileMeta")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("value_file_meta");
+
+                    b.Property<long?>("ValueInt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value_int");
+
+                    b.Property<JsonDocument>("ValueJsonb")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("value_jsonb");
+
+                    b.Property<string>("ValueString")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("value_string");
+
+                    b.Property<TimeOnly?>("ValueTime")
+                        .HasColumnType("time(0)")
+                        .HasColumnName("value_time");
+
+                    b.HasKey("ValueId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("ValueFileMeta")
+                        .HasDatabaseName("ix_av_file_meta")
+                        .HasFilter("value_file_meta IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueFileMeta"), "GIN");
+
+                    b.HasIndex("ValueJsonb")
+                        .HasDatabaseName("ix_av_jsonb")
+                        .HasFilter("value_jsonb IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueJsonb"), "GIN");
+
+                    b.HasIndex("AttributeId", "ValueBool")
+                        .HasDatabaseName("ix_av_attr_bool")
+                        .HasFilter("value_bool IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueDateOnly")
+                        .HasDatabaseName("ix_av_attr_dateonly")
+                        .HasFilter("value_dateonly IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueDatetime")
+                        .HasDatabaseName("ix_av_attr_datetime")
+                        .HasFilter("value_datetime IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueDecimal")
+                        .HasDatabaseName("ix_av_attr_decimal")
+                        .HasFilter("value_decimal IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueInt")
+                        .HasDatabaseName("ix_av_attr_int")
+                        .HasFilter("value_int IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueString")
+                        .HasDatabaseName("ix_av_attr_string")
+                        .HasFilter("value_string IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueTime")
+                        .HasDatabaseName("ix_av_attr_time")
+                        .HasFilter("value_time IS NOT NULL");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .HasDatabaseName("ix_av_entity");
+
+                    b.HasIndex("EntityId", "EntityType", "AttributeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_av_entity_attr");
+
+                    b.HasIndex("EntityType", "EntityId", "UpdatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_av_entity_updated");
+
+                    b.ToTable("attribute_values", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
+                {
+                    b.Property<string>("FieldId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("field_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<JsonDocument>("AllowedValues")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_values");
+
+                    b.Property<string>("CompositeTypeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("composite_type_id");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("FieldName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("field_name");
+
+                    b.Property<bool>("IsArray")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_array");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsSearchable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_searchable");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sortable");
+
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_composite_type_id");
+
+                    b.Property<string>("RefOptionSetId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_option_set_id");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
+                    b.Property<JsonDocument>("ValidationRule")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_rule");
+
+                    b.HasKey("FieldId");
+
+                    b.HasIndex("RefCompositeTypeId");
+
+                    b.HasIndex("RefOptionSetId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("CompositeTypeId", "FieldName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_composite_field");
+
+                    b.ToTable("composite_field_definitions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
+
+                            t.HasCheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
+                        });
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>
+                {
+                    b.Property<string>("CompositeTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("composite_type_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("TypeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("type_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("CompositeTypeId");
+
+                    b.HasIndex("EntityType", "TypeName", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("uq_composite_type");
+
+                    b.ToTable("composite_type_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
+                {
+                    b.Property<string>("ColumnId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("column_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<JsonDocument>("AllowedValues")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_values");
+
+                    b.Property<string>("ColumnName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("column_name");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsSearchable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_searchable");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sortable");
+
+                    b.Property<bool>("IsUnique")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_unique");
+
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_composite_type_id");
+
+                    b.Property<string>("TableDefinitionId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id");
+
+                    b.Property<JsonDocument>("ValidationRule")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_rule");
+
+                    b.HasKey("ColumnId");
+
+                    b.HasIndex("RefCompositeTypeId");
+
+                    b.HasIndex("TableDefinitionId", "ColumnName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_custom_table_column");
+
+                    b.ToTable("custom_table_columns", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
+                {
+                    b.Property<string>("TableDefinitionId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("table_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("TableDefinitionId");
+
+                    b.HasIndex("EntityType", "TableName", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("uq_custom_table");
+
+                    b.ToTable("custom_table_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
+                {
+                    b.Property<string>("RowId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("row_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ParentEntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("parent_entity_id");
+
+                    b.Property<string>("ParentEntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("parent_entity_type");
+
+                    b.Property<JsonDocument>("RowData")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("row_data");
+
+                    b.Property<int>("RowOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_order");
+
+                    b.Property<string>("TableDefinitionId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("RowId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.HasIndex("RowData")
+                        .HasDatabaseName("ix_ctr_rowdata");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("RowData"), "GIN");
+
+                    b.HasIndex("TableDefinitionId")
+                        .HasDatabaseName("ix_ctr_table");
+
+                    b.HasIndex("ParentEntityId", "AttributeId", "RowOrder")
+                        .HasDatabaseName("ix_ctr_order");
+
+                    b.HasIndex("ParentEntityType", "ParentEntityId", "AttributeId")
+                        .HasDatabaseName("ix_ctr_parent");
+
+                    b.ToTable("custom_table_rows", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EntityTypeDefinition", b =>
+                {
+                    b.Property<string>("EntityTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_type_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("EntityTypeId");
+
+                    b.HasIndex("EntityType")
+                        .IsUnique()
+                        .HasDatabaseName("uq_entity_type")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("entity_type_catalog", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", b =>
+                {
+                    b.Property<string>("InodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("inode_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("AttachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attached_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.HasKey("InodeId", "EntityType");
+
+                    b.HasIndex("EntityId")
+                        .HasDatabaseName("ix_inode_entity_entity");
+
+                    b.HasIndex("InodeId")
+                        .HasDatabaseName("ix_inode_entity_inode");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_inode_entity_global");
+
+                    b.ToTable("inode_entity", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntityType", b =>
+                {
+                    b.Property<string>("InodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("inode_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("AttachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attached_at");
+
+                    b.HasKey("InodeId", "EntityType");
+
+                    b.HasIndex("EntityType")
+                        .HasDatabaseName("ix_inode_et_type");
+
+                    b.HasIndex("InodeId")
+                        .HasDatabaseName("ix_inode_et_inode");
+
+                    b.ToTable("inode_entitytype", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>
+                {
+                    b.Property<string>("OptionItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_item_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("label");
+
+                    b.Property<string>("OptionSetId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("value");
+
+                    b.HasKey("OptionItemId");
+
+                    b.HasIndex("OptionSetId")
+                        .HasDatabaseName("ix_option_items_set");
+
+                    b.HasIndex("OptionSetId", "Value")
+                        .IsUnique()
+                        .HasDatabaseName("uq_option_item_value");
+
+                    b.ToTable("option_items", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>
+                {
+                    b.Property<string>("OptionSetId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_set_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("SetName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("set_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("OptionSetId");
+
+                    b.HasIndex("EntityType", "SetName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_option_set")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("option_sets", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.Unit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsBaseUnit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_base_unit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("symbol");
+
+                    b.Property<decimal>("ToBaseFactor")
+                        .HasPrecision(38, 15)
+                        .HasColumnType("numeric(38,15)")
+                        .HasColumnName("to_base_factor");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category")
+                        .IsUnique()
+                        .HasDatabaseName("uq_unit_category_base")
+                        .HasFilter("is_base_unit = true");
+
+                    b.HasIndex("Category", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("uq_unit_category_name");
+
+                    b.ToTable("units", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                        .WithMany()
+                        .HasForeignKey("RefCompositeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "RefOptionSet")
+                        .WithMany()
+                        .HasForeignKey("RefOptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "RefTableDefinition")
+                        .WithMany()
+                        .HasForeignKey("RefTableDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("RefCompositeType");
+
+                    b.Navigation("RefOptionSet");
+
+                    b.Navigation("RefTableDefinition");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                        .WithMany()
+                        .HasForeignKey("AttributeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Attribute");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "CompositeType")
+                        .WithMany("Fields")
+                        .HasForeignKey("CompositeTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                        .WithMany()
+                        .HasForeignKey("RefCompositeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "RefOptionSet")
+                        .WithMany()
+                        .HasForeignKey("RefOptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CompositeType");
+
+                    b.Navigation("RefCompositeType");
+
+                    b.Navigation("RefOptionSet");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                        .WithMany()
+                        .HasForeignKey("RefCompositeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
+                        .WithMany("Columns")
+                        .HasForeignKey("TableDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RefCompositeType");
+
+                    b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                        .WithMany()
+                        .HasForeignKey("AttributeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
+                        .WithMany()
+                        .HasForeignKey("TableDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Attribute");
+
+                    b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "OptionSet")
+                        .WithMany("Items")
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>
+                {
+                    b.Navigation("Fields");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
+                {
+                    b.Navigation("Columns");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>
+                {
+                    b.Navigation("Items");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+```
+
+## 文件 5/56 TreeGraph.Api/Data/Migrations/20261003230729_AddStringTreeNodes.cs
+
+```csharp
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace TreeGraph.Api.NodeEavSky.Data.Migrations
+{
+    /// <inheritdoc />
+    public partial class AddStringTreeNodes : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.CreateTable(
+                name: "string_tree_nodes",
+                columns: table => new
+                {
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    name = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    can_have_children = table.Column<bool>(type: "boolean", nullable: false),
+                    sort_order = table.Column<int>(type: "integer", nullable: false),
+                    parent_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_string_tree_nodes", x => x.id);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_string_tree_nodes_parent_id",
+                table: "string_tree_nodes",
+                column: "parent_id");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "string_tree_nodes");
+        }
+    }
+}
+```
+
+## 文件 6/56 TreeGraph.Api/Data/Migrations/20261003230729_AddStringTreeNodes.Designer.cs
+
+```csharp
+// <auto-generated />
+using System;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using TreeGraph.Api.NodeEavSky.Data;
+
+#nullable disable
+
+namespace TreeGraph.Api.NodeEavSky.Data.Migrations
+{
+    [DbContext(typeof(EavDbContext))]
+    [Migration("20261003230729_AddStringTreeNodes")]
+    partial class AddStringTreeNodes
+    {
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeAuditLog", b =>
+                {
+                    b.Property<string>("AuditId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("audit_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<string>("AttributeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("attribute_name");
+
+                    b.Property<string>("ChangeType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("change_type");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("changed_by");
+
+                    b.Property<string>("ClientIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("client_ip");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("text")
+                        .HasColumnName("new_value");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("text")
+                        .HasColumnName("old_value");
+
+                    b.HasKey("AuditId");
+
+                    b.HasIndex("ChangedAt")
+                        .HasDatabaseName("ix_audit_time");
+
+                    b.HasIndex("EntityType", "EntityId", "ChangedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_audit_entity");
+
+                    b.ToTable("attribute_audit_log", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
+                {
+                    b.Property<string>("AttributeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<JsonDocument>("AllowedValues")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_values");
+
+                    b.Property<string>("AttributeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("attribute_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsSearchable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_searchable");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sortable");
+
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_composite_type_id");
+
+                    b.Property<string>("RefOptionSetId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_option_set_id");
+
+                    b.Property<string>("RefTableDefinitionId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_table_definition_id");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<JsonDocument>("ValidationRule")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_rule");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("AttributeId");
+
+                    b.HasIndex("EntityType")
+                        .HasDatabaseName("ix_attr_catalog_entity")
+                        .HasFilter("is_deleted = false");
+
+                    b.HasIndex("RefCompositeTypeId");
+
+                    b.HasIndex("RefOptionSetId");
+
+                    b.HasIndex("RefTableDefinitionId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("EntityType", "AttributeName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attr_catalog");
+
+                    b.ToTable("attribute_catalog", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
+                {
+                    b.Property<string>("ValueId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("value_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<bool?>("ValueBool")
+                        .HasColumnType("boolean")
+                        .HasColumnName("value_bool");
+
+                    b.Property<DateOnly?>("ValueDateOnly")
+                        .HasColumnType("date")
+                        .HasColumnName("value_dateonly");
+
+                    b.Property<DateTimeOffset?>("ValueDatetime")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("value_datetime");
+
+                    b.Property<decimal?>("ValueDecimal")
+                        .HasPrecision(38, 15)
+                        .HasColumnType("numeric(38,15)")
+                        .HasColumnName("value_decimal");
+
+                    b.Property<JsonDocument>("ValueFileMeta")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("value_file_meta");
+
+                    b.Property<long?>("ValueInt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value_int");
+
+                    b.Property<JsonDocument>("ValueJsonb")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("value_jsonb");
+
+                    b.Property<string>("ValueString")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("value_string");
+
+                    b.Property<TimeOnly?>("ValueTime")
+                        .HasColumnType("time(0)")
+                        .HasColumnName("value_time");
+
+                    b.HasKey("ValueId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("ValueFileMeta")
+                        .HasDatabaseName("ix_av_file_meta")
+                        .HasFilter("value_file_meta IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueFileMeta"), "GIN");
+
+                    b.HasIndex("ValueJsonb")
+                        .HasDatabaseName("ix_av_jsonb")
+                        .HasFilter("value_jsonb IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueJsonb"), "GIN");
+
+                    b.HasIndex("AttributeId", "ValueBool")
+                        .HasDatabaseName("ix_av_attr_bool")
+                        .HasFilter("value_bool IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueDateOnly")
+                        .HasDatabaseName("ix_av_attr_dateonly")
+                        .HasFilter("value_dateonly IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueDatetime")
+                        .HasDatabaseName("ix_av_attr_datetime")
+                        .HasFilter("value_datetime IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueDecimal")
+                        .HasDatabaseName("ix_av_attr_decimal")
+                        .HasFilter("value_decimal IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueInt")
+                        .HasDatabaseName("ix_av_attr_int")
+                        .HasFilter("value_int IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueString")
+                        .HasDatabaseName("ix_av_attr_string")
+                        .HasFilter("value_string IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueTime")
+                        .HasDatabaseName("ix_av_attr_time")
+                        .HasFilter("value_time IS NOT NULL");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .HasDatabaseName("ix_av_entity");
+
+                    b.HasIndex("EntityId", "EntityType", "AttributeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_av_entity_attr");
+
+                    b.HasIndex("EntityType", "EntityId", "UpdatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_av_entity_updated");
+
+                    b.ToTable("attribute_values", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
+                {
+                    b.Property<string>("FieldId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("field_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<JsonDocument>("AllowedValues")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_values");
+
+                    b.Property<string>("CompositeTypeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("composite_type_id");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("FieldName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("field_name");
+
+                    b.Property<bool>("IsArray")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_array");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsSearchable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_searchable");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sortable");
+
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_composite_type_id");
+
+                    b.Property<string>("RefOptionSetId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_option_set_id");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
+                    b.Property<JsonDocument>("ValidationRule")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_rule");
+
+                    b.HasKey("FieldId");
+
+                    b.HasIndex("RefCompositeTypeId");
+
+                    b.HasIndex("RefOptionSetId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("CompositeTypeId", "FieldName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_composite_field");
+
+                    b.ToTable("composite_field_definitions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
+
+                            t.HasCheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
+                        });
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>
+                {
+                    b.Property<string>("CompositeTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("composite_type_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("TypeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("type_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("CompositeTypeId");
+
+                    b.HasIndex("EntityType", "TypeName", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("uq_composite_type");
+
+                    b.ToTable("composite_type_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
+                {
+                    b.Property<string>("ColumnId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("column_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<JsonDocument>("AllowedValues")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_values");
+
+                    b.Property<string>("ColumnName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("column_name");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsSearchable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_searchable");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sortable");
+
+                    b.Property<bool>("IsUnique")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_unique");
+
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_composite_type_id");
+
+                    b.Property<string>("TableDefinitionId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id");
+
+                    b.Property<JsonDocument>("ValidationRule")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_rule");
+
+                    b.HasKey("ColumnId");
+
+                    b.HasIndex("RefCompositeTypeId");
+
+                    b.HasIndex("TableDefinitionId", "ColumnName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_custom_table_column");
+
+                    b.ToTable("custom_table_columns", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
+                {
+                    b.Property<string>("TableDefinitionId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("table_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("TableDefinitionId");
+
+                    b.HasIndex("EntityType", "TableName", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("uq_custom_table");
+
+                    b.ToTable("custom_table_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
+                {
+                    b.Property<string>("RowId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("row_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ParentEntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("parent_entity_id");
+
+                    b.Property<string>("ParentEntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("parent_entity_type");
+
+                    b.Property<JsonDocument>("RowData")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("row_data");
+
+                    b.Property<int>("RowOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_order");
+
+                    b.Property<string>("TableDefinitionId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("RowId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.HasIndex("RowData")
+                        .HasDatabaseName("ix_ctr_rowdata");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("RowData"), "GIN");
+
+                    b.HasIndex("TableDefinitionId")
+                        .HasDatabaseName("ix_ctr_table");
+
+                    b.HasIndex("ParentEntityId", "AttributeId", "RowOrder")
+                        .HasDatabaseName("ix_ctr_order");
+
+                    b.HasIndex("ParentEntityType", "ParentEntityId", "AttributeId")
+                        .HasDatabaseName("ix_ctr_parent");
+
+                    b.ToTable("custom_table_rows", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EntityTypeDefinition", b =>
+                {
+                    b.Property<string>("EntityTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_type_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("EntityTypeId");
+
+                    b.HasIndex("EntityType")
+                        .IsUnique()
+                        .HasDatabaseName("uq_entity_type")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("entity_type_catalog", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", b =>
+                {
+                    b.Property<string>("InodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("inode_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("AttachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attached_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.HasKey("InodeId", "EntityType");
+
+                    b.HasIndex("EntityId")
+                        .HasDatabaseName("ix_inode_entity_entity");
+
+                    b.HasIndex("InodeId")
+                        .HasDatabaseName("ix_inode_entity_inode");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_inode_entity_global");
+
+                    b.ToTable("inode_entity", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntityType", b =>
+                {
+                    b.Property<string>("InodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("inode_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("AttachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attached_at");
+
+                    b.HasKey("InodeId", "EntityType");
+
+                    b.HasIndex("EntityType")
+                        .HasDatabaseName("ix_inode_et_type");
+
+                    b.HasIndex("InodeId")
+                        .HasDatabaseName("ix_inode_et_inode");
+
+                    b.ToTable("inode_entitytype", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>
+                {
+                    b.Property<string>("OptionItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_item_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("label");
+
+                    b.Property<string>("OptionSetId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("value");
+
+                    b.HasKey("OptionItemId");
+
+                    b.HasIndex("OptionSetId")
+                        .HasDatabaseName("ix_option_items_set");
+
+                    b.HasIndex("OptionSetId", "Value")
+                        .IsUnique()
+                        .HasDatabaseName("uq_option_item_value");
+
+                    b.ToTable("option_items", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>
+                {
+                    b.Property<string>("OptionSetId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_set_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("SetName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("set_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("OptionSetId");
+
+                    b.HasIndex("EntityType", "SetName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_option_set")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("option_sets", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.Unit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsBaseUnit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_base_unit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("symbol");
+
+                    b.Property<decimal>("ToBaseFactor")
+                        .HasPrecision(38, 15)
+                        .HasColumnType("numeric(38,15)")
+                        .HasColumnName("to_base_factor");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category")
+                        .IsUnique()
+                        .HasDatabaseName("uq_unit_category_base")
+                        .HasFilter("is_base_unit = true");
+
+                    b.HasIndex("Category", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("uq_unit_category_name");
+
+                    b.ToTable("units", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CanHaveChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_have_children");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParentId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("parent_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("ix_string_tree_nodes_parent_id");
+
+                    b.ToTable("string_tree_nodes", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                        .WithMany()
+                        .HasForeignKey("RefCompositeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "RefOptionSet")
+                        .WithMany()
+                        .HasForeignKey("RefOptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "RefTableDefinition")
+                        .WithMany()
+                        .HasForeignKey("RefTableDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("RefCompositeType");
+
+                    b.Navigation("RefOptionSet");
+
+                    b.Navigation("RefTableDefinition");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                        .WithMany()
+                        .HasForeignKey("AttributeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Attribute");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "CompositeType")
+                        .WithMany("Fields")
+                        .HasForeignKey("CompositeTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                        .WithMany()
+                        .HasForeignKey("RefCompositeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "RefOptionSet")
+                        .WithMany()
+                        .HasForeignKey("RefOptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CompositeType");
+
+                    b.Navigation("RefCompositeType");
+
+                    b.Navigation("RefOptionSet");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                        .WithMany()
+                        .HasForeignKey("RefCompositeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
+                        .WithMany("Columns")
+                        .HasForeignKey("TableDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RefCompositeType");
+
+                    b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                        .WithMany()
+                        .HasForeignKey("AttributeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
+                        .WithMany()
+                        .HasForeignKey("TableDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Attribute");
+
+                    b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "OptionSet")
+                        .WithMany("Items")
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>
+                {
+                    b.Navigation("Fields");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
+                {
+                    b.Navigation("Columns");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>
+                {
+                    b.Navigation("Items");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+```
+
+## 文件 7/56 TreeGraph.Api/Data/Migrations/EavDbContextModelSnapshot.cs
+
+```csharp
+// <auto-generated />
+using System;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using TreeGraph.Api.NodeEavSky.Data;
+
+#nullable disable
+
+namespace TreeGraph.Api.NodeEavSky.Data.Migrations
+{
+    [DbContext(typeof(EavDbContext))]
+    partial class EavDbContextModelSnapshot : ModelSnapshot
+    {
+        protected override void BuildModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeAuditLog", b =>
+                {
+                    b.Property<string>("AuditId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("audit_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<string>("AttributeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("attribute_name");
+
+                    b.Property<string>("ChangeType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("change_type");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("changed_by");
+
+                    b.Property<string>("ClientIp")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("client_ip");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("text")
+                        .HasColumnName("new_value");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("text")
+                        .HasColumnName("old_value");
+
+                    b.HasKey("AuditId");
+
+                    b.HasIndex("ChangedAt")
+                        .HasDatabaseName("ix_audit_time");
+
+                    b.HasIndex("EntityType", "EntityId", "ChangedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_audit_entity");
+
+                    b.ToTable("attribute_audit_log", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
+                {
+                    b.Property<string>("AttributeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<JsonDocument>("AllowedValues")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_values");
+
+                    b.Property<string>("AttributeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("attribute_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsSearchable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_searchable");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sortable");
+
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_composite_type_id");
+
+                    b.Property<string>("RefOptionSetId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_option_set_id");
+
+                    b.Property<string>("RefTableDefinitionId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_table_definition_id");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<JsonDocument>("ValidationRule")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_rule");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("AttributeId");
+
+                    b.HasIndex("EntityType")
+                        .HasDatabaseName("ix_attr_catalog_entity")
+                        .HasFilter("is_deleted = false");
+
+                    b.HasIndex("RefCompositeTypeId");
+
+                    b.HasIndex("RefOptionSetId");
+
+                    b.HasIndex("RefTableDefinitionId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("EntityType", "AttributeName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attr_catalog");
+
+                    b.ToTable("attribute_catalog", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
+                {
+                    b.Property<string>("ValueId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("value_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<bool?>("ValueBool")
+                        .HasColumnType("boolean")
+                        .HasColumnName("value_bool");
+
+                    b.Property<DateOnly?>("ValueDateOnly")
+                        .HasColumnType("date")
+                        .HasColumnName("value_dateonly");
+
+                    b.Property<DateTimeOffset?>("ValueDatetime")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("value_datetime");
+
+                    b.Property<decimal?>("ValueDecimal")
+                        .HasPrecision(38, 15)
+                        .HasColumnType("numeric(38,15)")
+                        .HasColumnName("value_decimal");
+
+                    b.Property<JsonDocument>("ValueFileMeta")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("value_file_meta");
+
+                    b.Property<long?>("ValueInt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value_int");
+
+                    b.Property<JsonDocument>("ValueJsonb")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("value_jsonb");
+
+                    b.Property<string>("ValueString")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("value_string");
+
+                    b.Property<TimeOnly?>("ValueTime")
+                        .HasColumnType("time(0)")
+                        .HasColumnName("value_time");
+
+                    b.HasKey("ValueId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("ValueFileMeta")
+                        .HasDatabaseName("ix_av_file_meta")
+                        .HasFilter("value_file_meta IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueFileMeta"), "GIN");
+
+                    b.HasIndex("ValueJsonb")
+                        .HasDatabaseName("ix_av_jsonb")
+                        .HasFilter("value_jsonb IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueJsonb"), "GIN");
+
+                    b.HasIndex("AttributeId", "ValueBool")
+                        .HasDatabaseName("ix_av_attr_bool")
+                        .HasFilter("value_bool IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueDateOnly")
+                        .HasDatabaseName("ix_av_attr_dateonly")
+                        .HasFilter("value_dateonly IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueDatetime")
+                        .HasDatabaseName("ix_av_attr_datetime")
+                        .HasFilter("value_datetime IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueDecimal")
+                        .HasDatabaseName("ix_av_attr_decimal")
+                        .HasFilter("value_decimal IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueInt")
+                        .HasDatabaseName("ix_av_attr_int")
+                        .HasFilter("value_int IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueString")
+                        .HasDatabaseName("ix_av_attr_string")
+                        .HasFilter("value_string IS NOT NULL");
+
+                    b.HasIndex("AttributeId", "ValueTime")
+                        .HasDatabaseName("ix_av_attr_time")
+                        .HasFilter("value_time IS NOT NULL");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .HasDatabaseName("ix_av_entity");
+
+                    b.HasIndex("EntityId", "EntityType", "AttributeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_av_entity_attr");
+
+                    b.HasIndex("EntityType", "EntityId", "UpdatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_av_entity_updated");
+
+                    b.ToTable("attribute_values", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
+                {
+                    b.Property<string>("FieldId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("field_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<JsonDocument>("AllowedValues")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_values");
+
+                    b.Property<string>("CompositeTypeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("composite_type_id");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("FieldName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("field_name");
+
+                    b.Property<bool>("IsArray")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_array");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsSearchable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_searchable");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sortable");
+
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_composite_type_id");
+
+                    b.Property<string>("RefOptionSetId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_option_set_id");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
+                    b.Property<JsonDocument>("ValidationRule")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_rule");
+
+                    b.HasKey("FieldId");
+
+                    b.HasIndex("RefCompositeTypeId");
+
+                    b.HasIndex("RefOptionSetId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("CompositeTypeId", "FieldName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_composite_field");
+
+                    b.ToTable("composite_field_definitions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
+
+                            t.HasCheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
+                        });
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>
+                {
+                    b.Property<string>("CompositeTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("composite_type_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("TypeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("type_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("CompositeTypeId");
+
+                    b.HasIndex("EntityType", "TypeName", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("uq_composite_type");
+
+                    b.ToTable("composite_type_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
+                {
+                    b.Property<string>("ColumnId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("column_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<JsonDocument>("AllowedValues")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_values");
+
+                    b.Property<string>("ColumnName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("column_name");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<string>("DefaultValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsSearchable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_searchable");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sortable");
+
+                    b.Property<bool>("IsUnique")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_unique");
+
+                    b.Property<string>("RefCompositeTypeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("ref_composite_type_id");
+
+                    b.Property<string>("TableDefinitionId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id");
+
+                    b.Property<JsonDocument>("ValidationRule")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_rule");
+
+                    b.HasKey("ColumnId");
+
+                    b.HasIndex("RefCompositeTypeId");
+
+                    b.HasIndex("TableDefinitionId", "ColumnName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_custom_table_column");
+
+                    b.ToTable("custom_table_columns", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
+                {
+                    b.Property<string>("TableDefinitionId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("table_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("TableDefinitionId");
+
+                    b.HasIndex("EntityType", "TableName", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("uq_custom_table");
+
+                    b.ToTable("custom_table_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
+                {
+                    b.Property<string>("RowId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("row_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ParentEntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("parent_entity_id");
+
+                    b.Property<string>("ParentEntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("parent_entity_type");
+
+                    b.Property<JsonDocument>("RowData")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("row_data");
+
+                    b.Property<int>("RowOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_order");
+
+                    b.Property<string>("TableDefinitionId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("table_definition_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("RowId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.HasIndex("RowData")
+                        .HasDatabaseName("ix_ctr_rowdata");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("RowData"), "GIN");
+
+                    b.HasIndex("TableDefinitionId")
+                        .HasDatabaseName("ix_ctr_table");
+
+                    b.HasIndex("ParentEntityId", "AttributeId", "RowOrder")
+                        .HasDatabaseName("ix_ctr_order");
+
+                    b.HasIndex("ParentEntityType", "ParentEntityId", "AttributeId")
+                        .HasDatabaseName("ix_ctr_parent");
+
+                    b.ToTable("custom_table_rows", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EntityTypeDefinition", b =>
+                {
+                    b.Property<string>("EntityTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_type_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("EntityTypeId");
+
+                    b.HasIndex("EntityType")
+                        .IsUnique()
+                        .HasDatabaseName("uq_entity_type")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("entity_type_catalog", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", b =>
+                {
+                    b.Property<string>("InodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("inode_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("AttachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attached_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.HasKey("InodeId", "EntityType");
+
+                    b.HasIndex("EntityId")
+                        .HasDatabaseName("ix_inode_entity_entity");
+
+                    b.HasIndex("InodeId")
+                        .HasDatabaseName("ix_inode_entity_inode");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_inode_entity_global");
+
+                    b.ToTable("inode_entity", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntityType", b =>
+                {
+                    b.Property<string>("InodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("inode_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<DateTimeOffset>("AttachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attached_at");
+
+                    b.HasKey("InodeId", "EntityType");
+
+                    b.HasIndex("EntityType")
+                        .HasDatabaseName("ix_inode_et_type");
+
+                    b.HasIndex("InodeId")
+                        .HasDatabaseName("ix_inode_et_inode");
+
+                    b.ToTable("inode_entitytype", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>
+                {
+                    b.Property<string>("OptionItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_item_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("label");
+
+                    b.Property<string>("OptionSetId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("value");
+
+                    b.HasKey("OptionItemId");
+
+                    b.HasIndex("OptionSetId")
+                        .HasDatabaseName("ix_option_items_set");
+
+                    b.HasIndex("OptionSetId", "Value")
+                        .IsUnique()
+                        .HasDatabaseName("uq_option_item_value");
+
+                    b.ToTable("option_items", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>
+                {
+                    b.Property<string>("OptionSetId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("option_set_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("SetName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("set_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("OptionSetId");
+
+                    b.HasIndex("EntityType", "SetName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_option_set")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("option_sets", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.Unit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsBaseUnit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_base_unit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("symbol");
+
+                    b.Property<decimal>("ToBaseFactor")
+                        .HasPrecision(38, 15)
+                        .HasColumnType("numeric(38,15)")
+                        .HasColumnName("to_base_factor");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category")
+                        .IsUnique()
+                        .HasDatabaseName("uq_unit_category_base")
+                        .HasFilter("is_base_unit = true");
+
+                    b.HasIndex("Category", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("uq_unit_category_name");
+
+                    b.ToTable("units", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Blazor.Shared.Trees.Models.StringTreeNode", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CanHaveChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_have_children");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParentId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("parent_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("ix_string_tree_nodes_parent_id");
+
+                    b.ToTable("string_tree_nodes", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                        .WithMany()
+                        .HasForeignKey("RefCompositeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "RefOptionSet")
+                        .WithMany()
+                        .HasForeignKey("RefOptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "RefTableDefinition")
+                        .WithMany()
+                        .HasForeignKey("RefTableDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("RefCompositeType");
+
+                    b.Navigation("RefOptionSet");
+
+                    b.Navigation("RefTableDefinition");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                        .WithMany()
+                        .HasForeignKey("AttributeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Attribute");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeFieldDefinition", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "CompositeType")
+                        .WithMany("Fields")
+                        .HasForeignKey("CompositeTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                        .WithMany()
+                        .HasForeignKey("RefCompositeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "RefOptionSet")
+                        .WithMany()
+                        .HasForeignKey("RefOptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CompositeType");
+
+                    b.Navigation("RefCompositeType");
+
+                    b.Navigation("RefOptionSet");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableColumn", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
+                        .WithMany()
+                        .HasForeignKey("RefCompositeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
+                        .WithMany("Columns")
+                        .HasForeignKey("TableDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RefCompositeType");
+
+                    b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                        .WithMany()
+                        .HasForeignKey("AttributeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
+                        .WithMany()
+                        .HasForeignKey("TableDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Attribute");
+
+                    b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "OptionSet")
+                        .WithMany("Items")
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>
+                {
+                    b.Navigation("Fields");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
+                {
+                    b.Navigation("Columns");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>
+                {
+                    b.Navigation("Items");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+```
+
+## 文件 8/56 TreeGraph.Api/Data/Seeding/EavSeeder.cs
+
+```csharp
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Shared.Eav;
+
+namespace TreeGraph.Api.NodeEavSky.Data.Seeding;
+
+/// <summary>
+/// 示例元数据种子：组合类型 Specs + Brand、Product 属性目录、
+/// 自定义表 certifications、选项集 gender / quality_grade。
+///
+/// 幂等保证：
+///   - 严格的多表存在性检查（不是只查 AttributeCatalog）
+///   - 整个 seed 包裹在事务中（含 execution strategy 重试兼容）
+///   - 失败时事务回滚，不会留下部分数据
+///
+/// 依赖：UnitSeedService 已先行写入单位（net_weight 需要按符号查 kg 的 Id）。
+/// </summary>
+public static class EavSeeder
+{
+    public static async Task SeedAsync(EavDbContext db, CancellationToken ct = default)
+    {
+        // 补 EntityTypeCatalog：即使旧数据已有 Product 属性，也能补齐类型记录
+        await EnsureEntityTypesAsync(db, ct);
+
+        // ── 严格的幂等检查：所有关键实体都存在才跳过 ──
+        if (await IsAlreadySeededAsync(db, ct))
+            return;
+
+        // ── Npgsql 重试策略兼容：用 ExecutionStrategy 包裹整个 seed ──
+        // （裸 BeginTransactionAsync 在 EnableRetryOnFailure 下会抛
+        //   "execution strategy does not support user-initiated transactions"）
+        var strategy = db.Database.CreateExecutionStrategy();
+
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                await SeedInternalAsync(db, ct);
+                await tx.CommitAsync(ct);
+            }
+            catch
+            {
+                await tx.RollbackAsync(ct);
+                throw;
+            }
+        });
+    }
+
+    /// <summary>补 EntityTypeCatalog：即使旧数据已有 Product 属性，也能补齐类型记录。</summary>
+    private static async Task EnsureEntityTypesAsync(EavDbContext db, CancellationToken ct)
+    {
+        if (await db.EntityTypes.AnyAsync(t => t.EntityType == "Product", ct))
+            return;
+
+        db.EntityTypes.Add(new EntityTypeDefinition
+        {
+            EntityType = "Product",
+            DisplayName = "商品",
+            Description = "示例：商品实体类型",
+            DisplayOrder = 1
+        });
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// 严格幂等检查：以下相关记录都存在才认为已 seed。
+    /// 注意：同一 DbContext 不支持并发查询，必须顺序执行（不能 Task.WhenAll）。
+    /// </summary>
+    private static async Task<bool> IsAlreadySeededAsync(
+        EavDbContext db, CancellationToken ct)
+    {
+        return await db.AttributeCatalog.AnyAsync(a => a.EntityType == "Product", ct)
+            && await db.CompositeTypes.AnyAsync(
+                t => t.EntityType == "Product" && t.TypeName == "Specs", ct)
+            && await db.CompositeTypes.AnyAsync(
+                t => t.EntityType == "Product" && t.TypeName == "Brand", ct)
+            && await db.CustomTables.AnyAsync(
+                t => t.EntityType == "Product" && t.TableName == "certifications", ct)
+            && await db.OptionSets.AnyAsync(
+                s => s.EntityType == "Shared" && s.SetName == "gender", ct)
+            && await db.OptionSets.AnyAsync(
+                s => s.EntityType == "Product" && s.SetName == "quality_grade", ct);
+    }
+
+    /// <summary>实际的 seed 逻辑（在事务中执行，中途 SaveChanges 不落库，Commit 才生效）</summary>
+    private static async Task SeedInternalAsync(EavDbContext db, CancellationToken ct)
+    {
+        // ============================================================
+        // 步骤 1：组合类型 Brand（先建，Specs 要引用它）
+        // ============================================================
+        var brand = new CompositeTypeDefinition
+        {
+            EntityType = "Product",
+            TypeName = "Brand",
+            DisplayName = "品牌",
+            Fields =
+            {
+                new CompositeFieldDefinition
+                {
+                    FieldName = "name", DisplayName = "品牌名",
+                    DataType = EavDataTypes.String, IsSearchable = true, DisplayOrder = 1
+                },
+                new CompositeFieldDefinition
+                {
+                    FieldName = "origin", DisplayName = "产地",
+                    DataType = EavDataTypes.String, DisplayOrder = 2
+                }
+            }
+        };
+        db.CompositeTypes.Add(brand);
+        await db.SaveChangesAsync(ct);
+        // 此时 brand.CompositeTypeId 已生成
+
+        // ============================================================
+        // 步骤 2：组合类型 Specs（直接引用 brand，消除两阶段回填）
+        // ============================================================
+        var specs = new CompositeTypeDefinition
+        {
+            EntityType = "Product",
+            TypeName = "Specs",
+            DisplayName = "规格参数",
+            Fields =
+            {
+                new CompositeFieldDefinition
+                {
+                    FieldName = "color", DisplayName = "颜色",
+                    DataType = EavDataTypes.String, IsSearchable = true, DisplayOrder = 1
+                },
+                new CompositeFieldDefinition
+                {
+                    FieldName = "weight", DisplayName = "重量(kg)",
+                    DataType = EavDataTypes.Decimal, DisplayOrder = 2
+                },
+                new CompositeFieldDefinition
+                {
+                    FieldName = "brand", DisplayName = "品牌信息",
+                    DataType = EavDataTypes.Composite,
+                    RefCompositeTypeId = brand.CompositeTypeId, // ← 直接引用
+                    IsSearchable = true, DisplayOrder = 3
+                }
+            }
+        };
+        db.CompositeTypes.Add(specs);
+        await db.SaveChangesAsync(ct);
+
+        // ============================================================
+        // 步骤 3：查 kg 单位（UnitSeedService 已先执行）
+        // ============================================================
+        var kgUnitId = await db.Units
+            .Where(u => u.Category == "weight" && u.Symbol == "kg")
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (kgUnitId == Guid.Empty)
+        {
+            throw new InvalidOperationException(
+                "kg 单位未找到。请确认 UnitSeedService 已在 EavSeeder 之前执行。");
+        }
+
+        // ============================================================
+        // 步骤 4：Product 属性目录（4 个基础属性 + 2 个引用属性）
+        // ============================================================
+        db.AttributeCatalog.AddRange(
+            new AttributeDefinition
+            {
+                EntityType = "Product",
+                AttributeName = "screen_size",
+                DisplayName = "屏幕尺寸",
+                DataType = EavDataTypes.Decimal,
+                IsRequired = true,
+                IsSearchable = true,
+                IsSortable = true,
+                DisplayOrder = 1,
+                ValidationRule = JsonDocument.Parse("""{"min": 0, "max": 200}""")
+            },
+            new AttributeDefinition
+            {
+                EntityType = "Product",
+                AttributeName = "release_date",
+                DisplayName = "发布日期",
+                DataType = EavDataTypes.Date,
+                IsSearchable = true,
+                DisplayOrder = 2
+            },
+            new AttributeDefinition
+            {
+                EntityType = "Product",
+                AttributeName = "net_weight",
+                DisplayName = "净重",
+                DataType = EavDataTypes.Decimal,
+                IsSearchable = true,
+                IsSortable = true,
+                DisplayOrder = 3,
+                UnitId = kgUnitId, // 基准单位：千克
+                ValidationRule = JsonDocument.Parse("""{"min": 0, "max": 10000}""")
+            },
+            new AttributeDefinition
+            {
+                EntityType = "Product",
+                AttributeName = "specs",
+                DisplayName = "规格参数",
+                DataType = EavDataTypes.Composite,
+                IsSearchable = true,
+                DisplayOrder = 4,
+                RefCompositeTypeId = specs.CompositeTypeId
+            });
+
+        // ============================================================
+        // 步骤 5：自定义表 certifications
+        // ============================================================
+        var certs = new CustomTableDefinition
+        {
+            EntityType = "Product",
+            TableName = "certifications",
+            DisplayName = "认证证书",
+            DisplayOrder = 1
+        };
+        certs.Columns.Add(new CustomTableColumn
+        {
+            ColumnName = "cert_name", DisplayName = "证书名称",
+            DataType = EavDataTypes.String,
+            IsRequired = true, IsSearchable = true, IsUnique = true, DisplayOrder = 1
+        });
+        certs.Columns.Add(new CustomTableColumn
+        {
+            ColumnName = "issuer", DisplayName = "颁发机构",
+            DataType = EavDataTypes.String, IsSearchable = true, DisplayOrder = 2
+        });
+        certs.Columns.Add(new CustomTableColumn
+        {
+            ColumnName = "issued_date", DisplayName = "颁发日期",
+            DataType = EavDataTypes.Date, DisplayOrder = 3
+        });
+        db.CustomTables.Add(certs);
+        await db.SaveChangesAsync(ct);
+
+        db.AttributeCatalog.Add(new AttributeDefinition
+        {
+            EntityType = "Product",
+            AttributeName = "certifications",
+            DisplayName = "认证证书",
+            DataType = EavDataTypes.Table,
+            IsSearchable = true,
+            DisplayOrder = 5,
+            RefTableDefinitionId = certs.TableDefinitionId
+        });
+
+        // ============================================================
+        // 步骤 6：选项集 gender（Shared）+ quality_grade（Product）
+        // ============================================================
+        var gender = new OptionSet
+        {
+            EntityType = "Shared", SetName = "gender", DisplayName = "性别"
+        };
+        gender.Items.Add(new OptionItem { Value = "unknown", Label = "未知", DisplayOrder = 1, IsDefault = true });
+        gender.Items.Add(new OptionItem { Value = "male", Label = "男", DisplayOrder = 2 });
+        gender.Items.Add(new OptionItem { Value = "female", Label = "女", DisplayOrder = 3 });
+        gender.Items.Add(new OptionItem { Value = "other", Label = "其他", DisplayOrder = 4 });
+        db.OptionSets.Add(gender);
+
+        var grade = new OptionSet
+        {
+            EntityType = "Product", SetName = "quality_grade", DisplayName = "质量等级"
+        };
+        grade.Items.Add(new OptionItem { Value = "grade_a", Label = "一级", DisplayOrder = 1 });
+        grade.Items.Add(new OptionItem { Value = "grade_b", Label = "二级", DisplayOrder = 2 });
+        grade.Items.Add(new OptionItem { Value = "grade_c", Label = "三级", DisplayOrder = 3 });
+        db.OptionSets.Add(grade);
+        await db.SaveChangesAsync(ct);
+
+        db.AttributeCatalog.Add(new AttributeDefinition
+        {
+            EntityType = "Product",
+            AttributeName = "quality_grade",
+            DisplayName = "质量等级",
+            DataType = EavDataTypes.SingleChoice,
+            IsSearchable = true,
+            DisplayOrder = 6,
+            RefOptionSetId = grade.OptionSetId
+        });
+
+        // 最终一次性提交（之前每步 SaveChanges 已在事务内，最后一次统一落库）
+        await db.SaveChangesAsync(ct);
+    }
+}
+```
+
+## 文件 9/56 TreeGraph.Api/Data/Seeding/UnitSeedService.cs
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
+
+namespace TreeGraph.Api.NodeEavSky.Data.Seeding;
+
+/// <summary>
+/// 单位种子服务：固定 GUID，运行时一次性写入（幂等）。
+///
+/// ★ GUID 在本文件内显式指定（非随机），便于跨环境引用一致、
+///   便于种子数据与外部系统对齐。
+///
+/// 排除的分类（有意为之）：
+///   - 温度（°C / °F / K）：非线性换算（+273.15），
+///     而 UnitConverter 只做乘法，纳入会导致数据损坏。
+///   - 货币（CNY / USD / ...）：汇率动态，不能用固定 ToBaseFactor。
+///
+/// 注意：若数据库已存在旧单位（随机 GUID），本 seed 会因 AnyAsync()
+/// 直接跳过，不会替换。切换到固定 GUID 需先清空 units 表：
+///   DELETE FROM attribute_values WHERE unit_id IS NOT NULL;  -- 若被引用
+///   DELETE FROM composite_field_definitions WHERE unit_id IS NOT NULL;
+///   UPDATE attribute_catalog SET unit_id = NULL;
+///   DELETE FROM units;
+///   然后重启 API。
+/// </summary>
+public class UnitSeedService
+{
+    private readonly EavDbContext _db;
+    private readonly IUnitCache _unitCache;
+    private readonly ILogger<UnitSeedService> _logger;
+
+    public UnitSeedService(
+        EavDbContext db, IUnitCache unitCache, ILogger<UnitSeedService> logger)
+    {
+        _db = db;
+        _unitCache = unitCache;
+        _logger = logger;
+    }
+
+    public async Task SeedAsync(CancellationToken ct = default)
+    {
+        // 幂等：已有数据则跳过
+        if (await _db.Units.AnyAsync(ct))
+        {
+            _logger.LogInformation("单位表已有数据，跳过 seed");
+            return;
+        }
+
+        var units = BuildUnits();
+        _db.Units.AddRange(units);
+        await _db.SaveChangesAsync(ct);
+        _unitCache.Invalidate();
+
+        _logger.LogInformation("已 seed {Count} 个单位（固定 GUID）", units.Count);
+    }
+
+    /// <summary>
+    /// 构建单位清单：13 个分类、50 个单位。GUID 显式固定。
+    /// </summary>
+    private static List<Unit> BuildUnits()
+    {
+        var units = new List<Unit>();
+        var now = DateTimeOffset.UtcNow;
+
+        // ==================== 长度 length（基准：米） ====================
+        AddCategory(units, "length", baseSymbol: "m", now,
+            ("c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c", "米",     "m",   1.0m,          1),
+            ("d1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", "千米",   "km",  1000m,         2),
+            ("e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", "厘米",   "cm",  0.01m,         3),
+            ("f3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", "毫米",   "mm",  0.001m,        4),
+            ("d7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", "英寸",   "in",  0.0254m,       5),
+            ("c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", "英尺",   "ft",  0.3048m,       6),
+            ("b5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", "码",     "yd",  0.9144m,       7),
+            ("a4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", "英里",   "mi",  1609.344m,     8)
+        );
+
+        // ==================== 重量 weight（基准：千克） ====================
+        AddCategory(units, "weight", baseSymbol: "kg", now,
+            ("e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", "千克", "kg", 1.0m,             1),
+            ("f9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", "克",   "g",  0.001m,           2),
+            ("a0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", "毫克", "mg", 0.000001m,        3),
+            ("b1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", "吨",   "t",  1000m,            4),
+            ("c2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", "磅",   "lb", 0.45359237m,      5),
+            ("d3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", "盎司", "oz", 0.028349523125m,  6)
+        );
+
+        // ==================== 体积 volume（基准：升） ====================
+        AddCategory(units, "volume", baseSymbol: "L", now,
+            ("2d21c35a-4251-479e-b814-060b2fc84445", "立方米", "m³", 1000m,  1),
+            ("7f0af6a9-ba1a-469c-b967-e32afe43cad2", "升",     "L",  1.0m,   2),
+            ("780e7a01-350d-45ec-b963-b36a996de614", "毫升",   "mL", 0.001m, 3)
+        );
+
+        // ==================== 面积 area（基准：平方米） ====================
+        AddCategory(units, "area", baseSymbol: "m²", now,
+            ("e88b04db-40ac-4bb7-b420-1f3b37180673", "平方米",   "m²", 1.0m,        1),
+            ("0d7ebe17-93ae-4e4c-92f4-063a124cd181", "平方公里", "km²", 1000000m,  2),
+            ("a4c312d3-023e-4d4e-b5a7-fb7fcbd55c56", "公顷",     "ha", 10000m,     3),
+            ("fefa26a5-d608-411c-b637-469a886e558c", "亩",       "亩", 666.6666667m, 4)
+        );
+
+        // ==================== 时间 time（基准：秒） ====================
+        AddCategory(units, "time", baseSymbol: "s", now,
+            ("e4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", "秒",   "s",   1.0m,    1),
+            ("f5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", "分钟", "min", 60m,     2),
+            ("a6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a", "小时", "h",   3600m,   3),
+            ("b7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b", "天",   "d",   86400m,  4)
+        );
+
+        // ==================== 速度 speed（基准：米/秒） ====================
+        AddCategory(units, "speed", baseSymbol: "m/s", now,
+            ("4cbec89d-3f52-4db3-9ab0-faeeb841ffbf", "米/秒",      "m/s",  1.0m,          1),
+            ("64e918fb-ee9d-45c7-b35a-2a55f5a5fe62", "千米/小时",  "km/h", 0.2777777778m, 2),
+            ("405ae7a3-8a13-479d-bc1a-6f9d3c15e521", "英里/小时",  "mph",  0.44704m,      3)
+        );
+
+        // ==================== 角度 angle（基准：度） ====================
+        AddCategory(units, "angle", baseSymbol: "°", now,
+            ("ed1b66d2-454b-453b-9d43-12605dffa456", "度",   "°",   1.0m,              1),
+            ("3d9088a3-7283-4f8f-b995-b193a57a6c2a", "弧度", "rad", 57.29577951308232m, 2)
+        );
+
+        // ==================== 电流 current（基准：安培） ====================
+        AddCategory(units, "current", baseSymbol: "A", now,
+            ("f1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f", "安培", "A",  1.0m,      1),
+            ("a2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a", "毫安", "mA", 0.001m,    2),
+            ("b3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b", "微安", "µA", 0.000001m, 3)
+        );
+
+        // ==================== 电压 voltage（基准：伏特） ====================
+        AddCategory(units, "voltage", baseSymbol: "V", now,
+            ("c4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c", "伏特", "V",  1.0m,   1),
+            ("d5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", "千伏", "kV", 1000m,  2),
+            ("e6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", "毫伏", "mV", 0.001m, 3)
+        );
+
+        // ==================== 功率 power（基准：瓦特） ====================
+        AddCategory(units, "power", baseSymbol: "W", now,
+            ("f7d8e9f0-a1b2-4c3d-4e5f-6a7b8c9d0e1f", "瓦特", "W",  1.0m,              1),
+            ("a8e9f0a1-b2c3-4d4e-5f6a-7b8c9d0e1f2a", "千瓦", "kW", 1000m,             2),
+            ("b9f0a1b2-c3d4-4e5f-6a7b-8c9d0e1f2a3b", "兆瓦", "MW", 1000000m,          3),
+            ("a00be966-be2e-484e-92b6-9706494ac775", "马力", "hp", 745.6998715822702m, 4)
+        );
+
+        // ==================== 压力 pressure（基准：帕斯卡） ====================
+        AddCategory(units, "pressure", baseSymbol: "Pa", now,
+            ("221d3c45-911f-4e94-9c3e-c13e6f2bcc76", "帕斯卡", "Pa",  1.0m,      1),
+            ("883a9940-84ec-4daa-8448-609461b984ea", "千帕",   "kPa", 1000m,     2),
+            ("d5306eb8-324f-4088-a867-6fbc7141fd59", "兆帕",   "MPa", 1000000m,  3),
+            ("8981bd9a-bd99-4f4c-b8af-038975b799be", "巴",     "bar", 100000m,   4)
+        );
+
+        // ==================== 能量 energy（基准：焦耳） ====================
+        AddCategory(units, "energy", baseSymbol: "J", now,
+            ("5db494d7-2a9c-4ae0-86e0-d4bb0dfc7b81", "焦耳",   "J",   1.0m,       1),
+            ("279a6b18-6d01-4437-b95b-0480ca7adc98", "千焦",   "kJ",  1000m,      2),
+            ("e3c1f025-3b2b-461a-a5a1-015cb4e3fe38", "千瓦时", "kWh", 3600000m,   3)
+        );
+
+        // ==================== 频率 frequency（基准：赫兹） ====================
+        AddCategory(units, "frequency", baseSymbol: "Hz", now,
+            ("5e880060-9410-40d7-bcb4-545ccd0c1bb6", "赫兹", "Hz",  1.0m,      1),
+            ("1a80ed3b-1b36-4d8b-b80b-3070dbc7979d", "千赫", "kHz", 1000m,     2),
+            ("41572712-95dd-4caf-b316-e1b924bc57c3", "兆赫", "MHz", 1000000m,  3)
+        );
+
+        // ★ 有意排除：
+        //   - 温度：非线性换算（°C ↔ K = ±273.15），UnitConverter 只做乘法
+        //   - 货币：汇率动态，不能用固定 ToBaseFactor
+        //
+        // 若未来需要，应在扩展 UnitConverter 支持 affine 变换（offset + factor）
+        // 后再纳入。参见：UnitsController / UnitConverter。
+
+        return units;
+    }
+
+    /// <summary>
+    /// 为一个分类添加单位。
+    /// 基准单位（symbol == baseSymbol）自动标记 IsBaseUnit = true。
+    /// </summary>
+    private static void AddCategory(
+        List<Unit> units, string category, string baseSymbol,
+        DateTimeOffset now,
+        params (string Id, string Name, string Symbol, decimal Factor, int Order)[] items)
+    {
+        foreach (var (id, name, symbol, factor, order) in items)
+        {
+            units.Add(new Unit
+            {
+                Id = Guid.Parse(id),
+                Category = category,
+                Name = name,
+                Symbol = symbol,
+                ToBaseFactor = factor,
+                IsBaseUnit = symbol == baseSymbol,
+                DisplayOrder = order,
+                IsDeleted = false,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+    }
+}
+```
+
+## 文件 10/56 TreeGraph.Api/NodeEavSky/Controllers/CustomTableDataController.cs
 
 ```csharp
 using Microsoft.AspNetCore.Mvc;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Controllers;
+namespace TreeGraph.Api.NodeEavSky.Controllers;
 
 [ApiController]
 [Route("api/eav/{entityType}/entities/{entityId}/tables")]
@@ -108,18 +5592,18 @@ public class CustomTableDataController : ControllerBase
 }
 ```
 
-## 文件 2/41 TreeGraph.Api/Controllers/EavController.cs
+## 文件 11/56 TreeGraph.Api/NodeEavSky/Controllers/EavController.cs
 
 ```csharp
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using TreeGraph.Api.Entities;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.Eav;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Controllers;
+namespace TreeGraph.Api.NodeEavSky.Controllers;
 
 [ApiController]
 [Route("api/eav/{entityType}")]
@@ -679,22 +6163,24 @@ public class EavController : ControllerBase
 }
 ```
 
-## 文件 3/41 TreeGraph.Api/Controllers/EavEntityTypesController.cs
+## 文件 12/56 TreeGraph.Api/NodeEavSky/Controllers/EavEntityTypesController.cs
 
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Controllers;
+namespace TreeGraph.Api.NodeEavSky.Controllers;
 
 /// <summary>
 /// 实体类型元数据端点。
 ///
-/// 独立于 EavController（其路由 api/eav/{entityType} 会与 api/eav/entity-types 冲突），
-/// 因此拆到单独 Controller。
+/// 数据源已从 AttributeCatalog 聚合改为 EntityTypeCatalog 表。
+/// AttributeCatalog 提供统计（属性数 / 可搜索数），
+/// EntityTypeCatalog 提供类型本身（DisplayName / Description）。
 /// </summary>
 [ApiController]
 [Route("api/eav/entity-types")]
@@ -709,13 +6195,28 @@ public class EavEntityTypesController : ControllerBase
         _attrCache = attrCache;
     }
 
-    /// <summary>列出所有已定义的实体类型（含属性计数）</summary>
+    // ============================================================
+    // 列表
+    // ============================================================
+
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
     {
-        // 直接从 AttributeCatalog 聚合
-        var rows = await _db.AttributeCatalog
-            .Where(a => !a.IsDeleted)
+        // 1. 从 EntityTypeCatalog 拿所有活动类型
+        var types = await _db.EntityTypes
+            .Where(t => !t.IsDeleted)
+            .OrderBy(t => t.DisplayOrder)
+            .ThenBy(t => t.EntityType)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        if (types.Count == 0)
+            return Ok(Array.Empty<EntityTypeSummaryDto>());
+
+        // 2. 从 AttributeCatalog 聚合统计
+        var typeNames = types.Select(t => t.EntityType).ToList();
+        var stats = await _db.AttributeCatalog
+            .Where(a => !a.IsDeleted && typeNames.Contains(a.EntityType))
             .GroupBy(a => a.EntityType)
             .Select(g => new
             {
@@ -726,31 +6227,252 @@ public class EavEntityTypesController : ControllerBase
                                 .Select(a => a.DisplayName)
                                 .FirstOrDefault()
             })
-            .OrderBy(x => x.EntityType)
             .AsNoTracking()
             .ToListAsync(ct);
 
-        var result = rows.Select(r => new EntityTypeSummaryDto(
-            r.EntityType, r.Total, r.Searchable, r.FirstDisplay));
+        var statsMap = stats.ToDictionary(s => s.EntityType);
+
+        var result = types.Select(t =>
+        {
+            statsMap.TryGetValue(t.EntityType, out var s);
+            return new EntityTypeSummaryDto(
+                t.EntityType,
+                s?.Total ?? 0,
+                s?.Searchable ?? 0,
+                s?.FirstDisplay,
+                t.EntityTypeId,
+                t.DisplayName);
+        });
 
         return Ok(result);
+    }
+
+    // ============================================================
+    // 批量详情（1 次 HTTP 替代 1+N 次）
+    // ============================================================
+
+    /// <summary>
+    /// 批量返回所有实体类型详情（含属性计数）。
+    ///
+    /// ★ 为什么需要这个端点：
+    ///   原 GET /api/eav/entity-types 只返回 SummaryDto，
+    ///   前端要拿详情（Description / DisplayOrder / CreatedAt / UpdatedAt）
+    ///   需逐个 GET /{id}，N 个类型 = 1+N 次 HTTP。
+    ///   N=145 时前端 LoadAsync 严重卡顿（>15s）。
+    ///
+    /// 本端点：1 次 HTTP 返回全量详情 + 属性计数（GroupBy 聚合，1 次 DB 查询）。
+    /// </summary>
+    [HttpGet("details")]
+    public async Task<IActionResult> ListDetails(
+        [FromQuery] bool includeDeleted = false,
+        CancellationToken ct = default)
+    {
+        // 1. 全量类型（1 次 DB）
+        var types = await _db.EntityTypes
+            .Where(t => includeDeleted || !t.IsDeleted)
+            .OrderBy(t => t.DisplayOrder)
+            .ThenBy(t => t.EntityType)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        if (types.Count == 0)
+            return Ok(Array.Empty<EntityTypeDetailDto>());
+
+        // 2. 属性计数（1 次 DB，GroupBy 聚合）
+        var typeNames = types.Select(t => t.EntityType).ToList();
+        var stats = await _db.AttributeCatalog
+            .Where(a => !a.IsDeleted && typeNames.Contains(a.EntityType))
+            .GroupBy(a => a.EntityType)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var statsMap = stats.ToDictionary(x => x.Type, x => x.Count);
+
+        // 3. 组装
+        var result = types.Select(t => new EntityTypeDetailDto(
+            t.EntityTypeId,
+            t.EntityType,
+            t.DisplayName,
+            t.Description,
+            t.DisplayOrder,
+            t.IsDeleted,
+            t.CreatedAt,
+            t.UpdatedAt,
+            statsMap.GetValueOrDefault(t.EntityType, 0)));
+
+        return Ok(result);
+    }
+
+    // ============================================================
+    // 详情
+    // ============================================================
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> Get(string id, CancellationToken ct)
+    {
+        var t = await _db.EntityTypes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.EntityTypeId == id, ct);
+        if (t is null) return NotFound();
+
+        var attrCount = await _db.AttributeCatalog
+            .CountAsync(a => a.EntityType == t.EntityType && !a.IsDeleted, ct);
+
+        return Ok(new EntityTypeDetailDto(
+            t.EntityTypeId, t.EntityType, t.DisplayName, t.Description,
+            t.DisplayOrder, t.IsDeleted, t.CreatedAt, t.UpdatedAt, attrCount));
+    }
+
+    // ============================================================
+    // 创建
+    // ============================================================
+
+    [HttpPost]
+    public async Task<IActionResult> Create(
+        [FromBody] CreateEntityTypeRequest req, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(req.DisplayName))
+            return BadRequest(new { error = "显示名必填" });
+
+        // 生成或使用客户端指定的 EntityType
+        string entityType;
+        if (!string.IsNullOrWhiteSpace(req.EntityType))
+        {
+            entityType = req.EntityType.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(
+                    entityType, @"^[A-Za-z][A-Za-z0-9_]*$"))
+                return BadRequest(new
+                {
+                    error = "EntityType 必须以字母开头，只含字母、数字、下划线"
+                });
+        }
+        else
+        {
+            entityType = GenerateEntityTypeId();
+        }
+
+        // 唯一性检查（自动生成时最多重试 3 次防碰撞）
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            var exists = await _db.EntityTypes
+                .AnyAsync(t => t.EntityType == entityType, ct);
+            if (!exists) break;
+
+            // 客户端显式指定的冲突 → 直接报错，不重试
+            if (!string.IsNullOrWhiteSpace(req.EntityType))
+                return Conflict(new { error = $"实体类型已存在: {entityType}" });
+
+            // 自动生成的碰撞 → 重新生成
+            entityType = GenerateEntityTypeId();
+        }
+
+        var entity = new EntityTypeDefinition
+        {
+            EntityType = entityType,
+            DisplayName = req.DisplayName.Trim(),
+            Description = req.Description,
+            DisplayOrder = req.DisplayOrder
+        };
+        _db.EntityTypes.Add(entity);
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(new { entity.EntityTypeId, entity.EntityType });
+    }
+
+    /// <summary>
+    /// 生成实体类型内部标识：`et_` + 12 位随机 hex（如 et_3f9a2b1c8d4e）。
+    /// 12 位 hex = 48 bit 随机，碰撞概率可忽略（10 万个类型下 ≈ 1.8e-7）。
+    /// </summary>
+    private static string GenerateEntityTypeId()
+        => "et_" + Guid.NewGuid().ToString("N")[..12];
+
+    // ============================================================
+    // 更新
+    // ============================================================
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(
+        string id, [FromBody] UpdateEntityTypeRequest req, CancellationToken ct)
+    {
+        var e = await _db.EntityTypes.FindAsync(new object[] { id }, ct);
+        if (e is null || e.IsDeleted) return NotFound();
+
+        if (req.DisplayName is not null) e.DisplayName = req.DisplayName.Trim();
+        if (req.Description is not null) e.Description = req.Description;
+        if (req.DisplayOrder is not null) e.DisplayOrder = req.DisplayOrder.Value;
+        e.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    // ============================================================
+    // 软删除
+    // ============================================================
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id, CancellationToken ct)
+    {
+        var e = await _db.EntityTypes.FindAsync(new object[] { id }, ct);
+        if (e is null || e.IsDeleted) return NotFound();
+
+        // 仍有活动属性时拒绝
+        var hasAttrs = await _db.AttributeCatalog
+            .AnyAsync(a => a.EntityType == e.EntityType && !a.IsDeleted, ct);
+        if (hasAttrs)
+            return BadRequest(new
+            {
+                error = $"该实体类型仍有活动属性（{e.EntityType}），请先删除其属性"
+            });
+
+        e.IsDeleted = true;
+        e.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    // ============================================================
+    // 恢复
+    // ============================================================
+
+    [HttpPost("{id}/undelete")]
+    public async Task<IActionResult> Undelete(string id, CancellationToken ct)
+    {
+        var e = await _db.EntityTypes.FindAsync(new object[] { id }, ct);
+        if (e is null) return NotFound();
+        if (!e.IsDeleted) return NoContent();   // 幂等
+
+        var conflict = await _db.EntityTypes.AnyAsync(
+            t => t.EntityTypeId != id
+              && t.EntityType == e.EntityType
+              && !t.IsDeleted, ct);
+        if (conflict)
+            return Conflict(new
+            {
+                error = $"同名的活动实体类型已存在（{e.EntityType}）"
+            });
+
+        e.IsDeleted = false;
+        e.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
     }
 }
 ```
 
-## 文件 4/41 TreeGraph.Api/Controllers/EavMetadataController.cs
+## 文件 13/56 TreeGraph.Api/NodeEavSky/Controllers/EavMetadataController.cs
 
 ```csharp
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.Eav;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Controllers;
+namespace TreeGraph.Api.NodeEavSky.Controllers;
 
 [ApiController]
 [Route("api/eav/metadata")]
@@ -778,29 +6500,41 @@ public class EavMetadataController : ControllerBase
     /// <summary>
     /// 创建属性定义。
     ///
-    /// ★ 单位绑定约束：只有 decimal 类型可以绑定 UnitId。
-    /// int 类型拒绝绑定，因为归一化到基准单位时会产生小数（如 150 cm → 1.5 m），
-    /// 写入 ValueInt (bigint) 会静默截断，造成数据损坏。
+    /// AttributeName 可选：
+    ///   - null / 空：自动生成 `attr_` + 12 位 hex
+    ///   - 非空：必须字母开头，字母/数字/下划线，且同一 EntityType 下唯一
+    ///
+    /// int / decimal 均可绑定单位（原 int 拒绝逻辑已移除）。
     /// </summary>
     [HttpPost("attributes")]
     public async Task<IActionResult> CreateAttribute(
         [FromBody] CreateAttributeRequest req, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(req.EntityType)
-            || string.IsNullOrWhiteSpace(req.AttributeName))
-            return BadRequest(new { error = "EntityType 与 AttributeName 必填" });
-
+        // ---- 基础校验 ----
+        if (string.IsNullOrWhiteSpace(req.EntityType))
+            return BadRequest(new { error = "EntityType 必填" });
+        if (string.IsNullOrWhiteSpace(req.DisplayName))
+            return BadRequest(new { error = "DisplayName 必填" });
         if (!EavDataTypes.All.Contains(req.DataType))
             return BadRequest(new { error = $"未知的 dataType: {req.DataType}" });
 
-        // 引用互斥
+        // ---- 实体类型存在性 ----
+        var entityTypeExists = await _db.EntityTypes
+            .AnyAsync(t => t.EntityType == req.EntityType && !t.IsDeleted, ct);
+        if (!entityTypeExists)
+            return BadRequest(new
+            {
+                error = $"实体类型不存在: {req.EntityType}。请先在「实体类型管理」中创建"
+            });
+
+        // ---- 引用互斥 ----
         var refCount = new[] {
             req.RefCompositeTypeId, req.RefTableDefinitionId, req.RefOptionSetId
         }.Count(x => x is not null);
         if (refCount > 1)
             return BadRequest(new { error = "组合类型 / 自定义表 / 选项集引用互斥" });
 
-        // 类型与引用匹配
+        // ---- 类型与引用匹配 ----
         if (req.DataType == EavDataTypes.Composite && req.RefCompositeTypeId is null)
             return BadRequest(new { error = "composite 必须指定 refCompositeTypeId" });
         if (req.DataType == EavDataTypes.Table && req.RefTableDefinitionId is null)
@@ -811,18 +6545,7 @@ public class EavMetadataController : ControllerBase
             or EavDataTypes.SingleChoice) && refCount > 0)
             return BadRequest(new { error = "当前 dataType 不支持引用" });
 
-        // ★ 单位只允许 decimal
-        if (req.UnitId is not null && req.DataType != EavDataTypes.Decimal)
-        {
-            return BadRequest(new
-            {
-                error = "只有 decimal 类型可以绑定单位。" +
-                        "int 类型归一化到基准单位时会产生小数（如 150 cm → 1.5 m），" +
-                        "写入 bigint 列会静默截断，请改用 decimal。"
-            });
-        }
-
-        // 引用存在性
+        // ---- 引用存在性 ----
         if (req.UnitId is { } uid
             && !await _db.Units.AnyAsync(u => u.Id == uid && !u.IsDeleted, ct))
             return BadRequest(new { error = $"单位不存在: {uid}" });
@@ -838,11 +6561,53 @@ public class EavMetadataController : ControllerBase
             && !await _db.OptionSets.AnyAsync(s => s.OptionSetId == sid, ct))
             return BadRequest(new { error = $"选项集不存在: {sid}" });
 
+        // ---- AttributeName 生成 / 校验 ----
+        string attributeName;
+        bool userSpecified = !string.IsNullOrWhiteSpace(req.AttributeName);
+
+        if (userSpecified)
+        {
+            attributeName = req.AttributeName!.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(
+                    attributeName, @"^[A-Za-z][A-Za-z0-9_]*$"))
+                return BadRequest(new
+                {
+                    error = "AttributeName 必须以字母开头，只含字母、数字、下划线"
+                });
+            if (attributeName.Length > 200)
+                return BadRequest(new { error = "AttributeName 过长（最大 200 字符）" });
+        }
+        else
+        {
+            attributeName = GenerateAttributeName();
+        }
+
+        // ---- 唯一性检查（用户指定的冲突直接 409，自动生成的碰撞重试最多 3 次）----
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            var conflict = await _db.AttributeCatalog.AnyAsync(
+                a => a.EntityType == req.EntityType
+                  && a.AttributeName == attributeName,
+                ct);
+
+            if (!conflict) break;
+
+            if (userSpecified)
+                return Conflict(new
+                {
+                    error = $"属性名已存在: {req.EntityType}.{attributeName}"
+                });
+
+            // 自动生成的碰撞：重新生成
+            attributeName = GenerateAttributeName();
+        }
+
+        // ---- 创建 ----
         var def = new AttributeDefinition
         {
             EntityType = req.EntityType,
-            AttributeName = req.AttributeName,
-            DisplayName = req.DisplayName,
+            AttributeName = attributeName,
+            DisplayName = req.DisplayName.Trim(),
             DataType = req.DataType,
             IsRequired = req.IsRequired,
             IsSearchable = req.IsSearchable,
@@ -863,8 +6628,15 @@ public class EavMetadataController : ControllerBase
         await _db.SaveChangesAsync(ct);
         _attrCache.Invalidate(req.EntityType);
 
-        return Ok(new { def.AttributeId });
+        return Ok(new { def.AttributeId, def.AttributeName });
     }
+
+    /// <summary>
+    /// 生成属性内部标识：`attr_` + 12 位随机 hex（如 attr_3f9a2b1c8d4e）。
+    /// 48 bit 随机，同 EntityType 下碰撞概率可忽略；有重试保护。
+    /// </summary>
+    private static string GenerateAttributeName()
+        => "attr_" + Guid.NewGuid().ToString("N")[..12];
 
     [HttpPost("composite-types")]
     public async Task<IActionResult> CreateCompositeType(
@@ -1402,7 +7174,7 @@ public class EavMetadataController : ControllerBase
     /// <summary>
     /// 更新属性定义。
     ///
-    /// ★ 单位绑定约束：只有 decimal 类型可以绑定 UnitId。
+    /// ★ int / decimal 均可绑定单位。
     /// 不可修改：EntityType、AttributeName、DataType。
     /// </summary>
     [HttpPut("attributes/{id}")]
@@ -1431,16 +7203,6 @@ public class EavMetadataController : ControllerBase
         }
         else if (req.UnitId is not null)
         {
-            if (def.DataType != EavDataTypes.Decimal)
-            {
-                return BadRequest(new
-                {
-                    error = "只有 decimal 类型可以绑定单位。" +
-                            "int 类型归一化到基准单位时会产生小数（如 150 cm → 1.5 m），" +
-                            "写入 bigint 列会静默截断。"
-                });
-            }
-
             var exists = await _db.Units.AnyAsync(
                 u => u.Id == req.UnitId.Value && !u.IsDeleted, ct);
             if (!exists) return BadRequest(new { error = $"单位不存在: {req.UnitId}" });
@@ -1740,17 +7502,668 @@ public class EavMetadataController : ControllerBase
 }
 ```
 
-## 文件 5/41 TreeGraph.Api/Controllers/OptionItemsController.cs
+## 文件 14/56 TreeGraph.Api/NodeEavSky/Controllers/InodeController.cs
+
+```csharp
+using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Shared.Eav;
+using TreeGraph.Shared.Eav.Dtos;
+
+namespace TreeGraph.Api.NodeEavSky.Controllers;
+
+/// <summary>
+/// iNode 聚合端点。
+///
+/// 定位方式：
+///   - 声明：/api/inode/{inodeId}/types/{entityType}
+///   - 实体：/api/inode/{inodeId}/entities/{entityType}
+///
+/// URL 里没有 entityId —— 由服务端首次 PUT 时自动生成。
+/// 转发到现有 EAV 管道（EavWriteService.SaveAsync(entityId, entityType, ...)）。
+/// </summary>
+[ApiController]
+[Route("api/inode/{inodeId}")]
+public class InodeController : ControllerBase
+{
+    private readonly IInodeEntityService _inodeEntities;
+    private readonly InodeEavFacade _facade;
+    private readonly IAttributeCache _attrCache;
+    private readonly EavDbContext _db;
+    private readonly CompositeValueService _compositeService;
+    private readonly JsonSerializerOptions _jsonOptions;
+
+    public InodeController(
+        IInodeEntityService inodeEntities,
+        InodeEavFacade facade,
+        IAttributeCache attrCache,
+        EavDbContext db,
+        CompositeValueService compositeService,
+        IOptions<JsonOptions> jsonOptions)
+    {
+        _inodeEntities = inodeEntities;
+        _facade = facade;
+        _attrCache = attrCache;
+        _db = db;
+        _compositeService = compositeService;
+        _jsonOptions = jsonOptions.Value.JsonSerializerOptions;
+    }
+
+    // ============================================================
+    // 声明层
+    // ============================================================
+
+    /// <summary>
+    /// 列出该 iNode 下所有类型卡片（声明的 + 未声明的但全局可用的）。
+    /// </summary>
+    [HttpGet("types")]
+    public async Task<IActionResult> ListTypes(
+        string inodeId, CancellationToken ct)
+    {
+        var declarations = await _inodeEntities.ListDeclarationsAsync(inodeId, ct);
+        var mappings = await _inodeEntities.ListByInodeAsync(inodeId, ct);
+        var mappingByType = mappings.ToDictionary(m => m.EntityType);
+
+        // 全局类型（直接查 entity_type_catalog）
+        var globalTypes = await _db.EntityTypes
+            .Where(t => !t.IsDeleted)
+            .ToListAsync(ct);
+
+        var cards = new List<InodeTypeCardDto>();
+
+        foreach (var decl in declarations)
+        {
+            var mapping = mappingByType.GetValueOrDefault(decl.EntityType);
+            var gt = globalTypes.FirstOrDefault(t => t.EntityType == decl.EntityType);
+
+            cards.Add(new InodeTypeCardDto(
+                decl.EntityType,
+                gt?.DisplayName ?? decl.EntityType,
+                gt?.EntityTypeId,
+                gt?.Description,
+                Declared: true,
+                HasEntity: mapping is not null,
+                EntityUpdatedAt: null));   // 需要时再填
+        }
+
+        return Ok(cards);
+    }
+
+    [HttpPost("types/{entityType}")]
+    public async Task<IActionResult> Attach(
+        string inodeId, string entityType, CancellationToken ct)
+    {
+        try
+        {
+            await _inodeEntities.AttachAsync(inodeId, entityType, ct);
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpDelete("types/{entityType}")]
+    public async Task<IActionResult> Detach(
+        string inodeId, string entityType, CancellationToken ct)
+    {
+        try
+        {
+            var ok = await _inodeEntities.DetachAsync(inodeId, entityType, ct);
+            if (!ok) return NotFound();
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    // ============================================================
+    // 实体 CRUD
+    // ============================================================
+
+    /// <summary>
+    /// 列出该 iNode 下所有已创建实体。
+    /// </summary>
+    [HttpGet("entities")]
+    public async Task<IActionResult> ListEntities(
+        string inodeId,
+        [FromQuery] string? unit,
+        CancellationToken ct)
+    {
+        var originalUnits = unit == "original";
+        var all = await _facade.LoadAllByInodeAsync(inodeId, originalUnits, ct);
+
+        var result = all.Values.Select(e => new DynamicEntityDto(
+            e.EntityId,
+            e.EntityType,
+            ToJsonDict(e),
+            e.UpdatedAt)).ToList();
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// 读单个实体。未创建返回 404。
+    /// </summary>
+    [HttpGet("entities/{entityType}")]
+    public async Task<IActionResult> GetEntity(
+        string inodeId, string entityType,
+        [FromQuery] string? unit,
+        CancellationToken ct)
+    {
+        var originalUnits = unit == "original";
+        var entity = await _facade.LoadAsync(
+            inodeId, entityType, originalUnits, ct);
+        if (entity is null) return NotFound();
+
+        return Ok(new DynamicEntityDto(
+            entity.EntityId,
+            entity.EntityType,
+            ToJsonDict(entity),
+            entity.UpdatedAt));
+    }
+
+    /// <summary>
+    /// PUT 全量替换。首次调用自动创建实体。
+    /// </summary>
+    [HttpPut("entities/{entityType}")]
+    public async Task<IActionResult> Put(
+        string inodeId, string entityType,
+        [FromBody] Dictionary<string, JsonElement> values,
+        CancellationToken ct)
+    {
+        var expected = ParseExpectedHeader();
+
+        try
+        {
+            var typed = ConvertBody(entityType, values);
+            await _facade.SaveAsync(inodeId, entityType, typed,
+                User.Identity?.Name ?? "system",
+                HttpContext.TraceIdentifier,
+                ct, expected);
+            return NoContent();
+        }
+        catch (EavConcurrencyException ex)
+        {
+            return Conflict(new
+            {
+                error = "并发冲突：实体已被其他用户修改，请刷新后重试",
+                currentUpdatedAt = ex.CurrentUpdatedAt,
+                expectedUpdatedAt = ex.ExpectedUpdatedAt
+            });
+        }
+        catch (EavValidationException ex)
+        {
+            return BadRequest(new { errors = ex.Errors });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// PATCH 部分更新。
+    /// </summary>
+    [HttpPatch("entities/{entityType}")]
+    public async Task<IActionResult> Patch(
+        string inodeId, string entityType,
+        [FromBody] Dictionary<string, JsonElement> values,
+        CancellationToken ct)
+    {
+        var expected = ParseExpectedHeader();
+
+        try
+        {
+            var typed = ConvertBody(entityType, values);
+            await _facade.PatchAsync(inodeId, entityType, typed,
+                User.Identity?.Name ?? "system",
+                HttpContext.TraceIdentifier,
+                ct, expected);
+            return NoContent();
+        }
+        catch (EavConcurrencyException ex)
+        {
+            return Conflict(new
+            {
+                error = "并发冲突：实体已被其他用户修改，请刷新后重试",
+                currentUpdatedAt = ex.CurrentUpdatedAt,
+                expectedUpdatedAt = ex.ExpectedUpdatedAt
+            });
+        }
+        catch (EavValidationException ex)
+        {
+            return BadRequest(new { errors = ex.Errors });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpDelete("entities/{entityType}")]
+    public async Task<IActionResult> DeleteEntity(
+        string inodeId, string entityType,
+        CancellationToken ct)
+    {
+        var ok = await _facade.DeleteAsync(
+            inodeId, entityType,
+            User.Identity?.Name ?? "system",
+            HttpContext.TraceIdentifier,
+            ct);
+        if (!ok) return NotFound();
+        return NoContent();
+    }
+
+    /// <summary>
+    /// 审计历史。
+    /// </summary>
+    [HttpGet("entities/{entityType}/history")]
+    public async Task<IActionResult> History(
+        string inodeId, string entityType,
+        [FromQuery] DateTimeOffset? from,
+        CancellationToken ct)
+    {
+        var history = await _facade.GetHistoryAsync(
+            inodeId, entityType, from, ct);
+
+        var result = history.Select(a => new EntityHistoryDto(
+            a.AuditId,
+            a.EntityId,
+            a.EntityType,
+            a.AttributeId,
+            a.AttributeName,
+            a.OldValue,
+            a.NewValue,
+            a.ChangeType,
+            a.ChangedBy,
+            a.ChangedAt,
+            a.CorrelationId,
+            a.ClientIp)).ToList();
+
+        return Ok(result);
+    }
+
+    // ============================================================
+    // 辅助
+    // ============================================================
+
+    private DateTimeOffset? ParseExpectedHeader()
+    {
+        var headerValue = Request.Headers["X-Expected-Updated-At"]
+            .FirstOrDefault();
+        if (string.IsNullOrEmpty(headerValue)) return null;
+
+        if (DateTimeOffset.TryParse(
+                headerValue,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind,
+                out var parsed))
+            return parsed;
+
+        return null;
+    }
+
+    private Dictionary<string, object?> ConvertBody(
+        string entityType, Dictionary<string, JsonElement> values)
+    {
+        var defs = _attrCache.GetDefinitions(entityType)
+            .ToDictionary(d => d.AttributeName);
+
+        return EavRequestBodyConverter.Convert(values, defs, _compositeService);
+    }
+
+    private Dictionary<string, JsonElement> ToJsonDict(DynamicEntity e)
+    {
+        var dict = new Dictionary<string, JsonElement>();
+        foreach (var (k, v) in e.Properties)
+        {
+            dict[k] = v is null
+                ? JsonDocument.Parse("null").RootElement.Clone()
+                : JsonSerializer.SerializeToElement(v, v.GetType(), _jsonOptions);
+        }
+        return dict;
+    }
+
+    // ============================================================
+    // 全景 JSON
+    // ============================================================
+
+    /// <summary>
+    /// 返回该 iNode 下所有实体的全部属性值（聚合 JSON）。
+    ///
+    /// 用途：外部应用一次性拉全景数据。
+    ///
+    /// 参数：
+    ///   displayName  - false（默认）：属性 key 用 AttributeName（英文内部标识）
+    ///                  true：属性 key 用 DisplayName（中文显示名）
+    ///   includeNull  - false（默认）：跳过值为 null 的属性
+    ///                  true：保留 null 键
+    ///   units        - default（默认）：数值保留 { value, unitId } 对象
+    ///                  base：数值归一化到基准单位，返回裸数字
+    ///                  original：数值按原始输入单位还原，返回裸数字
+    /// </summary>
+    [HttpGet("json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> GetAllAsJson(
+        string inodeId,
+        [FromQuery] bool displayName = false,
+        [FromQuery] bool includeNull = false,
+        [FromQuery] string? units = null,
+        CancellationToken ct = default)
+    {
+        // ---- 1. 参数校验 ----
+        var unitsMode = units?.ToLowerInvariant();
+        if (unitsMode is not (null or "default" or "base" or "original"))
+        {
+            return BadRequest(new
+            {
+                error = "units 参数必须是 default / base / original 之一"
+            });
+        }
+
+        // base 和 original 都返回裸数字，但取值方式不同：
+        //   - base:     归一化值（后端默认存储）
+        //   - original: 还原到用户原始输入单位
+        var originalUnits = unitsMode == "original";
+        var bareValue = unitsMode is "base" or "original";
+
+        // ---- 2. 加载所有实体（复用现有 Facade） ----
+        var all = await _facade.LoadAllByInodeAsync(inodeId, originalUnits, ct);
+
+        // ---- 3. 构建 entities 字典 ----
+        var entitiesDict = new Dictionary<string, object>(StringComparer.Ordinal);
+
+        foreach (var (entityType, entity) in all)
+        {
+            // 属性定义（用于 displayName 映射）
+            var defs = _attrCache.GetDefinitions(entityType)
+                .ToDictionary(d => d.AttributeName, StringComparer.Ordinal);
+
+            var props = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+            foreach (var (attrName, rawValue) in entity.Properties)
+            {
+                // 空值处理
+                if (rawValue is null && !includeNull) continue;
+
+                // key 选择
+                var key = attrName;
+                if (displayName
+                    && defs.TryGetValue(attrName, out var def)
+                    && !string.IsNullOrWhiteSpace(def.DisplayName))
+                {
+                    key = def.DisplayName;
+                }
+
+                // 值转换
+                props[key] = ConvertPropertyValue(rawValue, bareValue);
+            }
+
+            // includeNull=true：该类型已定义但实体中未写入的属性补 null 键。
+            // （未写入的属性没有 attribute_value 行，entity.Properties 里键不存在，
+            //   仅靠上面 rawValue is null 分支无法补齐。）
+            if (includeNull)
+            {
+                foreach (var def in _attrCache.GetDefinitions(entityType))
+                {
+                    var defKey = (displayName
+                            && !string.IsNullOrWhiteSpace(def.DisplayName))
+                        ? def.DisplayName
+                        : def.AttributeName;
+                    if (!props.ContainsKey(defKey)) props[defKey] = null;
+                }
+            }
+
+            entitiesDict[entityType] = new
+            {
+                entityId = entity.EntityId,
+                updatedAt = entity.UpdatedAt,
+                properties = props
+            };
+        }
+
+        // ---- 4. 序列化 ----
+        // 注意：DynamicCompositeValue 已在 Program.cs 里注册了自定义转换器，
+        //      JsonSerializer.Serialize 会自动应用。
+        var result = new
+        {
+            inodeId,
+            generatedAt = DateTimeOffset.UtcNow,
+            entities = entitiesDict
+        };
+
+        var json = JsonSerializer.Serialize(result, _jsonOptions);
+
+        // 直接返回 JSON 字符串（Content-Type: application/json）
+        return Content(json, "application/json");
+    }
+
+    /// <summary>
+    /// 属性值 → JSON 友好形式。
+    ///
+    ///   bareValue = false：数值保留 { value, unitId } 对象（含原始输入单位）
+    ///   bareValue = true：数值只返回裸 decimal（用于 base / original 模式）
+    /// </summary>
+    private static object? ConvertPropertyValue(object? value, bool bareValue)
+    {
+        if (value is null) return null;
+
+        return value switch
+        {
+            // 数值 + 单位
+            NumericValue nv => bareValue
+                ? (object)nv.Value
+                : new { value = nv.Value, unitId = nv.UnitId },
+
+            // 单选值
+            SingleChoiceValue sc => new { value = sc.Value, label = sc.Label },
+
+            // 其它类型：DateOnly / TimeOnly / DateTimeOffset / bool / string /
+            //           long / decimal / JsonDocument / DynamicCompositeValue
+            //           → 由 JsonSerializer 自动处理
+            _ => value
+        };
+    }
+}
+```
+
+## 文件 15/56 TreeGraph.Api/NodeEavSky/Controllers/InodeQueryController.cs
+
+```csharp
+using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
+using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Shared.Eav.Dtos;
+
+namespace TreeGraph.Api.NodeEavSky.Controllers;
+
+/// <summary>
+/// 跨 iNode 查询。
+/// </summary>
+[ApiController]
+[Route("api/inode")]
+public class InodeQueryController : ControllerBase
+{
+    private readonly EavQueryService _query;
+    private readonly IInodeEntityService _inodeEntities;
+    private readonly EavReadService _read;
+
+    public InodeQueryController(
+        EavQueryService query,
+        IInodeEntityService inodeEntities,
+        EavReadService read)
+    {
+        _query = query;
+        _inodeEntities = inodeEntities;
+        _read = read;
+    }
+
+    /// <summary>
+    /// 跨 iNode 查询（可选限定 inodeId）。
+    /// 请求体：
+    /// {
+    ///   "inodeId": "可选",
+    ///   "entityType": "Product",      // 类型名
+    ///   "filters": [...],
+    ///   "orderByAttribute": "可选",
+    ///   "orderDescending": false,
+    ///   "page": 1,
+    ///   "pageSize": 20
+    /// }
+    /// </summary>
+    [HttpPost("query")]
+    public async Task<IActionResult> Query(
+        [FromBody] InodeQueryRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(request.EntityType))
+            return BadRequest(new { error = "entityType 必填" });
+
+        // 1. 确定候选 entity_id 集合
+        IReadOnlyCollection<string>? allowedEntityIds = null;
+
+        if (!string.IsNullOrEmpty(request.InodeId))
+        {
+            var mappings = await _inodeEntities.ListByInodeAsync(
+                request.InodeId, ct);
+            allowedEntityIds = mappings
+                .Where(m => m.EntityType == request.EntityType)
+                .Select(m => m.EntityId)
+                .ToList();
+
+            if (allowedEntityIds.Count == 0)
+            {
+                return Ok(new PagedResult<InodeEntityDto>
+                {
+                    Items = new List<InodeEntityDto>(),
+                    Total = 0,
+                    Page = request.Page,
+                    PageSize = request.PageSize
+                });
+            }
+        }
+
+        // 2. 走查询
+        var internalReq = new Shared.Eav.Dtos.EavQueryRequest
+        {
+            EntityType = request.EntityType,
+            Filters = request.Filters,
+            OrderByAttribute = request.OrderByAttribute,
+            OrderDescending = request.OrderDescending,
+            Page = request.Page,
+            PageSize = request.PageSize
+        };
+
+        try
+        {
+            var result = await _query.QueryWithAllowedIdsAsync(
+                request.EntityType, allowedEntityIds, internalReq, ct);
+
+            // 3. 反查 inode_id（若跨 iNode 查询，需要给每个结果填充）
+            var entityIds = result.Items.Select(e => e.EntityId).ToList();
+            var inodeMap = await BuildInodeMapAsync(
+                entityIds, request.EntityType, request.InodeId, ct);
+
+            var dto = new PagedResult<InodeEntityDto>
+            {
+                Items = result.Items.Select(e => new InodeEntityDto(
+                    inodeMap.GetValueOrDefault(e.EntityId, ""),
+                    e.EntityId,
+                    e.EntityType,
+                    ToJsonDict(e),
+                    e.UpdatedAt)).ToList(),
+                Total = result.Total,
+                Page = result.Page,
+                PageSize = result.PageSize
+            };
+
+            return Ok(dto);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (NotSupportedException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    // ============================================================
+    // 辅助
+    // ============================================================
+
+    private async Task<Dictionary<string, string>> BuildInodeMapAsync(
+        IEnumerable<string> entityIds, string entityType,
+        string? inodeId, CancellationToken ct)
+    {
+        var map = new Dictionary<string, string>();
+
+        // 已指定 inodeId 时无需反查
+        if (!string.IsNullOrEmpty(inodeId))
+        {
+            foreach (var id in entityIds)
+                map[id] = inodeId;
+            return map;
+        }
+
+        // 跨 iNode：逐个反查
+        foreach (var id in entityIds)
+        {
+            var mapping = await _inodeEntities.GetByEntityAsync(
+                entityType, id, ct);
+            map[id] = mapping?.InodeId ?? "";
+        }
+        return map;
+    }
+
+    private static Dictionary<string, JsonElement> ToJsonDict(
+        DynamicEntity e)
+    {
+        var opts = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var dict = new Dictionary<string, JsonElement>();
+        foreach (var (k, v) in e.Properties)
+        {
+            dict[k] = v is null
+                ? JsonDocument.Parse("null").RootElement.Clone()
+                : JsonSerializer.SerializeToElement(v, v.GetType(), opts);
+        }
+        return dict;
+    }
+}
+```
+
+## 文件 16/56 TreeGraph.Api/NodeEavSky/Controllers/OptionItemsController.cs
 
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Controllers;
+namespace TreeGraph.Api.NodeEavSky.Controllers;
 
 [ApiController]
 [Route("api/eav/metadata/option-sets/{setId}/items")]
@@ -1924,17 +8337,17 @@ public class OptionItemsController : ControllerBase
 }
 ```
 
-## 文件 6/41 TreeGraph.Api/Controllers/OptionSetsController.cs
+## 文件 17/56 TreeGraph.Api/NodeEavSky/Controllers/OptionSetsController.cs
 
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Controllers;
+namespace TreeGraph.Api.NodeEavSky.Controllers;
 
 [ApiController]
 [Route("api/eav/metadata/option-sets")]
@@ -2181,17 +8594,17 @@ public class OptionSetsController : ControllerBase
 }
 ```
 
-## 文件 7/41 TreeGraph.Api/Controllers/UnitsController.cs
+## 文件 18/56 TreeGraph.Api/NodeEavSky/Controllers/UnitsController.cs
 
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
-using TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Controllers;
+namespace TreeGraph.Api.NodeEavSky.Controllers;
 
 [ApiController]
 [Route("api/units")]
@@ -2682,3663 +9095,10 @@ public class UnitsController : ControllerBase
 }
 ```
 
-## 文件 8/41 TreeGraph.Api/Data/EavDbContext.cs
+## 文件 19/56 TreeGraph.Api/NodeEavSky/Entities/AttributeAuditLog.cs
 
 ```csharp
-using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Entities;
-
-namespace TreeGraph.Api.Data;
-
-public class EavDbContext : DbContext
-{
-    public DbSet<AttributeDefinition> AttributeCatalog => Set<AttributeDefinition>();
-    public DbSet<AttributeValue> AttributeValues => Set<AttributeValue>();
-    public DbSet<CompositeTypeDefinition> CompositeTypes => Set<CompositeTypeDefinition>();
-    public DbSet<CompositeFieldDefinition> CompositeFields => Set<CompositeFieldDefinition>();
-    public DbSet<AttributeAuditLog> AttributeAuditLogs => Set<AttributeAuditLog>();
-    public DbSet<Unit> Units => Set<Unit>();
-    public DbSet<OptionSet> OptionSets => Set<OptionSet>();
-    public DbSet<OptionItem> OptionItems => Set<OptionItem>();
-    public DbSet<CustomTableDefinition> CustomTables => Set<CustomTableDefinition>();
-    public DbSet<CustomTableColumn> CustomTableColumns => Set<CustomTableColumn>();
-    public DbSet<CustomTableRow> CustomTableRows => Set<CustomTableRow>();
-
-    public EavDbContext(DbContextOptions<EavDbContext> options) : base(options) { }
-
-    protected override void OnModelCreating(ModelBuilder mb)
-    {
-        ConfigureUnits(mb);
-        ConfigureOptionSets(mb);
-        ConfigureAttributeCatalog(mb);
-        ConfigureAttributeValues(mb);
-        ConfigureCompositeTypes(mb);
-        ConfigureCustomTables(mb);
-        ConfigureAuditLog(mb);
-    }
-
-    private static void ConfigureUnits(ModelBuilder mb)
-    {
-        mb.Entity<Unit>(e =>
-        {
-            e.ToTable("units");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("id");
-            e.Property(x => x.Category).HasColumnName("category").HasMaxLength(50).IsRequired();
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
-            e.Property(x => x.Symbol).HasColumnName("symbol").HasMaxLength(20).IsRequired();
-            e.Property(x => x.ToBaseFactor).HasColumnName("to_base_factor").HasPrecision(38, 15);
-            e.Property(x => x.IsBaseUnit).HasColumnName("is_base_unit");
-            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            e.HasIndex(x => new { x.Category, x.Name })
-                .IsUnique()
-                .HasDatabaseName("uq_unit_category_name");
-
-            e.HasIndex(x => x.Category)
-                .IsUnique()
-                .HasDatabaseName("uq_unit_category_base")
-                .HasFilter("is_base_unit = true");
-        });
-    }
-
-    private static void ConfigureAttributeCatalog(ModelBuilder mb)
-    {
-        mb.Entity<AttributeDefinition>(e =>
-        {
-            // ★ 表级 CHECK 约束：int 类型不允许绑定单位
-            // 归一化到基准单位会产生小数（150 cm → 1.5 m），写入 bigint 会静默截断。
-            // 元数据层（Controller）与运行时层（EavValidationService）已双重拦截，
-            // 这里再加一道数据库层防线，杜绝直接 SQL / 旧工具绕过。
-            e.ToTable("attribute_catalog", t =>
-            {
-                t.HasCheckConstraint(
-                    "ck_attr_int_no_unit",
-                    "data_type <> 'int' OR unit_id IS NULL");
-            });
-
-            e.HasKey(x => x.AttributeId);
-            e.Property(x => x.AttributeId)
-                .HasColumnName("attribute_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
-            e.Property(x => x.IsRequired).HasColumnName("is_required");
-            e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
-            e.Property(x => x.IsSortable).HasColumnName("is_sortable");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
-            e.Property(x => x.Version).HasColumnName("version");
-            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
-            e.Property(x => x.DefaultValue).HasColumnName("default_value").HasMaxLength(500);
-
-            e.Property(x => x.AllowedValues).HasColumnName("allowed_values").HasColumnType("jsonb");
-            e.Property(x => x.ValidationRule).HasColumnName("validation_rule").HasColumnType("jsonb");
-            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
-            e.Property(x => x.RefTableDefinitionId).HasColumnName("ref_table_definition_id").HasMaxLength(36);
-            e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
-            e.Property(x => x.UnitId).HasColumnName("unit_id");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            e.HasIndex(x => new { x.EntityType, x.AttributeName })
-                .IsUnique()
-                .HasDatabaseName("uq_attr_catalog");
-
-            e.HasIndex(x => x.EntityType)
-                .HasDatabaseName("ix_attr_catalog_entity")
-                .HasFilter("is_deleted = false");
-
-            e.HasOne(x => x.RefCompositeType)
-                .WithMany().HasForeignKey(x => x.RefCompositeTypeId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            e.HasOne(x => x.Unit).WithMany()
-                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
-
-            e.HasOne(x => x.RefTableDefinition).WithMany()
-                .HasForeignKey(x => x.RefTableDefinitionId).OnDelete(DeleteBehavior.Restrict);
-
-            e.HasOne(x => x.RefOptionSet).WithMany()
-                .HasForeignKey(x => x.RefOptionSetId).OnDelete(DeleteBehavior.Restrict);
-        });
-    }
-
-    private static void ConfigureAttributeValues(ModelBuilder mb)
-    {
-        mb.Entity<AttributeValue>(e =>
-        {
-            e.ToTable("attribute_values");
-            e.HasKey(x => x.ValueId);
-            e.Property(x => x.ValueId)
-                .HasColumnName("value_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.ValueString).HasColumnName("value_string").HasMaxLength(2000);
-            e.Property(x => x.ValueInt).HasColumnName("value_int");
-
-            // ★ 修复 P1-1：value_decimal 精度从 (18,4) 提升到 (38,15)，
-            // 与 units.to_base_factor 一致，避免单位换算（如 1 mg → kg）截断为 0
-            e.Property(x => x.ValueDecimal)
-                .HasColumnName("value_decimal")
-                .HasPrecision(38, 15);
-
-            e.Property(x => x.ValueBool).HasColumnName("value_bool");
-            e.Property(x => x.ValueDatetime).HasColumnName("value_datetime").HasColumnType("timestamptz");
-            e.Property(x => x.ValueDateOnly).HasColumnName("value_dateonly").HasColumnType("date");
-            e.Property(x => x.ValueTime).HasColumnName("value_time").HasColumnType("time(0)");
-            e.Property(x => x.ValueFileMeta).HasColumnName("value_file_meta").HasColumnType("jsonb");
-            e.Property(x => x.ValueJsonb).HasColumnName("value_jsonb").HasColumnType("jsonb");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-            e.Property(x => x.UnitId).HasColumnName("unit_id");
-
-            e.HasIndex(x => new { x.EntityId, x.EntityType, x.AttributeId })
-                .IsUnique().HasDatabaseName("uq_av_entity_attr");
-
-            e.HasIndex(x => new { x.EntityType, x.EntityId })
-                .HasDatabaseName("ix_av_entity");
-
-            // ★ #3 冲突检测：加速 max(UpdatedAt) 查询
-            e.HasIndex(x => new { x.EntityType, x.EntityId, x.UpdatedAt })
-                .HasDatabaseName("ix_av_entity_updated")
-                .IsDescending(false, false, true);
-
-            e.HasIndex(x => new { x.AttributeId, x.ValueInt })
-                .HasDatabaseName("ix_av_attr_int").HasFilter("value_int IS NOT NULL");
-            e.HasIndex(x => new { x.AttributeId, x.ValueDecimal })
-                .HasDatabaseName("ix_av_attr_decimal").HasFilter("value_decimal IS NOT NULL");
-            e.HasIndex(x => new { x.AttributeId, x.ValueString })
-                .HasDatabaseName("ix_av_attr_string").HasFilter("value_string IS NOT NULL");
-            e.HasIndex(x => new { x.AttributeId, x.ValueBool })
-                .HasDatabaseName("ix_av_attr_bool").HasFilter("value_bool IS NOT NULL");
-            e.HasIndex(x => new { x.AttributeId, x.ValueDatetime })
-                .HasDatabaseName("ix_av_attr_datetime").HasFilter("value_datetime IS NOT NULL");
-            e.HasIndex(x => new { x.AttributeId, x.ValueDateOnly })
-                .HasDatabaseName("ix_av_attr_dateonly").HasFilter("value_dateonly IS NOT NULL");
-            e.HasIndex(x => new { x.AttributeId, x.ValueTime })
-                .HasDatabaseName("ix_av_attr_time").HasFilter("value_time IS NOT NULL");
-
-            e.HasIndex(x => x.ValueJsonb)
-                .HasDatabaseName("ix_av_jsonb").HasMethod("GIN")
-                .HasFilter("value_jsonb IS NOT NULL");
-            e.HasIndex(x => x.ValueFileMeta)
-                .HasDatabaseName("ix_av_file_meta").HasMethod("GIN")
-                .HasFilter("value_file_meta IS NOT NULL");
-
-            e.HasOne(x => x.Attribute).WithMany()
-                .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(x => x.Unit).WithMany()
-                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
-        });
-    }
-
-    private static void ConfigureCompositeTypes(ModelBuilder mb)
-    {
-        mb.Entity<CompositeTypeDefinition>(e =>
-        {
-            e.ToTable("composite_type_definitions");
-            e.HasKey(x => x.CompositeTypeId);
-            e.Property(x => x.CompositeTypeId)
-                .HasColumnName("composite_type_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.Version).HasColumnName("version");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            e.HasIndex(x => new { x.EntityType, x.TypeName, x.Version })
-                .IsUnique().HasDatabaseName("uq_composite_type");
-        });
-
-        mb.Entity<CompositeFieldDefinition>(e =>
-        {
-            // CHECK：decimal 才能绑单位；single_choice 才能绑选项集
-            e.ToTable("composite_field_definitions", t =>
-            {
-                t.HasCheckConstraint(
-                    "ck_composite_field_decimal_unit",
-                    "data_type = 'decimal' OR unit_id IS NULL");
-
-                // ★ #8：single_choice 才能绑选项集
-                t.HasCheckConstraint(
-                    "ck_composite_field_single_choice_optionset",
-                    "data_type = 'single_choice' OR ref_option_set_id IS NULL");
-            });
-
-            e.HasKey(x => x.FieldId);
-            e.Property(x => x.FieldId)
-                .HasColumnName("field_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.CompositeTypeId).HasColumnName("composite_type_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.FieldName).HasColumnName("field_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
-            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
-
-            // ★ #4：单位外键列
-            e.Property(x => x.UnitId).HasColumnName("unit_id");
-            // ★ #8：选项集外键列
-            e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
-
-            e.Property(x => x.IsArray).HasColumnName("is_array");
-            e.Property(x => x.IsRequired).HasColumnName("is_required");
-            e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
-            e.Property(x => x.IsSortable).HasColumnName("is_sortable");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
-            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
-            e.Property(x => x.DefaultValue).HasColumnName("default_value").HasMaxLength(500);
-            e.Property(x => x.ValidationRule).HasColumnName("validation_rule").HasColumnType("jsonb");
-            e.Property(x => x.AllowedValues).HasColumnName("allowed_values").HasColumnType("jsonb");
-
-            e.HasIndex(x => new { x.CompositeTypeId, x.FieldName })
-                .IsUnique().HasDatabaseName("uq_composite_field");
-
-            e.HasOne(x => x.CompositeType).WithMany(t => t.Fields)
-                .HasForeignKey(x => x.CompositeTypeId).OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(x => x.RefCompositeType).WithMany()
-                .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
-
-            // ★ #4：单位外键（Restrict）
-            e.HasOne(x => x.Unit).WithMany()
-                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
-
-            // ★ #8：选项集外键（Restrict）
-            e.HasOne(x => x.RefOptionSet).WithMany()
-                .HasForeignKey(x => x.RefOptionSetId).OnDelete(DeleteBehavior.Restrict);
-        });
-    }
-
-    private static void ConfigureOptionSets(ModelBuilder mb)
-    {
-        mb.Entity<OptionSet>(e =>
-        {
-            e.ToTable("option_sets");
-            e.HasKey(x => x.OptionSetId);
-            e.Property(x => x.OptionSetId)
-                .HasColumnName("option_set_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.SetName).HasColumnName("set_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");   // ★ 新增
-
-            // ★ 改为 partial unique index：软删的集合不占用 SetName
-            e.HasIndex(x => new { x.EntityType, x.SetName })
-                .IsUnique()
-                .HasDatabaseName("uq_option_set")
-                .HasFilter("is_deleted = false");
-        });
-
-        mb.Entity<OptionItem>(e =>
-        {
-            e.ToTable("option_items");
-            e.HasKey(x => x.OptionItemId);
-            e.Property(x => x.OptionItemId)
-                .HasColumnName("option_item_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.OptionSetId).HasColumnName("option_set_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.Value).HasColumnName("value").HasMaxLength(200).IsRequired();
-            e.Property(x => x.Label).HasColumnName("label").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
-            e.Property(x => x.IsDefault).HasColumnName("is_default");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
-
-            e.HasIndex(x => new { x.OptionSetId, x.Value })
-                .IsUnique().HasDatabaseName("uq_option_item_value");
-            e.HasIndex(x => x.OptionSetId).HasDatabaseName("ix_option_items_set");
-
-            e.HasOne(x => x.OptionSet).WithMany(s => s.Items)
-                .HasForeignKey(x => x.OptionSetId).OnDelete(DeleteBehavior.Cascade);
-        });
-    }
-
-    private static void ConfigureCustomTables(ModelBuilder mb)
-    {
-        mb.Entity<CustomTableDefinition>(e =>
-        {
-            e.ToTable("custom_table_definitions");
-            e.HasKey(x => x.TableDefinitionId);
-            e.Property(x => x.TableDefinitionId)
-                .HasColumnName("table_definition_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.TableName).HasColumnName("table_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.Version).HasColumnName("version");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
-            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            e.HasIndex(x => new { x.EntityType, x.TableName, x.Version })
-                .IsUnique().HasDatabaseName("uq_custom_table");
-        });
-
-        mb.Entity<CustomTableColumn>(e =>
-        {
-            e.ToTable("custom_table_columns");
-            e.HasKey(x => x.ColumnId);
-            e.Property(x => x.ColumnId)
-                .HasColumnName("column_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.TableDefinitionId).HasColumnName("table_definition_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.ColumnName).HasColumnName("column_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
-            e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
-            e.Property(x => x.IsRequired).HasColumnName("is_required");
-            e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
-            e.Property(x => x.IsSortable).HasColumnName("is_sortable");
-            e.Property(x => x.IsUnique).HasColumnName("is_unique");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
-            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
-            e.Property(x => x.DefaultValue).HasColumnName("default_value").HasMaxLength(500);
-            e.Property(x => x.ValidationRule).HasColumnName("validation_rule").HasColumnType("jsonb");
-            e.Property(x => x.AllowedValues).HasColumnName("allowed_values").HasColumnType("jsonb");
-
-            e.HasIndex(x => new { x.TableDefinitionId, x.ColumnName })
-                .IsUnique().HasDatabaseName("uq_custom_table_column");
-
-            e.HasOne(x => x.Table).WithMany(t => t.Columns)
-                .HasForeignKey(x => x.TableDefinitionId).OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(x => x.RefCompositeType).WithMany()
-                .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
-        });
-
-        mb.Entity<CustomTableRow>(e =>
-        {
-            e.ToTable("custom_table_rows");
-            e.HasKey(x => x.RowId);
-            e.Property(x => x.RowId)
-                .HasColumnName("row_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.TableDefinitionId).HasColumnName("table_definition_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.ParentEntityId).HasColumnName("parent_entity_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.ParentEntityType).HasColumnName("parent_entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.RowData).HasColumnName("row_data").HasColumnType("jsonb").IsRequired();
-            e.Property(x => x.RowOrder).HasColumnName("row_order");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            e.HasIndex(x => new { x.ParentEntityType, x.ParentEntityId, x.AttributeId })
-                .HasDatabaseName("ix_ctr_parent");
-            e.HasIndex(x => x.TableDefinitionId).HasDatabaseName("ix_ctr_table");
-            e.HasIndex(x => x.RowData).HasDatabaseName("ix_ctr_rowdata").HasMethod("GIN");
-            e.HasIndex(x => new { x.ParentEntityId, x.AttributeId, x.RowOrder })
-                .HasDatabaseName("ix_ctr_order");
-
-            e.HasOne(x => x.Attribute).WithMany()
-                .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(x => x.Table).WithMany()
-                .HasForeignKey(x => x.TableDefinitionId).OnDelete(DeleteBehavior.Restrict);
-        });
-    }
-
-    private static void ConfigureAuditLog(ModelBuilder mb)
-    {
-        mb.Entity<AttributeAuditLog>(e =>
-        {
-            e.ToTable("attribute_audit_log");
-            e.HasKey(x => x.AuditId);
-            e.Property(x => x.AuditId)
-                .HasColumnName("audit_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.OldValue).HasColumnName("old_value");
-            e.Property(x => x.NewValue).HasColumnName("new_value");
-            e.Property(x => x.ChangeType).HasColumnName("change_type").HasMaxLength(20).IsRequired();
-            e.Property(x => x.ChangedBy).HasColumnName("changed_by").HasMaxLength(200).IsRequired();
-            e.Property(x => x.ChangedAt).HasColumnName("changed_at");
-            e.Property(x => x.CorrelationId).HasColumnName("correlation_id").HasMaxLength(100);
-            e.Property(x => x.ClientIp).HasColumnName("client_ip").HasMaxLength(50);
-
-            e.HasIndex(x => new { x.EntityType, x.EntityId, x.ChangedAt })
-                .HasDatabaseName("ix_audit_entity")
-                .IsDescending(false, false, true);
-            e.HasIndex(x => x.ChangedAt).HasDatabaseName("ix_audit_time");
-        });
-    }
-}
-```
-
-## 文件 9/41 TreeGraph.Api/Data/Migrations/20261002100058_Initial.cs
-
-```csharp
-using System;
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore.Migrations;
-
-#nullable disable
-
-namespace TreeGraph.Api.Data.Migrations
-{
-    /// <inheritdoc />
-    public partial class Initial : Migration
-    {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.CreateTable(
-                name: "attribute_audit_log",
-                columns: table => new
-                {
-                    audit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    old_value = table.Column<string>(type: "text", nullable: true),
-                    new_value = table.Column<string>(type: "text", nullable: true),
-                    change_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    changed_by = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    changed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    correlation_id = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    client_ip = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_attribute_audit_log", x => x.audit_id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "composite_type_definitions",
-                columns: table => new
-                {
-                    composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    type_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    version = table.Column<int>(type: "integer", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_composite_type_definitions", x => x.composite_type_id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "custom_table_definitions",
-                columns: table => new
-                {
-                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    table_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    version = table.Column<int>(type: "integer", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_custom_table_definitions", x => x.table_definition_id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "option_sets",
-                columns: table => new
-                {
-                    option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    set_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_option_sets", x => x.option_set_id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "units",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    category = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    symbol = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    to_base_factor = table.Column<decimal>(type: "numeric(38,15)", precision: 38, scale: 15, nullable: false),
-                    is_base_unit = table.Column<bool>(type: "boolean", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_units", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "custom_table_columns",
-                columns: table => new
-                {
-                    column_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    column_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    is_required = table.Column<bool>(type: "boolean", nullable: false),
-                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_unique = table.Column<bool>(type: "boolean", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_custom_table_columns", x => x.column_id);
-                    table.ForeignKey(
-                        name: "FK_custom_table_columns_composite_type_definitions_ref_composi~",
-                        column: x => x.ref_composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_custom_table_columns_custom_table_definitions_table_definit~",
-                        column: x => x.table_definition_id,
-                        principalTable: "custom_table_definitions",
-                        principalColumn: "table_definition_id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "option_items",
-                columns: table => new
-                {
-                    option_item_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    value = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    label = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    is_default = table.Column<bool>(type: "boolean", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_option_items", x => x.option_item_id);
-                    table.ForeignKey(
-                        name: "FK_option_items_option_sets_option_set_id",
-                        column: x => x.option_set_id,
-                        principalTable: "option_sets",
-                        principalColumn: "option_set_id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "attribute_catalog",
-                columns: table => new
-                {
-                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    is_required = table.Column<bool>(type: "boolean", nullable: false),
-                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    version = table.Column<int>(type: "integer", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    ref_table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    unit_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_attribute_catalog", x => x.attribute_id);
-                    table.CheckConstraint("ck_attr_int_no_unit", "data_type <> 'int' OR unit_id IS NULL");
-                    table.ForeignKey(
-                        name: "FK_attribute_catalog_composite_type_definitions_ref_composite_~",
-                        column: x => x.ref_composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_attribute_catalog_custom_table_definitions_ref_table_defini~",
-                        column: x => x.ref_table_definition_id,
-                        principalTable: "custom_table_definitions",
-                        principalColumn: "table_definition_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_attribute_catalog_option_sets_ref_option_set_id",
-                        column: x => x.ref_option_set_id,
-                        principalTable: "option_sets",
-                        principalColumn: "option_set_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_attribute_catalog_units_unit_id",
-                        column: x => x.unit_id,
-                        principalTable: "units",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "composite_field_definitions",
-                columns: table => new
-                {
-                    field_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    field_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    unit_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    is_array = table.Column<bool>(type: "boolean", nullable: false),
-                    is_required = table.Column<bool>(type: "boolean", nullable: false),
-                    is_searchable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_sortable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    validation_rule = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_composite_field_definitions", x => x.field_id);
-                    table.CheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
-                    table.CheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_composite_type_definitions_comp~",
-                        column: x => x.composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_composite_type_definitions_ref_~",
-                        column: x => x.ref_composite_type_id,
-                        principalTable: "composite_type_definitions",
-                        principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_option_sets_ref_option_set_id",
-                        column: x => x.ref_option_set_id,
-                        principalTable: "option_sets",
-                        principalColumn: "option_set_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_composite_field_definitions_units_unit_id",
-                        column: x => x.unit_id,
-                        principalTable: "units",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "attribute_values",
-                columns: table => new
-                {
-                    value_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    value_string = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
-                    value_int = table.Column<long>(type: "bigint", nullable: true),
-                    value_decimal = table.Column<decimal>(type: "numeric(38,15)", precision: 38, scale: 15, nullable: true),
-                    value_bool = table.Column<bool>(type: "boolean", nullable: true),
-                    value_datetime = table.Column<DateTimeOffset>(type: "timestamptz", nullable: true),
-                    value_dateonly = table.Column<DateOnly>(type: "date", nullable: true),
-                    value_time = table.Column<TimeOnly>(type: "time(0) without time zone", nullable: true),
-                    value_file_meta = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    value_jsonb = table.Column<JsonDocument>(type: "jsonb", nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    unit_id = table.Column<Guid>(type: "uuid", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_attribute_values", x => x.value_id);
-                    table.ForeignKey(
-                        name: "FK_attribute_values_attribute_catalog_attribute_id",
-                        column: x => x.attribute_id,
-                        principalTable: "attribute_catalog",
-                        principalColumn: "attribute_id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_attribute_values_units_unit_id",
-                        column: x => x.unit_id,
-                        principalTable: "units",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "custom_table_rows",
-                columns: table => new
-                {
-                    row_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    parent_entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    parent_entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    row_data = table.Column<JsonDocument>(type: "jsonb", nullable: false),
-                    row_order = table.Column<int>(type: "integer", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_custom_table_rows", x => x.row_id);
-                    table.ForeignKey(
-                        name: "FK_custom_table_rows_attribute_catalog_attribute_id",
-                        column: x => x.attribute_id,
-                        principalTable: "attribute_catalog",
-                        principalColumn: "attribute_id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_custom_table_rows_custom_table_definitions_table_definition~",
-                        column: x => x.table_definition_id,
-                        principalTable: "custom_table_definitions",
-                        principalColumn: "table_definition_id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_audit_entity",
-                table: "attribute_audit_log",
-                columns: new[] { "entity_type", "entity_id", "changed_at" },
-                descending: new[] { false, false, true });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_audit_time",
-                table: "attribute_audit_log",
-                column: "changed_at");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_attr_catalog_entity",
-                table: "attribute_catalog",
-                column: "entity_type",
-                filter: "is_deleted = false");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_attribute_catalog_ref_composite_type_id",
-                table: "attribute_catalog",
-                column: "ref_composite_type_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_attribute_catalog_ref_option_set_id",
-                table: "attribute_catalog",
-                column: "ref_option_set_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_attribute_catalog_ref_table_definition_id",
-                table: "attribute_catalog",
-                column: "ref_table_definition_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_attribute_catalog_unit_id",
-                table: "attribute_catalog",
-                column: "unit_id");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_attr_catalog",
-                table: "attribute_catalog",
-                columns: new[] { "entity_type", "attribute_name" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_attribute_values_unit_id",
-                table: "attribute_values",
-                column: "unit_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_attr_bool",
-                table: "attribute_values",
-                columns: new[] { "attribute_id", "value_bool" },
-                filter: "value_bool IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_attr_dateonly",
-                table: "attribute_values",
-                columns: new[] { "attribute_id", "value_dateonly" },
-                filter: "value_dateonly IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_attr_datetime",
-                table: "attribute_values",
-                columns: new[] { "attribute_id", "value_datetime" },
-                filter: "value_datetime IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_attr_decimal",
-                table: "attribute_values",
-                columns: new[] { "attribute_id", "value_decimal" },
-                filter: "value_decimal IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_attr_int",
-                table: "attribute_values",
-                columns: new[] { "attribute_id", "value_int" },
-                filter: "value_int IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_attr_string",
-                table: "attribute_values",
-                columns: new[] { "attribute_id", "value_string" },
-                filter: "value_string IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_attr_time",
-                table: "attribute_values",
-                columns: new[] { "attribute_id", "value_time" },
-                filter: "value_time IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_entity",
-                table: "attribute_values",
-                columns: new[] { "entity_type", "entity_id" });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_entity_updated",
-                table: "attribute_values",
-                columns: new[] { "entity_type", "entity_id", "updated_at" },
-                descending: new[] { false, false, true });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_file_meta",
-                table: "attribute_values",
-                column: "value_file_meta",
-                filter: "value_file_meta IS NOT NULL")
-                .Annotation("Npgsql:IndexMethod", "GIN");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_av_jsonb",
-                table: "attribute_values",
-                column: "value_jsonb",
-                filter: "value_jsonb IS NOT NULL")
-                .Annotation("Npgsql:IndexMethod", "GIN");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_av_entity_attr",
-                table: "attribute_values",
-                columns: new[] { "entity_id", "entity_type", "attribute_id" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_composite_field_definitions_ref_composite_type_id",
-                table: "composite_field_definitions",
-                column: "ref_composite_type_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_composite_field_definitions_ref_option_set_id",
-                table: "composite_field_definitions",
-                column: "ref_option_set_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_composite_field_definitions_unit_id",
-                table: "composite_field_definitions",
-                column: "unit_id");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_composite_field",
-                table: "composite_field_definitions",
-                columns: new[] { "composite_type_id", "field_name" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "uq_composite_type",
-                table: "composite_type_definitions",
-                columns: new[] { "entity_type", "type_name", "version" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_custom_table_columns_ref_composite_type_id",
-                table: "custom_table_columns",
-                column: "ref_composite_type_id");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_custom_table_column",
-                table: "custom_table_columns",
-                columns: new[] { "table_definition_id", "column_name" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "uq_custom_table",
-                table: "custom_table_definitions",
-                columns: new[] { "entity_type", "table_name", "version" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "ix_ctr_order",
-                table: "custom_table_rows",
-                columns: new[] { "parent_entity_id", "attribute_id", "row_order" });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_ctr_parent",
-                table: "custom_table_rows",
-                columns: new[] { "parent_entity_type", "parent_entity_id", "attribute_id" });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_ctr_rowdata",
-                table: "custom_table_rows",
-                column: "row_data")
-                .Annotation("Npgsql:IndexMethod", "GIN");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_ctr_table",
-                table: "custom_table_rows",
-                column: "table_definition_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_custom_table_rows_attribute_id",
-                table: "custom_table_rows",
-                column: "attribute_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_option_items_set",
-                table: "option_items",
-                column: "option_set_id");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_option_item_value",
-                table: "option_items",
-                columns: new[] { "option_set_id", "value" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "uq_option_set",
-                table: "option_sets",
-                columns: new[] { "entity_type", "set_name" },
-                unique: true,
-                filter: "is_deleted = false");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_unit_category_base",
-                table: "units",
-                column: "category",
-                unique: true,
-                filter: "is_base_unit = true");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_unit_category_name",
-                table: "units",
-                columns: new[] { "category", "name" },
-                unique: true);
-        }
-
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropTable(
-                name: "attribute_audit_log");
-
-            migrationBuilder.DropTable(
-                name: "attribute_values");
-
-            migrationBuilder.DropTable(
-                name: "composite_field_definitions");
-
-            migrationBuilder.DropTable(
-                name: "custom_table_columns");
-
-            migrationBuilder.DropTable(
-                name: "custom_table_rows");
-
-            migrationBuilder.DropTable(
-                name: "option_items");
-
-            migrationBuilder.DropTable(
-                name: "attribute_catalog");
-
-            migrationBuilder.DropTable(
-                name: "composite_type_definitions");
-
-            migrationBuilder.DropTable(
-                name: "custom_table_definitions");
-
-            migrationBuilder.DropTable(
-                name: "option_sets");
-
-            migrationBuilder.DropTable(
-                name: "units");
-        }
-    }
-}
-```
-
-## 文件 10/41 TreeGraph.Api/Data/Migrations/20261002100058_Initial.Designer.cs
-
-```csharp
-// <auto-generated />
-using System;
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using TreeGraph.Api.Data;
-
-#nullable disable
-
-namespace TreeGraph.Api.Data.Migrations
-{
-    [DbContext(typeof(EavDbContext))]
-    [Migration("20261002100058_Initial")]
-    partial class Initial
-    {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
-        {
-#pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
-
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeAuditLog", b =>
-                {
-                    b.Property<string>("AuditId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("audit_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<string>("AttributeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("attribute_id");
-
-                    b.Property<string>("AttributeName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("attribute_name");
-
-                    b.Property<string>("ChangeType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("change_type");
-
-                    b.Property<DateTimeOffset>("ChangedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("changed_at");
-
-                    b.Property<string>("ChangedBy")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("changed_by");
-
-                    b.Property<string>("ClientIp")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("client_ip");
-
-                    b.Property<string>("CorrelationId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("correlation_id");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("entity_id");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<string>("NewValue")
-                        .HasColumnType("text")
-                        .HasColumnName("new_value");
-
-                    b.Property<string>("OldValue")
-                        .HasColumnType("text")
-                        .HasColumnName("old_value");
-
-                    b.HasKey("AuditId");
-
-                    b.HasIndex("ChangedAt")
-                        .HasDatabaseName("ix_audit_time");
-
-                    b.HasIndex("EntityType", "EntityId", "ChangedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("ix_audit_entity");
-
-                    b.ToTable("attribute_audit_log", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeDefinition", b =>
-                {
-                    b.Property<string>("AttributeId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("attribute_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<JsonDocument>("AllowedValues")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("allowed_values");
-
-                    b.Property<string>("AttributeName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("attribute_name");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DataType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("data_type");
-
-                    b.Property<string>("DefaultValue")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("default_value");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_required");
-
-                    b.Property<bool>("IsSearchable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_searchable");
-
-                    b.Property<bool>("IsSortable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_sortable");
-
-                    b.Property<string>("RefCompositeTypeId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_composite_type_id");
-
-                    b.Property<string>("RefOptionSetId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_option_set_id");
-
-                    b.Property<string>("RefTableDefinitionId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_table_definition_id");
-
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unit_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<JsonDocument>("ValidationRule")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("validation_rule");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.HasKey("AttributeId");
-
-                    b.HasIndex("EntityType")
-                        .HasDatabaseName("ix_attr_catalog_entity")
-                        .HasFilter("is_deleted = false");
-
-                    b.HasIndex("RefCompositeTypeId");
-
-                    b.HasIndex("RefOptionSetId");
-
-                    b.HasIndex("RefTableDefinitionId");
-
-                    b.HasIndex("UnitId");
-
-                    b.HasIndex("EntityType", "AttributeName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_attr_catalog");
-
-                    b.ToTable("attribute_catalog", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_attr_int_no_unit", "data_type <> 'int' OR unit_id IS NULL");
-                        });
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeValue", b =>
-                {
-                    b.Property<string>("ValueId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("value_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<string>("AttributeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("attribute_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("entity_id");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unit_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<bool?>("ValueBool")
-                        .HasColumnType("boolean")
-                        .HasColumnName("value_bool");
-
-                    b.Property<DateOnly?>("ValueDateOnly")
-                        .HasColumnType("date")
-                        .HasColumnName("value_dateonly");
-
-                    b.Property<DateTimeOffset?>("ValueDatetime")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("value_datetime");
-
-                    b.Property<decimal?>("ValueDecimal")
-                        .HasPrecision(38, 15)
-                        .HasColumnType("numeric(38,15)")
-                        .HasColumnName("value_decimal");
-
-                    b.Property<JsonDocument>("ValueFileMeta")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("value_file_meta");
-
-                    b.Property<long?>("ValueInt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("value_int");
-
-                    b.Property<JsonDocument>("ValueJsonb")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("value_jsonb");
-
-                    b.Property<string>("ValueString")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("value_string");
-
-                    b.Property<TimeOnly?>("ValueTime")
-                        .HasColumnType("time(0)")
-                        .HasColumnName("value_time");
-
-                    b.HasKey("ValueId");
-
-                    b.HasIndex("UnitId");
-
-                    b.HasIndex("ValueFileMeta")
-                        .HasDatabaseName("ix_av_file_meta")
-                        .HasFilter("value_file_meta IS NOT NULL");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueFileMeta"), "GIN");
-
-                    b.HasIndex("ValueJsonb")
-                        .HasDatabaseName("ix_av_jsonb")
-                        .HasFilter("value_jsonb IS NOT NULL");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueJsonb"), "GIN");
-
-                    b.HasIndex("AttributeId", "ValueBool")
-                        .HasDatabaseName("ix_av_attr_bool")
-                        .HasFilter("value_bool IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueDateOnly")
-                        .HasDatabaseName("ix_av_attr_dateonly")
-                        .HasFilter("value_dateonly IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueDatetime")
-                        .HasDatabaseName("ix_av_attr_datetime")
-                        .HasFilter("value_datetime IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueDecimal")
-                        .HasDatabaseName("ix_av_attr_decimal")
-                        .HasFilter("value_decimal IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueInt")
-                        .HasDatabaseName("ix_av_attr_int")
-                        .HasFilter("value_int IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueString")
-                        .HasDatabaseName("ix_av_attr_string")
-                        .HasFilter("value_string IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueTime")
-                        .HasDatabaseName("ix_av_attr_time")
-                        .HasFilter("value_time IS NOT NULL");
-
-                    b.HasIndex("EntityType", "EntityId")
-                        .HasDatabaseName("ix_av_entity");
-
-                    b.HasIndex("EntityId", "EntityType", "AttributeId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_av_entity_attr");
-
-                    b.HasIndex("EntityType", "EntityId", "UpdatedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("ix_av_entity_updated");
-
-                    b.ToTable("attribute_values", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CompositeFieldDefinition", b =>
-                {
-                    b.Property<string>("FieldId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("field_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<JsonDocument>("AllowedValues")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("allowed_values");
-
-                    b.Property<string>("CompositeTypeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("composite_type_id");
-
-                    b.Property<string>("DataType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("data_type");
-
-                    b.Property<string>("DefaultValue")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("default_value");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<string>("FieldName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("field_name");
-
-                    b.Property<bool>("IsArray")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_array");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_required");
-
-                    b.Property<bool>("IsSearchable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_searchable");
-
-                    b.Property<bool>("IsSortable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_sortable");
-
-                    b.Property<string>("RefCompositeTypeId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_composite_type_id");
-
-                    b.Property<string>("RefOptionSetId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_option_set_id");
-
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unit_id");
-
-                    b.Property<JsonDocument>("ValidationRule")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("validation_rule");
-
-                    b.HasKey("FieldId");
-
-                    b.HasIndex("RefCompositeTypeId");
-
-                    b.HasIndex("RefOptionSetId");
-
-                    b.HasIndex("UnitId");
-
-                    b.HasIndex("CompositeTypeId", "FieldName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_composite_field");
-
-                    b.ToTable("composite_field_definitions", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
-
-                            t.HasCheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
-                        });
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CompositeTypeDefinition", b =>
-                {
-                    b.Property<string>("CompositeTypeId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("composite_type_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("TypeName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("type_name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.HasKey("CompositeTypeId");
-
-                    b.HasIndex("EntityType", "TypeName", "Version")
-                        .IsUnique()
-                        .HasDatabaseName("uq_composite_type");
-
-                    b.ToTable("composite_type_definitions", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableColumn", b =>
-                {
-                    b.Property<string>("ColumnId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("column_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<JsonDocument>("AllowedValues")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("allowed_values");
-
-                    b.Property<string>("ColumnName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("column_name");
-
-                    b.Property<string>("DataType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("data_type");
-
-                    b.Property<string>("DefaultValue")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("default_value");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_required");
-
-                    b.Property<bool>("IsSearchable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_searchable");
-
-                    b.Property<bool>("IsSortable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_sortable");
-
-                    b.Property<bool>("IsUnique")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_unique");
-
-                    b.Property<string>("RefCompositeTypeId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_composite_type_id");
-
-                    b.Property<string>("TableDefinitionId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("table_definition_id");
-
-                    b.Property<JsonDocument>("ValidationRule")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("validation_rule");
-
-                    b.HasKey("ColumnId");
-
-                    b.HasIndex("RefCompositeTypeId");
-
-                    b.HasIndex("TableDefinitionId", "ColumnName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_custom_table_column");
-
-                    b.ToTable("custom_table_columns", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableDefinition", b =>
-                {
-                    b.Property<string>("TableDefinitionId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("table_definition_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("TableName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("table_name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.HasKey("TableDefinitionId");
-
-                    b.HasIndex("EntityType", "TableName", "Version")
-                        .IsUnique()
-                        .HasDatabaseName("uq_custom_table");
-
-                    b.ToTable("custom_table_definitions", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableRow", b =>
-                {
-                    b.Property<string>("RowId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("row_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<string>("AttributeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("attribute_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("ParentEntityId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("parent_entity_id");
-
-                    b.Property<string>("ParentEntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("parent_entity_type");
-
-                    b.Property<JsonDocument>("RowData")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("row_data");
-
-                    b.Property<int>("RowOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("row_order");
-
-                    b.Property<string>("TableDefinitionId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("table_definition_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("RowId");
-
-                    b.HasIndex("AttributeId");
-
-                    b.HasIndex("RowData")
-                        .HasDatabaseName("ix_ctr_rowdata");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("RowData"), "GIN");
-
-                    b.HasIndex("TableDefinitionId")
-                        .HasDatabaseName("ix_ctr_table");
-
-                    b.HasIndex("ParentEntityId", "AttributeId", "RowOrder")
-                        .HasDatabaseName("ix_ctr_order");
-
-                    b.HasIndex("ParentEntityType", "ParentEntityId", "AttributeId")
-                        .HasDatabaseName("ix_ctr_parent");
-
-                    b.ToTable("custom_table_rows", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.OptionItem", b =>
-                {
-                    b.Property<string>("OptionItemId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("option_item_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_default");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("label");
-
-                    b.Property<string>("OptionSetId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("option_set_id");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("value");
-
-                    b.HasKey("OptionItemId");
-
-                    b.HasIndex("OptionSetId")
-                        .HasDatabaseName("ix_option_items_set");
-
-                    b.HasIndex("OptionSetId", "Value")
-                        .IsUnique()
-                        .HasDatabaseName("uq_option_item_value");
-
-                    b.ToTable("option_items", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.OptionSet", b =>
-                {
-                    b.Property<string>("OptionSetId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("option_set_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("SetName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("set_name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("OptionSetId");
-
-                    b.HasIndex("EntityType", "SetName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_option_set")
-                        .HasFilter("is_deleted = false");
-
-                    b.ToTable("option_sets", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.Unit", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("category");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<bool>("IsBaseUnit")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_base_unit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Symbol")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("symbol");
-
-                    b.Property<decimal>("ToBaseFactor")
-                        .HasPrecision(38, 15)
-                        .HasColumnType("numeric(38,15)")
-                        .HasColumnName("to_base_factor");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Category")
-                        .IsUnique()
-                        .HasDatabaseName("uq_unit_category_base")
-                        .HasFilter("is_base_unit = true");
-
-                    b.HasIndex("Category", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("uq_unit_category_name");
-
-                    b.ToTable("units", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeDefinition", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.CompositeTypeDefinition", "RefCompositeType")
-                        .WithMany()
-                        .HasForeignKey("RefCompositeTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.OptionSet", "RefOptionSet")
-                        .WithMany()
-                        .HasForeignKey("RefOptionSetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.CustomTableDefinition", "RefTableDefinition")
-                        .WithMany()
-                        .HasForeignKey("RefTableDefinitionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("RefCompositeType");
-
-                    b.Navigation("RefOptionSet");
-
-                    b.Navigation("RefTableDefinition");
-
-                    b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeValue", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.AttributeDefinition", "Attribute")
-                        .WithMany()
-                        .HasForeignKey("AttributeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TreeGraph.Api.Entities.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Attribute");
-
-                    b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CompositeFieldDefinition", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.CompositeTypeDefinition", "CompositeType")
-                        .WithMany("Fields")
-                        .HasForeignKey("CompositeTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TreeGraph.Api.Entities.CompositeTypeDefinition", "RefCompositeType")
-                        .WithMany()
-                        .HasForeignKey("RefCompositeTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.OptionSet", "RefOptionSet")
-                        .WithMany()
-                        .HasForeignKey("RefOptionSetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("CompositeType");
-
-                    b.Navigation("RefCompositeType");
-
-                    b.Navigation("RefOptionSet");
-
-                    b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableColumn", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.CompositeTypeDefinition", "RefCompositeType")
-                        .WithMany()
-                        .HasForeignKey("RefCompositeTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.CustomTableDefinition", "Table")
-                        .WithMany("Columns")
-                        .HasForeignKey("TableDefinitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("RefCompositeType");
-
-                    b.Navigation("Table");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableRow", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.AttributeDefinition", "Attribute")
-                        .WithMany()
-                        .HasForeignKey("AttributeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TreeGraph.Api.Entities.CustomTableDefinition", "Table")
-                        .WithMany()
-                        .HasForeignKey("TableDefinitionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Attribute");
-
-                    b.Navigation("Table");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.OptionItem", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.OptionSet", "OptionSet")
-                        .WithMany("Items")
-                        .HasForeignKey("OptionSetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("OptionSet");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CompositeTypeDefinition", b =>
-                {
-                    b.Navigation("Fields");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableDefinition", b =>
-                {
-                    b.Navigation("Columns");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.OptionSet", b =>
-                {
-                    b.Navigation("Items");
-                });
-#pragma warning restore 612, 618
-        }
-    }
-}
-```
-
-## 文件 11/41 TreeGraph.Api/Data/Migrations/EavDbContextModelSnapshot.cs
-
-```csharp
-// <auto-generated />
-using System;
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using TreeGraph.Api.Data;
-
-#nullable disable
-
-namespace TreeGraph.Api.Data.Migrations
-{
-    [DbContext(typeof(EavDbContext))]
-    partial class EavDbContextModelSnapshot : ModelSnapshot
-    {
-        protected override void BuildModel(ModelBuilder modelBuilder)
-        {
-#pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
-
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeAuditLog", b =>
-                {
-                    b.Property<string>("AuditId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("audit_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<string>("AttributeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("attribute_id");
-
-                    b.Property<string>("AttributeName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("attribute_name");
-
-                    b.Property<string>("ChangeType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("change_type");
-
-                    b.Property<DateTimeOffset>("ChangedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("changed_at");
-
-                    b.Property<string>("ChangedBy")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("changed_by");
-
-                    b.Property<string>("ClientIp")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("client_ip");
-
-                    b.Property<string>("CorrelationId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("correlation_id");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("entity_id");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<string>("NewValue")
-                        .HasColumnType("text")
-                        .HasColumnName("new_value");
-
-                    b.Property<string>("OldValue")
-                        .HasColumnType("text")
-                        .HasColumnName("old_value");
-
-                    b.HasKey("AuditId");
-
-                    b.HasIndex("ChangedAt")
-                        .HasDatabaseName("ix_audit_time");
-
-                    b.HasIndex("EntityType", "EntityId", "ChangedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("ix_audit_entity");
-
-                    b.ToTable("attribute_audit_log", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeDefinition", b =>
-                {
-                    b.Property<string>("AttributeId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("attribute_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<JsonDocument>("AllowedValues")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("allowed_values");
-
-                    b.Property<string>("AttributeName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("attribute_name");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DataType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("data_type");
-
-                    b.Property<string>("DefaultValue")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("default_value");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_required");
-
-                    b.Property<bool>("IsSearchable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_searchable");
-
-                    b.Property<bool>("IsSortable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_sortable");
-
-                    b.Property<string>("RefCompositeTypeId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_composite_type_id");
-
-                    b.Property<string>("RefOptionSetId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_option_set_id");
-
-                    b.Property<string>("RefTableDefinitionId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_table_definition_id");
-
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unit_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<JsonDocument>("ValidationRule")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("validation_rule");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.HasKey("AttributeId");
-
-                    b.HasIndex("EntityType")
-                        .HasDatabaseName("ix_attr_catalog_entity")
-                        .HasFilter("is_deleted = false");
-
-                    b.HasIndex("RefCompositeTypeId");
-
-                    b.HasIndex("RefOptionSetId");
-
-                    b.HasIndex("RefTableDefinitionId");
-
-                    b.HasIndex("UnitId");
-
-                    b.HasIndex("EntityType", "AttributeName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_attr_catalog");
-
-                    b.ToTable("attribute_catalog", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_attr_int_no_unit", "data_type <> 'int' OR unit_id IS NULL");
-                        });
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeValue", b =>
-                {
-                    b.Property<string>("ValueId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("value_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<string>("AttributeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("attribute_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("entity_id");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unit_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<bool?>("ValueBool")
-                        .HasColumnType("boolean")
-                        .HasColumnName("value_bool");
-
-                    b.Property<DateOnly?>("ValueDateOnly")
-                        .HasColumnType("date")
-                        .HasColumnName("value_dateonly");
-
-                    b.Property<DateTimeOffset?>("ValueDatetime")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("value_datetime");
-
-                    b.Property<decimal?>("ValueDecimal")
-                        .HasPrecision(38, 15)
-                        .HasColumnType("numeric(38,15)")
-                        .HasColumnName("value_decimal");
-
-                    b.Property<JsonDocument>("ValueFileMeta")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("value_file_meta");
-
-                    b.Property<long?>("ValueInt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("value_int");
-
-                    b.Property<JsonDocument>("ValueJsonb")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("value_jsonb");
-
-                    b.Property<string>("ValueString")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("value_string");
-
-                    b.Property<TimeOnly?>("ValueTime")
-                        .HasColumnType("time(0)")
-                        .HasColumnName("value_time");
-
-                    b.HasKey("ValueId");
-
-                    b.HasIndex("UnitId");
-
-                    b.HasIndex("ValueFileMeta")
-                        .HasDatabaseName("ix_av_file_meta")
-                        .HasFilter("value_file_meta IS NOT NULL");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueFileMeta"), "GIN");
-
-                    b.HasIndex("ValueJsonb")
-                        .HasDatabaseName("ix_av_jsonb")
-                        .HasFilter("value_jsonb IS NOT NULL");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ValueJsonb"), "GIN");
-
-                    b.HasIndex("AttributeId", "ValueBool")
-                        .HasDatabaseName("ix_av_attr_bool")
-                        .HasFilter("value_bool IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueDateOnly")
-                        .HasDatabaseName("ix_av_attr_dateonly")
-                        .HasFilter("value_dateonly IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueDatetime")
-                        .HasDatabaseName("ix_av_attr_datetime")
-                        .HasFilter("value_datetime IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueDecimal")
-                        .HasDatabaseName("ix_av_attr_decimal")
-                        .HasFilter("value_decimal IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueInt")
-                        .HasDatabaseName("ix_av_attr_int")
-                        .HasFilter("value_int IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueString")
-                        .HasDatabaseName("ix_av_attr_string")
-                        .HasFilter("value_string IS NOT NULL");
-
-                    b.HasIndex("AttributeId", "ValueTime")
-                        .HasDatabaseName("ix_av_attr_time")
-                        .HasFilter("value_time IS NOT NULL");
-
-                    b.HasIndex("EntityType", "EntityId")
-                        .HasDatabaseName("ix_av_entity");
-
-                    b.HasIndex("EntityId", "EntityType", "AttributeId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_av_entity_attr");
-
-                    b.HasIndex("EntityType", "EntityId", "UpdatedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("ix_av_entity_updated");
-
-                    b.ToTable("attribute_values", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CompositeFieldDefinition", b =>
-                {
-                    b.Property<string>("FieldId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("field_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<JsonDocument>("AllowedValues")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("allowed_values");
-
-                    b.Property<string>("CompositeTypeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("composite_type_id");
-
-                    b.Property<string>("DataType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("data_type");
-
-                    b.Property<string>("DefaultValue")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("default_value");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<string>("FieldName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("field_name");
-
-                    b.Property<bool>("IsArray")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_array");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_required");
-
-                    b.Property<bool>("IsSearchable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_searchable");
-
-                    b.Property<bool>("IsSortable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_sortable");
-
-                    b.Property<string>("RefCompositeTypeId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_composite_type_id");
-
-                    b.Property<string>("RefOptionSetId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_option_set_id");
-
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unit_id");
-
-                    b.Property<JsonDocument>("ValidationRule")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("validation_rule");
-
-                    b.HasKey("FieldId");
-
-                    b.HasIndex("RefCompositeTypeId");
-
-                    b.HasIndex("RefOptionSetId");
-
-                    b.HasIndex("UnitId");
-
-                    b.HasIndex("CompositeTypeId", "FieldName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_composite_field");
-
-                    b.ToTable("composite_field_definitions", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
-
-                            t.HasCheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
-                        });
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CompositeTypeDefinition", b =>
-                {
-                    b.Property<string>("CompositeTypeId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("composite_type_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("TypeName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("type_name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.HasKey("CompositeTypeId");
-
-                    b.HasIndex("EntityType", "TypeName", "Version")
-                        .IsUnique()
-                        .HasDatabaseName("uq_composite_type");
-
-                    b.ToTable("composite_type_definitions", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableColumn", b =>
-                {
-                    b.Property<string>("ColumnId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("column_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<JsonDocument>("AllowedValues")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("allowed_values");
-
-                    b.Property<string>("ColumnName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("column_name");
-
-                    b.Property<string>("DataType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("data_type");
-
-                    b.Property<string>("DefaultValue")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("default_value");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_required");
-
-                    b.Property<bool>("IsSearchable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_searchable");
-
-                    b.Property<bool>("IsSortable")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_sortable");
-
-                    b.Property<bool>("IsUnique")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_unique");
-
-                    b.Property<string>("RefCompositeTypeId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("ref_composite_type_id");
-
-                    b.Property<string>("TableDefinitionId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("table_definition_id");
-
-                    b.Property<JsonDocument>("ValidationRule")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("validation_rule");
-
-                    b.HasKey("ColumnId");
-
-                    b.HasIndex("RefCompositeTypeId");
-
-                    b.HasIndex("TableDefinitionId", "ColumnName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_custom_table_column");
-
-                    b.ToTable("custom_table_columns", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableDefinition", b =>
-                {
-                    b.Property<string>("TableDefinitionId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("table_definition_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("TableName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("table_name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.HasKey("TableDefinitionId");
-
-                    b.HasIndex("EntityType", "TableName", "Version")
-                        .IsUnique()
-                        .HasDatabaseName("uq_custom_table");
-
-                    b.ToTable("custom_table_definitions", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableRow", b =>
-                {
-                    b.Property<string>("RowId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("row_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<string>("AttributeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("attribute_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("ParentEntityId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("parent_entity_id");
-
-                    b.Property<string>("ParentEntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("parent_entity_type");
-
-                    b.Property<JsonDocument>("RowData")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("row_data");
-
-                    b.Property<int>("RowOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("row_order");
-
-                    b.Property<string>("TableDefinitionId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("table_definition_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("RowId");
-
-                    b.HasIndex("AttributeId");
-
-                    b.HasIndex("RowData")
-                        .HasDatabaseName("ix_ctr_rowdata");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("RowData"), "GIN");
-
-                    b.HasIndex("TableDefinitionId")
-                        .HasDatabaseName("ix_ctr_table");
-
-                    b.HasIndex("ParentEntityId", "AttributeId", "RowOrder")
-                        .HasDatabaseName("ix_ctr_order");
-
-                    b.HasIndex("ParentEntityType", "ParentEntityId", "AttributeId")
-                        .HasDatabaseName("ix_ctr_parent");
-
-                    b.ToTable("custom_table_rows", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.OptionItem", b =>
-                {
-                    b.Property<string>("OptionItemId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("option_item_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_default");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("label");
-
-                    b.Property<string>("OptionSetId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("option_set_id");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("value");
-
-                    b.HasKey("OptionItemId");
-
-                    b.HasIndex("OptionSetId")
-                        .HasDatabaseName("ix_option_items_set");
-
-                    b.HasIndex("OptionSetId", "Value")
-                        .IsUnique()
-                        .HasDatabaseName("uq_option_item_value");
-
-                    b.ToTable("option_items", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.OptionSet", b =>
-                {
-                    b.Property<string>("OptionSetId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("option_set_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("SetName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("set_name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("OptionSetId");
-
-                    b.HasIndex("EntityType", "SetName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_option_set")
-                        .HasFilter("is_deleted = false");
-
-                    b.ToTable("option_sets", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.Unit", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("category");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<bool>("IsBaseUnit")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_base_unit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Symbol")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("symbol");
-
-                    b.Property<decimal>("ToBaseFactor")
-                        .HasPrecision(38, 15)
-                        .HasColumnType("numeric(38,15)")
-                        .HasColumnName("to_base_factor");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Category")
-                        .IsUnique()
-                        .HasDatabaseName("uq_unit_category_base")
-                        .HasFilter("is_base_unit = true");
-
-                    b.HasIndex("Category", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("uq_unit_category_name");
-
-                    b.ToTable("units", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeDefinition", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.CompositeTypeDefinition", "RefCompositeType")
-                        .WithMany()
-                        .HasForeignKey("RefCompositeTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.OptionSet", "RefOptionSet")
-                        .WithMany()
-                        .HasForeignKey("RefOptionSetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.CustomTableDefinition", "RefTableDefinition")
-                        .WithMany()
-                        .HasForeignKey("RefTableDefinitionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("RefCompositeType");
-
-                    b.Navigation("RefOptionSet");
-
-                    b.Navigation("RefTableDefinition");
-
-                    b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.AttributeValue", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.AttributeDefinition", "Attribute")
-                        .WithMany()
-                        .HasForeignKey("AttributeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TreeGraph.Api.Entities.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Attribute");
-
-                    b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CompositeFieldDefinition", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.CompositeTypeDefinition", "CompositeType")
-                        .WithMany("Fields")
-                        .HasForeignKey("CompositeTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TreeGraph.Api.Entities.CompositeTypeDefinition", "RefCompositeType")
-                        .WithMany()
-                        .HasForeignKey("RefCompositeTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.OptionSet", "RefOptionSet")
-                        .WithMany()
-                        .HasForeignKey("RefOptionSetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("CompositeType");
-
-                    b.Navigation("RefCompositeType");
-
-                    b.Navigation("RefOptionSet");
-
-                    b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableColumn", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.CompositeTypeDefinition", "RefCompositeType")
-                        .WithMany()
-                        .HasForeignKey("RefCompositeTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("TreeGraph.Api.Entities.CustomTableDefinition", "Table")
-                        .WithMany("Columns")
-                        .HasForeignKey("TableDefinitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("RefCompositeType");
-
-                    b.Navigation("Table");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableRow", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.AttributeDefinition", "Attribute")
-                        .WithMany()
-                        .HasForeignKey("AttributeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TreeGraph.Api.Entities.CustomTableDefinition", "Table")
-                        .WithMany()
-                        .HasForeignKey("TableDefinitionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Attribute");
-
-                    b.Navigation("Table");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.OptionItem", b =>
-                {
-                    b.HasOne("TreeGraph.Api.Entities.OptionSet", "OptionSet")
-                        .WithMany("Items")
-                        .HasForeignKey("OptionSetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("OptionSet");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CompositeTypeDefinition", b =>
-                {
-                    b.Navigation("Fields");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.CustomTableDefinition", b =>
-                {
-                    b.Navigation("Columns");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.Entities.OptionSet", b =>
-                {
-                    b.Navigation("Items");
-                });
-#pragma warning restore 612, 618
-        }
-    }
-}
-```
-
-## 文件 12/41 TreeGraph.Api/Data/Seeding/EavSeeder.cs
-
-```csharp
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
-using TreeGraph.Shared.Eav;
-
-namespace TreeGraph.Api.Data.Seeding;
-
-/// <summary>
-/// 示例元数据种子：组合类型 Specs + Brand、Product 属性目录、
-/// 自定义表 certifications、选项集 gender / quality_grade。
-///
-/// 幂等保证：
-///   - 严格的多表存在性检查（不是只查 AttributeCatalog）
-///   - 整个 seed 包裹在事务中（含 execution strategy 重试兼容）
-///   - 失败时事务回滚，不会留下部分数据
-///
-/// 依赖：UnitSeedService 已先行写入单位（net_weight 需要按符号查 kg 的 Id）。
-/// </summary>
-public static class EavSeeder
-{
-    public static async Task SeedAsync(EavDbContext db, CancellationToken ct = default)
-    {
-        // ── 严格的幂等检查：所有关键实体都存在才跳过 ──
-        if (await IsAlreadySeededAsync(db, ct))
-            return;
-
-        // ── Npgsql 重试策略兼容：用 ExecutionStrategy 包裹整个 seed ──
-        // （裸 BeginTransactionAsync 在 EnableRetryOnFailure 下会抛
-        //   "execution strategy does not support user-initiated transactions"）
-        var strategy = db.Database.CreateExecutionStrategy();
-
-        await strategy.ExecuteAsync(async () =>
-        {
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
-            try
-            {
-                await SeedInternalAsync(db, ct);
-                await tx.CommitAsync(ct);
-            }
-            catch
-            {
-                await tx.RollbackAsync(ct);
-                throw;
-            }
-        });
-    }
-
-    /// <summary>
-    /// 严格幂等检查：以下相关记录都存在才认为已 seed。
-    /// 注意：同一 DbContext 不支持并发查询，必须顺序执行（不能 Task.WhenAll）。
-    /// </summary>
-    private static async Task<bool> IsAlreadySeededAsync(
-        EavDbContext db, CancellationToken ct)
-    {
-        return await db.AttributeCatalog.AnyAsync(a => a.EntityType == "Product", ct)
-            && await db.CompositeTypes.AnyAsync(
-                t => t.EntityType == "Product" && t.TypeName == "Specs", ct)
-            && await db.CompositeTypes.AnyAsync(
-                t => t.EntityType == "Product" && t.TypeName == "Brand", ct)
-            && await db.CustomTables.AnyAsync(
-                t => t.EntityType == "Product" && t.TableName == "certifications", ct)
-            && await db.OptionSets.AnyAsync(
-                s => s.EntityType == "Shared" && s.SetName == "gender", ct)
-            && await db.OptionSets.AnyAsync(
-                s => s.EntityType == "Product" && s.SetName == "quality_grade", ct);
-    }
-
-    /// <summary>实际的 seed 逻辑（在事务中执行，中途 SaveChanges 不落库，Commit 才生效）</summary>
-    private static async Task SeedInternalAsync(EavDbContext db, CancellationToken ct)
-    {
-        // ============================================================
-        // 步骤 1：组合类型 Brand（先建，Specs 要引用它）
-        // ============================================================
-        var brand = new CompositeTypeDefinition
-        {
-            EntityType = "Product",
-            TypeName = "Brand",
-            DisplayName = "品牌",
-            Fields =
-            {
-                new CompositeFieldDefinition
-                {
-                    FieldName = "name", DisplayName = "品牌名",
-                    DataType = EavDataTypes.String, IsSearchable = true, DisplayOrder = 1
-                },
-                new CompositeFieldDefinition
-                {
-                    FieldName = "origin", DisplayName = "产地",
-                    DataType = EavDataTypes.String, DisplayOrder = 2
-                }
-            }
-        };
-        db.CompositeTypes.Add(brand);
-        await db.SaveChangesAsync(ct);
-        // 此时 brand.CompositeTypeId 已生成
-
-        // ============================================================
-        // 步骤 2：组合类型 Specs（直接引用 brand，消除两阶段回填）
-        // ============================================================
-        var specs = new CompositeTypeDefinition
-        {
-            EntityType = "Product",
-            TypeName = "Specs",
-            DisplayName = "规格参数",
-            Fields =
-            {
-                new CompositeFieldDefinition
-                {
-                    FieldName = "color", DisplayName = "颜色",
-                    DataType = EavDataTypes.String, IsSearchable = true, DisplayOrder = 1
-                },
-                new CompositeFieldDefinition
-                {
-                    FieldName = "weight", DisplayName = "重量(kg)",
-                    DataType = EavDataTypes.Decimal, DisplayOrder = 2
-                },
-                new CompositeFieldDefinition
-                {
-                    FieldName = "brand", DisplayName = "品牌信息",
-                    DataType = EavDataTypes.Composite,
-                    RefCompositeTypeId = brand.CompositeTypeId, // ← 直接引用
-                    IsSearchable = true, DisplayOrder = 3
-                }
-            }
-        };
-        db.CompositeTypes.Add(specs);
-        await db.SaveChangesAsync(ct);
-
-        // ============================================================
-        // 步骤 3：查 kg 单位（UnitSeedService 已先执行）
-        // ============================================================
-        var kgUnitId = await db.Units
-            .Where(u => u.Category == "weight" && u.Symbol == "kg")
-            .Select(u => u.Id)
-            .FirstOrDefaultAsync(ct);
-
-        if (kgUnitId == Guid.Empty)
-        {
-            throw new InvalidOperationException(
-                "kg 单位未找到。请确认 UnitSeedService 已在 EavSeeder 之前执行。");
-        }
-
-        // ============================================================
-        // 步骤 4：Product 属性目录（4 个基础属性 + 2 个引用属性）
-        // ============================================================
-        db.AttributeCatalog.AddRange(
-            new AttributeDefinition
-            {
-                EntityType = "Product",
-                AttributeName = "screen_size",
-                DisplayName = "屏幕尺寸",
-                DataType = EavDataTypes.Decimal,
-                IsRequired = true,
-                IsSearchable = true,
-                IsSortable = true,
-                DisplayOrder = 1,
-                ValidationRule = JsonDocument.Parse("""{"min": 0, "max": 200}""")
-            },
-            new AttributeDefinition
-            {
-                EntityType = "Product",
-                AttributeName = "release_date",
-                DisplayName = "发布日期",
-                DataType = EavDataTypes.Date,
-                IsSearchable = true,
-                DisplayOrder = 2
-            },
-            new AttributeDefinition
-            {
-                EntityType = "Product",
-                AttributeName = "net_weight",
-                DisplayName = "净重",
-                DataType = EavDataTypes.Decimal,
-                IsSearchable = true,
-                IsSortable = true,
-                DisplayOrder = 3,
-                UnitId = kgUnitId, // 基准单位：千克
-                ValidationRule = JsonDocument.Parse("""{"min": 0, "max": 10000}""")
-            },
-            new AttributeDefinition
-            {
-                EntityType = "Product",
-                AttributeName = "specs",
-                DisplayName = "规格参数",
-                DataType = EavDataTypes.Composite,
-                IsSearchable = true,
-                DisplayOrder = 4,
-                RefCompositeTypeId = specs.CompositeTypeId
-            });
-
-        // ============================================================
-        // 步骤 5：自定义表 certifications
-        // ============================================================
-        var certs = new CustomTableDefinition
-        {
-            EntityType = "Product",
-            TableName = "certifications",
-            DisplayName = "认证证书",
-            DisplayOrder = 1
-        };
-        certs.Columns.Add(new CustomTableColumn
-        {
-            ColumnName = "cert_name", DisplayName = "证书名称",
-            DataType = EavDataTypes.String,
-            IsRequired = true, IsSearchable = true, IsUnique = true, DisplayOrder = 1
-        });
-        certs.Columns.Add(new CustomTableColumn
-        {
-            ColumnName = "issuer", DisplayName = "颁发机构",
-            DataType = EavDataTypes.String, IsSearchable = true, DisplayOrder = 2
-        });
-        certs.Columns.Add(new CustomTableColumn
-        {
-            ColumnName = "issued_date", DisplayName = "颁发日期",
-            DataType = EavDataTypes.Date, DisplayOrder = 3
-        });
-        db.CustomTables.Add(certs);
-        await db.SaveChangesAsync(ct);
-
-        db.AttributeCatalog.Add(new AttributeDefinition
-        {
-            EntityType = "Product",
-            AttributeName = "certifications",
-            DisplayName = "认证证书",
-            DataType = EavDataTypes.Table,
-            IsSearchable = true,
-            DisplayOrder = 5,
-            RefTableDefinitionId = certs.TableDefinitionId
-        });
-
-        // ============================================================
-        // 步骤 6：选项集 gender（Shared）+ quality_grade（Product）
-        // ============================================================
-        var gender = new OptionSet
-        {
-            EntityType = "Shared", SetName = "gender", DisplayName = "性别"
-        };
-        gender.Items.Add(new OptionItem { Value = "unknown", Label = "未知", DisplayOrder = 1, IsDefault = true });
-        gender.Items.Add(new OptionItem { Value = "male", Label = "男", DisplayOrder = 2 });
-        gender.Items.Add(new OptionItem { Value = "female", Label = "女", DisplayOrder = 3 });
-        gender.Items.Add(new OptionItem { Value = "other", Label = "其他", DisplayOrder = 4 });
-        db.OptionSets.Add(gender);
-
-        var grade = new OptionSet
-        {
-            EntityType = "Product", SetName = "quality_grade", DisplayName = "质量等级"
-        };
-        grade.Items.Add(new OptionItem { Value = "grade_a", Label = "一级", DisplayOrder = 1 });
-        grade.Items.Add(new OptionItem { Value = "grade_b", Label = "二级", DisplayOrder = 2 });
-        grade.Items.Add(new OptionItem { Value = "grade_c", Label = "三级", DisplayOrder = 3 });
-        db.OptionSets.Add(grade);
-        await db.SaveChangesAsync(ct);
-
-        db.AttributeCatalog.Add(new AttributeDefinition
-        {
-            EntityType = "Product",
-            AttributeName = "quality_grade",
-            DisplayName = "质量等级",
-            DataType = EavDataTypes.SingleChoice,
-            IsSearchable = true,
-            DisplayOrder = 6,
-            RefOptionSetId = grade.OptionSetId
-        });
-
-        // 最终一次性提交（之前每步 SaveChanges 已在事务内，最后一次统一落库）
-        await db.SaveChangesAsync(ct);
-    }
-}
-```
-
-## 文件 13/41 TreeGraph.Api/Data/Seeding/UnitSeedService.cs
-
-```csharp
-using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Entities;
-using TreeGraph.Api.Services;
-
-namespace TreeGraph.Api.Data.Seeding;
-
-/// <summary>
-/// 单位种子服务：固定 GUID，运行时一次性写入（幂等）。
-///
-/// ★ GUID 在本文件内显式指定（非随机），便于跨环境引用一致、
-///   便于种子数据与外部系统对齐。
-///
-/// 排除的分类（有意为之）：
-///   - 温度（°C / °F / K）：非线性换算（+273.15），
-///     而 UnitConverter 只做乘法，纳入会导致数据损坏。
-///   - 货币（CNY / USD / ...）：汇率动态，不能用固定 ToBaseFactor。
-///
-/// 注意：若数据库已存在旧单位（随机 GUID），本 seed 会因 AnyAsync()
-/// 直接跳过，不会替换。切换到固定 GUID 需先清空 units 表：
-///   DELETE FROM attribute_values WHERE unit_id IS NOT NULL;  -- 若被引用
-///   DELETE FROM composite_field_definitions WHERE unit_id IS NOT NULL;
-///   UPDATE attribute_catalog SET unit_id = NULL;
-///   DELETE FROM units;
-///   然后重启 API。
-/// </summary>
-public class UnitSeedService
-{
-    private readonly EavDbContext _db;
-    private readonly IUnitCache _unitCache;
-    private readonly ILogger<UnitSeedService> _logger;
-
-    public UnitSeedService(
-        EavDbContext db, IUnitCache unitCache, ILogger<UnitSeedService> logger)
-    {
-        _db = db;
-        _unitCache = unitCache;
-        _logger = logger;
-    }
-
-    public async Task SeedAsync(CancellationToken ct = default)
-    {
-        // 幂等：已有数据则跳过
-        if (await _db.Units.AnyAsync(ct))
-        {
-            _logger.LogInformation("单位表已有数据，跳过 seed");
-            return;
-        }
-
-        var units = BuildUnits();
-        _db.Units.AddRange(units);
-        await _db.SaveChangesAsync(ct);
-        _unitCache.Invalidate();
-
-        _logger.LogInformation("已 seed {Count} 个单位（固定 GUID）", units.Count);
-    }
-
-    /// <summary>
-    /// 构建单位清单：13 个分类、50 个单位。GUID 显式固定。
-    /// </summary>
-    private static List<Unit> BuildUnits()
-    {
-        var units = new List<Unit>();
-        var now = DateTimeOffset.UtcNow;
-
-        // ==================== 长度 length（基准：米） ====================
-        AddCategory(units, "length", baseSymbol: "m", now,
-            ("c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c", "米",     "m",   1.0m,          1),
-            ("d1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", "千米",   "km",  1000m,         2),
-            ("e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", "厘米",   "cm",  0.01m,         3),
-            ("f3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", "毫米",   "mm",  0.001m,        4),
-            ("d7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", "英寸",   "in",  0.0254m,       5),
-            ("c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", "英尺",   "ft",  0.3048m,       6),
-            ("b5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", "码",     "yd",  0.9144m,       7),
-            ("a4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", "英里",   "mi",  1609.344m,     8)
-        );
-
-        // ==================== 重量 weight（基准：千克） ====================
-        AddCategory(units, "weight", baseSymbol: "kg", now,
-            ("e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", "千克", "kg", 1.0m,             1),
-            ("f9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", "克",   "g",  0.001m,           2),
-            ("a0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", "毫克", "mg", 0.000001m,        3),
-            ("b1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", "吨",   "t",  1000m,            4),
-            ("c2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", "磅",   "lb", 0.45359237m,      5),
-            ("d3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", "盎司", "oz", 0.028349523125m,  6)
-        );
-
-        // ==================== 体积 volume（基准：升） ====================
-        AddCategory(units, "volume", baseSymbol: "L", now,
-            ("2d21c35a-4251-479e-b814-060b2fc84445", "立方米", "m³", 1000m,  1),
-            ("7f0af6a9-ba1a-469c-b967-e32afe43cad2", "升",     "L",  1.0m,   2),
-            ("780e7a01-350d-45ec-b963-b36a996de614", "毫升",   "mL", 0.001m, 3)
-        );
-
-        // ==================== 面积 area（基准：平方米） ====================
-        AddCategory(units, "area", baseSymbol: "m²", now,
-            ("e88b04db-40ac-4bb7-b420-1f3b37180673", "平方米",   "m²", 1.0m,        1),
-            ("0d7ebe17-93ae-4e4c-92f4-063a124cd181", "平方公里", "km²", 1000000m,  2),
-            ("a4c312d3-023e-4d4e-b5a7-fb7fcbd55c56", "公顷",     "ha", 10000m,     3),
-            ("fefa26a5-d608-411c-b637-469a886e558c", "亩",       "亩", 666.6666667m, 4)
-        );
-
-        // ==================== 时间 time（基准：秒） ====================
-        AddCategory(units, "time", baseSymbol: "s", now,
-            ("e4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", "秒",   "s",   1.0m,    1),
-            ("f5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", "分钟", "min", 60m,     2),
-            ("a6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a", "小时", "h",   3600m,   3),
-            ("b7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b", "天",   "d",   86400m,  4)
-        );
-
-        // ==================== 速度 speed（基准：米/秒） ====================
-        AddCategory(units, "speed", baseSymbol: "m/s", now,
-            ("4cbec89d-3f52-4db3-9ab0-faeeb841ffbf", "米/秒",      "m/s",  1.0m,          1),
-            ("64e918fb-ee9d-45c7-b35a-2a55f5a5fe62", "千米/小时",  "km/h", 0.2777777778m, 2),
-            ("405ae7a3-8a13-479d-bc1a-6f9d3c15e521", "英里/小时",  "mph",  0.44704m,      3)
-        );
-
-        // ==================== 角度 angle（基准：度） ====================
-        AddCategory(units, "angle", baseSymbol: "°", now,
-            ("ed1b66d2-454b-453b-9d43-12605dffa456", "度",   "°",   1.0m,              1),
-            ("3d9088a3-7283-4f8f-b995-b193a57a6c2a", "弧度", "rad", 57.29577951308232m, 2)
-        );
-
-        // ==================== 电流 current（基准：安培） ====================
-        AddCategory(units, "current", baseSymbol: "A", now,
-            ("f1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f", "安培", "A",  1.0m,      1),
-            ("a2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a", "毫安", "mA", 0.001m,    2),
-            ("b3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b", "微安", "µA", 0.000001m, 3)
-        );
-
-        // ==================== 电压 voltage（基准：伏特） ====================
-        AddCategory(units, "voltage", baseSymbol: "V", now,
-            ("c4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c", "伏特", "V",  1.0m,   1),
-            ("d5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", "千伏", "kV", 1000m,  2),
-            ("e6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", "毫伏", "mV", 0.001m, 3)
-        );
-
-        // ==================== 功率 power（基准：瓦特） ====================
-        AddCategory(units, "power", baseSymbol: "W", now,
-            ("f7d8e9f0-a1b2-4c3d-4e5f-6a7b8c9d0e1f", "瓦特", "W",  1.0m,              1),
-            ("a8e9f0a1-b2c3-4d4e-5f6a-7b8c9d0e1f2a", "千瓦", "kW", 1000m,             2),
-            ("b9f0a1b2-c3d4-4e5f-6a7b-8c9d0e1f2a3b", "兆瓦", "MW", 1000000m,          3),
-            ("a00be966-be2e-484e-92b6-9706494ac775", "马力", "hp", 745.6998715822702m, 4)
-        );
-
-        // ==================== 压力 pressure（基准：帕斯卡） ====================
-        AddCategory(units, "pressure", baseSymbol: "Pa", now,
-            ("221d3c45-911f-4e94-9c3e-c13e6f2bcc76", "帕斯卡", "Pa",  1.0m,      1),
-            ("883a9940-84ec-4daa-8448-609461b984ea", "千帕",   "kPa", 1000m,     2),
-            ("d5306eb8-324f-4088-a867-6fbc7141fd59", "兆帕",   "MPa", 1000000m,  3),
-            ("8981bd9a-bd99-4f4c-b8af-038975b799be", "巴",     "bar", 100000m,   4)
-        );
-
-        // ==================== 能量 energy（基准：焦耳） ====================
-        AddCategory(units, "energy", baseSymbol: "J", now,
-            ("5db494d7-2a9c-4ae0-86e0-d4bb0dfc7b81", "焦耳",   "J",   1.0m,       1),
-            ("279a6b18-6d01-4437-b95b-0480ca7adc98", "千焦",   "kJ",  1000m,      2),
-            ("e3c1f025-3b2b-461a-a5a1-015cb4e3fe38", "千瓦时", "kWh", 3600000m,   3)
-        );
-
-        // ==================== 频率 frequency（基准：赫兹） ====================
-        AddCategory(units, "frequency", baseSymbol: "Hz", now,
-            ("5e880060-9410-40d7-bcb4-545ccd0c1bb6", "赫兹", "Hz",  1.0m,      1),
-            ("1a80ed3b-1b36-4d8b-b80b-3070dbc7979d", "千赫", "kHz", 1000m,     2),
-            ("41572712-95dd-4caf-b316-e1b924bc57c3", "兆赫", "MHz", 1000000m,  3)
-        );
-
-        // ★ 有意排除：
-        //   - 温度：非线性换算（°C ↔ K = ±273.15），UnitConverter 只做乘法
-        //   - 货币：汇率动态，不能用固定 ToBaseFactor
-        //
-        // 若未来需要，应在扩展 UnitConverter 支持 affine 变换（offset + factor）
-        // 后再纳入。参见：UnitsController / UnitConverter。
-
-        return units;
-    }
-
-    /// <summary>
-    /// 为一个分类添加单位。
-    /// 基准单位（symbol == baseSymbol）自动标记 IsBaseUnit = true。
-    /// </summary>
-    private static void AddCategory(
-        List<Unit> units, string category, string baseSymbol,
-        DateTimeOffset now,
-        params (string Id, string Name, string Symbol, decimal Factor, int Order)[] items)
-    {
-        foreach (var (id, name, symbol, factor, order) in items)
-        {
-            units.Add(new Unit
-            {
-                Id = Guid.Parse(id),
-                Category = category,
-                Name = name,
-                Symbol = symbol,
-                ToBaseFactor = factor,
-                IsBaseUnit = symbol == baseSymbol,
-                DisplayOrder = order,
-                IsDeleted = false,
-                CreatedAt = now,
-                UpdatedAt = now
-            });
-        }
-    }
-}
-```
-
-## 文件 14/41 TreeGraph.Api/Entities/AttributeAuditLog.cs
-
-```csharp
-namespace TreeGraph.Api.Entities;
+namespace TreeGraph.Api.NodeEavSky.Entities;
 
 /// <summary>属性变更审计日志（与值变更同事务提交）</summary>
 public class AttributeAuditLog
@@ -6361,12 +9121,12 @@ public class AttributeAuditLog
 }
 ```
 
-## 文件 15/41 TreeGraph.Api/Entities/AttributeDefinition.cs
+## 文件 20/56 TreeGraph.Api/NodeEavSky/Entities/AttributeDefinition.cs
 
 ```csharp
 using System.Text.Json;
 
-namespace TreeGraph.Api.Entities;
+namespace TreeGraph.Api.NodeEavSky.Entities;
 
 /// <summary>属性元数据（属性目录）</summary>
 public class AttributeDefinition
@@ -6413,12 +9173,12 @@ public class AttributeDefinition
 }
 ```
 
-## 文件 16/41 TreeGraph.Api/Entities/AttributeValue.cs
+## 文件 21/56 TreeGraph.Api/NodeEavSky/Entities/AttributeValue.cs
 
 ```csharp
 using System.Text.Json;
 
-namespace TreeGraph.Api.Entities;
+namespace TreeGraph.Api.NodeEavSky.Entities;
 
 /// <summary>类型化值表：每种基础类型独立存储列</summary>
 public class AttributeValue
@@ -6450,10 +9210,10 @@ public class AttributeValue
 }
 ```
 
-## 文件 17/41 TreeGraph.Api/Entities/CompositeTypeDefinition.cs
+## 文件 22/56 TreeGraph.Api/NodeEavSky/Entities/CompositeTypeDefinition.cs
 
 ```csharp
-namespace TreeGraph.Api.Entities;
+namespace TreeGraph.Api.NodeEavSky.Entities;
 
 /// <summary>组合类型定义</summary>
 public class CompositeTypeDefinition
@@ -6515,12 +9275,12 @@ public class CompositeFieldDefinition
 }
 ```
 
-## 文件 18/41 TreeGraph.Api/Entities/CustomTableDefinition.cs
+## 文件 23/56 TreeGraph.Api/NodeEavSky/Entities/CustomTableDefinition.cs
 
 ```csharp
 using System.Text.Json;
 
-namespace TreeGraph.Api.Entities;
+namespace TreeGraph.Api.NodeEavSky.Entities;
 
 /// <summary>自定义表结构定义（1:N，多行结构；列结构由 CustomTableColumn 定义）</summary>
 public class CustomTableDefinition
@@ -6565,12 +9325,12 @@ public class CustomTableColumn
 }
 ```
 
-## 文件 19/41 TreeGraph.Api/Entities/CustomTableRow.cs
+## 文件 24/56 TreeGraph.Api/NodeEavSky/Entities/CustomTableRow.cs
 
 ```csharp
 using System.Text.Json;
 
-namespace TreeGraph.Api.Entities;
+namespace TreeGraph.Api.NodeEavSky.Entities;
 
 /// <summary>
 /// 自定义表行数据：所有表共享一张物理行表，按 TableDefinitionId 区分，
@@ -6596,10 +9356,90 @@ public class CustomTableRow
 }
 ```
 
-## 文件 20/41 TreeGraph.Api/Entities/OptionSet.cs
+## 文件 25/56 TreeGraph.Api/NodeEavSky/Entities/EntityTypeDefinition.cs
 
 ```csharp
-namespace TreeGraph.Api.Entities;
+namespace TreeGraph.Api.NodeEavSky.Entities;
+
+/// <summary>
+/// 实体类型目录（独立于属性定义）。
+/// 创建属性前，其 EntityType 必须已存在于本表。
+/// </summary>
+public class EntityTypeDefinition
+{
+    public string EntityTypeId { get; set; } = "";
+    public string EntityType { get; set; } = "";         // "Product"
+    public string DisplayName { get; set; } = "";        // "商品"
+    public string? Description { get; set; }             // 说明
+    public int DisplayOrder { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+```
+
+## 文件 26/56 TreeGraph.Api/NodeEavSky/Entities/InodeEntity.cs
+
+```csharp
+namespace TreeGraph.Api.NodeEavSky.Entities;
+
+/// <summary>
+/// iNode ↔ 实体归属关系。
+///
+/// 约束：
+///   - PK (InodeId, EntityType)：每个 iNode 每个类型只有 1 个实体
+///   - UNIQUE (EntityType, EntityId)：每个实体只属于 1 个 iNode
+///
+/// EntityId 直接复用现有 EAV 的 entity_id
+/// （即 attribute_values.entity_id 指向的值）。
+/// </summary>
+public class InodeEntity
+{
+    /// <summary>iNode ID（GUID 字符串）</summary>
+    public string InodeId { get; set; } = "";
+
+    /// <summary>实体类型名（如 "Product"）</summary>
+    public string EntityType { get; set; } = "";
+
+    /// <summary>实体 ID（GUID 字符串）</summary>
+    public string EntityId { get; set; } = "";
+
+    public DateTimeOffset AttachedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+```
+
+## 文件 27/56 TreeGraph.Api/NodeEavSky/Entities/InodeEntityType.cs
+
+```csharp
+namespace TreeGraph.Api.NodeEavSky.Entities;
+
+/// <summary>
+/// iNode → EntityType 的声明关联（N:N）。
+///
+/// 语义：某个 iNode 声明"我会使用这个实体类型"。
+/// UI 上表现为"该 iNode 详情页显示哪些类型卡片"。
+///
+/// 用类型名（如 "Product"）而不是 typeId，与现有 EAV 的
+/// attribute_catalog.entity_type 字段保持一致。
+///
+/// 无 inode 表（外部应用维护 iNode），inode_id 只是字符串。
+/// </summary>
+public class InodeEntityType
+{
+    /// <summary>iNode ID（GUID 字符串）</summary>
+    public string InodeId { get; set; } = "";
+
+    /// <summary>实体类型名（如 "Product"）</summary>
+    public string EntityType { get; set; } = "";
+
+    public DateTimeOffset AttachedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+```
+
+## 文件 28/56 TreeGraph.Api/NodeEavSky/Entities/OptionSet.cs
+
+```csharp
+namespace TreeGraph.Api.NodeEavSky.Entities;
 
 /// <summary>选项集（一组互斥的单选值，可跨实体类型共享）</summary>
 public class OptionSet
@@ -6643,10 +9483,10 @@ public class OptionItem
 }
 ```
 
-## 文件 21/41 TreeGraph.Api/Entities/Unit.cs
+## 文件 29/56 TreeGraph.Api/NodeEavSky/Entities/Unit.cs
 
 ```csharp
-namespace TreeGraph.Api.Entities;
+namespace TreeGraph.Api.NodeEavSky.Entities;
 
 /// <summary>计量单位（按分类组织，每个分类一个基准单位）</summary>
 public class Unit
@@ -6671,14 +9511,14 @@ public class Unit
 }
 ```
 
-## 文件 22/41 TreeGraph.Api/Infrastructure/DbExceptionHandler.cs
+## 文件 30/56 TreeGraph.Api/NodeEavSky/Infrastructure/DbExceptionHandler.cs
 
 ```csharp
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace TreeGraph.Api.Infrastructure;
+namespace TreeGraph.Api.NodeEavSky.Infrastructure;
 
 /// <summary>把 EF Core / Npgsql 的已知异常映射为合适的 HTTP 响应</summary>
 public sealed class DbExceptionHandler : IExceptionHandler
@@ -6743,100 +9583,15 @@ public sealed class DbExceptionHandler : IExceptionHandler
 }
 ```
 
-## 文件 23/41 TreeGraph.Api/Program.cs
-
-```csharp
-using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Data.Seeding;
-using TreeGraph.Api.Infrastructure;
-using TreeGraph.Api.Services;
-
-var builder = WebApplication.CreateBuilder(args);
-
-// ★ Aspire ServiceDefaults：服务发现、健康检查、OpenTelemetry
-builder.AddServiceDefaults();
-
-// Add services to the container.
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.Converters.Add(new NumericValueJsonConverter());
-        options.JsonSerializerOptions.Converters.Add(new DynamicCompositeValueJsonConverter());
-    });
-builder.Services.AddOpenApi();
-
-// ★ 全局异常处理：把 EF/Npgsql 已知异常映射为 409/400
-builder.Services.AddExceptionHandler<DbExceptionHandler>();
-builder.Services.AddProblemDetails();
-
-// .NET Aspire 集成:自动从 ConnectionStrings:TreeGraphDb 注入连接字符串
-builder.AddNpgsqlDbContext<EavDbContext>("TreeGraphDb");
-
-builder.Services.AddMemoryCache();
-builder.Services.AddScoped<EavWriteService>();
-builder.Services.AddScoped<EavReadService>();
-builder.Services.AddScoped<EavQueryService>();
-builder.Services.AddScoped<EavValidationService>();
-builder.Services.AddScoped<CompositeValueService>();
-builder.Services.AddSingleton<IAttributeCache, AttributeCache>();
-builder.Services.AddSingleton<ICompositeTypeCache, CompositeTypeCache>();
-builder.Services.AddSingleton<IUnitCache, UnitCache>();
-builder.Services.AddSingleton<UnitConverter>();
-builder.Services.AddSingleton<ICustomTableCache, CustomTableCache>();
-builder.Services.AddSingleton<IOptionSetCache, OptionSetCache>();
-builder.Services.AddScoped<UnitSeedService>();
-builder.Services.AddScoped<CustomTableValidationService>();
-builder.Services.AddScoped<CustomTableWriteService>();
-builder.Services.AddScoped<CustomTableReadService>();
-builder.Services.AddScoped<CustomTableQueryService>();
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-// ★ 研发阶段：暂不启用身份验证/授权管道
-//   UseAuthorization() 会解析 IAuthorizationPolicyProvider，
-//   未 AddAuthorization() 时首次请求抛 InvalidOperationException。
-// app.UseAuthorization();
-
-// ★ 全局异常处理
-app.UseExceptionHandler();
-
-app.MapControllers();
-
-// ★ Aspire 默认端点（/health、/alive），供 Dashboard 探测
-app.MapDefaultEndpoints();
-
-// 启动时应用迁移并注入种子数据（EF 设计期跳过，避免 dotnet-ef 连接数据库）
-if (!EF.IsDesignTime)
-{
-    await using var scope = app.Services.CreateAsyncScope();
-    var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
-    await db.Database.MigrateAsync();
-    await scope.ServiceProvider.GetRequiredService<UnitSeedService>().SeedAsync();
-    await EavSeeder.SeedAsync(db);
-}
-
-app.Run();
-
-// ★ 让 WebApplicationFactory<Program> 可引用（集成测试）
-public partial class Program { }
-```
-
-## 文件 24/41 TreeGraph.Api/Services/AttributeCache.cs
+## 文件 31/56 TreeGraph.Api/NodeEavSky/Services/AttributeCache.cs
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 public interface IAttributeCache
 {
@@ -6883,15 +9638,15 @@ public class AttributeCache : IAttributeCache
 }
 ```
 
-## 文件 25/41 TreeGraph.Api/Services/CompositeTypeCache.cs
+## 文件 32/56 TreeGraph.Api/NodeEavSky/Services/CompositeTypeCache.cs
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 public interface ICompositeTypeCache
 {
@@ -6933,15 +9688,15 @@ public class CompositeTypeCache : ICompositeTypeCache
 }
 ```
 
-## 文件 26/41 TreeGraph.Api/Services/CompositeValueService.cs
+## 文件 33/56 TreeGraph.Api/NodeEavSky/Services/CompositeValueService.cs
 
 ```csharp
 using System.Text.Json;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Eav;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>组合类型值服务：递归验证 / JSONB 序列化 / 反序列化</summary>
 public class CompositeValueService
@@ -7249,15 +10004,15 @@ public class CompositeValueService
 }
 ```
 
-## 文件 27/41 TreeGraph.Api/Services/CustomTableCache.cs
+## 文件 34/56 TreeGraph.Api/NodeEavSky/Services/CustomTableCache.cs
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 public interface ICustomTableCache
 {
@@ -7363,14 +10118,14 @@ public class CustomTableCache : ICustomTableCache
 }
 ```
 
-## 文件 28/41 TreeGraph.Api/Services/CustomTableQueryService.cs
+## 文件 35/56 TreeGraph.Api/NodeEavSky/Services/CustomTableQueryService.cs
 
 ```csharp
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
+using TreeGraph.Api.NodeEavSky.Data;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>自定义表行内字段查询：JSONB @> 包含查询（走 ix_ctr_rowdata GIN 索引）</summary>
 public class CustomTableQueryService
@@ -7438,17 +10193,17 @@ public class CustomTableQueryService
 }
 ```
 
-## 文件 29/41 TreeGraph.Api/Services/CustomTableReadService.cs
+## 文件 36/56 TreeGraph.Api/NodeEavSky/Services/CustomTableReadService.cs
 
 ```csharp
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Eav;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>自定义表读取服务：按父实体 + 属性加载整表</summary>
 public class CustomTableReadService
@@ -7530,14 +10285,14 @@ public class CustomTableReadService
 }
 ```
 
-## 文件 30/41 TreeGraph.Api/Services/CustomTableValidationService.cs
+## 文件 37/56 TreeGraph.Api/NodeEavSky/Services/CustomTableValidationService.cs
 
 ```csharp
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Eav;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>
 /// 自定义表验证引擎：逐行按列定义验证，复用基础类型与组合类型验证器，本身不实现新的验证逻辑
@@ -7634,18 +10389,18 @@ public class CustomTableValidationService
 }
 ```
 
-## 文件 31/41 TreeGraph.Api/Services/CustomTableWriteService.cs
+## 文件 38/56 TreeGraph.Api/NodeEavSky/Services/CustomTableWriteService.cs
 
 ```csharp
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Eav;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>自定义表写入服务：整表替换（默认）+ 行级增量更新</summary>
 public class CustomTableWriteService
@@ -7928,10 +10683,10 @@ public class CustomTableWriteService
 }
 ```
 
-## 文件 32/41 TreeGraph.Api/Services/DynamicCompositeValue.cs
+## 文件 39/56 TreeGraph.Api/NodeEavSky/Services/DynamicCompositeValue.cs
 
 ```csharp
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>组合类型运行时值模型（字段名 -> 值）</summary>
 public class DynamicCompositeValue
@@ -7962,13 +10717,13 @@ public class DynamicCompositeValue
 }
 ```
 
-## 文件 33/41 TreeGraph.Api/Services/EavJsonConverters.cs
+## 文件 40/56 TreeGraph.Api/NodeEavSky/Services/EavJsonConverters.cs
 
 ```csharp
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>数量运行时值序列化为 { value, unitId }（输入走 EAV 管道，不支持直接反序列化）</summary>
 public sealed class NumericValueJsonConverter : JsonConverter<NumericValue>
@@ -8010,18 +10765,18 @@ public sealed class DynamicCompositeValueJsonConverter : JsonConverter<DynamicCo
 }
 ```
 
-## 文件 34/41 TreeGraph.Api/Services/EavQueryService.cs
+## 文件 41/56 TreeGraph.Api/NodeEavSky/Services/EavQueryService.cs
 
 ```csharp
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Eav;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>动态查询服务（纯 LINQ）：多个过滤器用 Intersect 实现 AND 语义</summary>
 public class EavQueryService
@@ -8145,6 +10900,12 @@ public class EavQueryService
 
         return def.DataType switch
         {
+            // ★ int + 单位：按 ValueDecimal 排序（归一化后的值）
+            EavDataTypes.Int when def.UnitId is not null => (await baseQuery
+                .Select(v => new { v.EntityId, v.ValueDecimal })
+                .ToListAsync(ct))
+                .ToDictionary(x => x.EntityId, x => (object?)x.ValueDecimal),
+
             EavDataTypes.Int => (await baseQuery
                 .Select(v => new { v.EntityId, v.ValueInt })
                 .ToListAsync(ct))
@@ -8221,6 +10982,10 @@ public class EavQueryService
 
         var filtered = def.DataType switch
         {
+            // ★ int + 单位：走 decimal 过滤路径（数据存于 ValueDecimal）
+            EavDataTypes.Int when def.UnitId is not null
+                => ApplyDecimalFilter(baseQuery, def, filter),
+
             EavDataTypes.Int => ApplyIntFilter(baseQuery, def, filter),
             EavDataTypes.Decimal => ApplyDecimalFilter(baseQuery, def, filter),
             EavDataTypes.String => ApplyStringFilter(baseQuery, filter),
@@ -8789,18 +11554,106 @@ public class EavQueryService
         bool b => b,
         _ => Convert.ToBoolean(value, CultureInfo.InvariantCulture)
     };
+
+    /// <summary>
+    /// 带 entity_id 预过滤的查询（iNode 场景用）。
+    ///
+    /// ★ 新增，不影响原有 QueryAsync。
+    ///
+    /// 逻辑：
+    ///   1. 走原有 FilterEntityIdsAsync 得到属性过滤后的候选 entity 集合
+    ///   2. 与 allowedEntityIds 求交集
+    ///   3. 内存分页 + 批量加载
+    /// </summary>
+    public async Task<PagedResult<DynamicEntity>> QueryWithAllowedIdsAsync(
+        string entityType,
+        IReadOnlyCollection<string>? allowedEntityIds,
+        EavQueryRequest request,
+        CancellationToken ct = default)
+    {
+        // 无限制 → 走原路径
+        if (allowedEntityIds is null)
+            return await QueryAsync(request, ct);
+
+        if (allowedEntityIds.Count == 0)
+        {
+            return new PagedResult<DynamicEntity>
+            {
+                Items = new List<DynamicEntity>(),
+                Total = 0,
+                Page = request.Page,
+                PageSize = request.PageSize
+            };
+        }
+
+        // 1. 属性过滤得到的 entityIds
+        var filtered = await FilterEntityIdsAsync(
+            new EavQueryRequest
+            {
+                EntityType = entityType,
+                Filters = request.Filters,
+                OrderByAttribute = request.OrderByAttribute,
+                OrderDescending = request.OrderDescending,
+                // 取全量后再交集分页，所以这里用大 pageSize
+                Page = 1,
+                PageSize = int.MaxValue
+            }, ct);
+
+        // 2. 交集
+        var allowed = allowedEntityIds.ToHashSet();
+        var intersected = filtered.Items
+            .Where(id => allowed.Contains(id))
+            .ToList();
+
+        // 3. 分页
+        var total = intersected.Count;
+        var skip = (request.Page - 1) * request.PageSize;
+        var pageIds = intersected.Skip(skip).Take(request.PageSize).ToList();
+
+        if (pageIds.Count == 0)
+        {
+            return new PagedResult<DynamicEntity>
+            {
+                Items = new List<DynamicEntity>(),
+                Total = total,
+                Page = request.Page,
+                PageSize = request.PageSize
+            };
+        }
+
+        // 4. 批量加载实体
+        var entities = await _readService.LoadBatchAsync(
+            pageIds, entityType, originalUnits: false, ct);
+
+        // 5. 保持 pageIds 的顺序
+        var inputOrder = pageIds
+            .Select((id, idx) => (id, idx))
+            .ToDictionary(x => x.id, x => x.idx);
+
+        var ordered = entities
+            .OrderBy(e => inputOrder.GetValueOrDefault(e.EntityId, int.MaxValue))
+            .ToList();
+
+        return new PagedResult<DynamicEntity>
+        {
+            Items = ordered,
+            Total = total,
+            Page = request.Page,
+            PageSize = request.PageSize
+        };
+    }
 }
 ```
 
-## 文件 35/41 TreeGraph.Api/Services/EavReadService.cs
+## 文件 42/56 TreeGraph.Api/NodeEavSky/Services/EavReadService.cs
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Eav;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>读取服务：按元数据把类型化值列还原为运行时值</summary>
 public class EavReadService
@@ -8898,8 +11751,15 @@ public class EavReadService
         {
             EavDataTypes.String => row.ValueString,
             EavDataTypes.SingleChoice => ExtractSingleChoice(row, def),
+
+            // ★ int + 单位：读 ValueDecimal（归一化后的值）
+            EavDataTypes.Int when def.UnitId is not null => ExtractNumericValue(
+                row.ValueDecimal, row.UnitId, def, originalUnits),
+
+            // int 无单位：读 ValueInt
             EavDataTypes.Int => ExtractNumericValue(
                 row.ValueInt is { } i ? i : null, row.UnitId, def, originalUnits),
+
             EavDataTypes.Decimal => ExtractNumericValue(
                 row.ValueDecimal, row.UnitId, def, originalUnits),
             EavDataTypes.Bool => row.ValueBool,
@@ -9010,17 +11870,138 @@ public class DynamicEntity
 }
 ```
 
-## 文件 36/41 TreeGraph.Api/Services/EavValidationService.cs
+## 文件 43/56 TreeGraph.Api/NodeEavSky/Services/EavRequestBodyConverter.cs
+
+```csharp
+using System.Text.Json;
+using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Shared.Eav;
+using TreeGraph.Shared.Eav.Dtos;
+
+namespace TreeGraph.Api.NodeEavSky.Services;
+
+/// <summary>
+/// 把 HTTP 请求体 Dictionary&lt;string, JsonElement&gt; 转成 EAV 写入管道
+/// 接受的强类型字典。
+///
+/// 与 EavController 内部的转换逻辑一致（重复以防污染旧控制器）。
+/// </summary>
+public static class EavRequestBodyConverter
+{
+    public static Dictionary<string, object?> Convert(
+        Dictionary<string, JsonElement> values,
+        IReadOnlyDictionary<string, AttributeDefinition> defs,
+        CompositeValueService compositeService)
+    {
+        var result = new Dictionary<string, object?>();
+        var tableAttrs = new List<string>();
+
+        // 未知属性检查
+        var unknownKeys = values.Keys.Where(k => !defs.ContainsKey(k)).ToList();
+        if (unknownKeys.Count > 0)
+        {
+            throw new EavValidationException(unknownKeys
+                .Select(k => new ValidationError(k, "未知属性"))
+                .ToList());
+        }
+
+        foreach (var (name, elem) in values)
+        {
+            var def = defs[name];
+
+            if (def.DataType == EavDataTypes.Table)
+            {
+                tableAttrs.Add(name);
+                continue;
+            }
+
+            result[name] = ConvertElement(elem, def, compositeService);
+        }
+
+        if (tableAttrs.Count > 0)
+        {
+            throw new ArgumentException(
+                $"table 类型属性不能通过此端点写入，请使用子表端点。" +
+                $"涉及属性: {string.Join(", ", tableAttrs)}");
+        }
+
+        return result;
+    }
+
+    private static object? ConvertElement(
+        JsonElement elem, AttributeDefinition def,
+        CompositeValueService compositeService)
+    {
+        if (elem.ValueKind == JsonValueKind.Null) return null;
+
+        return def.DataType switch
+        {
+            EavDataTypes.Int or EavDataTypes.Decimal => ParseNumeric(elem),
+            EavDataTypes.Bool => elem.GetBoolean(),
+            EavDataTypes.Datetime => elem.GetDateTimeOffset(),
+            EavDataTypes.Date => DateOnly.Parse(elem.GetString()!),
+            EavDataTypes.Time => TimeOnly.Parse(elem.GetString()!),
+            EavDataTypes.String => elem.GetString(),
+            EavDataTypes.SingleChoice => ParseSingleChoice(elem),
+            EavDataTypes.Json => JsonDocument.Parse(elem.GetRawText()),
+            EavDataTypes.File => JsonDocument.Parse(elem.GetRawText()),
+            EavDataTypes.Composite => ParseComposite(elem, def, compositeService),
+            _ => elem.GetString()
+        };
+    }
+
+    private static NumericValue ParseNumeric(JsonElement elem)
+    {
+        if (elem.ValueKind == JsonValueKind.Number)
+            return new NumericValue(elem.GetDecimal(), null);
+
+        if (elem.ValueKind == JsonValueKind.Object)
+        {
+            var value = elem.GetProperty("value").GetDecimal();
+            Guid? unitId = elem.TryGetProperty("unitId", out var u)
+                           && u.ValueKind == JsonValueKind.String
+                ? Guid.Parse(u.GetString()!)
+                : null;
+            return new NumericValue(value, unitId);
+        }
+        throw new ArgumentException("数值格式错误");
+    }
+
+    private static string? ParseSingleChoice(JsonElement elem)
+    {
+        if (elem.ValueKind == JsonValueKind.String) return elem.GetString();
+        if (elem.ValueKind == JsonValueKind.Object
+            && elem.TryGetProperty("value", out var v)
+            && v.ValueKind == JsonValueKind.String)
+            return v.GetString();
+        return elem.ToString();
+    }
+
+    private static DynamicCompositeValue ParseComposite(
+        JsonElement elem, AttributeDefinition def,
+        CompositeValueService compositeService)
+    {
+        if (def.RefCompositeTypeId is null)
+            throw new ArgumentException(
+                $"属性 {def.AttributeName} 是 composite 但未配置 RefCompositeTypeId");
+
+        using var doc = JsonDocument.Parse(elem.GetRawText());
+        return compositeService.Deserialize(doc, def.RefCompositeTypeId);
+    }
+}
+```
+
+## 文件 44/56 TreeGraph.Api/NodeEavSky/Services/EavValidationService.cs
 
 ```csharp
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Eav;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>EAV 验证引擎：必填 -> 类型转换 -> 枚举约束 -> 规则校验</summary>
 public class EavValidationService
@@ -9045,23 +12026,14 @@ public class EavValidationService
     /// <summary>
     /// 验证属性值（基础类型）。
     ///
-    /// ★ 防御性检查：
-    ///   - int 类型不允许绑定单位（元数据配置错误）。
-    ///   - int 类型不接受小数（否则写入 bigint 会静默截断）。
-    /// 即使数据库中被绕过（旧版本写入、直接 SQL），写入时也会在此处拦截。
+    /// ★ int / decimal 均可绑定单位。
+    ///   - int 无单位：必须为整数，写入 ValueInt
+    ///   - int 有单位：允许小数（归一化到基准单位可能产生），写入 ValueDecimal
+    ///   - decimal：无论有无单位，写入 ValueDecimal
     /// </summary>
     public ValidationResult ValidateBaseValue(AttributeDefinition def, object? value)
     {
         var errors = new List<ValidationError>();
-
-        // ★ 元数据一致性防御：int + UnitId 是非法配置
-        if (def.DataType == EavDataTypes.Int && def.UnitId is not null)
-        {
-            errors.Add(new(def.AttributeName,
-                "int 类型属性绑定了单位（元数据配置错误）。" +
-                "归一化到基准单位会产生小数并被截断，请改用 decimal 类型，或解除单位绑定。"));
-            return new ValidationResult(false, errors);
-        }
 
         // 单选类型：必填默认值放行逻辑与基础类型不同，走独立分支
         if (def.DataType == EavDataTypes.SingleChoice)
@@ -9085,12 +12057,13 @@ public class EavValidationService
                 return new ValidationResult(false, errors);
             }
 
-            // ★ int 类型必须为整数，否则写入 bigint 会静默截断
+            // ★ int 无单位时必须为整数（有单位时允许小数）
             if (def.DataType == EavDataTypes.Int
+                && def.UnitId is null
                 && numericValue.Value != Math.Truncate(numericValue.Value))
             {
                 errors.Add(new(def.AttributeName,
-                    $"int 类型不接受小数，收到 {numericValue.Value}"));
+                    $"int 类型（无单位）不接受小数，收到 {numericValue.Value}"));
                 return new ValidationResult(false, errors);
             }
 
@@ -9304,18 +12277,18 @@ public class EavValidationException : Exception
 }
 ```
 
-## 文件 37/41 TreeGraph.Api/Services/EavWriteService.cs
+## 文件 45/56 TreeGraph.Api/NodeEavSky/Services/EavWriteService.cs
 
 ```csharp
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Eav;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>写入服务：验证 -> 插入/更新/删除 -> 审计（同一事务提交）</summary>
 public class EavWriteService
@@ -9600,7 +12573,8 @@ public class EavWriteService
                     target.UnitId = null;
                 }
 
-                if (def.DataType == EavDataTypes.Int)
+                // ★ int 无单位 → ValueInt；int 有单位 → ValueDecimal；decimal → ValueDecimal
+                if (def.DataType == EavDataTypes.Int && def.UnitId is null)
                     target.ValueInt = (long)normalized;
                 else
                     target.ValueDecimal = normalized;
@@ -9679,9 +12653,16 @@ public class EavWriteService
         {
             EavDataTypes.String => v.ValueString,
             EavDataTypes.SingleChoice => FormatSingleChoice(v.ValueString, def),
-            EavDataTypes.Int when v.ValueInt is { } i => FormatNumeric(i, v.UnitId),
-            EavDataTypes.Decimal when v.ValueDecimal is { } d => FormatNumeric(d, v.UnitId),
+
+            // ★ int 无单位：ValueInt
+            EavDataTypes.Int when v.ValueInt is { } i && def.UnitId is null
+                => i.ToString(CultureInfo.InvariantCulture),
+            // ★ int 有单位：ValueDecimal（归一化后的值 + 原始单位符号）
+            EavDataTypes.Int when v.ValueDecimal is { } di
+                => FormatNumeric(di, v.UnitId),
             EavDataTypes.Int => null,
+
+            EavDataTypes.Decimal when v.ValueDecimal is { } d => FormatNumeric(d, v.UnitId),
             EavDataTypes.Decimal => null,
             EavDataTypes.Bool => v.ValueBool?.ToString(),
             EavDataTypes.Datetime => v.ValueDatetime?.ToString("o"),
@@ -9950,10 +12931,397 @@ public class EavConcurrencyException : Exception
 }
 ```
 
-## 文件 38/41 TreeGraph.Api/Services/NumericValue.cs
+## 文件 46/56 TreeGraph.Api/NodeEavSky/Services/InodeEavFacade.cs
 
 ```csharp
-namespace TreeGraph.Api.Services;
+using TreeGraph.Api.NodeEavSky.Entities;
+
+namespace TreeGraph.Api.NodeEavSky.Services;
+
+/// <summary>
+/// iNode 视角 → EAV 管道的转发层。
+///
+/// 职责：
+///   1. 从 (inodeId, entityType) 解析/生成 entityId
+///   2. 调用现有 EAV 服务（签名完全不变）
+///   3. 删除时级联清理 inode_entity 映射
+///
+/// 不做验证/写库逻辑，纯转发，便于维护。
+/// </summary>
+public class InodeEavFacade
+{
+    private readonly IInodeEntityService _inodeEntities;
+    private readonly EavWriteService _write;
+    private readonly EavReadService _read;
+
+    public InodeEavFacade(
+        IInodeEntityService inodeEntities,
+        EavWriteService write,
+        EavReadService read)
+    {
+        _inodeEntities = inodeEntities;
+        _write = write;
+        _read = read;
+    }
+
+    // ============================================================
+    // 读取
+    // ============================================================
+
+    /// <summary>
+    /// 按 (inodeId, entityType) 读实体。
+    /// iNode 下该类型尚未创建实体时返回 null。
+    /// </summary>
+    public async Task<DynamicEntity?> LoadAsync(
+        string inodeId, string entityType,
+        bool originalUnits = false,
+        CancellationToken ct = default)
+    {
+        var entityId = await _inodeEntities.GetEntityIdAsync(
+            inodeId, entityType, ct);
+        if (entityId is null) return null;
+
+        return await _read.LoadAsync(
+            entityId, entityType, originalUnits, ct);
+    }
+
+    /// <summary>审计历史。</summary>
+    public async Task<List<AttributeAuditLog>> GetHistoryAsync(
+        string inodeId, string entityType,
+        DateTimeOffset? from = null,
+        CancellationToken ct = default)
+    {
+        var entityId = await _inodeEntities.GetEntityIdAsync(
+            inodeId, entityType, ct);
+        if (entityId is null) return new List<AttributeAuditLog>();
+
+        return await _read.GetHistoryAsync(entityId, entityType, from, ct);
+    }
+
+    // ============================================================
+    // 写入
+    // ============================================================
+
+    public async Task SaveAsync(
+        string inodeId, string entityType,
+        Dictionary<string, object?> values,
+        string changedBy, string? correlationId = null,
+        CancellationToken ct = default,
+        DateTimeOffset? expectedUpdatedAt = null)
+    {
+        var entityId = await _inodeEntities.GetOrCreateEntityIdAsync(
+            inodeId, entityType, ct);
+
+        await _write.SaveAsync(entityId, entityType, values,
+            changedBy, correlationId, ct, expectedUpdatedAt);
+    }
+
+    public async Task PatchAsync(
+        string inodeId, string entityType,
+        Dictionary<string, object?> values,
+        string changedBy, string? correlationId = null,
+        CancellationToken ct = default,
+        DateTimeOffset? expectedUpdatedAt = null)
+    {
+        var entityId = await _inodeEntities.GetOrCreateEntityIdAsync(
+            inodeId, entityType, ct);
+
+        await _write.PatchAsync(entityId, entityType, values,
+            changedBy, correlationId, ct, expectedUpdatedAt);
+    }
+
+    /// <summary>
+    /// 删除实体：先删 EAV 数据，再删归属映射。
+    /// </summary>
+    public async Task<bool> DeleteAsync(
+        string inodeId, string entityType,
+        string changedBy, string? correlationId = null,
+        CancellationToken ct = default)
+    {
+        var entityId = await _inodeEntities.GetEntityIdAsync(
+            inodeId, entityType, ct);
+        if (entityId is null) return false;
+
+        // 1. 删 EAV 数据（属性值 + 审计 + 子表行）
+        await _write.DeleteEntityAsync(
+            entityId, entityType, changedBy, correlationId, ct);
+
+        // 2. 删归属映射
+        await _inodeEntities.DeleteMappingAsync(inodeId, entityType, ct);
+
+        return true;
+    }
+
+    // ============================================================
+    // 便利方法：加载某 iNode 下所有实体
+    // ============================================================
+
+    /// <summary>
+    /// 加载某 iNode 下所有已创建实体，按类型名分组返回。
+    /// 未创建的类型不会出现在结果里。
+    /// </summary>
+    public async Task<Dictionary<string, DynamicEntity>> LoadAllByInodeAsync(
+        string inodeId,
+        bool originalUnits = false,
+        CancellationToken ct = default)
+    {
+        var mappings = await _inodeEntities.ListByInodeAsync(inodeId, ct);
+        if (mappings.Count == 0)
+            return new Dictionary<string, DynamicEntity>();
+
+        var result = new Dictionary<string, DynamicEntity>();
+        foreach (var m in mappings)
+        {
+            var entity = await _read.LoadAsync(
+                m.EntityId, m.EntityType, originalUnits, ct);
+            result[m.EntityType] = entity;
+        }
+        return result;
+    }
+}
+```
+
+## 文件 47/56 TreeGraph.Api/NodeEavSky/Services/InodeEntityService.cs
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
+
+namespace TreeGraph.Api.NodeEavSky.Services;
+
+public interface IInodeEntityService
+{
+    /// <summary>查归属映射，返回 entity_id（不存在返回 null）。</summary>
+    Task<string?> GetEntityIdAsync(
+        string inodeId, string entityType, CancellationToken ct = default);
+
+    /// <summary>
+    /// 获取或创建 entity_id（原子）。
+    /// 不存在则生成新 GUID 并写映射 + 声明。
+    /// </summary>
+    Task<string> GetOrCreateEntityIdAsync(
+        string inodeId, string entityType, CancellationToken ct = default);
+
+    /// <summary>列出某 iNode 下所有归属映射。</summary>
+    Task<IReadOnlyList<InodeEntity>> ListByInodeAsync(
+        string inodeId, CancellationToken ct = default);
+
+    /// <summary>按类型名反查 iNode（entity 只属于一个 iNode）。</summary>
+    Task<InodeEntity?> GetByEntityAsync(
+        string entityType, string entityId, CancellationToken ct = default);
+
+    /// <summary>删除归属映射（不影响 EAV 数据）。</summary>
+    Task<bool> DeleteMappingAsync(
+        string inodeId, string entityType, CancellationToken ct = default);
+
+    // ============================================================
+    // 声明层
+    // ============================================================
+
+    Task<IReadOnlyList<InodeEntityType>> ListDeclarationsAsync(
+        string inodeId, CancellationToken ct = default);
+
+    Task AttachAsync(
+        string inodeId, string entityType, CancellationToken ct = default);
+
+    Task<bool> DetachAsync(
+        string inodeId, string entityType, CancellationToken ct = default);
+}
+
+/// <summary>
+/// iNode ↔ 实体归属服务。
+///
+/// 不触碰任何 EAV 表，只操作 inode_entitytype / inode_entity。
+/// </summary>
+public class InodeEntityService : IInodeEntityService
+{
+    private readonly EavDbContext _db;
+
+    public InodeEntityService(EavDbContext db)
+    {
+        _db = db;
+    }
+
+    // ============================================================
+    // 归属层
+    // ============================================================
+
+    public async Task<string?> GetEntityIdAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+    {
+        return await _db.InodeEntities
+            .Where(x => x.InodeId == inodeId && x.EntityType == entityType)
+            .Select(x => x.EntityId)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<string> GetOrCreateEntityIdAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(inodeId))
+            throw new ArgumentException("inodeId 不能为空", nameof(inodeId));
+        if (string.IsNullOrWhiteSpace(entityType))
+            throw new ArgumentException("entityType 不能为空", nameof(entityType));
+
+        // 1. 查现有映射
+        var existing = await GetEntityIdAsync(inodeId, entityType, ct);
+        if (existing is not null) return existing;
+
+        // 2. 类型存在性（查 entity_type_catalog）
+        if (!await TypeExistsAsync(entityType, ct))
+            throw new InvalidOperationException($"实体类型不存在: {entityType}");
+
+        // 3. 生成 entity_id（与现有 EAV 用法一致，GUID 字符串）
+        var entityId = Guid.NewGuid().ToString("D");
+        var now = DateTimeOffset.UtcNow;
+
+        // 4. 写归属映射
+        _db.InodeEntities.Add(new InodeEntity
+        {
+            InodeId = inodeId,
+            EntityType = entityType,
+            EntityId = entityId,
+            AttachedAt = now
+        });
+
+        // 5. 自动补声明（混合模式）
+        var declared = await _db.InodeEntityTypes.AnyAsync(
+            x => x.InodeId == inodeId && x.EntityType == entityType, ct);
+        if (!declared)
+        {
+            _db.InodeEntityTypes.Add(new InodeEntityType
+            {
+                InodeId = inodeId,
+                EntityType = entityType,
+                AttachedAt = now
+            });
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return entityId;
+    }
+
+    public async Task<IReadOnlyList<InodeEntity>> ListByInodeAsync(
+        string inodeId, CancellationToken ct = default)
+    {
+        return await _db.InodeEntities
+            .Where(x => x.InodeId == inodeId)
+            .OrderBy(x => x.EntityType)
+            .AsNoTracking()
+            .ToListAsync(ct);
+    }
+
+    public async Task<InodeEntity?> GetByEntityAsync(
+        string entityType, string entityId, CancellationToken ct = default)
+    {
+        return await _db.InodeEntities
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.EntityType == entityType && x.EntityId == entityId, ct);
+    }
+
+    public async Task<bool> DeleteMappingAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+    {
+        var mapping = await _db.InodeEntities
+            .FirstOrDefaultAsync(
+                x => x.InodeId == inodeId && x.EntityType == entityType, ct);
+        if (mapping is null) return false;
+
+        _db.InodeEntities.Remove(mapping);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    // ============================================================
+    // 声明层
+    // ============================================================
+
+    public async Task<IReadOnlyList<InodeEntityType>> ListDeclarationsAsync(
+        string inodeId, CancellationToken ct = default)
+    {
+        return await _db.InodeEntityTypes
+            .Where(x => x.InodeId == inodeId)
+            .OrderBy(x => x.EntityType)
+            .AsNoTracking()
+            .ToListAsync(ct);
+    }
+
+    public async Task AttachAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(inodeId))
+            throw new ArgumentException("inodeId 不能为空", nameof(inodeId));
+        if (string.IsNullOrWhiteSpace(entityType))
+            throw new ArgumentException("entityType 不能为空", nameof(entityType));
+
+        // 幂等
+        var exists = await _db.InodeEntityTypes
+            .AnyAsync(x => x.InodeId == inodeId && x.EntityType == entityType, ct);
+        if (exists) return;
+
+        // 类型存在性（查 entity_type_catalog）
+        if (!await TypeExistsAsync(entityType, ct))
+            throw new InvalidOperationException($"实体类型不存在: {entityType}");
+
+        _db.InodeEntityTypes.Add(new InodeEntityType
+        {
+            InodeId = inodeId,
+            EntityType = entityType,
+            AttachedAt = DateTimeOffset.UtcNow
+        });
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<bool> DetachAsync(
+        string inodeId, string entityType, CancellationToken ct = default)
+    {
+        // 已有实体时拒绝
+        var hasEntity = await _db.InodeEntities
+            .AnyAsync(x => x.InodeId == inodeId && x.EntityType == entityType, ct);
+        if (hasEntity)
+            throw new InvalidOperationException(
+                "该 iNode 下已有此类型的实体，请先删除实体后再取消声明");
+
+        var link = await _db.InodeEntityTypes
+            .FirstOrDefaultAsync(
+                x => x.InodeId == inodeId && x.EntityType == entityType, ct);
+        if (link is null) return false;
+
+        _db.InodeEntityTypes.Remove(link);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    // ============================================================
+    // 内部辅助：类型存在性检查
+    // ============================================================
+
+    /// <summary>
+    /// 类型存在性检查（查 entity_type_catalog，不是 attribute_catalog）。
+    ///
+    /// ★ 之前的 bug：误查 attribute_catalog，导致"无属性的类型"被判定为不存在。
+    ///   语义上，类型是否存在于 entity_type_catalog 与是否有属性无关。
+    ///
+    ///   例外场景（允许"无属性类型"的操作）：
+    ///     - 声明（Attach）：允许
+    ///     - 创建实体（GetOrCreateEntityId）：允许，但实际写入时若无属性会被
+    ///       未知属性检查拒绝，等同"写不进任何东西"
+    /// </summary>
+    private async Task<bool> TypeExistsAsync(
+        string entityType, CancellationToken ct)
+    {
+        return await _db.EntityTypes
+            .AnyAsync(t => t.EntityType == entityType && !t.IsDeleted, ct);
+    }
+}
+```
+
+## 文件 48/56 TreeGraph.Api/NodeEavSky/Services/NumericValue.cs
+
+```csharp
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>
 /// 数量类型运行时值：数值 + 单位。
@@ -9962,15 +13330,15 @@ namespace TreeGraph.Api.Services;
 public readonly record struct NumericValue(decimal Value, Guid? UnitId = null);
 ```
 
-## 文件 39/41 TreeGraph.Api/Services/OptionSetCache.cs
+## 文件 49/56 TreeGraph.Api/NodeEavSky/Services/OptionSetCache.cs
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 public interface IOptionSetCache
 {
@@ -10051,15 +13419,15 @@ public class OptionSetCache : IOptionSetCache
 public sealed record SingleChoiceValue(string Value, string Label);
 ```
 
-## 文件 40/41 TreeGraph.Api/Services/UnitCache.cs
+## 文件 50/56 TreeGraph.Api/NodeEavSky/Services/UnitCache.cs
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using TreeGraph.Api.Data;
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 public interface IUnitCache
 {
@@ -10119,12 +13487,12 @@ public class UnitCache : IUnitCache
 }
 ```
 
-## 文件 41/41 TreeGraph.Api/Services/UnitConverter.cs
+## 文件 51/56 TreeGraph.Api/NodeEavSky/Services/UnitConverter.cs
 
 ```csharp
-using TreeGraph.Api.Entities;
+using TreeGraph.Api.NodeEavSky.Entities;
 
-namespace TreeGraph.Api.Services;
+namespace TreeGraph.Api.NodeEavSky.Services;
 
 /// <summary>单位换算服务：目标值 = 源值 × 源单位系数 ÷ 目标单位系数</summary>
 public class UnitConverter
@@ -10155,6 +13523,637 @@ public class UnitConverter
     /// <summary>从基准单位还原到指定单位</summary>
     public decimal FromBase(decimal baseValue, Guid baseUnitId, Guid targetUnitId)
         => Convert(baseValue, baseUnitId, targetUnitId);
+}
+```
+
+## 文件 52/56 TreeGraph.Api/TreeSky/EfTreeService.cs
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Blazor.Shared.Trees.Models;
+
+namespace TreeGraph.Api.TreeSky;
+
+/// <summary>
+/// 泛型树 EF Core 实现（合并自源 CategoryTreeService / UnitTreeService，两者 95% 重复）。
+/// 差异点（DbSet、名称字段）由泛型约束与接口消除：
+/// 实体只需实现 <see cref="ITreeNodeBase{T}"/> 并在 EavDbContext 注册即可。
+/// 与源实现的行为差异：
+/// - HasChildren 不落库，读取时按子表实时计算（避免源实现中 HasChildren 与真实子节点漂移的问题）；
+/// - 防环检测用迭代走父链替代 Npgsql 递归 CTE，与具体表名解耦；
+/// - 移动节点到自身视为非法（源 CTE 判定 ancestorId == nodeId 时放行，会形成自环）。
+/// </summary>
+public class EfTreeService<TNode>(EavDbContext db) : ITreeService<TNode>
+    where TNode : class, ITreeNodeBase<TNode>, new()
+{
+    private DbSet<TNode> Set => db.Set<TNode>();
+
+    // ==================== 查询 ====================
+
+    public async Task<IReadOnlyList<TreeNodeDto<TNode>>> GetRootNodesAsync(
+        string? rootId = null, CancellationToken cancellationToken = default)
+    {
+        List<TNode> entities;
+        if (!string.IsNullOrEmpty(rootId))
+        {
+            var root = await Set.FirstOrDefaultAsync(c => c.Id == rootId, cancellationToken);
+            entities = root == null ? [] : [root];
+        }
+        else
+        {
+            entities = await Set
+                .Where(c => c.ParentId == null)
+                .OrderBy(c => c.SortOrder)
+                .ToListAsync(cancellationToken);
+        }
+
+        return await ToLazyDtosAsync(entities, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TreeNodeDto<TNode>>> GetChildrenAsync(
+        string parentId, CancellationToken cancellationToken = default)
+    {
+        var entities = await Set
+            .Where(c => c.ParentId == parentId)
+            .OrderBy(c => c.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        return await ToLazyDtosAsync(entities, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TreeNodeDto<TNode>>> QueryNodesAsync(
+        TreeQueryParams queryParams, CancellationToken cancellationToken = default)
+    {
+        var query = Set.AsQueryable();
+
+        if (!string.IsNullOrEmpty(queryParams.ParentId))
+            query = query.Where(c => c.ParentId == queryParams.ParentId);
+
+        // 注意：SearchTerm / OnlyWithChildren 依赖具体字段，泛型层不支持，
+        // 由宿主在具体控制器中扩展（参考源 CategoryTreeController 的 search 端点）。
+
+        var entities = await query
+            .OrderBy(c => c.SortOrder)
+            .Skip((queryParams.Page - 1) * queryParams.PageSize)
+            .Take(queryParams.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return await ToLazyDtosAsync(entities, cancellationToken);
+    }
+
+    public async Task<TreeNodeDto<TNode>?> GetFullTreeAsync(
+        string? rootId = null, CancellationToken cancellationToken = default)
+    {
+        var all = await Set.OrderBy(c => c.SortOrder).ToListAsync(cancellationToken);
+        if (all.Count == 0)
+            return null;
+
+        var root = string.IsNullOrEmpty(rootId)
+            ? all.FirstOrDefault(n => n.ParentId == null)
+            : all.FirstOrDefault(n => n.Id == rootId);
+        if (root == null)
+            return null;
+
+        var childrenLookup = all
+            .Where(n => n.ParentId != null)
+            .GroupBy(n => n.ParentId!)
+            .ToDictionary(g => g.Key, g => g.OrderBy(n => n.SortOrder).ToList());
+
+        return BuildDto(root);
+
+        TreeNodeDto<TNode> BuildDto(TNode entity)
+        {
+            var children = childrenLookup.GetValueOrDefault(entity.Id) ?? [];
+            return new TreeNodeDto<TNode>
+            {
+                Id = entity.Id,
+                ParentId = entity.ParentId,
+                Value = entity,
+                Text = entity.Text(),
+                SortOrder = entity.SortOrder,
+                HasChildren = children.Count > 0,
+                Children = children.Count > 0 ? children.Select(BuildDto).ToList() : null,
+            };
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> GetAncestorPathAsync(
+        string nodeId, CancellationToken cancellationToken = default)
+    {
+        var path = new List<string>();
+        var currentId = nodeId;
+
+        while (!string.IsNullOrEmpty(currentId))
+        {
+            var node = await Set
+                .Where(c => c.Id == currentId)
+                .Select(c => new { c.Id, c.ParentId })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (node == null) break;
+
+            path.Insert(0, node.Id);
+            currentId = node.ParentId;
+        }
+
+        return path.AsReadOnly();
+    }
+
+    // ==================== 写入 ====================
+
+    public async Task<TreeNodeDto<TNode>> CreateNodeAsync(
+        TreeNodeDto<TNode> nodeDto, CancellationToken cancellationToken = default)
+    {
+        var entity = nodeDto.Value ?? new TNode();
+        if (string.IsNullOrWhiteSpace(entity.Id))
+            entity.Id = Guid.NewGuid().ToString("N");
+        entity.ParentId = nodeDto.ParentId;
+        entity.SortOrder = nodeDto.Value?.SortOrder ?? nodeDto.SortOrder;
+
+        await Set.AddAsync(entity, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return await ToLazyDtoAsync(entity, cancellationToken);
+    }
+
+    public async Task<TreeNodeDto<TNode>> UpdateNodeAsync(
+        TreeNodeDto<TNode> nodeDto, CancellationToken cancellationToken = default)
+    {
+        var entity = await Set.FindAsync([nodeDto.Id], cancellationToken)
+            ?? throw new KeyNotFoundException($"节点 {nodeDto.Id} 不存在");
+
+        if (nodeDto.Value is { } value)
+        {
+            // 整体拷贝标量字段（含接口未暴露的 Name 等具体属性）；
+            // ParentId 不在此修改——移动只走 MoveNodeAsync。
+            var originalParentId = entity.ParentId;
+            db.Entry(entity).CurrentValues.SetValues(value);
+            entity.Id = nodeDto.Id;
+            entity.ParentId = originalParentId;
+        }
+        else
+        {
+            entity.SortOrder = nodeDto.SortOrder;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return await ToLazyDtoAsync(entity, cancellationToken);
+    }
+
+    public async Task<TreeNodeDto<TNode>> UpdateChildrenAsync(
+        TreeNodeDto<TNode> nodeDto, CancellationToken cancellationToken = default)
+    {
+        var children = await Set
+            .Where(c => c.ParentId == nodeDto.Id)
+            .ToListAsync(cancellationToken);
+
+        // 按传入 Children 顺序重排 SortOrder（与前端排序对话框语义一致）
+        var order = 0;
+        foreach (var childDto in nodeDto.Children ?? [])
+        {
+            var childId = childDto.Value?.Id ?? childDto.Id;
+            var child = children.FirstOrDefault(c => c.Id == childId);
+            if (child != null)
+                child.SortOrder = order;
+            order++;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return nodeDto;
+    }
+
+    public async Task<bool> DeleteNodeAsync(string nodeId, CancellationToken cancellationToken = default)
+    {
+        var node = await Set.FirstOrDefaultAsync(c => c.Id == nodeId, cancellationToken);
+        if (node == null)
+            return false;
+
+        // 级联硬删除全部后代
+        var all = await Set.ToListAsync(cancellationToken);
+        var byParent = all.Where(n => n.ParentId != null)
+            .GroupBy(n => n.ParentId!)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var toDelete = new List<TNode>();
+        var stack = new Stack<TNode>();
+        stack.Push(node);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            toDelete.Add(current);
+            foreach (var child in byParent.GetValueOrDefault(current.Id) ?? [])
+                stack.Push(child);
+        }
+
+        Set.RemoveRange(toDelete);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> MoveNodeAsync(
+        string nodeId, string? newParentId, CancellationToken cancellationToken = default)
+    {
+        var node = await Set.FindAsync([nodeId], cancellationToken);
+        if (node == null)
+            return false;
+
+        // 防环：目标是自身或自身的后代时拒绝（含自环，源实现放行了自环）
+        if (await IsSelfOrDescendantAsync(nodeId, newParentId, cancellationToken))
+            return false;
+
+        node.ParentId = newParentId;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    // ==================== 内部 ====================
+
+    /// <summary>candidateId 是否等于 ancestorId 或位于其子孙链上。</summary>
+    private async Task<bool> IsSelfOrDescendantAsync(
+        string ancestorId, string? candidateId, CancellationToken cancellationToken)
+    {
+        var currentId = candidateId;
+        while (!string.IsNullOrEmpty(currentId))
+        {
+            if (currentId == ancestorId)
+                return true;
+
+            currentId = await Set
+                .Where(c => c.Id == currentId)
+                .Select(c => c.ParentId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 懒加载 DTO：不带 Children，HasChildren 按子表实时计算。
+    /// 不填充 <see cref="TreeNodeDto{T}.Parent"/>：与批量路径 <see cref="ToLazyDtosAsync"/> 行为一致，
+    /// 避免单节点写操作多 1 次 DB 查询；客户端需要父引用时用 ParentId 反查或调祖先路径接口。
+    /// </summary>
+    private async Task<TreeNodeDto<TNode>> ToLazyDtoAsync(TNode entity, CancellationToken ct)
+    {
+        var hasChildren = await Set.AnyAsync(c => c.ParentId == entity.Id, ct);
+
+        return new TreeNodeDto<TNode>
+        {
+            Id = entity.Id,
+            ParentId = entity.ParentId,
+            Value = entity,
+            Text = entity.Text(),
+            SortOrder = entity.SortOrder,
+            HasChildren = hasChildren,
+            Children = null,
+        };
+    }
+
+    private async Task<IReadOnlyList<TreeNodeDto<TNode>>> ToLazyDtosAsync(
+        List<TNode> entities, CancellationToken ct)
+    {
+        if (entities.Count == 0)
+            return [];
+
+        // 批量计算 HasChildren，避免逐节点 AnyAsync
+        var ids = entities.Select(e => e.Id).ToList();
+        var parentIdsWithChildren = (await Set
+                .Where(c => c.ParentId != null && ids.Contains(c.ParentId))
+                .Select(c => c.ParentId!)
+                .Distinct()
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        return entities.Select(e => new TreeNodeDto<TNode>
+        {
+            Id = e.Id,
+            ParentId = e.ParentId,
+            Value = e,
+            Text = e.Text(),
+            SortOrder = e.SortOrder,
+            HasChildren = parentIdsWithChildren.Contains(e.Id),
+            Children = null,
+        }).ToList();
+    }
+}
+```
+
+## 文件 53/56 TreeGraph.Api/TreeSky/ITreeService.cs
+
+```csharp
+using TreeGraph.Blazor.Shared.Trees.Models;
+
+namespace TreeGraph.Api.TreeSky;
+
+/// <summary>
+/// 泛型树服务接口（移植自 APromisedLand.Api DiberyTree/ITreeService，与 TreeSky 组件的
+/// DiberyTreeApiClient 调用面一一对应）。
+/// </summary>
+/// <typeparam name="T">节点值的类型</typeparam>
+public interface ITreeService<T>
+{
+    /// <summary>获取根节点列表</summary>
+    Task<IReadOnlyList<TreeNodeDto<T>>> GetRootNodesAsync(string? parentId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>获取指定父节点的子节点列表（懒加载）</summary>
+    Task<IReadOnlyList<TreeNodeDto<T>>> GetChildrenAsync(string parentId, CancellationToken cancellationToken = default);
+
+    /// <summary>根据条件查询节点</summary>
+    Task<IReadOnlyList<TreeNodeDto<T>>> QueryNodesAsync(TreeQueryParams queryParams, CancellationToken cancellationToken = default);
+
+    /// <summary>获取完整的树（一次性加载全部）</summary>
+    Task<TreeNodeDto<T>?> GetFullTreeAsync(string? rootId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>创建节点</summary>
+    Task<TreeNodeDto<T>> CreateNodeAsync(TreeNodeDto<T> node, CancellationToken cancellationToken = default);
+
+    /// <summary>更新节点</summary>
+    Task<TreeNodeDto<T>> UpdateNodeAsync(TreeNodeDto<T> node, CancellationToken cancellationToken = default);
+
+    /// <summary>更新指定父节点的子节点顺序</summary>
+    Task<TreeNodeDto<T>> UpdateChildrenAsync(TreeNodeDto<T> nodeDto, CancellationToken cancellationToken = default);
+
+    /// <summary>删除节点（及其所有子节点）</summary>
+    Task<bool> DeleteNodeAsync(string nodeId, CancellationToken cancellationToken = default);
+
+    /// <summary>移动节点（更改父节点）</summary>
+    Task<bool> MoveNodeAsync(string nodeId, string? newParentId, CancellationToken cancellationToken = default);
+
+    /// <summary>获取从根节点到指定节点的祖先路径（ID 列表，根在前）</summary>
+    Task<IReadOnlyList<string>> GetAncestorPathAsync(string nodeId, CancellationToken cancellationToken = default);
+}
+```
+
+## 文件 54/56 TreeGraph.Api/TreeSky/StringTreeNodeController.cs
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using TreeGraph.Blazor.Shared.Trees.Models;
+
+namespace TreeGraph.Api.TreeSky;
+
+/// <summary>
+/// 字符串节点树 API。路由 /StringTreeNode 与 TreeSky 组件客户端
+/// DiberyTreeApiClient&lt;StringTreeNode&gt; 的 _basePath（typeof(T).Name）对齐。
+/// </summary>
+[ApiController]
+[Route("[controller]")]
+public class StringTreeNodeController(
+    ITreeService<StringTreeNode> treeService,
+    ILogger<StringTreeNodeController> logger)
+    : TreeControllerBase<StringTreeNode>(treeService, logger);
+```
+
+## 文件 55/56 TreeGraph.Api/TreeSky/StringTreeNodeSeeder.cs
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Blazor.Shared.Trees.Models;
+
+namespace TreeGraph.Api.TreeSky;
+
+/// <summary>
+/// TreeSky 演示树种子：与此前内存演示（InMemoryTreeStore）相同的数据，
+/// 幂等（表非空即跳过），仅在空库时播种一次。
+/// </summary>
+public static class StringTreeNodeSeeder
+{
+    public static async Task SeedAsync(EavDbContext db, CancellationToken ct = default)
+    {
+        if (await db.StringTreeNodes.AnyAsync(ct))
+            return;
+
+        StringTreeNode Node(string id, string name, string? parentId, int sort,
+            bool canHaveChildren, string? desc = null) => new()
+        {
+            Id = id,
+            Name = name,
+            Description = desc,
+            ParentId = parentId,
+            SortOrder = sort,
+            CanHaveChildren = canHaveChildren,
+        };
+
+        db.StringTreeNodes.AddRange(
+            Node("root", "物品总类", null, 0, true, "演示树的根节点"),
+            Node("cat-electronics", "电子产品", "root", 0, true),
+            Node("leaf-phone", "智能手机", "cat-electronics", 0, false, "可移动、可编辑的叶子节点"),
+            Node("leaf-laptop", "笔记本电脑", "cat-electronics", 1, false),
+            Node("cat-office", "办公用品", "root", 1, true),
+            Node("leaf-pen", "中性笔", "cat-office", 0, false),
+            Node("leaf-paper", "A4 打印纸", "cat-office", 1, false),
+            Node("cat-furniture", "家具（空分类）", "root", 2, true, "暂无子项，可在此创建子节点"));
+
+        await db.SaveChangesAsync(ct);
+    }
+}
+```
+
+## 文件 56/56 TreeGraph.Api/TreeSky/TreeControllerBase.cs
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using TreeGraph.Blazor.Shared.Trees.Models;
+
+namespace TreeGraph.Api.TreeSky;
+
+/// <summary>
+/// 泛型树控制器基类（移植自 APromisedLand.Api DiberyTree/TreeControllerBase）。
+/// 路由约定 [Route("[controller]")] 与 TreeSky 组件的 DiberyTreeApiClient
+/// （_basePath = typeof(T).Name）对齐：宿主控制器名必须与节点类型名一致。
+/// </summary>
+/// <typeparam name="T">节点值的类型</typeparam>
+[ApiController]
+[Route("[controller]")]
+public abstract class TreeControllerBase<T>(
+    ITreeService<T> treeService,
+    ILogger<TreeControllerBase<T>> logger)
+    : ControllerBase
+{
+    protected readonly ITreeService<T> TreeService = treeService;
+    protected readonly ILogger Logger = logger;
+
+    [HttpGet("roots")]
+    [HttpGet("roots/{rootId}")]
+    public virtual async Task<IActionResult> GetRoots(string? rootId = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var roots = await TreeService.GetRootNodesAsync(rootId, cancellationToken);
+            return Ok(ApiResponse<IReadOnlyList<TreeNodeDto<T>>>.Ok(roots));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "获取根节点失败");
+            return BadRequest(ApiResponse<object>.Fail($"获取根节点失败: {ex.Message}"));
+        }
+    }
+
+    [HttpGet("children/{parentId}")]
+    public virtual async Task<IActionResult> GetChildren(string parentId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var children = await TreeService.GetChildrenAsync(parentId, cancellationToken);
+            return Ok(ApiResponse<IReadOnlyList<TreeNodeDto<T>>>.Ok(children));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "获取子节点失败");
+            return BadRequest(ApiResponse<object>.Fail($"获取子节点失败: {ex.Message}"));
+        }
+    }
+
+    [HttpPost("query")]
+    public virtual async Task<IActionResult> Query([FromBody] TreeQueryParams queryParams, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await TreeService.QueryNodesAsync(queryParams, cancellationToken);
+            return Ok(ApiResponse<object>.Ok(result));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "查询节点失败");
+            return BadRequest(ApiResponse<object>.Fail($"查询节点失败: {ex.Message}"));
+        }
+    }
+
+    [HttpGet("full")]
+    public virtual async Task<IActionResult> GetFullTree([FromQuery] string? rootId = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tree = await TreeService.GetFullTreeAsync(rootId, cancellationToken);
+            if (tree == null)
+                return NotFound(ApiResponse<object>.Fail($"根节点 '{rootId ?? "默认"}' 不存在"));
+            return Ok(ApiResponse<TreeNodeDto<T>>.Ok(tree));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "获取完整树失败");
+            return StatusCode(500, ApiResponse<object>.Fail($"获取完整树失败: {ex.Message}"));
+        }
+    }
+
+    [HttpPost]
+    public virtual async Task<IActionResult> Create([FromBody] TreeNodeDto<T> node, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(node.Text))
+            return BadRequest(ApiResponse<object>.Fail("节点文本不能为空"));
+
+        try
+        {
+            var created = await TreeService.CreateNodeAsync(node, cancellationToken);
+            return CreatedAtAction(nameof(GetFullTree), new { rootId = created.Id }, ApiResponse<TreeNodeDto<T>>.Ok(created));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "创建节点失败");
+            return StatusCode(500, ApiResponse<object>.Fail($"创建节点时发生错误: {ex.Message}"));
+        }
+    }
+
+    [HttpPost("children")]
+    public virtual async Task<IActionResult> UpdateChildren([FromBody] TreeNodeDto<T> nodeDto, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await TreeService.UpdateChildrenAsync(nodeDto, cancellationToken);
+            return Ok(ApiResponse<TreeNodeDto<T>>.Ok(updated));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "更新节点子项失败");
+            return StatusCode(500, ApiResponse<object>.Fail($"更新节点子项时发生错误: {ex.Message}"));
+        }
+    }
+
+    [HttpPut("{id}")]
+    public virtual async Task<IActionResult> Update(string id, [FromBody] TreeNodeDto<T> node, CancellationToken cancellationToken = default)
+    {
+        if (id != node.Id)
+            return BadRequest(ApiResponse<object>.Fail("URL 中的 ID 与请求体中的 ID 不一致"));
+
+        if (string.IsNullOrWhiteSpace(node.Text))
+            return BadRequest(ApiResponse<object>.Fail("节点文本不能为空"));
+
+        try
+        {
+            var updated = await TreeService.UpdateNodeAsync(node, cancellationToken);
+            return Ok(ApiResponse<TreeNodeDto<T>>.Ok(updated));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(ApiResponse<object>.Fail($"节点 '{id}' 不存在"));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "更新节点失败");
+            return StatusCode(500, ApiResponse<object>.Fail($"更新节点时发生错误: {ex.Message}"));
+        }
+    }
+
+    [HttpDelete("{id}")]
+    public virtual async Task<IActionResult> Delete(string id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await TreeService.DeleteNodeAsync(id, cancellationToken);
+            if (!result)
+                return NotFound(ApiResponse<object>.Fail($"节点 '{id}' 不存在或删除失败"));
+            return Ok(ApiResponse<bool>.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "删除节点失败");
+            return StatusCode(500, ApiResponse<object>.Fail($"删除节点时发生错误: {ex.Message}"));
+        }
+    }
+
+    [HttpPost("move")]
+    public virtual async Task<IActionResult> Move([FromQuery] string nodeId, [FromQuery] string? newParentId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(nodeId))
+            return BadRequest(ApiResponse<object>.Fail("节点 ID 不能为空"));
+
+        try
+        {
+            var result = await TreeService.MoveNodeAsync(nodeId, newParentId, cancellationToken);
+            if (!result)
+                return BadRequest(ApiResponse<object>.Fail("移动失败，可能节点不存在或试图移动到自身子节点下"));
+            return Ok(ApiResponse<bool>.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "移动节点失败");
+            return StatusCode(500, ApiResponse<object>.Fail($"移动节点时发生错误: {ex.Message}"));
+        }
+    }
+
+    [HttpGet("{nodeId}/ancestors")]
+    public virtual async Task<IActionResult> GetAncestorPath(string nodeId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(nodeId))
+            return BadRequest(ApiResponse<object>.Fail("节点 ID 不能为空"));
+
+        try
+        {
+            var path = await TreeService.GetAncestorPathAsync(nodeId, cancellationToken);
+            if (path.Count == 0)
+                return NotFound(ApiResponse<object>.Fail($"节点 '{nodeId}' 不存在"));
+            return Ok(ApiResponse<IReadOnlyList<string>>.Ok(path));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "获取祖先路径失败");
+            return StatusCode(500, ApiResponse<object>.Fail($"获取祖先路径失败: {ex.Message}"));
+        }
+    }
 }
 ```
 
