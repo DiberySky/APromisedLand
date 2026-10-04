@@ -69,6 +69,33 @@ private async Task LoadAsync(CancellationToken ct = default) { ... }
 
 ---
 
+## 跨组件语义差异（易踩坑，需明示）
+
+### TreeSky vs StringTreeSky：空数据渲染
+
+| 组件 | 空数据判定条件 | 行为 |
+|---|---|---|
+| `TreeSky<T>` | `_items == null \|\| _items.Count == 0 \|\| _loading` | 显示 `ProgressCircularSky`（加载圈） |
+| `StringTreeSky` | `_loading \|\| _items is null` | 渲染空 `MudTreeView`（无加载圈） |
+
+**语义差异**：两者对"加载完成但结果为空"的处理不同——`TreeSky` 视为"仍在加载"，`StringTreeSky` 视为"空树"。
+
+**为什么这样设计**：
+- `TreeSky` 沿用原实现：`Items` 为 null 与空集合在 UI 上不加区分，都显示加载态
+- `StringTreeSky` 选择"空树优于加载圈"：用户能看到树框架（虽无内容），交互反馈更直观；且 `Items` 为 null 只在首屏（未加载完成）出现
+
+**影响**：
+- 扩展新树组件时，需明确选择哪种语义，避免跨组件行为不一致
+- 消费方若依赖"空 → 加载圈"或"空 → 空树"的视觉反馈，切换组件会改变观感
+
+**相关代码**：
+- `TreeGraph.Blazor.Shared/Trees/TreeSky.razor`（渲染条件行）
+- `TreeGraph.Blazor.Shared/Trees/StringTree/Components/StringTreeSky.razor`（渲染条件行）
+
+**判定是否需统一**：目前保持差异（各有合理场景）；若未来引入共用抽象，应把"空数据策略"作为参数暴露，而非硬编码。
+
+---
+
 ## 错误黑名单（本人实际犯过）
 
 | # | 错误 | 根因 | 正确做法 |
