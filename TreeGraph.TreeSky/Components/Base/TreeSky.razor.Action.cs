@@ -96,12 +96,13 @@ public partial class TreeSky<TItem>
                 Value = formModel,
             };
 
-            await ApiClient.CreateNodeAsync(dto);
+            await ApiClient.CreateNodeAsync(dto, _cts.Token);
 
             parent.Expanded = true;
-            await RefreshNodeChildrenAsync(parent);
+            await RefreshNodeChildrenAsync(parent, _cts.Token);
             Message.Success("创建成功");
         }
+        catch (OperationCanceledException) { }
         catch (Exception e)
         {
             Message.Details("创建失败", e.Message);
@@ -130,11 +131,12 @@ public partial class TreeSky<TItem>
                 Value = formModel,
             };
 
-            await ApiClient.UpdateNodeAsync(dto.Id, dto);
+            await ApiClient.UpdateNodeAsync(dto.Id, dto, _cts.Token);
 
             node.Text = formModel.Text();
             Message.Success("更新成功");
         }
+        catch (OperationCanceledException) { }
         catch (Exception e)
         {
             Message.Details("更新失败", e.Message);
@@ -154,13 +156,14 @@ public partial class TreeSky<TItem>
 
         try
         {
-            await ApiClient.DeleteNodeAsync(node.Value!.Id);
+            await ApiClient.DeleteNodeAsync(node.Value!.Id, _cts.Token);
 
             var parent = _items?.FindTreeItem(node.Value!.ParentId!);
-            await RefreshNodeChildrenAsync(parent!);
+            await RefreshNodeChildrenAsync(parent!, _cts.Token);
 
             Message.Success("删除成功");
         }
+        catch (OperationCanceledException) { }
         catch (Exception e)
         {
             Message.Details("删除失败", e.Message);
@@ -172,7 +175,7 @@ public partial class TreeSky<TItem>
         var formModel = await NodeDialogSvc.ShowCreateDialogAsync();
         if (formModel == null) return;
 
-        await RefreshTreeAsync();
+        await RefreshTreeAsync(_cts.Token);
         Message.Success("根分类已创建");
     }
 
@@ -206,14 +209,15 @@ public partial class TreeSky<TItem>
                 Value = node.Value,
             };
 
-            await ApiClient.UpdateNodeAsync(dto.Id, dto);
+            await ApiClient.UpdateNodeAsync(dto.Id, dto, _cts.Token);
 
             node.Value.Parent = selectResult;
 
-            await ReLoadingAsync(node);
+            await ReLoadingAsync(node, _cts.Token);
 
             Message.Success("转移成功");
         }
+        catch (OperationCanceledException) { }
         catch (Exception e)
         {
             Message.Details("转移失败", e.Message);
@@ -253,21 +257,25 @@ public partial class TreeSky<TItem>
             }).ToList()
         };
 
-        await ApiClient.UpdateChildrenAsync(nodeDto);
+        try
+        {
+            await ApiClient.UpdateChildrenAsync(nodeDto, _cts.Token);
+            await RefreshNodeChildrenAsync(node, _cts.Token);
 
-        await RefreshNodeChildrenAsync(node);
-
-        Message.Success($"排序成功");
+            Message.Success($"排序成功");
+        }
+        catch (OperationCanceledException) { }
     }
 
     #endregion
 
     #region 通用辅助方法
 
-    private async Task ExecuteTreeOperationAsync(Func<Task> operation, string successMessage)
+    private async Task ExecuteTreeOperationAsync(
+        Func<Task> operation, string successMessage, CancellationToken ct = default)
     {
         await operation();
-        await RefreshTreeAsync();
+        await RefreshTreeAsync(ct);
         Message.Success(successMessage);
     }
 
@@ -278,9 +286,9 @@ public partial class TreeSky<TItem>
     private static IReadOnlyList<TreeNodeDto<TItem>> OrderNodes(IEnumerable<TreeNodeDto<TItem>> items)
         => items.OrderBy(i => i.Value?.SortOrder).ThenBy(i => i.Text).ToList();
 
-    private async Task RefreshTreeAsync()
+    private async Task RefreshTreeAsync(CancellationToken ct = default)
     {
-        await RefreshAsync();
+        await RefreshAsync(ct);
         SelectedValue = null;
     }
 

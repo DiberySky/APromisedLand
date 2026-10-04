@@ -8,7 +8,10 @@ public interface ITreeClientService<TTree> where TTree : class
     bool NewPageShow { get; set; }
     bool SelectLeaf { get; set; }
 
-    Task<IReadOnlyList<TreeNodeDto<TTree>>> LoadInitialDataAsync(string? rootId);
-    Task<IReadOnlyList<TreeNodeDto<TTree>>> LoadChildrenAsync(TTree? parent = null);
-    Task<List<string>?> GetAncestorPathFromApiAsync(string nodeId);
+    Task<IReadOnlyList<TreeNodeDto<TTree>>> LoadInitialDataAsync(
+        string? rootId, CancellationToken ct = default);
+    Task<IReadOnlyList<TreeNodeDto<TTree>>> LoadChildrenAsync(
+        TTree? parent = null, CancellationToken ct = default);
+    Task<List<string>?> GetAncestorPathFromApiAsync(
+        string nodeId, CancellationToken ct = default);
 }

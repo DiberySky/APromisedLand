@@ -7,14 +7,17 @@ namespace TreeGraph.TreeSky.Components.Base;
 public partial class TreeSky<TItem>
 {
     // ========== 节点展开 ==========
-    private async Task ExpandToNodeAsync(string targetId, bool clearSelection = true)
+    private async Task ExpandToNodeAsync(
+        string targetId, bool clearSelection = true, CancellationToken ct = default)
     {
         var path = _items?.GetPathToNode(targetId);
 
         if (path == null)
         {
-            path = await GetAncestorPathFromApiAsync(targetId);
+            path = await GetAncestorPathFromApiAsync(targetId, ct);
         }
+
+        ct.ThrowIfCancellationRequested();
 
         if (path is not { Count: > 0 }) return;
 
@@ -29,19 +32,21 @@ public partial class TreeSky<TItem>
 
         await _items!.ExpandToNodeAsync(
             path: path,
-            loadChildren: LoadChildrenAsync,
+            loadChildren: item => LoadChildrenAsync(item, ct),
             onSelected: value =>
             {
                 SelectedValue = value;
                 _ = SelectedValueChanged.InvokeAsync(value);
-            });
+            },
+            ct: ct);
 
         StateHasChanged();
     }
 
-    private async Task<List<string>?> GetAncestorPathFromApiAsync(string nodeId)
+    private async Task<List<string>?> GetAncestorPathFromApiAsync(
+        string nodeId, CancellationToken ct = default)
     {
-        return await ClientService.GetAncestorPathFromApiAsync(nodeId);
+        return await ClientService.GetAncestorPathFromApiAsync(nodeId, ct);
     }
 
     // ========== 节点点击与导航 ==========
@@ -85,8 +90,10 @@ public partial class TreeSky<TItem>
     /// 等首帧渲染（MudTreeView 挂载）完成后再沿祖先路径懒加载展开，
     /// 避免在树视图挂载边界内设置选中值被其初始化流程重置。
     /// </summary>
-    private Task SetSelectedAsync()
+    private Task SetSelectedAsync(CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         if (string.IsNullOrEmpty(ClickNodeId)) return Task.CompletedTask;
         if (_items is not { Count: > 0 }) return Task.CompletedTask;
 
@@ -254,7 +261,7 @@ public partial class TreeSky<TItem>
             // 未展开但有子节点 → 触发懒加载
             if (current.Children?.Any() != true && current.Value?.HasChildren == true)
             {
-                var children = await LoadChildrenAsync(current.Value);
+                var children = await LoadChildrenAsync(current.Value, ct);
                 ct.ThrowIfCancellationRequested();
                 current.Children = children.ToList<ITreeItemData<TItem>>();
             }

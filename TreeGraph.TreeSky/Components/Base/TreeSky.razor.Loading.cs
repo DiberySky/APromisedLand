@@ -6,17 +6,24 @@ namespace TreeGraph.TreeSky.Components.Base;
 public partial class TreeSky<TItem>
 {
     // ========== 数据加载 ==========
-    private async Task<List<TreeItemData<TItem>>> LoadInitialDataAsync()
+    private async Task<List<TreeItemData<TItem>>> LoadInitialDataAsync(
+        CancellationToken ct = default)
     {
         try
         {
             _loading = true;
 
-            var items = await ClientService.LoadInitialDataAsync(RootId);
+            var items = await ClientService.LoadInitialDataAsync(RootId, ct);
+            ct.ThrowIfCancellationRequested();
 
             _loading = false;
 
             return items.Select(i => i.ToTreeItemData<TItem>()).ToList();
+        }
+        catch (OperationCanceledException)
+        {
+            _loading = false;
+            throw;
         }
         catch (Exception e)
         {
@@ -25,36 +32,41 @@ public partial class TreeSky<TItem>
         }
     }
 
-    private async Task<IReadOnlyCollection<TreeItemData<TItem>>> LoadChildrenAsync(TItem? parent)
+    private async Task<IReadOnlyCollection<TreeItemData<TItem>>> LoadChildrenAsync(
+        TItem? parent, CancellationToken ct = default)
     {
         if (parent == null)
         {
-            var roots = await ClientService.LoadChildrenAsync();
+            var roots = await ClientService.LoadChildrenAsync(null, ct);
             return roots.Select(i => i.ToTreeItemData<TItem>()).ToList();
         }
         else
         {
-            var children = await ClientService.LoadChildrenAsync(parent);
+            var children = await ClientService.LoadChildrenAsync(parent, ct);
             return children.Select(i => i.ToTreeItemData<TItem>()).ToList();
         }
     }
 
     // ========== 刷新 ==========
-    public async Task RefreshAsync()
+    public async Task RefreshAsync(CancellationToken ct = default)
     {
-        var rootItems = await ClientService.LoadChildrenAsync();
+        var rootItems = await ClientService.LoadChildrenAsync(null, ct);
+        ct.ThrowIfCancellationRequested();
+
         _items = rootItems?.Select(x => x.ToTreeItemData<TItem>()).ToList() ?? [];
         StateHasChanged();
     }
 
-    private async Task RefreshNodeChildrenAsync(ITreeItemData<TItem> node)
+    private async Task RefreshNodeChildrenAsync(
+        ITreeItemData<TItem> node, CancellationToken ct = default)
     {
         SelectedValue = null;
         _ = SelectedValueChanged.InvokeAsync(null);
 
         StateHasChanged();
 
-        var children = await ClientService.LoadChildrenAsync(node.Value);
+        var children = await ClientService.LoadChildrenAsync(node.Value, ct);
+        ct.ThrowIfCancellationRequested();
 
         node.Children = children.Select(c => new TreeItemData<TItem>
         {
@@ -73,11 +85,12 @@ public partial class TreeSky<TItem>
         StateHasChanged();
     }
 
-    private async Task ReLoadingAsync(ITreeItemData<TItem> node)
+    private async Task ReLoadingAsync(
+        ITreeItemData<TItem> node, CancellationToken ct = default)
     {
-        _items = await LoadInitialDataAsync();
+        _items = await LoadInitialDataAsync(ct);
 
-        await ExpandToNodeAsync(node.Value!.Id);
+        await ExpandToNodeAsync(node.Value!.Id, ct: ct);
 
         StateHasChanged();
     }

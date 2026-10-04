@@ -17,14 +17,17 @@ public class StringTreeClientService(DiberyTreeApiClient<StringTreeNode> api) : 
     /// <summary>移动/选择对话框中只能选中叶子（与源计量单位树语义一致）。</summary>
     public bool SelectLeaf { get; set; } = true;
 
-    public async Task<IReadOnlyList<TreeNodeDto<StringTreeNode>>> LoadInitialDataAsync(string? rootId)
-        => await api.GetRootNodesAsync(rootId);
+    public async Task<IReadOnlyList<TreeNodeDto<StringTreeNode>>> LoadInitialDataAsync(
+        string? rootId, CancellationToken ct = default)
+        => await api.GetRootNodesAsync(rootId, ct);
 
-    public async Task<IReadOnlyList<TreeNodeDto<StringTreeNode>>> LoadChildrenAsync(StringTreeNode? parent = null)
+    public async Task<IReadOnlyList<TreeNodeDto<StringTreeNode>>> LoadChildrenAsync(
+        StringTreeNode? parent = null, CancellationToken ct = default)
         => parent == null
-            ? await api.GetRootNodesAsync()
-            : await api.GetChildrenAsync(parent.Id);
+            ? await api.GetRootNodesAsync(null, ct)
+            : await api.GetChildrenAsync(parent.Id, ct);
 
-    public async Task<List<string>?> GetAncestorPathFromApiAsync(string nodeId)
-        => [.. await api.GetAncestorPathAsync(nodeId)];
+    public async Task<List<string>?> GetAncestorPathFromApiAsync(
+        string nodeId, CancellationToken ct = default)
+        => [.. await api.GetAncestorPathAsync(nodeId, ct)];
 }

@@ -6,13 +6,18 @@ using TreeGraph.TreeSky.Services;
 
 namespace TreeGraph.TreeSky.Components.Base;
 
-public partial class TreeSky<TItem>
+public partial class TreeSky<TItem> : IDisposable
 {
     private List<TreeItemData<TItem>>? _items;
     private string? _lastClickNodeId;
     private string HighlightedText { get; set; } = string.Empty;
 
     private bool _loading = true;
+
+    /// <summary>
+    /// 组件级取消令牌：组件卸载 / 页面导航时取消所有进行中的异步操作。
+    /// </summary>
+    private readonly CancellationTokenSource _cts = new();
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
 
@@ -21,10 +26,10 @@ public partial class TreeSky<TItem>
     {
         try
         {
-            _items = await LoadInitialDataAsync();
+            _items = await LoadInitialDataAsync(_cts.Token);
 
             // 恢复选中（深层节点会沿祖先路径懒加载展开）
-            await SetSelectedAsync();
+            await SetSelectedAsync(_cts.Token);
 
             if (ShowDialogFunc == null)
             {
@@ -34,6 +39,10 @@ public partial class TreeSky<TItem>
                 _ = CurrentPageChanged.InvokeAsync(CurrentPage);
             }
         }
+        catch (OperationCanceledException)
+        {
+            // 组件卸载 / 导航取消，静默忽略
+        }
         catch (Exception e)
         {
             Message.Details("数据加载失败。", e.Message);
@@ -42,10 +51,19 @@ public partial class TreeSky<TItem>
 
     protected override async Task OnParametersSetAsync()
     {
+        if (_cts.IsCancellationRequested) return;
+
         if (!string.IsNullOrEmpty(ClickNodeId) && ClickNodeId != _lastClickNodeId)
         {
             _lastClickNodeId = ClickNodeId;
-            await ExpandToNodeAsync(ClickNodeId);
+            try
+            {
+                await ExpandToNodeAsync(ClickNodeId, ct: _cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // 导航切换，静默忽略
+            }
         }
 
         if (RootId == null && _items != null) RootId = _items!.FirstOrDefault()?.Value?.Id;
@@ -57,7 +75,21 @@ public partial class TreeSky<TItem>
         if (firstRender && _pendingDeepClickNodeId is { } targetId)
         {
             _pendingDeepClickNodeId = null;
-            await ExpandToNodeAsync(targetId, clearSelection: false);
+            try
+            {
+                await ExpandToNodeAsync(targetId, clearSelection: false, ct: _cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // 组件已卸载，静默忽略
+            }
         }
+    }
+
+    // ========== IDisposable ==========
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
     }
 }

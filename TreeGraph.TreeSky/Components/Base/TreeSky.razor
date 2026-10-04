@@ -17,7 +17,7 @@
 }
 else
 {
-    <MudTreeView T="TItem" ServerData="@LoadChildrenAsync" Items="@_items"
+    <MudTreeView T="TItem" ServerData="@(p => LoadChildrenAsync(p))" Items="@_items"
                  @bind-SelectedValue="SelectedValue"
                  SelectionMode="@SelectionMode.ToggleSelection">
         <ItemTemplate>

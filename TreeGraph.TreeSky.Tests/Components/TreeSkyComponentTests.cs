@@ -54,7 +54,7 @@ public class TreeSkyComponentTests : TestContext
         // 永不完成 → 组件停在首次 await，保持 loading
         var tcs = new TaskCompletionSource<IReadOnlyList<TreeNodeDto<StringTreeNode>>>();
         _clientService
-            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>()))
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(tcs.Task);
 
         var cut = RenderComponent<TreeSky<StringTreeNode>>();
@@ -71,7 +71,7 @@ public class TreeSkyComponentTests : TestContext
     public void Render_AfterLoad_ShowsTreeViewWithNodeText()
     {
         _clientService
-            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>()))
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>> { RootDto() });
 
         var cut = RenderComponent<TreeSky<StringTreeNode>>();
@@ -91,7 +91,7 @@ public class TreeSkyComponentTests : TestContext
     public void Render_EmptyData_ShowsProgressCircular()
     {
         _clientService
-            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>()))
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>>());
 
         var cut = RenderComponent<TreeSky<StringTreeNode>>();
@@ -110,7 +110,7 @@ public class TreeSkyComponentTests : TestContext
     public void Render_LoadThrows_DoesNotCrash()
     {
         _clientService
-            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>()))
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("API 挂了"));
 
         var exception = Record.Exception(() => RenderComponent<TreeSky<StringTreeNode>>());
@@ -126,13 +126,13 @@ public class TreeSkyComponentTests : TestContext
     public void Render_CallsLoadInitialDataOnce()
     {
         _clientService
-            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>()))
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>> { RootDto() });
 
         RenderComponent<TreeSky<StringTreeNode>>();
 
         _clientService.Verify(
-            s => s.LoadInitialDataAsync(It.IsAny<string?>()),
+            s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -151,18 +151,18 @@ public class TreeSkyComponentTests : TestContext
             HasChildren = true,
         };
         _clientService
-            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>()))
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>> { root });
 
         _clientService
-            .Setup(s => s.GetAncestorPathFromApiAsync("3"))
+            .Setup(s => s.GetAncestorPathFromApiAsync("3", It.IsAny<CancellationToken>()))
             .ReturnsAsync(["1", "2", "3"]);
 
         _clientService
-            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1")))
+            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("2", hasChildren: true)]);
         _clientService
-            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "2")))
+            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "2"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("3")]);
 
         var cut = RenderComponent<TreeSky<StringTreeNode>>(
@@ -174,12 +174,12 @@ public class TreeSkyComponentTests : TestContext
 
         // 关键：初始恢复与 OnParametersSetAsync 不会重复展开（各层只加载一次）
         _clientService.Verify(
-            s => s.GetAncestorPathFromApiAsync("3"), Times.Once);
+            s => s.GetAncestorPathFromApiAsync("3", It.IsAny<CancellationToken>()), Times.Once);
         _clientService.Verify(
-            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1")),
+            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()),
             Times.Once);
         _clientService.Verify(
-            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "2")),
+            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "2"), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -191,10 +191,10 @@ public class TreeSkyComponentTests : TestContext
     public async Task GetAllLoadedNodes_DoesNotTriggerLazyLoad()
     {
         _clientService
-            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>()))
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("1", hasChildren: true)]);
         _clientService
-            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1")))
+            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("2")]);
 
         var cut = RenderComponent<TreeSky<StringTreeNode>>();
@@ -203,13 +203,13 @@ public class TreeSkyComponentTests : TestContext
 
         Assert.Single(cut.Instance.GetAllLoadedNodes());
         _clientService.Verify(
-            s => s.LoadChildrenAsync(It.IsAny<StringTreeNode>()), Times.Never);
+            s => s.LoadChildrenAsync(It.IsAny<StringTreeNode>(), It.IsAny<CancellationToken>()), Times.Never);
 
         var all = await cut.Instance.EnsureAllNodesLoadedAsync();
 
         Assert.Equal(2, all.Count);
         _clientService.Verify(
-            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1")),
+            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
