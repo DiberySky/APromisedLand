@@ -256,20 +256,20 @@ public class EfTreeService<TNode>(EavDbContext db) : ITreeService<TNode>
         return false;
     }
 
-    /// <summary>懒加载 DTO：不带 Children，HasChildren 按子表实时计算。</summary>
+    /// <summary>
+    /// 懒加载 DTO：不带 Children，HasChildren 按子表实时计算。
+    /// 不填充 <see cref="TreeNodeDto{T}.Parent"/>：与批量路径 <see cref="ToLazyDtosAsync"/> 行为一致，
+    /// 避免单节点写操作多 1 次 DB 查询；客户端需要父引用时用 ParentId 反查或调祖先路径接口。
+    /// </summary>
     private async Task<TreeNodeDto<TNode>> ToLazyDtoAsync(TNode entity, CancellationToken ct)
     {
         var hasChildren = await Set.AnyAsync(c => c.ParentId == entity.Id, ct);
-        var parent = entity.ParentId == null
-            ? null
-            : await Set.FindAsync([entity.ParentId], ct);
 
         return new TreeNodeDto<TNode>
         {
             Id = entity.Id,
             ParentId = entity.ParentId,
             Value = entity,
-            Parent = parent,
             Text = entity.Text(),
             SortOrder = entity.SortOrder,
             HasChildren = hasChildren,
