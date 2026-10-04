@@ -115,6 +115,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Blazor.E2E.Tests"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.TreeSky", "TreeGraph.TreeSky\TreeGraph.TreeSky.csproj", "{FF2C109A-EA75-4FE7-8289-838CE4EB8797}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.TreeSky.Tests", "TreeGraph.TreeSky.Tests\TreeGraph.TreeSky.Tests.csproj", "{287A1891-8FAE-4F48-9365-722814F73707}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -703,6 +705,18 @@ Global
 		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Release|x64.Build.0 = Release|Any CPU
 		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Release|x86.ActiveCfg = Release|Any CPU
 		{FF2C109A-EA75-4FE7-8289-838CE4EB8797}.Release|x86.Build.0 = Release|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Debug|x64.Build.0 = Debug|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Debug|x86.Build.0 = Debug|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Release|Any CPU.Build.0 = Release|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Release|x64.ActiveCfg = Release|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Release|x64.Build.0 = Release|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Release|x86.ActiveCfg = Release|Any CPU
+		{287A1891-8FAE-4F48-9365-722814F73707}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

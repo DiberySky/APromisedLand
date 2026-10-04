@@ -12,6 +12,7 @@ TreeGraph.Blazor/           # Blazor Server 前端（MudBlazor 9.11）
 TreeGraph.Shared/           # 共享 DTO
 TreeGraph.TreeSky/          # 树组件库（TreeSky 精简移植，详见其 README）
 TreeGraph.Api.Tests/        # API 集成测试（Testcontainers.PostgreSql）
+TreeGraph.TreeSky.Tests/    # TreeSky 类库单元测试（xUnit）
 TreeGraph.Blazor.Tests/     # Blazor 单元测试（bUnit）
 TreeGraph.Blazor.E2E.Tests/ # Playwright E2E 测试
 APromisedLand.AppHost/      # Aspire 编排
@@ -44,10 +45,11 @@ APromisedLand.AppHost/      # Aspire 编排
 
 ```
 API 集成:   100（含 TreeSky 后端测试 13）
+TreeSky 单元: 63（纯逻辑 28 / Moq 服务 30 / bUnit 组件 5）
 Blazor 单元: 81
 E2E:        21
 ─────────────
-总计:       202
+总计:       265
 ```
 
 ## TreeSky 树组件移植决策
