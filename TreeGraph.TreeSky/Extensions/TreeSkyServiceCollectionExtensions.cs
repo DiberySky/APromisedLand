@@ -15,6 +15,8 @@ public static class TreeSkyServiceCollectionExtensions
     /// <param name="httpClientName">内部 HttpClient 名称（默认 TreeSky）</param>
     /// <param name="configureClient">可选：配置 API 基地址等</param>
     /// <remarks>
+    /// 前置条件：宿主需已调用 <c>services.AddMudServices()</c>（内部 AddMudExtensions
+    /// 依赖 MudBlazor 服务已注册，否则启动时抛 InvalidOperationException）。
     /// 泛型 <see cref="ITreeClientService{TTree}"/> 由宿主按具体节点类型自行注册实现。
     /// </remarks>
     public static IServiceCollection AddTreeSky(

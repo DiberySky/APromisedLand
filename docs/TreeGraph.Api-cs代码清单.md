@@ -3,7 +3,7 @@
 - 生成时间：2026-10-03 05:42:16
 - 文件总数：41
 - 排除：bin/、obj/
-- 项目状态：ID 到 GUID String 重构完成（主键 HasSentinel 空串 + DB DEFAULT gen_random_uuid()）；InitialGuid 迁移已应用
+- 项目状态：ID 到 GUID String 重构完成（主键 HasSentinel 空串 + DB DEFAULT gen_random_uuid()::text）；GUID String 形态已包含在 Initial 迁移中，迁移链：20261003070415_Initial → 20261003230729_AddStringTreeNodes
 
 ## 文件 1/41 TreeGraph.Api/Controllers/CustomTableDataController.cs
 
