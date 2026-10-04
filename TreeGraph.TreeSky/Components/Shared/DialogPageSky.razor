@@ -57,11 +57,12 @@
 
                 @if (SubmitButtonVisible)
                 {
-                    <MudButton Text="提交"
-                               Variant="Variant.Filled"
+                    <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.SaveAs"
-                               OnClick="@(() => OnSubmitClick.InvokeAsync())"/>
+                               OnClick="@(() => OnSubmitClick.InvokeAsync())">
+                        提交
+                    </MudButton>
                 }
 
                 @if (DialogActions != null)

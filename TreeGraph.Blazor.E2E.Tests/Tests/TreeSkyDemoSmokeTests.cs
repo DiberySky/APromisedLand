@@ -20,8 +20,8 @@ namespace TreeGraph.Blazor.E2E.Tests.Tests;
 ///   - 行内容容器 .mud-treeview-item-content 只含本行内容，子节点在祖先 li 下的独立 li 中
 ///   - 行内 MoreHoriz 按钮 class 含 mud-icon-button-size-small
 ///   - 展开按钮在同行 li 下 .mud-treeview-item-arrow 内、class 含 mud-treeview-item-expand-button
-///   - 创建/编辑对话框的提交按钮无可见文字（DialogPageSky 用了 MudButton 非法属性 Text=）
-///     仅 SaveAs 图标，class 含 mud-button-text-success
+///   - 创建/编辑对话框提交按钮（DialogSky）为 Text 变体 Success 色，class 含
+///     mud-button-text-success；用 class 锚定以与操作对话框的其他 Text 按钮区分
 ///   - 操作对话框里还有一个 label 为"名称"的只读字段；编辑表单的名称 label 是"名称（string）"
 /// </summary>
 public class TreeSkyDemoSmokeTests : E2ETestBase
