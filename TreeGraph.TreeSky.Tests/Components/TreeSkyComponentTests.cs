@@ -260,4 +260,51 @@ public class TreeSkyComponentTests : TestContext
         Value = new StringTreeNode { Id = id, Name = id, HasChildren = hasChildren },
         HasChildren = hasChildren,
     };
+
+    // ============================================================
+    // 懒加载回写：用户点击展开（MudBlazor 内部 ServerData 路径）
+    // 验证 ServerData 结果经 @bind-Items 回写进组件 _items 同一对象树
+    // ============================================================
+
+    [Fact]
+    public void UserClickExpand_ServerDataResult_WritesBackToComponentItems()
+    {
+        // 首屏：仅根节点 1，子节点 2 未加载
+        _clientService
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([NodeDto("1", hasChildren: true)]);
+        _clientService
+            .Setup(s => s.LoadChildrenAsync(
+                It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([NodeDto("2")]);
+
+        var cut = RenderComponent<TreeSky<StringTreeNode>>();
+
+        // 初始：组件侧 _items 只有 1，2 尚未加载
+        Assert.Single(cut.Instance.GetAllLoadedNodes());
+
+        // 用户点击 1 的展开箭头 → MudTreeViewItem 内部 OnItemExpanded
+        // → TryInvokeServerLoadFunc → ServerData(1) → _itemsState.SetValueAsync
+        var toggle = cut.Find(".mud-treeview-item-arrow button");
+        toggle.Click();
+
+        // 关键断言：MudBlazor 加载结果必须回写到组件 _items（context.Children），
+        // 组件侧遍历必须能看到用户展开出来的 2
+        cut.WaitForAssertion(() =>
+        {
+            var loaded = cut.Instance.GetAllLoadedNodes();
+            Assert.Equal(2, loaded.Count);
+            Assert.Contains(loaded, n => n.Id == "2");
+            // UI 同步：两行树节点（MudCollapse 折叠后 DOM 保留，未加载则不存在）
+            Assert.Equal(2, cut.FindAll("li.mud-treeview-item").Count);
+        }, TimeSpan.FromSeconds(5));
+
+        // 守卫实证：折叠后再次展开，Children 已存在 → 不得重复请求
+        toggle.Click(); // 折叠
+        toggle.Click(); // 重新展开
+        _clientService.Verify(
+            s => s.LoadChildrenAsync(
+                It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }
