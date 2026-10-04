@@ -12,10 +12,10 @@
 <div class="d-flex align-center mb-4" style="gap: 8px;">
     <MudIcon Icon="@Icons.Material.Filled.AccountTree"
              Size="Size.Large" Color="Color.Primary" />
-    <MudText Typo="Typo.h5">StringTreeSky 演示（内存数据）</MudText>
+    <MudText Typo="Typo.h5">StringTreeSky 演示（API 数据）</MudText>
     <MudSpacer />
-    <MudChip T="string" Size="Size.Small" Color="Color.Info">
-        无后端 · 数据重启即重置
+    <MudChip T="string" Size="Size.Small" Color="Color.Success">
+        已接后端 · /StringTreeNode
     </MudChip>
     <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
                StartIcon="@Icons.Material.Filled.OpenInNew"
@@ -82,8 +82,8 @@
     {
         var parameters = new DialogParameters<StringTreeDialogPageSky>
         {
-            { x => x.Title, "内存树（壳组件演示）" },
+            { x => x.Title, "StringTree（壳组件演示）" },
         };
-        await DialogService.ShowAsync<StringTreeDialogPageSky>("内存树", parameters);
+        await DialogService.ShowAsync<StringTreeDialogPageSky>("StringTree", parameters);
     }
 }

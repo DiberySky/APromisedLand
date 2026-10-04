@@ -44,11 +44,16 @@ builder.Services.AddHttpClient("TreeSky", client =>
 //   必须在宿主自定义 Handler 之前，下面的 AddScoped 才能覆盖默认值。
 builder.Services.AddStringTreeSky();
 
-// ★ StringTreeSky 内存演示：单例 store 与接口实现共享同一份内存数据
-//   （与上方 API 版 StringTreeClientService 并存，服务不同接口，互不影响）。
-builder.Services.AddSingleton<InMemoryStringTreeStore>();
-builder.Services.AddScoped<IStringTreeDataSource, InMemoryStringTreeDataSource>();
-builder.Services.AddScoped<IStringTreeActionHandler, InMemoryStringTreeActionHandler>();
+// ★ StringTreeSky（T=string 树）：HTTP 版数据源 + 操作 Handler，
+//   桥接 DiberyTreeApiClient<StringTreeNode> → /StringTreeNode/* 端点。
+//   Noop Handler 由 AddStringTreeSky() 内部 TryAdd 注册，在此之前已执行，
+//   下面的 AddScoped 覆盖默认 Noop。
+builder.Services.AddScoped<IStringTreeDataSource, ApiStringTreeDataSource>();
+builder.Services.AddScoped<IStringTreeActionHandler, ApiStringTreeActionHandler>();
+
+// ★ StringTreeSky 内存演示（备用，未注册）：
+//   InMemoryStringTreeStore / InMemoryStringTreeDataSource / InMemoryStringTreeActionHandler
+//   保留在 Services/DemoTree/ 下供离线演示或测试参考，不注入到容器。
 
 // ★ 前端字段校验器（单例，无状态）
 builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();

@@ -2,10 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Data;
 using TreeGraph.Blazor.Shared.Trees.Models;
 
-namespace TreeGraph.Api.TreeSky;
+namespace TreeGraph.Api.StringTreeSky;
 
 /// <summary>
-/// TreeSky 演示树种子：与此前内存演示（InMemoryTreeStore）相同的数据，
+/// StringTreeSky 演示树种子：与此前内存演示（InMemoryTreeStore）相同的数据，
 /// 幂等（表非空即跳过），仅在空库时播种一次。
 /// </summary>
 public static class StringTreeNodeSeeder
