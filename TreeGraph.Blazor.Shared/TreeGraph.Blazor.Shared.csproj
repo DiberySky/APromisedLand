@@ -17,4 +17,16 @@
     <PackageReference Include="MudBlazor.Extensions" Version="9.11.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="Trees\TreeSky.razor.Action.cs">
+      <DependentUpon>TreeSky.razor</DependentUpon>
+    </Compile>
+    <Compile Update="Trees\TreeSky.razor.Loading.cs">
+      <DependentUpon>TreeSky.razor</DependentUpon>
+    </Compile>
+    <Compile Update="Trees\TreeSky.razor.Node.cs">
+      <DependentUpon>TreeSky.razor</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
 </Project>
