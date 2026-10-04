@@ -82,6 +82,7 @@ private async Task LoadAsync(CancellationToken ct = default) { ... }
 | 7 | Moq `Setup(s => s.Add(3 参))` 匹配失败 | 未考虑可选参数的精确匹配 | 用 `It.IsAny<Action<...>>()` + 显式类型 |
 | 8 | "文件路径 X 有 bug"（未读该文件）| 凭记忆定位 | 先读源码再断言 |
 | 9 | tag/提交信息声称"E2E 21/21"但本会话没跑 | 把历史数字当现状 | 起栈实测拿到通过证据后再写入不可篡改的 tag |
+| 10 | 用"已被间接覆盖"作为"不必显式测试"的理由 | 间接覆盖往往"恰好"避开边界条件（bUnit 测试恰好先调了 AddMudServices，从不暴露 AddTreeSky 的顺序约束） | 关键前置条件（DI 顺序、生命周期、接口契约）应显式测试——显式测试同时是**约束发现机制**，不只是防 bug |
 
 ---
 
@@ -152,3 +153,4 @@ ServerData 完全接管，Items 被忽略。
 ## 变更历史
 
 - 2026-10-04 初版：源于 TreeSky 批次 1-2 优化过程中 8 次文档 vs 代码偏差；#6/#8 落地时追加排序直传、move 路由、TreeRoute 与 E2E 实证条目
+- 2026-10-04 增补 #10：DI 冒烟测试首跑即暴露"AddTreeSky 必须在 AddMudServices 之后"的隐式约束——间接覆盖 ≠ 充分覆盖
