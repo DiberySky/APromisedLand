@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using TreeGraph.TreeSky.Attributes;
 
 namespace TreeGraph.TreeSky.Models;
 
@@ -8,6 +9,11 @@ namespace TreeGraph.TreeSky.Models;
 /// （System.String 为 sealed 且无无参构造，无法直接作为 TItem，故用此类承载。）
 /// 宿主可直接使用，也可继承后扩展字段。
 /// </summary>
+/// <remarks>
+/// 路由值与类型名一致：后端 StringTreeNodeController 使用 [Route("[controller]")]，
+/// 显式声明后类型改名不会漂移 URL 契约。
+/// </remarks>
+[TreeRoute("StringTreeNode")]
 public class StringTreeNode : ITreeNodeBase<StringTreeNode>
 {
     public string Id { get; set; } = string.Empty;
