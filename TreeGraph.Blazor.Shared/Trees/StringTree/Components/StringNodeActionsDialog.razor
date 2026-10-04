@@ -1,0 +1,115 @@
+@namespace TreeGraph.Blazor.Shared.Trees.StringTree.Components
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.Trees.StringTree.Contracts
+@using TreeGraph.Blazor.Shared.Trees.StringTree.Models
+
+<DialogSky Title="节点操作">
+    <ToolBarContent>
+        @if (IsBoot)
+        {
+            <MudText Color="Color.Info">根结点</MudText>
+        }
+        else if (ParentNode is not null)
+        {
+            <MudText Color="Color.Info">@ParentNode.Text</MudText>
+        }
+        <MudSpacer/>
+        @if (!IsBoot)
+        {
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Outlined.MoveUp"
+                       Color="Color.Warning"
+                       OnClick="@OnMove">
+                移动
+            </MudButton>
+        }
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
+            <MudStack Spacing="2">
+                <MudTextField T="string"
+                              Value="@Node.Text"
+                              Label="名称"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true"/>
+
+                <MudTextField T="string"
+                              Value="@Node.Description"
+                              Label="描述"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true"
+                              Lines="3"/>
+
+                <BoolFieldSky Label="是否允许添加子节点"
+                              ReadOnly="true"
+                              @bind-Value="Node.CanHaveChildren" />
+            </MudStack>
+        </MudContainer>
+    </DialogContent>
+    <DialogLeftActions>
+        @if (!HasChildren)
+        {
+            <MudButton OnClick="OnDelete"
+                       Variant="Variant.Text"
+                       Color="Color.Error"
+                       StartIcon="@Icons.Material.Outlined.Delete">
+                删除
+            </MudButton>
+        }
+    </DialogLeftActions>
+    <DialogRightActions>
+        @if (Node.CanHaveChildren || HasChildren)
+        {
+            <MudButton OnClick="OnSort"
+                       Variant="Variant.Text"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Outlined.ImportExport">
+                子项排序
+            </MudButton>
+        }
+
+        @if (!IsBoot)
+        {
+            <MudButton OnClick="OnEdit"
+                       Variant="Variant.Text"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Outlined.Edit">
+                设置修改
+            </MudButton>
+        }
+
+        @if (Node.CanHaveChildren)
+        {
+            <MudButton OnClick="OnAddChild"
+                       Variant="Variant.Text"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Outlined.Add">
+                创建子项
+            </MudButton>
+        }
+    </DialogRightActions>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter, EditorRequired] public StringNodeMeta Node { get; set; } = null!;
+    [Parameter] public StringNodeMeta? ParentNode { get; set; }
+    [Parameter] public bool IsBoot { get; set; }
+    [Parameter] public bool HasChildren { get; set; }
+
+    private void OnAddChild() => CloseWith(StringNodeAction.AddChild);
+    private void OnEdit() => CloseWith(StringNodeAction.Edit);
+    private void OnDelete() => CloseWith(StringNodeAction.Delete);
+    private void OnMove() => CloseWith(StringNodeAction.Move);
+    private void OnSort() => CloseWith(StringNodeAction.Sort);
+
+    private void CloseWith(StringNodeAction action)
+    {
+        MudDialog?.Close(DialogResult.Ok(new StringNodeActionResult
+        {
+            Action = action,
+            Node = Node,
+        }));
+    }
+}

@@ -1,0 +1,261 @@
+@namespace TreeGraph.Blazor.Shared.Trees.StringTree.Components
+@using TreeGraph.Blazor.Shared.Trees.StringTree.Contracts
+@using TreeGraph.Blazor.Shared.Trees.StringTree.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudContainer Class="py-2"
+                      Style="min-height: 300px; max-height: 500px; overflow-y: auto;">
+            <MudAlert Severity="Severity.Info"
+                      Dense="true"
+                      Class="mb-2"
+                      ShowCloseIcon="false">
+                当前选中:
+                <strong>@SelectedName</strong>
+                @if (_selectedId is null)
+                {
+                    <MudText Inline="true" Color="Color.Secondary">(根节点)</MudText>
+                }
+            </MudAlert>
+
+            <MudTextField T="string"
+                          @bind-Value="_searchText"
+                          Label="搜索节点"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Class="mb-2"
+                          Clearable="true"
+                          DebounceInterval="300"
+                          OnDebounceIntervalElapsed="OnSearchAsync" />
+
+            @if (_filteredNodes is not null && _filteredNodes.Count == 0)
+            {
+                <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
+                    未找到匹配的节点
+                </MudText>
+            }
+            else
+            {
+                <MudTreeView T="string"
+                             @bind-SelectedValue="_selectedId"
+                             SelectionMode="SelectionMode.SingleSelection">
+                    @RenderTreeItems(BuildTreeLevels())
+                </MudTreeView>
+            }
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close"
+                   Variant="Variant.Text"
+                   Color="Color.Default">
+            取消
+        </MudButton>
+        <MudButton OnClick="ConfirmSelection"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="!CanConfirm">
+            确认选择
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>扁平节点列表（必须包含 ParentId）。</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<StringNodeMeta> AllNodes { get; set; } = Array.Empty<StringNodeMeta>();
+
+    [Parameter] public StringNodeMeta? CurrentNode { get; set; }
+    [Parameter] public StringNodeMeta? CurrentParent { get; set; }
+    [Parameter] public bool AllowRootSelection { get; set; } = true;
+
+    private string _searchText = string.Empty;
+    private string? _selectedId;
+    private List<StringNodeMeta>? _filteredNodes;
+
+    private string SelectedName
+        => _selectedId is null
+            ? "根节点"
+            : AllNodes.FirstOrDefault(n => n.Id == _selectedId)?.Text ?? "根节点";
+
+    private bool CanConfirm => _selectedId != null || AllowRootSelection;
+
+    protected override void OnInitialized()
+    {
+        _selectedId = CurrentParent?.Id;
+    }
+
+    // ============================================================
+    // 层级构建：扁平列表 → 顶层列表（按 ParentId 分组）
+    // ============================================================
+
+    /// <summary>当前视图下（考虑搜索过滤）的顶层节点。</summary>
+    private List<StringNodeMeta> BuildTreeLevels()
+    {
+        var source = _filteredNodes ?? AllNodes.ToList();
+        var ids = source.Select(n => n.Id).ToHashSet();
+
+        // 父节点不在当前视图中的，视为顶层
+        return source
+            .Where(n => n.ParentId is null || !ids.Contains(n.ParentId))
+            .OrderBy(n => n.SortOrder)
+            .ThenBy(n => n.Text)
+            .ToList();
+    }
+
+    private List<StringNodeMeta> GetChildren(string parentId)
+    {
+        var source = _filteredNodes ?? AllNodes.ToList();
+        return source
+            .Where(n => n.ParentId == parentId)
+            .OrderBy(n => n.SortOrder)
+            .ThenBy(n => n.Text)
+            .ToList();
+    }
+
+    // ============================================================
+    // 渲染
+    // ============================================================
+
+    private RenderFragment RenderTreeItems(List<StringNodeMeta> items) => builder =>
+    {
+        foreach (var item in items)
+        {
+            var isDisabled = IsNodeDisabled(item);
+            var isSelected = item.Id == _selectedId;
+
+            builder.OpenComponent<MudTreeViewItem<string>>(0);
+            builder.AddAttribute(1, "Value", item.Id);
+            builder.AddAttribute(2, "Text", item.Text);
+            builder.AddAttribute(3, "Icon", GetNodeIcon(item, isSelected));
+            builder.AddAttribute(4, "IconColor", GetNodeColor(item, isSelected));
+            builder.AddAttribute(5, "Disabled", isDisabled);
+            builder.AddAttribute(6, "OnClick",
+                // MudTreeViewItem<T>.OnClick 是 EventCallback<MouseEventArgs>，
+                // 不能传 EventCallback<string>（运行时类型不匹配导致对话框渲染失败）
+                EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(
+                    this, _ => OnNodeClick(item.Id)));
+
+            var children = GetChildren(item.Id);
+            if (children.Count > 0)
+            {
+                builder.AddAttribute(7, "ChildContent", RenderTreeItems(children));
+            }
+
+            builder.CloseComponent();
+        }
+    };
+
+    private void OnNodeClick(string id)
+    {
+        var node = AllNodes.FirstOrDefault(n => n.Id == id);
+        if (node is null || IsNodeDisabled(node)) return;
+
+        _selectedId = id;
+        StateHasChanged();
+    }
+
+    // ============================================================
+    // 禁用逻辑：不能选自身或后代
+    // ============================================================
+
+    private bool IsNodeDisabled(StringNodeMeta node)
+    {
+        if (CurrentNode is null) return false;
+
+        var current = node;
+        while (current is not null)
+        {
+            if (current.Id == CurrentNode.Id) return true;
+
+            var parentId = current.ParentId;
+            current = parentId is null
+                ? null
+                : AllNodes.FirstOrDefault(n => n.Id == parentId);
+        }
+
+        return false;
+    }
+
+    // ============================================================
+    // 搜索
+    // ============================================================
+
+    private async Task OnSearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            _filteredNodes = null;
+            return;
+        }
+
+        await Task.Delay(100);
+
+        var keyword = _searchText.ToLowerInvariant();
+        var matchedIds = AllNodes
+            .Where(n => n.Text.ToLowerInvariant().Contains(keyword))
+            .Select(n => n.Id)
+            .ToHashSet();
+
+        // 保留匹配节点 + 其所有祖先（保持树形结构完整）
+        var result = new HashSet<string>();
+        foreach (var id in matchedIds)
+        {
+            var node = AllNodes.FirstOrDefault(n => n.Id == id);
+            while (node is not null)
+            {
+                result.Add(node.Id);
+                node = node.ParentId is null
+                    ? null
+                    : AllNodes.FirstOrDefault(n => n.Id == node.ParentId);
+            }
+        }
+
+        _filteredNodes = AllNodes.Where(n => result.Contains(n.Id)).ToList();
+        StateHasChanged();
+    }
+
+    // ============================================================
+    // 图标 / 颜色
+    // ============================================================
+
+    private string GetNodeIcon(StringNodeMeta node, bool isSelected)
+    {
+        if (isSelected) return Icons.Material.Filled.CheckCircle;
+        if (node.HasChildren) return Icons.Material.Filled.Folder;
+        return Icons.Material.Filled.InsertDriveFile;
+    }
+
+    private Color GetNodeColor(StringNodeMeta node, bool isSelected)
+    {
+        if (isSelected) return Color.Primary;
+        if (IsNodeDisabled(node)) return Color.Default;
+        return Color.Inherit;
+    }
+
+    // ============================================================
+    // 确认 / 取消
+    // ============================================================
+
+    private void ConfirmSelection()
+    {
+        StringNodeMeta? selected = _selectedId is null
+            ? null
+            : AllNodes.FirstOrDefault(n => n.Id == _selectedId);
+
+        var result = new StringParentSelectResult
+        {
+            IsConfirmed = true,
+            SelectedParent = selected,
+        };
+
+        MudDialog?.Close(DialogResult.Ok(result));
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+}

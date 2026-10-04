@@ -7,6 +7,8 @@ using TreeGraph.Blazor.Services.DemoTree;
 using TreeGraph.Blazor.Shared.Trees.Extensions;
 using TreeGraph.Blazor.Shared.Trees.Models;
 using TreeGraph.Blazor.Shared.Trees.Services;
+using TreeGraph.Blazor.Shared.Trees.StringTree.Extensions;
+using TreeGraph.Blazor.Shared.Trees.StringTree.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +39,16 @@ builder.Services.AddHttpClient("TreeSky", client =>
         options.Retry.MaxRetryAttempts = 1;
         options.Retry.ShouldHandle = _ => ValueTask.FromResult(false);
     });
+
+// ★ StringTreeSky（T=string 树）：Noop Handler 用 TryAdd 注册，
+//   必须在宿主自定义 Handler 之前，下面的 AddScoped 才能覆盖默认值。
+builder.Services.AddStringTreeSky();
+
+// ★ StringTreeSky 内存演示：单例 store 与接口实现共享同一份内存数据
+//   （与上方 API 版 StringTreeClientService 并存，服务不同接口，互不影响）。
+builder.Services.AddSingleton<InMemoryStringTreeStore>();
+builder.Services.AddScoped<IStringTreeDataSource, InMemoryStringTreeDataSource>();
+builder.Services.AddScoped<IStringTreeActionHandler, InMemoryStringTreeActionHandler>();
 
 // ★ 前端字段校验器（单例，无状态）
 builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();

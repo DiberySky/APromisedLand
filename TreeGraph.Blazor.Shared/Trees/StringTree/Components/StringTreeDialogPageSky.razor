@@ -1,0 +1,37 @@
+@namespace TreeGraph.Blazor.Shared.Trees.StringTree.Components
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.Trees.StringTree.Models
+
+<DialogPageSky Title="@Title" MaxWidth="@MaxWidth">
+    <ToolBarContent>
+        @if (!string.IsNullOrEmpty(TitleToolBar))
+        {
+            <MudText Typo="Typo.h6" Class="text-info">@TitleToolBar</MudText>
+        }
+        @if (ToolBarContent is not null)
+        {
+            @ToolBarContent
+        }
+        <MudSpacer/>
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer MaxWidth="@MaxWidth">
+            <StringTreeSky RootId="@RootId"
+                           IsSelectDialog="@IsSelectDialog"
+                           EditTemplate="@EditTemplate"
+                           ActionTemplate="@ActionTemplate" />
+        </MudContainer>
+    </DialogContent>
+</DialogPageSky>
+
+@code {
+    [Parameter] public required string Title { get; set; }
+    [Parameter] public string? TitleToolBar { get; set; }
+    [Parameter] public string? RootId { get; set; }
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
+    [Parameter] public bool IsSelectDialog { get; set; }
+
+    [Parameter] public RenderFragment? ToolBarContent { get; set; }
+    [Parameter] public RenderFragment<StringNodeMeta>? EditTemplate { get; set; }
+    [Parameter] public RenderFragment<StringNodeMeta>? ActionTemplate { get; set; }
+}
