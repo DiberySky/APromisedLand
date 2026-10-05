@@ -3,7 +3,7 @@
 @using TreeGraph.Blazor.Shared.Trees.StringTree.Contracts
 @using TreeGraph.Blazor.Shared.Trees.StringTree.Models
 
-<DialogSky Title="节点操作">
+<PageDialogSky Title="节点操作" TitleClass="mud-theme-success px-0 pa-0">
     <ToolBarContent>
         @if (IsBoot)
         {
@@ -88,7 +88,7 @@
             </MudButton>
         }
     </DialogRightActions>
-</DialogSky>
+</PageDialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

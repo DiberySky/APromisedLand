@@ -5,7 +5,9 @@
 @inject ISnackbar Snackbar
 
 @* 精简移植版：移除了与 UnitTree 体系耦合的 EditFunc/编辑按钮；补齐移动场景的选择确认逻辑 *@
-<DialogPageSky Title="@Title" MaxWidth="@MaxWidth"
+<PageDialogSky Title="@Title" ActionsMaxWidth="@MaxWidth"
+               ArrowBackVisible="true"
+               CancelButtonVisible="false"
                TitleClass="mud-theme-success px-0 pa-0">
     <ToolBarContent>
         @if (!string.IsNullOrEmpty(TitleToolBar))
@@ -45,7 +47,7 @@
                      OnClickItemText="@HandleClickItemText"/>
         </MudContainer>
     </DialogContent>
-</DialogPageSky>
+</PageDialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

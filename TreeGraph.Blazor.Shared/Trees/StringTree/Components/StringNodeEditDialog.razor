@@ -3,7 +3,8 @@
 @using TreeGraph.Blazor.Shared.Trees.StringTree.Contracts
 @using TreeGraph.Blazor.Shared.Trees.StringTree.Models
 
-<DialogSky Title="@_title"
+<PageDialogSky Title="@_title"
+           TitleClass="mud-theme-success px-0 pa-0"
            SubmitButtonVisible="true"
            OnSubmitClick="@SubmitAsync"
            OnCanceledClick="@Close">
@@ -25,7 +26,7 @@
             </MudForm>
         </MudContainer>
     </DialogContent>
-</DialogSky>
+</PageDialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

@@ -2,7 +2,10 @@
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.Trees.StringTree.Models
 
-<DialogPageSky Title="@Title" MaxWidth="@MaxWidth">
+<PageDialogSky Title="@Title" ActionsMaxWidth="@MaxWidth"
+               ArrowBackVisible="true"
+               CancelButtonVisible="false"
+               TitleClass="mud-theme-primary px-0 pa-0">
     <ToolBarContent>
         @if (!string.IsNullOrEmpty(TitleToolBar))
         {
@@ -22,7 +25,7 @@
                            ActionTemplate="@ActionTemplate" />
         </MudContainer>
     </DialogContent>
-</DialogPageSky>
+</PageDialogSky>
 
 @code {
     [Parameter] public required string Title { get; set; }
