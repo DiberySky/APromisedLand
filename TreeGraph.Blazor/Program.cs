@@ -1,7 +1,6 @@
-using Microsoft.Extensions.Http.Resilience;
 using MudBlazor.Services;
-using Polly;
 using TreeGraph.Blazor.Components;
+using TreeGraph.Blazor.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEav.Services;
 using TreeGraph.Blazor.Services.DemoTree;
 using TreeGraph.Blazor.Shared.Trees.TreeSky.Extensions;
@@ -33,12 +32,9 @@ builder.Services.AddHttpClient("TreeSky", client =>
         // Aspire 服务发现：与 EavApiClient 同一后端
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
     })
-    // 写操作（POST/PUT/DELETE/move）不幂等，禁止自动重试
-    .AddStandardResilienceHandler(options =>
-    {
-        options.Retry.MaxRetryAttempts = 1;
-        options.Retry.ShouldHandle = _ => ValueTask.FromResult(false);
-    });
+    // 写操作（POST/PUT/DELETE/move）不幂等，禁止自动重试。
+    // 具体参数见 NonIdempotentResilience，与 EavApiClient 共用同一套策略。
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
 // ★ StringTreeSky（T=string 树）：Noop Handler 用 TryAdd 注册，
 //   必须在宿主自定义 Handler 之前，下面的 AddScoped 才能覆盖默认值。
@@ -59,33 +55,15 @@ builder.Services.AddScoped<IStringTreeActionHandler, ApiStringTreeActionHandler>
 builder.Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
 builder.Services.AddScoped<EntityTypeDisplayService>();
 
-// ★ EavApiClient：通过 Aspire 服务发现访问 treegrapheavapi
-// 弹性策略显式配置：
-//   - 关闭自动重试：元数据 PUT/POST 不幂等，自动重试会引发数据损坏
-//     （例如 recalculate-factor 被重放 → 值被平方调整）
-//   - 放宽超时：单次重算可能耗时几秒
-//   - 保留熔断器默认参数（保护后端）
+// ★ EavApiClient：通过 Aspire 服务发现访问 treegrapheavapi。
+//   弹性策略（禁止重试、超时、熔断器采样窗口）统一由 NonIdempotentResilience 提供，
+//   与 TreeSky 客户端保持一致，避免同一后端操作在不同客户端上行为不同。
 builder.Services
     .AddHttpClient<EavApiClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
     })
-    .AddStandardResilienceHandler(options =>
-    {
-        // ★ 禁止重试的正确写法：
-        //   MaxRetryAttempts 校验约束为 1–int.MaxValue（不接受 0），
-        //   因此置 1 通过校验，再用 ShouldHandle 恒 false 让重试永不触发。
-        //   管理台 PUT/POST 不幂等（如 recalculate-factor 重放会导致数据损坏）。
-        options.Retry.MaxRetryAttempts = 1;
-        options.Retry.ShouldHandle = _ => ValueTask.FromResult(false);
-
-        // ★ 熔断器采样窗口必须 ≥ 2 × AttemptTimeout（30s → 至少 60s）
-        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
-
-        // 超时设置
-        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
-        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
-    });
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
 var app = builder.Build();
 
