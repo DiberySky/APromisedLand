@@ -81,6 +81,12 @@ if (!EF.IsDesignTime)
     await scope.ServiceProvider.GetRequiredService<UnitSeedService>().SeedAsync();
     await EavSeeder.SeedAsync(db);
     await StringTreeNodeSeeder.SeedAsync(db);
+
+    // E2E 基线（item/user/project + 固定 EntityId 示例值）仅开发/测试环境注入
+    if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+    {
+        await E2eBaselineSeeder.SeedAsync(db);
+    }
 }
 
 app.Run();
