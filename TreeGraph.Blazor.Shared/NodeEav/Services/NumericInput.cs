@@ -1,4 +1,4 @@
-namespace TreeGraph.Blazor.Services;
+namespace TreeGraph.Blazor.Shared.NodeEav.Services;
 
 public class NumericInput
 {

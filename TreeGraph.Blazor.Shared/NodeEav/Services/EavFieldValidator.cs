@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Blazor.Services;
+namespace TreeGraph.Blazor.Shared.NodeEav.Services;
 
 public interface IEavFieldValidator
 {

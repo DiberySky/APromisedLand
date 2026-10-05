@@ -1,6 +1,6 @@
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Blazor.Services;
+namespace TreeGraph.Blazor.Shared.NodeEav.Services;
 
 /// <summary>
 /// 动态查询运算符的元数据。

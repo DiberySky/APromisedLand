@@ -1,4 +1,4 @@
-namespace TreeGraph.Blazor.Services;
+namespace TreeGraph.Blazor.Shared.NodeEav.Services;
 
 /// <summary>
 /// 结构化字段校验错误。

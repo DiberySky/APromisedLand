@@ -1,4 +1,4 @@
-namespace TreeGraph.Blazor.Components.FieldRenderers;
+namespace TreeGraph.Blazor.Shared.NodeEav.Components.FieldRenderers;
 
 /// <summary>
 /// 带单位的数值（DynamicForm 内部表单值）。

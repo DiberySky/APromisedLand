@@ -1,5 +1,5 @@
 using System.Text.Json;
-using TreeGraph.Blazor.Services;
+using TreeGraph.Blazor.Shared.NodeEav.Services;
 using TreeGraph.Shared.Eav.Dtos;
 using Xunit;
 

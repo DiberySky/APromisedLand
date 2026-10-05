@@ -29,4 +29,8 @@
     </Compile>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
+  </ItemGroup>
+
 </Project>

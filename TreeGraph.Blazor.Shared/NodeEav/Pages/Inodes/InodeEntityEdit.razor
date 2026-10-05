@@ -1,32 +1,27 @@
-@page "/entities/{EntityType}/{EntityId}"
+@page "/inodes/{InodeId}/types/{EntityType}"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @using System.Text.Json
-@using TreeGraph.Blazor.Components.Shared
-@using TreeGraph.Blazor.Services
+@using TreeGraph.Blazor.Shared.NodeEav.Components.Shared
+@using TreeGraph.Blazor.Shared.NodeEav.Services
 @using TreeGraph.Shared.Eav.Dtos
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject IEavFieldValidator Validator
 @inject NavigationManager Nav
-@inject EntityTypeDisplayService EntityTypeDisplay
-@* EntityEdit.razor *@
-<PageTitle>编辑 @GetDisplayTitle()</PageTitle>
+@* InodeEntityEdit.razor *@
+<PageTitle>编辑 @EntityType</PageTitle>
 
-<div class="d-flex align-center mb-3" style="gap: 8px;">
+<div class="d-flex align-center mb-3" style="gap: 8px; flex-wrap: wrap;">
     <MudButton Variant="Variant.Text" Color="Color.Default"
                StartIcon="@Icons.Material.Filled.ArrowBack"
-               OnClick="BackToList">
-        返回列表
+               OnClick="BackToInode">
+        返回 iNode
     </MudButton>
-    <MudText Typo="Typo.h5">编辑 @GetDisplayTitle()</MudText>
+    <MudText Typo="Typo.h5">@_displayTitle</MudText>
     <MudText Typo="Typo.caption" Color="Color.Secondary">
-        @EntityId
+        iNode: <code>@InodeId</code>
     </MudText>
-    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                   Size="Size.Small"
-                   OnClick="CopyEntityId"
-                   title="复制 EntityId" />
 </div>
 
 @if (_loading)
@@ -36,14 +31,14 @@
 else if (_schema is null || _schema.Count == 0)
 {
     <MudAlert Severity="Severity.Warning">
-        实体类型 @EntityType 没有属性定义。请先在元数据管理页配置。
+        该类型尚未定义任何属性，请先在元数据管理中配置。
     </MudAlert>
 }
 else
 {
     <MudAlert Severity="Severity.Info" Class="mb-4">
         <b>提示</b>：保存只更新您填写的属性，未填写的属性<b>保持不变</b>。
-        如需删除某个属性值，请显式清空该字段。自定义表走独立端点，不受影响。
+        首次保存会自动创建实体。
     </MudAlert>
 
     @if (TotalErrorCount > 0)
@@ -55,7 +50,8 @@ else
             <ul style="margin: 6px 0 0 0; padding-left: 20px;">
                 @foreach (var (attrName, errs) in _errors.Where(kv => kv.Value.Count > 0))
                 {
-                    var attr = _regularAttributes.FirstOrDefault(a => a.AttributeName == attrName);
+                    var attr = _regularAttributes.FirstOrDefault(
+                        a => a.AttributeName == attrName);
                     var label = attr?.DisplayName ?? attrName;
                     foreach (var e in errs)
                     {
@@ -88,7 +84,7 @@ else
             @foreach (var attr in _tableAttributes)
             {
                 <CustomTableEditor EntityType="@EntityType"
-                                   EntityId="@EntityId"
+                                   EntityId="@(_entityId ?? "")"
                                    AttributeName="@attr.AttributeName"
                                    TableName="@attr.AttributeName"
                                    DisplayName="@attr.DisplayName"
@@ -97,18 +93,7 @@ else
         </MudPaper>
     }
 
-    @* ★ 审计历史面板 *@
-    <EntityHistoryPanel EntityType="@EntityType"
-                        EntityId="@EntityId"
-                        RefreshToken="_historyRefreshToken" />
-
     <div class="d-flex align-center" style="gap: 8px;">
-        <MudButton Variant="Variant.Text" Color="Color.Default"
-                   StartIcon="@Icons.Material.Filled.ArrowBack"
-                   OnClick="BackToList">
-            返回列表
-        </MudButton>
-
         <MudButton Variant="Variant.Filled"
                    Color="@(TotalErrorCount > 0 ? Color.Default : Color.Primary)"
                    OnClick="SaveAsync" Disabled="@_saving"
@@ -120,25 +105,22 @@ else
                    StartIcon="@Icons.Material.Filled.Refresh">
             重新加载
         </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Error"
-                   OnClick="ClearAllAsync"
-                   StartIcon="@Icons.Material.Filled.Delete">
-            清空所有属性
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Error"
-                   OnClick="DeleteEntityAsync"
-                   StartIcon="@Icons.Material.Filled.DeleteForever"
-                   Disabled="@_saving">
-            删除实体
-        </MudButton>
+        <MudSpacer />
+        @if (_entityId is not null)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                       OnClick="DeleteAsync"
+                       StartIcon="@Icons.Material.Filled.DeleteForever"
+                       Disabled="@_saving">
+                删除实体
+            </MudButton>
+        }
     </div>
 }
 
 @code {
+    [Parameter] public string InodeId { get; set; } = "";
     [Parameter] public string EntityType { get; set; } = "";
-    [Parameter] public string EntityId { get; set; } = "";
-
-    private string GetDisplayTitle() => EntityTypeDisplay.GetDisplayName(EntityType);
 
     private IReadOnlyList<AttributeSchemaDto>? _schema;
     private readonly Dictionary<string, object?> _values = new();
@@ -146,14 +128,13 @@ else
     private List<AttributeSchemaDto> _regularAttributes = new();
     private List<AttributeSchemaDto> _tableAttributes = new();
 
+    private string _displayTitle = "";
+    private string? _entityId;
+    private DateTimeOffset? _loadedUpdatedAt;
+
     private bool _loading;
     private bool _saving;
     private bool _initialized;
-
-    // 乐观锁版本
-    private DateTimeOffset? _loadedUpdatedAt;
-    // 保存成功后自增，触发审计历史面板刷新
-    private int _historyRefreshToken;
 
     private int TotalErrorCount => _errors.Values.Sum(v => v.Count);
 
@@ -165,23 +146,21 @@ else
         StateHasChanged();
     }
 
-    private void BackToList()
+    protected override async Task OnParametersSetAsync()
     {
-        Nav.NavigateTo($"/entities/{EntityType}");
+        if (_initialized) await LoadAsync();
     }
 
-    private async Task CopyEntityId()
-    {
-        // 简单通过 Snackbar 提示让用户复制；如需真正剪贴板可注入 IJSRuntime
-        Snackbar.Add($"EntityId: {EntityId}", Severity.Info);
-        await Task.CompletedTask;
-    }
+    private void BackToInode()
+        => Nav.NavigateTo($"/inodes/{Uri.EscapeDataString(InodeId)}");
 
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
+            _displayTitle = EntityType;
+
             var schema = await Api.GetSchemaAsync(EntityType);
             _schema = schema ?? Array.Empty<AttributeSchemaDto>();
 
@@ -189,10 +168,12 @@ else
             _tableAttributes = _schema.Where(a => a.DataType == "table").ToList();
 
             _values.Clear();
-            var entity = await Api.GetEntityAsync(EntityType, EntityId);
+            var entity = await Api.GetInodeEntityAsync(InodeId, EntityType);
             if (entity is not null)
             {
+                _entityId = entity.EntityId;
                 _loadedUpdatedAt = entity.UpdatedAt;
+
                 foreach (var attr in _regularAttributes)
                 {
                     if (entity.Properties.TryGetValue(attr.AttributeName, out var elem))
@@ -201,6 +182,7 @@ else
             }
             else
             {
+                _entityId = null;
                 _loadedUpdatedAt = null;
             }
 
@@ -224,12 +206,6 @@ else
     private IReadOnlyList<FieldValidationError>? GetFieldErrors(string name)
         => _errors.TryGetValue(name, out var e) && e.Count > 0 ? e : null;
 
-    /// <summary>
-    /// 更新表单值。
-    ///
-    /// ★ PATCH 语义：保留键（即使值为 null），让 PATCH 显式删除该属性；
-    ///   若从字典移除，PATCH 会视为"未提交"从而保持原值，用户清空操作失效。
-    /// </summary>
     private void SetValue(string name, object? value)
     {
         _values[name] = value;
@@ -242,40 +218,26 @@ else
         foreach (var attr in _regularAttributes)
         {
             var errs = Validator.Validate(attr, GetValue(attr.AttributeName));
-            if (errs.Count > 0)
-                _errors[attr.AttributeName] = errs;
+            if (errs.Count > 0) _errors[attr.AttributeName] = errs;
         }
     }
 
-    private void RevalidateField(string attributeName)
+    private void RevalidateField(string name)
     {
-        var attr = _regularAttributes.FirstOrDefault(a => a.AttributeName == attributeName);
+        var attr = _regularAttributes.FirstOrDefault(a => a.AttributeName == name);
         if (attr is null) return;
 
-        var errs = Validator.Validate(attr, GetValue(attributeName));
-        if (errs.Count > 0)
-            _errors[attributeName] = errs;
-        else
-            _errors.Remove(attributeName);
+        var errs = Validator.Validate(attr, GetValue(name));
+        if (errs.Count > 0) _errors[name] = errs;
+        else _errors.Remove(name);
     }
 
-    /// <summary>
-    /// 保存（PATCH 语义）。
-    ///
-    /// 语义：
-    ///   - values 中出现的键：更新
-    ///   - values 中值为 null 的键：删除该属性
-    ///   - values 中未出现的键：保持不变
-    /// </summary>
     private async Task SaveAsync()
     {
         RevalidateAll();
-
         if (TotalErrorCount > 0)
         {
-            Snackbar.Add(
-                $"有 {TotalErrorCount} 项校验错误未解决，请修正后再保存",
-                Severity.Warning);
+            Snackbar.Add($"有 {TotalErrorCount} 项校验错误未解决", Severity.Warning);
             StateHasChanged();
             return;
         }
@@ -284,26 +246,24 @@ else
         try
         {
             var submitValues = BuildSubmitValues();
-
             if (submitValues.Count == 0)
             {
                 Snackbar.Add("没有可保存的变更", Severity.Info);
                 return;
             }
 
-            var (ok, error, currentUpdatedAt) = await Api.PatchEntityAsync(
-                EntityType, EntityId, submitValues,
+            var (ok, error, current) = await Api.PatchInodeEntityAsync(
+                InodeId, EntityType, submitValues,
                 expectedUpdatedAt: _loadedUpdatedAt);
 
             if (!ok)
             {
-                if (currentUpdatedAt is not null)
+                if (current is not null)
                 {
-                    var localTime = currentUpdatedAt.Value.ToLocalTime()
+                    var local = current.Value.ToLocalTime()
                         .ToString("yyyy-MM-dd HH:mm:ss");
                     Snackbar.Add(
-                        $"保存失败：{error ?? "并发冲突"}\n" +
-                        $"服务端最新时间：{localTime}\n请点击「重新加载」后再修改。",
+                        $"保存失败：{error ?? "并发冲突"}\n服务端最新：{local}",
                         Severity.Error);
                 }
                 else
@@ -314,7 +274,6 @@ else
             }
 
             Snackbar.Add("保存成功", Severity.Success);
-            _historyRefreshToken++;
             await LoadAsync();
         }
         finally
@@ -323,59 +282,26 @@ else
         }
     }
 
-    /// <summary>
-    /// 清空所有属性。
-    ///
-    /// ★ PATCH 语义下，"清空"需要显式提交每个属性为 null（= 删除该属性）。
-    ///   提交空字典不会删除任何东西。
-    /// </summary>
-    private async Task ClearAllAsync()
+    private async Task DeleteAsync()
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
-            "确认清空",
-            $"确定清空实体 {EntityType}/{EntityId} 的所有属性吗？此操作不可撤销。",
-            yesText: "清空", cancelText: "取消");
+            "确认删除",
+            $"确定删除实体 {InodeId}/{EntityType} 的所有属性值？",
+            yesText: "永久删除", cancelText: "取消");
 
         if (confirmed != true) return;
-
-        var toClear = new Dictionary<string, object?>();
-        foreach (var attr in _regularAttributes)
-            toClear[attr.AttributeName] = null;
-
-        if (toClear.Count == 0)
-        {
-            Snackbar.Add("没有可清空的属性", Severity.Info);
-            return;
-        }
 
         _saving = true;
         try
         {
-            var (ok, error, currentUpdatedAt) = await Api.PatchEntityAsync(
-                EntityType, EntityId, toClear,
-                expectedUpdatedAt: _loadedUpdatedAt);
-
+            var (ok, error) = await Api.DeleteInodeEntityAsync(InodeId, EntityType);
             if (!ok)
             {
-                if (currentUpdatedAt is not null)
-                {
-                    var localTime = currentUpdatedAt.Value.ToLocalTime()
-                        .ToString("yyyy-MM-dd HH:mm:ss");
-                    Snackbar.Add(
-                        $"清空失败：{error ?? "并发冲突"}\n" +
-                        $"服务端最新时间：{localTime}",
-                        Severity.Error);
-                }
-                else
-                {
-                    Snackbar.Add($"清空失败：{error ?? "未知错误"}", Severity.Error);
-                }
+                Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
                 return;
             }
-
-            Snackbar.Add("已清空所有属性", Severity.Success);
-            _historyRefreshToken++;
-            await LoadAsync();
+            Snackbar.Add("已删除", Severity.Success);
+            BackToInode();
         }
         finally
         {
@@ -385,13 +311,6 @@ else
 
     // ---------- 提交值转换 ----------
 
-    /// <summary>
-    /// 把表单值转换为 PATCH 接口接受的 JSON 值字典。
-    ///
-    /// 语义：
-    ///   - _values 中存在的键（含 null）：提交
-    ///   - _values 中不存在的键：不提交（保持后端原值）
-    /// </summary>
     private Dictionary<string, object?> BuildSubmitValues()
     {
         var result = new Dictionary<string, object?>();
@@ -410,64 +329,43 @@ else
         _ => v
     };
 
-    // ---------- JSON -> 内部模型 ----------
+    // ---------- JSON → 内部模型 ----------
 
-    /// <summary>
-    /// 后端返回的 JSON 属性值 → 前端内部模型。
-    ///
-    /// ★ int / decimal 有单位时，后端返回 { value, unitId } 对象，统一走
-    ///   JsonToNumeric → NumericInput；无单位时返回裸数字。
-    /// </summary>
     private object? JsonElementToValue(JsonElement elem, AttributeSchemaDto schema)
     {
         if (elem.ValueKind == JsonValueKind.Null) return null;
 
         return schema.DataType switch
         {
-            "string" => elem.ValueKind == JsonValueKind.String ? elem.GetString() : elem.ToString(),
-
-            // int：有单位走 JsonToNumeric，无单位走裸数字 → long
+            "string" => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString() : elem.ToString(),
             "int" => schema.Unit is not null
                 ? JsonToNumeric(elem)
                 : (elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
                   : elem.ValueKind == JsonValueKind.String
                     && long.TryParse(elem.GetString(), out var l) ? l
                   : (object?)null),
-
-            // decimal：统一走 JsonToNumeric
             "decimal" => JsonToNumeric(elem),
-
-            "bool" => elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False
+            "bool" => elem.ValueKind == JsonValueKind.True
+                      || elem.ValueKind == JsonValueKind.False
                       ? elem.GetBoolean() : null,
             "datetime" => elem.GetDateTimeOffset(),
             "date" => elem.GetString(),
             "time" => elem.GetString(),
-
-            // single_choice：后端绑选项集时返回 { value, label }，未绑定时是纯字符串
             "single_choice" => elem.ValueKind == JsonValueKind.String
                 ? elem.GetString()
                 : elem.ValueKind == JsonValueKind.Object
                   && elem.TryGetProperty("value", out var sc)
                   && sc.ValueKind == JsonValueKind.String ? sc.GetString()
                 : elem.ToString(),
-
             "json" or "file" => elem.Clone(),
-
             "composite" => schema.CompositeType is not null
                 ? JsonToComposite(elem, schema.CompositeType)
                 : null,
-
             _ => elem.Clone()
         };
     }
 
-    /// <summary>
-    /// 数值 JSON → NumericInput。
-    ///
-    /// 支持两种形态：
-    ///   - { value: 1.5, unitId: "..." }  → 归一化后的值 + 原始输入单位
-    ///   - 裸数字                          → 视为基准单位值
-    /// </summary>
     private NumericInput JsonToNumeric(JsonElement elem)
     {
         if (elem.ValueKind == JsonValueKind.Object)
@@ -523,52 +421,23 @@ else
     private object? JsonToFieldValue(JsonElement elem, CompositeFieldSchemaDto field)
     {
         if (elem.ValueKind == JsonValueKind.Null) return null;
-
         if (field.DataType == "composite" && field.NestedType is not null)
             return JsonToComposite(elem, field.NestedType);
 
         return field.DataType switch
         {
-            "string" => elem.ValueKind == JsonValueKind.String ? elem.GetString() : elem.ToString(),
-            "int" => elem.ValueKind == JsonValueKind.Number ? elem.GetInt64() : (object?)null,
-            "decimal" => elem.ValueKind == JsonValueKind.Number ? elem.GetDecimal() : (object?)null,
+            "string" => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString() : elem.ToString(),
+            "int" => elem.ValueKind == JsonValueKind.Number
+                ? elem.GetInt64() : (object?)null,
+            "decimal" => elem.ValueKind == JsonValueKind.Number
+                ? elem.GetDecimal() : (object?)null,
             "bool" => elem.ValueKind is JsonValueKind.True or JsonValueKind.False
-                      ? elem.GetBoolean() : (object?)null,
+                ? elem.GetBoolean() : (object?)null,
             "datetime" => elem.GetDateTimeOffset(),
             "date" or "time" or "single_choice" => elem.GetString(),
             "json" or "file" => elem.Clone(),
             _ => elem.Clone()
         };
-    }
-
-    // ---------- 删除实体 ----------
-
-    private async Task DeleteEntityAsync()
-    {
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "确认删除实体",
-            $"确定删除实体 {EntityType}/{EntityId} 及其所有属性值和子表数据吗？\n\n" +
-            "此操作不可撤销。审计历史保留。",
-            yesText: "永久删除", cancelText: "取消");
-
-        if (confirmed != true) return;
-
-        _saving = true;
-        try
-        {
-            var (ok, error) = await Api.DeleteEntityAsync(EntityType, EntityId);
-            if (!ok)
-            {
-                Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
-                return;
-            }
-
-            Snackbar.Add("实体已删除", Severity.Success);
-            Nav.NavigateTo($"/entities/{EntityType}");
-        }
-        finally
-        {
-            _saving = false;
-        }
     }
 }

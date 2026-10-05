@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using MudBlazor.Services;
-using TreeGraph.Blazor.Components.Shared;
-using TreeGraph.Blazor.Services;
+using TreeGraph.Blazor.Shared.NodeEav.Components.Shared;
+using TreeGraph.Blazor.Shared.NodeEav.Services;
 using TreeGraph.Shared.Eav.Dtos;
 using Xunit;
 

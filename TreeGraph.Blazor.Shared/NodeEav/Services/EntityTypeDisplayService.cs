@@ -1,6 +1,6 @@
 using TreeGraph.Shared.Eav.Dtos;
 
-namespace TreeGraph.Blazor.Services;
+namespace TreeGraph.Blazor.Shared.NodeEav.Services;
 
 /// <summary>
 /// 实体类型"显示名"解析器。

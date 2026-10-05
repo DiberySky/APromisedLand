@@ -2,7 +2,7 @@ using Microsoft.Extensions.Http.Resilience;
 using MudBlazor.Services;
 using Polly;
 using TreeGraph.Blazor.Components;
-using TreeGraph.Blazor.Services;
+using TreeGraph.Blazor.Shared.NodeEav.Services;
 using TreeGraph.Blazor.Services.DemoTree;
 using TreeGraph.Blazor.Shared.Trees.TreeSky.Extensions;
 using TreeGraph.Blazor.Shared.Trees.TreeSky.Models;
