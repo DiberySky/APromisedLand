@@ -7,106 +7,110 @@
    值存于内部字典 _values，保存时由 BuildSubmitValues 转换为 PUT 提交格式。 *@
 
 <MudForm @ref="_form">
-    @foreach (var attr in SortedAttributes)
-    {
-        <div class="mb-4">
-            @switch (attr.DataType)
-            {
-                case EavDataTypes.String:
-                    <StringField Attr="attr"
-                                 Value="GetString(attr.AttributeName)"
-                                 ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
-
-                case EavDataTypes.Int:
-                case EavDataTypes.Decimal:
-                    if (attr.AvailableUnits is { Count: > 0 })
-                    {
-                        <UnitNumberField Attr="attr"
-                                         AvailableUnits="attr.AvailableUnits"
-                                         Value="GetNumeric(attr.AttributeName)"
-                                         ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    }
-                    else
-                    {
-                        <NumberField Attr="attr"
-                                     Value="GetDecimal(attr.AttributeName)"
+    <MudGrid>
+        @foreach (var attr in SortedAttributes)
+        {
+            <MudItem xs="12" sm="@(CompactLayout ? 12 : 6)" md="@(CompactLayout ? 12 : 4)">
+                @switch (attr.DataType)
+                {
+                    case EavDataTypes.String:
+                        <StringField Attr="attr"
+                                     Value="GetString(attr.AttributeName)"
                                      ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    }
-                    break;
+                        break;
 
-                case EavDataTypes.Bool:
-                    <BoolField Attr="attr"
-                               Value="GetBool(attr.AttributeName)"
-                               ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
+                    case EavDataTypes.Int:
+                    case EavDataTypes.Decimal:
+                        if (attr.AvailableUnits is { Count: > 0 })
+                        {
+                            <UnitNumberField Attr="attr"
+                                             AvailableUnits="attr.AvailableUnits"
+                                             Value="GetNumeric(attr.AttributeName)"
+                                             ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        }
+                        else
+                        {
+                            <NumberField Attr="attr"
+                                         Value="GetDecimal(attr.AttributeName)"
+                                         ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        }
+                        break;
 
-                case EavDataTypes.Date:
-                    <DateField Attr="attr"
-                               Value="GetDateTime(attr.AttributeName)"
-                               ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
+                    case EavDataTypes.Bool:
+                        <BoolField Attr="attr"
+                                   Value="GetBool(attr.AttributeName)"
+                                   ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        break;
 
-                case EavDataTypes.Datetime:
-                    <DateTimeField Attr="attr"
+                    case EavDataTypes.Date:
+                        <DateField Attr="attr"
                                    Value="GetDateTime(attr.AttributeName)"
                                    ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
+                        break;
 
-                case EavDataTypes.Time:
-                    <TimeField Attr="attr"
-                               Value="GetTime(attr.AttributeName)"
-                               ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
-
-                case EavDataTypes.SingleChoice:
-                    <SingleChoiceField Attr="attr"
-                                       Value="GetString(attr.AttributeName)"
+                    case EavDataTypes.Datetime:
+                        <DateTimeField Attr="attr"
+                                       Value="GetDateTime(attr.AttributeName)"
                                        ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
+                        break;
 
-                case EavDataTypes.Composite:
-                    <CompositeField Attr="attr"
+                    case EavDataTypes.Time:
+                        <TimeField Attr="attr"
+                                   Value="GetTime(attr.AttributeName)"
+                                   ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        break;
+
+                    case EavDataTypes.SingleChoice:
+                        <SingleChoiceField Attr="attr"
+                                           Value="GetString(attr.AttributeName)"
+                                           ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        break;
+
+                    case EavDataTypes.Composite:
+                        <CompositeField Attr="attr"
+                                        Value="GetJson(attr.AttributeName)"
+                                        ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        break;
+
+                    case EavDataTypes.Table:
+                        @* 表数据由 TableField 通过独立端点自行加载/保存，不参与本表单提交 *@
+                        <TableField Attr="attr"
+                                    EntityType="EntityType"
+                                    EntityId="EntityId"
                                     Value="GetJson(attr.AttributeName)"
                                     ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
+                        break;
 
-                case EavDataTypes.Table:
-                    @* 表数据由 TableField 通过独立端点自行加载/保存，不参与本表单提交 *@
-                    <TableField Attr="attr"
-                                EntityType="EntityType"
-                                EntityId="EntityId"
-                                Value="GetJson(attr.AttributeName)"
-                                ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
+                    case EavDataTypes.File:
+                        <FileField Attr="attr"
+                                   Value="GetJson(attr.AttributeName)"
+                                   ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        break;
 
-                case EavDataTypes.File:
-                    <FileField Attr="attr"
-                               Value="GetJson(attr.AttributeName)"
-                               ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
+                    case EavDataTypes.Json:
+                        @* json：StringField 兜底，原文本编辑 *@
+                        <StringField Attr="attr"
+                                     Value="GetJsonText(attr.AttributeName)"
+                                     ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        break;
 
-                case EavDataTypes.Json:
-                    @* json：StringField 兜底，原文本编辑 *@
-                    <StringField Attr="attr"
-                                 Value="GetJsonText(attr.AttributeName)"
-                                 ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                    break;
+                    default:
+                        <MudAlert Severity="Severity.Info">
+                            @attr.DisplayName：类型 @attr.DataType 暂不支持在表单中编辑（保存时不会提交此字段）
+                        </MudAlert>
+                        break;
+                }
+            </MudItem>
+        }
+    </MudGrid>
 
-                default:
-                    <MudAlert Severity="Severity.Info">
-                        @attr.DisplayName：类型 @attr.DataType 暂不支持在表单中编辑（保存时不会提交此字段）
-                    </MudAlert>
-                    break;
-            }
-        </div>
-    }
-
-    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-               OnClick="SubmitAsync" Disabled="_submitting"
-               StartIcon="@Icons.Material.Filled.Save">
-        @(_submitting ? "保存中..." : "保存")
-    </MudButton>
+    <MudStack Row Justify="Justify.FlexEnd" Class="mt-4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="SubmitAsync" Disabled="_submitting"
+                   StartIcon="@Icons.Material.Filled.Save">
+            @(_submitting ? "保存中..." : "保存")
+        </MudButton>
+    </MudStack>
 </MudForm>
 
 @code {
@@ -118,6 +122,9 @@
 
     /// <summary>保存回调，参数为已转换为提交格式的值字典。</summary>
     [Parameter] public EventCallback<Dictionary<string, object?>> OnSubmit { get; set; }
+
+    /// <summary>紧凑布局：为 true 时所有 MudItem 固定 xs="12"（供窄面板/对话框内复用）。</summary>
+    [Parameter] public bool CompactLayout { get; set; }
 
     private MudForm _form = null!;
     private bool _submitting;

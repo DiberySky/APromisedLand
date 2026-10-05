@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using MudBlazor;
 using MudBlazor.Services;
+using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.Trees.TreeSky.Extensions;
 using TreeGraph.Blazor.Shared.Trees.TreeSky;
 using TreeGraph.Blazor.Shared.Trees.TreeSky.Models;
@@ -16,8 +17,7 @@ namespace TreeGraph.Blazor.Shared.Tests.Components;
 /// MudBlazor 的弹层/对话框 JS 交互无法在此完整模拟，只覆盖：
 /// 加载中占位、数据到达后渲染树、空数据、加载异常不崩溃、初始加载调用一次。
 /// </summary>
-public class TreeSkyComponentTests : TestContext
-{
+public class TreeSkyComponentTests : BunitTestBase {
     private readonly Mock<ITreeClientService<StringTreeNode>> _clientService = new();
 
     public TreeSkyComponentTests()
@@ -25,6 +25,7 @@ public class TreeSkyComponentTests : TestContext
         JSInterop.Mode = JSRuntimeMode.Loose;
 
         Services.AddMudServices();
+        Services.AddSingleton<IPlatformContext>(new FakePlatformContext());
 
         // 注册 TreeSky 全部服务（BlazorService/MessageService/TreeNodeDialogService/
         // 导航历史/DiberyTreeApiClient + AddMudExtensions + HttpClient 工厂）
@@ -57,7 +58,7 @@ public class TreeSkyComponentTests : TestContext
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(tcs.Task);
 
-        var cut = RenderComponent<TreeSky<StringTreeNode>>();
+        var cut = Render<TreeSky<StringTreeNode>>();
 
         Assert.Contains("mud-progress-circular", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("mud-treeview", cut.Markup, StringComparison.Ordinal);
@@ -74,7 +75,7 @@ public class TreeSkyComponentTests : TestContext
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>> { RootDto() });
 
-        var cut = RenderComponent<TreeSky<StringTreeNode>>();
+        var cut = Render<TreeSky<StringTreeNode>>();
 
         cut.WaitForState(
             () => cut.Markup.Contains("mud-treeview", StringComparison.Ordinal),
@@ -94,7 +95,7 @@ public class TreeSkyComponentTests : TestContext
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>>());
 
-        var cut = RenderComponent<TreeSky<StringTreeNode>>();
+        var cut = Render<TreeSky<StringTreeNode>>();
 
         cut.WaitForState(
             () => cut.Markup.Contains("mud-progress-circular", StringComparison.Ordinal),
@@ -113,7 +114,7 @@ public class TreeSkyComponentTests : TestContext
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("API 挂了"));
 
-        var exception = Record.Exception(() => RenderComponent<TreeSky<StringTreeNode>>());
+        var exception = Record.Exception(() => Render<TreeSky<StringTreeNode>>());
 
         Assert.Null(exception);
     }
@@ -129,7 +130,7 @@ public class TreeSkyComponentTests : TestContext
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>> { RootDto() });
 
-        RenderComponent<TreeSky<StringTreeNode>>();
+        Render<TreeSky<StringTreeNode>>();
 
         _clientService.Verify(
             s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()),
@@ -165,8 +166,8 @@ public class TreeSkyComponentTests : TestContext
             .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "2"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("3")]);
 
-        var cut = RenderComponent<TreeSky<StringTreeNode>>(
-            ("ClickNodeId", "3"));
+        var cut = Render<TreeSky<StringTreeNode>>(
+            p => p.Add(x => x.ClickNodeId, "3"));
 
         cut.WaitForAssertion(
             () => Assert.Equal("3", cut.Instance.SelectedValue?.Id),
@@ -197,7 +198,7 @@ public class TreeSkyComponentTests : TestContext
             .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("2")]);
 
-        var cut = RenderComponent<TreeSky<StringTreeNode>>();
+        var cut = Render<TreeSky<StringTreeNode>>();
         cut.WaitForState(() => cut.Instance.GetAllLoadedNodes().Count == 1,
             TimeSpan.FromSeconds(2));
 
@@ -239,7 +240,7 @@ public class TreeSkyComponentTests : TestContext
         };
         var roots = new List<TreeItemData<StringTreeNode>> { root };
 
-        var cut = RenderComponent<TreeSky<StringTreeNode>>();
+        var cut = Render<TreeSky<StringTreeNode>>();
 
         Assert.True(cut.Instance.RemoveNodeFromParent(roots, "3"));
 
@@ -278,7 +279,7 @@ public class TreeSkyComponentTests : TestContext
                 It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("2")]);
 
-        var cut = RenderComponent<TreeSky<StringTreeNode>>();
+        var cut = Render<TreeSky<StringTreeNode>>();
 
         // 初始：组件侧 _items 只有 1，2 尚未加载
         Assert.Single(cut.Instance.GetAllLoadedNodes());

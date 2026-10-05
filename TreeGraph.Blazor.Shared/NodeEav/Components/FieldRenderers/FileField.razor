@@ -1,5 +1,6 @@
 @* FileField.razor *@
 @* 文件字段渲染器（基础版）：URL 输入 + JSON 元数据展示 *@
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudTextField T="string"
               Label="@($"{Attr.DisplayName} - 文件 URL")"
@@ -9,6 +10,11 @@
               Variant="Variant.Outlined"
               Placeholder="https://..."
               Class="mb-2" />
+
+@if (Platform.IsMobile)
+{
+    <MudText Typo="Typo.caption" Color="Color.Secondary">请输入可访问的文件 URL</MudText>
+}
 
 @if (_meta is not null)
 {

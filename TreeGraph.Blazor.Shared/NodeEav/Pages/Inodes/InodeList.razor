@@ -1,9 +1,9 @@
 @* InodeList.razor *@
 @page "/inodes"
-@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @using TreeGraph.Shared.Eav.Dtos
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 @* InodeList.razor *@
 <PageTitle>iNode 列表</PageTitle>
 
@@ -18,7 +18,7 @@
     输入 iNode GUID 即可访问其所有实体。
 </MudAlert>
 
-<MudPaper Class="pa-4 mb-4">
+<MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-4 mb-4")">
     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
         快速访问
     </MudText>
@@ -29,7 +29,9 @@
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
                       Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      Style="min-width: 480px; max-width: 640px;"
+                      Style="@(Platform.IsCompact
+                          ? "width: 100%;"
+                          : "min-width: 480px; max-width: 640px;")"
                       Immediate="true" />
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.ArrowForward"
@@ -47,7 +49,7 @@
 
 @if (_recentInodes.Count > 0)
 {
-    <MudPaper Class="pa-4">
+    <MudPaper Class="@(Platform.IsCompact ? "pa-2" : "pa-4")">
         <MudText Typo="Typo.subtitle1" Class="mb-2">最近访问</MudText>
         <MudList T="string">
             @foreach (var inode in _recentInodes)

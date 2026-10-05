@@ -1,6 +1,9 @@
 @* MainLayout.razor *@
 @inherits LayoutComponentBase
 @inject EntityTypeDisplayService EntityTypeDisplay
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 @* MainLayout.razor *@
 
 @* MudBlazor 必需的全局 Provider *@
@@ -40,10 +43,43 @@
 
 @code {
     private bool _drawerOpen = true;
+    private DotNetObjectReference<MainLayout>? _dotNetRef;
 
     protected override async Task OnInitializedAsync()
     {
         // 预加载实体类型映射，供各页面同步查 DisplayName
         await EntityTypeDisplay.EnsureLoadedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // 首次视口检测 + 注册 window.resize 监听（150ms 去抖，越过断点时才触发 Changed）
+            await Platform.RefreshAsync();
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("treeGraphPlatform.registerResize", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnWindowResize() => await Platform.RefreshAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        // 移除 resize listener（MainLayout 重建时 JS 端幂等保护会兜底，此处主动清理）
+        try
+        {
+            await JS.InvokeVoidAsync("treeGraphPlatform.unregisterResize");
+        }
+        catch (Microsoft.JSInterop.JSDisconnectedException)
+        {
+            // Blazor Server 断开时 JS 已不可用，忽略
+        }
+        catch (InvalidOperationException)
+        {
+            // 静态 SSR 阶段无 JS interop，忽略
+        }
     }
 }

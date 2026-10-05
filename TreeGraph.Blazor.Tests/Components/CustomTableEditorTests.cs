@@ -23,7 +23,7 @@ namespace TreeGraph.Blazor.Tests.Components;
 ///
 /// 不测：具体控件（MudTextField 等）的键盘交互（依赖 JS）。
 /// </summary>
-public class CustomTableEditorTests : TestContext
+public class CustomTableEditorTests : BunitTestBase
 {
     public CustomTableEditorTests()
     {
@@ -114,7 +114,7 @@ public class CustomTableEditorTests : TestContext
         Services.AddSingleton(api);
         Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
 
-        return RenderComponent<CustomTableEditor>(p => p
+        return Render<CustomTableEditor>(p => p
             .Add(x => x.EntityType, "Product")
             .Add(x => x.EntityId, "1")
             .Add(x => x.AttributeName, "certs")
@@ -310,7 +310,7 @@ public class CustomTableEditorTests : TestContext
         Services.AddSingleton(api);
         Services.AddSingleton<IEavFieldValidator, EavFieldValidator>();
 
-        var cut = RenderComponent<CustomTableEditor>(p => p
+        var cut = Render<CustomTableEditor>(p => p
             .Add(x => x.EntityType, "Product")
             .Add(x => x.EntityId, "1")
             .Add(x => x.AttributeName, "certs")

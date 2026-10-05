@@ -16,7 +16,7 @@ namespace TreeGraph.Blazor.Tests.Components;
 /// 焦点：AddFilter / RemoveFilter / ClearAll 是否触发正确的状态与回调。
 /// 不测 MudSelect 的下拉交互（依赖 JS，bUnit 不覆盖）。
 /// </summary>
-public class QueryFilterBuilderTests : TestContext
+public class QueryFilterBuilderTests : BunitTestBase
 {
     public QueryFilterBuilderTests()
     {
@@ -45,7 +45,7 @@ public class QueryFilterBuilderTests : TestContext
     [Fact]
     public void NoSupportedAttributes_RendersInfoAlert()
     {
-        var cut = RenderComponent<QueryFilterBuilder>(p => p
+        var cut = Render<QueryFilterBuilder>(p => p
             .Add(x => x.Filters, new List<AttributeFilter>())
             .Add(x => x.SupportedAttributes, Array.Empty<AttributeSchemaDto>()));
 
@@ -55,7 +55,7 @@ public class QueryFilterBuilderTests : TestContext
     [Fact]
     public void EmptyFilters_DoesNotRenderApplyButton()
     {
-        var cut = RenderComponent<QueryFilterBuilder>(p => p
+        var cut = Render<QueryFilterBuilder>(p => p
             .Add(x => x.Filters, new List<AttributeFilter>())
             .Add(x => x.SupportedAttributes, new[]
             {
@@ -76,7 +76,7 @@ public class QueryFilterBuilderTests : TestContext
     public void AddFilter_AddsToFiltersCollection()
     {
         var filters = new List<AttributeFilter>();
-        var cut = RenderComponent<QueryFilterBuilder>(p => p
+        var cut = Render<QueryFilterBuilder>(p => p
             .Add(x => x.Filters, filters)
             .Add(x => x.SupportedAttributes, new[] { MakeAttr("name") }));
 
@@ -99,7 +99,7 @@ public class QueryFilterBuilderTests : TestContext
             new() { AttributeName = "name", Operator = "eq" }
         };
 
-        var cut = RenderComponent<QueryFilterBuilder>(p => p
+        var cut = Render<QueryFilterBuilder>(p => p
             .Add(x => x.Filters, filters)
             .Add(x => x.SupportedAttributes, new[] { MakeAttr("name") }));
 
@@ -120,7 +120,7 @@ public class QueryFilterBuilderTests : TestContext
         };
         var appliedCount = 0;
 
-        var cut = RenderComponent<QueryFilterBuilder>(p => p
+        var cut = Render<QueryFilterBuilder>(p => p
             .Add(x => x.Filters, filters)
             .Add(x => x.SupportedAttributes, new[] { MakeAttr("name") })
             .Add(x => x.OnApply, EventCallback.Factory.Create(this, () => appliedCount++)));
@@ -149,7 +149,7 @@ public class QueryFilterBuilderTests : TestContext
         };
         var appliedCount = 0;
 
-        var cut = RenderComponent<QueryFilterBuilder>(p => p
+        var cut = Render<QueryFilterBuilder>(p => p
             .Add(x => x.Filters, filters)
             .Add(x => x.SupportedAttributes, new[] { MakeAttr("name") })
             .Add(x => x.OnApply, EventCallback.Factory.Create(this, () => appliedCount++)));
@@ -170,7 +170,7 @@ public class QueryFilterBuilderTests : TestContext
     public void AddFilter_ForNumericAttribute_PicksNumericOperator()
     {
         var filters = new List<AttributeFilter>();
-        var cut = RenderComponent<QueryFilterBuilder>(p => p
+        var cut = Render<QueryFilterBuilder>(p => p
             .Add(x => x.Filters, filters)
             .Add(x => x.SupportedAttributes, new[]
             {
@@ -189,7 +189,7 @@ public class QueryFilterBuilderTests : TestContext
     public void AddFilter_ForBoolAttribute_PicksBoolOperator()
     {
         var filters = new List<AttributeFilter>();
-        var cut = RenderComponent<QueryFilterBuilder>(p => p
+        var cut = Render<QueryFilterBuilder>(p => p
             .Add(x => x.Filters, filters)
             .Add(x => x.SupportedAttributes, new[]
             {

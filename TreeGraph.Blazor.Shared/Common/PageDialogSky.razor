@@ -1,10 +1,11 @@
 @* PageDialogSky.razor — 统一对话框外壳（DialogSky + DialogPageSky 合并版） *@
 @namespace TreeGraph.Blazor.Shared.Common
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
+@implements IDisposable
 
-<MudDialog MaxWidth="@DialogMaxWidth"
-           TitleClass="@TitleClass"
-           ContentClass="@ContentClass"
-           ActionsClass="@ActionsClass">
+<MudDialog TitleClass="@TitleClass"
+           ContentClass="@EffectiveContentClass"
+           ActionsClass="@EffectiveActionsClass">
     <TitleContent>
         @if (CustomTitle != null)
         {
@@ -33,6 +34,24 @@
                                        OnClick="@(() => OnStartClick.InvokeAsync())"/>
                     </MudTooltip>
                 }
+
+                @if (FullScreenToggleVisible)
+                {
+                    <MudTooltip Text="@(_manualFullScreen == true ? "还原" : "全屏")">
+                        <MudIconButton Icon="@(_manualFullScreen == true
+                                               ? Icons.Material.Filled.FullscreenExit
+                                               : Icons.Material.Filled.Fullscreen)"
+                                       Color="Color.Default"
+                                       OnClick="@ToggleFullScreenAsync"/>
+                    </MudTooltip>
+                }
+
+                @if (_isMobile && ShowCloseIconInTitleOnMobile)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                   Color="Color.Default"
+                                   OnClick="@CancelAsync"/>
+                }
             </MudToolBar>
         }
 
@@ -56,11 +75,12 @@
     </DialogContent>
 
     <DialogActions>
-        <MudContainer MaxWidth="@ActionsMaxWidth">
-            <MudStack Row Class="@ActionsContentClass" Spacing="2" AlignItems="AlignItems.Center">
+        @if (_effectiveActionsLayout == DialogActionsLayout.Column)
+        {
+            @* 移动端：竖排满宽；自定义 DialogActions 原样渲染（调用方自控布局） *@
+            <MudStack Spacing="2" Class="pa-4">
                 @if (DialogActions != null)
                 {
-                    @* 提供 DialogActions 时，完全替换默认按钮区 *@
                     @DialogActions
                 }
                 else
@@ -70,35 +90,84 @@
                         @DialogLeftActions
                     }
 
-                    <MudSpacer/>
-
-                    @if (DialogRightActions != null)
+                    @if (SubmitButtonVisible)
                     {
-                        @DialogRightActions
+                        <MudButton Variant="@SubmitButtonVariant"
+                                   Color="@SubmitButtonColor"
+                                   FullWidth="true"
+                                   Size="Size.Large"
+                                   StartIcon="@(IconsVisible ? Icons.Material.Filled.SaveAs : null)"
+                                   OnClick="@SubmitAsync">
+                            @SubmitButtonText
+                        </MudButton>
                     }
 
                     @if (CancelButtonVisible)
                     {
                         <MudButton Variant="Variant.Text"
                                    Color="Color.Default"
+                                   FullWidth="true"
+                                   Size="Size.Large"
                                    StartIcon="@(IconsVisible ? Icons.Material.Filled.Close : null)"
                                    OnClick="@CancelAsync">
                             @CancelButtonText
                         </MudButton>
                     }
 
-                    @if (SubmitButtonVisible)
+                    @if (DialogRightActions != null)
                     {
-                        <MudButton Variant="@SubmitButtonVariant"
-                                   Color="@SubmitButtonColor"
-                                   StartIcon="@(IconsVisible ? Icons.Material.Filled.SaveAs : null)"
-                                   OnClick="@SubmitAsync">
-                            @SubmitButtonText
-                        </MudButton>
+                        @DialogRightActions
                     }
                 }
             </MudStack>
-        </MudContainer>
+        }
+        else
+        {
+            @* 桌面端：现有 Row 布局原样保留 *@
+            <MudContainer MaxWidth="@ActionsMaxWidth">
+                <MudStack Row Class="@ActionsContentClass" Spacing="2" AlignItems="AlignItems.Center">
+                    @if (DialogActions != null)
+                    {
+                        @* 提供 DialogActions 时，完全替换默认按钮区 *@
+                        @DialogActions
+                    }
+                    else
+                    {
+                        @if (DialogLeftActions != null)
+                        {
+                            @DialogLeftActions
+                        }
+
+                        <MudSpacer/>
+
+                        @if (DialogRightActions != null)
+                        {
+                            @DialogRightActions
+                        }
+
+                        @if (CancelButtonVisible)
+                        {
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Default"
+                                       StartIcon="@(IconsVisible ? Icons.Material.Filled.Close : null)"
+                                       OnClick="@CancelAsync">
+                                @CancelButtonText
+                            </MudButton>
+                        }
+
+                        @if (SubmitButtonVisible)
+                        {
+                            <MudButton Variant="@SubmitButtonVariant"
+                                       Color="@SubmitButtonColor"
+                                       StartIcon="@(IconsVisible ? Icons.Material.Filled.SaveAs : null)"
+                                       OnClick="@SubmitAsync">
+                                @SubmitButtonText
+                            </MudButton>
+                        }
+                    }
+                </MudStack>
+            </MudContainer>
+        }
     </DialogActions>
 </MudDialog>
 
@@ -143,6 +212,36 @@
     [Parameter] public string ActionsClass { get; set; } = "mud-theme-default";
     [Parameter] public string ActionsContentClass { get; set; } = "";
 
+    // ───────── 移动端适配（新增） ─────────
+    // 【架构要点】MudDialog 组件不识别 MaxWidth/FullScreen/FullWidth 等组件参数——
+    // 它们会被 CaptureUnmatchedAttributes splat 到内部 content div 成为无效 HTML 属性。
+    // 正确的生效通道是 IMudDialogInstance.SetOptionsAsync 整体替换 DialogOptions。
+    // 因此以下 FullScreen/FullWidth 参数由本组件内部翻译为 SetOptionsAsync 调用，
+    // 调用方切勿自行在 PageDialogSky 上写 MaxWidth="..." 之类的属性（无效且污染 DOM）。
+    /// <summary>全屏显示。null=自动（移动端全屏）；显式 true/false 强制覆盖。
+    /// 经 IMudDialogInstance.SetOptionsAsync 生效（直接 splat 给 MudDialog 无效）。</summary>
+    [Parameter] public bool? FullScreen { get; set; }
+    /// <summary>撑满宽度。null=自动（移动端满宽）；显式 true/false 强制覆盖。
+    /// 生效时 DialogMaxWidth 被忽略（内部按 MaxWidth.False 处理）。
+    /// 经 IMudDialogInstance.SetOptionsAsync 生效（直接 splat 给 MudDialog 无效）。</summary>
+    [Parameter] public bool? FullWidth { get; set; }
+    /// <summary>操作区布局：Auto（移动端 Column / 桌面 Row）。默认 Auto。
+    /// 显式指定 Row/Column 后不再随平台切换。</summary>
+    [Parameter] public DialogActionsLayout ActionsLayout { get; set; } = DialogActionsLayout.Auto;
+    /// <summary>是否按 IPlatformContext 自动应用移动端默认值。默认 true。
+    /// 仅当本参数为 true 且 Platform.IsMobile 为 true 时进入移动端分支；
+    /// 移动端默认值再被 FullScreen/FullWidth 的显式值（非 null）逐一覆盖（OR/?? 语义）。</summary>
+    [Parameter] public bool AutoDetectMobile { get; set; } = true;
+    /// <summary>移动端在标题栏右侧显示关闭图标（独立于 IconsVisible；
+    /// IconsVisible 仅控制操作区按钮图标）。</summary>
+    [Parameter] public bool ShowCloseIconInTitleOnMobile { get; set; } = true;
+    /// <summary>标题栏显示手动全屏/还原切换按钮。默认 true。</summary>
+    [Parameter] public bool FullScreenToggleVisible { get; set; } = true;
+    /// <summary>移动端追加到 ContentClass 的额外样式（追加语义，不替换主题类）。</summary>
+    [Parameter] public string MobileContentClass { get; set; } = "pa-3";
+    /// <summary>移动端追加到 ActionsClass 的额外样式（追加语义）。</summary>
+    [Parameter] public string MobileActionsClass { get; set; } = "px-3 pb-3";
+
     // ───────── 插槽 ─────────
     [Parameter] public RenderFragment? ToolBarContent { get; set; }
     [Parameter] public bool ToolBarPaperVisible { get; set; } = true;
@@ -156,6 +255,114 @@
     [Parameter] public EventCallback OnStartClick { get; set; }
     [Parameter] public EventCallback OnCanceledClick { get; set; }
     [Parameter] public EventCallback OnSubmitClick { get; set; }
+
+    private bool _isMobile;
+    private bool _effectiveFullScreen;
+    private bool _effectiveFullWidth;
+    private DialogActionsLayout _effectiveActionsLayout;
+    /// <summary>手动全屏切换状态；null=跟随 FullScreen 参数/移动端默认值。</summary>
+    private bool? _manualFullScreen;
+
+    private string EffectiveContentClass =>
+        _isMobile ? $"{ContentClass} {MobileContentClass}".Trim() : ContentClass;
+
+    private string EffectiveActionsClass =>
+        _isMobile ? $"{ActionsClass} {MobileActionsClass}".Trim() : ActionsClass;
+
+    protected override void OnInitialized()
+    {
+        Platform.Changed += OnPlatformChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        ComputeEffectiveValues();
+        _ = ApplyDialogOptionsAsync();
+    }
+
+    private void ComputeEffectiveValues()
+    {
+        _isMobile = AutoDetectMobile && Platform.IsMobile;
+        _effectiveFullScreen = _manualFullScreen ?? FullScreen ?? _isMobile;
+        _effectiveFullWidth = FullWidth ?? _isMobile;
+        _effectiveActionsLayout = ActionsLayout == DialogActionsLayout.Auto
+            ? (_isMobile ? DialogActionsLayout.Column : DialogActionsLayout.Row)
+            : ActionsLayout;
+    }
+
+    // MudDialog 不接受 MaxWidth/FullScreen/FullWidth 组件参数（会被 splat 到 content div），
+    // DialogOptions 的属性又是 init-only（class，非 record，无 with 表达式/Clone），
+    // 只能经 IMudDialogInstance.SetOptionsAsync 整体替换。
+    //
+    // ⚠ 以下字段列表需随 MudBlazor 升级同步维护：
+    //    当前版本 9.11.0 共 11 个属性，漏掉字段会导致调用方设置被静默重置。
+    //    若升级后发现 DialogOptions 新增属性，请同步追加到下方列表。
+    //    暂无安全自动克隆手段（反射跨程序集需 AllowNonPublic、性能亦差）。
+    //
+    // 零回归原则：桌面+全默认时不触碰 Options（保留调用方 DialogOptions 原状）；
+    // 仅显式传参或移动端默认值才替换。
+    private async Task ApplyDialogOptionsAsync()
+    {
+        if (MudDialog is null)
+        {
+            return;
+        }
+
+        var effectiveFullScreen = _manualFullScreen ?? FullScreen ?? (_isMobile ? true : (bool?)null);
+        var effectiveFullWidth = FullWidth ?? (_isMobile ? true : (bool?)null);
+
+        // 桌面默认（两值均无需覆盖）：保留调用方 Options 原状
+        if (effectiveFullScreen is null && effectiveFullWidth is null)
+        {
+            return;
+        }
+
+        var src = MudDialog.Options;
+        var fullWidth = effectiveFullWidth ?? src.FullWidth;
+
+        await MudDialog.SetOptionsAsync(new DialogOptions
+        {
+            BackdropClick = src.BackdropClick,
+            CloseOnEscapeKey = src.CloseOnEscapeKey,
+            CloseOnNavigation = src.CloseOnNavigation,
+            CloseButton = src.CloseButton,
+            NoHeader = src.NoHeader,
+            Position = src.Position,
+            BackgroundClass = src.BackgroundClass,
+            DefaultFocus = src.DefaultFocus,
+            MaxWidth = fullWidth == true ? MudBlazor.MaxWidth.False : src.MaxWidth,
+            FullWidth = fullWidth,
+            FullScreen = effectiveFullScreen ?? src.FullScreen,
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // SSR 后完成首次视口检测，Changed 触发重渲染
+            await Platform.RefreshAsync();
+        }
+    }
+
+    private void OnPlatformChanged() => InvokeAsync(async () =>
+    {
+        // 形态变化时参数不变，OnParametersSet 不会重跑，需手动重算
+        ComputeEffectiveValues();
+        await ApplyDialogOptionsAsync();
+        StateHasChanged();
+    });
+
+    /// <summary>标题栏全屏/还原切换。手动值优先于 FullScreen 参数与移动端默认值。</summary>
+    private async Task ToggleFullScreenAsync()
+    {
+        _manualFullScreen = !(_manualFullScreen ?? FullScreen ?? _isMobile);
+        ComputeEffectiveValues();
+        await ApplyDialogOptionsAsync();
+        StateHasChanged();
+    }
+
+    public void Dispose() => Platform.Changed -= OnPlatformChanged;
 
     private async Task CancelAsync()
     {

@@ -1,6 +1,5 @@
 @* EntityEdit.razor *@
 @page "/entities/{EntityType}/{EntityId}"
-@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @using System.Text.Json
 @using TreeGraph.Blazor.Shared.NodeEav.Components.Shared
 @using TreeGraph.Blazor.Shared.NodeEav.Services
@@ -11,6 +10,7 @@
 @inject IEavFieldValidator Validator
 @inject NavigationManager Nav
 @inject EntityTypeDisplayService EntityTypeDisplay
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 @* EntityEdit.razor *@
 <PageTitle>编辑 @GetDisplayTitle()</PageTitle>
 
@@ -68,7 +68,7 @@ else
         </MudAlert>
     }
 
-    <MudPaper Class="pa-4 mb-4">
+    <MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-4 mb-4")">
         <MudText Typo="Typo.h6" Class="mb-3">属性值</MudText>
 
         @foreach (var attr in _regularAttributes)
@@ -116,22 +116,47 @@ else
                    StartIcon="@Icons.Material.Filled.Save">
             @(_saving ? "保存中..." : "保存")
         </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                   OnClick="ReloadAsync"
-                   StartIcon="@Icons.Material.Filled.Refresh">
-            重新加载
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Error"
-                   OnClick="ClearAllAsync"
-                   StartIcon="@Icons.Material.Filled.Delete">
-            清空所有属性
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Error"
-                   OnClick="DeleteEntityAsync"
-                   StartIcon="@Icons.Material.Filled.DeleteForever"
-                   Disabled="@_saving">
-            删除实体
-        </MudButton>
+
+        @if (Platform.IsCompact)
+        {
+            @* 紧凑布局：次要操作收纳进菜单，仅保留保存主按钮 *@
+            <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                     Color="Color.Default"
+                     AriaLabel="更多操作">
+                <MudMenuItem Icon="@Icons.Material.Filled.Refresh"
+                             OnClick="ReloadAsync">
+                    重新加载
+                </MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Delete"
+                             OnClick="ClearAllAsync">
+                    清空所有属性
+                </MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.DeleteForever"
+                             OnClick="DeleteEntityAsync"
+                             Disabled="@_saving">
+                    删除实体
+                </MudMenuItem>
+            </MudMenu>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                       OnClick="ReloadAsync"
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                重新加载
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                       OnClick="ClearAllAsync"
+                       StartIcon="@Icons.Material.Filled.Delete">
+                清空所有属性
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                       OnClick="DeleteEntityAsync"
+                       StartIcon="@Icons.Material.Filled.DeleteForever"
+                       Disabled="@_saving">
+                删除实体
+            </MudButton>
+        }
     </div>
 }
 

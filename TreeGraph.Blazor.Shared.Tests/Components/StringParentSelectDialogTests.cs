@@ -2,6 +2,7 @@ using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using MudBlazor.Services;
+using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Components;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Models;
 using Xunit;
@@ -17,12 +18,12 @@ namespace TreeGraph.Blazor.Shared.Tests.Components;
 /// 本测试用真实 MudBlazor + 真实参数传递链（MudDialogProvider + IDialogService）
 /// 复现该缺陷，定位后转为回归测试。
 /// </summary>
-public class StringParentSelectDialogTests : TestContext
-{
+public class StringParentSelectDialogTests : BunitTestBase {
     public StringParentSelectDialogTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddSingleton<IPlatformContext>(new FakePlatformContext());
     }
 
     /// <summary>3 节点扁平树：电子产品 → (手机, 电脑)。</summary>
@@ -248,7 +249,7 @@ public class StringParentSelectDialogTests : TestContext
         bool allowRoot = true,
         StringNodeMeta? currentParent = null)
     {
-        var provider = RenderComponent<MudDialogProvider>();
+        var provider = Render<MudDialogProvider>();
 
         var nodes = Nodes();
         var parameters = new DialogParameters

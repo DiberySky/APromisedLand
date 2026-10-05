@@ -1,10 +1,12 @@
 @* TimeField.razor *@
 @* 时间字段渲染器（按文档 6.x 同模式实现） *@
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudTimePicker Label="@Attr.DisplayName"
                Time="Value" TimeChanged="ValueChanged"
                Required="@Attr.IsRequired"
-               Variant="Variant.Outlined" />
+               Variant="Variant.Outlined"
+               PickerVariant="@(Platform.IsMobile ? PickerVariant.Dialog : PickerVariant.Inline)" />
 
 @code {
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;

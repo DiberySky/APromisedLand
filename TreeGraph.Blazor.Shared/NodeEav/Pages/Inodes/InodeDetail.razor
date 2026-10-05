@@ -1,6 +1,5 @@
 @* InodeDetail.razor *@
 @page "/inodes/{InodeId}"
-@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @using System.Text.Json
 @using TreeGraph.Blazor.Shared.NodeEav.Services
 @using TreeGraph.Shared.Eav.Dtos
@@ -9,6 +8,7 @@
 @inject NavigationManager Nav
 @inject IDialogService DialogService
 @inject IJSRuntime JS
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 @* InodeDetail.razor *@
 <PageTitle>iNode @InodeId</PageTitle>
 
@@ -23,29 +23,54 @@
     <MudText Typo="Typo.h5">iNode 详情</MudText>
 </div>
 
-<MudPaper Class="pa-3 mb-4">
+<MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-3 mb-4")">
     <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
         <MudText Typo="Typo.caption" Color="Color.Secondary">iNode ID</MudText>
         <code>@InodeId</code>
         <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
                        Size="Size.Small" OnClick="CopyId" title="复制" />
         <MudSpacer />
-        @* ★ JSON 预览入口 *@
-        <MudButton Variant="Variant.Outlined" Color="Color.Info"
-                   StartIcon="@Icons.Material.Filled.DataObject"
-                   OnClick="OpenJsonDrawer">
-            JSON 预览
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="OpenAttachDialog">
-            声明新类型
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                   StartIcon="@Icons.Material.Filled.Refresh"
-                   OnClick="ReloadAsync" Disabled="@_loading">
-            刷新
-        </MudButton>
+        @if (Platform.IsCompact)
+        {
+            @* 紧凑布局：主操作保留「声明新类型」，次要操作收纳进菜单 *@
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAttachDialog">
+                声明新类型
+            </MudButton>
+            <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                     Color="Color.Default"
+                     AriaLabel="更多操作">
+                <MudMenuItem Icon="@Icons.Material.Filled.DataObject"
+                             OnClick="OpenJsonDrawer">
+                    JSON 预览
+                </MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Refresh"
+                             OnClick="ReloadAsync"
+                             Disabled="@_loading">
+                    刷新
+                </MudMenuItem>
+            </MudMenu>
+        }
+        else
+        {
+            @* ★ JSON 预览入口 *@
+            <MudButton Variant="Variant.Outlined" Color="Color.Info"
+                       StartIcon="@Icons.Material.Filled.DataObject"
+                       OnClick="OpenJsonDrawer">
+                JSON 预览
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAttachDialog">
+                声明新类型
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="ReloadAsync" Disabled="@_loading">
+                刷新
+            </MudButton>
+        }
     </div>
 </MudPaper>
 
@@ -148,14 +173,14 @@ else
 }
 
 @* ============================================================ *@
-@* ★ JSON 预览抽屉（右侧滑出，600px 宽） *@
+@* ★ JSON 预览抽屉（右侧滑出；桌面 600px，紧凑全宽） *@
 @* ============================================================ *@
 <MudDrawer @bind-Open="_jsonDrawerOpen"
            Anchor="Anchor.End"
            Variant="DrawerVariant.Temporary"
            Elevation="4"
-           Width="600px">
-    <MudPaper Class="pa-4" Style="height: 100%; display: flex; flex-direction: column;">
+           Width="@(Platform.IsCompact ? "100%" : "600px")">
+    <MudPaper Class="@(Platform.IsCompact ? "pa-2" : "pa-4")" Style="height: 100%; display: flex; flex-direction: column;">
 
         @* 标题区 *@
         <div class="d-flex align-center mb-3">
@@ -243,60 +268,6 @@ else
     </MudPaper>
 </MudDrawer>
 
-@* ============================================================ *@
-@* 声明类型对话框                                                *@
-@* ============================================================ *@
-<MudDialog @bind-Visible="_showAttachDialog" Options="_dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">声明新类型</MudText>
-    </TitleContent>
-    <DialogContent>
-        @if (_allTypes is null)
-        {
-            <MudProgressLinear Indeterminate="true" />
-        }
-        else
-        {
-            var declared = _cards?.Select(c => c.EntityType).ToHashSet()
-                           ?? new HashSet<string>();
-            var available = _allTypes
-                .Where(t => !declared.Contains(t.EntityType))
-                .ToList();
-
-            if (available.Count == 0)
-            {
-                <MudAlert Severity="Severity.Info">
-                    所有可用的实体类型都已声明
-                </MudAlert>
-            }
-            else
-            {
-                <MudSelect T="string"
-                           @bind-Value="_newType"
-                           Label="实体类型"
-                           Variant="Variant.Outlined">
-                    @foreach (var t in available)
-                    {
-                        <MudSelectItem T="string" Value="@t.EntityType">
-                            @(string.IsNullOrWhiteSpace(t.DisplayName)
-                                ? t.EntityType
-                                : $"{t.DisplayName} ({t.EntityType})")
-                        </MudSelectItem>
-                    }
-                </MudSelect>
-            }
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _showAttachDialog = false)">取消</MudButton>
-        <MudButton Color="Color.Primary"
-                   OnClick="AttachAsync"
-                   Disabled="@(string.IsNullOrEmpty(_newType))">
-            声明
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
 @code {
     [Parameter] public string InodeId { get; set; } = "";
 
@@ -305,9 +276,6 @@ else
     private bool _loading;
     private bool _initialized;
 
-    private bool _showAttachDialog;
-    private string? _newType;
-
     // ★ JSON 预览状态
     private bool _jsonDrawerOpen;
     private bool _jsonLoading;
@@ -315,12 +283,6 @@ else
     private bool _jsonIncludeNull;
     private bool _jsonDisplayName;
     private bool _jsonOriginalUnits;
-
-    private readonly DialogOptions _dialogOptions = new()
-    {
-        MaxWidth = MaxWidth.Small,
-        FullWidth = true
-    };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -455,17 +417,26 @@ else
     // 声明类型
     // ============================================================
 
-    private void OpenAttachDialog()
+    private async Task OpenAttachDialog()
     {
-        _newType = null;
-        _showAttachDialog = true;
-    }
+        var declared = _cards?.Select(c => c.EntityType).ToHashSet()
+                       ?? new HashSet<string>();
+        var available = _allTypes?
+            .Where(t => !declared.Contains(t.EntityType))
+            .ToList();
 
-    private async Task AttachAsync()
-    {
-        if (string.IsNullOrEmpty(_newType)) return;
+        var parameters = new DialogParameters
+        {
+            { nameof(AttachTypeDialog.AvailableTypes), available }
+        };
 
-        var (ok, error) = await Api.AttachInodeTypeAsync(InodeId, _newType);
+        var dialog = await DialogService.ShowAsync<AttachTypeDialog>("声明新类型", parameters);
+        var result = await dialog.Result;
+
+        if (result?.Canceled != false || result.Data is not string entityType)
+            return;
+
+        var (ok, error) = await Api.AttachInodeTypeAsync(InodeId, entityType);
         if (!ok)
         {
             Snackbar.Add($"声明失败：{error ?? "未知错误"}", Severity.Error);
@@ -473,7 +444,6 @@ else
         }
 
         Snackbar.Add("声明成功", Severity.Success);
-        _showAttachDialog = false;
         await LoadAsync();
 
         // 抽屉开着时也刷新 JSON

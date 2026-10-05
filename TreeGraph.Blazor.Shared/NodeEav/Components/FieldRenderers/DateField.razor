@@ -1,10 +1,12 @@
 @* DateField.razor *@
 @* 日期字段渲染器（按文档 6.x 同模式实现） *@
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudDatePicker Label="@Attr.DisplayName"
                Date="Value" DateChanged="ValueChanged"
                Required="@Attr.IsRequired"
-               Variant="Variant.Outlined" />
+               Variant="Variant.Outlined"
+               PickerVariant="@(Platform.IsMobile ? PickerVariant.Dialog : PickerVariant.Inline)" />
 
 @code {
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;

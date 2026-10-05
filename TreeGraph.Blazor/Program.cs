@@ -8,6 +8,7 @@ using TreeGraph.Blazor.Shared.Trees.TreeSky.Models;
 using TreeGraph.Blazor.Shared.Trees.TreeSky.Services;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Extensions;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Services;
+using TreeGraph.Blazor.Shared.Platform;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,9 @@ builder.Services.AddRazorComponents()
 
 // MudBlazor
 builder.Services.AddMudServices();
+
+// ★ 平台上下文：JS 视口检测（600/960 断点），Scoped。Hybrid 可覆盖注册。
+builder.Services.AddTreeGraphPlatform();
 
 // ★ TreeSky 树组件库（BlazorService/MessageService/TreeNodeDialogService/导航/泛型树 API 客户端 + MudExtensions）
 builder.Services.AddTreeSky();

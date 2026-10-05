@@ -1,6 +1,5 @@
 @* EntityList.razor *@
 @page "/entities/{EntityType}"
-@rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
 @using TreeGraph.Blazor.Shared.NodeEav.Components.Shared
 @using TreeGraph.Blazor.Shared.NodeEav.Services
 @using TreeGraph.Shared.Eav.Dtos
@@ -9,6 +8,7 @@
 @inject NavigationManager Nav
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 @* EntityList.razor *@
 <PageTitle>@GetDisplayTitle() 实体列表</PageTitle>
 
@@ -81,6 +81,74 @@ else if (_result.Items.Count == 0)
                 新建实体
             </MudButton>
         }
+    </MudPaper>
+}
+else if (Platform.IsCompact)
+{
+    @* 紧凑布局：卡片列表替换表格 *@
+    <MudPaper Class="pa-2 mb-4">
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            共 <b>@_result.Total</b> 个实体，第 @_result.Page / @TotalPages 页
+        </MudText>
+
+        <MudStack Spacing="3">
+            @foreach (var item in _result.Items)
+            {
+                <MudCard Elevation="1" Outlined="true">
+                    <MudCardContent Class="pa-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            <code>@item.EntityId</code>
+                        </MudText>
+                        @foreach (var col in _previewColumns)
+                        {
+                            <MudText Typo="Typo.body2">
+                                @GetColumnDisplayName(col)：@FormatPreview(item.Properties.GetValueOrDefault(col))
+                            </MudText>
+                        }
+                    </MudCardContent>
+                    <MudCardActions Class="pa-2">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => OpenEdit(item.EntityId))"
+                                       title="编辑" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => ConfirmDelete(item.EntityId))"
+                                       title="删除" />
+                    </MudCardActions>
+                </MudCard>
+            }
+        </MudStack>
+
+        @* 卡片模式保留分页 *@
+        <div class="d-flex align-center pa-2 mt-2" style="gap: 8px;">
+            <MudSelect T="int"
+                       Value="_pageSize"
+                       ValueChanged="OnPageSizeChanged"
+                       Label="每页"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="width: 120px;">
+                <MudSelectItem T="int" Value="10">10</MudSelectItem>
+                <MudSelectItem T="int" Value="20">20</MudSelectItem>
+                <MudSelectItem T="int" Value="50">50</MudSelectItem>
+                <MudSelectItem T="int" Value="100">100</MudSelectItem>
+            </MudSelect>
+
+            <MudSpacer />
+
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                           Size="Size.Small"
+                           Disabled="@(_result.Page <= 1)"
+                           OnClick="@(() => GoToPage(_result.Page - 1))" />
+            <MudText Typo="Typo.body2">@_result.Page / @TotalPages</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                           Size="Size.Small"
+                           Disabled="@(_result.Page >= TotalPages)"
+                           OnClick="@(() => GoToPage(_result.Page + 1))" />
+        </div>
     </MudPaper>
 }
 else

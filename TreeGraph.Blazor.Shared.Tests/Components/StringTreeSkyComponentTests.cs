@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MudBlazor;
 using MudBlazor.Services;
+using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.Trees.TreeSky.Dialogs;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Components;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Extensions;
@@ -22,8 +23,7 @@ namespace TreeGraph.Blazor.Shared.Tests.Components;
 ///
 /// 不测：具体 DOM 交互（MudTreeView 的展开/点击，由 E2E 覆盖）。
 /// </summary>
-public class StringTreeSkyComponentTests : TestContext
-{
+public class StringTreeSkyComponentTests : BunitTestBase {
     // ============================================================
     // 测试 Doubles
     // ============================================================
@@ -124,6 +124,7 @@ public class StringTreeSkyComponentTests : TestContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddSingleton<IPlatformContext>(new FakePlatformContext());
         Services.AddScoped<MessageService>();
         Services.AddStringTreeSky();
         Services.AddSingleton<IStringTreeDataSource>(_dataSource);
@@ -144,7 +145,7 @@ public class StringTreeSkyComponentTests : TestContext
         Services.RemoveAll<IStringTreeDataSource>();
         Services.AddSingleton<IStringTreeDataSource, SlowDataSource>();
 
-        var cut = RenderComponent<StringTreeSky>();
+        var cut = Render<StringTreeSky>();
 
         // 组件停在首次 await，保持 loading
         Assert.Contains("mud-progress-circular", cut.Markup, StringComparison.Ordinal);
@@ -156,7 +157,7 @@ public class StringTreeSkyComponentTests : TestContext
     {
         _dataSource.Roots.Clear();
 
-        var cut = RenderComponent<StringTreeSky>();
+        var cut = Render<StringTreeSky>();
 
         cut.WaitForState(
             () => cut.Markup.Contains("mud-treeview", StringComparison.Ordinal),
@@ -175,7 +176,7 @@ public class StringTreeSkyComponentTests : TestContext
         _dataSource.Roots.Add(Root("1", "根节点A"));
         _dataSource.Roots.Add(Root("2", "根节点B"));
 
-        var cut = RenderComponent<StringTreeSky>();
+        var cut = Render<StringTreeSky>();
 
         cut.WaitForState(
             () => cut.Markup.Contains("mud-treeview", StringComparison.Ordinal),
@@ -195,7 +196,7 @@ public class StringTreeSkyComponentTests : TestContext
         Services.RemoveAll<IStringTreeDataSource>();
         Services.AddSingleton<IStringTreeDataSource, ThrowingDataSource>();
 
-        var cut = RenderComponent<StringTreeSky>();
+        var cut = Render<StringTreeSky>();
 
         // 异常被 OnInitializedAsync catch，组件渲染空树而非抛异常
         cut.WaitForState(
@@ -212,7 +213,7 @@ public class StringTreeSkyComponentTests : TestContext
     {
         _dataSource.Roots.Add(Root("1", "A"));
 
-        RenderComponent<StringTreeSky>();
+        Render<StringTreeSky>();
 
         Assert.Equal(1, _dataSource.GetRootsCallCount);
     }
@@ -235,7 +236,7 @@ public class StringTreeSkyComponentTests : TestContext
         };
         _dataSource.AncestorPaths["3"] = new() { "1", "2", "3" };
 
-        var cut = RenderComponent<StringTreeSky>(p => p
+        var cut = Render<StringTreeSky>(p => p
             .Add(x => x.ClickNodeId, "3"));
 
         cut.WaitForState(
@@ -255,7 +256,7 @@ public class StringTreeSkyComponentTests : TestContext
     {
         _dataSource.Roots.Add(Root("1", "根"));
 
-        var cut = RenderComponent<StringTreeSky>();
+        var cut = Render<StringTreeSky>();
         cut.WaitForState(() => cut.Instance.GetAllLoadedNodes().Count == 1,
             TimeSpan.FromSeconds(2));
 
@@ -276,7 +277,7 @@ public class StringTreeSkyComponentTests : TestContext
             new StringNodeMeta { Id = "2", Text = "子", ParentId = "1" }
         };
 
-        var cut = RenderComponent<StringTreeSky>();
+        var cut = Render<StringTreeSky>();
         cut.WaitForState(() => cut.Instance.GetAllLoadedNodes().Count == 1,
             TimeSpan.FromSeconds(2));
 
@@ -295,7 +296,7 @@ public class StringTreeSkyComponentTests : TestContext
     {
         _dataSource.Roots.Add(Root("1", "A"));
 
-        var cut = RenderComponent<StringTreeSky>();
+        var cut = Render<StringTreeSky>();
         cut.WaitForState(() => cut.Instance.GetAllLoadedNodes().Count == 1,
             TimeSpan.FromSeconds(2));
 

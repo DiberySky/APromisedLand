@@ -1,0 +1,46 @@
+@page "/dialog-test"
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.Platform
+@inject IPlatformContext Platform
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h4" Class="mb-4">MAUI 对话框测试</MudText>
+
+<MudText Typo="Typo.body1" Class="mb-4">
+    平台信息: HostKind=@Platform.HostKind, FormFactor=@Platform.FormFactor,
+    IsMobile=@Platform.IsMobile, IsCompact=@Platform.IsCompact
+</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary"
+           OnClick="OpenDialog" Class="mb-2">
+    打开 PageDialogSky
+</MudButton>
+
+<MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+           OnClick="OpenDialogFullScreen" Class="mb-2">
+    打开全屏对话框
+</MudButton>
+
+<MudButton Variant="Variant.Outlined" Color="Color.Tertiary"
+           OnClick="RefreshPlatform" Class="mb-2">
+    刷新平台信息
+</MudButton>
+
+@code {
+    private async Task OpenDialog()
+    {
+        await DialogService.ShowAsync<PageDialogSky>("测试对话框",
+            new DialogParameters { { "Title", "MAUI 对话框测试" } });
+    }
+
+    private async Task OpenDialogFullScreen()
+    {
+        await DialogService.ShowAsync<PageDialogSky>("全屏测试对话框",
+            new DialogParameters { { "Title", "全屏测试" }, { "FullScreen", true } });
+    }
+
+    private async Task RefreshPlatform()
+    {
+        await Platform.RefreshAsync();
+    }
+}

@@ -1,10 +1,12 @@
 @* NumberField.razor *@
 @* 数值字段渲染器（文档 6.2），int / decimal（无单位）共用 *@
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudNumericField T="decimal?" Label="@Attr.DisplayName"
                  Value="Value" ValueChanged="ValueChanged"
                  Required="@Attr.IsRequired"
-                 Variant="Variant.Outlined" />
+                 Variant="Variant.Outlined"
+                 InputMode="@(Platform.IsMobile ? InputMode.numeric : InputMode.none)" />
 
 @code {
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;

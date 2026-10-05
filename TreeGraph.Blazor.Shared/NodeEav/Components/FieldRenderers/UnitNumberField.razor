@@ -1,13 +1,15 @@
 @* UnitNumberField.razor *@
 @* 带单位数值字段渲染器（文档 6.3）。
    修正文档两处问题：数值变化需回传父组件；外部 LoadFrom 后需重新同步本地状态。 *@
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudGrid>
     <MudItem xs="12" sm="8">
         <MudNumericField T="decimal?" Label="@Attr.DisplayName"
                          Value="_value" ValueChanged="OnValueChanged"
                          Required="@Attr.IsRequired"
-                         Variant="Variant.Outlined" />
+                         Variant="Variant.Outlined"
+                         InputMode="@(Platform.IsMobile ? InputMode.numeric : InputMode.none)" />
     </MudItem>
     <MudItem xs="12" sm="4">
         <MudSelect T="Guid?" Label="单位"
