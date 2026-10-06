@@ -43,7 +43,7 @@ else
     @foreach (var c in _categories)
     {
         <MudPaper Class="pa-4 mb-4">
-            <div class="d-flex align-center mb-2">
+            <div class="d-flex align-center mb-2" style="flex-wrap: wrap; row-gap: 8px;">
                 <MudText Typo="Typo.h6">@c.Category</MudText>
                 @if (c.BaseUnit is not null)
                 {
@@ -61,11 +61,12 @@ else
                     </MudChip>
                     @if (c.Units.Count > 0)
                     {
-                        <MudButton Size="Size.Small"
+                        <MudButton Size="Size.Medium"
                                    Variant="Variant.Outlined"
                                    Color="Color.Warning"
                                    StartIcon="@Icons.Material.Filled.Star"
                                    Class="ml-2"
+                                   style="flex: 0 0 auto;"
                                    OnClick="@(() => OpenAssignBaseDialogAsync(c))">
                             指定基准单位
                         </MudButton>
