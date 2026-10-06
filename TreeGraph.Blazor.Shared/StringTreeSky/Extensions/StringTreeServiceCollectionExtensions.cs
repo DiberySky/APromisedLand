@@ -19,6 +19,10 @@ public static class StringTreeServiceCollectionExtensions
         services.AddScoped<IStringTreeClient, StringTreeApiClient>();
         services.AddScoped<ISpaceClient, SpaceApiClient>();
         services.AddScoped<NodePropertySummaryService>();
+        // EntityType → 空间名解析器（EAV 元数据按空间分组视图用）
+        services.AddScoped<SpaceEntityTypeResolver>();
+        // 按 EntityType 统计属性数量（空间管理页徽章用）
+        services.AddScoped<SpaceAttributeStatsService>();
         // ViewportService 由 AddResponsive() 提供（宿主 Program.cs 调用）
         return services;
     }

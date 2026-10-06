@@ -46,7 +46,9 @@ public class SpaceController : ControllerBase
 
     [HttpPost]
     public async Task<ActionResult<StringTreeResponse<SpaceDto>>> Create(
-        [FromBody] SpaceDto dto, CancellationToken ct)
+        [FromBody] SpaceDto dto,
+        [FromServices] IEntityTypeTemplateService templateSvc,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(dto.Name))
             return BadRequest(StringTreeResponse<SpaceDto>.Fail("空间名称不能为空"));
@@ -71,6 +73,14 @@ public class SpaceController : ControllerBase
         {
             await EnsureEntityTypeRegisteredAsync(
                 entityType, dto.Name.Trim(), dto.Description, ct);
+        }
+
+        // 从模板复制属性（仅独立 EntityType 时；复制失败不阻断建空间，结果仅报告）
+        if (entityType != StringTreeEntityTypes.Node
+            && !string.IsNullOrWhiteSpace(dto.TemplateEntityType))
+        {
+            await templateSvc.CopyAttributesAsync(
+                dto.TemplateEntityType!, entityType, ct);
         }
 
         var created = await _tree.CreateNodeAsync(new StringNodeDto

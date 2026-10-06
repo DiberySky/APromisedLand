@@ -89,6 +89,20 @@ python "<技能目录>\scripts\extract_by_section.py" $doc --root "d:\APromisedL
    `AddHttpClient<TInterface,TImpl>(BaseAddress=https+http://treegrapheavapi)
    .AddStandardResilienceHandler(NonIdempotentResilience.Configure)`，
    不盲抄文档里的工厂/双注册写法。
+8. **文档测试用 EF InMemory 时**：本仓 `TreeGraph.Api.Tests` 不引用
+   InMemory/SQLite 包，统一走 Testcontainers PostgreSQL（`[Collection("Integration")]`
+   + `EavApiFactory`，从 `factory.Services.CreateScope()` 解析 EavDbContext）。
+   两种情况都必须换：含 `ExecuteDeleteAsync` 的（InMemory 不支持）以及纯
+   LINQ 单测（保持仓库测试架构一致、勿新增包）。模型有 jsonb/GIN/timestamptz
+   等 PG 专属配置，SQLite 无法 EnsureCreated。配套改法：真实 FK 先造父定义、
+   共享库断言按本测试播种集合计数或用 GUID 唯一实体名保证可重入。
+9. **文档内跳转路由必须核对真实页面**：本仓 NodeEav 元数据页面在
+   `/metadata/*`（entity-types/attributes/units/option-sets/...，由 RCL
+   提供），文档若写 `/eav/...` 是死链，改为真实路由；目标页不支持的查询参数
+   可保留（文档通常已注明落默认列表可接受）。
+10. **razor RenderFragment 模板的闭合标签笔误**：文档里
+    `=> @<MudPaper>...</MudPaper>;` 可能误写成不匹配的 `</MudButton>;`，
+    逐字提取后必须靠 RCL 编译抓出并修正（提取保真、错误照改、报告偏差）。
 
 ## 6. 构建、迁移与回归
 

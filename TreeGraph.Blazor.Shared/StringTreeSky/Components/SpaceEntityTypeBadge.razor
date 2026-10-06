@@ -1,0 +1,69 @@
+@* SpaceEntityTypeBadge.razor
+   空间属性集徽章：显示"独立/共享 · N 个属性"。
+   点击时可触发宿主回调（一般跳转到元数据页）。 *@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky.Components
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+
+<MudChip T="string"
+         Size="@Size"
+         Color="@GetColor()"
+         Variant="@Variant"
+         Icon="@GetIcon()"
+         OnClick="@HandleClickAsync"
+         Class="@(OnClick.HasDelegate ? "cursor-pointer" : "")">
+    @GetLabel()
+</MudChip>
+
+@code {
+    /// <summary>解析结果（由 SpaceEntityTypeResolver.Resolve 产出）。</summary>
+    [Parameter, EditorRequired] public ResolvedEntityType? Resolved { get; set; }
+
+    /// <summary>
+    /// 属性数量。-1 表示未加载（只显示"独立/共享"）。
+    /// </summary>
+    [Parameter] public int AttributeCount { get; set; } = -1;
+
+    [Parameter] public Size Size { get; set; } = Size.Small;
+    [Parameter] public Variant Variant { get; set; } = Variant.Filled;
+
+    /// <summary>点击徽章时触发（可选）。</summary>
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private async Task HandleClickAsync()
+    {
+        if (OnClick.HasDelegate)
+            await OnClick.InvokeAsync();
+    }
+
+    private string GetLabel()
+    {
+        var kind = Resolved?.Kind switch
+        {
+            EntityTypeKind.Shared => "共享",
+            EntityTypeKind.SpaceOwned => "独立",
+            EntityTypeKind.Orphan => "孤立",
+            _ => "类型"
+        };
+
+        if (AttributeCount >= 0)
+            return $"{kind} · {AttributeCount} 个属性";
+
+        return kind;
+    }
+
+    private string GetIcon() => Resolved?.Kind switch
+    {
+        EntityTypeKind.Shared => Icons.Material.Filled.Share,
+        EntityTypeKind.SpaceOwned => Icons.Material.Filled.Folder,
+        EntityTypeKind.Orphan => Icons.Material.Filled.Warning,
+        _ => Icons.Material.Filled.Category
+    };
+
+    private Color GetColor() => Resolved?.Kind switch
+    {
+        EntityTypeKind.Shared => Color.Info,
+        EntityTypeKind.SpaceOwned => Color.Primary,
+        EntityTypeKind.Orphan => Color.Warning,
+        _ => Color.Default
+    };
+}

@@ -1,0 +1,58 @@
+@page "/eav/metadata/by-space"
+@using TreeGraph.Blazor.Shared.StringTreeSky.Components
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+
+<PageTitle>EAV 元数据 · 按空间</PageTitle>
+
+<div class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.h5">EAV 元数据 · 按空间</MudText>
+            <MudText Typo="Typo.caption" Class="text-grey">
+                按空间分组展示 EntityType 及其属性集
+            </MudText>
+        </MudStack>
+        <MudStack Row="true" Spacing="1">
+            <MudButton Variant="Variant.Text"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.List"
+                       OnClick="GoToList">
+                列表视图
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="ReloadAsync">
+                刷新
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    <SpaceEntityTypeGroupedView @key="_viewKey"
+                                OnEntityTypeSelected="HandleSelected" />
+</div>
+
+@code {
+    [Inject] private SpaceEntityTypeResolver Resolver { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private int _viewKey;
+
+    private void ReloadAsync()
+    {
+        Resolver.Invalidate();
+        _viewKey++;  // 强制重建组件
+    }
+
+    /// <summary>
+    /// 点击「查看属性」时跳转到现有 EAV 元数据页（如已支持 entityType 查询参数）。
+    /// 若现有页面不接受参数，可改为打开新弹窗或什么都不做。
+    /// </summary>
+    private void HandleSelected(string entityType)
+    {
+        // 本仓 EntityType 列表页路由为 /metadata/entity-types（暂不支持 entityType 参数，落默认列表，行为可接受）
+        Nav.NavigateTo($"/metadata/entity-types?entityType={Uri.EscapeDataString(entityType)}");
+    }
+
+    private void GoToList() => Nav.NavigateTo("/metadata/entity-types");
+}

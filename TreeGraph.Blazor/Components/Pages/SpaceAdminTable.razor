@@ -1,10 +1,13 @@
 @using TreeGraph.StringTree.Contracts
 @using TreeGraph.Blazor.Shared.StringTreeSky
+@using TreeGraph.Blazor.Shared.StringTreeSky.Components
 @using TreeGraph.Blazor.Shared.StringTreeSky.Services
 @inject ISpaceClient SpaceClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject SpaceEntityTypeResolver Resolver
+@inject SpaceAttributeStatsService AttrStats
 
 <div class="pa-4">
     <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
@@ -65,9 +68,10 @@
                   Loading="_loading">
             <HeaderContent>
                 <MudTh>名称</MudTh>
+                <MudTh Style="width:180px">属性集</MudTh>
                 <MudTh>描述</MudTh>
-                <MudTh Style="width:100px">Id 前缀</MudTh>
-                <MudTh Style="width:220px">操作</MudTh>
+                <MudTh Style="width:100px">Id</MudTh>
+                <MudTh Style="width:180px">操作</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="名称">
@@ -75,6 +79,16 @@
                         <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" />
                         <MudText Typo="Typo.body1"><b>@context.Name</b></MudText>
                     </MudStack>
+                </MudTd>
+                <MudTd DataLabel="属性集">
+                    @{
+                        var et = ResolveEntityType(context);
+                        var resolved = Resolver.Resolve(et);
+                        var count = _attrCounts.TryGetValue(et, out var n) ? n : -1;
+                    }
+                    <SpaceEntityTypeBadge Resolved="resolved"
+                                          AttributeCount="count"
+                                          OnClick="() => OpenMetadata(et)" />
                 </MudTd>
                 <MudTd DataLabel="描述">
                     <MudText Typo="Typo.body2" Class="text-grey">
@@ -114,6 +128,7 @@
     private List<SpaceDto> _filtered = new();
     private bool _loading = true;
     private string? _keyword;
+    private Dictionary<string, int> _attrCounts = new();
 
     protected override async Task OnInitializedAsync() => await ReloadAsync();
 
@@ -122,8 +137,16 @@
         _loading = true;
         try
         {
-            _spaces = await SpaceClient.ListSpacesAsync();
+            // 并行：空间列表 + 解析器初始化
+            var spacesTask = SpaceClient.ListSpacesAsync();
+            var resolverTask = Resolver.EnsureLoadedAsync();
+            await Task.WhenAll(spacesTask, resolverTask);
+
+            _spaces = await spacesTask;
             ApplyFilter();
+
+            // 后台异步拉属性计数
+            _ = LoadAttributeCountsAsync();
         }
         catch (Exception ex)
         {
@@ -133,6 +156,37 @@
         {
             _loading = false;
         }
+    }
+
+    private async Task LoadAttributeCountsAsync()
+    {
+        try
+        {
+            var entityTypes = _spaces
+                .Select(s => string.IsNullOrEmpty(s.EntityType)
+                    ? StringTreeEntityTypes.Node
+                    : s.EntityType);
+
+            var counts = await AttrStats.GetCountsAsync(entityTypes);
+            _attrCounts = new Dictionary<string, int>(counts);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // 静默失败，不影响主列表
+        }
+    }
+
+    /// <summary>把空间 → 它的 EntityType（空则视为共享默认）。</summary>
+    private string ResolveEntityType(SpaceDto space) =>
+        string.IsNullOrEmpty(space.EntityType)
+            ? StringTreeEntityTypes.Node
+            : space.EntityType;
+
+    /// <summary>跳转到元数据页。</summary>
+    private void OpenMetadata(string entityType)
+    {
+        Nav.NavigateTo($"/eav/metadata/by-space?entityType={Uri.EscapeDataString(entityType)}");
     }
 
     private void ApplyFilter()

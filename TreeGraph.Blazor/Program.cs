@@ -86,6 +86,12 @@ builder.Services
 builder.Services.AddScoped<NodeSchemaCache>();
 builder.Services.AddScoped<NodePropertySummaryService>();
 
+// ★ 空间-EntityType 解析 + 属性统计（空间管理徽章列 / 元数据按空间分组页使用）。
+//   宿主无参 AddStringTreeSky() 绑定的是 Trees\StringTree 旧扩展，未含解耦版
+//   StringTreeSky\Extensions 中的这两项注册，故与上方相同方式补注册。
+builder.Services.AddScoped<SpaceEntityTypeResolver>();
+builder.Services.AddScoped<SpaceAttributeStatsService>();
+
 // ★ 通用响应式模块（ResponsiveView / ResponsiveSplit 的 ViewportService）。
 builder.Services.AddResponsive();
 

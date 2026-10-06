@@ -1,10 +1,13 @@
 @using TreeGraph.StringTree.Contracts
 @using TreeGraph.Blazor.Shared.StringTreeSky
+@using TreeGraph.Blazor.Shared.StringTreeSky.Components
 @using TreeGraph.Blazor.Shared.StringTreeSky.Services
 @inject ISpaceClient SpaceClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject SpaceEntityTypeResolver Resolver
+@inject SpaceAttributeStatsService AttrStats
 
 <div class="mobile-space-admin">
 
@@ -77,6 +80,18 @@
                         {
                             <div class="admin-card__desc">@space.Description</div>
                         }
+                        @{
+                            var et = ResolveEntityType(space);
+                            var resolved = Resolver.Resolve(et);
+                            var count = _attrCounts.TryGetValue(et, out var n) ? n : -1;
+                        }
+                        <div class="mt-1" @onclick:stopPropagation="true">
+                            <SpaceEntityTypeBadge Resolved="resolved"
+                                                  AttributeCount="count"
+                                                  Size="Size.Small"
+                                                  Variant="Variant.Text"
+                                                  OnClick="() => OpenMetadata(et)" />
+                        </div>
                     </div>
                     <div class="admin-card__actions" @onclick:stopPropagation="true">
                         <MudIconButton Icon="@Icons.Material.Filled.Edit"
@@ -100,6 +115,7 @@
     private List<SpaceDto> _filtered = new();
     private bool _loading = true;
     private string? _keyword;
+    private Dictionary<string, int> _attrCounts = new();
 
     protected override async Task OnInitializedAsync() => await ReloadAsync();
 
@@ -108,8 +124,14 @@
         _loading = true;
         try
         {
-            _spaces = await SpaceClient.ListSpacesAsync();
+            var spacesTask = SpaceClient.ListSpacesAsync();
+            var resolverTask = Resolver.EnsureLoadedAsync();
+            await Task.WhenAll(spacesTask, resolverTask);
+
+            _spaces = await spacesTask;
             ApplyFilter();
+
+            _ = LoadAttributeCountsAsync();
         }
         catch (Exception ex)
         {
@@ -119,6 +141,36 @@
         {
             _loading = false;
         }
+    }
+
+    private async Task LoadAttributeCountsAsync()
+    {
+        try
+        {
+            var entityTypes = _spaces.Select(s => string.IsNullOrEmpty(s.EntityType)
+                ? StringTreeEntityTypes.Node
+                : s.EntityType);
+
+            var counts = await AttrStats.GetCountsAsync(entityTypes);
+            _attrCounts = new Dictionary<string, int>(counts);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // 静默失败，不影响主列表
+        }
+    }
+
+    /// <summary>把空间 → 它的 EntityType（空则视为共享默认）。</summary>
+    private string ResolveEntityType(SpaceDto space) =>
+        string.IsNullOrEmpty(space.EntityType)
+            ? StringTreeEntityTypes.Node
+            : space.EntityType;
+
+    /// <summary>跳转到元数据页。</summary>
+    private void OpenMetadata(string entityType)
+    {
+        Nav.NavigateTo($"/eav/metadata/by-space?entityType={Uri.EscapeDataString(entityType)}");
     }
 
     private void ApplyFilter()

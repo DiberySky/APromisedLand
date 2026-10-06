@@ -1,0 +1,171 @@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky.Components
+@using TreeGraph.Blazor.Shared.NodeEav.Services
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+@using TreeGraph.Shared.Eav.Dtos
+
+<MudStack Spacing="3">
+    @if (_loading)
+    {
+        <div class="d-flex justify-center pa-6">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else if (_totalCount == 0)
+    {
+        <MudAlert Severity="Severity.Info">尚无 EntityType 定义。</MudAlert>
+    }
+    else
+    {
+        @if (_owned.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle1">
+                <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" Color="Color.Primary" />
+                独立空间（@_owned.Count）
+            </MudText>
+            @foreach (var item in _owned)
+            {
+                @RenderCard(item)
+            }
+        }
+
+        @if (_shared.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle1" Class="mt-3">
+                <MudIcon Icon="@Icons.Material.Filled.Share" Size="Size.Small" Color="Color.Info" />
+                共享默认（@_shared.Count）
+            </MudText>
+            @foreach (var item in _shared)
+            {
+                @RenderCard(item)
+            }
+        }
+
+        @if (_orphans.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle1" Class="mt-3 text-warning">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" />
+                孤立 EntityType（@_orphans.Count）
+            </MudText>
+            <MudAlert Severity="Severity.Warning" Dense="true">
+                以下 EntityType 对应的空间已删除。可考虑清理。
+            </MudAlert>
+            @foreach (var item in _orphans)
+            {
+                @RenderCard(item)
+            }
+        }
+
+        @if (_others.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle1" Class="mt-3">
+                <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" />
+                其他类型（@_others.Count）
+            </MudText>
+            @foreach (var item in _others)
+            {
+                @RenderCard(item)
+            }
+        }
+    }
+</MudStack>
+
+@code {
+    [Inject] private EavApiClient EavApi { get; set; } = default!;
+    [Inject] private SpaceEntityTypeResolver Resolver { get; set; } = default!;
+
+    /// <summary>点击 EntityType 时回调（宿主可跳转到编辑页）。</summary>
+    [Parameter] public EventCallback<string> OnEntityTypeSelected { get; set; }
+
+    private bool _loading = true;
+    private int _totalCount;
+    private readonly List<EntityItem> _owned = new();
+    private readonly List<EntityItem> _shared = new();
+    private readonly List<EntityItem> _orphans = new();
+    private readonly List<EntityItem> _others = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Resolver.EnsureLoadedAsync();
+
+            var list = await EavApi.ListEntityTypesAsync() ?? new List<EntityTypeSummaryDto>();
+            _totalCount = list.Count;
+
+            foreach (var t in list)
+            {
+                var resolved = Resolver.Resolve(t.EntityType);
+                var item = new EntityItem(resolved, t);
+
+                switch (resolved.Kind)
+                {
+                    case EntityTypeKind.SpaceOwned: _owned.Add(item); break;
+                    case EntityTypeKind.Shared:     _shared.Add(item); break;
+                    case EntityTypeKind.Orphan:     _orphans.Add(item); break;
+                    default:                        _others.Add(item); break;
+                }
+            }
+
+            // 排序：独立按空间名，其余按 EntityType
+            _owned.Sort((a, b) => string.Compare(
+                a.Resolved.DisplayName, b.Resolved.DisplayName, StringComparison.OrdinalIgnoreCase));
+            _shared.Sort((a, b) => string.Compare(
+                a.Resolved.DisplayName, b.Resolved.DisplayName, StringComparison.OrdinalIgnoreCase));
+            _others.Sort((a, b) => string.Compare(
+                a.Resolved.EntityType, b.Resolved.EntityType, StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private RenderFragment RenderCard(EntityItem item) => @<MudPaper Class="pa-3 mb-2" Elevation="0" Outlined="true">
+        <MudStack Spacing="1">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@GetIcon(item.Resolved.Kind)"
+                         Color="@GetColor(item.Resolved.Kind)"
+                         Size="Size.Small" />
+                <MudText Typo="Typo.body1"><b>@item.Resolved.DisplayName</b></MudText>
+                @if (!string.IsNullOrEmpty(item.Resolved.SubLabel))
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                        @item.Resolved.SubLabel
+                    </MudChip>
+                }
+                <MudSpacer />
+                @if (OnEntityTypeSelected.HasDelegate)
+                {
+                    <MudButton Size="Size.Small"
+                               Variant="Variant.Text"
+                               Color="Color.Primary"
+                               OnClick="() => OnEntityTypeSelected.InvokeAsync(item.Resolved.EntityType)">
+                        查看属性
+                    </MudButton>
+                }
+            </MudStack>
+            <MudText Typo="Typo.caption"
+                     Style="font-family:monospace;color:#888">
+                @item.Resolved.EntityType
+            </MudText>
+        </MudStack>
+    </MudPaper>;
+
+    private static string GetIcon(EntityTypeKind kind) => kind switch
+    {
+        EntityTypeKind.Shared => Icons.Material.Filled.Share,
+        EntityTypeKind.SpaceOwned => Icons.Material.Filled.Folder,
+        EntityTypeKind.Orphan => Icons.Material.Filled.Warning,
+        _ => Icons.Material.Filled.Category
+    };
+
+    private static Color GetColor(EntityTypeKind kind) => kind switch
+    {
+        EntityTypeKind.Shared => Color.Info,
+        EntityTypeKind.SpaceOwned => Color.Primary,
+        EntityTypeKind.Orphan => Color.Warning,
+        _ => Color.Default
+    };
+
+    private record EntityItem(ResolvedEntityType Resolved, EntityTypeSummaryDto Summary);
+}

@@ -1,7 +1,10 @@
 @namespace TreeGraph.Blazor.Shared.StringTreeSky
 @using TreeGraph.StringTree.Contracts
 @using TreeGraph.Blazor.Shared.StringTreeSky.Services
+@using TreeGraph.Blazor.Shared.NodeEav.Services
+@using TreeGraph.Shared.Eav.Dtos
 @inject ISpaceClient SpaceClient
+@inject EavApiClient EavApi
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -22,7 +25,6 @@
                           Lines="3"
                           MaxLength="1024" />
 
-            @* ★ 仅新建时选择属性集模式 *@
             @if (IsNew)
             {
                 <MudDivider Class="my-2" />
@@ -33,7 +35,7 @@
                         <div>
                             <div><b>独立属性集</b>（推荐）</div>
                             <div class="text-caption text-grey">
-                                该空间拥有专属属性定义，不影响其他空间。
+                                该空间拥有专属属性定义。
                             </div>
                         </div>
                     </MudRadio>
@@ -46,6 +48,32 @@
                         </div>
                     </MudRadio>
                 </MudRadioGroup>
+
+                @* ★ 独立模式时可选模板 *@
+                @if (_mode == "independent")
+                {
+                    <MudSelect T="string?"
+                               @bind-Value="_templateEntityType"
+                               Label="从模板复制属性（可选）"
+                               Clearable="true"
+                               Placeholder="不复制，从空白开始"
+                               Disabled="_templatesLoading">
+                        @foreach (var t in _templates)
+                        {
+                            <MudSelectItem Value="@t.EntityType">
+                                @t.DisplayName
+                                <span class="text-caption text-grey ml-2">
+                                    (@ShortType(t.EntityType))
+                                </span>
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    @if (_templatesLoading)
+                    {
+                        <MudProgressLinear Indeterminate="true" />
+                    }
+                }
             }
         </MudStack>
     </DialogContent>
@@ -66,9 +94,41 @@
     [Parameter] public bool IsNew { get; set; }
 
     private bool _saving;
-
-    /// <summary>"independent" | "shared"。仅新建时生效。</summary>
     private string _mode = "independent";
+
+    // ★ 模板相关
+    private string? _templateEntityType;
+    private List<EntityTypeSummaryDto> _templates = new();
+    private bool _templatesLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsNew)
+            await LoadTemplatesAsync();
+    }
+
+    private async Task LoadTemplatesAsync()
+    {
+        _templatesLoading = true;
+        try
+        {
+            var list = await EavApi.ListEntityTypesAsync() ?? new List<EntityTypeSummaryDto>();
+
+            // 过滤掉当前空间自己（新建时不会出现，但保险）
+            _templates = list
+                .Where(t => t.EntityType != Space.EntityType)
+                .OrderBy(t => t.DisplayName)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载模板列表失败：{ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            _templatesLoading = false;
+        }
+    }
 
     private async Task SaveAsync()
     {
@@ -79,10 +139,14 @@
         {
             if (IsNew)
             {
-                // ★ 根据模式决定 EntityType
                 Space.EntityType = _mode == "shared"
                     ? StringTreeEntityTypes.Node
-                    : "auto";   // 后端生成独立 EntityType
+                    : "auto";
+
+                // ★ 独立模式才传模板
+                Space.TemplateEntityType = (_mode == "independent" && !string.IsNullOrWhiteSpace(_templateEntityType))
+                    ? _templateEntityType
+                    : null;
 
                 var created = await SpaceClient.CreateSpaceAsync(Space);
                 Snackbar.Add($"空间「{created.Name}」已创建", Severity.Success);
@@ -110,4 +174,14 @@
     }
 
     private void Cancel() => MudDialog?.Cancel();
+
+    private static string ShortType(string entityType)
+    {
+        if (string.IsNullOrEmpty(entityType)) return "";
+        // "StringTreeNode:abc-def..." → "abc-def…"
+        var idx = entityType.IndexOf(':');
+        if (idx < 0) return entityType;
+        var suffix = entityType[(idx + 1)..];
+        return suffix.Length <= 8 ? suffix : suffix[..8] + "…";
+    }
 }
