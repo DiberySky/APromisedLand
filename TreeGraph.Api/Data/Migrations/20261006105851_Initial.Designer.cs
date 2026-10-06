@@ -13,8 +13,8 @@ using TreeGraph.Api.NodeEavSky.Data;
 namespace TreeGraph.Api.NodeEavSky.Data.Migrations
 {
     [DbContext(typeof(EavDbContext))]
-    [Migration("20261006104604_AddStringTreeSkyNodes")]
-    partial class AddStringTreeSkyNodes
+    [Migration("20261006105851_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
