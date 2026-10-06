@@ -1,0 +1,120 @@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky
+@using System.Text.Json
+@using TreeGraph.StringTree.Contracts
+@using TreeGraph.Shared.Eav.Dtos
+@using TreeGraph.Blazor.Shared.NodeEav.Components
+@using TreeGraph.Blazor.Shared.NodeEav.Services
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+@* StringTree 节点动态 EAV 属性对话框。
+   直接复用 NodeEav 体系：EavApiClient + DynamicForm，
+   EntityType 固定 StringTreeNode；节点 Id 本身就是 GUID，直接作为 EntityId。 *@
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">节点属性 · @NodeName</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div class="d-flex justify-center pa-4">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else if (_schema.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">
+                当前节点未定义动态属性。请先在 EAV 元数据页为
+                <code>@StringTreeEntityTypes.Node</code> 配置属性定义。
+            </MudAlert>
+        }
+        else
+        {
+            @if (_tableAttributes.Count > 0)
+            {
+                <MudAlert Severity="Severity.Info" Dense Class="mb-3">
+                    子表类型属性（@string.Join("、", _tableAttributes.Select(a => a.DisplayName))）请在实体编辑页维护，本对话框不包含。
+                </MudAlert>
+            }
+            <DynamicForm @ref="_form"
+                         EntityType="@StringTreeEntityTypes.Node"
+                         EntityId="@NodeId"
+                         Schema="_schema"
+                         CompactLayout="true"
+                         OnSubmit="HandleSubmitAsync" />
+        }
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public string NodeId { get; set; } = string.Empty;
+    [Parameter] public string NodeName { get; set; } = string.Empty;
+
+    // 子表属性由独立组件/端点维护，本对话框只处理常规属性
+    private IReadOnlyList<AttributeSchemaDto> _schema = Array.Empty<AttributeSchemaDto>();
+    private List<AttributeSchemaDto> _tableAttributes = new();
+    private Dictionary<string, JsonElement> _props = new();
+    private DynamicForm? _form;
+    private bool _loading = true;
+    private bool _valuesLoaded;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var schema = await Api.GetSchemaAsync(StringTreeEntityTypes.Node);
+                _schema = (schema ?? Array.Empty<AttributeSchemaDto>())
+                    .Where(a => a.DataType != "table")
+                    .ToList();
+                _tableAttributes = (schema ?? Array.Empty<AttributeSchemaDto>())
+                    .Where(a => a.DataType == "table")
+                    .ToList();
+
+                var entity = await Api.GetEntityAsync(
+                    StringTreeEntityTypes.Node, NodeId);
+                if (entity is not null)
+                    _props = new Dictionary<string, JsonElement>(entity.Properties);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"加载属性失败：{ex.Message}", Severity.Error);
+            }
+            finally
+            {
+                _loading = false;
+            }
+
+            // 触发渲染 DynamicForm（本帧仍是 loading 占位，@ref 尚未赋值）
+            StateHasChanged();
+            return;
+        }
+
+        // 第二帧：DynamicForm 已渲染，灌入已有值
+        if (!_valuesLoaded && !_loading && _schema.Count > 0 && _form is not null)
+        {
+            if (_props.Count > 0) _form.LoadFrom(_props);
+            _valuesLoaded = true;
+        }
+    }
+
+    private async Task HandleSubmitAsync(Dictionary<string, object?> values)
+    {
+        var (ok, error, _) = await Api.SaveEntityAsync(
+            StringTreeEntityTypes.Node, NodeId, values);
+
+        if (ok)
+        {
+            Snackbar.Add("属性已保存", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add($"保存失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+}

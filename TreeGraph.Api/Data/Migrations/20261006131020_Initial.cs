@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -154,10 +153,9 @@ namespace TreeGraph.Api.NodeEavSky.Data.Migrations
                 name: "string_tree_sky_nodes",
                 columns: table => new
                 {
-                    id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
                     name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    parent_id = table.Column<int>(type: "integer", nullable: true),
+                    parent_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     sort_order = table.Column<int>(type: "integer", nullable: false),
                     description = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),

@@ -48,7 +48,7 @@ public class EavDbContext : DbContext
     }
 
     // ============================================================
-    // StringTreeSky：StringNodeEntity 树节点（int 自增主键）
+    // StringTreeSky：StringNodeEntity 树节点（GUID 字符串主键）
     // ============================================================
     private static void ConfigureStringTreeSkyNodes(ModelBuilder mb)
     {
@@ -56,9 +56,13 @@ public class EavDbContext : DbContext
         {
             e.ToTable("string_tree_sky_nodes");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Id)
+                .HasColumnName("id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
             e.Property(x => x.Name).HasColumnName("name").HasMaxLength(256).IsRequired();
-            e.Property(x => x.ParentId).HasColumnName("parent_id");
+            e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
             e.Property(x => x.SortOrder).HasColumnName("sort_order");
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1024);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");

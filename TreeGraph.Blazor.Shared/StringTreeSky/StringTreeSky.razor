@@ -59,6 +59,7 @@
                             {
                                 <button class="btn btn-sm btn-link" @onclick="() => StartEdit(row.Node)">重命名</button>
                             }
+                            <button class="btn btn-sm btn-link" @onclick="() => OpenPropertiesAsync(row.Node)">属性</button>
                             @if (Options.AllowDelete)
                             {
                                 <button class="btn btn-sm btn-link text-danger" @onclick="() => DeleteAsync(row)">删除</button>

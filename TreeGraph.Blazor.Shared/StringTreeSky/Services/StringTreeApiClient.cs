@@ -20,17 +20,17 @@ public class StringTreeApiClient : IStringTreeClient
     public Task<List<StringNodeDto>> GetRootNodesAsync(CancellationToken ct = default)
         => GetListAsync($"{_basePath}/nodes/roots", ct);
 
-    public Task<List<StringNodeDto>> GetChildrenAsync(int parentId, CancellationToken ct = default)
+    public Task<List<StringNodeDto>> GetChildrenAsync(string parentId, CancellationToken ct = default)
         => GetListAsync($"{_basePath}/nodes/children/{parentId}", ct);
 
-    public async Task<StringNodeDto?> GetNodeAsync(int id, CancellationToken ct = default)
+    public async Task<StringNodeDto?> GetNodeAsync(string id, CancellationToken ct = default)
     {
         var resp = await _http.GetFromJsonAsync<StringTreeResponse<StringNodeDto>>(
             $"{_basePath}/nodes/{id}", ct);
         return resp?.Data;
     }
 
-    public Task<List<StringNodeDto>> GetAncestorPathAsync(int id, CancellationToken ct = default)
+    public Task<List<StringNodeDto>> GetAncestorPathAsync(string id, CancellationToken ct = default)
         => GetListAsync($"{_basePath}/nodes/{id}/ancestors", ct);
 
     public async Task<StringNodeDto> CreateNodeAsync(StringNodeDto dto, CancellationToken ct = default)
@@ -50,20 +50,20 @@ public class StringTreeApiClient : IStringTreeClient
         return result?.Data;
     }
 
-    public async Task<bool> DeleteNodeAsync(int id, CancellationToken ct = default)
+    public async Task<bool> DeleteNodeAsync(string id, CancellationToken ct = default)
     {
         var resp = await _http.DeleteAsync($"{_basePath}/nodes/{id}", ct);
         return resp.IsSuccessStatusCode;
     }
 
-    public async Task<bool> MoveNodeAsync(int id, int? newParentId, int newSortOrder, CancellationToken ct = default)
+    public async Task<bool> MoveNodeAsync(string id, string? newParentId, int newSortOrder, CancellationToken ct = default)
     {
         var payload = new { ParentId = newParentId, SortOrder = newSortOrder };
         var resp = await _http.PostAsJsonAsync($"{_basePath}/nodes/{id}/move", payload, ct);
         return resp.IsSuccessStatusCode;
     }
 
-    public async Task<bool> SortChildrenAsync(int parentId, IReadOnlyList<int> orderedIds, CancellationToken ct = default)
+    public async Task<bool> SortChildrenAsync(string parentId, IReadOnlyList<string> orderedIds, CancellationToken ct = default)
     {
         var resp = await _http.PostAsJsonAsync($"{_basePath}/nodes/{parentId}/children/sort", orderedIds, ct);
         return resp.IsSuccessStatusCode;

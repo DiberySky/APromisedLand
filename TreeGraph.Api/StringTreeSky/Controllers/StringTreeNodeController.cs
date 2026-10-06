@@ -15,12 +15,12 @@ public class StringTreeNodeController : ControllerBase
     public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetRoots(CancellationToken ct)
         => Ok(StringTreeResponse<List<StringNodeDto>>.Ok(await _service.GetRootNodesAsync(ct)));
 
-    [HttpGet("nodes/children/{parentId:int}")]
-    public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetChildren(int parentId, CancellationToken ct)
+    [HttpGet("nodes/children/{parentId}")]
+    public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetChildren(string parentId, CancellationToken ct)
         => Ok(StringTreeResponse<List<StringNodeDto>>.Ok(await _service.GetChildrenAsync(parentId, ct)));
 
-    [HttpGet("nodes/{id:int}")]
-    public async Task<ActionResult<StringTreeResponse<StringNodeDto>>> GetNode(int id, CancellationToken ct)
+    [HttpGet("nodes/{id}")]
+    public async Task<ActionResult<StringTreeResponse<StringNodeDto>>> GetNode(string id, CancellationToken ct)
     {
         var node = await _service.GetNodeAsync(id, ct);
         return node is null
@@ -28,8 +28,8 @@ public class StringTreeNodeController : ControllerBase
             : Ok(StringTreeResponse<StringNodeDto>.Ok(node));
     }
 
-    [HttpGet("nodes/{id:int}/ancestors")]
-    public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetAncestors(int id, CancellationToken ct)
+    [HttpGet("nodes/{id}/ancestors")]
+    public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetAncestors(string id, CancellationToken ct)
         => Ok(StringTreeResponse<List<StringNodeDto>>.Ok(await _service.GetAncestorPathAsync(id, ct)));
 
     [HttpPost("nodes")]
@@ -40,9 +40,9 @@ public class StringTreeNodeController : ControllerBase
         return Ok(StringTreeResponse<StringNodeDto>.Ok(created));
     }
 
-    [HttpPut("nodes/{id:int}")]
+    [HttpPut("nodes/{id}")]
     public async Task<ActionResult<StringTreeResponse<StringNodeDto>>> Update(
-        int id, [FromBody] StringNodeDto dto, CancellationToken ct)
+        string id, [FromBody] StringNodeDto dto, CancellationToken ct)
     {
         var updated = await _service.UpdateNodeAsync(id, dto, ct);
         return updated is null
@@ -50,8 +50,8 @@ public class StringTreeNodeController : ControllerBase
             : Ok(StringTreeResponse<StringNodeDto>.Ok(updated));
     }
 
-    [HttpDelete("nodes/{id:int}")]
-    public async Task<ActionResult<StringTreeResponse<bool>>> Delete(int id, CancellationToken ct)
+    [HttpDelete("nodes/{id}")]
+    public async Task<ActionResult<StringTreeResponse<bool>>> Delete(string id, CancellationToken ct)
     {
         var ok = await _service.DeleteNodeAsync(id, ct);
         return ok
@@ -59,9 +59,9 @@ public class StringTreeNodeController : ControllerBase
             : NotFound(StringTreeResponse<bool>.Fail("节点不存在"));
     }
 
-    [HttpPost("nodes/{id:int}/move")]
+    [HttpPost("nodes/{id}/move")]
     public async Task<ActionResult<StringTreeResponse<bool>>> Move(
-        int id, [FromBody] MoveRequest req, CancellationToken ct)
+        string id, [FromBody] MoveRequest req, CancellationToken ct)
     {
         var ok = await _service.MoveNodeAsync(id, req.ParentId, req.SortOrder, ct);
         return ok
@@ -69,9 +69,9 @@ public class StringTreeNodeController : ControllerBase
             : BadRequest(StringTreeResponse<bool>.Fail("移动失败：节点不存在或会形成环"));
     }
 
-    [HttpPost("nodes/{parentId:int}/children/sort")]
+    [HttpPost("nodes/{parentId}/children/sort")]
     public async Task<ActionResult<StringTreeResponse<bool>>> Sort(
-        int parentId, [FromBody] List<int> orderedIds, CancellationToken ct)
+        string parentId, [FromBody] List<string> orderedIds, CancellationToken ct)
     {
         var ok = await _service.SortChildrenAsync(parentId, orderedIds, ct);
         return ok
@@ -81,7 +81,7 @@ public class StringTreeNodeController : ControllerBase
 
     public class MoveRequest
     {
-        public int? ParentId { get; set; }
+        public string? ParentId { get; set; }
         public int SortOrder { get; set; }
     }
 }

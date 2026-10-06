@@ -1010,12 +1010,12 @@ namespace TreeGraph.Api.NodeEavSky.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.StringTreeSky.Entities.StringNodeEntity", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1032,8 +1032,9 @@ namespace TreeGraph.Api.NodeEavSky.Data.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("name");
 
-                    b.Property<int?>("ParentId")
-                        .HasColumnType("integer")
+                    b.Property<string>("ParentId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("parent_id");
 
                     b.Property<int>("SortOrder")

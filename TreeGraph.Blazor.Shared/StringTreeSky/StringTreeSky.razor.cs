@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using MudBlazor;
 using TreeGraph.StringTree.Contracts;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
 
@@ -9,6 +10,8 @@ public partial class StringTreeSky : ComponentBase
 {
     [Parameter] public EventCallback<StringNodeDto> OnNodeSelected { get; set; }
     [Parameter] public EventCallback OnTreeChanged { get; set; }
+
+    [Inject] private IDialogService DialogService { get; set; } = default!;
 
     private sealed class Row
     {
@@ -20,10 +23,10 @@ public partial class StringTreeSky : ComponentBase
 
     private readonly List<Row> _all = new();
     private List<Row> _visible = new();
-    private readonly HashSet<int> _expandedIds = new();
+    private readonly HashSet<string> _expandedIds = new();
     private bool _loading;
 
-    private int? _editingId;
+    private string? _editingId;
     private string _editingName = string.Empty;
 
     protected override async Task OnInitializedAsync() => await ReloadAsync();
@@ -129,21 +132,21 @@ public partial class StringTreeSky : ComponentBase
     private bool IsVisible(Row row)
     {
         var current = row.Node;
-        while (current.ParentId.HasValue)
+        while (current.ParentId is not null)
         {
-            if (!_expandedIds.Contains(current.ParentId.Value)) return false;
-            var parentRow = _all.FirstOrDefault(r => r.Node.Id == current.ParentId.Value);
+            if (!_expandedIds.Contains(current.ParentId)) return false;
+            var parentRow = _all.FirstOrDefault(r => r.Node.Id == current.ParentId);
             if (parentRow == null) return false;
             current = parentRow.Node;
         }
         return true;
     }
 
-    private void RemoveDescendants(int parentId)
+    private void RemoveDescendants(string parentId)
     {
-        var stack = new Stack<int>();
+        var stack = new Stack<string>();
         stack.Push(parentId);
-        var toRemove = new List<int>();
+        var toRemove = new List<string>();
         while (stack.Count > 0)
         {
             var id = stack.Pop();
@@ -182,6 +185,26 @@ public partial class StringTreeSky : ComponentBase
 
         RebuildVisible();
         await NotifyChangedAsync();
+    }
+
+    private async Task OpenPropertiesAsync(StringNodeDto node)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(StringNodePropertiesDialog.NodeId), node.Id },
+            { nameof(StringNodePropertiesDialog.NodeName), node.Name }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        var dialog = await DialogService.ShowAsync<StringNodePropertiesDialog>(
+            "节点属性", parameters, options);
+        await dialog.Result;
     }
 
     private void StartEdit(StringNodeDto node)
