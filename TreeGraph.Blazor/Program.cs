@@ -45,11 +45,11 @@ builder.Services.AddHttpClient("TreeSky", client =>
 
 // ★ StringTreeSky（T=string 树）：Noop Handler 用 TryAdd 注册，
 //   必须在宿主自定义 Handler 之前，下面的 AddScoped 才能覆盖默认值。
-builder.Services.AddStringTreeSky();
+builder.Services.AddLegacyTreeSky();
 
 // ★ StringTreeSky（T=string 树）：HTTP 版数据源 + 操作 Handler，
 //   桥接 DiberyTreeApiClient<StringTreeNode> → /StringTreeNode/* 端点。
-//   Noop Handler 由 AddStringTreeSky() 内部 TryAdd 注册，在此之前已执行，
+//   Noop Handler 由 AddLegacyTreeSky() 内部 TryAdd 注册，在此之前已执行，
 //   下面的 AddScoped 覆盖默认 Noop。
 builder.Services.AddScoped<IStringTreeDataSource, ApiStringTreeDataSource>();
 builder.Services.AddScoped<IStringTreeActionHandler, ApiStringTreeActionHandler>();

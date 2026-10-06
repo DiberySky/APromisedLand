@@ -131,7 +131,7 @@ public class StringTreeSkyComponentTests : BunitTestBase {
         Services.AddMudServices();
         Services.AddSingleton<IPlatformContext>(new FakePlatformContext());
         Services.AddScoped<MessageService>();
-        Services.AddStringTreeSky();
+        Services.AddLegacyTreeSky();
         Services.AddSingleton<IStringTreeDataSource>(_dataSource);
         Services.AddSingleton<IStringTreeActionHandler, StubActionHandler>();
     }

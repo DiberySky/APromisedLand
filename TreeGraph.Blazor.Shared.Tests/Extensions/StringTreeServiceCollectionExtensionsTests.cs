@@ -9,7 +9,7 @@ using Xunit;
 namespace TreeGraph.Blazor.Shared.Tests.Extensions;
 
 /// <summary>
-/// AddStringTreeSky DI 冒烟：
+/// AddLegacyTreeSky DI 冒烟：
 ///   - 默认注册 NoopStringTreeActionHandler
 ///   - 宿主可后注册覆盖
 ///   - 生命周期 Scoped
@@ -22,12 +22,12 @@ public class StringTreeServiceCollectionExtensionsTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddMudServices();
-        services.AddStringTreeSky();
+        services.AddLegacyTreeSky();
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
     }
 
     [Fact]
-    public void AddStringTreeSky_ResolvesDefaultNoopHandler()
+    public void AddLegacyTreeSky_ResolvesDefaultNoopHandler()
     {
         using var provider = BuildProvider();
         using var scope = provider.CreateScope();
@@ -39,7 +39,7 @@ public class StringTreeServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddStringTreeSky_ResolvesDialogService()
+    public void AddLegacyTreeSky_ResolvesDialogService()
     {
         using var provider = BuildProvider();
         using var scope = provider.CreateScope();
@@ -49,11 +49,11 @@ public class StringTreeServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddStringTreeSky_HostRegistrationAfterCall_OverridesDefault()
+    public void AddLegacyTreeSky_HostRegistrationAfterCall_OverridesDefault()
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddStringTreeSky();
+        services.AddLegacyTreeSky();
 
         // 宿主覆盖
         var mock = new Mock<IStringTreeActionHandler>().Object;
@@ -70,7 +70,7 @@ public class StringTreeServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddStringTreeSky_DefaultHandler_IsScoped()
+    public void AddLegacyTreeSky_DefaultHandler_IsScoped()
     {
         using var provider = BuildProvider();
 

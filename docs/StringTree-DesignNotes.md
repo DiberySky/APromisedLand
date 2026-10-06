@@ -11,7 +11,7 @@
 | 数据层 | `StringNodeMeta` / `StringNodeAction` 模型；`IStringTreeDataSource` / `IStringTreeActionHandler` 接口；`NoopStringTreeActionHandler` | `TreeGraph.Blazor.Shared/Trees/StringTree/Models+Services/` |
 | 合同层 | `StringNodeActionResult` / `StringNodeTemplate` / `StringParentSelectResult` | `.../Contracts/` |
 | 对话框层 | `StringTreeDialogService` + 5 对话框（Actions / View / Edit / Sort / ParentSelect） | `.../Services+Components/` |
-| 主组件 | `StringTreeSky` + 4 partial（Action / Loading / Node / 参数）+ `AddStringTreeSky` | `.../Components/` + `.../Extensions/` |
+| 主组件 | `StringTreeSky` + 4 partial（Action / Loading / Node / 参数）+ `AddLegacyTreeSky` | `.../Components/` + `.../Extensions/` |
 | 内存示例 | `InMemoryStringTreeStore` / `DataSource` / `ActionHandler` | `TreeGraph.Blazor/Services/DemoTree/` |
 | 演示页 | `/string-tree-demo` | `TreeGraph.Blazor/Components/Pages/StringTreeDemo.razor` |
 
