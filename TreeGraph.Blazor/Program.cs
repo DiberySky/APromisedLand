@@ -11,6 +11,7 @@ using TreeGraph.Blazor.Shared.Trees.StringTree.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
+using TreeGraph.Blazor.Shared.Responsive.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +63,7 @@ builder.Services.AddSingleton<StringTreeSkyOptions>(_ => new StringTreeSkyOption
 {
     BasePath = "api/string-tree",
     DefaultExpandLevel = 1,
+    AllowFilter = true,
 });
 builder.Services
     .AddHttpClient<IStringTreeClient, StringTreeApiClient>(client =>
@@ -69,6 +71,23 @@ builder.Services
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
     })
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+// ★ 空间客户端（api/string-tree/spaces）：与 StringTreeApiClient 同地址、同弹性策略。
+builder.Services
+    .AddHttpClient<ISpaceClient, SpaceApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+// ★ 节点属性摘要 + Schema 缓存（增强项，默认旁路：SummaryAttributeNames 为空即零请求）。
+//   解耦版 AddStringTreeSky 扩展内含同注册；宿主手工注册 IStringTreeClient，
+//   故此处补注册，避免组件 [Inject] 无法解析。
+builder.Services.AddScoped<NodeSchemaCache>();
+builder.Services.AddScoped<NodePropertySummaryService>();
+
+// ★ 通用响应式模块（ResponsiveView / ResponsiveSplit 的 ViewportService）。
+builder.Services.AddResponsive();
 
 // ★ StringTreeSky 内存演示（备用，未注册）：
 //   InMemoryStringTreeStore / InMemoryStringTreeDataSource / InMemoryStringTreeActionHandler

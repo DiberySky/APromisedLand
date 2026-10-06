@@ -15,7 +15,11 @@ public static class StringTreeServiceCollectionExtensions
         var options = new StringTreeSkyOptions();
         configure?.Invoke(options);
         services.AddSingleton(options);
+        services.AddScoped<NodeSchemaCache>();
         services.AddScoped<IStringTreeClient, StringTreeApiClient>();
+        services.AddScoped<ISpaceClient, SpaceApiClient>();
+        services.AddScoped<NodePropertySummaryService>();
+        // ViewportService 由 AddResponsive() 提供（宿主 Program.cs 调用）
         return services;
     }
 }

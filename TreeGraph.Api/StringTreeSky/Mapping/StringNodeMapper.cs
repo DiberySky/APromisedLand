@@ -12,6 +12,9 @@ public static class StringNodeMapper
         ParentId = e.ParentId,
         SortOrder = e.SortOrder,
         Description = e.Description,
+        EntityType = string.IsNullOrEmpty(e.EntityType)
+            ? StringTreeEntityTypes.Node
+            : e.EntityType,
         HasChildren = hasChildren
     };
 }

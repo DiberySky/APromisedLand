@@ -1,3 +1,5 @@
+using TreeGraph.StringTree.Contracts;
+
 namespace TreeGraph.Api.StringTreeSky.Entities;
 
 public class StringNodeEntity
@@ -8,6 +10,10 @@ public class StringNodeEntity
     public string? ParentId { get; set; }
     public int SortOrder { get; set; }
     public string? Description { get; set; }
+
+    /// <summary>EAV EntityType（子节点继承父节点）。</summary>
+    public string EntityType { get; set; } = StringTreeEntityTypes.Node;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

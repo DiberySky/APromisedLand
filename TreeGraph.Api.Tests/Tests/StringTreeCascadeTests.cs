@@ -111,4 +111,66 @@ public class StringTreeCascadeTests(EavApiFactory factory) : IntegrationTestBase
             await Client.DeleteAsync($"{TreeBase}/{other.Id}");
         }
     }
+
+    /// <summary>
+    /// 归属守卫：StringTreeNode 的属性实体必须附属于已存在的 tree node，
+    /// 禁止用任意 GUID 凭空 PUT。
+    /// </summary>
+    [Fact]
+    public async Task PutProperty_OnNonExistentNode_IsRejected()
+    {
+        await EnsureSchemaAsync();
+
+        var ghostId = Guid.NewGuid().ToString("D");
+        // 该 GUID 不是任何 tree node
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Client.GetAsync($"{TreeBase}/{ghostId}")).StatusCode);
+
+        var resp = await Client.PutAsJsonAsync(
+            $"/api/eav/{StringTreeEntityTypes.Node}/entities/{ghostId}",
+            new Dictionary<string, object?> { [AttrName] = "无主属性" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    /// <summary>合法附属：对真实存在的节点 PUT 属性应成功。</summary>
+    [Fact]
+    public async Task PutProperty_OnExistingNode_Succeeds()
+    {
+        await EnsureSchemaAsync();
+        var node = await CreateNodeAsync("归属校验节点");
+        try
+        {
+            await PutNoteAsync(node.Id, "附属值");
+            Assert.True(await HasNoteAsync(node.Id));
+        }
+        finally
+        {
+            await Client.DeleteAsync($"{TreeBase}/{node.Id}");
+        }
+    }
+
+    /// <summary>
+    /// iNode 路径不能为 StringTreeNode 另发随机 entityId：
+    /// 生成的 entityId 不在节点表，守卫必须拒绝，封死身份分叉。
+    /// </summary>
+    [Fact]
+    public async Task PutViaInodePath_ForStringTreeNode_IsRejected()
+    {
+        await EnsureSchemaAsync();
+        var node = await CreateNodeAsync("inode 分叉守门节点");
+        try
+        {
+            var resp = await Client.PutAsJsonAsync(
+                $"/api/inode/{node.Id}/entities/{StringTreeEntityTypes.Node}",
+                new Dictionary<string, object?> { [AttrName] = "分叉值" });
+
+            // EavValidationException 统一映射为 400
+            Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        }
+        finally
+        {
+            await Client.DeleteAsync($"{TreeBase}/{node.Id}");
+        }
+    }
 }

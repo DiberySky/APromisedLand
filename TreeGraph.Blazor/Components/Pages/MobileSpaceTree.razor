@@ -1,0 +1,118 @@
+@using TreeGraph.StringTree.Contracts
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+@using TreeGraph.Blazor.Shared.StringTreeSky
+@inject ISpaceClient SpaceClient
+@inject IDialogService DialogService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<div class="space-tree-page">
+    <div class="space-tree-page__appbar">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                       Size="Size.Large"
+                       OnClick="GoBackAsync" />
+        <div class="space-tree-page__title">
+            @if (_loading)
+            {
+                <MudSkeleton Width="120px" Height="20px" />
+            }
+            else
+            {
+                <span>@(_space?.Name ?? "未找到空间")</span>
+            }
+        </div>
+        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                       Size="Size.Medium"
+                       Disabled="@(_space is null)"
+                       OnClick="OpenEditDialogAsync" />
+    </div>
+
+    @if (_space is not null && !string.IsNullOrEmpty(_space.Description))
+    {
+        <div class="space-tree-page__desc">@_space.Description</div>
+    }
+
+    <div class="space-tree-page__content">
+        @if (_loading)
+        {
+            <div class="d-flex justify-center pa-6">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else if (_space is null)
+        {
+            <div class="space-tree-page__empty">
+                <MudIcon Icon="@Icons.Material.Filled.ErrorOutline"
+                         Style="font-size:48px;color:#bbb" />
+                <MudText Typo="Typo.h6" Class="text-grey mt-3">空间不存在</MudText>
+                <MudButton Class="mt-3" Variant="Variant.Outlined" OnClick="GoBackAsync">
+                    返回列表
+                </MudButton>
+            </div>
+        }
+        else
+        {
+            <StringTreeSky @key="_space.Id"
+                           RootNodeId="_space.Id"
+                           ExplicitEntityType="_space.EntityType" />
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string SpaceId { get; set; } = "";
+
+    private SpaceDto? _space;
+    private bool _loading = true;
+    private string? _lastSpaceId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_lastSpaceId == SpaceId) return;
+        _lastSpaceId = SpaceId;
+
+        _loading = true;
+        try { _space = await SpaceClient.GetSpaceAsync(SpaceId); }
+        catch (Exception ex) { Snackbar.Add($"加载失败：{ex.Message}", Severity.Error); _space = null; }
+        finally { _loading = false; }
+    }
+
+    private void GoBackAsync() => Nav.NavigateTo("/spaces");
+
+    private async Task OpenEditDialogAsync()
+    {
+        if (_space is null) return;
+        var copy = new SpaceDto { Id = _space.Id, Name = _space.Name, Description = _space.Description };
+        var parameters = new DialogParameters
+        {
+            { nameof(SpaceEditDialog.Space), copy },
+            { nameof(SpaceEditDialog.IsNew), false }
+        };
+        var dialog = await DialogService.ShowAsync<SpaceEditDialog>("编辑空间", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            _space = await SpaceClient.GetSpaceAsync(SpaceId);
+            StateHasChanged();
+        }
+    }
+}
+
+<style>
+    .space-tree-page { display: flex; flex-direction: column; height: 100%; background: #fff; }
+    .space-tree-page__appbar {
+        display: flex; align-items: center;
+        padding: 0 8px;
+        padding-top: env(safe-area-inset-top, 0);
+        height: calc(56px + env(safe-area-inset-top, 0));
+        background: #fff; border-bottom: 1px solid #e0e0e0; flex-shrink: 0;
+    }
+    .space-tree-page__title { flex: 1; margin: 0 8px; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .space-tree-page__desc { padding: 8px 16px; font-size: 13px; color: #666; background: #fafafa; border-bottom: 1px solid #eee; }
+    .space-tree-page__content {
+        flex: 1; overflow-y: auto; padding: 8px;
+        padding-bottom: env(safe-area-inset-bottom, 8px);
+        -webkit-overflow-scrolling: touch;
+    }
+    .space-tree-page__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 300px; }
+</style>

@@ -15,7 +15,7 @@
                 {
                     case EavDataTypes.String:
                         <StringField Attr="attr"
-                                     Value="GetString(attr.AttributeName)"
+                                     Value="@GetString(attr.AttributeName)"
                                      ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
@@ -62,7 +62,7 @@
 
                     case EavDataTypes.SingleChoice:
                         <SingleChoiceField Attr="attr"
-                                           Value="GetString(attr.AttributeName)"
+                                           Value="@GetString(attr.AttributeName)"
                                            ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
@@ -90,7 +90,7 @@
                     case EavDataTypes.Json:
                         @* json：StringField 兜底，原文本编辑 *@
                         <StringField Attr="attr"
-                                     Value="GetJsonText(attr.AttributeName)"
+                                     Value="@GetJsonText(attr.AttributeName)"
                                      ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 

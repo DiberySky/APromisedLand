@@ -1,0 +1,138 @@
+@* ResponsiveSplit.razor
+   桌面双列布局：左（可调宽）+ 拖拽条 + 右。
+   宽度持久化到 localStorage（key = StorageKey）。
+
+   手机时本组件不参与渲染（由外层 ResponsiveView 分派）。 *@
+@namespace TreeGraph.Blazor.Shared.Responsive
+@using Microsoft.JSInterop
+@using TreeGraph.Blazor.Shared.Responsive
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="responsive-split @(_dragging ? "responsive-split--dragging" : "")"
+     style="--left-width: @(_leftWidth)px">
+
+    <div class="responsive-split__left">
+        @Left
+    </div>
+
+    <div class="responsive-split__divider"
+         @onpointerdown="StartDragAsync"
+         @ondblclick="ResetWidthAsync"
+         title="拖动调整宽度，双击重置">
+        <div class="responsive-split__grip"></div>
+    </div>
+
+    <div class="responsive-split__right">
+        @Right
+    </div>
+</div>
+
+@code {
+    [Parameter] public RenderFragment? Left { get; set; }
+    [Parameter] public RenderFragment? Right { get; set; }
+
+    /// <summary>初始宽度（px）。默认 260。</summary>
+    [Parameter] public int DefaultWidth { get; set; } = 260;
+
+    /// <summary>最小宽度（px）。</summary>
+    [Parameter] public int MinWidth { get; set; } = 160;
+
+    /// <summary>最大宽度（px）。</summary>
+    [Parameter] public int MaxWidth { get; set; } = 600;
+
+    /// <summary>
+    /// localStorage 键名。非空时自动持久化宽度。
+    /// 建议格式："模块名-split"（如 "spaces-split"）。
+    /// </summary>
+    [Parameter] public string? StorageKey { get; set; }
+
+    /// <summary>宽度变化时回调（可选）。</summary>
+    [Parameter] public EventCallback<int> WidthChanged { get; set; }
+
+    private int _leftWidth;
+    private bool _dragging;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _leftWidth = DefaultWidth;
+
+        // 从 localStorage 恢复
+        if (!string.IsNullOrEmpty(StorageKey))
+        {
+            try
+            {
+                var stored = await JS.InvokeAsync<string?>("responsive.getLocal", StorageKey);
+                if (int.TryParse(stored, out var w))
+                    _leftWidth = Math.Clamp(w, MinWidth, MaxWidth);
+            }
+            catch { /* 忽略 */ }
+        }
+    }
+
+    // ============ 拖拽 ============
+
+    private async Task StartDragAsync(PointerEventArgs e)
+    {
+        _dragging = true;
+        StateHasChanged();
+
+        try
+        {
+            await JS.InvokeVoidAsync("responsive.startDrag",
+                DotNetObjectReference.Create(this),
+                e.ClientX, _leftWidth, MinWidth, MaxWidth);
+        }
+        catch
+        {
+            _dragging = false;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void OnDragMove(int width)
+    {
+        if (width == _leftWidth) return;
+        _leftWidth = width;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnDragEnd()
+    {
+        _dragging = false;
+        await InvokeAsync(StateHasChanged);
+
+        if (!string.IsNullOrEmpty(StorageKey))
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("responsive.setLocal",
+                    StorageKey, _leftWidth.ToString());
+            }
+            catch { /* 忽略 */ }
+        }
+
+        if (WidthChanged.HasDelegate)
+            await WidthChanged.InvokeAsync(_leftWidth);
+    }
+
+    private async Task ResetWidthAsync()
+    {
+        _leftWidth = DefaultWidth;
+        if (!string.IsNullOrEmpty(StorageKey))
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("responsive.setLocal",
+                    StorageKey, DefaultWidth.ToString());
+            }
+            catch { /* 忽略 */ }
+        }
+        if (WidthChanged.HasDelegate)
+            await WidthChanged.InvokeAsync(_leftWidth);
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}

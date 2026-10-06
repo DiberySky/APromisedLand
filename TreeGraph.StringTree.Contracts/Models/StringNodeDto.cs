@@ -9,4 +9,7 @@ public class StringNodeDto
     public int SortOrder { get; set; }
     public bool HasChildren { get; set; }
     public string? Description { get; set; }
+
+    /// <summary>本节点使用的 EAV EntityType（子节点继承父节点）。</summary>
+    public string EntityType { get; set; } = StringTreeEntityTypes.Node;
 }

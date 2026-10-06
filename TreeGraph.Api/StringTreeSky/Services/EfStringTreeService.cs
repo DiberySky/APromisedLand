@@ -71,13 +71,39 @@ public class EfStringTreeService : IStringTreeService
 
     public async Task<StringNodeDto> CreateNodeAsync(StringNodeDto dto, CancellationToken ct = default)
     {
+        // 决定 EntityType：
+        //   1. 显式传入（非 "auto"）→ 用之
+        //   2. 有父节点 → 继承父节点
+        //   3. 无父节点（根/空间）且未指定 → 默认共享（旧行为）；
+        //      独立类型由 SpaceController 显式指定
+        string entityType;
+        if (!string.IsNullOrWhiteSpace(dto.EntityType)
+            && dto.EntityType != "auto")
+        {
+            entityType = dto.EntityType;
+        }
+        else if (dto.ParentId is not null)
+        {
+            var parent = await _db.StringTreeSkyNodes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(n => n.Id == dto.ParentId, ct);
+            entityType = parent?.EntityType ?? StringTreeEntityTypes.Node;
+        }
+        else
+        {
+            entityType = StringTreeEntityTypes.Node;
+        }
+
         var entity = new StringNodeEntity
         {
-            Id = Guid.NewGuid().ToString("D"),
+            Id = string.IsNullOrWhiteSpace(dto.Id)
+                ? Guid.NewGuid().ToString("D")
+                : dto.Id,
             Name = dto.Name?.Trim() ?? "未命名",
             ParentId = dto.ParentId,
             Description = dto.Description,
-            SortOrder = await NextSortOrderAsync(dto.ParentId, ct)
+            SortOrder = await NextSortOrderAsync(dto.ParentId, ct),
+            EntityType = entityType
         };
         _db.StringTreeSkyNodes.Add(entity);
         await _db.SaveChangesAsync(ct);
@@ -117,14 +143,25 @@ public class EfStringTreeService : IStringTreeService
             await using var dbx = new EavDbContext(_options);
             await using var tx = await dbx.Database.BeginTransactionAsync(ct);
 
-            await dbx.AttributeValues
-                .Where(v => v.EntityType == StringTreeEntityTypes.Node && nodeIds.Contains(v.EntityId))
-                .ExecuteDeleteAsync(ct);
+            // ★ 按 (EntityType, EntityId) 分组清理：独立空间子树的
+            //    EntityType 为 "StringTreeNode:{spaceId}"，不能再按固定常量清理
+            var nodes = await dbx.StringTreeSkyNodes
+                .Where(n => nodeIds.Contains(n.Id))
+                .Select(n => new { n.Id, n.EntityType })
+                .ToListAsync(ct);
 
-            await dbx.CustomTableRows
-                .Where(r => r.ParentEntityType == StringTreeEntityTypes.Node
-                            && nodeIds.Contains(r.ParentEntityId))
-                .ExecuteDeleteAsync(ct);
+            foreach (var g in nodes.GroupBy(n => n.EntityType))
+            {
+                var ids = g.Select(x => x.Id).ToList();
+
+                await dbx.AttributeValues
+                    .Where(v => v.EntityType == g.Key && ids.Contains(v.EntityId))
+                    .ExecuteDeleteAsync(ct);
+
+                await dbx.CustomTableRows
+                    .Where(r => r.ParentEntityType == g.Key && ids.Contains(r.ParentEntityId))
+                    .ExecuteDeleteAsync(ct);
+            }
 
             // 3) 物理删除节点（递归）
             await DeleteRecursiveAsync(dbx, id, ct);

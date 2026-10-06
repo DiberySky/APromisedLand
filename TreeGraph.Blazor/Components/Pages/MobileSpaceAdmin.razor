@@ -1,0 +1,254 @@
+@using TreeGraph.StringTree.Contracts
+@using TreeGraph.Blazor.Shared.StringTreeSky
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+@inject ISpaceClient SpaceClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<div class="mobile-space-admin">
+
+    @* AppBar *@
+    <div class="mobile-space-admin__appbar">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                       Size="Size.Large"
+                       OnClick="GoBack" />
+        <div class="mobile-space-admin__title">空间管理</div>
+        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       OnClick="OpenCreateDialogAsync" />
+    </div>
+
+    @* 搜索 *@
+    <div class="mobile-space-admin__search">
+        <MudTextField T="string"
+                      @bind-Value="_keyword"
+                      @bind-Value:after="ApplyFilter"
+                      Placeholder="搜索名称或描述…"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Dense="true"
+                      Variant="Variant.Outlined"
+                      FullWidth="true" />
+    </div>
+
+    @* 列表 *@
+    @if (_loading)
+    {
+        <div class="d-flex justify-center pa-6">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else if (_filtered.Count == 0)
+    {
+        <div class="mobile-space-admin__empty">
+            <MudIcon Icon="@Icons.Material.Filled.FolderOpen"
+                     Style="font-size:56px;color:#bbb" />
+            <MudText Typo="Typo.body1" Class="text-grey mt-3">
+                @(string.IsNullOrEmpty(_keyword) ? "尚无空间" : "无匹配结果")
+            </MudText>
+            @if (string.IsNullOrEmpty(_keyword))
+            {
+                <MudButton Class="mt-3"
+                           Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="OpenCreateDialogAsync">
+                    创建第一个空间
+                </MudButton>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="mobile-space-admin__list">
+            @foreach (var space in _filtered)
+            {
+                <div class="admin-card">
+                    <div class="admin-card__icon">
+                        <MudIcon Icon="@Icons.Material.Filled.Folder"
+                                 Size="Size.Large"
+                                 Color="Color.Primary" />
+                    </div>
+                    <div class="admin-card__body" @onclick="() => OpenTreeAsync(space)">
+                        <div class="admin-card__name">@space.Name</div>
+                        @if (!string.IsNullOrEmpty(space.Description))
+                        {
+                            <div class="admin-card__desc">@space.Description</div>
+                        }
+                    </div>
+                    <div class="admin-card__actions" @onclick:stopPropagation="true">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Medium"
+                                       Title="编辑"
+                                       OnClick="() => OpenEditDialogAsync(space)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Medium"
+                                       Color="Color.Error"
+                                       Title="删除"
+                                       OnClick="() => ConfirmDeleteAsync(space)" />
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<SpaceDto> _spaces = new();
+    private List<SpaceDto> _filtered = new();
+    private bool _loading = true;
+    private string? _keyword;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _spaces = await SpaceClient.ListSpacesAsync();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        if (string.IsNullOrWhiteSpace(_keyword))
+        {
+            _filtered = _spaces.ToList();
+            return;
+        }
+        var kw = _keyword.Trim();
+        _filtered = _spaces.Where(s =>
+            (s.Name?.Contains(kw, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (s.Description?.Contains(kw, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToList();
+    }
+
+    private void OpenTreeAsync(SpaceDto space)
+        => Nav.NavigateTo($"/spaces/{Uri.EscapeDataString(space.Id)}");
+
+    private void GoBack() => Nav.NavigateTo("/spaces");
+
+    private async Task OpenCreateDialogAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(SpaceEditDialog.Space), new SpaceDto() },
+            { nameof(SpaceEditDialog.IsNew), true }
+        };
+        var dialog = await DialogService.ShowAsync<SpaceEditDialog>("新建空间", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false }) await ReloadAsync();
+    }
+
+    private async Task OpenEditDialogAsync(SpaceDto space)
+    {
+        var copy = new SpaceDto { Id = space.Id, Name = space.Name, Description = space.Description };
+        var parameters = new DialogParameters
+        {
+            { nameof(SpaceEditDialog.Space), copy },
+            { nameof(SpaceEditDialog.IsNew), false }
+        };
+        var dialog = await DialogService.ShowAsync<SpaceEditDialog>("编辑空间", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false }) await ReloadAsync();
+    }
+
+    private async Task ConfirmDeleteAsync(SpaceDto space)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "删除空间",
+            $"确定删除「{space.Name}」及其下所有子节点？",
+            yesText: "删除", noText: "取消");
+        if (confirmed != true) return;
+
+        var ok = await SpaceClient.DeleteSpaceAsync(space.Id);
+        if (ok)
+        {
+            Snackbar.Add("已删除", Severity.Success);
+            _spaces.RemoveAll(s => s.Id == space.Id);
+            ApplyFilter();
+        }
+        else
+        {
+            Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+}
+
+<style>
+    .mobile-space-admin {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background: #f5f5f5;
+    }
+    .mobile-space-admin__appbar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 4px;
+        padding-top: env(safe-area-inset-top, 0);
+        height: calc(56px + env(safe-area-inset-top, 0));
+        background: #fff; border-bottom: 1px solid #e0e0e0;
+        flex-shrink: 0;
+    }
+    .mobile-space-admin__title {
+        flex: 1; text-align: center;
+        font-size: 17px; font-weight: 600;
+    }
+    .mobile-space-admin__search {
+        padding: 8px 12px;
+        background: #fff;
+        border-bottom: 1px solid #eee;
+        flex-shrink: 0;
+    }
+    .mobile-space-admin__empty {
+        flex: 1; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        padding: 24px; text-align: center;
+    }
+    .mobile-space-admin__list {
+        flex: 1; overflow-y: auto;
+        padding: 8px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0));
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .admin-card {
+        display: flex; align-items: center;
+        gap: 10px;
+        padding: 12px 8px 12px 14px;
+        margin-bottom: 8px;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        min-height: 64px;
+    }
+    .admin-card__icon {
+        flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        width: 42px; height: 42px;
+        border-radius: 8px;
+        background: #e3f2fd;
+    }
+    .admin-card__body { flex: 1; min-width: 0; cursor: pointer; }
+    .admin-card__name {
+        font-size: 16px; font-weight: 600;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .admin-card__desc {
+        margin-top: 2px; font-size: 13px; color: #888;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .admin-card__actions { flex-shrink: 0; display: flex; gap: 2px; }
+</style>

@@ -1,0 +1,13 @@
+@page "/spaces/admin"
+@using TreeGraph.Blazor.Shared.Responsive
+
+<PageTitle>空间管理</PageTitle>
+
+<ResponsiveView>
+    <Mobile>
+        <MobileSpaceAdmin />
+    </Mobile>
+    <Desktop>
+        <SpaceAdminTable />
+    </Desktop>
+</ResponsiveView>

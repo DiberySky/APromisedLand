@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.StringTreeSky.Entities;
+using TreeGraph.StringTree.Contracts;
 
 namespace TreeGraph.Api.NodeEavSky.Data;
 
@@ -65,6 +66,11 @@ public class EavDbContext : DbContext
             e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
             e.Property(x => x.SortOrder).HasColumnName("sort_order");
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1024);
+            e.Property(x => x.EntityType)
+                .HasColumnName("entity_type")
+                .HasMaxLength(120)
+                .IsRequired()
+                .HasDefaultValue(StringTreeEntityTypes.Node);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
@@ -75,6 +81,8 @@ public class EavDbContext : DbContext
 
             e.HasIndex(x => x.ParentId).HasDatabaseName("ix_string_tree_sky_nodes_parent");
             e.HasIndex(x => new { x.ParentId, x.SortOrder }).HasDatabaseName("ix_string_tree_sky_nodes_parent_sort");
+            e.HasIndex(x => x.EntityType)
+                .HasDatabaseName("ix_string_tree_sky_nodes_entity_type");
         });
     }
 

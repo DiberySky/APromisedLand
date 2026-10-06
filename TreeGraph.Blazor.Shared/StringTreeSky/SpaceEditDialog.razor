@@ -1,0 +1,113 @@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky
+@using TreeGraph.StringTree.Contracts
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+@inject ISpaceClient SpaceClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsNew ? "新建空间" : "编辑空间")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3" Class="mt-2">
+            <MudTextField T="string"
+                          @bind-Value="Space.Name"
+                          Label="名称"
+                          Required="true"
+                          MaxLength="256" />
+
+            <MudTextField T="string"
+                          @bind-Value="Space.Description"
+                          Label="描述"
+                          Lines="3"
+                          MaxLength="1024" />
+
+            @* ★ 仅新建时选择属性集模式 *@
+            @if (IsNew)
+            {
+                <MudDivider Class="my-2" />
+                <MudText Typo="Typo.subtitle2">属性集</MudText>
+
+                <MudRadioGroup T="string" @bind-Value="_mode">
+                    <MudRadio Value="@("independent")" Color="Color.Primary">
+                        <div>
+                            <div><b>独立属性集</b>（推荐）</div>
+                            <div class="text-caption text-grey">
+                                该空间拥有专属属性定义，不影响其他空间。
+                            </div>
+                        </div>
+                    </MudRadio>
+                    <MudRadio Value="@("shared")" Color="Color.Primary">
+                        <div>
+                            <div><b>共享默认属性集</b></div>
+                            <div class="text-caption text-grey">
+                                与所有"共享"空间共用一套属性定义。
+                            </div>
+                        </div>
+                    </MudRadio>
+                </MudRadioGroup>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">取消</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(_saving || string.IsNullOrWhiteSpace(Space.Name))"
+                   OnClick="SaveAsync">
+            @(_saving ? "保存中…" : "保存")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance? MudDialog { get; set; }
+    [Parameter] public SpaceDto Space { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private bool _saving;
+
+    /// <summary>"independent" | "shared"。仅新建时生效。</summary>
+    private string _mode = "independent";
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Space.Name)) return;
+
+        _saving = true;
+        try
+        {
+            if (IsNew)
+            {
+                // ★ 根据模式决定 EntityType
+                Space.EntityType = _mode == "shared"
+                    ? StringTreeEntityTypes.Node
+                    : "auto";   // 后端生成独立 EntityType
+
+                var created = await SpaceClient.CreateSpaceAsync(Space);
+                Snackbar.Add($"空间「{created.Name}」已创建", Severity.Success);
+            }
+            else
+            {
+                var updated = await SpaceClient.UpdateSpaceAsync(Space);
+                if (updated is null)
+                {
+                    Snackbar.Add("空间不存在", Severity.Warning);
+                    return;
+                }
+                Snackbar.Add("空间已更新", Severity.Success);
+            }
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"保存失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog?.Cancel();
+}

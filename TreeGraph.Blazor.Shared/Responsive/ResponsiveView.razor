@@ -1,0 +1,44 @@
+@* ResponsiveView.razor
+   根据视口宽度二选一渲染 Mobile / Desktop。
+   若仅提供一侧，则另一侧自动降级。 *@
+@namespace TreeGraph.Blazor.Shared.Responsive
+@using TreeGraph.Blazor.Shared.Responsive
+@implements IDisposable
+@inject ViewportService Viewport
+
+@if (!_ready)
+{
+    @if (Fallback is not null)
+    {
+        @Fallback
+    }
+}
+else if (Viewport.IsMobile)
+{
+    @(Mobile ?? Desktop)
+}
+else
+{
+    @(Desktop ?? Mobile)
+}
+
+@code {
+    [Parameter] public RenderFragment? Mobile { get; set; }
+    [Parameter] public RenderFragment? Desktop { get; set; }
+
+    /// <summary>初始化前的占位内容（可选）。</summary>
+    [Parameter] public RenderFragment? Fallback { get; set; }
+
+    private bool _ready;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Viewport.EnsureInitializedAsync();
+        Viewport.OnChanged += HandleChanged;
+        _ready = true;
+    }
+
+    private void HandleChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Viewport.OnChanged -= HandleChanged;
+}

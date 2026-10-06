@@ -75,6 +75,23 @@ public class DynamicFormResponsiveTests : BunitTestBase {
     }
 
     [Fact]
+    public void LoadFrom_StringValue_IsBoundToField()
+    {
+        var cut = Render<DynamicForm>(p =>
+        {
+            p.Add(x => x.EntityType, "item");
+            p.Add(x => x.Schema, BuildSchema(1));
+        });
+
+        var elem = System.Text.Json.JsonDocument.Parse("\"hello\"").RootElement.Clone();
+        cut.InvokeAsync(() => cut.Instance.LoadFrom(
+            new Dictionary<string, System.Text.Json.JsonElement> { ["attr0"] = elem }));
+
+        var input = cut.Find("input");
+        Assert.Equal("hello", input.GetAttribute("value"));
+    }
+
+    [Fact]
     public void SaveButton_InFlexEndStack()
     {
         var cut = Render<DynamicForm>(p =>

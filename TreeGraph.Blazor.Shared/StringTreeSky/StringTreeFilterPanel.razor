@@ -1,0 +1,206 @@
+
+@* StringTreeFilterPanel.razor
+   属性过滤条件编辑面板：属性 + 运算符 + 值。
+   复用 NodeEav 的 FilterOperatorCatalog 提供可用运算符。 *@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky
+@using TreeGraph.Blazor.Shared.NodeEav.Services
+@using TreeGraph.Shared.Eav.Dtos
+
+<MudPaper Class="pa-3 string-tree-filter-panel" Elevation="0" Outlined="true">
+    <MudStack Spacing="2">
+        @if (_filters.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Class="text-grey">
+                尚未添加过滤条件。添加条件后点击「应用」。
+            </MudText>
+        }
+
+        @for (int i = 0; i < _filters.Count; i++)
+        {
+            var idx = i;
+            var filter = _filters[idx];
+            var attr = FindAttr(filter.AttributeName);
+            var ops = attr is null
+                ? Array.Empty<FilterOperatorCatalog.OperatorInfo>()
+                : FilterOperatorCatalog.For(attr).ToArray();
+
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudSelect T="string"
+                           Value="@filter.AttributeName"
+                           ValueChanged="v => OnAttrChanged(idx, v)"
+                           Label="属性" Dense="true"
+                           Style="min-width:160px">
+                    @foreach (var a in Schema.Where(FilterOperatorCatalog.IsSupported))
+                    {
+                        <MudSelectItem Value="@a.AttributeName">
+                            @a.DisplayName
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="string"
+                           Value="@filter.Operator"
+                           ValueChanged="v => OnOpChanged(idx, v)"
+                           Label="运算符" Dense="true"
+                           Style="min-width:110px">
+                    @foreach (var op in ops)
+                    {
+                        <MudSelectItem Value="@op.Code">@op.DisplayName</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudTextField T="string"
+                              Value="@filter.Value"
+                              ValueChanged="v => OnValueChanged(idx, v)"
+                              Label="值" Dense="true"
+                              Style="min-width:140px" />
+
+                @if (NeedsSecondValue(filter.Operator))
+                {
+                    <MudTextField T="string"
+                                  Value="@filter.Value2"
+                                  ValueChanged="v => OnValue2Changed(idx, v)"
+                                  Label="值 2" Dense="true"
+                                  Style="min-width:140px" />
+                }
+
+                <MudIconButton Icon="@Icons.Material.Filled.RemoveCircleOutline"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="() => RemoveFilter(idx)" />
+            </MudStack>
+        }
+
+        <MudStack Row="true" Spacing="2" Class="mt-1">
+            <MudButton StartIcon="@Icons.Material.Filled.Add"
+                       Size="Size.Small"
+                       Disabled="@(!CanAddMore)"
+                       OnClick="AddFilterAsync">
+                添加条件
+            </MudButton>
+
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       Size="Size.Small"
+                       Disabled="@(_filters.Count == 0 || _applying)"
+                       OnClick="ApplyAsync">
+                @(_applying ? "查询中…" : "应用")
+            </MudButton>
+
+            <MudButton Size="Size.Small"
+                       Disabled="@(_filters.Count == 0 && !IsFiltered)"
+                       OnClick="ClearAsync">
+                清除
+            </MudButton>
+        </MudStack>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AttributeSchemaDto> Schema { get; set; }
+        = Array.Empty<AttributeSchemaDto>();
+
+    /// <summary>宿主当前是否处于过滤态。</summary>
+    [Parameter] public bool IsFiltered { get; set; }
+
+    /// <summary>点击「应用」时回调，携带已构造好的 AttributeFilter 列表。</summary>
+    [Parameter] public EventCallback<List<AttributeFilter>> OnApply { get; set; }
+
+    /// <summary>点击「清除」时回调。</summary>
+    [Parameter] public EventCallback OnClear { get; set; }
+
+    private readonly List<FilterRow> _filters = new();
+    private bool _applying;
+
+    private bool CanAddMore => _filters.Count < 5;
+
+    /// <summary>面板内部维护的行（避免与 DTO 双向绑定冲突）。</summary>
+    private sealed class FilterRow
+    {
+        public string AttributeName { get; set; } = "";
+        public string Operator { get; set; } = "eq";
+        public string? Value { get; set; }
+        public string? Value2 { get; set; }
+    }
+
+    private AttributeSchemaDto? FindAttr(string name)
+        => Schema.FirstOrDefault(a => a.AttributeName == name);
+
+    private static bool NeedsSecondValue(string op) => op == "between";
+
+    private async Task AddFilterAsync()
+    {
+        var first = Schema.FirstOrDefault(FilterOperatorCatalog.IsSupported);
+        _filters.Add(new FilterRow
+        {
+            AttributeName = first?.AttributeName ?? "",
+            Operator = "eq"
+        });
+        await Task.CompletedTask;
+    }
+
+    private void RemoveFilter(int idx)
+    {
+        if (idx >= 0 && idx < _filters.Count)
+            _filters.RemoveAt(idx);
+    }
+
+    private void OnAttrChanged(int idx, string name)
+    {
+        _filters[idx].AttributeName = name;
+        // 属性切换后重置运算符，避免不匹配
+        var attr = FindAttr(name);
+        if (attr is not null)
+        {
+            var ops = FilterOperatorCatalog.For(attr);
+            if (ops.Count > 0 && !ops.Any(o => o.Code == _filters[idx].Operator))
+                _filters[idx].Operator = ops[0].Code;
+        }
+    }
+
+    private void OnOpChanged(int idx, string op)
+        => _filters[idx].Operator = op;
+
+    private void OnValueChanged(int idx, string? v)
+        => _filters[idx].Value = v;
+
+    private void OnValue2Changed(int idx, string? v)
+        => _filters[idx].Value2 = v;
+
+    private async Task ApplyAsync()
+    {
+        // 校验：属性名 + 运算符非空
+        var valid = _filters
+            .Where(f => !string.IsNullOrWhiteSpace(f.AttributeName)
+                        && !string.IsNullOrWhiteSpace(f.Operator))
+            .ToList();
+
+        if (valid.Count == 0)
+            return;
+
+        _applying = true;
+        try
+        {
+            // 转换为 AttributeFilter（项目现有 DTO）
+            var payload = valid.Select(f => new AttributeFilter
+            {
+                AttributeName = f.AttributeName,
+                Operator = f.Operator,
+                Value = f.Value,
+                Value2 = NeedsSecondValue(f.Operator) ? f.Value2 : null
+            }).ToList();
+
+            await OnApply.InvokeAsync(payload);
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        _filters.Clear();
+        await OnClear.InvokeAsync();
+    }
+}

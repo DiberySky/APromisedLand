@@ -1,0 +1,55 @@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky
+@using TreeGraph.Blazor.Shared.Responsive
+@using TreeGraph.StringTree.Contracts
+
+<ResponsiveSplit StorageKey="string-tree-space-split"
+                 DefaultWidth="260"
+                 MinWidth="180"
+                 MaxWidth="480">
+    <Left>
+        <SpaceSelector SelectedSpaceId="_current?.Id"
+                       InitialSpaceId="InitialSpaceId"
+                       OnSelected="HandleSpaceSelected" />
+    </Left>
+    <Right>
+        @if (_current is null)
+        {
+            <div class="string-tree-space__empty">
+                <MudText Typo="Typo.h6" Class="text-grey">请选择或创建一个空间</MudText>
+            </div>
+        }
+        else
+        {
+            <StringTreeSky @key="_current.Id"
+                           RootNodeId="_current.Id"
+                           ExplicitEntityType="_current.EntityType"
+                           TreeKey="TreeKey"
+                           OnTreeChanged="OnTreeChanged" />
+        }
+    </Right>
+</ResponsiveSplit>
+
+@code {
+    [Parameter] public string? TreeKey { get; set; }
+    [Parameter] public string? InitialSpaceId { get; set; }
+    [Parameter] public EventCallback OnTreeChanged { get; set; }
+    [Parameter] public EventCallback<SpaceDto?> OnSpaceChanged { get; set; }
+
+    private SpaceDto? _current;
+
+    private async Task HandleSpaceSelected(SpaceDto? space)
+    {
+        _current = space;
+        await OnSpaceChanged.InvokeAsync(space);
+    }
+}
+
+<style>
+    .string-tree-space__empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 300px;
+    }
+</style>

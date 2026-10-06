@@ -18,6 +18,7 @@ public class EavWriteService
     private readonly IUnitCache _unitCache;
     private readonly UnitConverter _converter;
     private readonly IOptionSetCache _optionSetCache;
+    private readonly EntityOwnerGuardRegistry _ownerGuards;
 
     public EavWriteService(
         EavDbContext db,
@@ -26,7 +27,8 @@ public class EavWriteService
         CompositeValueService composite,
         IUnitCache unitCache,
         UnitConverter converter,
-        IOptionSetCache optionSetCache)
+        IOptionSetCache optionSetCache,
+        EntityOwnerGuardRegistry ownerGuards)
     {
         _db = db;
         _attrCache = attrCache;
@@ -35,6 +37,7 @@ public class EavWriteService
         _unitCache = unitCache;
         _converter = converter;
         _optionSetCache = optionSetCache;
+        _ownerGuards = ownerGuards;
     }
 
     /// <summary>
@@ -101,6 +104,10 @@ public class EavWriteService
         if (!Guid.TryParse(entityId, out _))
             throw new EavValidationException(new List<ValidationError>
                 { new("id", "Entity Id 必须是 GUID 格式") });
+
+        // ---- -1b. 归属校验：受外部主表约束的类型，entityId 必须指向已存在的宿主 ----
+        //   防止属性值脱离宿主实体凭空生成（孤儿数据）。
+        await _ownerGuards.EnsureOwnerExistsAsync(entityType, entityId, ct);
 
         var definitions = _attrCache.GetDefinitions(entityType)
             .ToDictionary(d => d.AttributeName);

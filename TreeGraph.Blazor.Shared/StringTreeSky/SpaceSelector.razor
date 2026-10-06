@@ -1,0 +1,228 @@
+@* SpaceSelector.razor
+   空间选择器：树形导航的入口。
+   选中某空间 → 触发 OnSelected；右侧 StringTreeSky 随之切换。 *@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky
+@using Microsoft.AspNetCore.Components.Routing
+@using TreeGraph.StringTree.Contracts
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+@inject ISpaceClient SpaceClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<div class="space-selector">
+    <div class="space-selector__header">
+        <MudText Typo="Typo.subtitle1" Class="font-weight-bold">空间</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                       Size="Size.Small"
+                       Color="Color.Primary"
+                       Title="新建空间"
+                       OnClick="OpenCreateDialogAsync" />
+    </div>
+
+    @if (_loading)
+    {
+        <div class="pa-4 d-flex justify-center">
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+        </div>
+    }
+    else if (_spaces.Count == 0)
+    {
+        <div class="pa-3">
+            <MudText Typo="Typo.caption" Class="text-grey">
+                尚无空间。点击右上角 + 创建第一个。
+            </MudText>
+        </div>
+    }
+    else
+    {
+        <MudNavMenu Dense="true">
+            @foreach (var space in _spaces)
+            {
+                var isActive = space.Id == SelectedSpaceId;
+                <MudNavLink Match="NavLinkMatch.All"
+                            Class="@(isActive ? "space-selector__item--active" : "")"
+                            OnClick="() => SelectAsync(space)">
+                    <div class="d-flex align-center justify-between" style="width:100%">
+                        <span class="space-selector__name" title="@space.Name">@space.Name</span>
+                        <span class="space-selector__actions" @onclick:stopPropagation="true">
+                            <MudIconButton Icon="@Icons.Material.Filled.MoreVert"
+                                           Size="Size.Small"
+                                           Edge="Edge.End"
+                                           OnClick="() => OpenMenuAsync(space)" />
+                        </span>
+                    </div>
+                </MudNavLink>
+            }
+        </MudNavMenu>
+    }
+</div>
+
+@code {
+    /// <summary>当前选中的空间 Id（由宿主提供，支持双向绑定）。</summary>
+    [Parameter] public string? SelectedSpaceId { get; set; }
+
+    /// <summary>选中空间时回调。</summary>
+    [Parameter] public EventCallback<SpaceDto?> OnSelected { get; set; }
+
+    /// <summary>空间列表变化（新建/删除）时回调，供宿主刷新。</summary>
+    [Parameter] public EventCallback OnListChanged { get; set; }
+
+    /// <summary>
+    /// 初始应选中的空间 Id（用于 /spaces/{id} 直达）。
+    /// 首次加载列表时若该空间存在则优先选中；否则回退到第一个。
+    /// </summary>
+    [Parameter] public string? InitialSpaceId { get; set; }
+
+    private List<SpaceDto> _spaces = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _spaces = await SpaceClient.ListSpacesAsync();
+
+            // 首次加载：优先选中 InitialSpaceId 指定的空间，找不到再回退第一个
+            if (string.IsNullOrEmpty(SelectedSpaceId) && _spaces.Count > 0)
+            {
+                var preferred = !string.IsNullOrEmpty(InitialSpaceId)
+                    ? _spaces.FirstOrDefault(s => s.Id == InitialSpaceId)
+                    : null;
+                await OnSelected.InvokeAsync(preferred ?? _spaces[0]);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载空间失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SelectAsync(SpaceDto space)
+    {
+        if (space.Id == SelectedSpaceId) return;
+        await OnSelected.InvokeAsync(space);
+    }
+
+    private async Task OpenCreateDialogAsync()
+    {
+        var dto = new SpaceDto { Name = "新空间" };
+        var parameters = new DialogParameters
+        {
+            { nameof(SpaceEditDialog.Space), dto },
+            { nameof(SpaceEditDialog.IsNew), true }
+        };
+        var dialog = await DialogService.ShowAsync<SpaceEditDialog>("新建空间", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await ReloadAsync();
+            await OnListChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OpenMenuAsync(SpaceDto space)
+    {
+        // 简单实现：用 MessageBox 询问操作
+        var action = await DialogService.ShowMessageBoxAsync(
+            space.Name,
+            "请选择操作",
+            yesText: "编辑", noText: "删除", cancelText: "取消");
+
+        if (action == true)
+        {
+            await OpenEditDialogAsync(space);
+        }
+        else if (action == false)
+        {
+            await ConfirmDeleteAsync(space);
+        }
+    }
+
+    private async Task OpenEditDialogAsync(SpaceDto space)
+    {
+        var copy = new SpaceDto
+        {
+            Id = space.Id,
+            Name = space.Name,
+            Description = space.Description
+        };
+        var parameters = new DialogParameters
+        {
+            { nameof(SpaceEditDialog.Space), copy },
+            { nameof(SpaceEditDialog.IsNew), false }
+        };
+        var dialog = await DialogService.ShowAsync<SpaceEditDialog>("编辑空间", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await ReloadAsync();
+            await OnListChanged.InvokeAsync();
+        }
+    }
+
+    private async Task ConfirmDeleteAsync(SpaceDto space)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "删除空间",
+            $"确定删除「{space.Name}」及其下所有子节点？此操作不可撤销。",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var ok = await SpaceClient.DeleteSpaceAsync(space.Id);
+        if (ok)
+        {
+            Snackbar.Add("空间已删除", Severity.Success);
+            _spaces.RemoveAll(s => s.Id == space.Id);
+
+            // 若删的是当前选中，自动切到第一个
+            if (space.Id == SelectedSpaceId)
+            {
+                var next = _spaces.FirstOrDefault();
+                await OnSelected.InvokeAsync(next);
+            }
+
+            await OnListChanged.InvokeAsync();
+        }
+        else
+        {
+            Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+}
+
+<style>
+    .space-selector {
+        width: 220px;
+        border-right: 1px solid #e0e0e0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .space-selector__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        border-bottom: 1px solid #eee;
+    }
+    .space-selector__name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .space-selector__actions { display: none; }
+    .space-selector ::deep .mud-nav-link:hover .space-selector__actions { display: inline-flex; }
+    .space-selector ::deep .space-selector__item--active {
+        background-color: rgba(25, 118, 210, 0.08) !important;
+        font-weight: 600;
+    }
+</style>

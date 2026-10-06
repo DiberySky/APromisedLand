@@ -1,0 +1,34 @@
+@page "/spaces"
+@using TreeGraph.Blazor.Shared.Responsive
+@using TreeGraph.Blazor.Shared.StringTreeSky
+
+<PageTitle>空间</PageTitle>
+
+@* ============ 桌面：管理入口放在组合组件上方 ============ *@
+<ResponsiveView>
+    <Mobile>
+        <MobileSpaceList />
+    </Mobile>
+    <Desktop>
+        <div class="d-flex flex-column" style="height: 80vh;">
+            @* ★ 新增：顶部工具栏 *@
+            <div class="d-flex align-center justify-between mb-2 px-1">
+                <MudText Typo="Typo.h6">空间</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Title="空间管理"
+                               Size="Size.Medium"
+                               OnClick="GoToAdmin" />
+            </div>
+
+            <div style="flex:1; min-height:0;">
+                <StringTreeSpace />
+            </div>
+        </div>
+    </Desktop>
+</ResponsiveView>
+
+@code {
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private void GoToAdmin() => Nav.NavigateTo("/spaces/admin");
+}

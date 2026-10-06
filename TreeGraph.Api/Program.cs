@@ -29,6 +29,8 @@ builder.Services.AddProblemDetails();
 builder.AddNpgsqlDbContext<EavDbContext>("TreeGraphDb");
 
 builder.Services.AddMemoryCache();
+// 实体归属守卫聚合器（具体 guard 由各业务模块注册；无守卫时安全放行）
+builder.Services.AddScoped<EntityOwnerGuardRegistry>();
 builder.Services.AddScoped<EavWriteService>();
 builder.Services.AddScoped<EavReadService>();
 builder.Services.AddScoped<EavQueryService>();

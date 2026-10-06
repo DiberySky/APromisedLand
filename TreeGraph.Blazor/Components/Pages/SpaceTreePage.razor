@@ -1,0 +1,20 @@
+@page "/spaces/{SpaceId}"
+@using TreeGraph.Blazor.Shared.Responsive
+@using TreeGraph.Blazor.Shared.StringTreeSky
+
+<PageTitle>空间</PageTitle>
+
+<ResponsiveView>
+    <Mobile>
+        <MobileSpaceTree SpaceId="SpaceId" />
+    </Mobile>
+    <Desktop>
+        <div style="height: 80vh;">
+            <StringTreeSpace InitialSpaceId="SpaceId" />
+        </div>
+    </Desktop>
+</ResponsiveView>
+
+@code {
+    [Parameter] public string SpaceId { get; set; } = "";
+}

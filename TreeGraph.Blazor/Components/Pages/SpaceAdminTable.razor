@@ -1,0 +1,204 @@
+@using TreeGraph.StringTree.Contracts
+@using TreeGraph.Blazor.Shared.StringTreeSky
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+@inject ISpaceClient SpaceClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<div class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+        <MudText Typo="Typo.h5">空间管理</MudText>
+        <MudStack Row="true" Spacing="2">
+            <MudTextField T="string"
+                          @bind-Value="_keyword"
+                          @bind-Value:after="ApplyFilter"
+                          Placeholder="搜索名称或描述…"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Dense="true"
+                          Variant="Variant.Outlined"
+                          Style="width:240px" />
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateDialogAsync">
+                新建空间
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center pa-6">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else if (_filtered.Count == 0)
+    {
+        <MudPaper Class="pa-8" Elevation="0" Outlined="true">
+            <div class="d-flex flex-column align-center">
+                <MudIcon Icon="@Icons.Material.Filled.FolderOpen"
+                         Style="font-size:64px;color:#bbb" />
+                <MudText Typo="Typo.h6" Class="text-grey mt-3">
+                    @(string.IsNullOrEmpty(_keyword) ? "尚无空间" : "无匹配结果")
+                </MudText>
+                @if (string.IsNullOrEmpty(_keyword))
+                {
+                    <MudButton Class="mt-3"
+                               Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="OpenCreateDialogAsync">
+                        创建第一个空间
+                    </MudButton>
+                }
+            </div>
+        </MudPaper>
+    }
+    else
+    {
+        <MudTable Items="_filtered"
+                  Dense="true"
+                  Hover="true"
+                  Breakpoint="Breakpoint.Sm"
+                  Loading="_loading">
+            <HeaderContent>
+                <MudTh>名称</MudTh>
+                <MudTh>描述</MudTh>
+                <MudTh Style="width:100px">Id 前缀</MudTh>
+                <MudTh Style="width:220px">操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="名称">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" />
+                        <MudText Typo="Typo.body1"><b>@context.Name</b></MudText>
+                    </MudStack>
+                </MudTd>
+                <MudTd DataLabel="描述">
+                    <MudText Typo="Typo.body2" Class="text-grey">
+                        @(string.IsNullOrEmpty(context.Description) ? "—" : context.Description)
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Id">
+                    <MudText Typo="Typo.caption" Style="font-family:monospace">
+                        @ShortId(context.Id)
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="操作">
+                    <MudButton Size="Size.Small"
+                               Variant="Variant.Text"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.AccountTree"
+                               OnClick="() => OpenTreeAsync(context)">
+                        打开树
+                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Title="编辑"
+                                   OnClick="() => OpenEditDialogAsync(context)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   Title="删除"
+                                   OnClick="() => ConfirmDeleteAsync(context)" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</div>
+
+@code {
+    private List<SpaceDto> _spaces = new();
+    private List<SpaceDto> _filtered = new();
+    private bool _loading = true;
+    private string? _keyword;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _spaces = await SpaceClient.ListSpacesAsync();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        if (string.IsNullOrWhiteSpace(_keyword))
+        {
+            _filtered = _spaces.ToList();
+            return;
+        }
+        var kw = _keyword.Trim();
+        _filtered = _spaces.Where(s =>
+            (s.Name?.Contains(kw, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (s.Description?.Contains(kw, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToList();
+    }
+
+    private void OpenTreeAsync(SpaceDto space)
+        => Nav.NavigateTo($"/spaces/{Uri.EscapeDataString(space.Id)}");
+
+    private async Task OpenCreateDialogAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(SpaceEditDialog.Space), new SpaceDto() },
+            { nameof(SpaceEditDialog.IsNew), true }
+        };
+        var dialog = await DialogService.ShowAsync<SpaceEditDialog>("新建空间", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false }) await ReloadAsync();
+    }
+
+    private async Task OpenEditDialogAsync(SpaceDto space)
+    {
+        var copy = new SpaceDto { Id = space.Id, Name = space.Name, Description = space.Description };
+        var parameters = new DialogParameters
+        {
+            { nameof(SpaceEditDialog.Space), copy },
+            { nameof(SpaceEditDialog.IsNew), false }
+        };
+        var dialog = await DialogService.ShowAsync<SpaceEditDialog>("编辑空间", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false }) await ReloadAsync();
+    }
+
+    private async Task ConfirmDeleteAsync(SpaceDto space)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "删除空间",
+            $"确定删除「{space.Name}」及其下所有子节点？此操作不可撤销。",
+            yesText: "删除", noText: "取消");
+        if (confirmed != true) return;
+
+        var ok = await SpaceClient.DeleteSpaceAsync(space.Id);
+        if (ok)
+        {
+            Snackbar.Add("空间已删除", Severity.Success);
+            _spaces.RemoveAll(s => s.Id == space.Id);
+            ApplyFilter();
+        }
+        else
+        {
+            Snackbar.Add("删除失败", Severity.Error);
+        }
+    }
+
+    private static string ShortId(string id)
+        => string.IsNullOrEmpty(id) ? "—"
+           : id.Length <= 12 ? id : id[..8] + "…";
+}
