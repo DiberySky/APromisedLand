@@ -1,11 +1,10 @@
-@* EntityTypes.razor *@
+@* EntityTypes.razor — 实体类型管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/EntityTypeEditDialog.razor） *@
 @page "/metadata/entity-types"
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
 @using TreeGraph.Shared.Eav.Dtos
-@* EntityTypes.razor *@
 <PageTitle>实体类型管理</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">实体类型管理</MudText>
@@ -18,7 +17,7 @@
             刷新
         </MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Success"
-                   OnClick="OpenCreateDialog"
+                   OnClick="OpenCreateAsync"
                    StartIcon="@Icons.Material.Filled.Add"
                    Class="ml-2">
             新建实体类型
@@ -43,7 +42,9 @@ else if (_types is null || _types.Count == 0)
 }
 else
 {
-    <MudTable Items="_types" Hover="true" Bordered="true">
+    @* 窄屏下表格超出视口，允许横向滚动（桌面端不影响） *@
+    <div style="overflow-x:auto">
+        <MudTable Items="_types" Hover="true" Bordered="true">
         <HeaderContent>
             <MudTh>名称</MudTh>
             <MudTh>说明</MudTh>
@@ -82,12 +83,12 @@ else
                 @if (!context.IsDeleted)
                 {
                     <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Color="Color.Primary"
-                                   OnClick="@(() => OpenEditDialog(context))"
+                                   OnClick="@(async () => await OpenEditAsync(context))"
                                    title="编辑" />
                     <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Color="Color.Error"
                                    OnClick="@(async () => await DeleteAsync(context))"
                                    title="删除" />
@@ -95,7 +96,7 @@ else
                 else
                 {
                     <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Color="Color.Success"
                                    OnClick="@(async () => await UndeleteAsync(context))"
                                    title="恢复" />
@@ -103,73 +104,20 @@ else
             </MudTd>
         </RowTemplate>
     </MudTable>
+    </div>
 }
-
-@* ============================================================ *@
-@* 新建 / 编辑对话框                                             *@
-@* ============================================================ *@
-<MudDialog @bind-Visible="_showDialog" Options="_dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            @(_editing is null ? "新建实体类型" : "编辑实体类型")
-        </MudText>
-    </TitleContent>
-    <DialogContent>
-        @* 编辑时展示内部标识（供调试，用户平时看不到） *@
-        @if (_editing is not null)
-        {
-            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                <MudText Typo="Typo.caption">
-                    内部标识：<code>@_editing.EntityType</code>
-                </MudText>
-            </MudAlert>
-        }
-
-        <MudTextField @bind-Value="_form.DisplayName"
-                      Label="实体类型名称"
-                      Placeholder="商品"
-                      Variant="Variant.Outlined"
-                      Class="mb-3"
-                      HelperText="@(_editing is null
-                          ? "例如：商品、订单、客户"
-                          : "创建后名称不可修改")" />
-
-        <MudTextField @bind-Value="_form.Description"
-                      Label="说明（可选）"
-                      Variant="Variant.Outlined"
-                      Lines="2"
-                      Class="mb-3" />
-
-        <MudNumericField T="int"
-                         @bind-Value="_form.DisplayOrder"
-                         Label="显示顺序"
-                         Variant="Variant.Outlined" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _showDialog = false)">取消</MudButton>
-        <MudButton Color="Color.Primary"
-                   OnClick="SaveAsync"
-                   Disabled="@_submitting">
-            @(_submitting ? "保存中..." : "保存")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
 
 @code {
     private IReadOnlyList<EntityTypeDetailDto>? _types;
     private bool _loading;
     private bool _initialized;
-    private bool _submitting;
 
-    private readonly DialogOptions _dialogOptions = new()
+    /// <summary>桌面端对话框选项：PageDialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
+    private static readonly DialogOptions DialogOptions = new()
     {
         MaxWidth = MaxWidth.Medium,
         FullWidth = true
     };
-
-    private bool _showDialog;
-    private EntityTypeDetailDto? _editing;
-    private FormModel _form = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -194,90 +142,49 @@ else
         }
     }
 
-    private void OpenCreateDialog()
+    // ---------- 新建 / 编辑 ----------
+
+    private async Task OpenCreateAsync()
     {
-        _editing = null;
-        _form = new FormModel
+        var parameters = new DialogParameters<EntityTypeEditDialog>
         {
-            DisplayOrder = (_types?.Count ?? 0) + 1
+            { x => x.InitialDisplayOrder, (_types?.Count ?? 0) + 1 }
         };
-        _showDialog = true;
-    }
 
-    private void OpenEditDialog(EntityTypeDetailDto dto)
-    {
-        _editing = dto;
-        _form = new FormModel
+        var dialog = await DialogService.ShowAsync<EntityTypeEditDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
         {
-            DisplayName = dto.DisplayName,
-            Description = dto.Description ?? "",
-            DisplayOrder = dto.DisplayOrder
-        };
-        _showDialog = true;
-    }
-
-    private async Task SaveAsync()
-    {
-        if (string.IsNullOrWhiteSpace(_form.DisplayName))
-        {
-            Snackbar.Add("请填写名称", Severity.Warning);
-            return;
-        }
-
-        _submitting = true;
-        try
-        {
-            if (_editing is null)
-            {
-                // 新建：不传 EntityType，服务端自动生成 et_xxxx
-                var id = await Api.CreateEntityTypeAsync(new CreateEntityTypeRequest
-                {
-                    DisplayName = _form.DisplayName.Trim(),
-                    Description = string.IsNullOrWhiteSpace(_form.Description)
-                        ? null : _form.Description,
-                    DisplayOrder = _form.DisplayOrder
-                });
-
-                if (id is null)
-                {
-                    Snackbar.Add("创建失败", Severity.Error);
-                    return;
-                }
-
-                Snackbar.Add($"已创建「{_form.DisplayName.Trim()}」", Severity.Success);
-            }
-            else
-            {
-                // 编辑
-                var (ok, error) = await Api.UpdateEntityTypeAsync(
-                    _editing.EntityTypeId,
-                    new UpdateEntityTypeRequest
-                    {
-                        DisplayName = _form.DisplayName,
-                        Description = _form.Description,
-                        DisplayOrder = _form.DisplayOrder
-                    });
-
-                if (!ok)
-                {
-                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
-                    return;
-                }
-
-                Snackbar.Add("更新成功", Severity.Success);
-            }
-
-            _showDialog = false;
             await LoadAsync();
+            await RefreshDisplayMapAsync();
+        }
+    }
 
-            // 刷新全局 DisplayName 映射，让 NavMenu 等页面立即生效
-            EntityTypeDisplay.Invalidate();
-            await EntityTypeDisplay.EnsureLoadedAsync();
-        }
-        finally
+    private async Task OpenEditAsync(EntityTypeDetailDto dto)
+    {
+        var parameters = new DialogParameters<EntityTypeEditDialog>
         {
-            _submitting = false;
+            { x => x.Editing, dto }
+        };
+
+        var dialog = await DialogService.ShowAsync<EntityTypeEditDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+            await RefreshDisplayMapAsync();
         }
+    }
+
+    /// <summary>刷新全局 DisplayName 映射，让 NavMenu 等页面立即生效。</summary>
+    private async Task RefreshDisplayMapAsync()
+    {
+        EntityTypeDisplay.Invalidate();
+        await EntityTypeDisplay.EnsureLoadedAsync();
     }
 
     private async Task DeleteAsync(EntityTypeDetailDto dto)
@@ -326,12 +233,5 @@ else
         {
             Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
         }
-    }
-
-    private class FormModel
-    {
-        public string DisplayName { get; set; } = "";
-        public string Description { get; set; } = "";
-        public int DisplayOrder { get; set; }
     }
 }

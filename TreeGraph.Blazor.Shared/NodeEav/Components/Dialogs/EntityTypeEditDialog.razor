@@ -1,0 +1,131 @@
+@* EntityTypeEditDialog.razor — 新建 / 编辑实体类型（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="@(Editing is null ? "新建实体类型" : "编辑实体类型")"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="SaveAsync">
+    <DialogContent>
+        @* 编辑时展示内部标识（供调试，用户平时看不到） *@
+        @if (Editing is not null)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                <MudText Typo="Typo.caption">
+                    内部标识：<code>@Editing.EntityType</code>
+                </MudText>
+            </MudAlert>
+        }
+
+        <MudTextField @bind-Value="_form.DisplayName"
+                      Label="实体类型名称"
+                      Placeholder="商品"
+                      Variant="Variant.Outlined"
+                      Class="mb-3"
+                      HelperText="@(Editing is null
+                          ? "例如：商品、订单、客户"
+                          : "创建后名称不可修改")" />
+
+        <MudTextField @bind-Value="_form.Description"
+                      Label="说明（可选）"
+                      Variant="Variant.Outlined"
+                      Lines="2"
+                      Class="mb-3" />
+
+        <MudNumericField T="int"
+                         @bind-Value="_form.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined" />
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>编辑目标；null 表示新建。</summary>
+    [Parameter] public EntityTypeDetailDto? Editing { get; set; }
+    /// <summary>新建模式下的初始显示顺序（现有类型数 + 1）。</summary>
+    [Parameter] public int InitialDisplayOrder { get; set; }
+
+    private FormModel _form = new();
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        _form = Editing is null
+            ? new FormModel { DisplayOrder = InitialDisplayOrder }
+            : new FormModel
+            {
+                DisplayName = Editing.DisplayName,
+                Description = Editing.Description ?? "",
+                DisplayOrder = Editing.DisplayOrder
+            };
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_form.DisplayName))
+        {
+            Snackbar.Add("请填写名称", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            if (Editing is null)
+            {
+                // 新建：不传 EntityType，服务端自动生成 et_xxxx
+                var id = await Api.CreateEntityTypeAsync(new CreateEntityTypeRequest
+                {
+                    DisplayName = _form.DisplayName.Trim(),
+                    Description = string.IsNullOrWhiteSpace(_form.Description)
+                        ? null : _form.Description,
+                    DisplayOrder = _form.DisplayOrder
+                });
+
+                if (id is null)
+                {
+                    Snackbar.Add("创建失败", Severity.Error);
+                    return;
+                }
+
+                Snackbar.Add($"已创建「{_form.DisplayName.Trim()}」", Severity.Success);
+            }
+            else
+            {
+                // 编辑
+                var (ok, error) = await Api.UpdateEntityTypeAsync(
+                    Editing.EntityTypeId,
+                    new UpdateEntityTypeRequest
+                    {
+                        DisplayName = _form.DisplayName,
+                        Description = _form.Description,
+                        DisplayOrder = _form.DisplayOrder
+                    });
+
+                if (!ok)
+                {
+                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                    return;
+                }
+
+                Snackbar.Add("更新成功", Severity.Success);
+            }
+
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class FormModel
+    {
+        public string DisplayName { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int DisplayOrder { get; set; }
+    }
+}

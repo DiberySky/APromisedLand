@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="TreeGraph.Blazor.Maui.styles.css" />
     <link rel="icon" href="data:,">
+    <!-- 必须在 Blazor 启动前加载：物理返回键 popstate 监听需先于对话框注册就位 -->
+    <script src="js/platform-back.js"></script>
 </head>
 
 <body>

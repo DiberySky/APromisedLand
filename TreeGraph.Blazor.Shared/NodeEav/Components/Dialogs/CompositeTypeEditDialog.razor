@@ -1,0 +1,83 @@
+@* CompositeTypeEditDialog.razor — 编辑组合类型（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="编辑组合类型"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="UpdateAsync">
+    <DialogContent>
+        @if (Type is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Type.EntityType / @Type.TypeName
+                （类型标识不可修改）
+            </MudText>
+        }
+
+        <MudTextField @bind-Value="_editTypeForm.DisplayName"
+                      Label="显示名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudAlert Severity="Severity.Info" Dense="true">
+            TypeName 与 EntityType 是引用标识，不可修改。如需更名，请新建并迁移引用。
+        </MudAlert>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public CompositeTypeDetailDto? Type { get; set; }
+
+    private UpdateCompositeTypeRequest _editTypeForm = new();
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        if (Type is not null)
+        {
+            _editTypeForm = new UpdateCompositeTypeRequest
+            {
+                DisplayName = Type.DisplayName
+            };
+        }
+    }
+
+    private async Task UpdateAsync()
+    {
+        if (Type is null) return;
+
+        if (string.IsNullOrWhiteSpace(_editTypeForm.DisplayName))
+        {
+            Snackbar.Add("显示名不能为空", Severity.Warning);
+            return;
+        }
+        if (_editTypeForm.DisplayName == Type.DisplayName)
+        {
+            MudDialog?.Close(DialogResult.Cancel());
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateCompositeTypeAsync(
+                Type.CompositeTypeId, _editTypeForm);
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

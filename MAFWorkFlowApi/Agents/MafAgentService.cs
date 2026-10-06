@@ -1,11 +1,12 @@
 using System.Runtime.CompilerServices;
 using MAFWorkFlowApi.Models;
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
-using AgentSessionStore = Microsoft.Agents.AI.Hosting.AgentSessionStore;
+
+// AgentSessionStore 位于 Microsoft.Agents.AI 命名空间（已在上方 using 中）
+using AgentSessionStore = Microsoft.Agents.AI.AgentSessionStore;
 
 namespace MAFWorkFlowApi.Agents;
 
@@ -64,15 +65,17 @@ public sealed class MafAgentService
     {
         var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
 
+        // ★ 使用 AgentSessionStoreKey
         var session = await _sessionStore.GetSessionAsync(
-            _generalAssistant, currentConversationId, ct)
+            _generalAssistant, new AgentSessionStoreKey(currentConversationId), ct)
             ?? await _generalAssistant.CreateSessionAsync(cancellationToken: ct);
 
         var response = await _generalAssistant.RunAsync(
             userMessage, session, cancellationToken: ct);
 
+        // ★ 使用 AgentSessionStoreKey
         await _sessionStore.SaveSessionAsync(
-            _generalAssistant, currentConversationId, session, ct);
+            _generalAssistant, new AgentSessionStoreKey(currentConversationId), session, ct);
 
         return new AgentReply(
             ConversationId: currentConversationId,
@@ -124,10 +127,6 @@ public sealed class MafAgentService
     // Writer-Critic 工作流（流式）
     // ─────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// 流式运行 Writer-Critic 工作流，逐块产出增量文本。
-    /// 每个事件携带 Agent 名、增量文本和是否最终帧。
-    /// </summary>
     public async IAsyncEnumerable<WorkflowStreamEvent> RunWriterCriticStreamAsync(
         string topic,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -138,7 +137,6 @@ public sealed class MafAgentService
         await foreach (var update in workflowAgent
             .RunStreamingAsync(topic, session, cancellationToken: ct))
         {
-            // 提取增量文本
             var delta = update.Text;
             if (string.IsNullOrEmpty(delta) && update.Contents is { Count: > 0 })
             {
@@ -150,11 +148,8 @@ public sealed class MafAgentService
             if (string.IsNullOrEmpty(delta))
                 continue;
 
-            // AgentResponseUpdate 使用 FinishReason 属性表示结束原因。
-            // 当 FinishReason 为 ChatFinishReason.Stop 时，表示当前是最终帧。
             var isFinal = update.FinishReason == ChatFinishReason.Stop;
 
-            // AuthorName 声明为 string?，显式判空以避免可空性分析警告
             var authorName = update.AuthorName;
             if (string.IsNullOrEmpty(authorName))
                 authorName = "unknown";

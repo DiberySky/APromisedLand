@@ -3,7 +3,7 @@
 @using TreeGraph.Blazor.Shared.Trees.StringTree.Contracts
 @using TreeGraph.Blazor.Shared.Trees.StringTree.Models
 
-<MudDialog>
+<PageDialogSky Title="选择父节点" TitleClass="mud-theme-success px-0 pa-0">
     <DialogContent>
         <MudContainer Class="py-2"
                       Style="min-height: 300px; max-height: 500px; overflow-y: auto;">
@@ -59,7 +59,7 @@
             确认选择
         </MudButton>
     </DialogActions>
-</MudDialog>
+</PageDialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

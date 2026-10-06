@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 9+ 默认禁止 HTTP 明文流量；开发期对宿主回环/局域网地址开白名单。
+     Release 构建应改用 HTTPS 并移除此配置。 -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android 模拟器访问宿主 loopback 的专用别名 -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <!-- Android 真机：宿主局域网 IP 占位；与 ApiConfiguration.PhysicalDeviceHostKey 对齐，
+             实际网段不同请在此追加。 -->
+        <domain includeSubdomains="true">192.168.1.100</domain>
+    </domain-config>
+</network-security-config>

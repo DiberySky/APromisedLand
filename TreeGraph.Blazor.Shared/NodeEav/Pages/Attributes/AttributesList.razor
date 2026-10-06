@@ -212,7 +212,7 @@ else
                 <MudTd>@context.DisplayOrder</MudTd>
                 <MudTd>
                     <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Color="Color.Primary"
                                    OnClick="@(() => GoToManage(context.EntityType))"
                                    title="在管理页打开" />
@@ -235,12 +235,12 @@ else
                     <MudSpacer />
 
                     <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Disabled="@(_page <= 1)"
                                    OnClick="@(() => GoToPage(_page - 1))" />
                     <MudText Typo="Typo.body2">@_page / @TotalPages</MudText>
                     <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Disabled="@(_page >= TotalPages)"
                                    OnClick="@(() => GoToPage(_page + 1))" />
                 </div>

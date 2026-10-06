@@ -1,0 +1,67 @@
+@* CustomTableCreateDialog.razor — 新建自定义表（PageDialogSky 外壳，DialogService 模式；供 Metadata/CustomTables 页面使用） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="新建自定义表"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="CreateAsync">
+    <DialogContent>
+        <MudTextField @bind-Value="_newTable.EntityType"
+                      Label="实体类型"
+                      Placeholder="Product"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_newTable.TableName"
+                      Label="表名 (snake_case)"
+                      Placeholder="specs"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_newTable.DisplayName"
+                      Label="显示名"
+                      Placeholder="规格参数"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudNumericField T="int"
+                         @bind-Value="_newTable.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined" />
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private CreateCustomTableRequest _newTable = new() { EntityType = "Product" };
+    private bool _submitting;
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newTable.EntityType) ||
+            string.IsNullOrWhiteSpace(_newTable.TableName) ||
+            string.IsNullOrWhiteSpace(_newTable.DisplayName))
+        {
+            Snackbar.Add("请填写所有字段", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var id = await Api.CreateCustomTableAsync(_newTable);
+            if (id is null)
+            {
+                Snackbar.Add("创建失败", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add($"创建成功：Id={id}", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

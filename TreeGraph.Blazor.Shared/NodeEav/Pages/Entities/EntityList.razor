@@ -108,12 +108,12 @@ else if (Platform.IsCompact)
                     </MudCardContent>
                     <MudCardActions Class="pa-2">
                         <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Color="Color.Primary"
                                        OnClick="@(() => OpenEdit(item.EntityId))"
                                        title="编辑" />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Color="Color.Error"
                                        OnClick="@(() => ConfirmDelete(item.EntityId))"
                                        title="删除" />
@@ -140,12 +140,12 @@ else if (Platform.IsCompact)
             <MudSpacer />
 
             <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
-                           Size="Size.Small"
+                           Size="Size.Medium"
                            Disabled="@(_result.Page <= 1)"
                            OnClick="@(() => GoToPage(_result.Page - 1))" />
             <MudText Typo="Typo.body2">@_result.Page / @TotalPages</MudText>
             <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
-                           Size="Size.Small"
+                           Size="Size.Medium"
                            Disabled="@(_result.Page >= TotalPages)"
                            OnClick="@(() => GoToPage(_result.Page + 1))" />
         </div>
@@ -178,12 +178,12 @@ else
                 }
                 <MudTd>
                     <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Color="Color.Primary"
                                    OnClick="@(() => OpenEdit(context.EntityId))"
                                    title="编辑" />
                     <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Color="Color.Error"
                                    OnClick="@(() => ConfirmDelete(context.EntityId))"
                                    title="删除" />
@@ -207,12 +207,12 @@ else
                     <MudSpacer />
 
                     <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Disabled="@(_result.Page <= 1)"
                                    OnClick="@(() => GoToPage(_result.Page - 1))" />
                     <MudText Typo="Typo.body2">@_result.Page / @TotalPages</MudText>
                     <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
-                                   Size="Size.Small"
+                                   Size="Size.Medium"
                                    Disabled="@(_result.Page >= TotalPages)"
                                    OnClick="@(() => GoToPage(_result.Page + 1))" />
                 </div>

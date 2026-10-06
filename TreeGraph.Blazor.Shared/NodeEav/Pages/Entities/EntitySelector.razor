@@ -71,10 +71,11 @@
                              Style="cursor: pointer; height: 100%;"
                              Elevation="1">
                         <MudCardContent>
-                            <div class="d-flex align-center mb-2">
+                            <div class="d-flex align-center mb-2" style="min-width:0; overflow:hidden;">
                                 <MudIcon Icon="@Icons.Material.Filled.Storage"
                                          Color="Color.Primary" Size="Size.Medium" />
-                                <MudText Typo="Typo.h6" Class="ml-2">
+                                <MudText Typo="Typo.h6" Class="ml-2"
+                                         Style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                                     @GetDisplayName(captured)
                                 </MudText>
                             </div>
@@ -101,7 +102,7 @@
                             }
                         </MudCardContent>
                         <MudCardActions>
-                            <MudButton Size="Size.Small"
+                            <MudButton Size="Size.Medium"
                                        Variant="Variant.Text"
                                        Color="Color.Primary"
                                        EndIcon="@Icons.Material.Filled.ChevronRight">
@@ -170,6 +171,8 @@ else
                 共 <b>@_entities.Total</b> 个实体，第 @_page / @TotalPages 页
             </MudText>
 
+            @* 窄屏下表格超出视口，允许横向滚动 *@
+            <div style="overflow-x:auto">
             <MudTable Items="_entities.Items" Hover="true" Bordered="true"
                       Dense="true">
                 <HeaderContent>
@@ -206,12 +209,12 @@ else
                     </MudTd>
                     <MudTd>
                         <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Color="Color.Primary"
                                        OnClick="@(() => EditEntity(context.EntityId))"
                                        title="编辑" />
                         <MudIconButton Icon="@Icons.Material.Filled.History"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Color="Color.Info"
                                        OnClick="@(() => ViewHistory(context.EntityId))"
                                        title="审计历史" />
@@ -235,17 +238,18 @@ else
                         <MudSpacer />
 
                         <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Disabled="@(_page <= 1)"
                                        OnClick="@(() => GoToPageAsync(_page - 1))" />
                         <MudText Typo="Typo.body2">@_page / @TotalPages</MudText>
                         <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Disabled="@(_page >= TotalPages)"
                                        OnClick="@(() => GoToPageAsync(_page + 1))" />
                     </div>
                 </PagerContent>
             </MudTable>
+            </div>
         </MudPaper>
     }
 }

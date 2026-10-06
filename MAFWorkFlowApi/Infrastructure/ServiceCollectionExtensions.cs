@@ -1,21 +1,15 @@
 using MAFWorkFlowApi.Agents;
 using MAFWorkFlowApi.HealthChecks;
 using MAFWorkFlowApi.Services;
+using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
 namespace MAFWorkFlowApi.Infrastructure;
 
-/// <summary>
-/// Program.cs 服务注册的模块化扩展。
-/// 将原本集中在 Program.cs 中的数十行注册拆分为语义清晰的扩展方法。
-/// </summary>
 internal static class ServiceCollectionExtensions
 {
-    /// <summary>
-    /// 注册 LiteGraph 核心服务：配置绑定、命名 HttpClient、LiteGraphRestClient。
-    /// </summary>
     public static IServiceCollection AddLiteGraph(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<LiteGraphOptions>(
@@ -28,9 +22,6 @@ internal static class ServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>
-    /// 注册 Agent 相关服务：会话存储、MAF Agent、Ollama 配置与预热。
-    /// </summary>
     public static IServiceCollection AddMafAgentServices(this IServiceCollection services, IConfiguration config)
     {
         // Ollama Agent 配置绑定
@@ -54,9 +45,6 @@ internal static class ServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>
-    /// 注册图领域服务：LiteGraph SDK、图工具、Agent 编排、语义检索。
-    /// </summary>
     public static IServiceCollection AddGraphDomainServices(this IServiceCollection services, IConfiguration config)
     {
         // LiteGraph SDK + 图数据服务
@@ -82,24 +70,19 @@ internal static class ServiceCollectionExtensions
         services.AddScoped<IntentParserService>();
         services.AddScoped<SemanticSearchService>();
 
-        // RerankerService — Singleton（无状态，避免 Scoped 重复实例化刷屏日志）
+        // RerankerService — Singleton
         services.AddSingleton<RerankerService>();
 
         return services;
     }
 
-    /// <summary>
-    /// 注册 MCP Server 与健康检查。
-    /// </summary>
     public static IServiceCollection AddMcpAndHealthChecks(this IServiceCollection services)
     {
-        // MCP Server
         services
             .AddMcpServer()
             .WithHttpTransport()
             .WithTools<McpGraphTools>();
 
-        // 健康检查
         services.AddHealthChecks()
             .AddCheck<OllamaModelReadyHealthCheck>(
                 name: "ollama-model-ready",

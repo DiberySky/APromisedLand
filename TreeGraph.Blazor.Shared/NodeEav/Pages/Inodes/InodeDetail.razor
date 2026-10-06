@@ -28,7 +28,7 @@
         <MudText Typo="Typo.caption" Color="Color.Secondary">iNode ID</MudText>
         <code>@InodeId</code>
         <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                       Size="Size.Small" OnClick="CopyId" title="复制" />
+                       Size="Size.Medium" OnClick="CopyId" title="复制" />
         <MudSpacer />
         @if (Platform.IsCompact)
         {
@@ -161,7 +161,7 @@ else
                         </MudButton>
                         <MudSpacer />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Color="Color.Error"
                                        OnClick="@(async () => await DetachAsync(captured))"
                                        title="取消声明" />
@@ -189,7 +189,7 @@ else
             <MudText Typo="Typo.h6">原始 JSON 预览</MudText>
             <MudSpacer />
             <MudIconButton Icon="@Icons.Material.Filled.Close"
-                           Size="Size.Small"
+                           Size="Size.Medium"
                            OnClick="@(() => _jsonDrawerOpen = false)"
                            title="关闭" />
         </div>

@@ -1,0 +1,133 @@
+@* UnitMigrateDialog.razor — 迁移单位到其它分类（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageDialogSky Title="迁移到其它分类"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "迁移中..." : "迁移")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="MigrateAsync">
+    <DialogContent>
+        @if (Unit is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Unit.Category / @Unit.Name
+            </MudText>
+        }
+
+        <MudAlert Severity="Severity.Warning" Class="mb-3">
+            迁移后 ToBaseFactor 的语义会变化，需要重新指定。
+        </MudAlert>
+
+        <MudSelect T="string"
+                   Value="_form.NewCategory"
+                   ValueChanged="@(v => _form.NewCategory = v)"
+                   Label="目标分类"
+                   Variant="Variant.Outlined"
+                   Class="mb-3">
+            @foreach (var cat in Categories)
+            {
+                <MudSelectItem T="string" Value="@cat">@cat</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField @bind-Value="_form.NewCategory"
+                      Label="或输入新分类名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudNumericField T="decimal"
+                         @bind-Value="_form.NewToBaseFactor"
+                         Label="新的换算系数（相对新分类基准单位）"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudAlert Severity="Severity.Info">
+            保守模式：单位被属性绑定或被数值数据引用时，服务端将拒绝迁移，请先解除引用。
+        </MudAlert>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public UnitDto? Unit { get; set; }
+    [Parameter] public IEnumerable<string> Categories { get; set; } = Enumerable.Empty<string>();
+
+    private MigrateUnitCategoryForm _form = new();
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        if (Unit is not null && string.IsNullOrEmpty(_form.NewCategory))
+        {
+            _form = new MigrateUnitCategoryForm
+            {
+                NewCategory = "",
+                NewToBaseFactor = Unit.ToBaseFactor
+            };
+        }
+    }
+
+    private async Task MigrateAsync()
+    {
+        if (Unit is null) return;
+
+        if (string.IsNullOrWhiteSpace(_form.NewCategory))
+        {
+            Snackbar.Add("请选择或输入目标分类", Severity.Warning);
+            return;
+        }
+        if (_form.NewCategory == Unit.Category)
+        {
+            Snackbar.Add("目标分类与原分类相同", Severity.Warning);
+            return;
+        }
+        if (_form.NewToBaseFactor <= 0)
+        {
+            Snackbar.Add("新换算系数必须大于 0", Severity.Warning);
+            return;
+        }
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认迁移",
+            $"将「{Unit.Name}」从分类「{Unit.Category}」" +
+            $"迁移到「{_form.NewCategory}」，新系数 {_form.NewToBaseFactor}？\n\n" +
+            "此操作会改变该单位的分类归属，不可撤销。若单位仍被引用，服务端将拒绝。",
+            yesText: "确认迁移", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.MigrateUnitCategoryAsync(
+                Unit.Id,
+                new MigrateUnitCategoryRequest
+                {
+                    NewCategory = _form.NewCategory,
+                    NewToBaseFactor = _form.NewToBaseFactor
+                });
+
+            if (!ok)
+            {
+                Snackbar.Add($"迁移失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("迁移成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class MigrateUnitCategoryForm
+    {
+        public string NewCategory { get; set; } = "";
+        public decimal NewToBaseFactor { get; set; }
+    }
+}

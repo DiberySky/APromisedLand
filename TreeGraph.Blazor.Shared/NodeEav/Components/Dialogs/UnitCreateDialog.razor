@@ -1,0 +1,67 @@
+@* UnitCreateDialog.razor — 新建单位（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="新建单位"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="CreateAsync">
+    <DialogContent>
+        <MudTextField @bind-Value="_newUnit.Category" Label="分类"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_newUnit.Name" Label="名称"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_newUnit.Symbol" Label="符号"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudNumericField T="decimal" @bind-Value="_newUnit.ToBaseFactor"
+                         Label="换算系数（相对基准单位）"
+                         Variant="Variant.Outlined" Class="mb-3" />
+        <MudSwitch T="bool" @bind-Value="_newUnit.IsBaseUnit"
+                   Label="基准单位（每分类只能一个）" />
+        <MudNumericField T="int" @bind-Value="_newUnit.DisplayOrder"
+                         Label="显示顺序" Variant="Variant.Outlined"
+                         Class="mt-3" />
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private CreateUnitRequest _newUnit = new();
+    private bool _submitting;
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newUnit.Category) ||
+            string.IsNullOrWhiteSpace(_newUnit.Name) ||
+            string.IsNullOrWhiteSpace(_newUnit.Symbol))
+        {
+            Snackbar.Add("请填写分类、名称、符号", Severity.Warning);
+            return;
+        }
+        if (_newUnit.ToBaseFactor <= 0)
+        {
+            Snackbar.Add("换算系数必须大于 0", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var id = await Api.CreateUnitAsync(_newUnit);
+            if (id is null)
+            {
+                Snackbar.Add("创建失败（可能分类下已存在同名单位或基准单位）", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add($"创建成功：{id}", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

@@ -30,10 +30,10 @@ public static class TreeGraphEavApiExtension
             .WithReference(context.TreeGraphDb)
             .WaitFor(context.TreeGraphDb);
 
-        // 健康检查：动态表单 Schema 端点（内部走属性缓存 -> 数据库，可探活）
+        // 健康检查：实体类型目录端点（仅读元数据，空表也返回 200 + []）
         context.TreeGraphEavApi
             .WithHttpHealthCheck(
-                path: "/api/eav/Product/schema",
+                path: "/api/eav/entity-types",
                 statusCode: 200,
                 endpointName: "http");
 

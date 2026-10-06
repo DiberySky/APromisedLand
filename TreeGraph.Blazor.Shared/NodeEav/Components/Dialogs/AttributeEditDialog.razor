@@ -1,0 +1,229 @@
+@* AttributeEditDialog.razor — 编辑属性（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="编辑属性"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="UpdateAsync">
+    <DialogContent>
+        @if (Attribute is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Attribute.EntityType / @Attribute.AttributeName
+                （类型: @Attribute.DataType，不可修改）
+            </MudText>
+        }
+
+        <MudTextField @bind-Value="_editForm.DisplayName"
+                      Label="显示名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        @if (Attribute?.DataType is "decimal" or "int")
+        {
+            <MudSelect T="Guid?"
+                       Value="_editForm.UnitId"
+                       ValueChanged="@(v => _editForm.UnitId = v)"
+                       Label="基准单位"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">
+                    （不使用单位）
+                </MudSelectItem>
+                @foreach (var u in Units ?? new List<UnitDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">
+                        @u.Name (@u.Symbol) - @u.Category
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudAlert Severity="Severity.Warning" Class="mb-3">
+                修改基准单位不会自动转换已有数据。如需变更，请先规划数据迁移。
+            </MudAlert>
+        }
+
+        @if (Attribute?.DataType == "composite")
+        {
+            <MudSelect T="string"
+                       Value="@(_editForm.RefCompositeTypeId ?? "")"
+                       ValueChanged="@(v => _editForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
+                       Label="组合类型"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in CompositeTypes ?? new List<CompositeTypeDetailDto>())
+                {
+                    <MudSelectItem T="string" Value="@t.CompositeTypeId">
+                        @t.DisplayName (@t.TypeName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @if (Attribute?.DataType == "table")
+        {
+            <MudSelect T="string"
+                       Value="@(_editForm.RefTableDefinitionId ?? "")"
+                       ValueChanged="@(v => _editForm.RefTableDefinitionId = string.IsNullOrEmpty(v) ? null : v)"
+                       Label="自定义表"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in CustomTables ?? new List<CustomTableDetailDto>())
+                {
+                    <MudSelectItem T="string" Value="@t.TableDefinitionId">
+                        @t.DisplayName (@t.TableName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @if (Attribute?.DataType == "single_choice")
+        {
+            <MudSelect T="string"
+                       Value="@(_editForm.RefOptionSetId ?? "")"
+                       ValueChanged="@(v => _editForm.RefOptionSetId = string.IsNullOrEmpty(v) ? null : v)"
+                       Label="选项集"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var s in OptionSets ?? new List<OptionSetSummaryDto>())
+                {
+                    <MudSelectItem T="string" Value="@s.OptionSetId">
+                        @s.DisplayName (@s.SetName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        <MudNumericField T="int"
+                         @bind-Value="_editForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudGrid>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_editForm.IsRequired"
+                           Label="必填" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_editForm.IsSearchable"
+                           Label="可搜索" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_editForm.IsSortable"
+                           Label="可排序" Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>编辑目标（页面已通过 GetAttributeAsync 取详情）。</summary>
+    [Parameter] public AttributeDetailDto? Attribute { get; set; }
+    [Parameter] public IReadOnlyList<UnitDto>? Units { get; set; }
+    [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
+    [Parameter] public IReadOnlyList<CustomTableDetailDto>? CustomTables { get; set; }
+    [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
+
+    private UpdateAttributeForm _editForm = new();
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        if (Attribute is not null)
+        {
+            _editForm = new UpdateAttributeForm
+            {
+                DisplayName = Attribute.DisplayName,
+                IsRequired = Attribute.IsRequired,
+                IsSearchable = Attribute.IsSearchable,
+                IsSortable = Attribute.IsSortable,
+                DisplayOrder = Attribute.DisplayOrder,
+                UnitId = Attribute.UnitId,
+                RefCompositeTypeId = Attribute.RefCompositeTypeId,
+                RefTableDefinitionId = Attribute.RefTableDefinitionId,
+                RefOptionSetId = Attribute.RefOptionSetId
+            };
+        }
+    }
+
+    private async Task UpdateAsync()
+    {
+        if (Attribute is null) return;
+
+        var (unitId, clearUnit) = Diff(_editForm.UnitId, Attribute.UnitId);
+        var (ctId, clearCt) = Diff(_editForm.RefCompositeTypeId, Attribute.RefCompositeTypeId);
+        var (tblId, clearTbl) = Diff(_editForm.RefTableDefinitionId, Attribute.RefTableDefinitionId);
+        var (optId, clearOpt) = Diff(_editForm.RefOptionSetId, Attribute.RefOptionSetId);
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateAttributeAsync(
+                Attribute.AttributeId,
+                new UpdateAttributeRequest
+                {
+                    DisplayName = _editForm.DisplayName,
+                    IsRequired = _editForm.IsRequired,
+                    IsSearchable = _editForm.IsSearchable,
+                    IsSortable = _editForm.IsSortable,
+                    DisplayOrder = _editForm.DisplayOrder,
+
+                    UnitId = unitId,
+                    ClearUnitId = clearUnit,
+
+                    RefCompositeTypeId = ctId,
+                    ClearRefCompositeTypeId = clearCt,
+
+                    RefTableDefinitionId = tblId,
+                    ClearRefTableDefinitionId = clearTbl,
+
+                    RefOptionSetId = optId,
+                    ClearRefOptionSetId = clearOpt
+                });
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private static (T? Value, bool Clear) Diff<T>(T? current, T? original) where T : struct
+    {
+        if (current is null && original is not null) return (null, true);
+        if (current is not null && !current.Value.Equals(original)) return (current, false);
+        return (null, false);
+    }
+
+    private static (string? Value, bool Clear) Diff(string? current, string? original)
+    {
+        if (current is null && original is not null) return (null, true);
+        if (current is not null && current != original) return (current, false);
+        return (null, false);
+    }
+
+    private class UpdateAttributeForm
+    {
+        public string DisplayName { get; set; } = "";
+        public bool IsRequired { get; set; }
+        public bool IsSearchable { get; set; }
+        public bool IsSortable { get; set; }
+        public int DisplayOrder { get; set; }
+        public Guid? UnitId { get; set; }
+        public string? RefCompositeTypeId { get; set; }
+        public string? RefTableDefinitionId { get; set; }
+        public string? RefOptionSetId { get; set; }
+    }
+}

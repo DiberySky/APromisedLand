@@ -1,0 +1,73 @@
+@* UnitAssignBaseDialog.razor — 指定基准单位（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="指定基准单位"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "设置中..." : "设为基准")"
+               SubmitButtonDisabled="@(_submitting || _assignBaseUnitId is null)"
+               OnSubmitClick="AssignBaseAsync">
+    <DialogContent>
+        @if (Category is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                分类：@Category.Category
+            </MudText>
+        }
+
+        <MudAlert Severity="Severity.Info" Class="mb-3">
+            该分类当前无基准单位。请选择一个单位作为基准——此操作不会重算已有数据。
+        </MudAlert>
+
+        <MudSelect T="Guid?"
+                   Value="_assignBaseUnitId"
+                   ValueChanged="@(v => _assignBaseUnitId = v)"
+                   Label="选择单位"
+                   Variant="Variant.Outlined">
+            @if (Category is not null)
+            {
+                @foreach (var u in Category.Units)
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">
+                        @u.Name (@u.Symbol) — 系数 @u.ToBaseFactor
+                    </MudSelectItem>
+                }
+            }
+        </MudSelect>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public UnitCategoryDto? Category { get; set; }
+
+    private Guid? _assignBaseUnitId;
+    private bool _submitting;
+
+    private async Task AssignBaseAsync()
+    {
+        if (Category is null || _assignBaseUnitId is null) return;
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateUnitAsync(
+                _assignBaseUnitId.Value,
+                new UpdateUnitRequest { IsBaseUnit = true });
+
+            if (!ok)
+            {
+                Snackbar.Add($"设置失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("已设为基准单位", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

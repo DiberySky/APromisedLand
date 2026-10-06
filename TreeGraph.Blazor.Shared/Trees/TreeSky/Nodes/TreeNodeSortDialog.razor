@@ -14,7 +14,7 @@
                     <MudContainer class="@("d-flex align-items-center")">
                         <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward"
                                        Class="mr-2"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Color="Color.Info"
                                        Disabled="@(index == 0)"
                                        OnClick="@(() => Move(index, -1))" />
@@ -22,7 +22,7 @@
                         <MudText Typo="Typo.body1">@_children[index].Text()</MudText>
                         <MudSpacer />
                         <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Color="Color.Info"
                                        Disabled="@(index == _children.Count - 1)"
                                        OnClick="@(() => Move(index, 1))"/>

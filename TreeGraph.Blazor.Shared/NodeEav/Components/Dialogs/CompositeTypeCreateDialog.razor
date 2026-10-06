@@ -1,0 +1,62 @@
+@* CompositeTypeCreateDialog.razor — 新建组合类型（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="新建组合类型"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="CreateAsync">
+    <DialogContent>
+        <MudTextField @bind-Value="_newType.EntityType"
+                      Label="实体类型"
+                      HelperText="填 Shared 表示全局共享"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_newType.TypeName"
+                      Label="类型名 (PascalCase)"
+                      Placeholder="Address"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_newType.DisplayName"
+                      Label="显示名"
+                      Placeholder="地址"
+                      Variant="Variant.Outlined" />
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private CreateCompositeTypeRequest _newType = new() { EntityType = "Shared" };
+    private bool _submitting;
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newType.EntityType) ||
+            string.IsNullOrWhiteSpace(_newType.TypeName) ||
+            string.IsNullOrWhiteSpace(_newType.DisplayName))
+        {
+            Snackbar.Add("请填写所有字段", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var id = await Api.CreateCompositeTypeAsync(_newType);
+            if (id is null)
+            {
+                Snackbar.Add("创建失败", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add($"创建成功：Id={id}", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

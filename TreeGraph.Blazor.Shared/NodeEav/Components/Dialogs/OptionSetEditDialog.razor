@@ -1,0 +1,64 @@
+@* OptionSetEditDialog.razor — 编辑选项集（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="编辑选项集"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="UpdateAsync">
+    <DialogContent>
+        @if (Set is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Set.EntityType / @Set.SetName（不可修改）
+            </MudText>
+        }
+
+        <MudTextField @bind-Value="_form.DisplayName"
+                      Label="显示名"
+                      Variant="Variant.Outlined" />
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public OptionSetSummaryDto? Set { get; set; }
+
+    private UpdateOptionSetRequest _form = new();
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        if (Set is not null)
+        {
+            _form = new UpdateOptionSetRequest { DisplayName = Set.DisplayName };
+        }
+    }
+
+    private async Task UpdateAsync()
+    {
+        if (Set is null) return;
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateOptionSetAsync(
+                Set.OptionSetId, _form);
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

@@ -1,0 +1,346 @@
+@* CompositeTypeFieldDialog.razor — 添加 / 编辑组合类型字段（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="@(EditingField is null ? "添加字段" : "编辑字段")"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="SaveFieldAsync">
+    <DialogContent>
+        @if (Type is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Type.DisplayName (@Type.TypeName)
+            </MudText>
+        }
+
+        <MudTextField @bind-Value="_fieldForm.FieldName"
+                      Label="字段名 (snake_case)"
+                      Placeholder="street_name"
+                      Variant="Variant.Outlined"
+                      Disabled="@(EditingField is not null)"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_fieldForm.DisplayName"
+                      Label="显示名"
+                      Placeholder="街道名称"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudSelect T="string"
+                   Value="_fieldForm.DataType"
+                   ValueChanged="OnFieldDataTypeChanged"
+                   Label="数据类型"
+                   Variant="Variant.Outlined"
+                   Disabled="@(EditingField is not null)"
+                   Class="mb-3">
+            @foreach (var dt in DataTypeOptions)
+            {
+                <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+            }
+        </MudSelect>
+
+        @* decimal 类型的基准单位 *@
+        @if (_fieldForm.DataType == "decimal")
+        {
+            <MudSelect T="Guid?"
+                       Value="_fieldForm.UnitId"
+                       ValueChanged="@(v => _fieldForm.UnitId = v)"
+                       Label="基准单位（可选）"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">
+                    （不使用单位）
+                </MudSelectItem>
+                @foreach (var u in Units ?? (IReadOnlyList<UnitDto>)Array.Empty<UnitDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">
+                        @u.Name (@u.Symbol) - @u.Category
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @* single_choice 的选项集 *@
+        @if (_fieldForm.DataType == "single_choice")
+        {
+            <MudSelect T="string"
+                       Value="@(_fieldForm.RefOptionSetId ?? "")"
+                       ValueChanged="@(v => _fieldForm.RefOptionSetId = string.IsNullOrEmpty(v) ? null : v)"
+                       Label="选项集"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                <MudSelectItem T="string" Value="@("")">
+                    （不绑定，仅用 AllowedValues）
+                </MudSelectItem>
+                @foreach (var os in OptionSets ?? (IReadOnlyList<OptionSetSummaryDto>)Array.Empty<OptionSetSummaryDto>())
+                {
+                    <MudSelectItem T="string" Value="@os.OptionSetId">
+                        @os.DisplayName (@os.SetName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                绑定选项集后，前端渲染为下拉并显示 Label；否则使用 AllowedValues。
+            </MudText>
+        }
+
+        @* composite 类型的嵌套引用 *@
+        @if (_fieldForm.DataType == "composite")
+        {
+            <MudSelect T="string"
+                       Value="@(_fieldForm.RefCompositeTypeId ?? "")"
+                       ValueChanged="@(v => _fieldForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
+                       Label="嵌套组合类型"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in NestedTypes)
+                {
+                    <MudSelectItem T="string" Value="@t.CompositeTypeId">
+                        @t.DisplayName (@t.TypeName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        <MudGrid Class="mb-3">
+            <MudItem xs="6">
+                <MudNumericField T="int"
+                                 @bind-Value="_fieldForm.DisplayOrder"
+                                 Label="显示顺序"
+                                 Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6" Class="d-flex align-center">
+                <MudSwitch T="bool"
+                           @bind-Value="_fieldForm.IsArray"
+                           Label="数组"
+                           Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudSwitch T="bool"
+                           @bind-Value="_fieldForm.IsRequired"
+                           Label="必填"
+                           Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSwitch T="bool"
+                           @bind-Value="_fieldForm.IsSearchable"
+                           Label="可搜索"
+                           Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSwitch T="bool"
+                           @bind-Value="_fieldForm.IsSortable"
+                           Label="可排序"
+                           Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>所属组合类型。</summary>
+    [Parameter] public CompositeTypeDetailDto? Type { get; set; }
+    /// <summary>编辑目标；null 表示添加新字段。</summary>
+    [Parameter] public CompositeFieldDetailDto? EditingField { get; set; }
+    /// <summary>添加模式下的初始显示顺序（现有活动字段数 + 1）。</summary>
+    [Parameter] public int InitialDisplayOrder { get; set; }
+    /// <summary>单位引用候选（decimal 类型用）。</summary>
+    [Parameter] public IReadOnlyList<UnitDto>? Units { get; set; }
+    /// <summary>选项集候选（single_choice 类型用）。</summary>
+    [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
+    /// <summary>嵌套组合类型候选（已排除自身与已删除类型）。</summary>
+    [Parameter] public IEnumerable<CompositeTypeDetailDto> NestedTypes { get; set; }
+        = Enumerable.Empty<CompositeTypeDetailDto>();
+
+    private FieldForm _fieldForm = new();
+    private bool _submitting;
+
+    private static readonly (string Value, string Label)[] DataTypeOptions =
+    {
+        ("string",   "字符串"),
+        ("int",      "整数"),
+        ("decimal",  "小数"),
+        ("bool",     "布尔"),
+        ("datetime", "日期时间"),
+        ("date",     "日期"),
+        ("time",     "时间"),
+        ("single_choice", "单选"),
+        ("composite", "嵌套组合"),
+        ("json",     "JSON")
+    };
+
+    protected override void OnParametersSet()
+    {
+        _fieldForm = EditingField is null
+            ? new FieldForm
+            {
+                // ★ 只统计活动字段的显示顺序
+                DisplayOrder = InitialDisplayOrder,
+                IsSearchable = true
+            }
+            : new FieldForm
+            {
+                FieldName = EditingField.FieldName,
+                DisplayName = EditingField.DisplayName,
+                DataType = EditingField.DataType,
+                RefCompositeTypeId = EditingField.RefCompositeTypeId,
+                UnitId = EditingField.UnitId,
+                RefOptionSetId = EditingField.RefOptionSetId,
+                IsArray = EditingField.IsArray,
+                IsRequired = EditingField.IsRequired,
+                IsSearchable = EditingField.IsSearchable,
+                IsSortable = EditingField.IsSortable,
+                DisplayOrder = EditingField.DisplayOrder
+            };
+    }
+
+    /// <summary>
+    /// 切换类型时清空不适用的引用。
+    ///   - decimal 保留 UnitId，清空 RefOptionSetId / RefCompositeTypeId
+    ///   - single_choice 保留 RefOptionSetId，清空 UnitId / RefCompositeTypeId
+    ///   - composite 保留 RefCompositeTypeId，清空 UnitId / RefOptionSetId
+    ///   - 其它类型全部清空
+    /// </summary>
+    private void OnFieldDataTypeChanged(string dt)
+    {
+        _fieldForm.DataType = dt;
+
+        if (dt != "decimal") _fieldForm.UnitId = null;
+        if (dt != "single_choice") _fieldForm.RefOptionSetId = null;
+        if (dt != "composite") _fieldForm.RefCompositeTypeId = null;
+    }
+
+    private async Task SaveFieldAsync()
+    {
+        if (Type is null) return;
+
+        if (string.IsNullOrWhiteSpace(_fieldForm.FieldName) ||
+            string.IsNullOrWhiteSpace(_fieldForm.DisplayName))
+        {
+            Snackbar.Add("请填写字段名和显示名", Severity.Warning);
+            return;
+        }
+
+        if (_fieldForm.DataType == "composite" &&
+            _fieldForm.RefCompositeTypeId is null)
+        {
+            Snackbar.Add("组合类型字段必须指定嵌套类型", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            if (EditingField is null)
+            {
+                var id = await Api.AddCompositeFieldAsync(
+                    Type.CompositeTypeId,
+                    new CreateCompositeFieldRequest
+                    {
+                        FieldName = _fieldForm.FieldName,
+                        DisplayName = _fieldForm.DisplayName,
+                        DataType = _fieldForm.DataType,
+                        RefCompositeTypeId = _fieldForm.RefCompositeTypeId,
+                        UnitId = _fieldForm.UnitId,
+                        RefOptionSetId = _fieldForm.RefOptionSetId,
+                        IsArray = _fieldForm.IsArray,
+                        IsRequired = _fieldForm.IsRequired,
+                        IsSearchable = _fieldForm.IsSearchable,
+                        IsSortable = _fieldForm.IsSortable,
+                        DisplayOrder = _fieldForm.DisplayOrder
+                    });
+
+                if (id is null)
+                {
+                    Snackbar.Add("添加失败", Severity.Error);
+                    return;
+                }
+                Snackbar.Add($"添加成功：Id={id}", Severity.Success);
+            }
+            else
+            {
+                // diff 计算 ClearRefOptionSetId / ClearUnitId
+                var (optId, clearOpt) = Diff(
+                    _fieldForm.RefOptionSetId, EditingField.RefOptionSetId);
+                var (unitId, clearUnit) = Diff(
+                    _fieldForm.UnitId, EditingField.UnitId);
+
+                var (ok, error) = await Api.UpdateCompositeFieldAsync(
+                    Type.CompositeTypeId,
+                    EditingField.FieldId,
+                    new UpdateCompositeFieldRequest
+                    {
+                        DisplayName = _fieldForm.DisplayName,
+                        IsRequired = _fieldForm.IsRequired,
+                        IsSearchable = _fieldForm.IsSearchable,
+                        IsSortable = _fieldForm.IsSortable,
+                        DisplayOrder = _fieldForm.DisplayOrder,
+
+                        RefOptionSetId = optId,
+                        ClearRefOptionSetId = clearOpt,
+
+                        UnitId = unitId,
+                        ClearUnitId = clearUnit
+                    });
+
+                if (!ok)
+                {
+                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                    return;
+                }
+                Snackbar.Add("更新成功", Severity.Success);
+            }
+
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    /// <summary>计算 diff：返回 (要设置的值, 是否清除)。</summary>
+    private static (long? Value, bool Clear) Diff(long? current, long? original)
+    {
+        if (current is null && original is not null) return (null, true);
+        if (current is not null && current != original) return (current, false);
+        return (null, false);
+    }
+
+    /// <summary>Guid 版 diff（单位引用用）。</summary>
+    private static (Guid? Value, bool Clear) Diff(Guid? current, Guid? original)
+    {
+        if (current is null && original is not null) return (null, true);
+        if (current is not null && current != original) return (current, false);
+        return (null, false);
+    }
+
+    /// <summary>string 版 diff（ID 字符串化后用）。</summary>
+    private static (string? Value, bool Clear) Diff(string? current, string? original)
+    {
+        if (current is null && original is not null) return (null, true);
+        if (current is not null && current != original) return (current, false);
+        return (null, false);
+    }
+
+    private class FieldForm
+    {
+        public string FieldName { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string DataType { get; set; } = "string";
+        public string? RefCompositeTypeId { get; set; }
+        public Guid? UnitId { get; set; }
+        public string? RefOptionSetId { get; set; }
+        public bool IsArray { get; set; }
+        public bool IsRequired { get; set; }
+        public bool IsSearchable { get; set; }
+        public bool IsSortable { get; set; }
+        public int DisplayOrder { get; set; }
+    }
+}

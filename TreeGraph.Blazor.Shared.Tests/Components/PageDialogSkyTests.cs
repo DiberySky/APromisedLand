@@ -385,6 +385,57 @@ public class PageDialogSkyTests : BunitTestBase {
     }
 
     // ============================================================
+    // 16b. 桌面 + DialogMaxWidth 显式传参：覆盖调用方 Options.MaxWidth
+    //      （null 默认的零回归路径已由 #14 的引用相等断言覆盖）
+    // ============================================================
+
+    [Fact]
+    public async Task Desktop_DialogMaxWidth_Explicit_OverridesOptions()
+    {
+        var original = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            BackdropClick = false,
+        };
+
+        var (_, reference) = await OpenDialogWithRefAsync(
+            new DialogParameters { { "DialogMaxWidth", MaxWidth.Medium } },
+            original);
+
+        var options = ((PageDialogSky)reference.Dialog!).MudDialog!.Options;
+
+        // 显式 DialogMaxWidth 生效，不再静默忽略
+        Assert.Equal(MaxWidth.Medium, options.MaxWidth);
+        // 触发了整体替换，但调用方其他字段逐一保留
+        Assert.NotSame(original, options);
+        Assert.False(options.BackdropClick);
+    }
+
+    // ============================================================
+    // 16c. FullWidth=true + DialogMaxWidth 同时指定：FullWidth 优先
+    //      （满宽时 MaxWidth 内部按 False 处理）
+    // ============================================================
+
+    [Fact]
+    public async Task FullWidthTrue_BeatsDialogMaxWidth_MaxWidthFalse()
+    {
+        var original = new DialogOptions { MaxWidth = MaxWidth.Large };
+
+        var (_, reference) = await OpenDialogWithRefAsync(
+            new DialogParameters
+            {
+                { "FullWidth", true },
+                { "DialogMaxWidth", MaxWidth.Medium },
+            },
+            original);
+
+        var options = ((PageDialogSky)reference.Dialog!).MudDialog!.Options;
+
+        Assert.True(options.FullWidth);
+        Assert.Equal(MaxWidth.False, options.MaxWidth);
+    }
+
+    // ============================================================
     // 17. DialogOptions 属性数守卫：MudBlazor 升级新增字段时失败，
     //     提醒同步 PageDialogSky.ApplyDialogOptionsAsync 的手动拷贝列表
     // ============================================================
@@ -404,5 +455,44 @@ public class PageDialogSkyTests : BunitTestBase {
                 "FullScreen", "FullWidth", "MaxWidth", "NoHeader", "Position",
             },
             props.Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
+    }
+
+    // ============================================================
+    // 18. SubmitButtonDisabled=true：提交按钮被禁用
+    // ============================================================
+
+    [Fact]
+    public async Task SubmitButtonDisabled_True_SubmitButtonIsDisabled()
+    {
+        var provider = await OpenDialogAsync(new DialogParameters
+        {
+            { "SubmitButtonVisible", true },
+            { "SubmitButtonDisabled", true },
+        });
+
+        var submitButton = provider.FindAll(".mud-dialog-actions button")
+            .FirstOrDefault(b => b.TextContent.Trim() == "提交");
+
+        Assert.NotNull(submitButton);
+        Assert.NotNull(submitButton!.GetAttribute("disabled"));
+    }
+
+    // ============================================================
+    // 18b. SubmitButtonDisabled=false（默认）：提交按钮可用
+    // ============================================================
+
+    [Fact]
+    public async Task SubmitButtonDisabled_Default_SubmitButtonIsEnabled()
+    {
+        var provider = await OpenDialogAsync(new DialogParameters
+        {
+            { "SubmitButtonVisible", true },
+        });
+
+        var submitButton = provider.FindAll(".mud-dialog-actions button")
+            .FirstOrDefault(b => b.TextContent.Trim() == "提交");
+
+        Assert.NotNull(submitButton);
+        Assert.Null(submitButton!.GetAttribute("disabled"));
     }
 }

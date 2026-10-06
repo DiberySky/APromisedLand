@@ -13,3 +13,6 @@ playwright-report/
 playwright-browsers/
 # JetBrains Rider/IntelliJ
 .idea/
+
+# Node.js
+node_modules/

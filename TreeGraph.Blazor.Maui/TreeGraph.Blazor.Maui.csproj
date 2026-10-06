@@ -74,6 +74,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\APromisedLand.MauiServiceDefaults\APromisedLand.MauiServiceDefaults.csproj" />
         <ProjectReference Include="..\TreeGraph.Blazor.Shared\TreeGraph.Blazor.Shared.csproj"/>
     </ItemGroup>
 

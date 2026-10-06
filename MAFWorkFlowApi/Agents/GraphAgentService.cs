@@ -1,14 +1,13 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using MAFWorkFlowApi.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
-// AgentSessionStore 已迁移至 Abstractions 包
-using AgentSessionStore = Microsoft.Agents.AI.Hosting.AgentSessionStore;
+// ★ AgentSessionStore 已提升至 Microsoft.Agents.AI 命名空间
+using AgentSessionStore = Microsoft.Agents.AI.AgentSessionStore;
 
 namespace MAFWorkFlowApi.Agents;
-
-#pragma warning disable MAAI001
 
 public sealed class GraphAgentService
 {
@@ -17,7 +16,7 @@ public sealed class GraphAgentService
     private readonly IConversationCatalog _catalog;
     private readonly ToolCallContext _toolCtx;
     private readonly AssistantAgentService _assistant;
-    private readonly LlmAgentRouter _router;   // ★ 新增
+    private readonly LlmAgentRouter _router;
     private readonly ILogger<GraphAgentService> _logger;
 
     public GraphAgentService(
@@ -27,7 +26,7 @@ public sealed class GraphAgentService
         IConversationCatalog catalog,
         ToolCallContext toolCtx,
         AssistantAgentService assistant,
-        LlmAgentRouter router,   // ★ 新增
+        LlmAgentRouter router,
         ILoggerFactory loggerFactory)
     {
         _sessionStore = sessionStore;
@@ -51,29 +50,31 @@ public sealed class GraphAgentService
         string userMessage,
         CancellationToken ct)
     {
-        // ★ LLM 路由：元问题交给 AssistantAgent
+        // LLM 路由：元问题交给 AssistantAgent
         var route = await _router.RouteAsync(userMessage, ct);
         if (route == "assistant")
         {
             _logger.LogInformation("[Router] 路由到 AssistantAgent: {Msg}", userMessage);
             return await _assistant.ChatAsync(conversationId, userMessage, ct);
         }
-        
+
         var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
 
         _toolCtx.Reset();
 
+        // ★ 使用 AgentSessionStoreKey 替代 string
         var session = await _sessionStore.GetSessionAsync(
-                          _graphAgent, currentConversationId, ct)
+                          _graphAgent, new AgentSessionStoreKey(currentConversationId), ct)
                       ?? await _graphAgent.CreateSessionAsync(cancellationToken: ct);
 
         var response = await _graphAgent.RunAsync(
             userMessage, session, cancellationToken: ct);
 
+        // ★ 使用 AgentSessionStoreKey
         await _sessionStore.SaveSessionAsync(
-            _graphAgent, currentConversationId, session, ct);
+            _graphAgent, new AgentSessionStoreKey(currentConversationId), session, ct);
 
-        // ★ 读取工具调用详情列表
+        // 读取工具调用详情列表
         var toolsInvoked = _toolCtx.Records.Select(r => r.ToolName).ToList();
         var toolCallDetails = _toolCtx.Records
             .Select(r => new ToolCallDetailDto(
@@ -82,7 +83,7 @@ public sealed class GraphAgentService
                 Result: TruncateForUi(r.Result, 800),
                 ElapsedMs: r.ElapsedMs,
                 Success: r.Success,
-                FromCache: r.FromCache))   // ★ 新增
+                FromCache: r.FromCache))
             .ToList();
 
         var finalReply = SanitizeReply(response, toolsInvoked);
@@ -95,8 +96,8 @@ public sealed class GraphAgentService
             ToolsInvoked: toolsInvoked,
             ToolCallDetails: toolCallDetails);
     }
-    
-        /// <summary>
+
+    /// <summary>
     /// 流式版本的对话：逐块产出增量文本。
     /// 工具调用期间不产出内容（LLM 先决定调用哪些工具），
     /// 只流式化最终的自然语言回答。
@@ -106,7 +107,7 @@ public sealed class GraphAgentService
         string userMessage,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        // ★ LLM 路由：元问题走 AssistantAgent（非流式，包装成流式返回）
+        // LLM 路由：元问题走 AssistantAgent（非流式，包装成流式返回）
         var route = await _router.RouteAsync(userMessage, ct);
         if (route == "assistant")
         {
@@ -114,47 +115,55 @@ public sealed class GraphAgentService
 
             var reply = await _assistant.ChatAsync(conversationId, userMessage, ct);
 
-            yield return new StreamChunk(
-                Type: StreamChunkType.Start,
-                Text: null,
-                ConversationId: reply.ConversationId,
-                AgentName: reply.AgentName);   // ★
+            yield return new StreamChunk
+            {
+                Type = StreamChunkType.Start,
+                Text = null,
+                ConversationId = reply.ConversationId,
+                AgentName = reply.AgentName
+            };
 
-            yield return new StreamChunk(
-                Type: StreamChunkType.Delta,
-                Text: reply.Reply,
-                ConversationId: null,
-                AgentName: reply.AgentName);   // ★
+            yield return new StreamChunk
+            {
+                Type = StreamChunkType.Delta,
+                Text = reply.Reply,
+                ConversationId = null,
+                AgentName = reply.AgentName
+            };
 
-            yield return new StreamChunk(
-                Type: StreamChunkType.Done,
-                Text: reply.Reply,
-                ConversationId: reply.ConversationId,
-                ToolsInvoked: new List<string>(),
-                ToolCallDetails: new List<ToolCallDetailDto>(),
-                AgentName: reply.AgentName);   // ★
+            yield return new StreamChunk
+            {
+                Type = StreamChunkType.Done,
+                Text = reply.Reply,
+                ConversationId = reply.ConversationId,
+                ToolsInvoked = new List<string>(),
+                ToolCallDetails = new List<ToolCallDetailDto>(),
+                AgentName = reply.AgentName
+            };
 
             yield break;
         }
-        
+
         var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
         _toolCtx.Reset();
 
+        // ★ 使用 AgentSessionStoreKey
         var session = await _sessionStore.GetSessionAsync(
-            _graphAgent, currentConversationId, ct)
+            _graphAgent, new AgentSessionStoreKey(currentConversationId), ct)
             ?? await _graphAgent.CreateSessionAsync(cancellationToken: ct);
 
         // 先产出会话 ID，前端立即显示
-        yield return new StreamChunk(
-            Type: StreamChunkType.Start,
-            Text: null,
-            ConversationId: currentConversationId);
+        yield return new StreamChunk
+        {
+            Type = StreamChunkType.Start,
+            Text = null,
+            ConversationId = currentConversationId
+        };
 
-        var accumulated = new System.Text.StringBuilder();
+        var accumulated = new StringBuilder();
 
         await foreach (var update in _graphAgent
-            .RunStreamingAsync(userMessage, session, cancellationToken: ct)
-            .WithCancellation(ct))
+            .RunStreamingAsync(userMessage, session, cancellationToken: ct))
         {
             // 提取增量文本（只取最终回答的文本，跳过 functionCall / functionResult）
             var delta = update.Text;
@@ -171,14 +180,17 @@ public sealed class GraphAgentService
 
             accumulated.Append(delta);
 
-            yield return new StreamChunk(
-                Type: StreamChunkType.Delta,
-                Text: delta,
-                ConversationId: null);
+            yield return new StreamChunk
+            {
+                Type = StreamChunkType.Delta,
+                Text = delta,
+                ConversationId = null
+            };
         }
 
+        // ★ 使用 AgentSessionStoreKey
         await _sessionStore.SaveSessionAsync(
-            _graphAgent, currentConversationId, session, ct);
+            _graphAgent, new AgentSessionStoreKey(currentConversationId), session, ct);
 
         // 最终事件：包含完整文本 + 工具调用详情
         var toolsInvoked = _toolCtx.Records.Select(r => r.ToolName).ToList();
@@ -192,13 +204,15 @@ public sealed class GraphAgentService
             ? accumulated.ToString()
             : "（模型未返回内容）";
 
-        yield return new StreamChunk(
-            Type: StreamChunkType.Done,
-            Text: finalText,
-            ConversationId: currentConversationId,
-            ToolsInvoked: toolsInvoked,
-            ToolCallDetails: toolCallDetails,
-            AgentName: _graphAgent.Name ?? "GraphAssistant");   // ★
+        yield return new StreamChunk
+        {
+            Type = StreamChunkType.Done,
+            Text = finalText,
+            ConversationId = currentConversationId,
+            ToolsInvoked = toolsInvoked,
+            ToolCallDetails = toolCallDetails,
+            AgentName = _graphAgent.Name ?? "GraphAssistant"
+        };
     }
 
     private static string? TruncateForUi(string? text, int maxLen)
@@ -215,8 +229,7 @@ public sealed class GraphAgentService
     public ValueTask<IReadOnlyList<SessionMessage>> GetSessionMessagesAsync(
         string conversationId, CancellationToken ct)
         => _catalog.GetSessionMessagesAsync(conversationId, ct);
-    
-    // ★ 转发到 IConversationCatalog：显示名相关
+
     public ValueTask<IReadOnlyDictionary<string, string>> GetAllDisplayNamesAsync(
         CancellationToken ct)
         => _catalog.GetAllDisplayNamesAsync(ct);
@@ -347,10 +360,27 @@ public enum StreamChunkType
     Done
 }
 
-public sealed record StreamChunk(
-    StreamChunkType Type,
-    string? Text,
-    string? ConversationId,
-    IReadOnlyList<string>? ToolsInvoked = null,
-    IReadOnlyList<ToolCallDetailDto>? ToolCallDetails = null,
-    string? AgentName = null);
+/// <summary>
+/// 流式响应块。使用普通 class 并通过 JsonPropertyName 标记，
+/// 消除"自动属性访问器从未被使用"的警告。
+/// </summary>
+public sealed class StreamChunk
+{
+    [System.Text.Json.Serialization.JsonPropertyName("type")]
+    public StreamChunkType Type { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("text")]
+    public string? Text { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("conversationId")]
+    public string? ConversationId { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("toolsInvoked")]
+    public IReadOnlyList<string>? ToolsInvoked { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("toolCallDetails")]
+    public IReadOnlyList<ToolCallDetailDto>? ToolCallDetails { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("agentName")]
+    public string? AgentName { get; set; }
+}

@@ -1,0 +1,124 @@
+@* UnitRecalculateDialog.razor — 修改换算系数并重算数据（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageDialogSky Title="修改换算系数并重算"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "重算中..." : "确认重算")"
+               SubmitButtonColor="Color.Error"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="RecalculateAsync">
+    <DialogContent>
+        @if (Unit is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Unit.Category / @Unit.Name
+            </MudText>
+        }
+
+        <MudAlert Severity="Severity.Error" Class="mb-3">
+            <b>危险操作。</b>将在数据库端批量重算所有引用该单位的历史数据，请确认已备份数据库。
+        </MudAlert>
+
+        @if (Unit is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">
+                当前换算系数：<code>@Unit.ToBaseFactor</code>
+            </MudText>
+        }
+
+        <MudNumericField T="decimal"
+                         @bind-Value="_form.NewToBaseFactor"
+                         Label="新的换算系数"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            重算公式：<br />
+            · 作为输入单位：值 × 新系数 / 旧系数<br />
+            · 作为基准单位：值 × 旧系数 / 新系数<br />
+            · 同时命中两种角色：不变<br />
+            · 预计影响超过 20 万行时服务端将拒绝（请走离线脚本）
+        </MudText>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public UnitDto? Unit { get; set; }
+
+    private RecalculateUnitFactorForm _form = new();
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        if (Unit is not null && _form.NewToBaseFactor == 0)
+        {
+            _form = new RecalculateUnitFactorForm
+            {
+                NewToBaseFactor = Unit.ToBaseFactor
+            };
+        }
+    }
+
+    private async Task RecalculateAsync()
+    {
+        if (Unit is null) return;
+
+        if (_form.NewToBaseFactor <= 0)
+        {
+            Snackbar.Add("新换算系数必须大于 0", Severity.Warning);
+            return;
+        }
+        if (_form.NewToBaseFactor == Unit.ToBaseFactor)
+        {
+            Snackbar.Add("系数未变化", Severity.Info);
+            return;
+        }
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认重算",
+            $"将「{Unit.Name}」的换算系数从 {Unit.ToBaseFactor} " +
+            $"改为 {_form.NewToBaseFactor}，并在数据库端批量重算所有引用该单位的历史数据？\n\n" +
+            "操作同步执行、整体事务提交，不可撤销，请确认已备份数据库。",
+            yesText: "确认重算", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        _submitting = true;
+        try
+        {
+            var (ok, result, error) = await Api.RecalculateUnitFactorAsync(
+                Unit.Id,
+                new RecalculateUnitFactorRequest
+                {
+                    NewToBaseFactor = _form.NewToBaseFactor
+                });
+
+            if (!ok)
+            {
+                Snackbar.Add($"重算失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            var affected = result?.AffectedValues ?? 0;
+            var attrs = result?.AffectedAttributes ?? 0;
+            Snackbar.Add(
+                $"重算完成：共更新 {affected} 行数值数据（涉及 {attrs} 个属性）",
+                Severity.Success);
+
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class RecalculateUnitFactorForm
+    {
+        public decimal NewToBaseFactor { get; set; }
+    }
+}

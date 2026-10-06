@@ -23,16 +23,17 @@ public class InodeListResponsiveTests : BunitTestBase {
         _platform.IsCompact = false;
         var cut = Render<InodeList>();
 
-        Assert.Contains("min-width: 480px", cut.Markup, StringComparison.Ordinal);
+        // 宽度约束改挂在外层包装 div 上，使用 min() 函数保证窄屏不溢出
+        Assert.Contains("min-width: min(480px, 100%)", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("max-width: 640px", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Compact_QuickAccessPaper_FullWidthInput()
+    public void Any_QuickAccessPaper_NoFixedMinWidth()
     {
-        _platform.IsCompact = true;
+        // 原 IsCompact 三元分支已移除，任何平台下都不应有硬编码 480px min-width
         var cut = Render<InodeList>();
 
-        Assert.Contains("width: 100%", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("min-width: 480px", cut.Markup, StringComparison.Ordinal);
     }
 

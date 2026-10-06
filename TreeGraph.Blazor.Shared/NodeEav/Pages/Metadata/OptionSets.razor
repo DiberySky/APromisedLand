@@ -1,9 +1,8 @@
-@* OptionSets.razor *@
+@* OptionSets.razor — 选项集管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/OptionSet*Dialog.razor） *@
 @page "/metadata/option-sets"
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@* OptionSets.razor *@
 <PageTitle>选项集管理</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">选项集管理</MudText>
@@ -28,7 +27,7 @@
                 刷新
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Success"
-                       OnClick="OpenCreateSetDialog"
+                       OnClick="OpenCreateSetAsync"
                        StartIcon="@Icons.Material.Filled.Add"
                        Class="ml-2">
                 新建选项集
@@ -66,11 +65,13 @@ else
 
             <MudExpansionPanel @key="currentSet.OptionSetId">
                 <TitleContent>
-                    <div class="d-flex align-center" style="width: 100%;">
+                    <div class="d-flex align-center" style="width: 100%; min-width: 0;">
+                        <div class="d-flex align-center" style="flex: 1 1 auto; min-width: 0; overflow: hidden;">
                         <MudIcon Icon="@Icons.Material.Filled.Checklist"
                                  Color="@(currentSet.IsDeleted ? Color.Error : Color.Primary)"
                                  Class="mr-2" />
-                        <MudText Typo="Typo.subtitle1">
+                        <MudText Typo="Typo.subtitle1"
+                                 Style="flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                             @currentSet.DisplayName
                         </MudText>
                         <MudChip T="string" Size="Size.Small" Color="Color.Info"
@@ -100,7 +101,8 @@ else
                                 集合已删除
                             </MudChip>
                         }
-                        <MudSpacer />
+                        </div>
+                        <div class="d-flex align-center" style="flex: 0 0 auto;">
                         @if (!currentSet.IsDeleted)
                         {
                             @* 批量恢复选项（仅存在已删除项时显示） *@
@@ -108,18 +110,18 @@ else
                             {
                                 <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
                                                Color="Color.Success"
-                                               Size="Size.Small"
+                                               Size="Size.Medium"
                                                OnClick="@(async () => await UndeleteAllItemsAsync(currentSet))"
                                                title="@($"恢复全部 {deletedCount} 个已删除选项")" />
                             }
                             <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                            Color="Color.Primary"
-                                           Size="Size.Small"
-                                           OnClick="@(() => OpenEditSetDialog(currentSet))"
+                                           Size="Size.Medium"
+                                           OnClick="@(async () => await OpenEditSetAsync(currentSet))"
                                            title="编辑选项集" />
                             <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                            Color="Color.Error"
-                                           Size="Size.Small"
+                                           Size="Size.Medium"
                                            OnClick="@(async () => await DeleteSetAsync(currentSet))"
                                            title="删除选项集" />
                         }
@@ -128,10 +130,11 @@ else
                             @* ★ 集合级恢复 *@
                             <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
                                            Color="Color.Success"
-                                           Size="Size.Small"
+                                           Size="Size.Medium"
                                            OnClick="@(async () => await UndeleteSetAsync(currentSet))"
                                            title="恢复选项集（含全部选项）" />
                         }
+                        </div>
                     </div>
                 </TitleContent>
 
@@ -144,7 +147,7 @@ else
                                        Variant="Variant.Outlined"
                                        Color="Color.Primary"
                                        StartIcon="@Icons.Material.Filled.Add"
-                                       OnClick="@(() => OpenAddItemDialog(currentSet))">
+                                       OnClick="@(async () => await OpenAddItemAsync(currentSet))">
                                 添加选项
                             </MudButton>
                         </div>
@@ -202,28 +205,28 @@ else
                                     @if (!context.IsDeleted)
                                     {
                                         <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
-                                                       Size="Size.Small"
+                                                       Size="Size.Medium"
                                                        OnClick="@(async () => await MoveUpAsync(currentSet, context))"
                                                        title="上移" />
                                         <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
-                                                       Size="Size.Small"
+                                                       Size="Size.Medium"
                                                        OnClick="@(async () => await MoveDownAsync(currentSet, context))"
                                                        title="下移" />
                                         @if (!context.IsDefault)
                                         {
                                             <MudIconButton Icon="@Icons.Material.Filled.StarBorder"
-                                                           Size="Size.Small"
+                                                           Size="Size.Medium"
                                                            Color="Color.Warning"
                                                            OnClick="@(async () => await SetDefaultAsync(currentSet, context))"
                                                            title="设为默认" />
                                         }
                                         <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                                       Size="Size.Small"
+                                                       Size="Size.Medium"
                                                        Color="Color.Primary"
-                                                       OnClick="@(() => OpenEditItemDialog(currentSet, context))"
+                                                       OnClick="@(async () => await OpenEditItemAsync(currentSet, context))"
                                                        title="编辑" />
                                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                       Size="Size.Small"
+                                                       Size="Size.Medium"
                                                        Color="Color.Error"
                                                        OnClick="@(async () => await DeleteItemAsync(currentSet, context))"
                                                        title="删除" />
@@ -231,7 +234,7 @@ else
                                     else
                                     {
                                         <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
-                                                       Size="Size.Small"
+                                                       Size="Size.Medium"
                                                        Color="Color.Success"
                                                        OnClick="@(async () => await UndeleteItemAsync(currentSet, context))"
                                                        title="恢复" />
@@ -246,121 +249,6 @@ else
     </MudExpansionPanels>
 }
 
-@* ============================================================ *@
-@* 新建选项集 *@
-@* ============================================================ *@
-<MudDialog @bind-Visible="_showCreateSetDialog" Options="_dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">新建选项集</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudTextField @bind-Value="_newSet.EntityType"
-                      Label="实体类型"
-                      HelperText="填 Shared 表示全局共享"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
-        <MudTextField @bind-Value="_newSet.SetName"
-                      Label="集合名 (snake_case)"
-                      Placeholder="gender"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
-        <MudTextField @bind-Value="_newSet.DisplayName"
-                      Label="显示名"
-                      Placeholder="性别"
-                      Variant="Variant.Outlined" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _showCreateSetDialog = false)">取消</MudButton>
-        <MudButton Color="Color.Primary"
-                   OnClick="CreateSetAsync"
-                   Disabled="@_submitting">
-            @(_submitting ? "创建中..." : "创建")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* ============================================================ *@
-@* 编辑选项集 *@
-@* ============================================================ *@
-<MudDialog @bind-Visible="_showEditSetDialog" Options="_dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">编辑选项集</MudText>
-        @if (_editingSet is not null)
-        {
-            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                @_editingSet.EntityType / @_editingSet.SetName（不可修改）
-            </MudText>
-        }
-    </TitleContent>
-    <DialogContent>
-        <MudTextField @bind-Value="_editSetForm.DisplayName"
-                      Label="显示名"
-                      Variant="Variant.Outlined" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _showEditSetDialog = false)">取消</MudButton>
-        <MudButton Color="Color.Primary"
-                   OnClick="UpdateSetAsync"
-                   Disabled="@_submitting">
-            @(_submitting ? "保存中..." : "保存")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
-@* ============================================================ *@
-@* 添加 / 编辑选项 *@
-@* ============================================================ *@
-<MudDialog @bind-Visible="_showItemDialog" Options="_dialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            @(_editingItem is null ? "添加选项" : "编辑选项")
-        </MudText>
-        @if (_currentSet is not null)
-        {
-            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                @_currentSet.DisplayName (@_currentSet.SetName)
-            </MudText>
-        }
-    </TitleContent>
-    <DialogContent>
-        <MudTextField @bind-Value="_itemForm.Value"
-                      Label="Value（存储值，如 male）"
-                      Variant="Variant.Outlined"
-                      Disabled="@(_editingItem is not null)"
-                      Class="mb-3" />
-        @if (_editingItem is not null)
-        {
-            <MudAlert Severity="Severity.Info" Class="mb-3">
-                Value 是存储的稳定标识，不可修改。如需变更，请新建选项并迁移数据。
-            </MudAlert>
-        }
-
-        <MudTextField @bind-Value="_itemForm.Label"
-                      Label="Label（显示名，如 男）"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
-
-        <MudNumericField T="int"
-                         @bind-Value="_itemForm.DisplayOrder"
-                         Label="显示顺序"
-                         Variant="Variant.Outlined"
-                         Class="mb-3" />
-
-        <MudSwitch T="bool"
-                   @bind-Value="_itemForm.IsDefault"
-                   Label="设为默认选项"
-                   Color="Color.Primary" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _showItemDialog = false)">取消</MudButton>
-        <MudButton Color="Color.Primary"
-                   OnClick="SaveItemAsync"
-                   Disabled="@_submitting">
-            @(_submitting ? "保存中..." : "保存")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
-
 @code {
     private string? _entityType;
     private bool _includeDeleted;               // ★ 新增
@@ -369,24 +257,12 @@ else
     private bool _loading;
     private bool _initialized;
 
-    private bool _submitting;
-    private readonly DialogOptions _dialogOptions = new()
+    /// <summary>桌面端对话框选项：PageDialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
+    private static readonly DialogOptions DialogOptions = new()
     {
         MaxWidth = MaxWidth.Small,
         FullWidth = true
     };
-
-    private bool _showCreateSetDialog;
-    private CreateOptionSetRequest _newSet = new() { EntityType = "Shared" };
-
-    private bool _showEditSetDialog;
-    private OptionSetSummaryDto? _editingSet;
-    private UpdateOptionSetRequest _editSetForm = new();
-
-    private bool _showItemDialog;
-    private OptionSetSummaryDto? _currentSet;
-    private OptionItemDetailDto? _editingItem;
-    private OptionItemForm _itemForm = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -451,71 +327,32 @@ else
 
     // ---------- 选项集 CRUD ----------
 
-    private void OpenCreateSetDialog()
+    private async Task OpenCreateSetAsync()
     {
-        _newSet = new CreateOptionSetRequest { EntityType = "Shared" };
-        _showCreateSetDialog = true;
-    }
+        var dialog = await DialogService.ShowAsync<OptionSetCreateDialog>(
+            string.Empty, DialogOptions);
+        var result = await dialog.Result;
 
-    private async Task CreateSetAsync()
-    {
-        if (string.IsNullOrWhiteSpace(_newSet.EntityType) ||
-            string.IsNullOrWhiteSpace(_newSet.SetName) ||
-            string.IsNullOrWhiteSpace(_newSet.DisplayName))
+        if (result is { Canceled: false })
         {
-            Snackbar.Add("请填写所有字段", Severity.Warning);
-            return;
-        }
-
-        _submitting = true;
-        try
-        {
-            var id = await Api.CreateOptionSetAsync(_newSet);
-            if (id is null)
-            {
-                Snackbar.Add("创建失败", Severity.Error);
-                return;
-            }
-            Snackbar.Add($"创建成功：Id={id}", Severity.Success);
-            _showCreateSetDialog = false;
             await LoadAsync();
         }
-        finally
-        {
-            _submitting = false;
-        }
     }
 
-    private void OpenEditSetDialog(OptionSetSummaryDto set)
+    private async Task OpenEditSetAsync(OptionSetSummaryDto set)
     {
-        _editingSet = set;
-        _editSetForm = new UpdateOptionSetRequest { DisplayName = set.DisplayName };
-        _showEditSetDialog = true;
-    }
-
-    private async Task UpdateSetAsync()
-    {
-        if (_editingSet is null) return;
-
-        _submitting = true;
-        try
+        var parameters = new DialogParameters<OptionSetEditDialog>
         {
-            var (ok, error) = await Api.UpdateOptionSetAsync(
-                _editingSet.OptionSetId, _editSetForm);
+            { x => x.Set, set }
+        };
 
-            if (!ok)
-            {
-                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
-                return;
-            }
+        var dialog = await DialogService.ShowAsync<OptionSetEditDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
 
-            Snackbar.Add("更新成功", Severity.Success);
-            _showEditSetDialog = false;
+        if (result is { Canceled: false })
+        {
             await LoadAsync();
-        }
-        finally
-        {
-            _submitting = false;
         }
     }
 
@@ -610,91 +447,44 @@ else
 
     // ---------- 选项 CRUD ----------
 
-    private void OpenAddItemDialog(OptionSetSummaryDto set)
+    private async Task OpenAddItemAsync(OptionSetSummaryDto set)
     {
-        _currentSet = set;
-        _editingItem = null;
         var existingCount = _itemsCache.TryGetValue(set.OptionSetId, out var items)
             ? items.Count(i => !i.IsDeleted)
             : 0;
-        _itemForm = new OptionItemForm { DisplayOrder = existingCount + 1 };
-        _showItemDialog = true;
+
+        var parameters = new DialogParameters<OptionSetItemDialog>
+        {
+            { x => x.Set, set },
+            { x => x.InitialDisplayOrder, existingCount + 1 }
+        };
+
+        var dialog = await DialogService.ShowAsync<OptionSetItemDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await ReloadItemsAsync(set.OptionSetId);
+        }
     }
 
-    private void OpenEditItemDialog(
+    private async Task OpenEditItemAsync(
         OptionSetSummaryDto set, OptionItemDetailDto item)
     {
-        _currentSet = set;
-        _editingItem = item;
-        _itemForm = new OptionItemForm
+        var parameters = new DialogParameters<OptionSetItemDialog>
         {
-            Value = item.Value,
-            Label = item.Label,
-            DisplayOrder = item.DisplayOrder,
-            IsDefault = item.IsDefault
+            { x => x.Set, set },
+            { x => x.EditingItem, item }
         };
-        _showItemDialog = true;
-    }
 
-    private async Task SaveItemAsync()
-    {
-        if (_currentSet is null) return;
+        var dialog = await DialogService.ShowAsync<OptionSetItemDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
 
-        if (string.IsNullOrWhiteSpace(_itemForm.Value) ||
-            string.IsNullOrWhiteSpace(_itemForm.Label))
+        if (result is { Canceled: false })
         {
-            Snackbar.Add("请填写 Value 和 Label", Severity.Warning);
-            return;
-        }
-
-        _submitting = true;
-        try
-        {
-            if (_editingItem is null)
-            {
-                var id = await Api.AddOptionItemAsync(
-                    _currentSet.OptionSetId,
-                    new CreateOptionItemRequest
-                    {
-                        Value = _itemForm.Value,
-                        Label = _itemForm.Label,
-                        DisplayOrder = _itemForm.DisplayOrder,
-                        IsDefault = _itemForm.IsDefault
-                    });
-
-                if (id is null)
-                {
-                    Snackbar.Add("添加失败（Value 可能已存在）", Severity.Error);
-                    return;
-                }
-                Snackbar.Add($"添加成功：Id={id}", Severity.Success);
-            }
-            else
-            {
-                var (ok, error) = await Api.UpdateOptionItemAsync(
-                    _currentSet.OptionSetId,
-                    _editingItem.OptionItemId,
-                    new UpdateOptionItemRequest
-                    {
-                        Label = _itemForm.Label,
-                        DisplayOrder = _itemForm.DisplayOrder,
-                        IsDefault = _itemForm.IsDefault
-                    });
-
-                if (!ok)
-                {
-                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
-                    return;
-                }
-                Snackbar.Add("更新成功", Severity.Success);
-            }
-
-            _showItemDialog = false;
-            await ReloadItemsAsync(_currentSet.OptionSetId);
-        }
-        finally
-        {
-            _submitting = false;
+            await ReloadItemsAsync(set.OptionSetId);
         }
     }
 
@@ -817,15 +607,5 @@ else
             Snackbar.Add($"重排序失败：{error ?? "未知错误"}", Severity.Error);
 
         await ReloadItemsAsync(optionSetId);
-    }
-
-    // ---------- 辅助 ----------
-
-    private class OptionItemForm
-    {
-        public string Value { get; set; } = "";
-        public string Label { get; set; } = "";
-        public int DisplayOrder { get; set; }
-        public bool IsDefault { get; set; }
     }
 }

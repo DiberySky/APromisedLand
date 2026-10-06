@@ -99,3 +99,26 @@ h1:focus {
         padding-left: env(safe-area-inset-left);
     }
 }
+
+/* ───────── PageDialogSky 移动端适配（Hybrid 宿主） ─────────
+   模板自带的 safe-area 规则仅覆盖 iOS 普通流；MudDialog 经 Provider 以 fixed 门户
+   渲染，全屏（手机默认）时标题/操作区会压到状态栏与手势导航条。Android WebView 同样
+   支持 env(safe-area-inset-*)（viewport-fit=cover 已在 index.html 声明）。 */
+.mud-dialog-fullscreen .mud-dialog-title {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
+.mud-dialog-fullscreen .mud-dialog-actions {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* 操作区按钮最小触控目标 ≥ 44dp（Material/Android 推荐） */
+.mud-dialog-actions .mud-button-root {
+    min-height: 44px;
+}
+
+/* 标题栏图标按钮默认 40px，同样补齐到 ≥ 44dp */
+.mud-dialog-title .mud-icon-button {
+    min-width: 44px;
+    min-height: 44px;
+}

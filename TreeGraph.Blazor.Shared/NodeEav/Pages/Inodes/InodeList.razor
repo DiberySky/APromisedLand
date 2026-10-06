@@ -23,16 +23,17 @@
         快速访问
     </MudText>
     <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
-        <MudTextField T="string"
-                      @bind-Value="_quickInodeId"
-                      Label="iNode ID (GUID)"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      Style="@(Platform.IsCompact
-                          ? "width: 100%;"
-                          : "min-width: 480px; max-width: 640px;")"
-                      Immediate="true" />
+        @* 宽度约束必须挂在外层包装 div（flex item）上：MudTextField 的 Style 落在内层 .mud-input，
+           无法约束外层 .mud-input-control 的占位宽度。min(480px,100%) 保证窄屏不溢出。 *@
+        <div style="flex: 1 1 480px; min-width: min(480px, 100%); max-width: 640px;">
+            <MudTextField T="string"
+                          @bind-Value="_quickInodeId"
+                          Label="iNode ID (GUID)"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                          Immediate="true" />
+        </div>
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.ArrowForward"
                    OnClick="GoToQuickInode"
@@ -62,11 +63,11 @@
                         <code>@inode</code>
                         <MudSpacer />
                         <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        OnClick="@(e => CopyId(inode))"
                                        title="复制" />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Size="Size.Small"
+                                       Size="Size.Medium"
                                        Color="Color.Error"
                                        OnClick="@(() => RemoveRecent(inode))"
                                        title="移除记录" />

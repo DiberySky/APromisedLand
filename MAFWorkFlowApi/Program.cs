@@ -2,10 +2,8 @@ using MAFWorkFlowApi.Agents;
 using MAFWorkFlowApi.HealthChecks;
 using MAFWorkFlowApi.Infrastructure;
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.AI;
 using OllamaSharp;
-using AgentSessionStore = Microsoft.Agents.AI.Hosting.AgentSessionStore;
 
 #pragma warning disable EXTEXP0001
 
@@ -44,7 +42,6 @@ builder.Services.AddHttpClient(OllamaWarmupService.HttpClientName)
     .ConfigureHttpClient(client =>
         client.Timeout = TimeSpan.FromMinutes(10));
 
-// ★ 合并：Reranker HttpClient 只注册一次
 builder.Services.AddHttpClient("Reranker")
     .ConfigureHttpClient(client =>
     {
@@ -116,10 +113,7 @@ builder.Services.AddMcpAndHealthChecks();
 var app = builder.Build();
 
 // ---------------------------------------------------------------------------
-// ★ 15. 中间件管线（顺序已修正）
-//    ★ LiteGraphExceptionMiddleware 必须放在最外层：
-//      1) 先于 DeveloperExceptionPage 捕获 HttpRequestException，避免堆栈泄漏
-//      2) 下游任何中间件抛出的 HTTP 异常都会被统一映射为 JSON
+// 15. 中间件管线（顺序已修正）
 // ---------------------------------------------------------------------------
 app.UseMiddleware<LiteGraphExceptionMiddleware>();
 

@@ -1,0 +1,240 @@
+@* CustomTableColumnDialog.razor — 添加 / 编辑自定义表列（PageDialogSky 外壳，DialogService 模式；供 Metadata/CustomTables 页面使用） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="@(EditingColumn is null ? "添加列" : "编辑列")"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="SaveColumnAsync">
+    <DialogContent>
+        @if (Table is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Table.DisplayName (@Table.TableName)
+            </MudText>
+        }
+
+        <MudTextField @bind-Value="_columnForm.ColumnName"
+                      Label="列名 (snake_case)"
+                      Placeholder="weight"
+                      Variant="Variant.Outlined"
+                      Disabled="@(EditingColumn is not null)"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_columnForm.DisplayName"
+                      Label="显示名"
+                      Placeholder="重量"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudSelect T="string"
+                   Value="_columnForm.DataType"
+                   ValueChanged="OnColumnDataTypeChanged"
+                   Label="数据类型"
+                   Variant="Variant.Outlined"
+                   Disabled="@(EditingColumn is not null)"
+                   Class="mb-3">
+            @foreach (var dt in DataTypeOptions)
+            {
+                <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+            }
+        </MudSelect>
+
+        @if (_columnForm.DataType == "composite")
+        {
+            <MudSelect T="string"
+                       Value="@(_columnForm.RefCompositeTypeId ?? "")"
+                       ValueChanged="@(v => _columnForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
+                       Label="嵌套组合类型"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in CompositeTypes ?? (IReadOnlyList<CompositeTypeDetailDto>)Array.Empty<CompositeTypeDetailDto>())
+                {
+                    <MudSelectItem T="string" Value="@t.CompositeTypeId">
+                        @t.DisplayName (@t.TypeName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        <MudNumericField T="int"
+                         @bind-Value="_columnForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudSwitch T="bool"
+                           @bind-Value="_columnForm.IsRequired"
+                           Label="必填"
+                           Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSwitch T="bool"
+                           @bind-Value="_columnForm.IsSearchable"
+                           Label="可搜索"
+                           Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSwitch T="bool"
+                           @bind-Value="_columnForm.IsSortable"
+                           Label="可排序"
+                           Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSwitch T="bool"
+                           @bind-Value="_columnForm.IsUnique"
+                           Label="唯一"
+                           Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>所属自定义表。</summary>
+    [Parameter] public CustomTableDetailDto? Table { get; set; }
+    /// <summary>编辑目标；null 表示添加新列。</summary>
+    [Parameter] public CustomTableColumnDto? EditingColumn { get; set; }
+    /// <summary>添加模式下的初始显示顺序（由页面按各自口径计算后传入）。</summary>
+    [Parameter] public int InitialDisplayOrder { get; set; }
+    /// <summary>组合类型候选（composite 类型列用）。</summary>
+    [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
+
+    private ColumnForm _columnForm = new();
+    private bool _submitting;
+
+    private static readonly (string Value, string Label)[] DataTypeOptions =
+    {
+        ("string",   "字符串"),
+        ("int",      "整数"),
+        ("decimal",  "小数"),
+        ("bool",     "布尔"),
+        ("datetime", "日期时间"),
+        ("date",     "日期"),
+        ("time",     "时间"),
+        ("single_choice", "单选"),
+        ("composite", "嵌套组合"),
+        ("json",     "JSON")
+    };
+
+    protected override void OnParametersSet()
+    {
+        _columnForm = EditingColumn is null
+            ? new ColumnForm
+            {
+                DisplayOrder = InitialDisplayOrder,
+                IsSearchable = true
+            }
+            : new ColumnForm
+            {
+                ColumnName = EditingColumn.ColumnName,
+                DisplayName = EditingColumn.DisplayName,
+                DataType = EditingColumn.DataType,
+                RefCompositeTypeId = EditingColumn.RefCompositeTypeId,
+                IsRequired = EditingColumn.IsRequired,
+                IsSearchable = EditingColumn.IsSearchable,
+                IsSortable = EditingColumn.IsSortable,
+                IsUnique = EditingColumn.IsUnique,
+                DisplayOrder = EditingColumn.DisplayOrder
+            };
+    }
+
+    private void OnColumnDataTypeChanged(string dt)
+    {
+        _columnForm.DataType = dt;
+        if (dt != "composite") _columnForm.RefCompositeTypeId = null;
+    }
+
+    private async Task SaveColumnAsync()
+    {
+        if (Table is null) return;
+
+        if (string.IsNullOrWhiteSpace(_columnForm.ColumnName) ||
+            string.IsNullOrWhiteSpace(_columnForm.DisplayName))
+        {
+            Snackbar.Add("请填写列名和显示名", Severity.Warning);
+            return;
+        }
+
+        if (_columnForm.DataType == "composite" &&
+            _columnForm.RefCompositeTypeId is null)
+        {
+            Snackbar.Add("组合类型列必须指定嵌套类型", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            if (EditingColumn is null)
+            {
+                var id = await Api.AddCustomTableColumnAsync(
+                    Table.TableDefinitionId,
+                    new CreateTableColumnRequest
+                    {
+                        ColumnName = _columnForm.ColumnName,
+                        DisplayName = _columnForm.DisplayName,
+                        DataType = _columnForm.DataType,
+                        RefCompositeTypeId = _columnForm.RefCompositeTypeId,
+                        IsRequired = _columnForm.IsRequired,
+                        IsSearchable = _columnForm.IsSearchable,
+                        IsSortable = _columnForm.IsSortable,
+                        IsUnique = _columnForm.IsUnique,
+                        DisplayOrder = _columnForm.DisplayOrder
+                    });
+
+                if (id is null)
+                {
+                    Snackbar.Add("添加失败", Severity.Error);
+                    return;
+                }
+                Snackbar.Add($"添加成功：Id={id}", Severity.Success);
+            }
+            else
+            {
+                var (ok, error) = await Api.UpdateTableColumnAsync(
+                    Table.TableDefinitionId,
+                    EditingColumn.ColumnId,
+                    new UpdateTableColumnRequest
+                    {
+                        DisplayName = _columnForm.DisplayName,
+                        IsRequired = _columnForm.IsRequired,
+                        IsSearchable = _columnForm.IsSearchable,
+                        IsSortable = _columnForm.IsSortable,
+                        IsUnique = _columnForm.IsUnique,
+                        DisplayOrder = _columnForm.DisplayOrder
+                    });
+
+                if (!ok)
+                {
+                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                    return;
+                }
+                Snackbar.Add("更新成功", Severity.Success);
+            }
+
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class ColumnForm
+    {
+        public string ColumnName { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string DataType { get; set; } = "string";
+        public string? RefCompositeTypeId { get; set; }
+        public bool IsRequired { get; set; }
+        public bool IsSearchable { get; set; }
+        public bool IsSortable { get; set; }
+        public bool IsUnique { get; set; }
+        public int DisplayOrder { get; set; }
+    }
+}

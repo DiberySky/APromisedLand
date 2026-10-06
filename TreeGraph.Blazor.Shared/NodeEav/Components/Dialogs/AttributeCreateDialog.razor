@@ -1,0 +1,313 @@
+@* AttributeCreateDialog.razor — 新建属性（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="新建属性"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="CreateAsync">
+    <DialogContent>
+        @* 实体类型（下拉） *@
+        <MudSelect T="string"
+                   Value="_createForm.EntityType"
+                   ValueChanged="@(v => _createForm.EntityType = v)"
+                   Label="实体类型"
+                   Variant="Variant.Outlined"
+                   Class="mb-3"
+                   HelperText="如需新类型，请先到「实体类型管理」创建">
+            @foreach (var et in EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
+            {
+                <MudSelectItem T="string" Value="@et.EntityType">
+                    @GetDisplayName(et)
+                </MudSelectItem>
+            }
+        </MudSelect>
+
+        @* 显示名（必填，中文） *@
+        <MudTextField @bind-Value="_createForm.DisplayName"
+                      Label="显示名"
+                      Placeholder="屏幕尺寸"
+                      Variant="Variant.Outlined"
+                      Class="mb-3"
+                      HelperText="用户在界面上看到的名字" />
+
+        @* 数据类型 *@
+        <MudSelect T="string"
+                   Value="_createForm.DataType"
+                   ValueChanged="OnCreateDataTypeChanged"
+                   Label="数据类型"
+                   Variant="Variant.Outlined"
+                   Class="mb-3">
+            @foreach (var dt in DataTypeOptions)
+            {
+                <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+            }
+        </MudSelect>
+
+        @* int / decimal：单位 *@
+        @if (_createForm.DataType is "decimal" or "int")
+        {
+            <MudSelect T="Guid?"
+                       Value="_createForm.UnitId"
+                       ValueChanged="@(v => _createForm.UnitId = v)"
+                       Label="基准单位（可选）"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">
+                    （不使用单位）
+                </MudSelectItem>
+                @foreach (var u in Units ?? new List<UnitDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">
+                        @u.Name (@u.Symbol) - @u.Category
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @* composite *@
+        @if (_createForm.DataType == "composite")
+        {
+            <MudSelect T="string"
+                       Value="@(_createForm.RefCompositeTypeId ?? "")"
+                       ValueChanged="@(v => _createForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
+                       Label="组合类型"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in CompositeTypes ?? new List<CompositeTypeDetailDto>())
+                {
+                    <MudSelectItem T="string" Value="@t.CompositeTypeId">
+                        @t.DisplayName (@t.TypeName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @* table *@
+        @if (_createForm.DataType == "table")
+        {
+            <MudSelect T="string"
+                       Value="@(_createForm.RefTableDefinitionId ?? "")"
+                       ValueChanged="@(v => _createForm.RefTableDefinitionId = string.IsNullOrEmpty(v) ? null : v)"
+                       Label="自定义表"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var t in CustomTables ?? new List<CustomTableDetailDto>())
+                {
+                    <MudSelectItem T="string" Value="@t.TableDefinitionId">
+                        @t.DisplayName (@t.TableName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @* single_choice *@
+        @if (_createForm.DataType == "single_choice")
+        {
+            <MudSelect T="string"
+                       Value="@(_createForm.RefOptionSetId ?? "")"
+                       ValueChanged="@(v => _createForm.RefOptionSetId = string.IsNullOrEmpty(v) ? null : v)"
+                       Label="选项集"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var s in OptionSets ?? new List<OptionSetSummaryDto>())
+                {
+                    <MudSelectItem T="string" Value="@s.OptionSetId">
+                        @s.DisplayName (@s.SetName)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        <MudNumericField T="int"
+                         @bind-Value="_createForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudGrid>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_createForm.IsRequired"
+                           Label="必填" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_createForm.IsSearchable"
+                           Label="可搜索" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_createForm.IsSortable"
+                           Label="可排序" Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+
+        @* 高级选项：AttributeName 可选覆盖 *@
+        <MudExpansionPanels Class="mt-3">
+            <MudExpansionPanel Text="高级选项（内部标识）">
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                    <MudText Typo="Typo.caption">
+                        内部标识（AttributeName）会出现在 <b>JSON key</b>、
+                        查询过滤、审计日志、导出列名里。
+                        留空则系统自动生成（如 <code>attr_3f9a2b1c8d4e</code>）。
+                        如需与外部系统对接，建议手动指定可读的英文标识。
+                    </MudText>
+                </MudAlert>
+                <MudTextField @bind-Value="_createForm.AttributeName"
+                              Label="内部标识（可选）"
+                              Placeholder="screen_size"
+                              Variant="Variant.Outlined"
+                              HelperText="留空自动生成；填了则：字母开头，只含字母/数字/下划线"
+                              Immediate="true" />
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>初始实体类型（页面当前选中项）。</summary>
+    [Parameter] public string? EntityType { get; set; }
+    /// <summary>新建模式下的初始显示顺序（现有属性数 + 1）。</summary>
+    [Parameter] public int InitialDisplayOrder { get; set; }
+    [Parameter] public IReadOnlyList<EntityTypeSummaryDto>? EntityTypes { get; set; }
+    [Parameter] public IReadOnlyList<UnitDto>? Units { get; set; }
+    [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
+    [Parameter] public IReadOnlyList<CustomTableDetailDto>? CustomTables { get; set; }
+    [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
+
+    private CreateAttributeForm _createForm = new();
+    private bool _submitting;
+
+    private static readonly (string Value, string Label)[] DataTypeOptions =
+    {
+        ("string",   "字符串"),
+        ("int",      "整数"),
+        ("decimal",  "小数"),
+        ("bool",     "布尔"),
+        ("datetime", "日期时间"),
+        ("date",     "日期"),
+        ("time",     "时间"),
+        ("single_choice", "单选"),
+        ("file",     "文件"),
+        ("composite", "组合类型"),
+        ("table",    "自定义表"),
+        ("json",     "JSON")
+    };
+
+    protected override void OnParametersSet()
+    {
+        _createForm = new CreateAttributeForm
+        {
+            EntityType = EntityType ?? "",
+            DisplayOrder = InitialDisplayOrder,
+            IsSearchable = true
+        };
+    }
+
+    private static string GetDisplayName(EntityTypeSummaryDto et)
+        => string.IsNullOrWhiteSpace(et.DisplayName)
+            ? et.EntityType
+            : et.DisplayName;
+
+    private void OnCreateDataTypeChanged(string dt)
+    {
+        _createForm.DataType = dt;
+        if (dt is not ("decimal" or "int")) _createForm.UnitId = null;
+        if (dt != "composite") _createForm.RefCompositeTypeId = null;
+        if (dt != "table") _createForm.RefTableDefinitionId = null;
+        if (dt != "single_choice") _createForm.RefOptionSetId = null;
+    }
+
+    private async Task CreateAsync()
+    {
+        var f = _createForm;
+        if (string.IsNullOrWhiteSpace(f.EntityType) ||
+            string.IsNullOrWhiteSpace(f.DisplayName))
+        {
+            Snackbar.Add("请填写实体类型、显示名", Severity.Warning);
+            return;
+        }
+        if (f.DataType == "composite" && f.RefCompositeTypeId is null)
+        {
+            Snackbar.Add("组合类型必须选择引用的类型", Severity.Warning);
+            return;
+        }
+        if (f.DataType == "table" && f.RefTableDefinitionId is null)
+        {
+            Snackbar.Add("自定义表必须选择引用的表", Severity.Warning);
+            return;
+        }
+        if (f.DataType == "single_choice" && f.RefOptionSetId is null)
+        {
+            Snackbar.Add("单选类型必须选择选项集", Severity.Warning);
+            return;
+        }
+
+        // 高级选项校验（如填了 AttributeName）
+        if (!string.IsNullOrWhiteSpace(f.AttributeName))
+        {
+            var name = f.AttributeName.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(
+                    name, @"^[A-Za-z][A-Za-z0-9_]*$"))
+            {
+                Snackbar.Add(
+                    "内部标识必须以字母开头，只含字母、数字、下划线（或留空自动生成）",
+                    Severity.Warning);
+                return;
+            }
+        }
+
+        _submitting = true;
+        try
+        {
+            var id = await Api.CreateAttributeAsync(new CreateAttributeRequest
+            {
+                EntityType = f.EntityType,
+                // null / 空 → 服务端自动生成
+                AttributeName = string.IsNullOrWhiteSpace(f.AttributeName)
+                    ? null
+                    : f.AttributeName.Trim(),
+                DisplayName = f.DisplayName.Trim(),
+                DataType = f.DataType,
+                IsRequired = f.IsRequired,
+                IsSearchable = f.IsSearchable,
+                IsSortable = f.IsSortable,
+                DisplayOrder = f.DisplayOrder,
+                UnitId = f.UnitId,
+                RefCompositeTypeId = f.RefCompositeTypeId,
+                RefTableDefinitionId = f.RefTableDefinitionId,
+                RefOptionSetId = f.RefOptionSetId
+            });
+
+            if (id is null)
+            {
+                Snackbar.Add("创建失败", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add($"创建成功：{f.DisplayName}", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class CreateAttributeForm
+    {
+        public string EntityType { get; set; } = "";
+        public string? AttributeName { get; set; }    // 可空
+        public string DisplayName { get; set; } = "";
+        public string DataType { get; set; } = "string";
+        public bool IsRequired { get; set; }
+        public bool IsSearchable { get; set; }
+        public bool IsSortable { get; set; }
+        public int DisplayOrder { get; set; }
+        public Guid? UnitId { get; set; }
+        public string? RefCompositeTypeId { get; set; }
+        public string? RefTableDefinitionId { get; set; }
+        public string? RefOptionSetId { get; set; }
+    }
+}

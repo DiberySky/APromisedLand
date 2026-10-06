@@ -1,0 +1,142 @@
+@* OptionSetItemDialog.razor — 添加 / 编辑选项（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="@(EditingItem is null ? "添加选项" : "编辑选项")"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="SaveAsync">
+    <DialogContent>
+        @if (Set is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Set.DisplayName (@Set.SetName)
+            </MudText>
+        }
+
+        <MudTextField @bind-Value="_form.Value"
+                      Label="Value（存储值，如 male）"
+                      Variant="Variant.Outlined"
+                      Disabled="@(EditingItem is not null)"
+                      Class="mb-3" />
+        @if (EditingItem is not null)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-3">
+                Value 是存储的稳定标识，不可修改。如需变更，请新建选项并迁移数据。
+            </MudAlert>
+        }
+
+        <MudTextField @bind-Value="_form.Label"
+                      Label="Label（显示名，如 男）"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudNumericField T="int"
+                         @bind-Value="_form.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        <MudSwitch T="bool"
+                   @bind-Value="_form.IsDefault"
+                   Label="设为默认选项"
+                   Color="Color.Primary" />
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>所属选项集。</summary>
+    [Parameter] public OptionSetSummaryDto? Set { get; set; }
+    /// <summary>编辑目标；null 表示添加新选项。</summary>
+    [Parameter] public OptionItemDetailDto? EditingItem { get; set; }
+    /// <summary>添加模式下的初始显示顺序（现有活动项数 + 1）。</summary>
+    [Parameter] public int InitialDisplayOrder { get; set; }
+
+    private OptionItemForm _form = new();
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        _form = EditingItem is null
+            ? new OptionItemForm { DisplayOrder = InitialDisplayOrder }
+            : new OptionItemForm
+            {
+                Value = EditingItem.Value,
+                Label = EditingItem.Label,
+                DisplayOrder = EditingItem.DisplayOrder,
+                IsDefault = EditingItem.IsDefault
+            };
+    }
+
+    private async Task SaveAsync()
+    {
+        if (Set is null) return;
+
+        if (string.IsNullOrWhiteSpace(_form.Value) ||
+            string.IsNullOrWhiteSpace(_form.Label))
+        {
+            Snackbar.Add("请填写 Value 和 Label", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            if (EditingItem is null)
+            {
+                var id = await Api.AddOptionItemAsync(
+                    Set.OptionSetId,
+                    new CreateOptionItemRequest
+                    {
+                        Value = _form.Value,
+                        Label = _form.Label,
+                        DisplayOrder = _form.DisplayOrder,
+                        IsDefault = _form.IsDefault
+                    });
+
+                if (id is null)
+                {
+                    Snackbar.Add("添加失败（Value 可能已存在）", Severity.Error);
+                    return;
+                }
+                Snackbar.Add($"添加成功：Id={id}", Severity.Success);
+            }
+            else
+            {
+                var (ok, error) = await Api.UpdateOptionItemAsync(
+                    Set.OptionSetId,
+                    EditingItem.OptionItemId,
+                    new UpdateOptionItemRequest
+                    {
+                        Label = _form.Label,
+                        DisplayOrder = _form.DisplayOrder,
+                        IsDefault = _form.IsDefault
+                    });
+
+                if (!ok)
+                {
+                    Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                    return;
+                }
+                Snackbar.Add("更新成功", Severity.Success);
+            }
+
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class OptionItemForm
+    {
+        public string Value { get; set; } = "";
+        public string Label { get; set; } = "";
+        public int DisplayOrder { get; set; }
+        public bool IsDefault { get; set; }
+    }
+}

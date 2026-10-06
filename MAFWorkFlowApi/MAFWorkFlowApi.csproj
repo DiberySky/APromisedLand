@@ -4,18 +4,19 @@
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <NoWarn>$(NoWarn);MAAI001</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.6.0" />
         <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.6.0" />
-        <PackageReference Include="LiteGraph.Sdk" Version="10.0.0" />
+        <PackageReference Include="LiteGraph.Sdk" Version="10.1.0" />
         <PackageReference Include="Microsoft.Agents.AI" Version="1.23.0" />
         <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.23.0" />
-        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.21.0-preview.260911.1" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.23.0-preview.260928.1" />
         <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.23.0">
-          <PrivateAssets>all</PrivateAssets>
-          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.12" />
@@ -24,7 +25,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
     </ItemGroup>
 
 </Project>

@@ -27,6 +27,7 @@ void TreeGraph()
 
     // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi)
     builder.AddTreeGraphBlazor(context);
+    builder.AddTreeGraphMaui(context);
 }
 
 void MafRagApi()

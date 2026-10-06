@@ -1,0 +1,95 @@
+@* CustomTableEditDialog.razor — 编辑自定义表（PageDialogSky 外壳，DialogService 模式；供 Metadata/CustomTables 页面使用） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="编辑自定义表"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="UpdateAsync">
+    <DialogContent>
+        @if (Table is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Table.EntityType / @Table.TableName
+                （表名与实体类型不可修改）
+            </MudText>
+        }
+
+        <MudTextField @bind-Value="_editTableForm.DisplayName"
+                      Label="显示名"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudNumericField T="int?"
+                         @bind-Value="_editTableForm.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+        <MudAlert Severity="Severity.Info">
+            TableName 与 EntityType 是引用标识，不可修改。如需更名，请新建并迁移引用。
+        </MudAlert>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public CustomTableDetailDto? Table { get; set; }
+
+    private UpdateCustomTableRequest _editTableForm = new();
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        if (Table is not null)
+        {
+            _editTableForm = new UpdateCustomTableRequest
+            {
+                DisplayName = Table.DisplayName,
+                DisplayOrder = Table.DisplayOrder
+            };
+        }
+    }
+
+    private async Task UpdateAsync()
+    {
+        if (Table is null) return;
+
+        if (string.IsNullOrWhiteSpace(_editTableForm.DisplayName))
+        {
+            Snackbar.Add("显示名不能为空", Severity.Warning);
+            return;
+        }
+
+        // 未变更则直接关闭，避免无谓请求（后端 null 语义为"不修改"）
+        var unchanged =
+            _editTableForm.DisplayName == Table.DisplayName &&
+            _editTableForm.DisplayOrder == Table.DisplayOrder;
+
+        if (unchanged)
+        {
+            MudDialog?.Close(DialogResult.Cancel());
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateCustomTableAsync(
+                Table.TableDefinitionId, _editTableForm);
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

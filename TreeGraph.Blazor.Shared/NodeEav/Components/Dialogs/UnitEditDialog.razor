@@ -1,0 +1,250 @@
+@* UnitEditDialog.razor — 编辑单位（含高级操作；PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageDialogSky Title="编辑单位"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="UpdateAsync">
+    <DialogContent>
+        @if (Unit is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                @Unit.Category / @Unit.Name
+            </MudText>
+        }
+
+        <MudTextField @bind-Value="_form.Name" Label="名称"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField @bind-Value="_form.Symbol" Label="符号"
+                      Variant="Variant.Outlined" Class="mb-3" />
+        <MudNumericField T="int" @bind-Value="_form.DisplayOrder"
+                         Label="显示顺序"
+                         Variant="Variant.Outlined" Class="mb-3" />
+
+        @if (Unit is not null)
+        {
+            <MudSwitch T="bool"
+                       Value="_form.IsBaseUnit"
+                       ValueChanged="OnIsBaseUnitChanged"
+                       Label="基准单位（同分类仅一个）"
+                       Color="Color.Primary"
+                       Disabled="@Unit.IsBaseUnit" />
+
+            @if (Unit.IsBaseUnit)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-3">
+                    该单位已是基准单位。若要更换基准，请在另一个单位上勾选"基准单位"。
+                </MudAlert>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-3">
+                    勾选后本分类的其它基准单位会自动降级。
+                </MudAlert>
+            }
+
+            <MudDivider Class="my-4" />
+
+            @* ★ 高级操作（打开子对话框） *@
+            <MudExpansionPanels>
+                <MudExpansionPanel Text="高级操作">
+                    <MudAlert Severity="Severity.Warning" Class="mb-3">
+                        以下操作会修改已有数据的语义或分类归属，请谨慎执行。建议先备份数据库。
+                    </MudAlert>
+
+                    <div class="d-flex flex-column gap-2">
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.SwapHoriz"
+                                   OnClick="OpenMigrateDialogAsync">
+                            迁移到其它分类
+                        </MudButton>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2 mb-2">
+                            仅允许迁移无引用的单位；被属性或数值数据引用时服务端将拒绝。
+                        </MudText>
+
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.Calculate"
+                                   OnClick="OpenRecalculateDialogAsync">
+                            修改换算系数并重算数据
+                        </MudButton>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
+                            数据库端批量重算（通常几秒内完成）；预计超过 20 万行时服务端将拒绝。
+                        </MudText>
+                    </div>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public UnitDto? Unit { get; set; }
+    /// <summary>全部分类名（迁移对话框的目标分类选项）。</summary>
+    [Parameter] public IEnumerable<string> Categories { get; set; } = Enumerable.Empty<string>();
+
+    private UpdateUnitForm _form = new();
+    private bool _submitting;
+
+    private static readonly DialogOptions DialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (Unit is not null)
+        {
+            _form = new UpdateUnitForm
+            {
+                Name = Unit.Name,
+                Symbol = Unit.Symbol,
+                DisplayOrder = Unit.DisplayOrder,
+                IsBaseUnit = Unit.IsBaseUnit
+            };
+        }
+    }
+
+    private async Task OnIsBaseUnitChanged(bool desired)
+    {
+        if (Unit is null) return;
+
+        if (!desired && Unit.IsBaseUnit)
+        {
+            Snackbar.Add(
+                "不能直接取消基准单位。如需切换，请在目标单位上勾选'基准单位'。",
+                Severity.Warning);
+            _form.IsBaseUnit = true;
+            return;
+        }
+
+        if (desired && !Unit.IsBaseUnit)
+        {
+            var confirmed = await DialogService.ShowMessageBoxAsync(
+                "设为基准单位",
+                $"将「{Unit.Name}」({Unit.Symbol}) " +
+                $"设为分类「{Unit.Category}」的基准单位？\n\n" +
+                "· 本分类现有的基准单位将自动降级。\n" +
+                "· 已有属性值按原基准单位归一化存储，切换基准会导致数值语义变化。\n" +
+                "· 若属性目录中存在绑定到本分类基准单位的属性，请评估后再操作。",
+                yesText: "确认", cancelText: "取消");
+
+            _form.IsBaseUnit = confirmed == true;
+            return;
+        }
+
+        _form.IsBaseUnit = desired;
+    }
+
+    private async Task UpdateAsync()
+    {
+        if (Unit is null) return;
+
+        if (string.IsNullOrWhiteSpace(_form.Name))
+        {
+            Snackbar.Add("名称不能为空", Severity.Warning);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_form.Symbol))
+        {
+            Snackbar.Add("符号不能为空", Severity.Warning);
+            return;
+        }
+
+        var baseUnchanged = _form.IsBaseUnit == Unit.IsBaseUnit || Unit.IsBaseUnit;
+
+        if (_form.Name == Unit.Name &&
+            _form.Symbol == Unit.Symbol &&
+            _form.DisplayOrder == Unit.DisplayOrder &&
+            baseUnchanged)
+        {
+            MudDialog?.Close(DialogResult.Cancel());
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateUnitAsync(
+                Unit.Id,
+                new UpdateUnitRequest
+                {
+                    Name = _form.Name,
+                    Symbol = _form.Symbol,
+                    DisplayOrder = _form.DisplayOrder,
+                    IsBaseUnit = !Unit.IsBaseUnit && _form.IsBaseUnit
+                        ? true
+                        : null
+                });
+
+            if (!ok)
+            {
+                Snackbar.Add($"更新失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("更新成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // ---------- 高级操作（子对话框；成功时连同本对话框一起关闭） ----------
+
+    private async Task OpenMigrateDialogAsync()
+    {
+        if (Unit is null) return;
+
+        var parameters = new DialogParameters<UnitMigrateDialog>
+        {
+            { x => x.Unit, Unit },
+            { x => x.Categories, Categories }
+        };
+
+        var dialog = await DialogService.ShowAsync<UnitMigrateDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+    }
+
+    private async Task OpenRecalculateDialogAsync()
+    {
+        if (Unit is null) return;
+
+        var parameters = new DialogParameters<UnitRecalculateDialog>
+        {
+            { x => x.Unit, Unit }
+        };
+
+        var dialog = await DialogService.ShowAsync<UnitRecalculateDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+    }
+
+    private class UpdateUnitForm
+    {
+        public string Name { get; set; } = "";
+        public string Symbol { get; set; } = "";
+        public int DisplayOrder { get; set; }
+        public bool IsBaseUnit { get; set; }
+    }
+}

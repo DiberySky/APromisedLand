@@ -1,0 +1,61 @@
+@* OptionSetCreateDialog.razor — 新建选项集（PageDialogSky 外壳，DialogService 模式） *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<PageDialogSky Title="新建选项集"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
+               SubmitButtonDisabled="@_submitting"
+               OnSubmitClick="CreateAsync">
+    <DialogContent>
+        <MudTextField @bind-Value="_newSet.EntityType"
+                      Label="实体类型"
+                      HelperText="填 Shared 表示全局共享"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_newSet.SetName"
+                      Label="集合名 (snake_case)"
+                      Placeholder="gender"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_newSet.DisplayName"
+                      Label="显示名"
+                      Placeholder="性别"
+                      Variant="Variant.Outlined" />
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private CreateOptionSetRequest _newSet = new() { EntityType = "Shared" };
+    private bool _submitting;
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newSet.EntityType) ||
+            string.IsNullOrWhiteSpace(_newSet.SetName) ||
+            string.IsNullOrWhiteSpace(_newSet.DisplayName))
+        {
+            Snackbar.Add("请填写所有字段", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var id = await Api.CreateOptionSetAsync(_newSet);
+            if (id is null)
+            {
+                Snackbar.Add("创建失败", Severity.Error);
+                return;
+            }
+            Snackbar.Add($"创建成功：Id={id}", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

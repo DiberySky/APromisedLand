@@ -58,3 +58,9 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* 移动端 ExpansionPanel 标题允许收缩并截断，避免长文本+chips 横向溢出 */
+.mud-expand-panel-text {
+    min-width: 0;
+    overflow: hidden;
+}
