@@ -6,7 +6,7 @@ namespace TreeGraph.Api.StringTreeSky.Seeding;
 
 public static class StringTreeNodeSeeder
 {
-    public static async Task SeedAsync(EavDbContext db)
+    public static async Task SeedAsync(TreeGraphDbContext db)
     {
         if (await db.StringTreeSkyNodes.AnyAsync()) return;
 

@@ -19,7 +19,7 @@ namespace TreeGraph.Api.NodeEavSky.Data.Seeding;
 /// </summary>
 public static class EavSeeder
 {
-    public static async Task SeedAsync(EavDbContext db, CancellationToken ct = default)
+    public static async Task SeedAsync(TreeGraphDbContext db, CancellationToken ct = default)
     {
         // 补 EntityTypeCatalog：即使旧数据已有 Product 属性，也能补齐类型记录
         await EnsureEntityTypesAsync(db, ct);
@@ -50,7 +50,7 @@ public static class EavSeeder
     }
 
     /// <summary>补 EntityTypeCatalog：即使旧数据已有 Product 属性，也能补齐类型记录。</summary>
-    private static async Task EnsureEntityTypesAsync(EavDbContext db, CancellationToken ct)
+    private static async Task EnsureEntityTypesAsync(TreeGraphDbContext db, CancellationToken ct)
     {
         if (await db.EntityTypes.AnyAsync(t => t.EntityType == "Product", ct))
             return;
@@ -70,7 +70,7 @@ public static class EavSeeder
     /// 注意：同一 DbContext 不支持并发查询，必须顺序执行（不能 Task.WhenAll）。
     /// </summary>
     private static async Task<bool> IsAlreadySeededAsync(
-        EavDbContext db, CancellationToken ct)
+        TreeGraphDbContext db, CancellationToken ct)
     {
         return await db.AttributeCatalog.AnyAsync(a => a.EntityType == "Product", ct)
             && await db.CompositeTypes.AnyAsync(
@@ -86,7 +86,7 @@ public static class EavSeeder
     }
 
     /// <summary>实际的 seed 逻辑（在事务中执行，中途 SaveChanges 不落库，Commit 才生效）</summary>
-    private static async Task SeedInternalAsync(EavDbContext db, CancellationToken ct)
+    private static async Task SeedInternalAsync(TreeGraphDbContext db, CancellationToken ct)
     {
         // ============================================================
         // 步骤 1：组合类型 Brand（先建，Specs 要引用它）

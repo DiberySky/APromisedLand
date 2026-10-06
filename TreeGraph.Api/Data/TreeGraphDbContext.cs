@@ -5,7 +5,7 @@ using TreeGraph.StringTree.Contracts;
 
 namespace TreeGraph.Api.NodeEavSky.Data;
 
-public class EavDbContext : DbContext
+public class TreeGraphDbContext : DbContext
 {
     public DbSet<EntityTypeDefinition> EntityTypes => Set<EntityTypeDefinition>();
     public DbSet<AttributeDefinition> AttributeCatalog => Set<AttributeDefinition>();
@@ -30,7 +30,7 @@ public class EavDbContext : DbContext
     // StringTreeSky 解耦版（int 自增主键，独立表，与上面 TreeSky 体系并行）
     public DbSet<StringNodeEntity> StringTreeSkyNodes => Set<StringNodeEntity>();
 
-    public EavDbContext(DbContextOptions<EavDbContext> options) : base(options) { }
+    public TreeGraphDbContext(DbContextOptions<TreeGraphDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder mb)
     {

@@ -11,7 +11,7 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// <summary>动态查询服务（纯 LINQ）：多个过滤器用 Intersect 实现 AND 语义</summary>
 public class EavQueryService
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly IAttributeCache _attrCache;
     private readonly ICompositeTypeCache _compositeCache;
     private readonly EavReadService _readService;
@@ -20,7 +20,7 @@ public class EavQueryService
     private readonly UnitConverter _converter;
 
     public EavQueryService(
-        EavDbContext db, IAttributeCache attrCache, ICompositeTypeCache compositeCache,
+        TreeGraphDbContext db, IAttributeCache attrCache, ICompositeTypeCache compositeCache,
         EavReadService readService, CompositeValueService composite,
         IUnitCache unitCache, UnitConverter converter)
     {

@@ -7,13 +7,13 @@ namespace TreeGraph.Api.TreeSky;
 /// <summary>
 /// 泛型树 EF Core 实现（合并自源 CategoryTreeService / UnitTreeService，两者 95% 重复）。
 /// 差异点（DbSet、名称字段）由泛型约束与接口消除：
-/// 实体只需实现 <see cref="ITreeNodeBase{T}"/> 并在 EavDbContext 注册即可。
+/// 实体只需实现 <see cref="ITreeNodeBase{T}"/> 并在 TreeGraphDbContext 注册即可。
 /// 与源实现的行为差异：
 /// - HasChildren 不落库，读取时按子表实时计算（避免源实现中 HasChildren 与真实子节点漂移的问题）；
 /// - 防环检测用迭代走父链替代 Npgsql 递归 CTE，与具体表名解耦；
 /// - 移动节点到自身视为非法（源 CTE 判定 ancestorId == nodeId 时放行，会形成自环）。
 /// </summary>
-public class EfTreeService<TNode>(EavDbContext db) : ITreeService<TNode>
+public class EfTreeService<TNode>(TreeGraphDbContext db) : ITreeService<TNode>
     where TNode : class, ITreeNodeBase<TNode>, new()
 {
     private DbSet<TNode> Set => db.Set<TNode>();

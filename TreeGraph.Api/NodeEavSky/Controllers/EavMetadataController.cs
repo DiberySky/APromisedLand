@@ -13,13 +13,13 @@ namespace TreeGraph.Api.NodeEavSky.Controllers;
 [Route("api/eav/metadata")]
 public class EavMetadataController : ControllerBase
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly IAttributeCache _attrCache;
     private readonly ICompositeTypeCache _compositeCache;
     private readonly ICustomTableCache _customTableCache;
 
     public EavMetadataController(
-        EavDbContext db, IAttributeCache attrCache, ICompositeTypeCache compositeCache,
+        TreeGraphDbContext db, IAttributeCache attrCache, ICompositeTypeCache compositeCache,
         ICustomTableCache customTableCache)
     {
         _db = db;

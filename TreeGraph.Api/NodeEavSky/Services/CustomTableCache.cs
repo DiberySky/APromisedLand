@@ -58,7 +58,7 @@ public class CustomTableCache : ICustomTableCache
             entry.SlidingExpiration = Sliding;
 
             using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
             var table = db.CustomTables
                 .Include(t => t.Columns)
                 .AsNoTracking()
@@ -88,7 +88,7 @@ public class CustomTableCache : ICustomTableCache
             entry.SlidingExpiration = Sliding;
 
             using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
             return db.CustomTables
                 .Where(t => t.EntityType == entityType
                          && t.TableName == tableName

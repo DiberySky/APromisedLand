@@ -11,7 +11,7 @@ namespace TreeGraph.Api.NodeEavSky.Controllers;
 [Route("api/units")]
 public class UnitsController : ControllerBase
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly IUnitCache _unitCache;
 
     /// <summary>
@@ -21,7 +21,7 @@ public class UnitsController : ControllerBase
     /// </summary>
     private const int SyncRecalculateLimit = 200_000;
 
-    public UnitsController(EavDbContext db, IUnitCache unitCache)
+    public UnitsController(TreeGraphDbContext db, IUnitCache unitCache)
     {
         _db = db;
         _unitCache = unitCache;

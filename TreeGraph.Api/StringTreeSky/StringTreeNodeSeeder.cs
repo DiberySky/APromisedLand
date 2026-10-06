@@ -10,7 +10,7 @@ namespace TreeGraph.Api.StringTreeSky;
 /// </summary>
 public static class StringTreeNodeSeeder
 {
-    public static async Task SeedAsync(EavDbContext db, CancellationToken ct = default)
+    public static async Task SeedAsync(TreeGraphDbContext db, CancellationToken ct = default)
     {
         if (await db.StringTreeNodes.AnyAsync(ct))
             return;

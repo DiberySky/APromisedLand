@@ -8,7 +8,7 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// <summary>读取服务：按元数据把类型化值列还原为运行时值</summary>
 public class EavReadService
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly IAttributeCache _attrCache;
     private readonly CompositeValueService _composite;
     private readonly IUnitCache _unitCache;
@@ -16,7 +16,7 @@ public class EavReadService
     private readonly IOptionSetCache _optionSetCache;
 
     public EavReadService(
-        EavDbContext db, IAttributeCache attrCache, CompositeValueService composite,
+        TreeGraphDbContext db, IAttributeCache attrCache, CompositeValueService composite,
         IUnitCache unitCache, UnitConverter converter, IOptionSetCache optionSetCache)
     {
         _db = db;

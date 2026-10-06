@@ -26,7 +26,7 @@ builder.Services.AddExceptionHandler<DbExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 // .NET Aspire 集成:自动从 ConnectionStrings:TreeGraphDb 注入连接字符串
-builder.AddNpgsqlDbContext<EavDbContext>("TreeGraphDb");
+builder.AddNpgsqlDbContext<TreeGraphDbContext>("TreeGraphDb");
 
 builder.Services.AddMemoryCache();
 // 实体归属守卫聚合器（具体 guard 由各业务模块注册；无守卫时安全放行）
@@ -54,7 +54,7 @@ builder.Services.AddScoped<CustomTableQueryService>();
 builder.Services.AddScoped<TreeGraph.Api.TreeSky.ITreeService<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode>,
     TreeGraph.Api.TreeSky.EfTreeService<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode>>();
 
-// ★ StringTreeSky 解耦版：表 string_tree_sky_nodes 并入 EavDbContext（treegraphdb），
+// ★ StringTreeSky 解耦版：表 string_tree_sky_nodes 并入 TreeGraphDbContext（treegraphdb），
 //   仅服务/控制器独立，与 TreeSky 泛型体系并行（StringTreeSky 完全解耦方案）。
 builder.Services.AddStringTreeApi();
 
@@ -83,7 +83,7 @@ app.MapDefaultEndpoints();
 if (!EF.IsDesignTime)
 {
     await using var scope = app.Services.CreateAsyncScope();
-    var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
     await db.Database.MigrateAsync();
     await scope.ServiceProvider.GetRequiredService<UnitSeedService>().SeedAsync();
     await EavSeeder.SeedAsync(db);

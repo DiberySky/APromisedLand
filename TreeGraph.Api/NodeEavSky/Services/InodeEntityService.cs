@@ -50,9 +50,9 @@ public interface IInodeEntityService
 /// </summary>
 public class InodeEntityService : IInodeEntityService
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
 
-    public InodeEntityService(EavDbContext db)
+    public InodeEntityService(TreeGraphDbContext db)
     {
         _db = db;
     }

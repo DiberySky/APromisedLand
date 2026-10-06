@@ -2214,11 +2214,11 @@
 |   |   |   +-- 20261003070415_Initial.Designer.cs
 |   |   |   +-- 20261003230729_AddStringTreeNodes.cs
 |   |   |   +-- 20261003230729_AddStringTreeNodes.Designer.cs
-|   |   |   \-- EavDbContextModelSnapshot.cs
+|   |   |   \-- TreeGraphDbContextModelSnapshot.cs
 |   |   +-- Seeding
 |   |   |   +-- EavSeeder.cs
 |   |   |   \-- UnitSeedService.cs
-|   |   \-- EavDbContext.cs
+|   |   \-- TreeGraphDbContext.cs
 |   +-- NodeEavSky
 |   |   +-- Controllers
 |   |   |   +-- CustomTableDataController.cs

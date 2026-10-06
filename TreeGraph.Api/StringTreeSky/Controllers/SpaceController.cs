@@ -12,9 +12,9 @@ namespace TreeGraph.Api.StringTreeSky.Controllers;
 public class SpaceController : ControllerBase
 {
     private readonly IStringTreeService _tree;
-    private readonly EavDbContext _eavDb;
+    private readonly TreeGraphDbContext _eavDb;
 
-    public SpaceController(IStringTreeService tree, EavDbContext eavDb)
+    public SpaceController(IStringTreeService tree, TreeGraphDbContext eavDb)
     {
         _tree = tree;
         _eavDb = eavDb;

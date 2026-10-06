@@ -25,12 +25,12 @@ namespace TreeGraph.Api.NodeEavSky.Data.Seeding;
 /// </summary>
 public class UnitSeedService
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly IUnitCache _unitCache;
     private readonly ILogger<UnitSeedService> _logger;
 
     public UnitSeedService(
-        EavDbContext db, IUnitCache unitCache, ILogger<UnitSeedService> logger)
+        TreeGraphDbContext db, IUnitCache unitCache, ILogger<UnitSeedService> logger)
     {
         _db = db;
         _unitCache = unitCache;

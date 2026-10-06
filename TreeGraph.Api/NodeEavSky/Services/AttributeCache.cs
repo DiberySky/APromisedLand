@@ -33,7 +33,7 @@ public class AttributeCache : IAttributeCache
             entry.SlidingExpiration = TimeSpan.FromMinutes(10);
 
             using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
             return db.AttributeCatalog
                 .Where(a => a.EntityType == entityType && !a.IsDeleted)
                 .OrderBy(a => a.DisplayOrder)

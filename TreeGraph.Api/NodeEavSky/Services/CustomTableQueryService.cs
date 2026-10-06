@@ -7,10 +7,10 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// <summary>自定义表行内字段查询：JSONB @> 包含查询（走 ix_ctr_rowdata GIN 索引）</summary>
 public class CustomTableQueryService
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly ICustomTableCache _tableCache;
 
-    public CustomTableQueryService(EavDbContext db, ICustomTableCache tableCache)
+    public CustomTableQueryService(TreeGraphDbContext db, ICustomTableCache tableCache)
     {
         _db = db;
         _tableCache = tableCache;

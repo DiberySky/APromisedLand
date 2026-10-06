@@ -7,9 +7,9 @@ namespace TreeGraph.Api.StringTreeSky.Services;
 
 public class EntityTypeTemplateService : IEntityTypeTemplateService
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
 
-    public EntityTypeTemplateService(EavDbContext db) => _db = db;
+    public EntityTypeTemplateService(TreeGraphDbContext db) => _db = db;
 
     public async Task<TemplateCopyResult> CopyAttributesAsync(
         string sourceEntityType,

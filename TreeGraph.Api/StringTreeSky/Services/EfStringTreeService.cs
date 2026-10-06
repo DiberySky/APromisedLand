@@ -8,10 +8,10 @@ namespace TreeGraph.Api.StringTreeSky.Services;
 
 public class EfStringTreeService : IStringTreeService
 {
-    private readonly EavDbContext _db;
-    private readonly DbContextOptions<EavDbContext> _options;
+    private readonly TreeGraphDbContext _db;
+    private readonly DbContextOptions<TreeGraphDbContext> _options;
 
-    public EfStringTreeService(EavDbContext db, DbContextOptions<EavDbContext> options)
+    public EfStringTreeService(TreeGraphDbContext db, DbContextOptions<TreeGraphDbContext> options)
     {
         _db = db;
         _options = options;
@@ -134,13 +134,13 @@ public class EfStringTreeService : IStringTreeService
         await CollectDescendantIdsAsync(id, nodeIds, ct);
 
         // 2) EAV 清理 + 树删除在同一事务内原子提交
-        //    （StringTreeSky 已并入 EavDbContext；节点 Id 即 EAV EntityId，
+        //    （StringTreeSky 已并入 TreeGraphDbContext；节点 Id 即 EAV EntityId，
         //     无需任何 Id 映射。Npgsql 重试执行策略要求事务整体作为可重试单元。）
         var strategy = _db.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
             // 每次重试使用全新上下文，避免前次失败留下的被跟踪实体污染重试
-            await using var dbx = new EavDbContext(_options);
+            await using var dbx = new TreeGraphDbContext(_options);
             await using var tx = await dbx.Database.BeginTransactionAsync(ct);
 
             // ★ 按 (EntityType, EntityId) 分组清理：独立空间子树的
@@ -172,7 +172,7 @@ public class EfStringTreeService : IStringTreeService
         return true;
     }
 
-    private static async Task DeleteRecursiveAsync(EavDbContext db, string id, CancellationToken ct)
+    private static async Task DeleteRecursiveAsync(TreeGraphDbContext db, string id, CancellationToken ct)
     {
         var children = await db.StringTreeSkyNodes.Where(n => n.ParentId == id).ToListAsync(ct);
         foreach (var child in children)

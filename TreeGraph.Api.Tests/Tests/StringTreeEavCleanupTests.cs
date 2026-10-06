@@ -32,7 +32,7 @@ public class StringTreeEavCleanupTests(EavApiFactory factory)
     //
     // 适配说明（相对设计文档）：
     //   文档原 Fixture 用 EF InMemory，但 DeleteNodeAsync 内部使用
-    //   ExecuteDeleteAsync，InMemory Provider 不支持；而 EavDbContext 模型
+    //   ExecuteDeleteAsync，InMemory Provider 不支持；而 TreeGraphDbContext 模型
     //   含 jsonb/GIN/timestamptz 等 PostgreSQL 专属配置，SQLite 也无法建库。
     //   因此接入仓库标准的 Testcontainers PostgreSQL（Integration 集合，
     //   全测试共享容器、串行执行），直接构造 EfStringTreeService 做白盒测试。
@@ -44,8 +44,8 @@ public class StringTreeEavCleanupTests(EavApiFactory factory)
 
     private sealed class Fixture : IAsyncDisposable
     {
-        public EavDbContext Db { get; }
-        public DbContextOptions<EavDbContext> Options { get; }
+        public TreeGraphDbContext Db { get; }
+        public DbContextOptions<TreeGraphDbContext> Options { get; }
         public EfStringTreeService Service { get; }
 
         private readonly IServiceScope _scope;
@@ -57,8 +57,8 @@ public class StringTreeEavCleanupTests(EavApiFactory factory)
         {
             _scope = factory.Services.CreateScope();
             var sp = _scope.ServiceProvider;
-            Options = sp.GetRequiredService<DbContextOptions<EavDbContext>>();
-            Db = sp.GetRequiredService<EavDbContext>();
+            Options = sp.GetRequiredService<DbContextOptions<TreeGraphDbContext>>();
+            Db = sp.GetRequiredService<TreeGraphDbContext>();
             Service = new EfStringTreeService(Db, Options);
         }
 

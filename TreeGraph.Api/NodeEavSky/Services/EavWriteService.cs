@@ -11,7 +11,7 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// <summary>写入服务：验证 -> 插入/更新/删除 -> 审计（同一事务提交）</summary>
 public class EavWriteService
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly IAttributeCache _attrCache;
     private readonly EavValidationService _validator;
     private readonly CompositeValueService _composite;
@@ -21,7 +21,7 @@ public class EavWriteService
     private readonly EntityOwnerGuardRegistry _ownerGuards;
 
     public EavWriteService(
-        EavDbContext db,
+        TreeGraphDbContext db,
         IAttributeCache attrCache,
         EavValidationService validator,
         CompositeValueService composite,

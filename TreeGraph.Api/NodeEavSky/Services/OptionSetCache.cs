@@ -37,7 +37,7 @@ public class OptionSetCache : IOptionSetCache
             entry.SlidingExpiration = TimeSpan.FromMinutes(10);
 
             using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
             var set = db.OptionSets
                 .Include(s => s.Items.Where(i => !i.IsDeleted))
                 .AsNoTracking()
@@ -55,7 +55,7 @@ public class OptionSetCache : IOptionSetCache
     public List<OptionSet> GetAll(string? entityType = null, bool includeDeleted = false)
     {
         using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
 
         var query = db.OptionSets.AsQueryable();
         if (!includeDeleted) query = query.Where(s => !s.IsDeleted);

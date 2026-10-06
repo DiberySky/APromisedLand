@@ -18,10 +18,10 @@ namespace TreeGraph.Api.NodeEavSky.Controllers;
 [Route("api/eav/entity-types")]
 public class EavEntityTypesController : ControllerBase
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly IAttributeCache _attrCache;
 
-    public EavEntityTypesController(EavDbContext db, IAttributeCache attrCache)
+    public EavEntityTypesController(TreeGraphDbContext db, IAttributeCache attrCache)
     {
         _db = db;
         _attrCache = attrCache;

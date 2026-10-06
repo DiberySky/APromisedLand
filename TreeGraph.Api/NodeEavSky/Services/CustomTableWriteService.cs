@@ -11,14 +11,14 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// <summary>自定义表写入服务：整表替换（默认）+ 行级增量更新</summary>
 public class CustomTableWriteService
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly ICustomTableCache _tableCache;
     private readonly CustomTableValidationService _validator;
     private readonly CompositeValueService _composite;
     private readonly EntityOwnerGuardRegistry _ownerGuards;
 
     public CustomTableWriteService(
-        EavDbContext db,
+        TreeGraphDbContext db,
         ICustomTableCache tableCache,
         CustomTableValidationService validator,
         CompositeValueService composite,

@@ -85,7 +85,7 @@ Claude Code 环境：使用工作区技能 **`patch-against-docs`**（触发词�
 **同时必须排除的干扰项**：
 - `FilterOperatorCatalog.cs` 与 `QueryFilterEditor.razor` 中的 `OperatorInfo.IsMultiValue`——**同名但无关**：表示 `in/nin` 运算符接受多值输入，删除会破坏筛选器
 - 旧迁移（`Initial.cs`）与两个历史 Designer 快照——历史产物，冻结不动
-- `EavDbContextModelSnapshot`——由新迁移自动更新，不手改
+- `TreeGraphDbContextModelSnapshot`——由新迁移自动更新，不手改
 
 **教训**：
 

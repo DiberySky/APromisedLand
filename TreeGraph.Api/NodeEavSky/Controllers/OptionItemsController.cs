@@ -11,10 +11,10 @@ namespace TreeGraph.Api.NodeEavSky.Controllers;
 [Route("api/eav/metadata/option-sets/{setId}/items")]
 public class OptionItemsController : ControllerBase
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly IOptionSetCache _optionSetCache;
 
-    public OptionItemsController(EavDbContext db, IOptionSetCache optionSetCache)
+    public OptionItemsController(TreeGraphDbContext db, IOptionSetCache optionSetCache)
     {
         _db = db;
         _optionSetCache = optionSetCache;

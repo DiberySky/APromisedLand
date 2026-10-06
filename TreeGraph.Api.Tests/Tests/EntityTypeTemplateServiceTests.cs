@@ -16,7 +16,7 @@ namespace TreeGraph.Api.Tests.Tests;
 ///   文档原测试用 EF InMemory，但本仓库测试项目统一使用 Testcontainers
 ///   PostgreSQL（Integration 集合，全测试共享容器），且不引入 InMemory 包。
 ///   因此：
-///     1. EavDbContext 从共享容器的 DI 容器解析（每测一个 scope）；
+///     1. TreeGraphDbContext 从共享容器的 DI 容器解析（每测一个 scope）；
 ///     2. 每个测试用 GUID 后缀的唯一 EntityType 名，保证共享库下可重复执行
 ///        （uq_entity_type / uq_attr_catalog / uq_option_set 均为唯一约束）。
 ///   断言语义与文档完全一致。
@@ -28,14 +28,14 @@ public class EntityTypeTemplateServiceTests(EavApiFactory factory) : IDisposable
 
     public void Dispose() => _scope.Dispose();
 
-    private EavDbContext CreateDb()
-        => _scope.ServiceProvider.GetRequiredService<EavDbContext>();
+    private TreeGraphDbContext CreateDb()
+        => _scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
 
     /// <summary>生成每次运行唯一的 EntityType 名（≤100 字符，满足 maxLength）。</summary>
     private static string NewType(string prefix)
         => $"TPL_{prefix}_{Guid.NewGuid():N}"[..24];
 
-    private static async Task RegisterEntityTypeAsync(EavDbContext db, string entityType, string displayName)
+    private static async Task RegisterEntityTypeAsync(TreeGraphDbContext db, string entityType, string displayName)
     {
         db.EntityTypes.Add(new EntityTypeDefinition
         {
@@ -50,7 +50,7 @@ public class EntityTypeTemplateServiceTests(EavApiFactory factory) : IDisposable
     }
 
     private static async Task SeedAttrAsync(
-        EavDbContext db, string entityType, string name, string dataType,
+        TreeGraphDbContext db, string entityType, string name, string dataType,
         bool required = false, JsonDocument? allowed = null)
     {
         db.AttributeCatalog.Add(new AttributeDefinition

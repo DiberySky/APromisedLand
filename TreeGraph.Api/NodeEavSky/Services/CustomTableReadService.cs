@@ -10,12 +10,12 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// <summary>自定义表读取服务：按父实体 + 属性加载整表</summary>
 public class CustomTableReadService
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly ICustomTableCache _tableCache;
     private readonly CompositeValueService _composite;
 
     public CustomTableReadService(
-        EavDbContext db,
+        TreeGraphDbContext db,
         ICustomTableCache tableCache,
         CompositeValueService composite)
     {

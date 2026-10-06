@@ -36,7 +36,7 @@ public static class E2eBaselineSeeder
     // 5 个 iNode 覆盖 10 个实体：001/002 三类型齐全，003 双类型，004/005 单类型。
     public const string InodePrefix = "inode-seed-";
 
-    public static async Task SeedAsync(EavDbContext db, CancellationToken ct = default)
+    public static async Task SeedAsync(TreeGraphDbContext db, CancellationToken ct = default)
     {
         if (await IsAlreadySeededAsync(db, ct))
             return;
@@ -59,7 +59,7 @@ public static class E2eBaselineSeeder
     }
 
     /// <summary>严格幂等：item 类型 + 属性 + 示例实体 + iNode 归属都存在才跳过。</summary>
-    private static async Task<bool> IsAlreadySeededAsync(EavDbContext db, CancellationToken ct)
+    private static async Task<bool> IsAlreadySeededAsync(TreeGraphDbContext db, CancellationToken ct)
     {
         return await db.EntityTypes.AnyAsync(t => t.EntityType == "item" && !t.IsDeleted, ct)
             && await db.AttributeCatalog.AnyAsync(
@@ -70,7 +70,7 @@ public static class E2eBaselineSeeder
                 x => x.InodeId == "inode-seed-001" && x.EntityId == "item-seed-001", ct);
     }
 
-    private static async Task SeedInternalAsync(EavDbContext db, CancellationToken ct)
+    private static async Task SeedInternalAsync(TreeGraphDbContext db, CancellationToken ct)
     {
         // ════════════════════════════════════════════════════
         // 步骤 1：实体类型
@@ -204,7 +204,7 @@ public static class E2eBaselineSeeder
     // ════════════════════════════════════════════════════════
 
     private static async Task<EntityTypeDefinition> EnsureEntityTypeAsync(
-        EavDbContext db, string code, string displayName, string? description,
+        TreeGraphDbContext db, string code, string displayName, string? description,
         int displayOrder, CancellationToken ct)
     {
         var existing = await db.EntityTypes
@@ -224,7 +224,7 @@ public static class E2eBaselineSeeder
     }
 
     private static async Task<OptionSet> EnsureOptionSetAsync(
-        EavDbContext db, string entityType, string setName, string displayName,
+        TreeGraphDbContext db, string entityType, string setName, string displayName,
         (string Value, string Label, int Order, bool IsDefault)[] items,
         CancellationToken ct)
     {
@@ -256,7 +256,7 @@ public static class E2eBaselineSeeder
     }
 
     private static async Task<AttributeDefinition> EnsureAttributeAsync(
-        EavDbContext db,
+        TreeGraphDbContext db,
         string entityType, string attributeName, string displayName, string dataType,
         bool isRequired, bool isSearchable, bool isSortable, int displayOrder,
         string? defaultValue, string? refOptionSetId,
@@ -296,7 +296,7 @@ public static class E2eBaselineSeeder
     /// 两张表均按主键幂等。
     /// </summary>
     private static async Task EnsureInodeAsync(
-        EavDbContext db, string inodeId, string entityType, string entityId,
+        TreeGraphDbContext db, string inodeId, string entityType, string entityId,
         CancellationToken ct)
     {
         var declared = await db.InodeEntityTypes.AnyAsync(
@@ -324,7 +324,7 @@ public static class E2eBaselineSeeder
     }
 
     private static async Task UpsertStringAsync(
-        EavDbContext db, string entityId, string entityType,
+        TreeGraphDbContext db, string entityId, string entityType,
         AttributeDefinition attr, string value, CancellationToken ct)
     {
         var exists = await db.AttributeValues.AnyAsync(
@@ -343,7 +343,7 @@ public static class E2eBaselineSeeder
     }
 
     private static async Task UpsertBoolAsync(
-        EavDbContext db, string entityId, string entityType,
+        TreeGraphDbContext db, string entityId, string entityType,
         AttributeDefinition attr, bool value, CancellationToken ct)
     {
         var exists = await db.AttributeValues.AnyAsync(

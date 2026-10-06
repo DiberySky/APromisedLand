@@ -26,7 +26,7 @@ public class InodeController : ControllerBase
     private readonly IInodeEntityService _inodeEntities;
     private readonly InodeEavFacade _facade;
     private readonly IAttributeCache _attrCache;
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly CompositeValueService _compositeService;
     private readonly JsonSerializerOptions _jsonOptions;
 
@@ -34,7 +34,7 @@ public class InodeController : ControllerBase
         IInodeEntityService inodeEntities,
         InodeEavFacade facade,
         IAttributeCache attrCache,
-        EavDbContext db,
+        TreeGraphDbContext db,
         CompositeValueService compositeService,
         IOptions<JsonOptions> jsonOptions)
     {

@@ -35,7 +35,7 @@ public class UnitCache : IUnitCache
             entry.SlidingExpiration = TimeSpan.FromMinutes(20);
 
             using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
             return db.Units
                 .Where(u => !u.IsDeleted)
                 .OrderBy(u => u.Category)

@@ -11,10 +11,10 @@ namespace TreeGraph.Api.NodeEavSky.Controllers;
 [Route("api/eav/metadata/option-sets")]
 public class OptionSetsController : ControllerBase
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
     private readonly IOptionSetCache _optionSetCache;
 
-    public OptionSetsController(EavDbContext db, IOptionSetCache optionSetCache)
+    public OptionSetsController(TreeGraphDbContext db, IOptionSetCache optionSetCache)
     {
         _db = db;
         _optionSetCache = optionSetCache;
@@ -48,7 +48,7 @@ public class OptionSetsController : ControllerBase
         CancellationToken ct = default)
     {
         using var scope = HttpContext.RequestServices.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<EavDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
 
         var query = db.OptionSets.AsQueryable();
         if (!includeDeleted) query = query.Where(s => !s.IsDeleted);

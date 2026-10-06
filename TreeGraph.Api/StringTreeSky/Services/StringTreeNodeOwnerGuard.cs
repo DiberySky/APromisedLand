@@ -14,9 +14,9 @@ namespace TreeGraph.Api.StringTreeSky.Services;
 /// </summary>
 public sealed class StringTreeNodeOwnerGuard : IEntityOwnerGuard
 {
-    private readonly EavDbContext _db;
+    private readonly TreeGraphDbContext _db;
 
-    public StringTreeNodeOwnerGuard(EavDbContext db) => _db = db;
+    public StringTreeNodeOwnerGuard(TreeGraphDbContext db) => _db = db;
 
     public async Task EnsureOwnerExistsAsync(
         string entityType, string entityId, CancellationToken ct = default)

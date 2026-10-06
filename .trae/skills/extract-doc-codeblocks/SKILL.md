@@ -91,7 +91,7 @@ python "<技能目录>\scripts\extract_by_section.py" $doc --root "d:\APromisedL
    不盲抄文档里的工厂/双注册写法。
 8. **文档测试用 EF InMemory 时**：本仓 `TreeGraph.Api.Tests` 不引用
    InMemory/SQLite 包，统一走 Testcontainers PostgreSQL（`[Collection("Integration")]`
-   + `EavApiFactory`，从 `factory.Services.CreateScope()` 解析 EavDbContext）。
+   + `EavApiFactory`，从 `factory.Services.CreateScope()` 解析 TreeGraphDbContext）。
    两种情况都必须换：含 `ExecuteDeleteAsync` 的（InMemory 不支持）以及纯
    LINQ 单测（保持仓库测试架构一致、勿新增包）。模型有 jsonb/GIN/timestamptz
    等 PG 专属配置，SQLite 无法 EnsureCreated。配套改法：真实 FK 先造父定义、
@@ -113,7 +113,7 @@ python "<技能目录>\scripts\extract_by_section.py" $doc --root "d:\APromisedL
 
   ```powershell
   dotnet ef migrations add <Name> --project TreeGraph.Api `
-    --context EavDbContext -o Data/Migrations
+    --context TreeGraphDbContext -o Data/Migrations
   ```
 
   生成后 Read 迁移确认只含预期变更（无意外模型漂移）；应用由 API 启动时
