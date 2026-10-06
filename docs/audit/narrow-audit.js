@@ -12,6 +12,7 @@ const VIEWPORTS = [
   { name: 'landscape-844', label: '844×390 横屏', width: 844, height: 390, out: 'landscape-summary.json' },
 ];
 const BASE = 'http://localhost:5783';
+const API = 'http://localhost:5773';
 const PAGES = [
   '/inodes',
   '/metadata/units',
@@ -21,9 +22,37 @@ const PAGES = [
   '/metadata/custom-tables',
   '/metadata/attributes',
   '/entities',
+  '/query',
 ];
 
-async function runViewport(browser, auditSrc, vp) {
+// 动态路由：从 API 解析真实数据页（EntityList 实体列表 / InodeDetail 详情）
+async function resolveDynamicRoutes() {
+  const routes = [];
+  try {
+    const resp = await fetch(`${API}/api/eav/entity-types`);
+    if (!resp.ok) throw new Error(`entity-types ${resp.status}`);
+    const types = await resp.json();
+    const name = Array.isArray(types) ? types[0]?.entityType : undefined;
+    if (!name) return routes;
+    routes.push(`/entities/${encodeURIComponent(name)}`);
+
+    const q = await fetch(`${API}/api/inode/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entityType: name, pageSize: 1 }),
+    });
+    if (q.ok) {
+      const data = await q.json();
+      const inodeId = data.items?.[0]?.inodeId;
+      if (inodeId) routes.push(`/inodes/${encodeURIComponent(inodeId)}`);
+    }
+  } catch (e) {
+    console.log(`⚠️ 动态路由解析失败（跳过实体列表/详情页审计）: ${e.message || e}`);
+  }
+  return routes;
+}
+
+async function runViewport(browser, auditSrc, vp, pages) {
   const context = await browser.newContext({
     viewport: { width: vp.width, height: vp.height },
   });
@@ -33,7 +62,7 @@ async function runViewport(browser, auditSrc, vp) {
   const page = await context.newPage();
 
   const results = [];
-  for (const route of PAGES) {
+  for (const route of pages) {
     try {
       await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 20000 });
       await page.waitForTimeout(2000);
@@ -91,11 +120,13 @@ async function runViewport(browser, auditSrc, vp) {
   });
 
   const auditSrc = fs.readFileSync(path.join(__dirname, 'audit.js'), 'utf8');
+  const pages = [...PAGES, ...(await resolveDynamicRoutes())];
+  console.log(`审计路由 ${pages.length} 个: ${pages.join(', ')}`);
   const targets = VIEWPORTS.filter(v => !filter || v.name.includes(filter));
   const all = [];
   for (const vp of targets) {
     console.log(`\n──────── 视口：${vp.label} ────────`);
-    all.push(await runViewport(browser, auditSrc, vp));
+    all.push(await runViewport(browser, auditSrc, vp, pages));
   }
 
   const failed = all.filter(s =>

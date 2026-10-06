@@ -39,6 +39,18 @@
             if (!window.__audit_isVisible(el)) return;
             // 关闭状态的抽屉/弹层靠 transform 移出屏幕，offsetParent 仍在 → 属误报
             if (el.closest('[class*="mud-drawer"][class*="closed"], .mud-popover:not(.mud-popover-open)')) return;
+            // 可横向滚动容器内的溢出是设计行为（如移动端表格），不报
+            const scrollAncestor = el.parentElement?.closest('[style*="overflow"]');
+            if (scrollAncestor) {
+                const cs = getComputedStyle(scrollAncestor);
+                const ox = cs.overflowX;
+                const oy = cs.overflowY;
+                // overflow:hidden / auto / scroll / overlay 都会裁剪溢出，不报
+                if (['auto', 'scroll', 'overlay', 'hidden'].includes(ox)
+                    || ['auto', 'scroll', 'overlay', 'hidden'].includes(oy)) return;
+            }
+            // MudBlazor grid 用负边距抵消 gutter，属设计行为，不报
+            if (el.classList.contains('mud-grid') || el.classList.contains('mud-grid-item')) return;
             const r = el.getBoundingClientRect();
             if (r.right > vw + 1 || r.left < -1) {
                 hits.push(window.__audit_describe(el));
@@ -52,7 +64,7 @@
                 other.width <= h.width
             );
         });
-        return { count: hits.length, deduped: filtered };
+        return { count: hits.length, deduped: filtered, hits };
     };
 
     // ───── 维度 2：固定宽度元素 ─────
@@ -71,7 +83,8 @@
 
             // 只报两类真问题：显式 min-width ≥ 70% 视口宽；或内联样式把宽度写成
             // 固定 px 值且 ≥ 60% 视口宽。min()/clamp() 等响应式内联写法不算债。
-            const inlineFixed = /(?:min-width|width)\s*:\s*(\d+(?:\.\d+)?)px/.exec(styleAttr);
+            // 注意：max-width 不是固定宽度，需用 (?<!max-) 负向后行断言排除。
+            const inlineFixed = /(?<!max-)(?:min-width|width)\s*:\s*(\d+(?:\.\d+)?)px/.exec(styleAttr);
             const inlineFixedBig = inlineFixed && parseFloat(inlineFixed[1]) >= vw * 0.6;
             if ((minW && minW !== 'none' && minW !== 'auto' && minWVal >= vw * 0.7) || inlineFixedBig) {
                 const d = window.__audit_describe(el);

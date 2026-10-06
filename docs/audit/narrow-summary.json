@@ -4,7 +4,7 @@
     "width": 390,
     "height": 844
   },
-  "totalPages": 8,
+  "totalPages": 11,
   "pages": [
     {
       "route": "/inodes",
@@ -122,6 +122,51 @@
       "toolbarOverflow": 0,
       "smallTouchTargets": 0,
       "smallTouchComponentDefaults": 239,
+      "topOverflow": [],
+      "topFixedW": [],
+      "topTouch": []
+    },
+    {
+      "route": "/query",
+      "url": "/query",
+      "viewport": "390×844",
+      "overflow": 0,
+      "fixedWidth": 0,
+      "narrowGridItems": 0,
+      "tableOverflow": 0,
+      "toolbarOverflow": 0,
+      "smallTouchTargets": 0,
+      "smallTouchComponentDefaults": 2,
+      "topOverflow": [],
+      "topFixedW": [],
+      "topTouch": []
+    },
+    {
+      "route": "/entities/et_0055a7ce8644",
+      "url": "/entities/et_0055a7ce8644",
+      "viewport": "390×844",
+      "overflow": 0,
+      "fixedWidth": 0,
+      "narrowGridItems": 0,
+      "tableOverflow": 0,
+      "toolbarOverflow": 0,
+      "smallTouchTargets": 0,
+      "smallTouchComponentDefaults": 3,
+      "topOverflow": [],
+      "topFixedW": [],
+      "topTouch": []
+    },
+    {
+      "route": "/inodes/9c840ace-71b7-4196-b430-9e3910286ef2",
+      "url": "/inodes/9c840ace-71b7-4196-b430-9e3910286ef2",
+      "viewport": "390×844",
+      "overflow": 0,
+      "fixedWidth": 0,
+      "narrowGridItems": 0,
+      "tableOverflow": 0,
+      "toolbarOverflow": 0,
+      "smallTouchTargets": 0,
+      "smallTouchComponentDefaults": 9,
       "topOverflow": [],
       "topFixedW": [],
       "topTouch": []
