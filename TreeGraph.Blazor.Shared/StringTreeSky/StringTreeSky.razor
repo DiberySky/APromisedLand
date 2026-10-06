@@ -1,0 +1,72 @@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky
+@using TreeGraph.StringTree.Contracts
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+@inject IStringTreeClient Client
+@inject StringTreeSkyOptions Options
+
+<div class="string-tree-sky">
+    <div class="string-tree-sky__toolbar">
+        @if (Options.AllowCreate)
+        {
+            <button class="btn btn-sm btn-primary" @onclick="CreateRootAsync">新建根节点</button>
+        }
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ReloadAsync">刷新</button>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="string-tree-sky__loading">加载中…</div>
+    }
+    else if (_visible.Count == 0)
+    {
+        <div class="string-tree-sky__empty">暂无节点</div>
+    }
+    else
+    {
+        <ul class="string-tree-sky__list">
+            @foreach (var row in _visible)
+            {
+                <li class="string-tree-sky__item" style="padding-left:@(row.Level * 20)px" @key="row.Node.Id">
+                    @if (row.Node.HasChildren)
+                    {
+                        <span class="string-tree-sky__toggle" @onclick="() => ToggleAsync(row)">@(row.Expanded ? "▼" : "▶")</span>
+                    }
+                    else
+                    {
+                        <span class="string-tree-sky__toggle string-tree-sky__toggle--leaf">•</span>
+                    }
+
+                    @if (_editingId == row.Node.Id)
+                    {
+                        <input class="form-control form-control-sm d-inline-block"
+                               style="width:220px"
+                               @bind="_editingName"
+                               @bind:event="oninput"
+                               @onkeydown="OnEditKeyDown" />
+                        <button class="btn btn-sm btn-success" @onclick="() => CommitEditAsync(row.Node)">保存</button>
+                        <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">取消</button>
+                    }
+                    else
+                    {
+                        <span class="string-tree-sky__name" @ondblclick="() => StartEdit(row.Node)">@row.Node.Name</span>
+
+                        <span class="string-tree-sky__actions">
+                            @if (Options.AllowCreate)
+                            {
+                                <button class="btn btn-sm btn-link" @onclick="() => AddChildAsync(row)">＋子节点</button>
+                            }
+                            @if (Options.AllowRename)
+                            {
+                                <button class="btn btn-sm btn-link" @onclick="() => StartEdit(row.Node)">重命名</button>
+                            }
+                            @if (Options.AllowDelete)
+                            {
+                                <button class="btn btn-sm btn-link text-danger" @onclick="() => DeleteAsync(row)">删除</button>
+                            }
+                        </span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</div>

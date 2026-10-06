@@ -1,0 +1,87 @@
+using Microsoft.AspNetCore.Mvc;
+using TreeGraph.Api.StringTreeSky.Services;
+using TreeGraph.StringTree.Contracts;
+
+namespace TreeGraph.Api.StringTreeSky.Controllers;
+
+[ApiController]
+[Route("api/string-tree")]
+public class StringTreeNodeController : ControllerBase
+{
+    private readonly IStringTreeService _service;
+    public StringTreeNodeController(IStringTreeService service) => _service = service;
+
+    [HttpGet("nodes/roots")]
+    public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetRoots(CancellationToken ct)
+        => Ok(StringTreeResponse<List<StringNodeDto>>.Ok(await _service.GetRootNodesAsync(ct)));
+
+    [HttpGet("nodes/children/{parentId:int}")]
+    public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetChildren(int parentId, CancellationToken ct)
+        => Ok(StringTreeResponse<List<StringNodeDto>>.Ok(await _service.GetChildrenAsync(parentId, ct)));
+
+    [HttpGet("nodes/{id:int}")]
+    public async Task<ActionResult<StringTreeResponse<StringNodeDto>>> GetNode(int id, CancellationToken ct)
+    {
+        var node = await _service.GetNodeAsync(id, ct);
+        return node is null
+            ? NotFound(StringTreeResponse<StringNodeDto>.Fail("节点不存在"))
+            : Ok(StringTreeResponse<StringNodeDto>.Ok(node));
+    }
+
+    [HttpGet("nodes/{id:int}/ancestors")]
+    public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetAncestors(int id, CancellationToken ct)
+        => Ok(StringTreeResponse<List<StringNodeDto>>.Ok(await _service.GetAncestorPathAsync(id, ct)));
+
+    [HttpPost("nodes")]
+    public async Task<ActionResult<StringTreeResponse<StringNodeDto>>> Create(
+        [FromBody] StringNodeDto dto, CancellationToken ct)
+    {
+        var created = await _service.CreateNodeAsync(dto, ct);
+        return Ok(StringTreeResponse<StringNodeDto>.Ok(created));
+    }
+
+    [HttpPut("nodes/{id:int}")]
+    public async Task<ActionResult<StringTreeResponse<StringNodeDto>>> Update(
+        int id, [FromBody] StringNodeDto dto, CancellationToken ct)
+    {
+        var updated = await _service.UpdateNodeAsync(id, dto, ct);
+        return updated is null
+            ? NotFound(StringTreeResponse<StringNodeDto>.Fail("节点不存在"))
+            : Ok(StringTreeResponse<StringNodeDto>.Ok(updated));
+    }
+
+    [HttpDelete("nodes/{id:int}")]
+    public async Task<ActionResult<StringTreeResponse<bool>>> Delete(int id, CancellationToken ct)
+    {
+        var ok = await _service.DeleteNodeAsync(id, ct);
+        return ok
+            ? Ok(StringTreeResponse<bool>.Ok(true))
+            : NotFound(StringTreeResponse<bool>.Fail("节点不存在"));
+    }
+
+    [HttpPost("nodes/{id:int}/move")]
+    public async Task<ActionResult<StringTreeResponse<bool>>> Move(
+        int id, [FromBody] MoveRequest req, CancellationToken ct)
+    {
+        var ok = await _service.MoveNodeAsync(id, req.ParentId, req.SortOrder, ct);
+        return ok
+            ? Ok(StringTreeResponse<bool>.Ok(true))
+            : BadRequest(StringTreeResponse<bool>.Fail("移动失败：节点不存在或会形成环"));
+    }
+
+    [HttpPost("nodes/{parentId:int}/children/sort")]
+    public async Task<ActionResult<StringTreeResponse<bool>>> Sort(
+        int parentId, [FromBody] List<int> orderedIds, CancellationToken ct)
+    {
+        var ok = await _service.SortChildrenAsync(parentId, orderedIds, ct);
+        return ok
+            ? Ok(StringTreeResponse<bool>.Ok(true))
+            : BadRequest(StringTreeResponse<bool>.Fail("排序失败"));
+    }
+
+    public class MoveRequest
+    {
+        public int? ParentId { get; set; }
+        public int SortOrder { get; set; }
+    }
+}

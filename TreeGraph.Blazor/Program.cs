@@ -9,6 +9,8 @@ using TreeGraph.Blazor.Shared.Trees.TreeSky.Services;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Extensions;
 using TreeGraph.Blazor.Shared.Trees.StringTree.Services;
 using TreeGraph.Blazor.Shared.Platform;
+using TreeGraph.Blazor.Shared.StringTreeSky;
+using TreeGraph.Blazor.Shared.StringTreeSky.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +52,23 @@ builder.Services.AddStringTreeSky();
 //   下面的 AddScoped 覆盖默认 Noop。
 builder.Services.AddScoped<IStringTreeDataSource, ApiStringTreeDataSource>();
 builder.Services.AddScoped<IStringTreeActionHandler, ApiStringTreeActionHandler>();
+
+// ★ StringTreeSky（解耦版）：独立契约层 + 非泛型 HTTP 客户端，端点 api/string-tree/*。
+//   与 EavApiClient 同一 Aspire 服务发现与弹性策略。
+//   注：不采用文档片段的 AddHttpClient + AddStringTreeSky 双注册——
+//   AddStringTreeSky 内部 AddScoped<IStringTreeClient, StringTreeApiClient> 无
+//   HttpClient 可注入，会覆盖类型化客户端注册导致 BaseAddress 丢失。
+builder.Services.AddSingleton<StringTreeSkyOptions>(_ => new StringTreeSkyOptions
+{
+    BasePath = "api/string-tree",
+    DefaultExpandLevel = 1,
+});
+builder.Services
+    .AddHttpClient<IStringTreeClient, StringTreeApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
 // ★ StringTreeSky 内存演示（备用，未注册）：
 //   InMemoryStringTreeStore / InMemoryStringTreeDataSource / InMemoryStringTreeActionHandler

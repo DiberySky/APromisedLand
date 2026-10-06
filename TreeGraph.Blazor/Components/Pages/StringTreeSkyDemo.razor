@@ -1,0 +1,7 @@
+@* StringTreeSkyDemo.razor — StringTreeSky 解耦版演示页 *@
+@page "/string-tree-sky"
+@rendermode InteractiveServer
+@using TreeGraph.Blazor.Shared.StringTreeSky
+
+<h3>StringTreeSky 独立演示</h3>
+<StringTreeSky OnTreeChanged="@(() => StateHasChanged())" />
