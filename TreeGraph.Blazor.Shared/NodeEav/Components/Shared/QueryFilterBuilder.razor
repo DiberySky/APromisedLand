@@ -39,10 +39,10 @@
                                    OnChanged="OnFilterChanged" />
             }
 
-            <div class="d-flex" style="gap: 8px;">
+            <div class="d-flex" style="gap: 8px; flex-wrap: wrap;">
                 <MudButton Variant="Variant.Outlined"
                            Color="Color.Primary"
-                           Size="Size.Small"
+                           Size="Size.Medium"
                            StartIcon="@Icons.Material.Filled.Add"
                            OnClick="AddFilter">
                     添加条件
@@ -51,14 +51,14 @@
                 {
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Default"
-                               Size="Size.Small"
+                               Size="Size.Medium"
                                StartIcon="@Icons.Material.Filled.Clear"
                                OnClick="ClearAllAsync">
                         清空条件
                     </MudButton>
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Success"
-                               Size="Size.Small"
+                               Size="Size.Medium"
                                StartIcon="@Icons.Material.Filled.Search"
                                OnClick="@(async () => await OnApply.InvokeAsync())">
                         应用查询

@@ -107,11 +107,11 @@ else
             <MudItem xs="12" sm="6" md="4">
                 <MudCard Elevation="1" Style="height: 100%;">
                     <MudCardContent>
-                        <div class="d-flex align-center mb-2">
+                        <div class="d-flex align-center mb-2" style="flex-wrap: wrap; row-gap: 4px;">
                             <MudIcon Icon="@Icons.Material.Filled.Category"
                                      Color="@(captured.HasEntity ? Color.Success : Color.Default)"
                                      Size="Size.Medium" />
-                            <MudText Typo="Typo.h6" Class="ml-2">
+                            <MudText Typo="Typo.h6" Class="ml-2" Style="min-width: 0; overflow-wrap: anywhere;">
                                 @captured.DisplayName
                             </MudText>
                             @if (captured.HasEntity)
@@ -142,7 +142,7 @@ else
                         }
                     </MudCardContent>
                     <MudCardActions>
-                        <MudButton Size="Size.Small"
+                        <MudButton Size="Size.Medium"
                                    Variant="Variant.Filled"
                                    Color="Color.Primary"
                                    StartIcon="@(captured.HasEntity
@@ -151,7 +151,7 @@ else
                                    OnClick="@(() => GoToEdit(captured.EntityType))">
                             @(captured.HasEntity ? "编辑" : "填写")
                         </MudButton>
-                        <MudButton Size="Size.Small"
+                        <MudButton Size="Size.Medium"
                                    Variant="Variant.Text"
                                    Color="Color.Default"
                                    StartIcon="@Icons.Material.Filled.History"
@@ -219,16 +219,16 @@ else
         </MudPaper>
 
         @* 操作区 *@
-        <div class="d-flex align-center mb-3" style="gap: 8px;">
+        <div class="d-flex align-center mb-3" style="gap: 8px; flex-wrap: wrap;">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       Size="Size.Small"
+                       Size="Size.Medium"
                        StartIcon="@Icons.Material.Filled.Refresh"
                        OnClick="LoadJsonAsync"
                        Disabled="_jsonLoading">
                 刷新
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                       Size="Size.Small"
+                       Size="Size.Medium"
                        StartIcon="@Icons.Material.Filled.ContentCopy"
                        OnClick="CopyJsonToClipboard"
                        Disabled="@(string.IsNullOrEmpty(_jsonText))">
