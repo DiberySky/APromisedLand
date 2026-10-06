@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.StringTreeSky.Data;
+using TreeGraph.Api.NodeEavSky.Data;
 using TreeGraph.Api.StringTreeSky.Entities;
 using TreeGraph.Api.StringTreeSky.Mapping;
 using TreeGraph.StringTree.Contracts;
@@ -8,19 +8,19 @@ namespace TreeGraph.Api.StringTreeSky.Services;
 
 public class EfStringTreeService : IStringTreeService
 {
-    private readonly StringTreeDbContext _db;
+    private readonly EavDbContext _db;
 
-    public EfStringTreeService(StringTreeDbContext db) => _db = db;
+    public EfStringTreeService(EavDbContext db) => _db = db;
 
     public async Task<List<StringNodeDto>> GetRootNodesAsync(CancellationToken ct = default)
     {
-        var rows = await _db.StringNodes
+        var rows = await _db.StringTreeSkyNodes
             .Where(n => n.ParentId == null)
             .OrderBy(n => n.SortOrder).ThenBy(n => n.Id)
             .Select(n => new
             {
                 Node = n,
-                HasChildren = _db.StringNodes.Any(c => c.ParentId == n.Id)
+                HasChildren = _db.StringTreeSkyNodes.Any(c => c.ParentId == n.Id)
             })
             .ToListAsync(ct);
 
@@ -29,13 +29,13 @@ public class EfStringTreeService : IStringTreeService
 
     public async Task<List<StringNodeDto>> GetChildrenAsync(int parentId, CancellationToken ct = default)
     {
-        var rows = await _db.StringNodes
+        var rows = await _db.StringTreeSkyNodes
             .Where(n => n.ParentId == parentId)
             .OrderBy(n => n.SortOrder).ThenBy(n => n.Id)
             .Select(n => new
             {
                 Node = n,
-                HasChildren = _db.StringNodes.Any(c => c.ParentId == n.Id)
+                HasChildren = _db.StringTreeSkyNodes.Any(c => c.ParentId == n.Id)
             })
             .ToListAsync(ct);
 
@@ -44,22 +44,22 @@ public class EfStringTreeService : IStringTreeService
 
     public async Task<StringNodeDto?> GetNodeAsync(int id, CancellationToken ct = default)
     {
-        var entity = await _db.StringNodes.FindAsync(new object?[] { id }, ct);
+        var entity = await _db.StringTreeSkyNodes.FindAsync(new object?[] { id }, ct);
         if (entity == null) return null;
-        var hasChildren = await _db.StringNodes.AnyAsync(c => c.ParentId == id, ct);
+        var hasChildren = await _db.StringTreeSkyNodes.AnyAsync(c => c.ParentId == id, ct);
         return entity.ToDto(hasChildren);
     }
 
     public async Task<List<StringNodeDto>> GetAncestorPathAsync(int id, CancellationToken ct = default)
     {
         var path = new List<StringNodeDto>();
-        var current = await _db.StringNodes.FindAsync(new object?[] { id }, ct);
+        var current = await _db.StringTreeSkyNodes.FindAsync(new object?[] { id }, ct);
         while (current != null)
         {
-            var hasChildren = await _db.StringNodes.AnyAsync(c => c.ParentId == current.Id, ct);
+            var hasChildren = await _db.StringTreeSkyNodes.AnyAsync(c => c.ParentId == current.Id, ct);
             path.Insert(0, current.ToDto(hasChildren));
             if (!current.ParentId.HasValue) break;
-            current = await _db.StringNodes.FindAsync(new object?[] { current.ParentId.Value }, ct);
+            current = await _db.StringTreeSkyNodes.FindAsync(new object?[] { current.ParentId.Value }, ct);
         }
         return path;
     }
@@ -73,14 +73,14 @@ public class EfStringTreeService : IStringTreeService
             Description = dto.Description,
             SortOrder = await NextSortOrderAsync(dto.ParentId, ct)
         };
-        _db.StringNodes.Add(entity);
+        _db.StringTreeSkyNodes.Add(entity);
         await _db.SaveChangesAsync(ct);
         return entity.ToDto(false);
     }
 
     public async Task<StringNodeDto?> UpdateNodeAsync(int id, StringNodeDto dto, CancellationToken ct = default)
     {
-        var entity = await _db.StringNodes.FindAsync(new object?[] { id }, ct);
+        var entity = await _db.StringTreeSkyNodes.FindAsync(new object?[] { id }, ct);
         if (entity == null) return null;
 
         entity.Name = dto.Name?.Trim() ?? entity.Name;
@@ -88,13 +88,13 @@ public class EfStringTreeService : IStringTreeService
         entity.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
-        var hasChildren = await _db.StringNodes.AnyAsync(c => c.ParentId == id, ct);
+        var hasChildren = await _db.StringTreeSkyNodes.AnyAsync(c => c.ParentId == id, ct);
         return entity.ToDto(hasChildren);
     }
 
     public async Task<bool> DeleteNodeAsync(int id, CancellationToken ct = default)
     {
-        var entity = await _db.StringNodes.FindAsync(new object?[] { id }, ct);
+        var entity = await _db.StringTreeSkyNodes.FindAsync(new object?[] { id }, ct);
         if (entity == null) return false;
 
         await DeleteRecursiveAsync(id, ct);
@@ -104,20 +104,20 @@ public class EfStringTreeService : IStringTreeService
 
     private async Task DeleteRecursiveAsync(int id, CancellationToken ct)
     {
-        var children = await _db.StringNodes.Where(n => n.ParentId == id).ToListAsync(ct);
+        var children = await _db.StringTreeSkyNodes.Where(n => n.ParentId == id).ToListAsync(ct);
         foreach (var child in children)
         {
             await DeleteRecursiveAsync(child.Id, ct);
         }
-        var entity = await _db.StringNodes.FindAsync(new object?[] { id }, ct);
-        if (entity != null) _db.StringNodes.Remove(entity);
+        var entity = await _db.StringTreeSkyNodes.FindAsync(new object?[] { id }, ct);
+        if (entity != null) _db.StringTreeSkyNodes.Remove(entity);
     }
 
     public async Task<bool> MoveNodeAsync(int id, int? newParentId, int newSortOrder, CancellationToken ct = default)
     {
         if (id == newParentId) return false;
 
-        var entity = await _db.StringNodes.FindAsync(new object?[] { id }, ct);
+        var entity = await _db.StringTreeSkyNodes.FindAsync(new object?[] { id }, ct);
         if (entity == null) return false;
 
         if (newParentId.HasValue && await WouldCreateCycleAsync(id, newParentId.Value, ct))
@@ -137,7 +137,7 @@ public class EfStringTreeService : IStringTreeService
         while (currentId.HasValue && guard++ < 1000)
         {
             if (currentId.Value == nodeId) return true;
-            var parent = await _db.StringNodes.FindAsync(new object?[] { currentId.Value }, ct);
+            var parent = await _db.StringTreeSkyNodes.FindAsync(new object?[] { currentId.Value }, ct);
             if (parent == null) break;
             currentId = parent.ParentId;
         }
@@ -146,7 +146,7 @@ public class EfStringTreeService : IStringTreeService
 
     public async Task<bool> SortChildrenAsync(int parentId, IReadOnlyList<int> orderedIds, CancellationToken ct = default)
     {
-        var children = await _db.StringNodes.Where(n => n.ParentId == parentId).ToListAsync(ct);
+        var children = await _db.StringTreeSkyNodes.Where(n => n.ParentId == parentId).ToListAsync(ct);
         var map = children.ToDictionary(c => c.Id);
         for (int i = 0; i < orderedIds.Count; i++)
         {
@@ -162,7 +162,7 @@ public class EfStringTreeService : IStringTreeService
 
     private async Task<int> NextSortOrderAsync(int? parentId, CancellationToken ct)
     {
-        var max = await _db.StringNodes
+        var max = await _db.StringTreeSkyNodes
             .Where(n => n.ParentId == parentId)
             .Select(n => (int?)n.SortOrder)
             .MaxAsync(ct);

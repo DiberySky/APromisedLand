@@ -13,6 +13,11 @@ using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Components;
 
+// 旧 StringTree 体系组件别名：本测试类命名空间向上查找会命中新解耦组件的命名空间
+// TreeGraph.Blazor.Shared.StringTreeSky（CS0118）；别名放在命名空间内部才能优先于
+// 外层命名空间成员生效。
+using StringTreeSky = TreeGraph.Blazor.Shared.Trees.StringTree.Components.StringTreeSky;
+
 /// <summary>
 /// StringTreeSky 组件测试（bUnit）。
 ///

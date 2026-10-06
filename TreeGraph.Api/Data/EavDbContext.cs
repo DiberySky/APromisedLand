@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.StringTreeSky.Entities;
 
 namespace TreeGraph.Api.NodeEavSky.Data;
 
@@ -25,6 +26,9 @@ public class EavDbContext : DbContext
     // TreeSky 树组件（StringTreeNode 定义在 TreeGraph.Blazor.Shared 类库 Models 中）
     public DbSet<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode> StringTreeNodes => Set<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode>();
 
+    // StringTreeSky 解耦版（int 自增主键，独立表，与上面 TreeSky 体系并行）
+    public DbSet<StringNodeEntity> StringTreeSkyNodes => Set<StringNodeEntity>();
+
     public EavDbContext(DbContextOptions<EavDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -40,6 +44,34 @@ public class EavDbContext : DbContext
         ConfigureCustomTables(mb);
         ConfigureAuditLog(mb);
         ConfigureStringTreeNodes(mb);
+        ConfigureStringTreeSkyNodes(mb);
+    }
+
+    // ============================================================
+    // StringTreeSky：StringNodeEntity 树节点（int 自增主键）
+    // ============================================================
+    private static void ConfigureStringTreeSkyNodes(ModelBuilder mb)
+    {
+        mb.Entity<StringNodeEntity>(e =>
+        {
+            e.ToTable("string_tree_sky_nodes");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(256).IsRequired();
+            e.Property(x => x.ParentId).HasColumnName("parent_id");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1024);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasOne(x => x.Parent)
+                .WithMany(x => x.Children)
+                .HasForeignKey(x => x.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => x.ParentId).HasDatabaseName("ix_string_tree_sky_nodes_parent");
+            e.HasIndex(x => new { x.ParentId, x.SortOrder }).HasDatabaseName("ix_string_tree_sky_nodes_parent_sort");
+        });
     }
 
     // ============================================================

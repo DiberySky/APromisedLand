@@ -5,7 +5,6 @@ using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Api.TreeSky;
 using TreeGraph.Api.StringTreeSky;
-using TreeGraph.Api.StringTreeSky.Data;
 using TreeGraph.Api.StringTreeSky.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,10 +52,9 @@ builder.Services.AddScoped<CustomTableQueryService>();
 builder.Services.AddScoped<TreeGraph.Api.TreeSky.ITreeService<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode>,
     TreeGraph.Api.TreeSky.EfTreeService<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode>>();
 
-// ★ StringTreeSky 解耦版：独立 SQLite 库（stringtree.db）+ 独立表 StringTreeNodes，
-//   与 EavDbContext / TreeSky 泛型体系完全并行（StringTreeSky 完全解耦方案）。
-builder.Services.AddStringTreeApi(opt =>
-    opt.UseSqlite("Data Source=stringtree.db"));
+// ★ StringTreeSky 解耦版：表 string_tree_sky_nodes 并入 EavDbContext（treegraphdb），
+//   仅服务/控制器独立，与 TreeSky 泛型体系并行（StringTreeSky 完全解耦方案）。
+builder.Services.AddStringTreeApi();
 
 var app = builder.Build();
 
@@ -89,10 +87,8 @@ if (!EF.IsDesignTime)
     await EavSeeder.SeedAsync(db);
     await StringTreeNodeSeeder.SeedAsync(db);
 
-    // ★ StringTreeSky 解耦版：独立库 EnsureCreated + 空库播种（幂等）
-    var stringTreeDb = scope.ServiceProvider.GetRequiredService<StringTreeDbContext>();
-    await stringTreeDb.Database.EnsureCreatedAsync();
-    await TreeGraph.Api.StringTreeSky.Seeding.StringTreeNodeSeeder.SeedAsync(stringTreeDb);
+    // ★ StringTreeSky 解耦版：空库播种（幂等）
+    await TreeGraph.Api.StringTreeSky.Seeding.StringTreeNodeSeeder.SeedAsync(db);
 
     // E2E 基线（item/user/project + 固定 EntityId 示例值）仅开发/测试环境注入
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
