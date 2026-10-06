@@ -149,6 +149,8 @@
             if (!window.__audit_isVisible(el)) return;
             // 输入框内嵌的小图标按钮（清除/ adornment）有意做小，不报
             if (el.closest('.mud-input-adornment')) return;
+            // Snackbar 关闭按钮是 MudBlazor 内置控件（固定 26px，业务侧不可配），不报
+            if (el.classList.contains('mud-snackbar-close-button')) return;
             const r = el.getBoundingClientRect();
             if (r.width < 44 || r.height < 44) {
                 const d = window.__audit_describe(el);

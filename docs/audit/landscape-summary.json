@@ -1,15 +1,15 @@
 {
   "viewport": {
-    "name": "narrow-390",
-    "width": 390,
-    "height": 844
+    "name": "landscape-844",
+    "width": 844,
+    "height": 390
   },
   "totalPages": 8,
   "pages": [
     {
       "route": "/inodes",
       "url": "/inodes",
-      "viewport": "390×844",
+      "viewport": "844×390",
       "overflow": 0,
       "fixedWidth": 0,
       "narrowGridItems": 0,
@@ -24,7 +24,7 @@
     {
       "route": "/metadata/units",
       "url": "/metadata/units",
-      "viewport": "390×844",
+      "viewport": "844×390",
       "overflow": 0,
       "fixedWidth": 0,
       "narrowGridItems": 0,
@@ -39,7 +39,7 @@
     {
       "route": "/metadata/option-sets",
       "url": "/metadata/option-sets",
-      "viewport": "390×844",
+      "viewport": "844×390",
       "overflow": 0,
       "fixedWidth": 0,
       "narrowGridItems": 0,
@@ -54,7 +54,7 @@
     {
       "route": "/metadata/composite-types",
       "url": "/metadata/composite-types",
-      "viewport": "390×844",
+      "viewport": "844×390",
       "overflow": 0,
       "fixedWidth": 0,
       "narrowGridItems": 0,
@@ -69,7 +69,7 @@
     {
       "route": "/metadata/entity-types",
       "url": "/metadata/entity-types",
-      "viewport": "390×844",
+      "viewport": "844×390",
       "overflow": 0,
       "fixedWidth": 0,
       "narrowGridItems": 0,
@@ -84,7 +84,7 @@
     {
       "route": "/metadata/custom-tables",
       "url": "/metadata/custom-tables",
-      "viewport": "390×844",
+      "viewport": "844×390",
       "overflow": 0,
       "fixedWidth": 0,
       "narrowGridItems": 0,
@@ -99,7 +99,7 @@
     {
       "route": "/metadata/attributes",
       "url": "/metadata/attributes",
-      "viewport": "390×844",
+      "viewport": "844×390",
       "overflow": 0,
       "fixedWidth": 0,
       "narrowGridItems": 0,
@@ -114,7 +114,7 @@
     {
       "route": "/entities",
       "url": "/entities",
-      "viewport": "390×844",
+      "viewport": "844×390",
       "overflow": 0,
       "fixedWidth": 0,
       "narrowGridItems": 0,

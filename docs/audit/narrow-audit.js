@@ -1,10 +1,16 @@
-// narrow-audit.js — 390px 窄屏全量审计（Playwright）
-// 用法：node narrow-audit.js
+// narrow-audit.js — 窄屏/横屏全量审计（Playwright）
+// 用法：
+//   node narrow-audit.js            跑全部视口（390 竖屏 + 844 横屏）
+//   node narrow-audit.js 390        只跑 390×844 竖屏
+//   node narrow-audit.js 844        只跑 844×390 横屏
 const { chromium } = require('playwright-core');
 const fs = require('fs');
 const path = require('path');
 
-const VIEWPORT = { width: 390, height: 844 };
+const VIEWPORTS = [
+  { name: 'narrow-390', label: '390×844 竖屏', width: 390, height: 844, out: 'narrow-summary.json' },
+  { name: 'landscape-844', label: '844×390 横屏', width: 844, height: 390, out: 'landscape-summary.json' },
+];
 const BASE = 'http://localhost:5783';
 const PAGES = [
   '/inodes',
@@ -17,19 +23,13 @@ const PAGES = [
   '/entities',
 ];
 
-(async () => {
-  const CHROME = require('os').homedir() +
-    '/AppData/Local/ms-playwright/chromium-1148/chrome-win/chrome.exe';
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: CHROME,
+async function runViewport(browser, auditSrc, vp) {
+  const context = await browser.newContext({
+    viewport: { width: vp.width, height: vp.height },
   });
-  const context = await browser.newContext({ viewport: VIEWPORT });
 
   // 把审计脚本注入每个页面（addInitScript 在每次导航后执行）
-  const auditSrc = fs.readFileSync(path.join(__dirname, 'audit.js'), 'utf8');
   await context.addInitScript({ content: auditSrc });
-
   const page = await context.newPage();
 
   const results = [];
@@ -59,7 +59,7 @@ const PAGES = [
   }
 
   const summary = {
-    viewport: VIEWPORT,
+    viewport: { name: vp.name, width: vp.width, height: vp.height },
     totalPages: results.length,
     pages: results,
     totals: {
@@ -71,11 +71,35 @@ const PAGES = [
       smallTouch: results.reduce((s, p) => s + (p.smallTouchTargets || 0), 0),
     },
   };
-  console.log('\n=== 汇总（390×844 窄屏）===');
+  console.log(`\n=== 汇总（${vp.label}）===`);
   console.log(JSON.stringify(summary.totals, null, 2));
 
-  fs.writeFileSync(path.join(__dirname, 'narrow-summary.json'), JSON.stringify(summary, null, 2));
-  console.log(`\n详细结果写入 narrow-summary.json`);
+  fs.writeFileSync(path.join(__dirname, vp.out), JSON.stringify(summary, null, 2));
+  console.log(`\n详细结果写入 ${vp.out}`);
 
+  await context.close();
+  return summary;
+}
+
+(async () => {
+  const filter = process.argv[2];
+  const CHROME = require('os').homedir() +
+    '/AppData/Local/ms-playwright/chromium-1148/chrome-win/chrome.exe';
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: CHROME,
+  });
+
+  const auditSrc = fs.readFileSync(path.join(__dirname, 'audit.js'), 'utf8');
+  const targets = VIEWPORTS.filter(v => !filter || v.name.includes(filter));
+  const all = [];
+  for (const vp of targets) {
+    console.log(`\n──────── 视口：${vp.label} ────────`);
+    all.push(await runViewport(browser, auditSrc, vp));
+  }
+
+  const failed = all.filter(s =>
+    Object.values(s.totals).some(v => v > 0) || s.pages.some(p => p.error));
   await browser.close();
+  if (failed.length) process.exit(2);
 })().catch(e => { console.error(e); process.exit(1); });
