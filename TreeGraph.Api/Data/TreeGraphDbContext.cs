@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.StringTreeSky.Entities;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 
 namespace TreeGraph.Api.NodeEavSky.Data;
 
@@ -24,10 +24,6 @@ public class TreeGraphDbContext : DbContext
     public DbSet<InodeEntityType> InodeEntityTypes => Set<InodeEntityType>();
     public DbSet<InodeEntity> InodeEntities => Set<InodeEntity>();
 
-    // TreeSky 树组件（StringTreeNode 定义在 TreeGraph.Blazor.Shared 类库 Models 中）
-    public DbSet<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode> StringTreeNodes => Set<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode>();
-
-    // StringTreeSky 解耦版（int 自增主键，独立表，与上面 TreeSky 体系并行）
     public DbSet<StringNodeEntity> StringTreeSkyNodes => Set<StringNodeEntity>();
 
     public TreeGraphDbContext(DbContextOptions<TreeGraphDbContext> options) : base(options) { }
@@ -44,7 +40,6 @@ public class TreeGraphDbContext : DbContext
         ConfigureCompositeTypes(mb);
         ConfigureCustomTables(mb);
         ConfigureAuditLog(mb);
-        ConfigureStringTreeNodes(mb);
         ConfigureStringTreeSkyNodes(mb);
     }
 
@@ -83,31 +78,6 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => new { x.ParentId, x.SortOrder }).HasDatabaseName("ix_string_tree_sky_nodes_parent_sort");
             e.HasIndex(x => x.EntityType)
                 .HasDatabaseName("ix_string_tree_sky_nodes_entity_type");
-        });
-    }
-
-    // ============================================================
-    // TreeSky：StringTreeNode 树节点
-    // HasChildren/Parent/Children 为运行时导航属性，不落库
-    // ============================================================
-    private static void ConfigureStringTreeNodes(ModelBuilder mb)
-    {
-        mb.Entity<TreeGraph.Blazor.Shared.Trees.TreeSky.Models.StringTreeNode>(e =>
-        {
-            e.ToTable("string_tree_nodes");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(300).IsRequired();
-            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
-            e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
-            e.Property(x => x.SortOrder).HasColumnName("sort_order");
-            e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
-
-            e.Ignore(x => x.HasChildren);
-            e.Ignore(x => x.Parent);
-            e.Ignore(x => x.Children);
-
-            e.HasIndex(x => x.ParentId).HasDatabaseName("ix_string_tree_nodes_parent_id");
         });
     }
 

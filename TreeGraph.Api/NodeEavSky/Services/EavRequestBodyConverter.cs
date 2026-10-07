@@ -1,7 +1,7 @@
 using System.Text.Json;
 using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Shared.Eav;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav;
+using TreeGraph.Shared.NodeEav.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.Services;
 

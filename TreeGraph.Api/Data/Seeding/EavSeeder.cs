@@ -2,7 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Shared.Eav;
+using TreeGraph.Shared.NodeEav;
 
 namespace TreeGraph.Api.NodeEavSky.Data.Seeding;
 

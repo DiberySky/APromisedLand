@@ -119,8 +119,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Blazor.Shared.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Blazor.Maui", "TreeGraph.Blazor.Maui\TreeGraph.Blazor.Maui.csproj", "{EFD3E534-41C8-481C-96A1-7FC9FEE158EC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.StringTree.Contracts", "TreeGraph.StringTree.Contracts\TreeGraph.StringTree.Contracts.csproj", "{B23AFBA1-36BD-4491-8869-1734CE826C9A}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -733,18 +731,6 @@ Global
 		{EFD3E534-41C8-481C-96A1-7FC9FEE158EC}.Release|x64.Build.0 = Release|Any CPU
 		{EFD3E534-41C8-481C-96A1-7FC9FEE158EC}.Release|x86.ActiveCfg = Release|Any CPU
 		{EFD3E534-41C8-481C-96A1-7FC9FEE158EC}.Release|x86.Build.0 = Release|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Debug|x64.Build.0 = Debug|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Debug|x86.Build.0 = Debug|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Release|x64.ActiveCfg = Release|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Release|x64.Build.0 = Release|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Release|x86.ActiveCfg = Release|Any CPU
-		{B23AFBA1-36BD-4491-8869-1734CE826C9A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

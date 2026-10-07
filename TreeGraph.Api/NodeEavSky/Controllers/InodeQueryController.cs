@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.Controllers;
 
@@ -72,7 +72,7 @@ public class InodeQueryController : ControllerBase
         }
 
         // 2. 走查询
-        var internalReq = new Shared.Eav.Dtos.EavQueryRequest
+        var internalReq = new Shared.NodeEav.Dtos.EavQueryRequest
         {
             EntityType = request.EntityType,
             Filters = request.Filters,

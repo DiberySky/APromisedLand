@@ -2,8 +2,8 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using TreeGraph.Blazor.Shared.NodeEav.Services;
-using TreeGraph.Shared.Eav;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav;
+using TreeGraph.Shared.NodeEav.Dtos;
 
 namespace TreeGraph.Blazor.Shared.StringTreeSky.Services;
 

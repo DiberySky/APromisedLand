@@ -5,7 +5,7 @@ using TreeGraph.Blazor.Shared.NodeEav.Services;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
 using TreeGraph.Blazor.Shared.Tests.NodeEav;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.StringTreeSky;

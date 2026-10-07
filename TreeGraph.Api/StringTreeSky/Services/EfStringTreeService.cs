@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Data;
 using TreeGraph.Api.StringTreeSky.Entities;
 using TreeGraph.Api.StringTreeSky.Mapping;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 
 namespace TreeGraph.Api.StringTreeSky.Services;
 

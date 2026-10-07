@@ -1,6 +1,6 @@
 using System.Text.Json;
 using TreeGraph.Blazor.Shared.NodeEav.Services;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 using Xunit;
 
 namespace TreeGraph.Blazor.Tests;

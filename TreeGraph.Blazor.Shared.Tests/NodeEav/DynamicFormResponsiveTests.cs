@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.NodeEav.Components;
 using TreeGraph.Blazor.Shared.Platform;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.NodeEav;

@@ -1,5 +1,5 @@
 using TreeGraph.Api.StringTreeSky.Entities;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 
 namespace TreeGraph.Api.StringTreeSky.Mapping;
 

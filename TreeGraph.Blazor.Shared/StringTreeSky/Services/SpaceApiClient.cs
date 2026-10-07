@@ -1,5 +1,5 @@
 using System.Net.Http.Json;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 
 namespace TreeGraph.Blazor.Shared.StringTreeSky.Services;
 

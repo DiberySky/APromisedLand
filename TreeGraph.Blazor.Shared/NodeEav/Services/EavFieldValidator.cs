@@ -2,7 +2,7 @@ using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 
 namespace TreeGraph.Blazor.Shared.NodeEav.Services;
 

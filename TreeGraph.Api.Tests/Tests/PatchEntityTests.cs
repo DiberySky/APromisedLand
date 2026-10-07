@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using TreeGraph.Api.Tests.Fixtures;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Tests;

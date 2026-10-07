@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.Controllers;
 

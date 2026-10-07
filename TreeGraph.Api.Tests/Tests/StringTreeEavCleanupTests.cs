@@ -6,7 +6,7 @@ using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.StringTreeSky.Entities;
 using TreeGraph.Api.StringTreeSky.Services;
 using TreeGraph.Api.Tests.Fixtures;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Tests;

@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Components.Web;
 using MudBlazor;
 using TreeGraph.Blazor.Shared.NodeEav.Services;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
-using TreeGraph.Shared.Eav.Dtos;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.NodeEav.Dtos;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 
 namespace TreeGraph.Blazor.Shared.StringTreeSky;
 

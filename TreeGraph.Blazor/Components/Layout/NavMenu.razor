@@ -1,6 +1,5 @@
 @* NavMenu.razor *@
-@using TreeGraph.Blazor.Services
-@using TreeGraph.Shared.Eav.Dtos
+@using TreeGraph.Shared.NodeEav.Dtos
 @inject EavApiClient Api
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
@@ -9,20 +8,6 @@
     <MudNavLink Href="/" Match="NavLinkMatch.All"
                 Icon="@Icons.Material.Filled.Home">
         首页
-    </MudNavLink>
-
-    @* ★ TreeSky 树组件演示（内存数据，可增删改/排序/移动） *@
-    <MudNavLink Href="/tree-sky-demo"
-                Icon="@Icons.Material.Filled.AccountTree"
-                Match="NavLinkMatch.All">
-        TreeSky 演示
-    </MudNavLink>
-
-    @* ★ StringTreeSky 树组件演示（API 数据 /StringTreeNode） *@
-    <MudNavLink Href="/string-tree-demo"
-                Icon="@Icons.Material.Filled.AccountTree"
-                Match="NavLinkMatch.All">
-        StringTree 演示
     </MudNavLink>
 
     @* ★ iNode 入口 *@

@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using TreeGraph.Api.Tests.Fixtures;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Tests;

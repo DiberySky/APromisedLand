@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 
 namespace TreeGraph.Blazor.E2E.Tests.Fixtures;
 

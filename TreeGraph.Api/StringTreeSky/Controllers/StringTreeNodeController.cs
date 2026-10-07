@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using TreeGraph.Api.StringTreeSky.Services;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 
 namespace TreeGraph.Api.StringTreeSky.Controllers;
 

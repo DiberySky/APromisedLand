@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Data;
 using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.Eav.Dtos;
-using TreeGraph.StringTree.Contracts;
+using TreeGraph.Shared.NodeEav.Dtos;
+using TreeGraph.Shared.StringTreeSky.Contracts;
 
 namespace TreeGraph.Api.StringTreeSky.Services;
 

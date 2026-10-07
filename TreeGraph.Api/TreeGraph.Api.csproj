@@ -20,7 +20,6 @@
       <ProjectReference Include="..\APromisedLand.ServiceDefaults\APromisedLand.ServiceDefaults.csproj" />
       <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
       <ProjectReference Include="..\TreeGraph.Blazor.Shared\TreeGraph.Blazor.Shared.csproj" />
-      <ProjectReference Include="..\TreeGraph.StringTree.Contracts\TreeGraph.StringTree.Contracts.csproj" />
     </ItemGroup>
     
 </Project>

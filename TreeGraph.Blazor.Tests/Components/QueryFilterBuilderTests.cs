@@ -5,7 +5,7 @@ using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.NodeEav.Components.Shared;
 using TreeGraph.Blazor.Shared.NodeEav.Services;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 using Xunit;
 
 namespace TreeGraph.Blazor.Tests.Components;

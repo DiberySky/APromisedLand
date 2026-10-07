@@ -31,7 +31,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
-    <ProjectReference Include="..\TreeGraph.StringTree.Contracts\TreeGraph.StringTree.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

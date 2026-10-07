@@ -1,4 +1,4 @@
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 
 namespace TreeGraph.Blazor.Shared.NodeEav.Services;
 

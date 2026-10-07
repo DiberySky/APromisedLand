@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.Eav.Dtos;
+using TreeGraph.Shared.NodeEav.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.Controllers;
 

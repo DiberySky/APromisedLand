@@ -59,7 +59,7 @@ public class SpaceAttributeStatsService
             if (_counts is not null) return _counts;
 
             var list = await _eavApi.ListAttributesAsync(includeDeleted: false, ct: ct)
-                       ?? new List<TreeGraph.Shared.Eav.Dtos.AttributeDetailDto>();
+                       ?? new List<TreeGraph.Shared.NodeEav.Dtos.AttributeDetailDto>();
 
             _counts = list
                 .GroupBy(a => a.EntityType ?? "")
