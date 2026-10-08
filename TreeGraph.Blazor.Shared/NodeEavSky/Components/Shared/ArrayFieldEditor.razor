@@ -1,0 +1,138 @@
+@* ArrayFieldEditor.razor *@
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+
+@* ArrayFieldEditor.razor *@
+
+@* 数组字段编辑器：每个元素独立渲染 + 独立校验错误；添加/删除元素。 *@
+
+<MudText Typo="Typo.subtitle2" Class="mb-1">
+    @Field.DisplayName
+    @if (Field.IsRequired)
+    {
+        <span class="mud-error-text">*</span>
+    }
+</MudText>
+
+@if (Errors is { Count: > 0 } && Errors.Any(e => string.IsNullOrEmpty(e.Path)))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-2">
+        @string.Join("；", Errors.Where(e => string.IsNullOrEmpty(e.Path)).Select(e => e.Message))
+    </MudAlert>
+}
+
+@for (int i = 0; i < _items.Count; i++)
+{
+    var idx = i;
+    var itemErrors = SliceItemErrors(idx);
+    <MudPaper Class="pa-3 mb-2" Outlined="true">
+        <div class="d-flex align-center mb-2">
+            <MudText Typo="Typo.caption">#@(idx + 1)</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Medium"
+                           Color="Color.Error"
+                           OnClick="@(() => RemoveAt(idx))" />
+        </div>
+
+        @if (Field.DataType == "composite" && Field.NestedType is not null)
+        {
+            <CompositeFieldEditor TypeSchema="@Field.NestedType"
+                                  BasePath=""
+                                  Value="@(GetItem(idx) as Dictionary<string, object?>)"
+                                  ValueChanged="@(v => SetItem(idx, v))"
+                                  Errors="@itemErrors" />
+        }
+        else
+        {
+            <RenderLeafField Field="Field"
+                             Value="@GetItem(idx)"
+                             ValueChanged="@(v => SetItem(idx, v))"
+                             Errors="@itemErrors" />
+        }
+    </MudPaper>
+}
+
+<MudButton Variant="Variant.Outlined"
+           Color="Color.Primary"
+           Size="Size.Medium"
+           StartIcon="@Icons.Material.Filled.Add"
+           OnClick="AddItem">
+    添加元素
+</MudButton>
+
+@code {
+    [Parameter, EditorRequired] public CompositeFieldSchemaDto Field { get; set; } = null!;
+    [Parameter] public string BasePath { get; set; } = "";
+
+    /// <summary>数组值（List&lt;object?&gt;）。</summary>
+    [Parameter] public List<object?>? Value { get; set; }
+    [Parameter] public EventCallback<object?> ValueChanged { get; set; }
+
+    /// <summary>该数组字段的全部错误，Path 形如 "[0]" / "[0].sub"。</summary>
+    [Parameter] public IReadOnlyList<FieldValidationError>? Errors { get; set; }
+
+    private List<object?> _items = new();
+
+    protected override void OnParametersSet()
+    {
+        _items = Value ?? new List<object?>();
+    }
+
+    private object? GetItem(int i)
+        => i >= 0 && i < _items.Count ? _items[i] : null;
+
+    private void SetItem(int i, object? v)
+    {
+        var newList = new List<object?>(_items);
+        if (i >= 0 && i < newList.Count)
+        {
+            newList[i] = v;
+            ValueChanged.InvokeAsync(newList);
+        }
+    }
+
+    private void AddItem()
+    {
+        var newList = new List<object?>(_items) { null };
+        ValueChanged.InvokeAsync(newList);
+    }
+
+    private void RemoveAt(int i)
+    {
+        if (i < 0 || i >= _items.Count) return;
+        var newList = new List<object?>(_items);
+        newList.RemoveAt(i);
+        ValueChanged.InvokeAsync(newList);
+    }
+
+    /// <summary>筛出属于第 i 个元素的错误，并剥离 "[i]" 前缀。</summary>
+    private IReadOnlyList<FieldValidationError> SliceItemErrors(int i)
+    {
+        if (Errors is null || Errors.Count == 0)
+            return Array.Empty<FieldValidationError>();
+
+        var prefix = $"[{i}]";
+        var result = new List<FieldValidationError>();
+        foreach (var e in Errors)
+        {
+            if (string.IsNullOrEmpty(e.Path)) continue;
+
+            if (e.Path == prefix)
+            {
+                result.Add(new FieldValidationError("", e.Message));
+            }
+            else if (e.Path.StartsWith(prefix + "."))
+            {
+                result.Add(new FieldValidationError(
+                    e.Path.Substring(prefix.Length + 1), e.Message));
+            }
+            else if (e.Path.StartsWith(prefix + "["))
+            {
+                result.Add(new FieldValidationError(
+                    e.Path.Substring(prefix.Length), e.Message));
+            }
+        }
+        return result;
+    }
+}

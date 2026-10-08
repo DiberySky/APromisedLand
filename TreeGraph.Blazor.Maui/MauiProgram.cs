@@ -2,7 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Maui;
-using TreeGraph.Blazor.Shared.NodeEav.Services;
+using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 
 namespace TreeGraph.Blazor.Maui;

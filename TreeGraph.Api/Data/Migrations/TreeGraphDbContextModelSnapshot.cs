@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.Data;
 
 #nullable disable
 
-namespace TreeGraph.Api.NodeEavSky.Data.Migrations
+namespace TreeGraph.Api.Data.Migrations
 {
     [DbContext(typeof(TreeGraphDbContext))]
     partial class TreeGraphDbContextModelSnapshot : ModelSnapshot

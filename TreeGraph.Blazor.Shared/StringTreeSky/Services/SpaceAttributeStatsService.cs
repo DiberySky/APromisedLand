@@ -1,4 +1,4 @@
-using TreeGraph.Blazor.Shared.NodeEav.Services;
+using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 
 namespace TreeGraph.Blazor.Shared.StringTreeSky.Services;
 
@@ -59,7 +59,7 @@ public class SpaceAttributeStatsService
             if (_counts is not null) return _counts;
 
             var list = await _eavApi.ListAttributesAsync(includeDeleted: false, ct: ct)
-                       ?? new List<TreeGraph.Shared.NodeEav.Dtos.AttributeDetailDto>();
+                       ?? new List<TreeGraph.Shared.NodeEavSky.Dtos.AttributeDetailDto>();
 
             _counts = list
                 .GroupBy(a => a.EntityType ?? "")

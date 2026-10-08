@@ -4,10 +4,10 @@ using Moq;
 using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.Platform;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Extensions;
-using TreeGraph.Blazor.Shared.Trees.TreeSky;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Models;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Services;
+using TreeGraph.Blazor.Shared.TreeSky.Extensions;
+using TreeGraph.Blazor.Shared.TreeSky;
+using TreeGraph.Blazor.Shared.TreeSky.Models;
+using TreeGraph.Blazor.Shared.TreeSky.Services;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Components;

@@ -1,0 +1,70 @@
+@* TreeNodeEditDialog.razor *@
+@namespace TreeGraph.Blazor.Shared.TreeSky.Nodes
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@* 精简移植版：移除节点属性区（NodeAttributeItemsSky/属性定义选择），仅保留 EditTemplate 表单 *@
+@implements IDisposable
+
+<DialogTreeSky TItem="@TItem"
+               Item="@_node"
+               Title="@_title"
+               SubmitButtonVisible="true"
+               OnSubmitClick="@SubmitAsync"
+               OnCanceledClick="@Close">
+    <DialogContent>
+        <MudContainer Class="py-8">
+            <MudForm @ref="_form" Model="@_node">
+                @if (NodeTemplate.EditTemplate is null)
+                {
+                    <MudStack Spacing="3">
+                        <MudText Color="Color.Secondary">未提供编辑模板（EditTemplate）。</MudText>
+                    </MudStack>
+                }
+                else
+                {
+                    @NodeTemplate.EditTemplate(_node)
+                }
+            </MudForm>
+        </MudContainer>
+    </DialogContent>
+</DialogTreeSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public bool IsCreate { get; set; }
+
+    [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
+
+    private MudForm _form = null!;
+
+    private TItem _node = null!;
+
+    private string _title = null!;
+
+    protected override void OnInitialized()
+    {
+        _node = NodeTemplate.Node.Value!;
+
+        _title = IsCreate ? $"创建【{_node.Parent!.Text()}】子节点" : _node.Text();
+
+        base.OnInitialized();
+    }
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        MudDialog?.Close(DialogResult.Ok(_node));
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    public void Dispose()
+    {
+    }
+}

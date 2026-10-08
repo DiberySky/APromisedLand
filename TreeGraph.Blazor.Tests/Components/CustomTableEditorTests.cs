@@ -4,10 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using MudBlazor;
 using MudBlazor.Services;
-using TreeGraph.Blazor.Shared.NodeEav.Components.Shared;
-using TreeGraph.Blazor.Shared.NodeEav.Services;
+using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared;
+using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Tests.TestDoubles;
-using TreeGraph.Shared.NodeEav.Dtos;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
 
 namespace TreeGraph.Blazor.Tests.Components;

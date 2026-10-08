@@ -3,7 +3,7 @@ using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.StringTreeSky.Entities;
 using TreeGraph.Shared.StringTreeSky.Contracts;
 
-namespace TreeGraph.Api.NodeEavSky.Data;
+namespace TreeGraph.Api.Data;
 
 public class TreeGraphDbContext : DbContext
 {

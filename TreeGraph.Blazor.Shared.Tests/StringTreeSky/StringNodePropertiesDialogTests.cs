@@ -4,7 +4,7 @@ using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
-using TreeGraph.Blazor.Shared.Tests.NodeEav;
+using TreeGraph.Blazor.Shared.Tests.NodeEavSky;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.StringTreeSky;

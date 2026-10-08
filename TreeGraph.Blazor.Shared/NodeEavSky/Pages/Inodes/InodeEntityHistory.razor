@@ -1,0 +1,137 @@
+@* InodeEntityHistory.razor *@
+@page "/inodes/{InodeId}/types/{EntityType}/history"
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@inject EavApiClient Api
+@inject NavigationManager Nav
+@* InodeEntityHistory.razor *@
+<PageTitle>审计历史</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudButton Variant="Variant.Text" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.ArrowBack"
+               OnClick="BackToEdit">
+        返回
+    </MudButton>
+    <MudText Typo="Typo.h5">审计历史</MudText>
+</div>
+
+<MudPaper Class="pa-3 mb-4">
+    <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">iNode</MudText>
+        <code>@InodeId</code>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-4">类型</MudText>
+        <code>@EntityType</code>
+    </div>
+</MudPaper>
+
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="4">
+        <MudDatePicker @bind-Date="_from" Label="起始时间"
+                       Variant="Variant.Outlined" />
+    </MudItem>
+    <MudItem xs="12" md="4" Class="d-flex align-center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LoadAsync" Disabled="@_loading"
+                   StartIcon="@Icons.Material.Filled.Search">
+            查询
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_history is { Count: > 0 })
+{
+    <MudTimeline TimelinePosition="TimelinePosition.Start">
+        @foreach (var h in _history)
+        {
+            <MudTimelineItem Color="@GetColor(h.ChangeType)" Elevation="0">
+                <MudText Typo="Typo.subtitle2">
+                    @h.ChangedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                </MudText>
+                <MudText Typo="Typo.caption" Class="mb-2">
+                    @h.AttributeName · @h.ChangeType · @h.ChangedBy
+                </MudText>
+                <MudPaper Class="pa-2" Elevation="1">
+                    @if (!string.IsNullOrEmpty(h.OldValue))
+                    {
+                        <MudText Typo="Typo.body2"
+                                 Class="text-decoration-line-through">
+                            旧值: @h.OldValue
+                        </MudText>
+                    }
+                    @if (!string.IsNullOrEmpty(h.NewValue))
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Success">
+                            新值: @h.NewValue
+                        </MudText>
+                    }
+                </MudPaper>
+            </MudTimelineItem>
+        }
+    </MudTimeline>
+}
+else if (_history is not null)
+{
+    <MudAlert Severity="Severity.Info">暂无历史记录</MudAlert>
+}
+
+@code {
+    [Parameter] public string InodeId { get; set; } = "";
+    [Parameter] public string EntityType { get; set; } = "";
+
+    private IReadOnlyList<EntityHistoryDto>? _history;
+    private DateTime? _from;
+    private bool _loading = true;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized) await LoadAsync();
+    }
+
+    private void BackToEdit()
+        => Nav.NavigateTo(
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
+            $"{Uri.EscapeDataString(EntityType)}");
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            DateTimeOffset? from = null;
+            if (_from.HasValue)
+            {
+                var local = _from.Value;
+                var offset = TimeZoneInfo.Local.GetUtcOffset(local);
+                from = new DateTimeOffset(local, offset);
+            }
+
+            _history = await Api.GetInodeEntityHistoryAsync(
+                InodeId, EntityType, from);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static Color GetColor(string changeType) => changeType switch
+    {
+        "Insert" => Color.Success,
+        "Update" => Color.Info,
+        "Delete" => Color.Error,
+        _ => Color.Default
+    };
+}

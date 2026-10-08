@@ -5,8 +5,8 @@ using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
-using TreeGraph.Blazor.Shared.Tests.NodeEav;
-using TreeGraph.Shared.NodeEav.Dtos;
+using TreeGraph.Blazor.Shared.Tests.NodeEavSky;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 using TreeGraph.Shared.StringTreeSky.Contracts;
 using Xunit;
 

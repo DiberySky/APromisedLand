@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
-using TreeGraph.Blazor.Shared.NodeEav.Services;
+using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
-using TreeGraph.Blazor.Shared.Tests.NodeEav;
+using TreeGraph.Blazor.Shared.Tests.NodeEavSky;
 using TreeGraph.Shared.StringTreeSky.Contracts;
 using Xunit;
 

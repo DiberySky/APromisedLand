@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.Data;
 
 namespace TreeGraph.Api.NodeEavSky.Services;
 

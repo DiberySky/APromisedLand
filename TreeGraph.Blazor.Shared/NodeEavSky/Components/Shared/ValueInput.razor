@@ -1,0 +1,204 @@
+@* ValueInput.razor *@
+@using System.Globalization
+@using System.Text.Json
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@* ValueInput.razor *@
+@* 单值输入组件，按属性类型渲染。 *@
+
+@if (Attribute.DataType == "string")
+{
+    <MudTextField T="string"
+                  Value="@(Value as string)"
+                  ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Placeholder="值"
+                  Immediate="true"
+                  FullWidth="true" />
+}
+else if (Attribute.DataType == "int")
+{
+    @* ★ int 有单位时走数值 + 单位双控件；无单位时保持 long? 输入 *@
+    @if (Attribute.Unit is not null)
+    {
+        var numeric = Value as NumericInput ?? new NumericInput();
+        <div class="d-flex" style="gap: 4px;">
+            <MudNumericField T="decimal?"
+                             Value="@numeric.Value"
+                             ValueChanged="@(v =>
+                             {
+                                 var n = Value as NumericInput ?? new NumericInput();
+                                 n.Value = v ?? 0;
+                                 ValueChanged.InvokeAsync(n);
+                             })"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             Placeholder="值"
+                             FullWidth="true" />
+            <MudSelect T="Guid?"
+                       Value="@numeric.UnitId"
+                       ValueChanged="@(u =>
+                       {
+                           var n = Value as NumericInput ?? new NumericInput();
+                           n.UnitId = u;
+                           ValueChanged.InvokeAsync(n);
+                       })"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="min-width: 100px;">
+                @foreach (var u in Attribute.AvailableUnits ?? Array.Empty<UnitSchemaDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">@u.Symbol</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    }
+    else
+    {
+        <MudNumericField T="long?"
+                         Value="@(Value switch { long l => l, int i => i, _ => null })"
+                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         Placeholder="值"
+                         FullWidth="true" />
+    }
+}
+else if (Attribute.DataType == "decimal")
+{
+    @if (Attribute.Unit is not null)
+    {
+        var numeric = Value as NumericInput ?? new NumericInput();
+        <div class="d-flex" style="gap: 4px;">
+            <MudNumericField T="decimal?"
+                             Value="@numeric.Value"
+                             ValueChanged="@(v =>
+                             {
+                                 var n = Value as NumericInput ?? new NumericInput();
+                                 n.Value = v ?? 0;
+                                 ValueChanged.InvokeAsync(n);
+                             })"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             Placeholder="值"
+                             FullWidth="true" />
+            <MudSelect T="Guid?"
+                       Value="@numeric.UnitId"
+                       ValueChanged="@(u =>
+                       {
+                           var n = Value as NumericInput ?? new NumericInput();
+                           n.UnitId = u;
+                           ValueChanged.InvokeAsync(n);
+                       })"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="min-width: 100px;">
+                @foreach (var u in Attribute.AvailableUnits ?? Array.Empty<UnitSchemaDto>())
+                {
+                    <MudSelectItem T="Guid?" Value="@u.Id">@u.Symbol</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    }
+    else
+    {
+        <MudNumericField T="decimal?"
+                         Value="@(Value switch
+                         {
+                             decimal d => d,
+                             double db => (decimal)db,
+                             int i => i,
+                             long l => l,
+                             _ => null
+                         })"
+                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         Placeholder="值"
+                         FullWidth="true" />
+    }
+}
+else if (Attribute.DataType == "bool")
+{
+    <MudSelect T="bool?"
+               Value="@(Value as bool?)"
+               ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+               Variant="Variant.Outlined"
+               Margin="Margin.Dense"
+               FullWidth="true">
+        <MudSelectItem T="bool?" Value="@((bool?)null)">（未选择）</MudSelectItem>
+        <MudSelectItem T="bool?" Value="@((bool?)true)">是</MudSelectItem>
+        <MudSelectItem T="bool?" Value="@((bool?)false)">否</MudSelectItem>
+    </MudSelect>
+}
+else if (Attribute.DataType == "datetime")
+{
+    <MudTextField T="string"
+                  Value="@(Value is DateTimeOffset dto ? dto.ToString("O") : Value as string)"
+                  ValueChanged="@(v =>
+                  {
+                      if (string.IsNullOrWhiteSpace(v))
+                          ValueChanged.InvokeAsync(null);
+                      else if (DateTimeOffset.TryParse(v, out var parsed))
+                          ValueChanged.InvokeAsync(parsed);
+                  })"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Placeholder="ISO 8601"
+                  Immediate="true"
+                  FullWidth="true" />
+}
+else if (Attribute.DataType == "date")
+{
+    <MudDatePicker Date="@(Value is string s && DateOnly.TryParse(s, out var d)
+                            ? d.ToDateTime(TimeOnly.MinValue) : null)"
+                   DateChanged="@(v => ValueChanged.InvokeAsync(
+                       v.HasValue ? v.Value.ToString("yyyy-MM-dd") : null))"
+                   Variant="Variant.Outlined"
+                   Margin="Margin.Dense" />
+}
+else if (Attribute.DataType == "time")
+{
+    <MudTimePicker Time="@(Value is string s && TimeOnly.TryParse(s, out var t)
+                            ? t.ToTimeSpan() : null)"
+                   TimeChanged="@(v => ValueChanged.InvokeAsync(
+                       v.HasValue
+                           ? new TimeOnly(v.Value.Hours, v.Value.Minutes, v.Value.Seconds)
+                               .ToString("HH:mm:ss")
+                           : null))"
+                   Variant="Variant.Outlined"
+                   Margin="Margin.Dense" />
+}
+else if (Attribute.DataType == "single_choice")
+{
+    <MudSelect T="string"
+               Value="@(Value as string)"
+               ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+               Variant="Variant.Outlined"
+               Margin="Margin.Dense"
+               FullWidth="true">
+        <MudSelectItem T="string" Value="@((string?)null)">（未选择）</MudSelectItem>
+        @foreach (var item in Attribute.OptionSet?.Items ?? Array.Empty<OptionItemSchemaDto>())
+        {
+            <MudSelectItem T="string" Value="@item.Value">@item.Label</MudSelectItem>
+        }
+    </MudSelect>
+}
+else
+{
+    <MudTextField T="string"
+                  Value="@(Value?.ToString())"
+                  ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Placeholder="值"
+                  Immediate="true"
+                  FullWidth="true" />
+}
+
+@code {
+    [Parameter, EditorRequired] public AttributeSchemaDto Attribute { get; set; } = null!;
+    [Parameter] public object? Value { get; set; }
+    [Parameter] public EventCallback<object?> ValueChanged { get; set; }
+}

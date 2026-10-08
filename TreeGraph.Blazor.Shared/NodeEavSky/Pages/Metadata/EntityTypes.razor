@@ -1,0 +1,237 @@
+@* EntityTypes.razor — 实体类型管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/EntityTypeEditDialog.razor） *@
+@page "/metadata/entity-types"
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject EntityTypeDisplayService EntityTypeDisplay
+@using TreeGraph.Shared.NodeEavSky.Dtos
+<PageTitle>实体类型管理</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">实体类型管理</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <div class="d-flex align-center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LoadAsync" Disabled="@_loading"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            刷新
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   OnClick="OpenCreateAsync"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Class="ml-2">
+            新建实体类型
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_types is null || _types.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.Category"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">暂无实体类型</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            点击"新建实体类型"创建第一个
+        </MudText>
+    </MudPaper>
+}
+else
+{
+    @* 窄屏下表格超出视口，允许横向滚动（桌面端不影响） *@
+    <div style="overflow-x:auto">
+        <MudTable Items="_types" Hover="true" Bordered="true">
+        <HeaderContent>
+            <MudTh>名称</MudTh>
+            <MudTh>说明</MudTh>
+            <MudTh>属性数</MudTh>
+            <MudTh>顺序</MudTh>
+            <MudTh>状态</MudTh>
+            <MudTh>操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
+                <MudText Typo="Typo.body1">@context.DisplayName</MudText>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @(string.IsNullOrEmpty(context.Description) ? "—" : context.Description)
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                    @context.AttributeCount
+                </MudChip>
+            </MudTd>
+            <MudTd>@context.DisplayOrder</MudTd>
+            <MudTd>
+                @if (context.IsDeleted)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error">已删除</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">活动</MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                @if (!context.IsDeleted)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Medium"
+                                   Color="Color.Primary"
+                                   OnClick="@(async () => await OpenEditAsync(context))"
+                                   title="编辑" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Medium"
+                                   Color="Color.Error"
+                                   OnClick="@(async () => await DeleteAsync(context))"
+                                   title="删除" />
+                }
+                else
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                                   Size="Size.Medium"
+                                   Color="Color.Success"
+                                   OnClick="@(async () => await UndeleteAsync(context))"
+                                   title="恢复" />
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<EntityTypeDetailDto>? _types;
+    private bool _loading;
+    private bool _initialized;
+
+    /// <summary>桌面端对话框选项：PageDialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
+    private static readonly DialogOptions DialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            // ★ 1 次 HTTP 替代 1+N 次（原 foreach 串行 GetEntityTypeAsync）
+            _types = await Api.ListEntityTypeDetailsAsync()
+                     ?? Array.Empty<EntityTypeDetailDto>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // ---------- 新建 / 编辑 ----------
+
+    private async Task OpenCreateAsync()
+    {
+        var parameters = new DialogParameters<EntityTypeEditDialog>
+        {
+            { x => x.InitialDisplayOrder, (_types?.Count ?? 0) + 1 }
+        };
+
+        var dialog = await DialogService.ShowAsync<EntityTypeEditDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+            await RefreshDisplayMapAsync();
+        }
+    }
+
+    private async Task OpenEditAsync(EntityTypeDetailDto dto)
+    {
+        var parameters = new DialogParameters<EntityTypeEditDialog>
+        {
+            { x => x.Editing, dto }
+        };
+
+        var dialog = await DialogService.ShowAsync<EntityTypeEditDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+            await RefreshDisplayMapAsync();
+        }
+    }
+
+    /// <summary>刷新全局 DisplayName 映射，让 NavMenu 等页面立即生效。</summary>
+    private async Task RefreshDisplayMapAsync()
+    {
+        EntityTypeDisplay.Invalidate();
+        await EntityTypeDisplay.EnsureLoadedAsync();
+    }
+
+    private async Task DeleteAsync(EntityTypeDetailDto dto)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除实体类型「{dto.DisplayName}」？\n\n" +
+            "· 仍有活动属性时将被拒绝。\n" +
+            "· 删除后可通过恢复按钮还原。",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteEntityTypeAsync(dto.EntityTypeId);
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await LoadAsync();
+            EntityTypeDisplay.Invalidate();
+            await EntityTypeDisplay.EnsureLoadedAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    private async Task UndeleteAsync(EntityTypeDetailDto dto)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认恢复",
+            $"确定恢复实体类型「{dto.DisplayName}」？",
+            yesText: "恢复", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.UndeleteEntityTypeAsync(dto.EntityTypeId);
+        if (ok)
+        {
+            Snackbar.Add("恢复成功", Severity.Success);
+            await LoadAsync();
+            EntityTypeDisplay.Invalidate();
+            await EntityTypeDisplay.EnsureLoadedAsync();
+        }
+        else
+        {
+            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+}

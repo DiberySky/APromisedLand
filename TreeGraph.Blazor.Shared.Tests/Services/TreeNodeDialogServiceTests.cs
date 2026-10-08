@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Components;
 using Moq;
 using MudBlazor;
-using TreeGraph.Blazor.Shared.Trees.TreeSky;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Contracts;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Dialogs;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Nodes;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Models;
+using TreeGraph.Blazor.Shared.TreeSky;
+using TreeGraph.Blazor.Shared.TreeSky.Contracts;
+using TreeGraph.Blazor.Shared.TreeSky.Dialogs;
+using TreeGraph.Blazor.Shared.TreeSky.Nodes;
+using TreeGraph.Blazor.Shared.TreeSky.Models;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Services;

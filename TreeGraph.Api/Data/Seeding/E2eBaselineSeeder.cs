@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Shared.NodeEav;
+using TreeGraph.Shared.NodeEavSky;
 
-namespace TreeGraph.Api.NodeEavSky.Data.Seeding;
+namespace TreeGraph.Api.Data.Seeding;
 
 /// <summary>
 /// E2E 基线种子：item / user / project 三个实体类型的属性定义 + 示例属性值。

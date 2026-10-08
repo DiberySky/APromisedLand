@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.NodeEav;
-using TreeGraph.Shared.NodeEav.Dtos;
+using TreeGraph.Shared.NodeEavSky;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.Controllers;
 

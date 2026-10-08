@@ -2,7 +2,7 @@ using System.Text.Json;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Api.Tests.Fixtures;
-using TreeGraph.Shared.NodeEav;
+using TreeGraph.Shared.NodeEavSky;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Tests;

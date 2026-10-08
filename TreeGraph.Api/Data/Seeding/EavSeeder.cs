@@ -1,10 +1,10 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Shared.NodeEav;
+using TreeGraph.Shared.NodeEavSky;
 
-namespace TreeGraph.Api.NodeEavSky.Data.Seeding;
+namespace TreeGraph.Api.Data.Seeding;
 
 /// <summary>
 /// 示例元数据种子：组合类型 Specs + Brand、Product 属性目录、

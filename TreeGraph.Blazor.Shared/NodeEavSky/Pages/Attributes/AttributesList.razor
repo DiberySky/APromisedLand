@@ -1,0 +1,371 @@
+@* AttributesList.razor *@
+@page "/attributes"
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject EntityTypeDisplayService EntityTypeDisplay
+@* AttributesList.razor *@
+@* 全局属性列表（跨实体类型）：只读浏览 + 快速过滤 + 分页。 *@
+
+<PageTitle>属性列表</PageTitle>
+
+<div class="d-flex align-center mb-4" style="gap: 8px;">
+    <MudIcon Icon="@Icons.Material.Filled.ListAlt"
+             Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h5">属性列表</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" Color="Color.Default"
+               StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="LoadAsync" Disabled="@_loading">
+        刷新
+    </MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Settings"
+               OnClick="GoToManage">
+        进入管理页
+    </MudButton>
+</div>
+
+@* ---------- 统计卡 ---------- *@
+<MudGrid Class="mb-4">
+    <MudItem xs="6" md="3">
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">实体类型</MudText>
+            <MudText Typo="Typo.h5">@_entityTypeCount</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" md="3">
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">属性总数</MudText>
+            <MudText Typo="Typo.h5">@_filteredAll.Count</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" md="3">
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">可搜索</MudText>
+            <MudText Typo="Typo.h5" Color="Color.Info">
+                @_filteredAll.Count(a => a.IsSearchable)
+            </MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" md="3">
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">可排序</MudText>
+            <MudText Typo="Typo.h5" Color="Color.Warning">
+                @_filteredAll.Count(a => a.IsSortable)
+            </MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@* ---------- 过滤区 ---------- *@
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudSelect T="string?"
+                       Value="_filterEntityType"
+                       ValueChanged="OnFilterEntityTypeChanged"
+                       Label="实体类型"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       FullWidth="true">
+                @foreach (var et in _entityTypes ?? Array.Empty<EntityTypeSummaryDto>())
+                {
+                    <MudSelectItem T="string?" Value="@et.EntityType">
+                        @GetDisplayName(et) (@et.AttributeCount)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudTextField T="string"
+                          Value="_searchText"
+                          ValueChanged="OnSearchChanged"
+                          Label="搜索属性名 / 显示名"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Immediate="true"
+                          FullWidth="true" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudSwitch T="bool" @bind-Value="_includeDeleted"
+                       Label="显示已删除"
+                       Color="Color.Warning" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@* ---------- 列表 ---------- *@
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_filteredAll.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.ListAlt"
+                 Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h6" Class="mt-2">无匹配属性</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            试试清空过滤条件，或前往管理页新建属性
+        </MudText>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            共 <b>@_filteredAll.Count</b> 个属性，第 @_page / @TotalPages 页
+        </MudText>
+
+        <MudTable Items="_pagedItems" Hover="true" Bordered="true" Dense="true">
+            <HeaderContent>
+                <MudTh>实体类型</MudTh>
+                <MudTh>属性名</MudTh>
+                <MudTh>显示名</MudTh>
+                <MudTh>类型</MudTh>
+                <MudTh>单位 / 引用</MudTh>
+                <MudTh>必填</MudTh>
+                <MudTh>可搜索</MudTh>
+                <MudTh>可排序</MudTh>
+                <MudTh>顺序</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                        @GetDisplayName(context.EntityType)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <code>@context.AttributeName</code>
+                    @if (context.IsDeleted)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error"
+                                 Class="ml-1">
+                            已删除
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd>@context.DisplayName</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@GetDataTypeColor(context.DataType)">
+                        @context.DataType
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    @if (context.UnitId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                                 Class="mr-1">
+                            单位: @context.UnitSymbol
+                        </MudChip>
+                    }
+                    @if (context.RefCompositeTypeId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Dark"
+                                 Class="mr-1">
+                            组合: @context.CompositeTypeName
+                        </MudChip>
+                    }
+                    @if (context.RefTableDefinitionId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info"
+                                 Class="mr-1">
+                            表: @context.TableName
+                        </MudChip>
+                    }
+                    @if (context.RefOptionSetId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                            选项: @context.OptionSetName
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.IsRequired)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                 Color="Color.Success" Size="Size.Small" />
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.IsSearchable)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                 Color="Color.Success" Size="Size.Small" />
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.IsSortable)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                 Color="Color.Success" Size="Size.Small" />
+                    }
+                </MudTd>
+                <MudTd>@context.DisplayOrder</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                   Size="Size.Medium"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => GoToManage(context.EntityType))"
+                                   title="在管理页打开" />
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <div class="d-flex align-center pa-2" style="gap: 8px;">
+                    <MudSelect T="int"
+                               Value="_pageSize"
+                               ValueChanged="OnPageSizeChanged"
+                               Label="每页"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Style="width: 120px;">
+                        <MudSelectItem T="int" Value="20">20</MudSelectItem>
+                        <MudSelectItem T="int" Value="50">50</MudSelectItem>
+                        <MudSelectItem T="int" Value="100">100</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSpacer />
+
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                                   Size="Size.Medium"
+                                   Disabled="@(_page <= 1)"
+                                   OnClick="@(() => GoToPage(_page - 1))" />
+                    <MudText Typo="Typo.body2">@_page / @TotalPages</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                                   Size="Size.Medium"
+                                   Disabled="@(_page >= TotalPages)"
+                                   OnClick="@(() => GoToPage(_page + 1))" />
+                </div>
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private IReadOnlyList<AttributeDetailDto> _all = Array.Empty<AttributeDetailDto>();
+    private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
+
+    private string? _filterEntityType;
+    private string? _searchText;
+    private bool _includeDeleted;
+
+    private int _page = 1;
+    private int _pageSize = 20;
+    private bool _loading;
+    private bool _initialized;
+
+    private int _entityTypeCount => _entityTypes?.Count ?? 0;
+
+    /// <summary>应用过滤后的全量列表（用于统计 + 分页）。</summary>
+    private List<AttributeDetailDto> _filteredAll => _all
+        .Where(a => _includeDeleted || !a.IsDeleted)
+        .Where(a => string.IsNullOrEmpty(_filterEntityType)
+                 || a.EntityType == _filterEntityType)
+        .Where(a => string.IsNullOrWhiteSpace(_searchText)
+                 || a.AttributeName.Contains(_searchText, StringComparison.OrdinalIgnoreCase)
+                 || a.DisplayName.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(a => a.EntityType)
+        .ThenBy(a => a.DisplayOrder)
+        .ThenBy(a => a.AttributeId)
+        .ToList();
+
+    private int TotalPages => _filteredAll.Count == 0
+        ? 1
+        : (int)Math.Ceiling((double)_filteredAll.Count / _pageSize);
+
+    private List<AttributeDetailDto> _pagedItems => _filteredAll
+        .Skip((_page - 1) * _pageSize)
+        .Take(_pageSize)
+        .ToList();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            // 并行加载实体类型 + 全部属性（含已删除，前端过滤）
+            var entityTypesTask = Api.ListEntityTypesAsync();
+            var attributesTask = Api.ListAttributesAsync(
+                entityType: null, includeDeleted: true);
+
+            await Task.WhenAll(entityTypesTask, attributesTask);
+
+            _entityTypes = entityTypesTask.Result;
+            _all = attributesTask.Result ?? Array.Empty<AttributeDetailDto>();
+
+            if (_entityTypes is null)
+                Snackbar.Add("实体类型加载失败", Severity.Warning);
+
+            _page = 1;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnFilterEntityTypeChanged(string? value)
+    {
+        _filterEntityType = value;
+        _page = 1;
+    }
+
+    private void OnSearchChanged(string? value)
+    {
+        _searchText = value;
+        _page = 1;
+    }
+
+    private void OnPageSizeChanged(int size)
+    {
+        _pageSize = size;
+        _page = 1;
+    }
+
+    private void GoToPage(int page)
+    {
+        if (page < 1 || page > TotalPages) return;
+        _page = page;
+    }
+
+    private void GoToManage() => Nav.NavigateTo("/metadata/attributes");
+
+    private void GoToManage(string entityType)
+        => Nav.NavigateTo("/metadata/attributes");
+
+    private static Color GetDataTypeColor(string dataType) => dataType switch
+    {
+        "string" => Color.Info,
+        "int" or "decimal" => Color.Primary,
+        "bool" => Color.Success,
+        "datetime" or "date" or "time" => Color.Warning,
+        "single_choice" => Color.Tertiary,
+        "composite" => Color.Dark,
+        "table" => Color.Info,
+        "file" => Color.Default,
+        _ => Color.Default
+    };
+
+    private string GetDisplayName(string entityType)
+        => EntityTypeDisplay.GetDisplayName(entityType);
+
+    private static string GetDisplayName(EntityTypeSummaryDto et)
+        => EntityTypeDisplayService.GetDisplayName(et);
+}

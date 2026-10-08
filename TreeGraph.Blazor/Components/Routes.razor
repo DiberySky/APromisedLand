@@ -1,7 +1,7 @@
 @* Routes.razor *@
 @* AdditionalAssemblies：RCL 中的 NodeEav 页面（@page 路由照常生效） *@
 <Router AppAssembly="typeof(Program).Assembly"
-        AdditionalAssemblies="new[] { typeof(TreeGraph.Blazor.Shared.NodeEav.Pages.Attributes.AttributesList).Assembly }"
+        AdditionalAssemblies="new[] { typeof(TreeGraph.Blazor.Shared.NodeEavSky.Pages.Attributes.AttributesList).Assembly }"
         NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)"/>

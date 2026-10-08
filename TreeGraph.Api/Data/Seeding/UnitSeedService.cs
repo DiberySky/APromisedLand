@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Services;
 
-namespace TreeGraph.Api.NodeEavSky.Data.Seeding;
+namespace TreeGraph.Api.Data.Seeding;
 
 /// <summary>
 /// 单位种子服务：固定 GUID，运行时一次性写入（幂等）。

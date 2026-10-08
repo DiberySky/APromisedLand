@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.NodeEavSky.Data;
-using TreeGraph.Api.NodeEavSky.Data.Seeding;
+using TreeGraph.Api.Data;
+using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Api.StringTreeSky.Extensions;

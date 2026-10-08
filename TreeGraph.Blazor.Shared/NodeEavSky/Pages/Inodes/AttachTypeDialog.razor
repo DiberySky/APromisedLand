@@ -1,0 +1,51 @@
+@* AttachTypeDialog.razor — 为 iNode 声明新实体类型（PageDialogSky 外壳） *@
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Pages.Inodes
+
+<PageDialogSky Title="声明新类型"
+               SubmitButtonVisible="true"
+               SubmitButtonText="声明"
+               OnSubmitClick="Submit">
+    <DialogContent>
+        @if (AvailableTypes is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (AvailableTypes.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">所有实体类型均已声明</MudAlert>
+        }
+        else
+        {
+            <MudSelect T="string"
+                       @bind-Value="_selected"
+                       Label="实体类型"
+                       Variant="Variant.Outlined">
+                @foreach (var t in AvailableTypes)
+                {
+                    <MudSelectItem T="string" Value="@t.EntityType">
+                        @(string.IsNullOrWhiteSpace(t.DisplayName)
+                            ? t.EntityType
+                            : $"{t.DisplayName} ({t.EntityType})")
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>可选实体类型；null 表示仍在加载。</summary>
+    [Parameter] public IReadOnlyList<EntityTypeSummaryDto>? AvailableTypes { get; set; }
+
+    private string? _selected;
+
+    private void Submit()
+    {
+        if (string.IsNullOrEmpty(_selected)) return;
+        MudDialog?.Close(DialogResult.Ok(_selected));
+    }
+}

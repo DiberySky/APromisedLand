@@ -1,0 +1,278 @@
+@* RenderLeafField.razor *@
+@using System.Text.Json
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@* RenderLeafField.razor *@
+@* 组合叶子字段。★ 支持单字段 inline 高亮；★ single_choice 用 AllowedValues 生成下拉。 *@
+
+@{
+    var errorText = Errors is { Count: > 0 }
+        ? string.Join("；", Errors.Select(e => e.Message))
+        : null;
+    var hasError = errorText is not null;
+}
+
+@if (Field.DataType == "string")
+{
+    <MudTextField T="string"
+                  Label="@Field.DisplayName"
+                  Value="@(Value as string)"
+                  ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                  Variant="Variant.Outlined"
+                  Required="@Field.IsRequired"
+                  Error="@hasError"
+                  ErrorText="@errorText"
+                  Immediate="true"
+                  FullWidth="true" />
+}
+else if (Field.DataType == "int")
+{
+    <MudNumericField T="long?"
+                     Label="@Field.DisplayName"
+                     Value="@(Value switch { long l => l, int i => i, _ => null })"
+                     ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                     Variant="Variant.Outlined"
+                     Required="@Field.IsRequired"
+                     Error="@hasError"
+                     ErrorText="@errorText"
+                     FullWidth="true" />
+}
+else if (Field.DataType == "decimal")
+{
+    @if (Field.Unit is not null)
+    {
+        var numeric = Value as NumericInput ?? new NumericInput();
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudNumericField T="decimal?"
+                                 Label="@Field.DisplayName"
+                                 Value="@numeric.Value"
+                                 ValueChanged="@(v =>
+                                 {
+                                     var n = Value as NumericInput ?? new NumericInput();
+                                     n.Value = v ?? 0;
+                                     ValueChanged.InvokeAsync(n);
+                                 })"
+                                 Variant="Variant.Outlined"
+                                 Required="@Field.IsRequired"
+                                 Error="@hasError"
+                                 ErrorText="@errorText"
+                                 FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?"
+                           Label="单位"
+                           Value="@numeric.UnitId"
+                           ValueChanged="@(u =>
+                           {
+                               var n = Value as NumericInput ?? new NumericInput();
+                               n.UnitId = u;
+                               ValueChanged.InvokeAsync(n);
+                           })"
+                           Variant="Variant.Outlined"
+                           FullWidth="true">
+                    @foreach (var u in Field.AvailableUnits ?? Array.Empty<UnitSchemaDto>())
+                    {
+                        <MudSelectItem T="Guid?" Value="@u.Id">
+                            @u.Name (@u.Symbol)
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        <MudNumericField T="decimal?"
+                         Label="@Field.DisplayName"
+                         Value="@(Value switch
+                         {
+                             decimal d => d,
+                             double db => (decimal)db,
+                             int i => i,
+                             long l => l,
+                             _ => null
+                         })"
+                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                         Variant="Variant.Outlined"
+                         Required="@Field.IsRequired"
+                         Error="@hasError"
+                         ErrorText="@errorText"
+                         FullWidth="true" />
+    }
+}
+else if (Field.DataType == "bool")
+{
+    <MudSwitch T="bool"
+               Label="@Field.DisplayName"
+               Value="@(Value is bool b && b)"
+               ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+               Color="Color.Primary" />
+}
+else if (Field.DataType == "datetime")
+{
+    <MudTextField T="string"
+                  Label="@(Field.DisplayName + " (ISO 8601)")"
+                  Value="@(Value is DateTimeOffset dto ? dto.ToString("O") : Value as string)"
+                  ValueChanged="@OnDatetimeTextChanged"
+                  Variant="Variant.Outlined"
+                  Required="@Field.IsRequired"
+                  Error="@hasError"
+                  ErrorText="@errorText"
+                  Immediate="true"
+                  FullWidth="true" />
+}
+else if (Field.DataType == "date")
+{
+    <MudDatePicker Label="@Field.DisplayName"
+                   Date="@(Value is string s && DateOnly.TryParse(s, out var d)
+                          ? d.ToDateTime(TimeOnly.MinValue) : null)"
+                   DateChanged="@(v => ValueChanged.InvokeAsync(
+                       v.HasValue ? v.Value.ToString("yyyy-MM-dd") : null))"
+                   Variant="Variant.Outlined"
+                   Required="@Field.IsRequired"
+                   Error="@hasError"
+                   ErrorText="@errorText" />
+}
+else if (Field.DataType == "time")
+{
+    <MudTimePicker Label="@Field.DisplayName"
+                   Time="@(Value is string s && TimeOnly.TryParse(s, out var t)
+                          ? t.ToTimeSpan() : null)"
+                   TimeChanged="@(v => ValueChanged.InvokeAsync(
+                       v.HasValue
+                           ? new TimeOnly(v.Value.Hours, v.Value.Minutes, v.Value.Seconds)
+                               .ToString("HH:mm:ss")
+                           : null))"
+                   Variant="Variant.Outlined"
+                   Required="@Field.IsRequired"
+                   Error="@hasError"
+                   ErrorText="@errorText" />
+}
+else if (Field.DataType == "single_choice")
+{
+    @if (Field.OptionSet is not null)
+    {
+        <MudSelect T="string"
+                   Label="@Field.DisplayName"
+                   Value="@(Value as string)"
+                   ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                   Variant="Variant.Outlined"
+                   Required="@Field.IsRequired"
+                   Error="@hasError"
+                   ErrorText="@errorText"
+                   FullWidth="true">
+            @if (!Field.IsRequired)
+            {
+                <MudSelectItem T="string" Value="@((string?)null)">（未选择）</MudSelectItem>
+            }
+            @foreach (var item in Field.OptionSet.Items)
+            {
+                <MudSelectItem T="string" Value="@item.Value">
+                    @item.Label
+                </MudSelectItem>
+            }
+        </MudSelect>
+    }
+    else
+    {
+        var options = ExtractAllowedValues();
+        @if (options.Count > 0)
+        {
+            <MudSelect T="string"
+                       Label="@Field.DisplayName"
+                       Value="@(Value as string)"
+                       ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                       Variant="Variant.Outlined"
+                       Required="@Field.IsRequired"
+                       Error="@hasError"
+                       ErrorText="@errorText"
+                       FullWidth="true">
+                @if (!Field.IsRequired)
+                {
+                    <MudSelectItem T="string" Value="@((string?)null)">（未选择）</MudSelectItem>
+                }
+                @foreach (var opt in options)
+                {
+                    <MudSelectItem T="string" Value="@opt">@opt</MudSelectItem>
+                }
+            </MudSelect>
+        }
+        else
+        {
+            <MudTextField T="string"
+                          Label="@(Field.DisplayName + " (无选项，自由输入)")"
+                          Value="@(Value as string)"
+                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                          Variant="Variant.Outlined"
+                          Required="@Field.IsRequired"
+                          Error="@hasError"
+                          ErrorText="@errorText"
+                          Immediate="true"
+                          FullWidth="true" />
+        }
+    }
+}
+else
+{
+    @* json / file / 其它 *@
+    <MudTextField T="string"
+                  Label="@(Field.DisplayName + " (JSON)")"
+                  Value="@(Value is JsonElement je ? je.GetRawText()
+                            : Value is null ? null
+                            : JsonSerializer.Serialize(Value))"
+                  ValueChanged="@OnJsonTextChanged"
+                  Variant="Variant.Outlined"
+                  Lines="3"
+                  Required="@Field.IsRequired"
+                  Error="@hasError"
+                  ErrorText="@errorText"
+                  Immediate="true"
+                  FullWidth="true" />
+}
+
+@code {
+    [Parameter, EditorRequired] public CompositeFieldSchemaDto Field { get; set; } = null!;
+    [Parameter] public object? Value { get; set; }
+    [Parameter] public EventCallback<object?> ValueChanged { get; set; }
+
+    /// <summary>属于该叶子的错误（Path 已由父级剥离，Path 为 "" 或 "[i]" 等）。</summary>
+    [Parameter] public IReadOnlyList<FieldValidationError>? Errors { get; set; }
+
+    private void OnDatetimeTextChanged(string? v)
+    {
+        if (string.IsNullOrWhiteSpace(v))
+            ValueChanged.InvokeAsync(null);
+        else if (DateTimeOffset.TryParse(v, out var parsed))
+            ValueChanged.InvokeAsync(parsed);
+    }
+
+    private void OnJsonTextChanged(string? v)
+    {
+        if (string.IsNullOrWhiteSpace(v))
+        {
+            ValueChanged.InvokeAsync(null);
+            return;
+        }
+        try
+        {
+            using var doc = JsonDocument.Parse(v);
+            ValueChanged.InvokeAsync(doc.RootElement.Clone());
+        }
+        catch (JsonException) { /* 用户继续输入 */ }
+    }
+
+    private List<string> ExtractAllowedValues()
+    {
+        var result = new List<string>();
+        if (Field.AllowedValues is JsonElement av && av.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in av.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                    result.Add(item.GetString()!);
+            }
+        }
+        return result;
+    }
+}

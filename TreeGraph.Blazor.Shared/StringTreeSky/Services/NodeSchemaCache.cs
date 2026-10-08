@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using TreeGraph.Blazor.Shared.NodeEav.Services;
-using TreeGraph.Shared.NodeEav.Dtos;
+using TreeGraph.Blazor.Shared.NodeEavSky.Services;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Blazor.Shared.StringTreeSky.Services;
 

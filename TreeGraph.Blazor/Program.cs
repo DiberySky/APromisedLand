@@ -1,10 +1,10 @@
 using MudBlazor.Services;
 using TreeGraph.Blazor.Components;
 using TreeGraph.Blazor.Infrastructure;
-using TreeGraph.Blazor.Shared.NodeEav.Services;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Extensions;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Models;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Services;
+using TreeGraph.Blazor.Shared.NodeEavSky.Services;
+using TreeGraph.Blazor.Shared.TreeSky.Extensions;
+using TreeGraph.Blazor.Shared.TreeSky.Models;
+using TreeGraph.Blazor.Shared.TreeSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;

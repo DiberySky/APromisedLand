@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using TreeGraph.Api.NodeEavSky.Data;
+using TreeGraph.Api.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.StringTreeSky.Entities;
 using TreeGraph.Api.StringTreeSky.Services;

@@ -5,11 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using MudBlazor;
 using MudBlazor.Services;
-using TreeGraph.Blazor.Shared.NodeEav.Services;
+using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
-using TreeGraph.Blazor.Shared.Tests.NodeEav;
+using TreeGraph.Blazor.Shared.Tests.NodeEavSky;
 using TreeGraph.Shared.StringTreeSky.Contracts;
 using Xunit;
 

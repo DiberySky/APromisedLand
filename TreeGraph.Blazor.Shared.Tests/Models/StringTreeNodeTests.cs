@@ -1,5 +1,5 @@
 using System.Text.Json;
-using TreeGraph.Blazor.Shared.Trees.TreeSky.Models;
+using TreeGraph.Blazor.Shared.TreeSky.Models;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Models;
