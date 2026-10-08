@@ -31,6 +31,21 @@
         属性列表
     </MudNavLink>
 
+    @* ★ 空间管理 *@
+    <MudNavGroup Title="空间"
+                 Icon="@Icons.Material.Filled.Workspaces">
+        <MudNavLink Href="/spaces"
+                    Icon="@Icons.Material.Filled.ViewList"
+                    Match="NavLinkMatch.All">
+            空间列表
+        </MudNavLink>
+        <MudNavLink Href="/spaces/admin"
+                    Icon="@Icons.Material.Filled.ManageAccounts"
+                    Match="NavLinkMatch.All">
+            空间管理
+        </MudNavLink>
+    </MudNavGroup>
+
     @* ★ 动态实体数据菜单 *@
     <MudNavGroup Title="实体数据"
                  Icon="@Icons.Material.Filled.Storage"
