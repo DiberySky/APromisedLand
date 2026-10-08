@@ -443,8 +443,8 @@ public class PageDialogSkyTests : BunitTestBase {
     [Fact]
     public void DialogOptions_PropertyCount_Guard()
     {
-        // MudBlazor 9.11.0 共 11 个属性（全 init-only，无 Clone/record-with 可用通道）。
-        // 若升级后数量变化，必须检查 ApplyDialogOptionsAsync 的逐字段拷贝是否漏字段。
+        // MudBlazor 9.11.0 共 11 个属性（record，已由 record with 自动覆盖）。
+        // 若升级后数量变化，提醒复核 with 表达式的语义（新增属性通常已默认携带，无需手动追加）。
         var props = typeof(DialogOptions).GetProperties();
         Assert.Equal(11, props.Length);
         Assert.Equal(
@@ -494,5 +494,95 @@ public class PageDialogSkyTests : BunitTestBase {
 
         Assert.NotNull(submitButton);
         Assert.Null(submitButton!.GetAttribute("disabled"));
+    }
+
+    // ============================================================
+    // 19. 提交重试回归：SubmitButtonClosesDialog=false（默认）时校验失败后
+    //     再次点击提交仍触发 OnSubmitClick（_closing 不得锁死不关闭路径）
+    // ============================================================
+
+    [Fact]
+    public async Task Submit_Twice_WhenNotClosing_InvokesBothTimes()
+    {
+        var submitCount = 0;
+        var provider = await OpenDialogAsync(new DialogParameters
+        {
+            { "SubmitButtonVisible", true },
+            { "OnSubmitClick", EventCallback.Factory.Create(this, () => submitCount++) },
+        });
+
+        var submitButton = provider.FindAll(".mud-dialog-actions button")
+            .First(b => b.TextContent.Trim() == "提交");
+        submitButton.Click();
+        // 首次点击触发重渲染，需重新查找元素再点第二次
+        provider.FindAll(".mud-dialog-actions button")
+            .First(b => b.TextContent.Trim() == "提交").Click();
+
+        Assert.Equal(2, submitCount);
+    }
+
+    // ============================================================
+    // 20. 物理返回键重入：HandleBackButton 连触两次，OnCanceledClick 只触发一次
+    // ============================================================
+
+    [Fact]
+    public async Task BackButton_Twice_InvokesCanceledOnce()
+    {
+        var cancelCount = 0;
+        var (provider, reference) = await OpenDialogWithRefAsync(new DialogParameters
+        {
+            { "OnCanceledClick", EventCallback.Factory.Create(this, () => cancelCount++) },
+        });
+
+        var instance = (PageDialogSky)reference.Dialog!;
+        // Close 内部触发 StateHasChanged，必须切回渲染器 Dispatcher
+        await provider.InvokeAsync(() => instance.HandleBackButton());
+        await provider.InvokeAsync(() => instance.HandleBackButton());
+
+        Assert.Equal(1, cancelCount);
+    }
+
+    // ============================================================
+    // 21. 返回箭头（非关闭语义）也受 _closing 保护：关闭流程中点击不再触发
+    // ============================================================
+
+    [Fact]
+    public async Task ArrowBack_NotClosing_WhenClosingSet_NotInvoked()
+    {
+        var cancelCount = 0;
+        var (provider, reference) = await OpenDialogWithRefAsync(new DialogParameters
+        {
+            { "ArrowBackVisible", true },
+            { "ArrowBackClosesDialog", false },
+            { "OnCanceledClick", EventCallback.Factory.Create(this, () => cancelCount++) },
+        });
+
+        // 模拟关闭流程已开始（_closing = true），但对话框仍显示
+        var instance = (PageDialogSky)reference.Dialog!;
+        typeof(PageDialogSky)
+            .GetField("_closing", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .SetValue(instance, true);
+
+        // 点返回箭头（ArrowBackClosesDialog=false 路径）：_closing 已置位，不得触发
+        provider.Find(".mud-dialog-title .mud-toolbar button").Click();
+        Assert.Equal(0, cancelCount);
+    }
+
+    // ============================================================
+    // 22. FullScreen=true 显式传参：切换按钮初始即显示"还原"图标
+    // ============================================================
+
+    [Fact]
+    public async Task FullScreenTrue_ToggleButton_ShowsRestoreIcon()
+    {
+        var provider = await OpenDialogAsync(new DialogParameters
+        {
+            { "FullScreen", true },
+        });
+
+        Assert.Contains(Icons.Material.Filled.FullscreenExit, provider.Markup,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(Icons.Material.Filled.Fullscreen, provider.Markup,
+            StringComparison.Ordinal);
     }
 }

@@ -39,8 +39,8 @@
 
                 @if (FullScreenToggleVisible)
                 {
-                    <MudTooltip Text="@(_manualFullScreen == true ? "还原" : "全屏")">
-                        <MudIconButton Icon="@(_manualFullScreen == true
+                    <MudTooltip Text="@(EffectiveFullScreenState ? "还原" : "全屏")">
+                        <MudIconButton Icon="@(EffectiveFullScreenState
                                                ? Icons.Material.Filled.FullscreenExit
                                                : Icons.Material.Filled.Fullscreen)"
                                        Color="Color.Default"
@@ -287,6 +287,10 @@
     private string EffectiveActionsClass =>
         _isMobile ? $"{ActionsClass} {MobileActionsClass}".Trim() : ActionsClass;
 
+    /// <summary>当前生效的全屏状态（手动切换 &gt; FullScreen 参数 &gt; 移动端默认）。
+    /// 用于标题栏切换按钮的图标/提示与初始状态对齐。</summary>
+    private bool EffectiveFullScreenState => _manualFullScreen ?? FullScreen ?? _isMobile;
+
     protected override void OnInitialized()
     {
         Platform.Changed += OnPlatformChanged;
@@ -505,14 +509,16 @@
 
     private async Task SubmitAsync()
     {
-        if (_closing)
-        {
-            return;
-        }
-        _closing = true;
-
+        // 仅在真正关闭时置重入标志：SubmitButtonClosesDialog=false（默认）时对话框保持打开，
+        // 父组件校验失败后必须允许再次提交；该路径的重入防护由调用方的 SubmitButtonDisabled 负责。
         if (SubmitButtonClosesDialog)
         {
+            if (_closing)
+            {
+                return;
+            }
+            _closing = true;
+
             MudDialog?.Close(DialogResult.Ok(true));
         }
 
@@ -532,8 +538,9 @@
         {
             await CancelAsync();
         }
-        else
+        else if (!_closing)
         {
+            // 非关闭路径也要受重入保护：关闭流程中点返回箭头不得双触发 OnCanceledClick
             await OnCanceledClick.InvokeAsync();
         }
     }
