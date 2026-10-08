@@ -5,6 +5,7 @@ using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.TreeSky.Extensions;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
 using TreeGraph.Blazor.Shared.TreeSky.Services;
+using TreeGraph.Shared.TreeSky.Entities;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
@@ -33,6 +34,11 @@ builder.Services.AddTreeSky(
     },
     configureClientBuilder: httpBuilder =>
         httpBuilder.AddStandardResilienceHandler(NonIdempotentResilience.Configure));
+
+// ★ 泛型树组件读操作适配器（ITreeClientService<T>）：包装 TreeApiClient<T>，
+//   添加排序逻辑与 UI 属性，供 TreeSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
+builder.Services.AddScoped<ITreeClientService<UnitTree>, UnitTreeClientService>();
+builder.Services.AddScoped<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
 
 // ★ StringTreeSky（解耦版）：独立契约层 + 非泛型 HTTP 客户端，端点 api/string-tree/*。
 //   与 EavApiClient 同一 Aspire 服务发现与弹性策略。
