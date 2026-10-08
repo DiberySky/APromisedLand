@@ -1,6 +1,7 @@
 using MudBlazor;
 using TreeGraph.Blazor.Shared.TreeSky;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Models;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests;

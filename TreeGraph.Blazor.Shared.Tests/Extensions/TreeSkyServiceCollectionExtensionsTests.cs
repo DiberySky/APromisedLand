@@ -3,6 +3,7 @@ using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.TreeSky.Extensions;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
 using TreeGraph.Blazor.Shared.TreeSky.Services;
+using TreeGraph.Shared.TreeSky.Abstractions;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Extensions;
@@ -10,7 +11,7 @@ namespace TreeGraph.Blazor.Shared.Tests.Extensions;
 /// <summary>
 /// AddTreeSky DI 注册冒烟测试：
 /// 重点验证 #6 的开放泛型嵌套注册链
-/// ITreeActionHandler&lt;T&gt; → DefaultTreeActionHandler&lt;T&gt; → DiberyTreeApiClient&lt;T&gt; → HttpClient
+/// ITreeActionHandler&lt;T&gt; → DefaultTreeActionHandler&lt;T&gt; → TreeApiClient&lt;T&gt; → HttpClient
 /// 对任意满足约束的 T 都能由容器构造，且宿主可在 AddTreeSky 之后覆盖默认 Handler。
 /// </summary>
 public class TreeSkyServiceCollectionExtensionsTests
@@ -63,7 +64,7 @@ public class TreeSkyServiceCollectionExtensionsTests
         var sp = scope.ServiceProvider;
 
         var handler = sp.GetRequiredService<ITreeActionHandler<StringTreeNode>>();
-        var apiClient = sp.GetRequiredService<DiberyTreeApiClient<StringTreeNode>>();
+        var apiClient = sp.GetRequiredService<TreeApiClient<StringTreeNode>>();
 
         Assert.IsType<DefaultTreeActionHandler<StringTreeNode>>(handler);
         Assert.NotNull(apiClient);

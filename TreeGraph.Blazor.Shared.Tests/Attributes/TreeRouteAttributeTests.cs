@@ -3,6 +3,7 @@ using System.Text;
 using TreeGraph.Blazor.Shared.TreeSky.Attributes;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
 using TreeGraph.Blazor.Shared.TreeSky.Services;
+using TreeGraph.Shared.TreeSky.Abstractions;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Attributes;
@@ -34,7 +35,7 @@ public class TreeRouteAttributeTests
     }
 
     // ============================================================
-    // DiberyTreeApiClient 路由解析（桩 HttpClient）
+    // TreeApiClient 路由解析（桩 HttpClient）
     // ============================================================
 
     private sealed class RecordingHandler : HttpMessageHandler
@@ -82,7 +83,7 @@ public class TreeRouteAttributeTests
     public async Task Client_DecoratedType_UsesAttributeRoute()
     {
         var handler = new RecordingHandler();
-        var client = new DiberyTreeApiClient<DecoratedNode>(
+        var client = new TreeApiClient<DecoratedNode>(
             new HttpClient(handler) { BaseAddress = new Uri("https://test/") });
 
         await client.GetRootNodesAsync();
@@ -94,7 +95,7 @@ public class TreeRouteAttributeTests
     public async Task Client_UndecoratedType_FallsBackToTypeName()
     {
         var handler = new RecordingHandler();
-        var client = new DiberyTreeApiClient<PlainNode>(
+        var client = new TreeApiClient<PlainNode>(
             new HttpClient(handler) { BaseAddress = new Uri("https://test/") });
 
         await client.GetRootNodesAsync();
@@ -108,7 +109,7 @@ public class TreeRouteAttributeTests
     {
         // 回归护栏：A 方案下现有 URL 一个字符都不能变
         var handler = new RecordingHandler();
-        var client = new DiberyTreeApiClient<StringTreeNode>(
+        var client = new TreeApiClient<StringTreeNode>(
             new HttpClient(handler) { BaseAddress = new Uri("https://test/") });
 
         await client.GetRootNodesAsync();

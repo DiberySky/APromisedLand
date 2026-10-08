@@ -8,6 +8,7 @@ using TreeGraph.Blazor.Shared.TreeSky.Extensions;
 using TreeGraph.Blazor.Shared.TreeSky;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
 using TreeGraph.Blazor.Shared.TreeSky.Services;
+using TreeGraph.Shared.TreeSky.Models;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Components;
@@ -28,7 +29,7 @@ public class TreeSkyComponentTests : BunitTestBase {
         Services.AddSingleton<IPlatformContext>(new FakePlatformContext());
 
         // 注册 TreeSky 全部服务（BlazorService/MessageService/TreeNodeDialogService/
-        // 导航历史/DiberyTreeApiClient + AddMudExtensions + HttpClient 工厂）
+        // 导航历史/TreeApiClient + AddMudExtensions + HttpClient 工厂）
         Services.AddTreeSky();
 
         _clientService.SetupProperty(s => s.Title, "测试树");

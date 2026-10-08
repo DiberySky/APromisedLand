@@ -9,7 +9,7 @@ namespace TreeGraph.Blazor.Shared.Tests.Services;
 
 /// <summary>
 /// DefaultTreeActionHandler 单测。
-/// DiberyTreeApiClient 的方法非虚，Moq 无法拦截，
+/// TreeApiClient 的方法非虚，Moq 无法拦截，
 /// 因此用桩 HttpMessageHandler + 真实 HttpClient 走完整 HTTP 管道，
 /// 同时验证 URL 路由、方法谓词与请求体 DTO 构造。
 /// </summary>
@@ -41,7 +41,7 @@ public class DefaultTreeActionHandlerTests
     private static (DefaultTreeActionHandler<StringTreeNode> Handler, StubHttpHandler Stub) CreateHandler()
     {
         var stub = new StubHttpHandler();
-        var client = new DiberyTreeApiClient<StringTreeNode>(
+        var client = new TreeApiClient<StringTreeNode>(
             new HttpClient(stub) { BaseAddress = new Uri("https://test/") });
         return (new DefaultTreeActionHandler<StringTreeNode>(client), stub);
     }
