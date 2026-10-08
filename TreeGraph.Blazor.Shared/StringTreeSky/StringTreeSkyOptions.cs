@@ -9,6 +9,7 @@ public class StringTreeSkyOptions
     public bool AllowRename { get; set; } = true;
     public bool AllowDelete { get; set; } = true;
     public bool AllowCreate { get; set; } = true;
+    public bool AllowSort { get; set; } = true;
 
     public List<string> SummaryAttributeNames { get; set; } = new();
     public int SummaryMaxLength { get; set; } = 60;

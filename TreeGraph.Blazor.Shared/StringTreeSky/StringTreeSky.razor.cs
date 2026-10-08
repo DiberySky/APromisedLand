@@ -524,6 +524,54 @@ public partial class StringTreeSky : ComponentBase
         await NotifyChangedAsync();
     }
 
+    // ============ 排序（上移/下移） ============
+
+    private List<Row> GetSiblings(Row row)
+    {
+        var parentId = row.Node.ParentId;
+        return _all
+            .Where(r => r.Node.ParentId == parentId && r.Level == row.Level)
+            .OrderBy(r => r.Node.SortOrder)
+            .ThenBy(r => r.Node.Id)
+            .ToList();
+    }
+
+    private async Task MoveUpAsync(Row row)
+    {
+        var siblings = GetSiblings(row);
+        var index = siblings.FindIndex(s => s.Node.Id == row.Node.Id);
+        if (index <= 0) return;
+
+        // 交换相邻兄弟的 SortOrder
+        (siblings[index].Node.SortOrder, siblings[index - 1].Node.SortOrder) =
+            (siblings[index - 1].Node.SortOrder, siblings[index].Node.SortOrder);
+
+        var parentId = row.Node.ParentId!;
+        var orderedIds = siblings.Select(s => s.Node.Id).ToList();
+        await Client.SortChildrenAsync(parentId, orderedIds);
+
+        RebuildVisible();
+        await NotifyChangedAsync();
+    }
+
+    private async Task MoveDownAsync(Row row)
+    {
+        var siblings = GetSiblings(row);
+        var index = siblings.FindIndex(s => s.Node.Id == row.Node.Id);
+        if (index < 0 || index >= siblings.Count - 1) return;
+
+        // 交换相邻兄弟的 SortOrder
+        (siblings[index].Node.SortOrder, siblings[index + 1].Node.SortOrder) =
+            (siblings[index + 1].Node.SortOrder, siblings[index].Node.SortOrder);
+
+        var parentId = row.Node.ParentId!;
+        var orderedIds = siblings.Select(s => s.Node.Id).ToList();
+        await Client.SortChildrenAsync(parentId, orderedIds);
+
+        RebuildVisible();
+        await NotifyChangedAsync();
+    }
+
     private async Task NotifyChangedAsync()
     {
         if (OnTreeChanged.HasDelegate) await OnTreeChanged.InvokeAsync();

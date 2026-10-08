@@ -94,6 +94,11 @@
                             {
                                 <button class="btn btn-sm btn-link" @onclick="() => StartEdit(row.Node)">重命名</button>
                             }
+                            @if (!_isFiltered && Options.AllowSort && row.Node.ParentId is not null)
+                            {
+                                <button class="btn btn-sm btn-link" @onclick="() => MoveUpAsync(row)">↑上移</button>
+                                <button class="btn btn-sm btn-link" @onclick="() => MoveDownAsync(row)">↓下移</button>
+                            }
                             <button class="btn btn-sm btn-link" @onclick="() => OpenPropertiesAsync(row.Node)">属性</button>
                             @if (!_isFiltered && Options.AllowDelete)
                             {
