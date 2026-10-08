@@ -22,6 +22,11 @@
     var stack = [];
     var suppressNextPopState = false;
 
+    // 同一对话框 300ms 内的重复触发视为一次（.NET 侧 _closing 之外的第二道防线：
+    // 防止栈顶项尚未出栈期间被原生层/popstate 连查两次）
+    var lastBackInvoke = { ref: null, time: 0 };
+    var BACK_DEBOUNCE_MS = 300;
+
     function refId(dotNetRef) {
         return dotNetRef ? dotNetRef.__dotNetObject : null;
     }
@@ -33,6 +38,14 @@
     function closeTopDialog() {
         if (stack.length === 0) return false;
         var top = stack[stack.length - 1];
+        var id = refId(top);
+
+        var now = Date.now();
+        if (lastBackInvoke.ref === id && (now - lastBackInvoke.time) < BACK_DEBOUNCE_MS) {
+            return true;    // 去抖：同一对话框 300ms 内重复触发视为一次
+        }
+        lastBackInvoke = { ref: id, time: now };
+
         Promise.resolve(top.invokeMethodAsync('HandleBackButton')).catch(function (err) {
             console.warn('[treegraph] back handler invoke failed:', err);
         });
