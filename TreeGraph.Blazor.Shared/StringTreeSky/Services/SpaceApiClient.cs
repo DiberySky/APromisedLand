@@ -49,7 +49,11 @@ public class SpaceApiClient : ISpaceClient
     {
         var resp = await _http.PutAsJsonAsync($"{_basePath}/{dto.Id}", dto, ct);
         if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
-        resp.EnsureSuccessStatusCode();
+        if (!resp.IsSuccessStatusCode)
+        {
+            var error = await resp.Content.ReadFromJsonAsync<StringTreeResponse<SpaceDto>>(ct);
+            throw new HttpRequestException(error?.Message ?? "更新空间失败");
+        }
         var result = await resp.Content.ReadFromJsonAsync<StringTreeResponse<SpaceDto>>(ct);
         return result?.Data;
     }
