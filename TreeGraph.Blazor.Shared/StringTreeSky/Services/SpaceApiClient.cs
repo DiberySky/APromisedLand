@@ -26,15 +26,21 @@ public class SpaceApiClient : ISpaceClient
 
     public async Task<SpaceDto?> GetSpaceAsync(string id, CancellationToken ct = default)
     {
-        var resp = await _http.GetFromJsonAsync<StringTreeResponse<SpaceDto>>(
-            $"{_basePath}/{id}", ct);
-        return resp?.Data;
+        var resp = await _http.GetAsync($"{_basePath}/{id}", ct);
+        if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        resp.EnsureSuccessStatusCode();
+        var result = await resp.Content.ReadFromJsonAsync<StringTreeResponse<SpaceDto>>(ct);
+        return result?.Data;
     }
 
     public async Task<SpaceDto> CreateSpaceAsync(SpaceDto dto, CancellationToken ct = default)
     {
         var resp = await _http.PostAsJsonAsync(_basePath, dto, ct);
-        resp.EnsureSuccessStatusCode();
+        if (!resp.IsSuccessStatusCode)
+        {
+            var error = await resp.Content.ReadFromJsonAsync<StringTreeResponse<SpaceDto>>(ct);
+            throw new HttpRequestException(error?.Message ?? "创建空间失败");
+        }
         var result = await resp.Content.ReadFromJsonAsync<StringTreeResponse<SpaceDto>>(ct);
         return result!.Data!;
     }

@@ -23,6 +23,7 @@ public class SpaceController : ControllerBase
     // ============ List ============
 
     [HttpGet]
+    [ProducesResponseType(typeof(StringTreeResponse<List<SpaceDto>>), StatusCodes.Status200OK)]
     public async Task<ActionResult<StringTreeResponse<List<SpaceDto>>>> List(CancellationToken ct)
     {
         var roots = await _tree.GetRootNodesAsync(ct);
@@ -33,6 +34,8 @@ public class SpaceController : ControllerBase
     // ============ Get ============
 
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(StringTreeResponse<SpaceDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StringTreeResponse<SpaceDto>), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StringTreeResponse<SpaceDto>>> Get(string id, CancellationToken ct)
     {
         var node = await _tree.GetNodeAsync(id, ct);
@@ -45,6 +48,8 @@ public class SpaceController : ControllerBase
     // ============ Create ============
 
     [HttpPost]
+    [ProducesResponseType(typeof(StringTreeResponse<SpaceDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(StringTreeResponse<SpaceDto>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<StringTreeResponse<SpaceDto>>> Create(
         [FromBody] SpaceDto dto,
         [FromServices] IEntityTypeTemplateService templateSvc,
@@ -92,12 +97,16 @@ public class SpaceController : ControllerBase
             EntityType = entityType
         }, ct);
 
-        return Ok(StringTreeResponse<SpaceDto>.Ok(ToSpaceDto(created)));
+        return CreatedAtAction(nameof(Get), new { id = created.Id },
+            StringTreeResponse<SpaceDto>.Ok(ToSpaceDto(created)));
     }
 
     // ============ Update ============
 
     [HttpPut("{id}")]
+    [ProducesResponseType(typeof(StringTreeResponse<SpaceDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StringTreeResponse<SpaceDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(StringTreeResponse<SpaceDto>), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StringTreeResponse<SpaceDto>>> Update(
         string id, [FromBody] SpaceDto dto, CancellationToken ct)
     {
@@ -125,6 +134,8 @@ public class SpaceController : ControllerBase
     // ============ Delete ============
 
     [HttpDelete("{id}")]
+    [ProducesResponseType(typeof(StringTreeResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StringTreeResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StringTreeResponse<bool>>> Delete(string id, CancellationToken ct)
     {
         var existing = await _tree.GetNodeAsync(id, ct);
