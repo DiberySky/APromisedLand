@@ -12,14 +12,18 @@ public class StringTreeNodeController : ControllerBase
     public StringTreeNodeController(IStringTreeService service) => _service = service;
 
     [HttpGet("nodes/roots")]
+    [ProducesResponseType(typeof(StringTreeResponse<List<StringNodeDto>>), StatusCodes.Status200OK)]
     public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetRoots(CancellationToken ct)
         => Ok(StringTreeResponse<List<StringNodeDto>>.Ok(await _service.GetRootNodesAsync(ct)));
 
     [HttpGet("nodes/children/{parentId}")]
+    [ProducesResponseType(typeof(StringTreeResponse<List<StringNodeDto>>), StatusCodes.Status200OK)]
     public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetChildren(string parentId, CancellationToken ct)
         => Ok(StringTreeResponse<List<StringNodeDto>>.Ok(await _service.GetChildrenAsync(parentId, ct)));
 
     [HttpGet("nodes/{id}")]
+    [ProducesResponseType(typeof(StringTreeResponse<StringNodeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StringTreeResponse<StringNodeDto>), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StringTreeResponse<StringNodeDto>>> GetNode(string id, CancellationToken ct)
     {
         var node = await _service.GetNodeAsync(id, ct);
@@ -29,18 +33,23 @@ public class StringTreeNodeController : ControllerBase
     }
 
     [HttpGet("nodes/{id}/ancestors")]
+    [ProducesResponseType(typeof(StringTreeResponse<List<StringNodeDto>>), StatusCodes.Status200OK)]
     public async Task<ActionResult<StringTreeResponse<List<StringNodeDto>>>> GetAncestors(string id, CancellationToken ct)
         => Ok(StringTreeResponse<List<StringNodeDto>>.Ok(await _service.GetAncestorPathAsync(id, ct)));
 
     [HttpPost("nodes")]
+    [ProducesResponseType(typeof(StringTreeResponse<StringNodeDto>), StatusCodes.Status201Created)]
     public async Task<ActionResult<StringTreeResponse<StringNodeDto>>> Create(
         [FromBody] StringNodeDto dto, CancellationToken ct)
     {
         var created = await _service.CreateNodeAsync(dto, ct);
-        return Ok(StringTreeResponse<StringNodeDto>.Ok(created));
+        return CreatedAtAction(nameof(GetNode), new { id = created.Id },
+            StringTreeResponse<StringNodeDto>.Ok(created));
     }
 
     [HttpPut("nodes/{id}")]
+    [ProducesResponseType(typeof(StringTreeResponse<StringNodeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StringTreeResponse<StringNodeDto>), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StringTreeResponse<StringNodeDto>>> Update(
         string id, [FromBody] StringNodeDto dto, CancellationToken ct)
     {
@@ -51,6 +60,8 @@ public class StringTreeNodeController : ControllerBase
     }
 
     [HttpDelete("nodes/{id}")]
+    [ProducesResponseType(typeof(StringTreeResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StringTreeResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StringTreeResponse<bool>>> Delete(string id, CancellationToken ct)
     {
         var ok = await _service.DeleteNodeAsync(id, ct);
@@ -60,6 +71,8 @@ public class StringTreeNodeController : ControllerBase
     }
 
     [HttpPost("nodes/{id}/move")]
+    [ProducesResponseType(typeof(StringTreeResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StringTreeResponse<bool>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<StringTreeResponse<bool>>> Move(
         string id, [FromBody] MoveRequest req, CancellationToken ct)
     {
@@ -70,6 +83,8 @@ public class StringTreeNodeController : ControllerBase
     }
 
     [HttpPost("nodes/{parentId}/children/sort")]
+    [ProducesResponseType(typeof(StringTreeResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StringTreeResponse<bool>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<StringTreeResponse<bool>>> Sort(
         string parentId, [FromBody] List<string> orderedIds, CancellationToken ct)
     {

@@ -25,9 +25,11 @@ public class StringTreeApiClient : IStringTreeClient
 
     public async Task<StringNodeDto?> GetNodeAsync(string id, CancellationToken ct = default)
     {
-        var resp = await _http.GetFromJsonAsync<StringTreeResponse<StringNodeDto>>(
-            $"{_basePath}/nodes/{id}", ct);
-        return resp?.Data;
+        var resp = await _http.GetAsync($"{_basePath}/nodes/{id}", ct);
+        if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        resp.EnsureSuccessStatusCode();
+        var result = await resp.Content.ReadFromJsonAsync<StringTreeResponse<StringNodeDto>>(ct);
+        return result?.Data;
     }
 
     public Task<List<StringNodeDto>> GetAncestorPathAsync(string id, CancellationToken ct = default)
@@ -36,7 +38,11 @@ public class StringTreeApiClient : IStringTreeClient
     public async Task<StringNodeDto> CreateNodeAsync(StringNodeDto dto, CancellationToken ct = default)
     {
         var resp = await _http.PostAsJsonAsync($"{_basePath}/nodes", dto, ct);
-        resp.EnsureSuccessStatusCode();
+        if (!resp.IsSuccessStatusCode)
+        {
+            var error = await resp.Content.ReadFromJsonAsync<StringTreeResponse<StringNodeDto>>(ct);
+            throw new HttpRequestException(error?.Message ?? "创建节点失败");
+        }
         var result = await resp.Content.ReadFromJsonAsync<StringTreeResponse<StringNodeDto>>(ct);
         return result!.Data!;
     }
