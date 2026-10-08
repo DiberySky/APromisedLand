@@ -1,0 +1,6 @@
+﻿@TreeGraph.FileStorageApi_HostAddress = http://localhost:5287
+
+GET {{TreeGraph.FileStorageApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -22,10 +22,18 @@ void TreeGraph()
     builder.AddRedis(context);
     // builder.AddNebulaGraph(context);
 
+    // ★ SeaweedFS：TreeGraph.FileStorageApi 的对象存储依赖
+    //   (SeaweedMaster/Volume/Filer/S3 容器组，由 SeaweedFsExtension 声明)
+    builder.AddSeaweedFs(context);
+
     // ★ EAV 动态类型 API(复用 TreeGraphDb,固定端口 5773)
     builder.AddTreeGraphEavApi(context);
 
-    // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi)
+    // ★ TreeGraph 文件存储 API(独立微服务,固定端口 5326,
+    //   复用 FileMetadataDb + SeaweedS3,与 EavApi 平级)
+    builder.AddTreeGraphFileStorageApi(context);
+
+    // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi + FileStorageApi)
     builder.AddTreeGraphBlazor(context);
     builder.AddTreeGraphMaui(context);
 }

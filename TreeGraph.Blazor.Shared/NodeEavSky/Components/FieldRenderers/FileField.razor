@@ -1,34 +1,64 @@
-@* FileField.razor *@
-@* 文件字段渲染器（基础版）：URL 输入 + JSON 元数据展示 *@
+@* FileField.razor — EAV file 属性渲染器（接入 FileStorageApi 分块上传/下载/删除） *@
+@* 存储 JSON shape 与 seeder BuildFileMeta 对齐：docId/fileName/contentType/size/sha256/version/status *@
+@inject IFileStorageClient FileStorage
+@inject IDialogService Dialog
+@inject IJSRuntime JS
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
+@using TreeGraph.Blazor.Shared.FileStorageSky.Services
+@using TreeGraph.Shared.FileStorageSky.Contracts
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@implements System.IAsyncDisposable
 
-<MudTextField T="string"
-              Label="@($"{Attr.DisplayName} - 文件 URL")"
-              Value="_url"
-              ValueChanged="OnUrlChanged"
-              Required="@Attr.IsRequired"
-              Variant="Variant.Outlined"
-              Placeholder="https://..."
-              Class="mb-2" />
-
-@if (Platform.IsMobile)
+@if (_meta is null && !_isUploading)
 {
-    <MudText Typo="Typo.caption" Color="Color.Secondary">请输入可访问的文件 URL</MudText>
+    <div class="d-flex align-center gap-2 mb-2">
+        <label class="mud-button-root mud-button mud-button-filled mud-button-filled-size-medium
+                     mud-button-filled-primary mud-button-filled">
+            <InputFile OnChange="OnFileSelected" accept="*/*" class="d-none" />
+            <span class="mud-button-label">@($"上传{Attr.DisplayName}")</span>
+        </label>
+        @if (Attr.IsRequired)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Error">必填</MudText>
+        }
+    </div>
 }
-
-@if (_meta is not null)
+else if (_isUploading)
 {
-    <MudPaper Class="pa-2" Elevation="0" Outlined="true">
+    <MudPaper Class="pa-2 mb-2" Elevation="0" Outlined="true">
+        <MudProgressLinear Value="_progress" Max="100" Color="Color.Primary" />
         <MudText Typo="Typo.caption">
-            文件名: @_meta.FileName
-        </MudText>
-        <MudText Typo="Typo.caption">
-            类型: @_meta.MimeType
-        </MudText>
-        <MudText Typo="Typo.caption">
-            大小: @(_meta.SizeBytes / 1024) KB
+            已上传 @_uploadedChunks / @_totalChunks 块（@_progress%）
         </MudText>
     </MudPaper>
+}
+else
+{
+    <MudPaper Class="pa-2 mb-2" Elevation="0" Outlined="true">
+        <MudText Typo="Typo.body2">@_meta.FileName</MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            类型: @_meta.ContentType | 大小: @FormatSize(_meta.Size) | 版本: v@_meta.Version
+        </MudText>
+        @if (!string.IsNullOrEmpty(_meta.Sha256))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                SHA256: @(_meta.Sha256!.Length > 16 ? _meta.Sha256![..16] + "…" : _meta.Sha256)
+            </MudText>
+        }
+        <div class="d-flex gap-2 mt-2">
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Download"
+                       OnClick="OnDownloadAsync">下载</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="OnDeleteAsync">删除</MudButton>
+        </div>
+    </MudPaper>
+}
+@if (_errorMessage is not null)
+{
+    <MudText Typo="Typo.caption" Color="Color.Error" Class="mb-2">@_errorMessage</MudText>
 }
 
 @code {
@@ -36,54 +66,227 @@
     [Parameter] public JsonElement? Value { get; set; }
     [Parameter] public EventCallback<JsonElement?> ValueChanged { get; set; }
 
-    private string? _url;
     private FileMeta? _meta;
+    private bool _isUploading;
+    private int _progress;
+    private int _uploadedChunks;
+    private int _totalChunks;
+    private string? _errorMessage;
+    private CancellationTokenSource? _cts;
+
+    private static readonly JsonSerializerOptions WebJsonOpt =
+        new(JsonSerializerDefaults.Web);
 
     protected override void OnParametersSet()
     {
-        if (Value is { ValueKind: JsonValueKind.Object } obj)
+        if (Value is { ValueKind: JsonValueKind.Object } obj
+            && obj.TryGetProperty("docId", out var d)
+            && !string.IsNullOrWhiteSpace(d.GetString()))
         {
-            _url = obj.TryGetProperty("url", out var u) ? u.GetString() : null;
             _meta = new FileMeta
             {
-                FileName = obj.TryGetProperty("fileName", out var fn)
-                    ? fn.GetString() ?? "" : "",
-                MimeType = obj.TryGetProperty("mimeType", out var mt)
-                    ? mt.GetString() ?? "" : "",
-                SizeBytes = obj.TryGetProperty("sizeBytes", out var sz)
-                    && sz.TryGetInt64(out var s) ? s : 0
+                DocId = d.GetString()!,
+                FileName = obj.TryGetProperty("fileName", out var fn) ? fn.GetString() ?? "" : "",
+                ContentType = obj.TryGetProperty("contentType", out var ct) ? ct.GetString() ?? "" : "",
+                Size = obj.TryGetProperty("size", out var sz) && sz.TryGetInt64(out var s) ? s : 0,
+                Sha256 = obj.TryGetProperty("sha256", out var sh) ? sh.GetString() : null,
+                Version = obj.TryGetProperty("version", out var v) && v.TryGetInt32(out var vi) ? vi : 1,
+                Status = obj.TryGetProperty("status", out var st) ? st.GetString() ?? "active" : "active",
             };
         }
         else
         {
-            _url = null;
             _meta = null;
         }
     }
 
-    private Task OnUrlChanged(string? v)
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
-        _url = v;
-        if (string.IsNullOrWhiteSpace(v))
+        _errorMessage = null;
+        var file = e.File;
+        _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
+        try
         {
-            _meta = null;
-            return ValueChanged.InvokeAsync(null);
-        }
+            var fingerprint = $"{file.Name}:{file.Size}";
+            var chunkSize = file.Size >= 256L * 1024
+                ? (int)Math.Min(8L * 1024 * 1024, file.Size)
+                : (int?)null;
 
-        var obj = new
+            var init = await FileStorage.InitiateUploadAsync(new InitiateUploadRequest
+            {
+                FileName = file.Name,
+                ContentType = string.IsNullOrWhiteSpace(file.ContentType)
+                    ? "application/octet-stream" : file.ContentType,
+                TotalSize = file.Size,
+                ChunkSize = chunkSize,
+                Fingerprint = fingerprint,
+            }, ct);
+
+            _totalChunks = init.TotalChunks;
+            _uploadedChunks = 0;
+            _progress = 0;
+            _isUploading = true;
+            StateHasChanged();
+
+            _ = HeartbeatLoop(init.UploadId, ct);
+
+            if (init.Resumed)
+            {
+                var status = await FileStorage.GetUploadStatusAsync(init.UploadId, ct);
+                _uploadedChunks = status.ReceivedCount;
+            }
+
+            await UploadAsync(file, init, ct);
+            await BuildValueJsonAndCommit(init.UploadId, file, ct);
+        }
+        catch (Exception ex)
         {
-            url = v,
-            fileName = Path.GetFileName(v),
-            mimeType = "",
-            sizeBytes = 0
-        };
-        return ValueChanged.InvokeAsync(JsonSerializer.SerializeToElement(obj));
+            _errorMessage = $"上传失败: {ex.Message}";
+        }
+        finally
+        {
+            _isUploading = false;
+            _cts?.Cancel();
+            StateHasChanged();
+        }
     }
 
-    private class FileMeta
+    private async Task UploadAsync(IBrowserFile file, InitiateUploadResponse init, CancellationToken ct)
     {
+        await using var stream = file.OpenReadStream(maxAllowedSize: 2L * 1024 * 1024 * 1024, ct);
+        var chunkSize = init.ChunkSize;
+        var buf = new byte[chunkSize];
+        for (var i = _uploadedChunks; i < _totalChunks; i++)
+        {
+            var read = await stream.ReadAsync(buf.AsMemory(0, chunkSize), ct);
+            if (read == 0) break;
+            using var ms = new MemoryStream(buf, 0, read);
+            var resp = await FileStorage.UploadChunkAsync(
+                init.UploadId, i, ms, read, expectedSha256: null, ct);
+            _uploadedChunks = resp.ReceivedCount;
+            _progress = (int)(resp.Progress * 100);
+            StateHasChanged();
+        }
+    }
+
+    private async Task HeartbeatLoop(Guid uploadId, CancellationToken ct)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(300));
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                _ = await FileStorage.HeartbeatAsync(uploadId, ct);
+            }
+        }
+        catch { /* 心跳失败不阻断主流程 */ }
+    }
+
+    private async Task BuildValueJsonAndCommit(Guid uploadId, IBrowserFile file, CancellationToken ct)
+    {
+        var complete = await FileStorage.CompleteUploadAsync(uploadId, request: null, ct);
+
+        FileMeta meta;
+        var full = await FileStorage.GetFileByDocIdAsync(complete.DocId, complete.Version, ct);
+        if (full is not null)
+        {
+            meta = new FileMeta
+            {
+                DocId = full.DocId,
+                FileName = full.FileName,
+                ContentType = full.ContentType,
+                Size = full.Size,
+                Sha256 = full.Sha256,
+                Version = full.Version,
+                Status = full.Status,
+            };
+        }
+        else
+        {
+            meta = new FileMeta
+            {
+                DocId = complete.DocId,
+                FileName = file.Name,
+                ContentType = string.IsNullOrWhiteSpace(file.ContentType)
+                    ? "application/octet-stream" : file.ContentType,
+                Size = complete.Size,
+                Sha256 = complete.Sha256,
+                Version = complete.Version,
+                Status = "active",
+            };
+        }
+
+        _meta = meta;
+        var json = JsonSerializer.SerializeToElement(meta, WebJsonOpt);
+        await ValueChanged.InvokeAsync(json);
+    }
+
+    private async Task OnDownloadAsync()
+    {
+        if (_meta is null) return;
+        _errorMessage = null;
+        try
+        {
+            var full = await FileStorage.GetFileByDocIdAsync(_meta.DocId, _meta.Version, CancellationToken.None);
+            if (full is null) { _errorMessage = "文件不存在"; return; }
+            var stream = await FileStorage.DownloadFileAsync(full.Id, ct: CancellationToken.None);
+            if (stream is null) { _errorMessage = "文件不存在"; return; }
+            await JS.InvokeVoidAsync("treegraphFile.downloadFromStream",
+                _meta.FileName, new DotNetStreamReference(stream));
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"下载失败: {ex.Message}";
+        }
+    }
+
+    private async Task OnDeleteAsync()
+    {
+        if (_meta is null) return;
+        var ok = await Dialog.ShowMessageBoxAsync("删除文件", "确认删除该文件？",
+            yesText: "删除", cancelText: "取消");
+        if (ok != true) return;
+
+        _errorMessage = null;
+        try
+        {
+            var full = await FileStorage.GetFileByDocIdAsync(_meta.DocId, _meta.Version, CancellationToken.None);
+            if (full is not null)
+                await FileStorage.DeleteFileAsync(full.Id, CancellationToken.None);
+            _meta = null;
+            await ValueChanged.InvokeAsync(null);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"删除失败: {ex.Message}";
+        }
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:F1} MB"
+        : bytes >= 1024 ? $"{bytes / 1024.0:F1} KB"
+        : $"{bytes} B";
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_cts is not null)
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = null;
+        }
+        await ValueTask.CompletedTask;
+    }
+
+    private sealed class FileMeta
+    {
+        public string DocId { get; set; } = "";
         public string FileName { get; set; } = "";
-        public string MimeType { get; set; } = "";
-        public long SizeBytes { get; set; }
+        public string ContentType { get; set; } = "";
+        public long Size { get; set; }
+        public string? Sha256 { get; set; }
+        public int Version { get; set; } = 1;
+        public string Status { get; set; } = "active";
     }
 }

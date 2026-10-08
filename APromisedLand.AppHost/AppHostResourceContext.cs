@@ -45,6 +45,9 @@ public class AppHostResourceContext
     public IResourceBuilder<ProjectResource>? MafWorkFlowApi { get; set; }
     public IResourceBuilder<ProjectResource>? MafSampleApi { get; set; }
 
+    /// <summary>TreeGraph.FileStorageApi(独立微服务,端口 5326,复用 FileMetadataDb + SeaweedS3)。</summary>
+    public IResourceBuilder<ProjectResource>? TreeGraphFileStorageApi { get; set; }
+
     /// <summary>泛型树形数据 API(基于 TreeDb,无 ltree,纯递归 CTE + LIKE)。</summary>
     public IResourceBuilder<ProjectResource>? TreeGraphApi { get; set; }
 

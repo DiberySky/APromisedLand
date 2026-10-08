@@ -96,6 +96,9 @@ if (!EF.IsDesignTime)
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
     {
         await E2eBaselineSeeder.SeedAsync(db);
+
+        // ★ StringTreeSky + EAV 集成演示种子：Space → StringTree → 全套 EAV 属性
+        await StringTreeDemoSeeder.SeedAsync(db);
     }
 }
 

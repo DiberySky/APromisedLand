@@ -51,6 +51,7 @@
         <ProjectReference Include="..\SemanticSearch.Api\SemanticSearch.Api.csproj" />
         <ProjectReference Include="..\TreeGraph.Api\TreeGraph.Api.csproj" />
         <ProjectReference Include="..\TreeGraph.Blazor\TreeGraph.Blazor.csproj" />
+        <ProjectReference Include="..\TreeGraph.FileStorageApi\TreeGraph.FileStorageApi.csproj" />
         <ProjectReference Include="..\TreeGraphApi\TreeGraphApi.csproj" />
         <ProjectReference Include="..\WeatherApi\WeatherApi.csproj" />
     </ItemGroup>

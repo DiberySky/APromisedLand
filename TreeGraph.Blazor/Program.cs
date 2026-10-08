@@ -9,6 +9,8 @@ using TreeGraph.Shared.TreeSky.Entities;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
+using TreeGraph.Blazor.Shared.FileStorageSky;
+using TreeGraph.Blazor.Shared.FileStorageSky.Services;
 using TreeGraph.Blazor.Shared.Responsive.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -92,6 +94,22 @@ builder.Services
     .AddHttpClient<EavApiClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+// ★ FileStorageSky 客户端（UploadsController + FilesController）：独立微服务 treegraphfilestorageapi。
+//   Aspire 服务发现名 "treegraphfilestorageapi"（见 AppHost/Extensions/TreeGraphFileStorageApiExtension.cs），
+//   全小写,与 treegrapheavapi 风格一致;TreeGraph.BlazorExtension 已通过
+//   WithReference(TreeGraphFileStorageApi) 注入服务发现。
+builder.Services.AddSingleton<FileStorageSkyOptions>(_ => new FileStorageSkyOptions
+{
+    UploadsPath = "Uploads",
+    FilesPath = "Files",
+});
+builder.Services
+    .AddHttpClient<IFileStorageClient, FileStorageApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegraphfilestorageapi");
     })
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 

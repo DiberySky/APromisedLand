@@ -1,0 +1,332 @@
+@* DemoSpaceExplorer.razor — 接入 StringTreeDemoSeeder 种子数据的端到端示例 *@
+
+@* 路由：/demo-space。如需在 NavMenu 中加入口，可参照 NavMenu.razor
+   中的"空间"MudNavGroup，添加：
+   <MudNavLink Href="/demo-space" Icon="@Icons.Material.Filled.Science">
+       演示数据查看器
+   </MudNavLink> *@
+
+@page "/demo-space"
+@rendermode InteractiveServer
+@using TreeGraph.Blazor.Shared.StringTreeSky.Services
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.StringTreeSky.Contracts
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@using System.Text.Json
+@inject ISpaceClient SpaceClient
+@inject IStringTreeClient TreeClient
+@inject EavApiClient EavClient
+@inject ISnackbar Snackbar
+
+<PageTitle>演示数据查看器</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">演示数据查看器</MudText>
+
+<MudText Typo="Typo.body2" Color="Color.Info" Class="mb-4">
+    本页演示如何串联调用三套 API Client 接入 StringTreeDemoSeeder 种子数据：<br />
+    <MudChip T="string" Size="Size.Small" Color="Color.Primary">ISpaceClient</MudChip> 获取空间 →
+    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">IStringTreeClient</MudChip> 遍历节点 →
+    <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">EavApiClient</MudChip> 加载属性 / 表格
+</MudText>
+
+@if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">
+        @_loadError
+    </MudAlert>
+}
+
+@if (_space is null)
+{
+    <MudProgressCircular Color="Color.Primary" Size="Size.Large" Class="mt-4" />
+    <MudText Typo="Typo.body2" Class="mt-2">@(_loadError ?? "正在加载演示空间…")</MudText>
+}
+else
+{
+    @* ============================================================
+       顶部：空间信息卡
+       ============================================================ *@
+    <MudCard Class="mb-4" Outlined="true">
+        <MudCardContent>
+            <MudText Typo="Typo.h6">@_space.Name</MudText>
+            <MudText Typo="Typo.body2">@_space.Description</MudText>
+            <MudDivider Class="my-3" />
+            <MudText Typo="Typo.caption" Color="Color.Surface">
+                EntityType: <code>@_space.EntityType</code>　Id: <code>@_space.Id</code>
+            </MudText>
+        </MudCardContent>
+    </MudCard>
+
+    @* ============================================================
+       左右两栏：左 StringTree 节点 / 右 选中节点属性 + 表格
+       ============================================================ *@
+    <div class="d-flex gap-4" style="align-items: flex-start;">
+        @* ── 左栏：节点树 ── *@
+        <MudPaper Class="flex-1 pa-3" Outlined="true" Style="min-width: 280px;">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">StringTree 节点</MudText>
+            @if (_rootNodes.Count == 0)
+            {
+                <MudText Typo="Typo.body2">（无节点）</MudText>
+            }
+            else
+            {
+                <MudList T="string" Clickable="true">
+                    @foreach (var node in _rootNodes)
+                    {
+                        <MudListItem T="string" Clickable="true"
+                                     OnClick="@(() => OnSelectNode(node.Id))"
+                                     Icon="@Icons.Material.Filled.Folder"
+                                     IconColor="@(node.Id == _selectedId ? Color.Primary : Color.Default)">
+                            <span>@node.Name</span>
+                            @if (node.HasChildren)
+                            {
+                                <MudButton Size="Size.Small"
+                                           Variant="Variant.Text"
+                                           OnClick="@(() => ToggleExpand(node))">
+                                    @(node == _expandedNode ? "▾" : "▸")
+                                </MudButton>
+                            }
+                        </MudListItem>
+
+                        @* demo 数据 3 层：space → 子节点 → 孙节点，仅需展开 1 层即可 *@
+                        @if (_expandedNode?.Id == node.Id && _grandchildren.TryGetValue(node.Id, out var kids))
+                        {
+                            <MudList T="string" Clickable="true" Style="margin-left: 16px;">
+                                @foreach (var kid in kids)
+                                {
+                                    <MudListItem T="string" Clickable="true"
+                                                 OnClick="@(() => OnSelectNode(kid.Id))"
+                                                 Icon="@Icons.Material.Filled.Description"
+                                                 IconColor="@(kid.Id == _selectedId ? Color.Primary : Color.Default)">
+                                        @kid.Name
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                    }
+                </MudList>
+            }
+        </MudPaper>
+
+        @* ── 右栏：选中节点详情 ── *@
+        <MudPaper Class="flex-2 pa-3" Outlined="true" Style="flex: 2; min-width: 0;">
+            @if (_selectedId is null)
+            {
+                <MudText Typo="Typo.subtitle1" Color="Color.Surface">
+                    ← 请选择左侧节点查看属性
+                </MudText>
+            }
+            else if (_isLoadingDetail)
+            {
+                <MudProgressCircular Color="Color.Primary" Size="Size.Medium" />
+            }
+            else if (_entity is null)
+            {
+                <MudAlert Severity="Severity.Warning">节点属性加载失败</MudAlert>
+            }
+            else
+            {
+                <MudText Typo="Typo.subtitle1" Class="mb-1">@_selectedId</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Surface" Class="mb-3">
+                    共 @_entity.Properties.Count 个属性值　UpdatedAt: @(_entity.UpdatedAt?.ToString("u") ?? "—")
+                </MudText>
+
+                @* ── 属性表 ── *@
+                <MudTable Items="@_orderedProps" Hover="true" Dense="true" Class="mb-4">
+                    <HeaderContent>
+                        <MudTh>属性</MudTh>
+                        <MudTh>显示名</MudTh>
+                        <MudTh>类型</MudTh>
+                        <MudTh>值</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd><code>@context.Name</code></MudTd>
+                        <MudTd>@context.DisplayName</MudTd>
+                        <MudTd><MudChip T="string" Size="Size.Small">@context.DataType</MudChip></MudTd>
+                        <MudTd>@RenderValue(context.Value, context.DataType)</MudTd>
+                    </RowTemplate>
+                </MudTable>
+
+                @* ── 证书表格（仅 demo-node-001 有数据，其它节点为空） ── *@
+                @if (_certs?.Rows.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">认证证书（自定义表）</MudText>
+                    <MudTable Items="@_certs.Rows" Hover="true" Dense="true">
+                        <HeaderContent>
+                            <MudTh>序号</MudTh>
+                            <MudTh>证书名称</MudTh>
+                            <MudTh>颁发机构</MudTh>
+                            <MudTh>颁发日期</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@(context.RowOrder + 1)</MudTd>
+                            <MudTd>@GetField(context, "cert_name")</MudTd>
+                            <MudTd>@GetField(context, "issuer")</MudTd>
+                            <MudTd>@GetField(context, "issued_date")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            }
+        </MudPaper>
+    </div>
+}
+
+@code {
+    // ════════════════════════════════════════════════════════
+    // ★ 注入三套 API Client：
+    //   1. ISpaceClient        → 查询 Space（api/string-tree/spaces）
+    //   2. IStringTreeClient   → 遍历 StringTree 节点（api/string-tree/nodes）
+    //   3. EavApiClient        → 加载 EAV 实体属性 / 自定义表行（api/eav/{entityType}/entities）
+    // ════════════════════════════════════════════════════════
+
+    private const string DemoSpaceId = "demo-space-001";
+    private const string CertsTableName = "certifications";
+
+    private SpaceDto? _space;
+    private List<StringNodeDto> _rootNodes = new();
+    private string? _loadError;
+    private string? _selectedId;
+    private bool _isLoadingDetail;
+    private DynamicEntityDto? _entity;
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private CustomTableValue? _certs;
+
+    // 节点展开状态（demo 数据固定 3 层，仅需展开 1 层即看到孙节点 demo-node-004）
+    private StringNodeDto? _expandedNode;
+    private Dictionary<string, List<StringNodeDto>> _grandchildren = new();
+
+    // 用于 MudTable 的属性行模型（属性 + Schema 显示名 / 数据类型）
+    private List<AttrRow> _orderedProps = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // ★ 第 1 步：调用 ISpaceClient 获取演示空间
+            //   StringTreeDemoSeeder.SpaceNodeId = "demo-space-001"
+            _space = await SpaceClient.GetSpaceAsync(DemoSpaceId);
+            if (_space is null)
+            {
+                _loadError = $"未找到 Space（id={DemoSpaceId}）。请确认后端 StringTreeDemoSeeder 已运行。";
+                return;
+            }
+
+            // ★ 第 2 步：调用 IStringTreeClient 获取根节点
+            //   演示空间本身就是根节点，其余节点都是它的子孙
+            _rootNodes = await TreeClient.GetChildrenAsync(_space.Id);
+
+            // ★ 第 3 步：预加载 EntityType 的 Schema（属性定义，含显示名 / 类型 / 选项集）
+            //   注意：EntityType 形如 "StringTreeNode:demo-space-001"，
+            //   与节点 Id 一一对应，整棵树共享同一个属性集
+            _schema = await EavClient.GetSchemaAsync(_space.EntityType);
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"初始化失败：{ex.Message}";
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    // 节点选择 → 加载 EAV 实体属性 + 自定义表行
+    // ════════════════════════════════════════════════════════
+
+    private async Task OnSelectNode(string nodeId)
+    {
+        _selectedId = nodeId;
+        _isLoadingDetail = true;
+        _entity = null;
+        _certs = null;
+        _orderedProps.Clear();
+
+        try
+        {
+            if (_space is null) return;
+
+            // ★ 第 4 步：EavApiClient 加载节点实体（属性值集合）
+            //   entityId = StringNode.Id，entityType = Space.EntityType
+            _entity = await EavClient.GetEntityAsync(_space.EntityType, nodeId);
+
+            // ★ 第 5 步：合并 Schema（显示名 / 类型）与 Entity（值）→ 生成表格行
+            if (_entity is not null && _schema is not null)
+            {
+                var schemaLookup = _schema.ToDictionary(s => s.AttributeName);
+                _orderedProps = _entity.Properties
+                    .Select(kv =>
+                    {
+                        schemaLookup.TryGetValue(kv.Key, out var def);
+                        return new AttrRow(
+                            kv.Key,
+                            def?.DisplayName ?? kv.Key,
+                            def?.DataType ?? "unknown",
+                            kv.Value);
+                    })
+                    .OrderBy(r => r.DisplayName)
+                    .ToList();
+            }
+
+            // ★ 第 6 步：EavApiClient 加载自定义表行（仅 certifications 属性有数据）
+            _certs = await EavClient.LoadCustomTableAsync(
+                _space.EntityType, nodeId, CertsTableName);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载节点详情失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingDetail = false;
+        }
+    }
+
+    private async Task ToggleExpand(StringNodeDto node)
+    {
+        // 折叠已展开的节点
+        if (_expandedNode?.Id == node.Id)
+        {
+            _expandedNode = null;
+            return;
+        }
+
+        // 展开：第一次需懒加载子节点
+        if (!_grandchildren.ContainsKey(node.Id))
+        {
+            try
+            {
+                var kids = await TreeClient.GetChildrenAsync(node.Id);
+                _grandchildren[node.Id] = kids;
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"加载子节点失败：{ex.Message}", Severity.Error);
+                return;
+            }
+        }
+        _expandedNode = node;
+    }
+
+    // ───── 值渲染辅助 ─────
+
+    private static string RenderValue(JsonElement elem, string dataType) => dataType switch
+    {
+        "bool"   => elem.ValueKind == JsonValueKind.True ? "是" :
+                    elem.ValueKind == JsonValueKind.False ? "否" : elem.ToString(),
+        "string" => elem.ValueKind == JsonValueKind.String ? elem.GetString() ?? "" : elem.ToString(),
+        "int"    => elem.ValueKind == JsonValueKind.Number ? elem.GetInt64().ToString() : elem.ToString(),
+        "decimal"=> elem.ValueKind == JsonValueKind.Number ? elem.GetDecimal().ToString("F2") : elem.ToString(),
+        "datetime" or "date" or "time" => elem.ToString(),
+        "json" or "composite" => elem.GetRawText(),
+        _ => elem.ToString()
+    };
+
+    private static string GetField(CustomTableRowValue row, string columnName)
+    {
+        if (row.Fields.TryGetValue(columnName, out var v) && v is JsonElement je)
+        {
+            return je.ValueKind == JsonValueKind.String ? je.GetString() ?? "" : je.ToString();
+        }
+        return v?.ToString() ?? "";
+    }
+
+    // 属性行模型
+    private sealed record AttrRow(string Name, string DisplayName, string DataType, JsonElement Value);
+}
