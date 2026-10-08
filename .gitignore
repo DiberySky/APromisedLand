@@ -16,3 +16,6 @@ playwright-browsers/
 
 # Node.js
 node_modules/
+
+# 凭证/个人笔记，不入库
+Notes/GitHub.md
