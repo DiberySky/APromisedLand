@@ -1,4 +1,4 @@
-namespace TreeGraph.Blazor.Shared.TreeSky.Models;
+namespace TreeGraph.Shared.TreeSky.Models;
 
 /// <summary>
 /// 树节点数据传输对象（泛型）

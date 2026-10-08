@@ -1,4 +1,6 @@
 using TreeGraph.Blazor.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Abstractions;
 
 namespace TreeGraph.Blazor.Shared.TreeSky.Services;
 
@@ -14,7 +16,7 @@ namespace TreeGraph.Blazor.Shared.TreeSky.Services;
 ///   - ITreeActionHandler  = 写操作（可替换的业务契约）
 ///
 /// 默认实现 <see cref="DefaultTreeActionHandler{TItem}"/> 直接转发到
-/// <see cref="DiberyTreeApiClient{T}"/>；宿主可替换为带校验 / 审计 / 缓存的实现。
+/// <see cref="TreeApiClient{T}"/>；宿主可替换为带校验 / 审计 / 缓存的实现。
 /// </summary>
 /// <typeparam name="TItem">树节点值类型</typeparam>
 public interface ITreeActionHandler<TItem>

@@ -1,4 +1,4 @@
-namespace TreeGraph.Blazor.Shared.TreeSky.Models;
+namespace TreeGraph.Shared.TreeSky.Models;
 
 /// <summary>
 /// 树节点查询参数

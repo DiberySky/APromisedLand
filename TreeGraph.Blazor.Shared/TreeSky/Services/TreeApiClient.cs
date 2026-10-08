@@ -1,9 +1,10 @@
-// DiberyTreeApiClient.cs
+// TreeApiClient.cs
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using TreeGraph.Blazor.Shared.TreeSky.Attributes;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Models;
 
 namespace TreeGraph.Blazor.Shared.TreeSky.Services;
 
@@ -11,7 +12,7 @@ namespace TreeGraph.Blazor.Shared.TreeSky.Services;
 /// 泛型树 API 客户端，用于调用后端的 TreeControllerBase&lt;T&gt;，包含树节点 CRUD。
 /// </summary>
 /// <typeparam name="T">节点值的类型</typeparam>
-public class DiberyTreeApiClient<T>(HttpClient httpClient)
+public class TreeApiClient<T>(HttpClient httpClient)
 {
     /// <summary>
     /// URL 前缀。优先读类型上的 <see cref="TreeRouteAttribute"/>；
@@ -100,15 +101,15 @@ public class DiberyTreeApiClient<T>(HttpClient httpClient)
     }
 
     /// <summary>
-    /// 获取从根节点到指定节点的祖先路径
+    /// 获取从根节点到指定节点的祖先路径；节点不存在时返回 null（对应后端 404）。
     /// </summary>
-    public async Task<IReadOnlyList<string>> GetAncestorPathAsync(
+    public async Task<IReadOnlyList<string>?> GetAncestorPathAsync(
         string nodeId,
         CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get,
             $"{_basePath}/{Uri.EscapeDataString(nodeId)}/ancestors");
-        return await SendAndGetDataAsync<IReadOnlyList<string>>(request, cancellationToken);
+        return await SendAndGetDataOrNullAsync<IReadOnlyList<string>>(request, cancellationToken);
     }
 
     /// <summary>

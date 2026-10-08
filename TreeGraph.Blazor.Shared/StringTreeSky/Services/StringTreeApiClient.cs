@@ -4,7 +4,7 @@ using TreeGraph.Shared.StringTreeSky.Contracts;
 namespace TreeGraph.Blazor.Shared.StringTreeSky.Services;
 
 /// <summary>
-/// 独立非泛型 HTTP 客户端：不继承 DiberyTreeApiClient，不依赖 ITreeClientService。
+/// 独立非泛型 HTTP 客户端：不继承 TreeApiClient，不依赖 ITreeClientService。
 /// </summary>
 public class StringTreeApiClient : IStringTreeClient
 {

@@ -51,6 +51,14 @@ builder.Services.AddScoped<CustomTableQueryService>();
 // ★ StringTreeSky 解耦版：表 string_tree_sky_nodes 在 TreeGraphDbContext（treegraphdb）。
 builder.Services.AddStringTreeApi();
 
+// ★ TreeSky：计量单位树 / 分类树（表 unit_trees、category_trees，随迁移 HasData 播种）
+builder.Services.AddScoped<TreeGraph.Api.TreeSky.Services.ITreeService<
+    TreeGraph.Shared.TreeSky.Entities.UnitTree>,
+    TreeGraph.Api.TreeSky.Services.UnitTreeService>();
+builder.Services.AddScoped<TreeGraph.Api.TreeSky.Services.ITreeService<
+    TreeGraph.Shared.TreeSky.Entities.CategoryTree>,
+    TreeGraph.Api.TreeSky.Services.CategoryTreeService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

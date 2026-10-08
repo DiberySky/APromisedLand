@@ -4,6 +4,8 @@ using TreeGraph.Blazor.Shared.TreeSky;
 using TreeGraph.Blazor.Shared.TreeSky.Nodes;
 using TreeGraph.Blazor.Shared.TreeSky.Contracts;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Abstractions;
 
 namespace TreeGraph.Blazor.Shared.TreeSky.Dialogs;
 /// <summary>

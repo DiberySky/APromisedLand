@@ -63,7 +63,7 @@ TreeGraph.Blazor.Shared/
     │   ├── ITreeClientService.cs      # 宿主需实现的客户端服务接口
     │   ├── ITreeActionHandler.cs      # 写操作 Handler 接口
     │   ├── DefaultTreeActionHandler.cs
-    │   └── DiberyTreeApiClient.cs     # 泛型 HTTP API 客户端（增删改/排序/移动）
+    │   └── TreeApiClient.cs     # 泛型 HTTP API 客户端（增删改/排序/移动）
     ├── Navigation/
     │   ├── ITreeNavigationHistoryService.cs
     │   ├── TreeNavigationHistoryService.cs
@@ -88,7 +88,7 @@ TreeGraph.Blazor.Shared/
 // MudBlazor 基础服务（宿主原有）
 builder.Services.AddMudServices();
 
-// TreeSky 组件库（含 BlazorService/MessageService/TreeNodeDialogService<>/导航历史/DiberyTreeApiClient<> + MudExtensions）
+// TreeSky 组件库（含 BlazorService/MessageService/TreeNodeDialogService<>/导航历史/TreeApiClient<> + MudExtensions）
 builder.Services.AddTreeSky();
 
 // ★ 由宿主自行注册：具体节点类型的客户端服务
@@ -141,7 +141,7 @@ builder.Services.AddTreeSky(configureClient: c => c.BaseAddress = new Uri("https
 
 ### 1. DI 注册：`TryAddTransient<HttpClient>` 导致 ApiClient 拿到空配置
 
-**问题**：`AddHttpClient("TreeSky")` 内部通过 `TryAddTransient<HttpClient>()` 注册了一个无名 HttpClient。库内若同样用 `TryAddTransient` 注册 `HttpClient`，会因服务已存在而静默失效，导致 `DiberyTreeApiClient<>` 注入的 `HttpClient` 没有 `BaseAddress`，也无任何消息处理器。
+**问题**：`AddHttpClient("TreeSky")` 内部通过 `TryAddTransient<HttpClient>()` 注册了一个无名 HttpClient。库内若同样用 `TryAddTransient` 注册 `HttpClient`，会因服务已存在而静默失效，导致 `TreeApiClient<>` 注入的 `HttpClient` 没有 `BaseAddress`，也无任何消息处理器。
 
 **修复**（`Trees/Extensions/TreeSkyServiceCollectionExtensions.cs`）：将 `TryAddTransient` 改为 `AddTransient`：
 
@@ -192,4 +192,4 @@ services.AddTransient(sp =>
 
 - **泛型约束**：`TItem : class, ITreeNodeBase<TItem>, new()`。`System.String` 不满足（sealed、无 `new()`），库已内建 `StringTreeNode` 作为字符串承载类型。
 - **宿主需自行实现**：`ITreeClientService<TNode>`（数据读取/排序/标题配置）。
-- **Move 后端路由**：移动走 `POST {T}/move`（组件 → `ITreeActionHandler.MoveNodeAsync` → `DiberyTreeApiClient.MoveNodeAsync`）；更新接口不修改 ParentId，后端 move 含防环校验，失败返回 400。
+- **Move 后端路由**：移动走 `POST {T}/move`（组件 → `ITreeActionHandler.MoveNodeAsync` → `TreeApiClient.MoveNodeAsync`）；更新接口不修改 ParentId，后端 move 含防环校验，失败返回 400。

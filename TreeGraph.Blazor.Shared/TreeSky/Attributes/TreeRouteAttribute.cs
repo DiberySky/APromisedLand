@@ -3,7 +3,7 @@ namespace TreeGraph.Blazor.Shared.TreeSky.Attributes;
 /// <summary>
 /// 声明泛型树 API 客户端使用的 URL 前缀。
 ///
-/// 用途：<see cref="Services.DiberyTreeApiClient{T}"/> 用它替代 typeof(T).Name
+/// 用途：<see cref="Services.TreeApiClient{T}"/> 用它替代 typeof(T).Name
 /// 作为请求路径前缀，让 C# 类型改名不影响 URL 契约。
 ///
 /// 示例：

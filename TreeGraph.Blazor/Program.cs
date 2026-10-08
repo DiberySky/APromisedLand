@@ -25,7 +25,14 @@ builder.Services.AddMudServices();
 builder.Services.AddTreeGraphPlatform();
 
 // ★ TreeSky 树组件库（BlazorService/MessageService/TreeNodeDialogService/导航/泛型树 API 客户端 + MudExtensions）
-builder.Services.AddTreeSky();
+//   named HttpClient 指向 treegrapheavapi（Aspire 服务发现），写操作统一 NonIdempotentResilience。
+builder.Services.AddTreeSky(
+    configureClient: client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    },
+    configureClientBuilder: httpBuilder =>
+        httpBuilder.AddStandardResilienceHandler(NonIdempotentResilience.Configure));
 
 // ★ StringTreeSky（解耦版）：独立契约层 + 非泛型 HTTP 客户端，端点 api/string-tree/*。
 //   与 EavApiClient 同一 Aspire 服务发现与弹性策略。

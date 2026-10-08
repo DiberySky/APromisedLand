@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Abstractions;
 using TreeGraph.Blazor.Shared.TreeSky.Navigation;
 using TreeGraph.Blazor.Shared.TreeSky.Services;
 

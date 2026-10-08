@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using TreeGraph.Blazor.Shared.TreeSky.Attributes;
+using TreeGraph.Shared.TreeSky.Abstractions;
 
 namespace TreeGraph.Blazor.Shared.TreeSky.Models;
 

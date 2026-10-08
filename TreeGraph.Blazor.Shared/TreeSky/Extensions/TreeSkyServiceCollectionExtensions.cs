@@ -9,7 +9,7 @@ public static class TreeSkyServiceCollectionExtensions
 {
     /// <summary>
     /// 注册 TreeSky 组件库所需服务：
-    /// BlazorService、MessageService、TreeNodeDialogService&lt;&gt;、导航历史、DiberyTreeApiClient&lt;&gt;。
+    /// BlazorService、MessageService、TreeNodeDialogService&lt;&gt;、导航历史、TreeApiClient&lt;&gt;。
     /// </summary>
     /// <param name="services">服务集合</param>
     /// <param name="httpClientName">内部 HttpClient 名称（默认 TreeSky）</param>
@@ -22,7 +22,8 @@ public static class TreeSkyServiceCollectionExtensions
     public static IServiceCollection AddTreeSky(
         this IServiceCollection services,
         string httpClientName = "TreeSky",
-        Action<HttpClient>? configureClient = null)
+        Action<HttpClient>? configureClient = null,
+        Action<IHttpClientBuilder>? configureClientBuilder = null)
     {
         // MudBlazor.Extensions（ShowExAsync / DialogOptionsEx 运行时依赖）
         services.AddMudExtensions();
@@ -33,7 +34,7 @@ public static class TreeSkyServiceCollectionExtensions
         services.AddScoped<ITreeNavigationHistoryService, TreeNavigationHistoryService>();
 
         // 泛型树 API 客户端（open generic，经命名 HttpClient 工厂获取 HttpClient）
-        services.AddScoped(typeof(DiberyTreeApiClient<>));
+        services.AddScoped(typeof(TreeApiClient<>));
 
         // 默认树节点写操作 Handler（宿主可注册同接口实现覆盖）
         services.AddScoped(typeof(ITreeActionHandler<>), typeof(DefaultTreeActionHandler<>));
@@ -43,6 +44,9 @@ public static class TreeSkyServiceCollectionExtensions
         {
             builder.ConfigureHttpClient(configureClient);
         }
+
+        // 宿主可在此附加弹性策略 / 故障处理（写操作建议 NonIdempotentResilience）
+        configureClientBuilder?.Invoke(builder);
 
         // 注意：必须用 AddTransient（非 TryAdd）。AddHttpClient(name) 内部已 TryAdd 注册过
         // 一个指向无名客户端的 HttpClient，TryAdd 会静默失效，导致 ApiClient 拿到

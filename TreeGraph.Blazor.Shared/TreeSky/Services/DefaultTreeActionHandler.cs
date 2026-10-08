@@ -1,9 +1,11 @@
 using TreeGraph.Blazor.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Abstractions;
 
 namespace TreeGraph.Blazor.Shared.TreeSky.Services;
 
 /// <summary>
-/// 默认写操作实现：直接转发到 <see cref="DiberyTreeApiClient{T}"/>。
+/// 默认写操作实现：直接转发到 <see cref="TreeApiClient{T}"/>。
 ///
 /// 核心价值：集中"如何从 TItem 构造 TreeNodeDto"的业务知识
 /// （此前散落在 TreeSky.HandleXxxAsync 中）。
@@ -11,7 +13,7 @@ namespace TreeGraph.Blazor.Shared.TreeSky.Services;
 /// 宿主可继承覆盖 <see cref="BuildDto"/> 等方法，或整体替换为自定义 Handler。
 /// </summary>
 public class DefaultTreeActionHandler<TItem>(
-    DiberyTreeApiClient<TItem> client)
+    TreeApiClient<TItem> client)
     : ITreeActionHandler<TItem>
     where TItem : class, ITreeNodeBase<TItem>, new()
 {

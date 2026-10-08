@@ -1,5 +1,8 @@
-namespace TreeGraph.Blazor.Shared.TreeSky.Models;
+namespace TreeGraph.Shared.TreeSky.Models;
 
+/// <summary>
+/// TreeSky 统一响应信封（泛型）
+/// </summary>
 public class ApiResponse<T>
 {
     public bool Success { get; set; }

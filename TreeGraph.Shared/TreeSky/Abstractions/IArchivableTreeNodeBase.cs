@@ -1,7 +1,7 @@
-namespace TreeGraph.Blazor.Shared.TreeSky.Models;
+namespace TreeGraph.Shared.TreeSky.Abstractions;
 
 /// <summary>
-/// 可归档的树节点接口
+/// 可归档的树节点契约。
 /// </summary>
 public interface IArchivableTreeNodeBase<TItem> : ITreeNodeBase<TItem>
 {

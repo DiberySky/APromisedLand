@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Models;
+using TreeGraph.Shared.TreeSky.Abstractions;
 
 namespace TreeGraph.Blazor.Shared.TreeSky.Contracts;
 public class NodeTemplate<TItem>

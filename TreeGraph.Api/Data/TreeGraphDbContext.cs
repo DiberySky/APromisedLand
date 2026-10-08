@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.StringTreeSky.Entities;
 using TreeGraph.Shared.StringTreeSky.Contracts;
+using TreeGraph.Shared.TreeSky.Entities;
 
 namespace TreeGraph.Api.Data;
 
@@ -26,6 +27,10 @@ public class TreeGraphDbContext : DbContext
 
     public DbSet<StringNodeEntity> StringTreeSkyNodes => Set<StringNodeEntity>();
 
+    // TreeSky：计量单位树 / 分类树
+    public DbSet<UnitTree> UnitTrees => Set<UnitTree>();
+    public DbSet<CategoryTree> CategoryTrees => Set<CategoryTree>();
+
     public TreeGraphDbContext(DbContextOptions<TreeGraphDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -41,6 +46,57 @@ public class TreeGraphDbContext : DbContext
         ConfigureCustomTables(mb);
         ConfigureAuditLog(mb);
         ConfigureStringTreeSkyNodes(mb);
+        ConfigureUnitTrees(mb);
+        ConfigureCategoryTrees(mb);
+    }
+
+    // ============================================================
+    // TreeSky：计量单位树 / 分类树
+    // ============================================================
+    private static void ConfigureUnitTrees(ModelBuilder mb)
+    {
+        mb.Entity<UnitTree>(e =>
+        {
+            e.ToTable("unit_trees");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Abbreviation).HasColumnName("abbreviation").HasMaxLength(50);
+            e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.HasChildren).HasColumnName("has_children");
+
+            e.HasOne(x => x.Parent)
+                .WithMany()
+                .HasForeignKey(x => x.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => x.ParentId).HasDatabaseName("ix_unit_trees_parent");
+
+            e.HasData(UnitTree.SeedData());
+        });
+    }
+
+    private static void ConfigureCategoryTrees(ModelBuilder mb)
+    {
+        mb.Entity<CategoryTree>(e =>
+        {
+            e.ToTable("category_trees");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(300).IsRequired();
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
+            e.Property(x => x.IsArchived).HasColumnName("is_archived");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
+
+            e.HasIndex(x => x.ParentId).HasDatabaseName("ix_category_trees_parent");
+
+            e.HasData(CategoryTree.SeedData());
+        });
     }
 
     // ============================================================
