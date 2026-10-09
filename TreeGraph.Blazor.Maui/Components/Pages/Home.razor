@@ -1,5 +1,53 @@
-﻿@page "/"
+@* Home.razor — 应用入口：空间浏览器（PageSky 外壳 + 抽屉导航） *@
+@page "/"
+@layout SkyLayout
+@using TreeGraph.Blazor.Shared.StringTreeSky
 
-<h1>Hello, world!</h1>
+<PageTitle>空间</PageTitle>
 
-Welcome to your new app.
+@* 抽屉导航：承接原侧栏 NavMenu 的全部链接（Temporary 覆盖式，不挤压内容） *@
+<MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.Start" Elevation="1"
+           Variant="DrawerVariant.Temporary">
+    <MudDrawerHeader>
+        <MudText Typo="Typo.h6">TreeGraph</MudText>
+    </MudDrawerHeader>
+    <MudNavMenu>
+        <MudNavLink Href="" Match="NavLinkMatch.All"
+                    Icon="@Icons.Material.Outlined.Home">空间</MudNavLink>
+        <MudNavLink Href="counter"
+                    Icon="@Icons.Material.Outlined.PlusOne">Counter</MudNavLink>
+        <MudNavLink Href="weather"
+                    Icon="@Icons.Material.Outlined.List">Weather</MudNavLink>
+        <MudNavLink Href="dialog-test"
+                    Icon="@Icons.Material.Outlined.WebAsset">对话框测试</MudNavLink>
+
+        @* NodeEav 业务页面（RCL） *@
+        <MudNavLink Href="inodes" Match="NavLinkMatch.Prefix"
+                    Icon="@Icons.Material.Outlined.AccountTree">iNode 列表</MudNavLink>
+        <MudNavLink Href="entities"
+                    Icon="@Icons.Material.Outlined.Category">选择实体</MudNavLink>
+        <MudNavLink Href="attributes"
+                    Icon="@Icons.Material.Outlined.FormatListBulleted">属性列表</MudNavLink>
+        <MudNavLink Href="metadata/entity-types" Match="NavLinkMatch.Prefix"
+                    Icon="@Icons.Material.Outlined.Schema">元数据-实体类型</MudNavLink>
+        <MudNavLink Href="metadata/units" Match="NavLinkMatch.Prefix"
+                    Icon="@Icons.Material.Outlined.Straighten">元数据-单位</MudNavLink>
+    </MudNavMenu>
+</MudDrawer>
+
+<PageSky Title="空间"
+         ArrowBackVisible="false"
+         StartButtonVisible="true"
+         OnStartClick="ToggleDrawer">
+    <PageContent>
+        <div style="height: 80vh;">
+            <StringTreeSpace/>
+        </div>
+    </PageContent>
+</PageSky>
+
+@code {
+    private bool _drawerOpen;
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+}

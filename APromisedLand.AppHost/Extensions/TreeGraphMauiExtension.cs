@@ -25,7 +25,7 @@ public static class TreeGraphMauiExtension
         AppHostResourceContext resourceContext)
     {
         resourceContext.TreeGraphMauiSky = builder.AddMauiProject(
-            "TreeGraphMauiSky",
+            "TreeGraphMaui",
             "../TreeGraph.Blazor.Maui/TreeGraph.Blazor.Maui.csproj");
 
         if (OperatingSystem.IsWindows())

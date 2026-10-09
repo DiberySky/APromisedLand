@@ -5,6 +5,8 @@ using TreeGraph.Blazor.Maui;
 using TreeGraph.Blazor.Maui.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
+using TreeGraph.Blazor.Shared.StringTreeSky;
+using TreeGraph.Blazor.Shared.StringTreeSky.Services;
 using TreeGraph.Blazor.Shared.TreeSky.Extensions;
 using TreeGraph.Blazor.Shared.TreeSky.Models;
 using TreeGraph.Blazor.Shared.TreeSky.Services;
@@ -43,6 +45,34 @@ public static class MauiProgram
         //   添加排序逻辑与 UI 属性，供 TreeSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
         builder.Services.AddScoped<ITreeClientService<UnitTree>, UnitTreeClientService>();
         builder.Services.AddScoped<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
+
+        // ★ StringTreeSky（解耦版）：独立契约层 + 非泛型 HTTP 客户端，端点 api/string-tree/*。
+        //   注册方式与 Web 宿主 Program.cs 对齐：手工类型化 HttpClient，
+        //   不走 AddStringTreeSky()（其内部 AddScoped 无 HttpClient 可注入，会覆盖导致 BaseAddress 丢失）。
+        builder.Services.AddSingleton<StringTreeSkyOptions>(_ => new StringTreeSkyOptions
+        {
+            BasePath = "api/string-tree",
+            DefaultExpandLevel = 1,
+            AllowFilter = true,
+        });
+        builder.Services
+            .AddHttpClient<IStringTreeClient, StringTreeApiClient>(client =>
+            {
+                client.BaseAddress = new Uri("https+http://treegrapheavapi");
+            })
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+        // ★ 空间客户端（api/string-tree/spaces）：与 StringTreeApiClient 同地址、同弹性策略。
+        builder.Services
+            .AddHttpClient<ISpaceClient, SpaceApiClient>(client =>
+            {
+                client.BaseAddress = new Uri("https+http://treegrapheavapi");
+            })
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+        // ★ 节点属性摘要 + Schema 缓存（StringTreeSky 组件 [Inject] 需要）。
+        builder.Services.AddScoped<NodeSchemaCache>();
+        builder.Services.AddScoped<NodePropertySummaryService>();
 
         // ★ NodeEav 业务页面依赖
         //   通过 Aspire 服务发现访问 treegrapheavapi：

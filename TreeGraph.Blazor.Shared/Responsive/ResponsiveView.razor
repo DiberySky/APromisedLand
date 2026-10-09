@@ -1,10 +1,9 @@
 @* ResponsiveView.razor
-   根据视口宽度二选一渲染 Mobile / Desktop。
+   根据视口宽度二选一渲染 Mobile / Desktop（由 MudBlazor IBrowserViewportService 驱动）。
    若仅提供一侧，则另一侧自动降级。 *@
 @namespace TreeGraph.Blazor.Shared.Responsive
-@using TreeGraph.Blazor.Shared.Responsive
-@implements IDisposable
-@inject ViewportService Viewport
+@implements IAsyncDisposable
+@inject IBrowserViewportService Viewport
 
 @if (!_ready)
 {
@@ -13,7 +12,7 @@
         @Fallback
     }
 }
-else if (Viewport.IsMobile)
+else if (_isMobile)
 {
     @(Mobile ?? Desktop)
 }
@@ -29,16 +28,40 @@ else
     /// <summary>初始化前的占位内容（可选）。</summary>
     [Parameter] public RenderFragment? Fallback { get; set; }
 
+    private readonly Guid _observerId = Guid.NewGuid();
     private bool _ready;
+    private bool _isMobile; // 默认桌面：SSR 首帧与 JS 不可用阶段按桌面渲染
 
     protected override async Task OnInitializedAsync()
     {
-        await Viewport.EnsureInitializedAsync();
-        Viewport.OnChanged += HandleChanged;
+        try
+        {
+            var size = await Viewport.GetCurrentBrowserWindowSizeAsync();
+            // SSR/预渲染阶段 JS 不可用时服务返回默认尺寸（Width=0），视为未知 → 按桌面渲染
+            _isMobile = size.Width > 0 && IsMobileWidth(size.Width);
+            await Viewport.SubscribeAsync(_observerId, OnViewportChanged, fireImmediately: false);
+        }
+        catch
+        {
+            // SSR 预渲染阶段 JS 不可用：保持默认桌面，交互建立后本方法会重跑
+        }
         _ready = true;
     }
 
-    private void HandleChanged() => InvokeAsync(StateHasChanged);
+    private void OnViewportChanged(BrowserViewportEventArgs args)
+    {
+        var isMobile = IsMobileWidth(args.BrowserWindowSize.Width);
+        if (isMobile == _isMobile) return;
+        _isMobile = isMobile;
+        InvokeAsync(StateHasChanged);
+    }
 
-    public void Dispose() => Viewport.OnChanged -= HandleChanged;
+    /// <summary>断点由 ResponsiveOptions 决定，默认 768。</summary>
+    private static bool IsMobileWidth(int width) => width < ResponsiveOptions.MobileBreakpoint;
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await Viewport.UnsubscribeAsync(_observerId); }
+        catch { /* 忽略（circuit 已断开等） */ }
+    }
 }

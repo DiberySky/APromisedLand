@@ -1,0 +1,32 @@
+@* 临时测试页：验证 ResponsiveSplit（MudSplitPanel）拖拽 / 持久化 / 双击重置。验证后删除。 *@
+@page "/split-test"
+@rendermode InteractiveServer
+@layout SplitTestLayout
+@using TreeGraph.Blazor.Shared.Responsive
+
+<PageTitle>Split Test</PageTitle>
+
+<ResponsiveView>
+    <Mobile>
+        <MudText Typo="Typo.h6">移动布局占位</MudText>
+    </Mobile>
+    <Desktop>
+        <div style="height: 80vh;">
+            <ResponsiveSplit StorageKey="split-test"
+                             DefaultWidth="260"
+                             MinWidth="180"
+                             MaxWidth="480">
+                <Left>
+                    <MudPaper Class="pa-4 mud-height-full" Elevation="0">
+                        <MudText Typo="Typo.h6">左面板</MudText>
+                    </MudPaper>
+                </Left>
+                <Right>
+                    <MudPaper Class="pa-4 mud-height-full" Elevation="0">
+                        <MudText Typo="Typo.h6">右面板</MudText>
+                    </MudPaper>
+                </Right>
+            </ResponsiveSplit>
+        </div>
+    </Desktop>
+</ResponsiveView>

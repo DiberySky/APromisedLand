@@ -7,22 +7,26 @@
 @inject EavApiClient EavApi
 @inject ISnackbar Snackbar
 
-<MudDialog>
-    <TitleContent>
-        <MudText Typo="Typo.h6">@(IsNew ? "新建空间" : "编辑空间")</MudText>
-    </TitleContent>
+<PageDialogSky Title="@(IsNew ? "新建空间" : "编辑空间")"
+               SubmitButtonVisible="true"
+               SubmitButtonText="@(_saving ? "保存中…" : "保存")"
+               SubmitButtonDisabled="@(_saving || string.IsNullOrWhiteSpace(Space.Name))"
+               OnSubmitClick="SaveAsync">
     <DialogContent>
         <MudStack Spacing="3" Class="mt-2">
             <MudTextField T="string"
                           @bind-Value="Space.Name"
                           Label="名称"
                           Required="true"
+                          Immediate="true"
+                          Variant="Variant.Outlined"
                           MaxLength="256" />
 
             <MudTextField T="string"
                           @bind-Value="Space.Description"
                           Label="描述"
                           Lines="3"
+                          Variant="Variant.Outlined"
                           MaxLength="1024" />
 
             @if (IsNew)
@@ -55,6 +59,7 @@
                     <MudSelect T="string?"
                                @bind-Value="_templateEntityType"
                                Label="从模板复制属性（可选）"
+                               Variant="Variant.Outlined"
                                Clearable="true"
                                Placeholder="不复制，从空白开始"
                                Disabled="_templatesLoading">
@@ -77,16 +82,7 @@
             }
         </MudStack>
     </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="Cancel">取消</MudButton>
-        <MudButton Color="Color.Primary"
-                   Variant="Variant.Filled"
-                   Disabled="@(_saving || string.IsNullOrWhiteSpace(Space.Name))"
-                   OnClick="SaveAsync">
-            @(_saving ? "保存中…" : "保存")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+</PageDialogSky>
 
 @code {
     [CascadingParameter] private IMudDialogInstance? MudDialog { get; set; }
@@ -172,8 +168,6 @@
             _saving = false;
         }
     }
-
-    private void Cancel() => MudDialog?.Cancel();
 
     private static string ShortType(string entityType)
     {

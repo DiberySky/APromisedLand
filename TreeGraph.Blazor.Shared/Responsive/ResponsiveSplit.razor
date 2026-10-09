@@ -1,32 +1,33 @@
 @* ResponsiveSplit.razor
-   桌面双列布局：左（可调宽）+ 拖拽条 + 右。
+   桌面双列布局：基于 MudSplitPanel（官方 split 组件），左（可调宽）+ 拖拽条 + 右。
    宽度持久化到 localStorage（key = StorageKey）。
+   样式对齐 MudBlazor 主题（面板透明、divider 悬停色取自主题变量）。
 
    手机时本组件不参与渲染（由外层 ResponsiveView 分派）。 *@
 @namespace TreeGraph.Blazor.Shared.Responsive
 @using Microsoft.JSInterop
-@using TreeGraph.Blazor.Shared.Responsive
-@implements IAsyncDisposable
 @inject IJSRuntime JS
 
-<div class="responsive-split @(_dragging ? "responsive-split--dragging" : "")"
-     style="--left-width: @(_leftWidth)px">
-
-    <div class="responsive-split__left">
+<MudSplitPanel @ref="_splitPanel"
+               Class="responsive-split mud-width-full mud-height-full"
+               Style="@($"--responsive-split-max: {MaxWidth}px")"
+               FirstPanelInitialSize="@_leftWidth"
+               MinPanelSize="@MinWidth"
+               ResetOnDoubleClick="false"
+               Transparent="true"
+               ClassFirstPanel="responsive-split__left"
+               ClassSecondPanel="responsive-split__right"
+               @onmouseup="SyncAndPersistAsync"
+               @ontouchend="SyncAndPersistAsync"
+               @onkeyup="SyncAndPersistAsync"
+               @ondblclick="ResetWidthAsync">
+    <FirstPanel>
         @Left
-    </div>
-
-    <div class="responsive-split__divider"
-         @onpointerdown="StartDragAsync"
-         @ondblclick="ResetWidthAsync"
-         title="拖动调整宽度，双击重置">
-        <div class="responsive-split__grip"></div>
-    </div>
-
-    <div class="responsive-split__right">
+    </FirstPanel>
+    <SecondPanel>
         @Right
-    </div>
-</div>
+    </SecondPanel>
+</MudSplitPanel>
 
 @code {
     [Parameter] public RenderFragment? Left { get; set; }
@@ -38,7 +39,7 @@
     /// <summary>最小宽度（px）。</summary>
     [Parameter] public int MinWidth { get; set; } = 160;
 
-    /// <summary>最大宽度（px）。</summary>
+    /// <summary>最大宽度（px）。拖拽超出后松手自动回弹到该值。</summary>
     [Parameter] public int MaxWidth { get; set; } = 600;
 
     /// <summary>
@@ -50,8 +51,8 @@
     /// <summary>宽度变化时回调（可选）。</summary>
     [Parameter] public EventCallback<int> WidthChanged { get; set; }
 
+    private MudSplitPanel? _splitPanel;
     private int _leftWidth;
-    private bool _dragging;
 
     protected override async Task OnInitializedAsync()
     {
@@ -62,7 +63,7 @@
         {
             try
             {
-                var stored = await JS.InvokeAsync<string?>("responsive.getLocal", StorageKey);
+                var stored = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
                 if (int.TryParse(stored, out var w))
                     _leftWidth = Math.Clamp(w, MinWidth, MaxWidth);
             }
@@ -70,69 +71,57 @@
         }
     }
 
-    // ============ 拖拽 ============
+    // ============ 拖拽同步 ============
+    // MudSplitPanel 的拖拽由 JS 直接改 DOM 且不抛事件，
+    // 故在 mouseup / touchend / keyup 后统一读回实际宽度。
 
-    private async Task StartDragAsync(PointerEventArgs e)
+    private async Task SyncAndPersistAsync()
     {
-        _dragging = true;
-        StateHasChanged();
+        if (_splitPanel is null) return;
 
-        try
+        int width;
+        try { width = await _splitPanel.GetDividerPositionAsync(); }
+        catch { return; }
+
+        var clamped = Math.Clamp(width, MinWidth, MaxWidth);
+        if (clamped == _leftWidth) return;
+
+        _leftWidth = clamped;
+
+        // 超出 MaxWidth：回弹到边界（JS 只约束 MinPanelSize，不约束最大宽度）
+        if (clamped != width)
         {
-            await JS.InvokeVoidAsync("responsive.startDrag",
-                DotNetObjectReference.Create(this),
-                e.ClientX, _leftWidth, MinWidth, MaxWidth);
-        }
-        catch
-        {
-            _dragging = false;
-            StateHasChanged();
-        }
-    }
-
-    [JSInvokable]
-    public void OnDragMove(int width)
-    {
-        if (width == _leftWidth) return;
-        _leftWidth = width;
-        InvokeAsync(StateHasChanged);
-    }
-
-    [JSInvokable]
-    public async Task OnDragEnd()
-    {
-        _dragging = false;
-        await InvokeAsync(StateHasChanged);
-
-        if (!string.IsNullOrEmpty(StorageKey))
-        {
-            try
-            {
-                await JS.InvokeVoidAsync("responsive.setLocal",
-                    StorageKey, _leftWidth.ToString());
-            }
-            catch { /* 忽略 */ }
+            try { await _splitPanel.SetDividerPositionAsync(clamped); } catch { /* 忽略 */ }
         }
 
+        await PersistAsync();
         if (WidthChanged.HasDelegate)
             await WidthChanged.InvokeAsync(_leftWidth);
     }
 
+    // 双击重置：回到默认宽度。
+    // 不用官方 ResetOnDoubleClick——它只会回到 FirstPanelInitialSize（含存储恢复值）。
     private async Task ResetWidthAsync()
     {
         _leftWidth = DefaultWidth;
-        if (!string.IsNullOrEmpty(StorageKey))
+        if (_splitPanel is not null)
         {
-            try
-            {
-                await JS.InvokeVoidAsync("responsive.setLocal",
-                    StorageKey, DefaultWidth.ToString());
-            }
-            catch { /* 忽略 */ }
+            try { await _splitPanel.SetDividerPositionAsync(DefaultWidth); } catch { /* 忽略 */ }
         }
+
+        await PersistAsync();
         if (WidthChanged.HasDelegate)
             await WidthChanged.InvokeAsync(_leftWidth);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    private async Task PersistAsync()
+    {
+        if (string.IsNullOrEmpty(StorageKey)) return;
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem",
+                StorageKey, _leftWidth.ToString());
+        }
+        catch { /* 忽略 */ }
+    }
 }

@@ -1,54 +1,20 @@
-.responsive-split {
-    display: flex;
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
-    background: #fff;
-}
+/* ResponsiveSplit：布局与拖拽条视觉由 MudSplitPanel 提供，此处只做补充约束。
+   颜色一律取 MudBlazor 主题变量，随亮/暗主题切换。 */
 
-.responsive-split__left {
-    width: var(--left-width, 260px);
-    flex-shrink: 0;
+/* 左面板：最大宽度约束 + 独立滚动 */
+.responsive-split ::deep .responsive-split__left {
+    max-width: var(--responsive-split-max);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    border-right: 1px solid transparent;    /* 用分隔条代替 */
 }
 
-.responsive-split__divider {
-    width: 6px;
-    flex-shrink: 0;
-    cursor: col-resize;
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s;
-    position: relative;
-    z-index: 1;
-}
-
-.responsive-split__divider:hover,
-.responsive-split--dragging .responsive-split__divider {
-    background: rgba(25, 118, 210, 0.12);
-}
-
-.responsive-split__grip {
-    width: 2px;
-    height: 32px;
-    border-radius: 1px;
-    background: #ccc;
-    transition: background 0.15s, height 0.15s;
-}
-
-.responsive-split__divider:hover .responsive-split__grip,
-.responsive-split--dragging .responsive-split__grip {
-    background: #1976d2;
-    height: 48px;
-}
-
-.responsive-split__right {
-    flex: 1;
-    min-width: 0;
+/* 右面板：独立滚动 */
+.responsive-split ::deep .responsive-split__right {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+}
+
+/* 拖拽条悬停反馈：使用主题悬停色 */
+.responsive-split ::deep .divider:hover {
+    background-color: var(--mud-palette-action-default-hover);
 }

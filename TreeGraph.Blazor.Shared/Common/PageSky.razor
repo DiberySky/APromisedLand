@@ -1,0 +1,102 @@
+@* PageSky.razor — 页面骨架：顶部栏 + 正文 + 可选底部栏 *@
+@namespace TreeGraph.Blazor.Shared.Common
+
+@inject NavigationManager NavigationManager
+
+<MudAppBar Class="mud-theme-primary" Color="Color.Inherit" Dense="true"
+           Elevation="0">
+    <ChildContent>
+        @if (ArrowBackVisible)
+        {
+            <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                           Edge="Edge.Start" Color="Color.Warning"
+                           OnClick="BackClick"/>
+        }
+
+        @if (string.IsNullOrEmpty(Title) == false)
+        {
+            <MudSpacer/>
+            <MudText>@Title</MudText>
+            <MudSpacer/>
+        }
+
+        @if (TopBarRightContent is not null)
+        {
+            @TopBarRightContent
+        }
+
+        @if (StartButtonVisible)
+        {
+            <MudIconButton Icon="@Icons.Material.Outlined.Menu"
+                           Color="Color.Success"
+                           OnClick="StartClick"/>
+        }
+    </ChildContent>
+</MudAppBar>
+
+<MudContainer MaxWidth="@MaxWidth" Class="mb-16">
+    @if (PageContent is not null)
+    {
+        @PageContent
+    }
+</MudContainer>
+
+@if (BottomBarVisible)
+{
+    <MudAppBar Bottom Color="@BottomBarColor" Dense>
+        <ChildContent>
+            @if (BottomBarContent is not null)
+            {
+                @BottomBarContent
+            }
+
+            @if (LogoutButtonVisible)
+            {
+                <MudSpacer/>
+                <MudIconButton Icon="@Icons.Material.Outlined.Logout"
+                               Color="Color.Error"
+                               OnClick="Logout"/>
+            }
+        </ChildContent>
+    </MudAppBar>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool ArrowBackVisible { get; set; } = true;
+    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.False;
+    [Parameter] public bool BottomBarVisible { get; set; } = false;
+    [Parameter] public Color BottomBarColor { get; set; } = Color.Dark;
+    [Parameter] public bool StartButtonVisible { get; set; } = false;
+
+    /// <summary>底部栏是否显示登出按钮，由调用方按自身认证状态控制。</summary>
+    [Parameter] public bool LogoutButtonVisible { get; set; }
+
+    [Parameter] public RenderFragment? TopBarRightContent { get; set; }
+    [Parameter] public RenderFragment? PageContent { get; set; }
+    [Parameter] public RenderFragment? BottomBarContent { get; set; }
+
+    [Parameter] public EventCallback OnStartClick { get; set; }
+
+    [Parameter] public EventCallback OnBackClick { get; set; }
+    [Parameter] public string? BackPage { get; set; }
+
+    /// <summary>点击登出按钮时触发；登出与跳转逻辑由调用方实现。</summary>
+    [Parameter] public EventCallback OnLogout { get; set; }
+
+    private async Task BackClick()
+    {
+        if (string.IsNullOrEmpty(BackPage))
+        {
+            await OnBackClick.InvokeAsync();
+        }
+        else
+        {
+            NavigationManager.NavigateTo(BackPage);
+        }
+    }
+
+    private Task StartClick() => OnStartClick.InvokeAsync();
+
+    private Task Logout() => OnLogout.InvokeAsync();
+}

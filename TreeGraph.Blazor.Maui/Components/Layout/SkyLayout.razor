@@ -1,0 +1,23 @@
+@* SkyLayout.razor — 无 chrome 极简布局：供 PageSky 类页面自带顶栏/底栏使用 *@
+@inherits LayoutComponentBase
+@inject IPlatformContext Platform
+
+<MudThemeProvider IsDarkMode="true"/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+
+@* MudLayout：PageSky 的 MudAppBar 与页面内 MudDrawer 的布局锚点 *@
+<MudLayout>
+    @Body
+</MudLayout>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Platform.RefreshAsync();
+        }
+    }
+}

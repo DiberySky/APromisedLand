@@ -1,0 +1,11 @@
+@* 临时布局：仅用于 SplitTestPage 验证，绕开 NavMenu 的后端依赖。验证后删除。 *@
+@inherits LayoutComponentBase
+
+<MudThemeProvider IsDarkMode DefaultScrollbar />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<main style="height: 100vh;">
+    @Body
+</main>

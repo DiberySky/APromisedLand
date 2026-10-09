@@ -7,8 +7,8 @@
                  MinWidth="180"
                  MaxWidth="480">
     <Left>
-        <SpaceSelector SelectedSpaceId="_current?.Id"
-                       InitialSpaceId="InitialSpaceId"
+        <SpaceSelector SelectedSpaceId="@_current?.Id"
+                       InitialSpaceId="@InitialSpaceId"
                        OnSelected="HandleSpaceSelected" />
     </Left>
     <Right>
@@ -20,10 +20,10 @@
         }
         else
         {
-            <StringTreeSky @key="_current.Id"
-                           RootNodeId="_current.Id"
-                           ExplicitEntityType="_current.EntityType"
-                           TreeKey="TreeKey"
+            <StringTreeSky @key="@_current.Id"
+                           RootNodeId="@_current.Id"
+                           ExplicitEntityType="@_current.EntityType"
+                           TreeKey="@TreeKey"
                            OnTreeChanged="OnTreeChanged" />
         }
     </Right>
