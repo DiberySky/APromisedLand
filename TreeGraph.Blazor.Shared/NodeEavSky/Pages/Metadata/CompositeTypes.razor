@@ -6,36 +6,38 @@
 
 <PageTitle>组合类型管理</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4">组合类型管理</MudText>
+<PageHeaderSky Title="组合类型管理">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   Size="Size.Small"
+                   OnClick="LoadAsync" Disabled="_loading"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            刷新
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   Size="Size.Small"
+                   OnClick="OpenCreateTypeAsync"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Class="ml-2">
+            新建组合类型
+        </MudButton>
+    </Actions>
+</PageHeaderSky>
 
-<MudPaper Class="pa-4 mb-4">
-    <MudGrid>
-        <MudItem xs="12" md="4" Class="d-flex align-center">
-            <MudTextField @bind-Value="_entityType" Label="实体类型（可选）"
-                          Variant="Variant.Outlined" Margin="Margin.Dense"
-                          Placeholder="留空显示全部" />
-        </MudItem>
-        <MudItem xs="12" md="2" Class="d-flex align-center">
-            @* ★ 显示已删除开关 *@
-            <MudSwitch T="bool" @bind-Value="_includeDeleted"
-                       Label="显示已删除"
-                       Color="Color.Warning" />
-        </MudItem>
-        <MudItem xs="12" md="6" Class="d-flex align-center">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       OnClick="LoadAsync" Disabled="_loading"
-                       StartIcon="@Icons.Material.Filled.Refresh">
-                刷新
-            </MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Success"
-                       OnClick="OpenCreateTypeAsync"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       Class="ml-2">
-                新建组合类型
-            </MudButton>
-        </MudItem>
-    </MudGrid>
-</MudPaper>
+@* 过滤器栏（无 MudPaper 包裹） *@
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="4" Class="d-flex align-center">
+        <MudTextField @bind-Value="_entityType" Label="实体类型（可选）"
+                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Placeholder="留空显示全部" />
+    </MudItem>
+    <MudItem xs="12" md="2" Class="d-flex align-center">
+        @* ★ 显示已删除开关 *@
+        <MudSwitch T="bool" @bind-Value="_includeDeleted"
+                   Label="显示已删除"
+                   Color="Color.Warning" />
+    </MudItem>
+</MudGrid>
 
 @if (_loading)
 {
@@ -43,14 +45,12 @@
 }
 else if (_types is null || _types.Count == 0)
 {
-    <MudPaper Class="pa-8 text-center">
-        <MudIcon Icon="@Icons.Material.Filled.AccountTree"
-                 Size="Size.Large" Color="Color.Default" />
-        <MudText Typo="Typo.h6" Class="mt-2">暂无组合类型</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            点击"新建组合类型"创建第一个
-        </MudText>
-    </MudPaper>
+    <EmptyStateSky Icon="@Icons.Material.Filled.AccountTree"
+                   Title="暂无组合类型">
+        <Description>
+            <text>点击"新建组合类型"创建第一个</text>
+        </Description>
+    </EmptyStateSky>
 }
 else
 {
@@ -140,7 +140,8 @@ else
                     else
                     {
                         <MudTable Items="type.Fields" Dense="true" Bordered="true"
-                                  Hover="true">
+                                  Hover="true"
+                                  Breakpoint="Breakpoint.Sm">
                             <HeaderContent>
                                 <MudTh>字段名</MudTh>
                                 <MudTh>显示名</MudTh>
@@ -154,7 +155,7 @@ else
                                 <MudTh>操作</MudTh>
                             </HeaderContent>
                             <RowTemplate>
-                                <MudTd>
+                                <MudTd DataLabel="字段名">
                                     <code>@context.FieldName</code>
                                     @* ★ 已删除字段标记 *@
                                     @if (context.IsDeleted)
@@ -165,14 +166,14 @@ else
                                         </MudChip>
                                     }
                                 </MudTd>
-                                <MudTd>@context.DisplayName</MudTd>
-                                <MudTd>
+                                <MudTd DataLabel="显示名">@context.DisplayName</MudTd>
+                                <MudTd DataLabel="类型">
                                     <MudChip T="string" Size="Size.Small"
                                              Color="@GetDataTypeColor(context.DataType)">
                                         @context.DataType
                                     </MudChip>
                                 </MudTd>
-                                <MudTd>
+                                <MudTd DataLabel="引用">
                                     @* 单位 / 选项集 / 嵌套组合引用 *@
                                     @if (context.UnitId is not null)
                                     {
@@ -196,36 +197,36 @@ else
                                         </MudChip>
                                     }
                                 </MudTd>
-                                <MudTd>
+                                <MudTd DataLabel="数组">
                                     @if (context.IsArray)
                                     {
                                         <MudIcon Icon="@Icons.Material.Filled.Check"
                                                  Color="Color.Success" Size="Size.Small" />
                                     }
                                 </MudTd>
-                                <MudTd>
+                                <MudTd DataLabel="必填">
                                     @if (context.IsRequired)
                                     {
                                         <MudIcon Icon="@Icons.Material.Filled.Check"
                                                  Color="Color.Success" Size="Size.Small" />
                                     }
                                 </MudTd>
-                                <MudTd>
+                                <MudTd DataLabel="可搜索">
                                     @if (context.IsSearchable)
                                     {
                                         <MudIcon Icon="@Icons.Material.Filled.Check"
                                                  Color="Color.Success" Size="Size.Small" />
                                     }
                                 </MudTd>
-                                <MudTd>
+                                <MudTd DataLabel="可排序">
                                     @if (context.IsSortable)
                                     {
                                         <MudIcon Icon="@Icons.Material.Filled.Check"
                                                  Color="Color.Success" Size="Size.Small" />
                                     }
                                 </MudTd>
-                                <MudTd>@context.DisplayOrder</MudTd>
-                                <MudTd>
+                                <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
+                                <MudTd DataLabel="操作">
                                     @if (!context.IsDeleted)
                                     {
                                         <MudIconButton Icon="@Icons.Material.Filled.Edit"

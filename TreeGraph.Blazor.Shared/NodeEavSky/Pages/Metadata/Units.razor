@@ -5,23 +5,23 @@
 @inject IDialogService DialogService
 <PageTitle>单位管理</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4">单位管理</MudText>
-
-<MudPaper Class="pa-4 mb-4">
-    <div class="d-flex align-center">
+<PageHeaderSky Title="单位管理">
+    <Actions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   Size="Size.Small"
                    OnClick="LoadAsync" Disabled="_loading"
                    StartIcon="@Icons.Material.Filled.Refresh">
             刷新
         </MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   Size="Size.Small"
                    OnClick="OpenCreateAsync"
                    StartIcon="@Icons.Material.Filled.Add"
                    Class="ml-2">
             新建单位
         </MudButton>
-    </div>
-</MudPaper>
+    </Actions>
+</PageHeaderSky>
 
 @if (_loading)
 {
@@ -29,21 +29,19 @@
 }
 else if (_categories is null || _categories.Count == 0)
 {
-    <MudPaper Class="pa-8 text-center">
-        <MudIcon Icon="@Icons.Material.Filled.Straighten"
-                 Size="Size.Large" Color="Color.Default" />
-        <MudText Typo="Typo.h6" Class="mt-2">暂无单位</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            点击"新建单位"创建第一个
-        </MudText>
-    </MudPaper>
+    <EmptyStateSky Icon="@Icons.Material.Filled.Straighten"
+                   Title="暂无单位">
+        <Description>
+            <text>点击"新建单位"创建第一个</text>
+        </Description>
+    </EmptyStateSky>
 }
 else
 {
     @foreach (var c in _categories)
     {
         <MudPaper Class="pa-4 mb-4">
-            <div class="d-flex align-center mb-2" style="flex-wrap: wrap; row-gap: 8px;">
+            <div class="d-flex align-center flex-wrap mb-2">
                 <MudText Typo="Typo.h6">@c.Category</MudText>
                 @if (c.BaseUnit is not null)
                 {
@@ -66,14 +64,15 @@ else
                                    Color="Color.Warning"
                                    StartIcon="@Icons.Material.Filled.Star"
                                    Class="ml-2"
-                                   style="flex: 0 0 auto;"
                                    OnClick="@(() => OpenAssignBaseDialogAsync(c))">
                             指定基准单位
                         </MudButton>
                     }
                 }
             </div>
-            <MudTable Items="c.Units" Hover="true" Bordered="true">
+            <MudTable Items="c.Units" Hover="true" Bordered="true"
+                      Dense="true"
+                      Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>名称</MudTh>
                     <MudTh>符号</MudTh>
@@ -83,18 +82,18 @@ else
                     <MudTh>操作</MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd>@context.Name</MudTd>
-                    <MudTd>@context.Symbol</MudTd>
-                    <MudTd>@context.ToBaseFactor</MudTd>
-                    <MudTd>@context.DisplayOrder</MudTd>
-                    <MudTd>
+                    <MudTd DataLabel="名称">@context.Name</MudTd>
+                    <MudTd DataLabel="符号">@context.Symbol</MudTd>
+                    <MudTd DataLabel="换算系数">@context.ToBaseFactor</MudTd>
+                    <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
+                    <MudTd DataLabel="基准">
                         @if (context.IsBaseUnit)
                         {
                             <MudIcon Icon="@Icons.Material.Filled.Check"
                                      Color="Color.Success" />
                         }
                     </MudTd>
-                    <MudTd>
+                    <MudTd DataLabel="操作">
                         <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                        Size="Size.Medium"
                                        Color="Color.Primary"

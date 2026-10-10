@@ -1,0 +1,53 @@
+@* PageHeaderSky.razor — 统一页头（对齐 DiberyTree 的 MudToolBar mud-theme-dark 模式）
+   替换全部手写 div.d-flex + style gap:8px 页头。
+   compact 下标题降 Typo.h6，右侧 Actions 自动收纳为 MoreVert 菜单。 *@
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
+
+<MudToolBar Class="mud-theme-dark mb-4">
+    @if (ArrowBackVisible)
+    {
+        <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                       Edge="Edge.Start"
+                       Color="Color.Warning"
+                       OnClick="OnArrowBackClick" />
+    }
+
+    <MudText Typo="@(Platform.IsCompact ? Typo.h6 : Typo.h5)">@Title</MudText>
+
+    @if (SecondaryInfo != null)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
+            @SecondaryInfo
+        </MudText>
+    }
+
+    <MudSpacer />
+
+    @if (Platform.IsCompact && Actions != null)
+    {
+        @* compact：右侧 Actions 收纳为 MoreVert 菜单 *@
+        <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                 Color="Color.Default"
+                 AriaLabel="更多操作">
+            @Actions
+        </MudMenu>
+    }
+    else if (Actions != null)
+    {
+        @* 桌面端：Actions 原样平铺 *@
+        @Actions
+    }
+</MudToolBar>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public bool ArrowBackVisible { get; set; }
+    [Parameter] public EventCallback OnArrowBackClick { get; set; }
+
+    /// <summary>次要信息（如 EntityId），显示在标题右侧小字。</summary>
+    [Parameter] public RenderFragment? SecondaryInfo { get; set; }
+
+    /// <summary>右侧操作区。compact 下自动收纳为 MoreVert 菜单。</summary>
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

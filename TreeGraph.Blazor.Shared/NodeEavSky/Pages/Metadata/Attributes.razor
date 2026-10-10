@@ -6,215 +6,211 @@
 @inject EntityTypeDisplayService EntityTypeDisplay
 <PageTitle>属性定义管理</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4">属性定义管理</MudText>
+<PageHeaderSky Title="属性定义管理">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   Size="Size.Small"
+                   OnClick="LoadAsync" Disabled="@_loading"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            刷新
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   Size="Size.Small"
+                   OnClick="OpenCreateAsync"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Class="ml-2"
+                   Disabled="@(string.IsNullOrEmpty(_entityType))">
+            新建属性
+        </MudButton>
+    </Actions>
+</PageHeaderSky>
 
-<MudPaper Class="pa-4 mb-4">
-    <MudGrid>
-        <MudItem xs="12" md="3" Class="d-flex align-center">
-            <MudSelect T="string"
-                       Value="_entityType"
-                       ValueChanged="OnEntityTypeChanged"
-                       Label="实体类型"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       FullWidth="true">
-                @if (_entityTypes is null)
-                {
-                    <MudSelectItem T="string" Value="@("")" Disabled="true">
-                        加载中...
-                    </MudSelectItem>
-                }
-                else if (_entityTypes.Count == 0)
-                {
-                    <MudSelectItem T="string" Value="@("")" Disabled="true">
-                        （暂无实体类型）
-                    </MudSelectItem>
-                }
-                else
-                {
-                    @foreach (var et in _entityTypes)
-                    {
-                        <MudSelectItem T="string" Value="@et.EntityType">
-                            @GetDisplayName(et) (@et.AttributeCount)
-                        </MudSelectItem>
-                    }
-                }
-            </MudSelect>
-        </MudItem>
-        <MudItem xs="12" md="3" Class="d-flex align-center">
-            <MudSwitch T="bool" @bind-Value="_includeDeleted"
-                       Label="显示已删除"
-                       Color="Color.Warning" />
-        </MudItem>
-        <MudItem xs="12" md="6" Class="d-flex align-center">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       OnClick="LoadAsync" Disabled="@_loading"
-                       StartIcon="@Icons.Material.Filled.Refresh">
-                刷新
-            </MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Success"
-                       OnClick="OpenCreateAsync"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       Class="ml-2"
-                       Disabled="@(string.IsNullOrEmpty(_entityType))">
-                新建属性
-            </MudButton>
-        </MudItem>
-    </MudGrid>
-</MudPaper>
-
-@if (_loading)
-{
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-}
-else if (_attributes is null || _attributes.Count == 0)
-{
-    <MudPaper Class="pa-8 text-center">
-        <MudIcon Icon="@Icons.Material.Filled.ListAlt"
-                 Size="Size.Large" Color="Color.Default" />
-        <MudText Typo="Typo.h6" Class="mt-2">暂无属性定义</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            @if (string.IsNullOrEmpty(_entityType))
+@* 过滤器栏（无 MudPaper 包裹） *@
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="3" Class="d-flex align-center">
+        <MudSelect T="string"
+                   Value="_entityType"
+                   ValueChanged="OnEntityTypeChanged"
+                   Label="实体类型"
+                   Variant="Variant.Outlined"
+                   Margin="Margin.Dense"
+                   FullWidth="true">
+            @if (_entityTypes is null)
             {
-                <text>请先在上方选择一个实体类型</text>
+                <MudSelectItem T="string" Value="@("")" Disabled="true">
+                    加载中...
+                </MudSelectItem>
+            }
+            else if (_entityTypes.Count == 0)
+            {
+                <MudSelectItem T="string" Value="@("")" Disabled="true">
+                    （暂无实体类型）
+                </MudSelectItem>
             }
             else
             {
-                <text>点击"新建属性"为该实体类型添加第一个属性</text>
+                @foreach (var et in _entityTypes)
+                {
+                    <MudSelectItem T="string" Value="@et.EntityType">
+                        @GetDisplayName(et) (@et.AttributeCount)
+                    </MudSelectItem>
+                }
             }
+        </MudSelect>
+    </MudItem>
+    <MudItem xs="12" md="3" Class="d-flex align-center">
+        <MudSwitch T="bool" @bind-Value="_includeDeleted"
+                   Label="显示已删除"
+                   Color="Color.Warning" />
+    </MudItem>
+</MudGrid>
+
+<MudTable Items="_attributes" Hover="true" Bordered="true"
+          Dense="true"
+          Breakpoint="Breakpoint.Sm"
+          Loading="@_loading"
+          LoadingProgressColor="Color.Primary"
+          Filter="new Func<AttributeDetailDto, bool>(FilterFunc)">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">
+            共 @(_attributes?.Count ?? 0) 个属性
         </MudText>
-    </MudPaper>
-}
-else
-{
-    <MudTable Items="_attributes" Hover="true" Bordered="true"
-              Filter="new Func<AttributeDetailDto, bool>(FilterFunc)">
-        <ToolBarContent>
-            <MudText Typo="Typo.h6">
-                共 @_attributes.Count 个属性
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString"
+                      Placeholder="搜索属性名 / 显示名"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium"
+                      Class="mt-0"
+                      Immediate="true" />
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>属性名</MudTh>
+        <MudTh>显示名</MudTh>
+        <MudTh>类型</MudTh>
+        <MudTh>引用</MudTh>
+        <MudTh>必填</MudTh>
+        <MudTh>可搜索</MudTh>
+        <MudTh>可排序</MudTh>
+        <MudTh>顺序</MudTh>
+        <MudTh>操作</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="属性名">
+            @* 主显中文，副显内部标识（小字） *@
+            <MudText Typo="Typo.body2">@context.DisplayName</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                <code>@context.AttributeName</code>
             </MudText>
-            <MudSpacer />
-            <MudTextField @bind-Value="_searchString"
-                          Placeholder="搜索属性名 / 显示名"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          IconSize="Size.Medium"
-                          Class="mt-0"
-                          Immediate="true" />
-        </ToolBarContent>
-        <HeaderContent>
-            <MudTh>属性名</MudTh>
-            <MudTh>显示名</MudTh>
-            <MudTh>类型</MudTh>
-            <MudTh>引用</MudTh>
-            <MudTh>必填</MudTh>
-            <MudTh>可搜索</MudTh>
-            <MudTh>可排序</MudTh>
-            <MudTh>顺序</MudTh>
-            <MudTh>操作</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd>
-                @* 主显中文，副显内部标识（小字） *@
-                <MudText Typo="Typo.body2">@context.DisplayName</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    <code>@context.AttributeName</code>
-                </MudText>
-                @if (context.IsDeleted)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Error"
-                             Class="ml-1">
-                        已删除
-                    </MudChip>
-                }
-            </MudTd>
-            <MudTd>@context.DisplayName</MudTd>
-            <MudTd>
-                <MudChip T="string" Size="Size.Small"
-                         Color="@GetDataTypeColor(context.DataType)">
-                    @context.DataType
+            @if (context.IsDeleted)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Error"
+                         Class="ml-1">
+                    已删除
                 </MudChip>
-            </MudTd>
-            <MudTd>
-                @if (context.UnitId is not null)
+            }
+        </MudTd>
+        <MudTd DataLabel="显示名">@context.DisplayName</MudTd>
+        <MudTd DataLabel="类型">
+            <MudChip T="string" Size="Size.Small"
+                     Color="@GetDataTypeColor(context.DataType)">
+                @context.DataType
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="引用">
+            @if (context.UnitId is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                         Class="mr-1">
+                    单位: @context.UnitSymbol
+                </MudChip>
+            }
+            @if (context.RefCompositeTypeId is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Dark"
+                         Class="mr-1">
+                    组合: @context.CompositeTypeName
+                </MudChip>
+            }
+            @if (context.RefTableDefinitionId is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Info"
+                         Class="mr-1">
+                    表: @context.TableName
+                </MudChip>
+            }
+            @if (context.RefOptionSetId is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                    选项: @context.OptionSetName
+                </MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="必填">
+            @if (context.IsRequired)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Check"
+                         Color="Color.Success" Size="Size.Small" />
+            }
+        </MudTd>
+        <MudTd DataLabel="可搜索">
+            @if (context.IsSearchable)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Check"
+                         Color="Color.Success" Size="Size.Small" />
+            }
+        </MudTd>
+        <MudTd DataLabel="可排序">
+            @if (context.IsSortable)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Check"
+                         Color="Color.Success" Size="Size.Small" />
+            }
+        </MudTd>
+        <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
+        <MudTd DataLabel="操作">
+            @if (!context.IsDeleted)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Medium"
+                               Color="Color.Primary"
+                               OnClick="@(async () => await OpenEditAsync(context))"
+                               title="编辑" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Medium"
+                               Color="Color.Error"
+                               OnClick="@(async () => await DeleteAsync(context))"
+                               title="删除" />
+            }
+            else
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                               Size="Size.Medium"
+                               Color="Color.Success"
+                               OnClick="@(async () => await UndeleteAsync(context))"
+                               title="恢复" />
+            }
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new[] { 20, 50, 100 }" />
+    </PagerContent>
+    <NoRecordsContent>
+        <EmptyStateSky Icon="@Icons.Material.Filled.ListAlt"
+                       Title="暂无属性定义">
+            <Description>
+                @if (string.IsNullOrEmpty(_entityType))
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Warning"
-                             Class="mr-1">
-                        单位: @context.UnitSymbol
-                    </MudChip>
-                }
-                @if (context.RefCompositeTypeId is not null)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Dark"
-                             Class="mr-1">
-                        组合: @context.CompositeTypeName
-                    </MudChip>
-                }
-                @if (context.RefTableDefinitionId is not null)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Info"
-                             Class="mr-1">
-                        表: @context.TableName
-                    </MudChip>
-                }
-                @if (context.RefOptionSetId is not null)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
-                        选项: @context.OptionSetName
-                    </MudChip>
-                }
-            </MudTd>
-            <MudTd>
-                @if (context.IsRequired)
-                {
-                    <MudIcon Icon="@Icons.Material.Filled.Check"
-                             Color="Color.Success" Size="Size.Small" />
-                }
-            </MudTd>
-            <MudTd>
-                @if (context.IsSearchable)
-                {
-                    <MudIcon Icon="@Icons.Material.Filled.Check"
-                             Color="Color.Success" Size="Size.Small" />
-                }
-            </MudTd>
-            <MudTd>
-                @if (context.IsSortable)
-                {
-                    <MudIcon Icon="@Icons.Material.Filled.Check"
-                             Color="Color.Success" Size="Size.Small" />
-                }
-            </MudTd>
-            <MudTd>@context.DisplayOrder</MudTd>
-            <MudTd>
-                @if (!context.IsDeleted)
-                {
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                   Size="Size.Medium"
-                                   Color="Color.Primary"
-                                   OnClick="@(async () => await OpenEditAsync(context))"
-                                   title="编辑" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Medium"
-                                   Color="Color.Error"
-                                   OnClick="@(async () => await DeleteAsync(context))"
-                                   title="删除" />
+                    <text>请先在上方选择一个实体类型</text>
                 }
                 else
                 {
-                    <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
-                                   Size="Size.Medium"
-                                   Color="Color.Success"
-                                   OnClick="@(async () => await UndeleteAsync(context))"
-                                   title="恢复" />
+                    <text>点击"新建属性"为该实体类型添加第一个属性</text>
                 }
-            </MudTd>
-        </RowTemplate>
-        <PagerContent>
-            <MudTablePager PageSizeOptions="new[] { 20, 50, 100 }" />
-        </PagerContent>
-    </MudTable>
-}
+            </Description>
+        </EmptyStateSky>
+    </NoRecordsContent>
+</MudTable>
 
 @code {
     private string? _entityType;

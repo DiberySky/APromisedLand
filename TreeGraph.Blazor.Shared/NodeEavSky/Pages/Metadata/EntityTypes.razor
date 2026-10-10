@@ -7,105 +7,96 @@
 @using TreeGraph.Shared.NodeEavSky.Dtos
 <PageTitle>实体类型管理</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4">实体类型管理</MudText>
-
-<MudPaper Class="pa-4 mb-4">
-    <div class="d-flex align-center">
+<PageHeaderSky Title="实体类型管理">
+    <Actions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   Size="Size.Small"
                    OnClick="LoadAsync" Disabled="@_loading"
                    StartIcon="@Icons.Material.Filled.Refresh">
             刷新
         </MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   Size="Size.Small"
                    OnClick="OpenCreateAsync"
                    StartIcon="@Icons.Material.Filled.Add"
                    Class="ml-2">
             新建实体类型
         </MudButton>
-    </div>
-</MudPaper>
+    </Actions>
+</PageHeaderSky>
 
-@if (_loading)
-{
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-}
-else if (_types is null || _types.Count == 0)
-{
-    <MudPaper Class="pa-8 text-center">
-        <MudIcon Icon="@Icons.Material.Filled.Category"
-                 Size="Size.Large" Color="Color.Default" />
-        <MudText Typo="Typo.h6" Class="mt-2">暂无实体类型</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            点击"新建实体类型"创建第一个
-        </MudText>
-    </MudPaper>
-}
-else
-{
-    @* 窄屏下表格超出视口，允许横向滚动（桌面端不影响） *@
-    <div style="overflow-x:auto">
-        <MudTable Items="_types" Hover="true" Bordered="true">
-        <HeaderContent>
-            <MudTh>名称</MudTh>
-            <MudTh>说明</MudTh>
-            <MudTh>属性数</MudTh>
-            <MudTh>顺序</MudTh>
-            <MudTh>状态</MudTh>
-            <MudTh>操作</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd>
-                @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
-                <MudText Typo="Typo.body1">@context.DisplayName</MudText>
-            </MudTd>
-            <MudTd>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    @(string.IsNullOrEmpty(context.Description) ? "—" : context.Description)
-                </MudText>
-            </MudTd>
-            <MudTd>
-                <MudChip T="string" Size="Size.Small" Color="Color.Info">
-                    @context.AttributeCount
-                </MudChip>
-            </MudTd>
-            <MudTd>@context.DisplayOrder</MudTd>
-            <MudTd>
-                @if (context.IsDeleted)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Error">已删除</MudChip>
-                }
-                else
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Success">活动</MudChip>
-                }
-            </MudTd>
-            <MudTd>
-                @if (!context.IsDeleted)
-                {
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                   Size="Size.Medium"
-                                   Color="Color.Primary"
-                                   OnClick="@(async () => await OpenEditAsync(context))"
-                                   title="编辑" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Medium"
-                                   Color="Color.Error"
-                                   OnClick="@(async () => await DeleteAsync(context))"
-                                   title="删除" />
-                }
-                else
-                {
-                    <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
-                                   Size="Size.Medium"
-                                   Color="Color.Success"
-                                   OnClick="@(async () => await UndeleteAsync(context))"
-                                   title="恢复" />
-                }
-            </MudTd>
-        </RowTemplate>
-    </MudTable>
-    </div>
-}
+<MudTable Items="_types" Hover="true" Bordered="true"
+          Dense="true"
+          Breakpoint="Breakpoint.Sm"
+          Loading="@_loading"
+          LoadingProgressColor="Color.Primary">
+    <HeaderContent>
+        <MudTh>名称</MudTh>
+        <MudTh>说明</MudTh>
+        <MudTh>属性数</MudTh>
+        <MudTh>顺序</MudTh>
+        <MudTh>状态</MudTh>
+        <MudTh>操作</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="名称">
+            @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
+            <MudText Typo="Typo.body1">@context.DisplayName</MudText>
+        </MudTd>
+        <MudTd DataLabel="说明">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @(string.IsNullOrEmpty(context.Description) ? "—" : context.Description)
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="属性数">
+            <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                @context.AttributeCount
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
+        <MudTd DataLabel="状态">
+            @if (context.IsDeleted)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Error">已删除</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success">活动</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="操作">
+            @if (!context.IsDeleted)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Medium"
+                               Color="Color.Primary"
+                               OnClick="@(async () => await OpenEditAsync(context))"
+                               title="编辑" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Medium"
+                               Color="Color.Error"
+                               OnClick="@(async () => await DeleteAsync(context))"
+                               title="删除" />
+            }
+            else
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
+                               Size="Size.Medium"
+                               Color="Color.Success"
+                               OnClick="@(async () => await UndeleteAsync(context))"
+                               title="恢复" />
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <EmptyStateSky Icon="@Icons.Material.Filled.Category"
+                       Title="暂无实体类型">
+            <Description>
+                <text>点击"新建实体类型"创建第一个</text>
+            </Description>
+        </EmptyStateSky>
+    </NoRecordsContent>
+</MudTable>
 
 @code {
     private IReadOnlyList<EntityTypeDetailDto>? _types;

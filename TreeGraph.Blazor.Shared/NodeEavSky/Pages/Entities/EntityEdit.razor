@@ -1,4 +1,4 @@
-@* EntityEdit.razor *@
+@* EntityEdit.razor — 对齐 DiberyTree 模式：PageHeaderSky + 字段级校验 *@
 @page "/entities/{EntityType}/{EntityId}"
 @using System.Text.Json
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
@@ -11,24 +11,20 @@
 @inject NavigationManager Nav
 @inject EntityTypeDisplayService EntityTypeDisplay
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
-@* EntityEdit.razor *@
+
 <PageTitle>编辑 @GetDisplayTitle()</PageTitle>
 
-<div class="d-flex align-center mb-3" style="gap: 8px;">
-    <MudButton Variant="Variant.Text" Color="Color.Default"
-               StartIcon="@Icons.Material.Filled.ArrowBack"
-               OnClick="BackToList">
-        返回列表
-    </MudButton>
-    <MudText Typo="Typo.h5">编辑 @GetDisplayTitle()</MudText>
-    <MudText Typo="Typo.caption" Color="Color.Secondary">
+<PageHeaderSky Title="@($"编辑 {GetDisplayTitle()}")"
+               ArrowBackVisible="true"
+               OnArrowBackClick="BackToList">
+    <SecondaryInfo>
         @EntityId
-    </MudText>
-    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                   Size="Size.Medium"
-                   OnClick="CopyEntityId"
-                   title="复制 EntityId" />
-</div>
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                       Size="Size.Small"
+                       OnClick="CopyEntityId"
+                       title="复制 EntityId" />
+    </SecondaryInfo>
+</PageHeaderSky>
 
 @if (_loading)
 {
@@ -42,31 +38,9 @@ else if (_schema is null || _schema.Count == 0)
 }
 else
 {
-    <MudAlert Severity="Severity.Info" Class="mb-4">
-        <b>提示</b>：保存只更新您填写的属性，未填写的属性<b>保持不变</b>。
-        如需删除某个属性值，请显式清空该字段。自定义表走独立端点，不受影响。
-    </MudAlert>
-
-    @if (TotalErrorCount > 0)
-    {
-        <MudAlert Severity="Severity.Error" Dense="false" Class="mb-4">
-            <MudText Typo="Typo.body1">
-                有 <b>@TotalErrorCount</b> 项校验错误，请修正后再保存：
-            </MudText>
-            <ul style="margin: 6px 0 0 0; padding-left: 20px;">
-                @foreach (var (attrName, errs) in _errors.Where(kv => kv.Value.Count > 0))
-                {
-                    var attr = _regularAttributes.FirstOrDefault(a => a.AttributeName == attrName);
-                    var label = attr?.DisplayName ?? attrName;
-                    foreach (var e in errs)
-                    {
-                        var path = string.IsNullOrEmpty(e.Path) ? "" : $" [{e.Path}]";
-                        <li>@label@(path)：@e.Message</li>
-                    }
-                }
-            </ul>
-        </MudAlert>
-    }
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">
+        保存只更新您填写的属性，未填写的属性保持不变。如需删除某个属性值，请显式清空该字段。
+    </MudText>
 
     <MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-4 mb-4")">
         <MudText Typo="Typo.h6" Class="mb-3">属性值</MudText>
@@ -103,7 +77,7 @@ else
                         EntityId="@EntityId"
                         RefreshToken="_historyRefreshToken" />
 
-    <div class="d-flex align-center" style="gap: 8px;">
+    <MudToolBar Class="mud-theme-dark mt-4">
         <MudButton Variant="Variant.Text" Color="Color.Default"
                    StartIcon="@Icons.Material.Filled.ArrowBack"
                    OnClick="BackToList">
@@ -119,7 +93,6 @@ else
 
         @if (Platform.IsCompact)
         {
-            @* 紧凑布局：次要操作收纳进菜单，仅保留保存主按钮 *@
             <MudMenu Icon="@Icons.Material.Filled.MoreVert"
                      Color="Color.Default"
                      AriaLabel="更多操作">
@@ -157,7 +130,7 @@ else
                 删除实体
             </MudButton>
         }
-    </div>
+    </MudToolBar>
 }
 
 @code {

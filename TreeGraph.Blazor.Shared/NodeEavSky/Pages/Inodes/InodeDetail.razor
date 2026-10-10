@@ -12,66 +12,38 @@
 @* InodeDetail.razor *@
 <PageTitle>iNode @InodeId</PageTitle>
 
-<div class="d-flex align-center mb-4" style="gap: 8px;">
-    <MudButton Variant="Variant.Text" Color="Color.Default"
-               StartIcon="@Icons.Material.Filled.ArrowBack"
-               OnClick="BackToList">
-        返回
-    </MudButton>
-    <MudIcon Icon="@Icons.Material.Filled.Hub"
-             Size="Size.Large" Color="Color.Primary" />
-    <MudText Typo="Typo.h5">iNode 详情</MudText>
-</div>
+<PageHeaderSky Title="iNode 详情"
+               ArrowBackVisible="true"
+               OnArrowBackClick="BackToList">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAttachDialog">
+            声明新类型
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.DataObject"
+                   OnClick="OpenJsonDrawer">
+            JSON 预览
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="ReloadAsync" Disabled="@_loading">
+            刷新
+        </MudButton>
+    </Actions>
+</PageHeaderSky>
 
 <MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-3 mb-4")">
-    <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
         <MudText Typo="Typo.caption" Color="Color.Secondary">iNode ID</MudText>
         <code>@InodeId</code>
         <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                       Size="Size.Medium" OnClick="CopyId" title="复制" />
-        <MudSpacer />
-        @if (Platform.IsCompact)
-        {
-            @* 紧凑布局：主操作保留「声明新类型」，次要操作收纳进菜单 *@
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenAttachDialog">
-                声明新类型
-            </MudButton>
-            <MudMenu Icon="@Icons.Material.Filled.MoreVert"
-                     Color="Color.Default"
-                     AriaLabel="更多操作">
-                <MudMenuItem Icon="@Icons.Material.Filled.DataObject"
-                             OnClick="OpenJsonDrawer">
-                    JSON 预览
-                </MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Filled.Refresh"
-                             OnClick="ReloadAsync"
-                             Disabled="@_loading">
-                    刷新
-                </MudMenuItem>
-            </MudMenu>
-        }
-        else
-        {
-            @* ★ JSON 预览入口 *@
-            <MudButton Variant="Variant.Outlined" Color="Color.Info"
-                       StartIcon="@Icons.Material.Filled.DataObject"
-                       OnClick="OpenJsonDrawer">
-                JSON 预览
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenAttachDialog">
-                声明新类型
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                       StartIcon="@Icons.Material.Filled.Refresh"
-                       OnClick="ReloadAsync" Disabled="@_loading">
-                刷新
-            </MudButton>
-        }
-    </div>
+                       Size="Size.Small" OnClick="CopyId" title="复制" />
+    </MudStack>
 </MudPaper>
 
 @if (_loading)
@@ -80,19 +52,19 @@
 }
 else if (_cards is null || _cards.Count == 0)
 {
-    <MudPaper Class="pa-8 text-center">
-        <MudIcon Icon="@Icons.Material.Filled.Inbox"
-                 Size="Size.Large" Color="Color.Default" />
-        <MudText Typo="Typo.h6" Class="mt-2">该 iNode 尚未声明任何类型</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-            点击下方按钮，为该 iNode 声明它会使用的实体类型
-        </MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Success"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="OpenAttachDialog">
-            声明新类型
-        </MudButton>
-    </MudPaper>
+    <EmptyStateSky Icon="@Icons.Material.Filled.Inbox"
+                   Title="该 iNode 尚未声明任何类型">
+        <Description>
+            <text>点击下方按钮，为该 iNode 声明它会使用的实体类型</text>
+        </Description>
+        <Action>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAttachDialog">
+                声明新类型
+            </MudButton>
+        </Action>
+    </EmptyStateSky>
 }
 else
 {
@@ -105,9 +77,9 @@ else
         {
             var captured = card;
             <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="1" Style="height: 100%;">
+                <MudCard Elevation="1" Class="h-100">
                     <MudCardContent>
-                        <div class="d-flex align-center mb-2" style="flex-wrap: wrap; row-gap: 4px;">
+                        <div class="d-flex align-center flex-wrap mb-2">
                             <MudIcon Icon="@Icons.Material.Filled.Category"
                                      Color="@(captured.HasEntity ? Color.Success : Color.Default)"
                                      Size="Size.Medium" />
@@ -219,7 +191,7 @@ else
         </MudPaper>
 
         @* 操作区 *@
-        <div class="d-flex align-center mb-3" style="gap: 8px; flex-wrap: wrap;">
+        <div class="d-flex align-center flex-wrap mb-3" style="gap: 8px;">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Medium"
                        StartIcon="@Icons.Material.Filled.Refresh"
@@ -250,9 +222,12 @@ else
         }
         else if (string.IsNullOrEmpty(_jsonText))
         {
-            <MudAlert Severity="Severity.Info">
-                暂无数据。可能 iNode 下没有任何实体。
-            </MudAlert>
+            <EmptyStateSky Icon="@Icons.Material.Filled.DataObject"
+                           Title="暂无数据">
+                <Description>
+                    <text>可能 iNode 下没有任何实体。</text>
+                </Description>
+            </EmptyStateSky>
         }
         else
         {
@@ -262,7 +237,7 @@ else
                              font-family: 'Consolas', 'Menlo', monospace;
                              font-size: 12px;
                              white-space: pre;">
-                <pre style="margin: 0;">@_jsonText</pre>
+                <pre class="ma-0">@_jsonText</pre>
             </MudPaper>
         }
     </MudPaper>

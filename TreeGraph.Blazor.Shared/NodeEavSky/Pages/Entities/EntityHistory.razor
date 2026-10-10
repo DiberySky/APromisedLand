@@ -1,29 +1,37 @@
 @* EntityHistory.razor *@
 @page "/entities/{EntityType}/{EntityId}/history"
 @inject EavApiClient Api
-@* EntityHistory.razor *@
+@inject NavigationManager Nav
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
+
 <PageTitle>审计历史 - @EntityType #@EntityId</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4">
-    @EntityType #@EntityId 的审计历史
-</MudText>
+<PageHeaderSky Title="审计历史"
+               ArrowBackVisible="true"
+               OnArrowBackClick="BackToEntity">
+    <SecondaryInfo>
+        @($"{EntityType} #{@EntityId}")
+    </SecondaryInfo>
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Search"
+                   OnClick="LoadAsync" Disabled="@_loading">
+            查询
+        </MudButton>
+    </Actions>
+</PageHeaderSky>
 
 <MudGrid Class="mb-4">
     <MudItem xs="12" md="4">
         <MudDatePicker @bind-Date="_from" Label="起始时间"
                        Variant="Variant.Outlined" />
     </MudItem>
-    <MudItem xs="12" md="4" Class="d-flex align-center">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   OnClick="LoadAsync" Disabled="@_loading">
-            查询
-        </MudButton>
-    </MudItem>
 </MudGrid>
 
 @if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" />
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
 }
 else if (_history is not null && _history.Count > 0)
 {
@@ -57,7 +65,12 @@ else if (_history is not null && _history.Count > 0)
 }
 else if (_history is not null)
 {
-    <MudAlert Severity="Severity.Info">暂无历史记录</MudAlert>
+    <EmptyStateSky Icon="@Icons.Material.Filled.History"
+                   Title="暂无历史记录">
+        <Description>
+            <text>该实体尚无属性变更记录</text>
+        </Description>
+    </EmptyStateSky>
 }
 
 @code {
@@ -106,4 +119,7 @@ else if (_history is not null)
         "Delete" => Color.Error,
         _ => Color.Default
     };
+
+    private void BackToEntity()
+        => Nav.NavigateTo($"/entities/{EntityType}/{EntityId}");
 }

@@ -6,7 +6,11 @@ using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.NodeEavSky;
 
-/// <summary>EntityList 紧凑布局测试（bUnit + Fake API）。</summary>
+/// <summary>
+/// EntityList 响应式测试（bUnit + Fake API）。
+/// 重构后对齐 DiberyTree 模式：MudTable 始终渲染，通过 Breakpoint.Sm 实现
+/// 小屏自动切卡片布局；行操作通过 MoreHoriz 按钮聚合。
+/// </summary>
 public class EntityListResponsiveTests : BunitTestBase {
     private readonly FakePlatformContext _platform;
 
@@ -37,8 +41,12 @@ public class EntityListResponsiveTests : BunitTestBase {
         }, TimeSpan.FromSeconds(2));
     }
 
+    /// <summary>
+    /// 重构后 compact 模式也渲染 MudTable（Breakpoint.Sm 通过 CSS 自动切卡片，
+    /// 不再走 Platform.IsCompact 组件分支）。
+    /// </summary>
     [Fact]
-    public void Compact_RendersCardsNoTable()
+    public void Compact_StillRendersMudTable()
     {
         _platform.IsCompact = true;
         var cut = Render<EntityList>(p =>
@@ -46,23 +54,42 @@ public class EntityListResponsiveTests : BunitTestBase {
 
         cut.WaitForAssertion(() =>
         {
-            Assert.Empty(cut.FindAll(".mud-table"));
-            Assert.NotEmpty(cut.FindAll(".mud-card"));
+            Assert.NotEmpty(cut.FindAll(".mud-table"));
         }, TimeSpan.FromSeconds(2));
     }
 
+    /// <summary>
+    /// 表格内容始终包含预览列（不再区分卡片/表格模式）。
+    /// </summary>
     [Fact]
-    public void Compact_CardsShowPreviewColumns()
+    public void TableShowsPreviewColumns()
     {
-        _platform.IsCompact = true;
+        _platform.IsCompact = false;
         var cut = Render<EntityList>(p =>
             p.Add(x => x.EntityType, "item"));
 
         cut.WaitForAssertion(() =>
         {
-            var card = cut.Find(".mud-card");
-            Assert.Contains("测试项", card.TextContent, StringComparison.Ordinal);
-            Assert.Contains("名称", card.TextContent, StringComparison.Ordinal);
+            var table = cut.Find(".mud-table");
+            Assert.Contains("测试项", table.TextContent, StringComparison.Ordinal);
+            Assert.Contains("名称", table.TextContent, StringComparison.Ordinal);
+        }, TimeSpan.FromSeconds(2));
+    }
+
+    /// <summary>
+    /// 重构后行操作通过 MoreHoriz 按钮聚合（对齐 DiberyTree TreeNodeActionsDialog 模式）。
+    /// </summary>
+    [Fact]
+    public void RowActionsUseMoreHorizButton()
+    {
+        _platform.IsCompact = false;
+        var cut = Render<EntityList>(p =>
+            p.Add(x => x.EntityType, "item"));
+
+        cut.WaitForAssertion(() =>
+        {
+            var moreHorizButtons = cut.FindAll("button[aria-label='操作'], .mud-icon-button");
+            Assert.NotEmpty(moreHorizButtons);
         }, TimeSpan.FromSeconds(2));
     }
 }

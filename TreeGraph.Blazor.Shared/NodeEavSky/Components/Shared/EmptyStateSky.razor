@@ -1,0 +1,32 @@
+@* EmptyStateSky.razor — 统一空态/错误态（对齐 DiberyTree 的 NoRecordsContent 模式）
+   替换全部手写 MudPaper pa-8 text-center 空态块。
+   可用于 MudTable 的 NoRecordsContent 或独立展示。 *@
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+
+<MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="2" Class="pa-8 text-center">
+    @if (!string.IsNullOrEmpty(Icon))
+    {
+        <MudIcon Icon="@Icon" Size="Size.Large" Color="Color.Default" />
+    }
+    @if (!string.IsNullOrEmpty(Title))
+    {
+        <MudText Typo="Typo.h6">@Title</MudText>
+    }
+    @if (Description != null)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            @Description
+        </MudText>
+    }
+    @if (Action != null)
+    {
+        @Action
+    }
+</MudStack>
+
+@code {
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? Description { get; set; }
+    [Parameter] public RenderFragment? Action { get; set; }
+}

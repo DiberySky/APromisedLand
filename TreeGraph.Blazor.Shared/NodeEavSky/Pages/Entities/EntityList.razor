@@ -1,6 +1,7 @@
-@* EntityList.razor *@
+@* EntityList.razor — 对齐 DiberyTree 模式：PageHeaderSky + MudTable Breakpoint + MoreHoriz 行操作 *@
 @page "/entities/{EntityType}"
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @inject EavApiClient Api
@@ -8,20 +9,30 @@
 @inject NavigationManager Nav
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
-@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
-@* EntityList.razor *@
+
 <PageTitle>@GetDisplayTitle() 实体列表</PageTitle>
 
-<div class="d-flex align-center mb-4" style="gap: 8px;">
-    <MudButton Variant="Variant.Text" Color="Color.Default"
-               StartIcon="@Icons.Material.Filled.ArrowBack"
-               OnClick="BackToHome">
-        返回
-    </MudButton>
-    <MudText Typo="Typo.h5">@GetDisplayTitle() 实体</MudText>
-</div>
+<PageHeaderSky Title="@($"{GetDisplayTitle()} 实体")"
+               ArrowBackVisible="true"
+               OnArrowBackClick="BackToHome">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="LoadAsync" Disabled="@_loading">
+            刷新
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="CreateNew"
+                   Disabled="@_loading">
+            新建实体
+        </MudButton>
+    </Actions>
+</PageHeaderSky>
 
-@* ★ 动态查询过滤器 *@
+@* 动态查询过滤器 *@
 @if (_schema is not null && _schema.Count > 0)
 {
     <QueryFilterBuilder Filters="_filters"
@@ -29,202 +40,98 @@
                         OnApply="OnFilterChanged" />
 }
 
-<MudPaper Class="pa-4 mb-4">
-    <div class="d-flex align-center" style="gap: 8px;">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Refresh"
-                   OnClick="LoadAsync" Disabled="@_loading">
-            刷新
-        </MudButton>
-
-        <MudSpacer />
-
-        @* ★ 一键新建：自动生成 GUID 并直接进入编辑页 *@
-        <MudButton Variant="Variant.Filled" Color="Color.Success"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="CreateNew"
-                   Disabled="@_loading">
-            新建实体
-        </MudButton>
-    </div>
-</MudPaper>
-
-@if (_loading)
+@if (_result is not null)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+        共 <b>@_result.Total</b> 个实体，第 @_result.Page / @TotalPages 页
+    </MudText>
 }
-else if (_result is null)
-{
-    <MudAlert Severity="Severity.Error">加载失败，请检查后端服务</MudAlert>
-}
-else if (_result.Items.Count == 0)
-{
-    <MudPaper Class="pa-8 text-center">
-        <MudIcon Icon="@Icons.Material.Filled.Inbox"
-                 Size="Size.Large" Color="Color.Default" />
-        <MudText Typo="Typo.h6" Class="mt-2">未找到实体</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            @if (_filters.Count > 0)
+
+<MudTable Items="@_result?.Items"
+          T="DynamicEntityDto"
+          Hover="true" Bordered="true"
+          Dense="true"
+          Breakpoint="Breakpoint.Sm"
+          Loading="@_loading"
+          LoadingProgressColor="Color.Primary"
+          @key="(_result?.Page ?? 0, _result?.Total ?? 0, _filters.Count)">
+    <HeaderContent>
+        <MudTh>EntityId</MudTh>
+        @foreach (var col in _previewColumns)
+        {
+            <MudTh>@GetColumnDisplayName(col)</MudTh>
+        }
+        <MudTh Style="text-align:right">操作</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="EntityId">
+            <code>@context.EntityId</code>
+        </MudTd>
+        @foreach (var col in _previewColumns)
+        {
+            <MudTd DataLabel="@GetColumnDisplayName(col)">
+                @FormatPreview(context.Properties.GetValueOrDefault(col))
+            </MudTd>
+        }
+        <MudTd Style="text-align:right">
+            <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
+                           Size="Size.Small"
+                           Color="Color.Primary"
+                           OnClick="@(() => ShowRowActionsAsync(context))"
+                           title="操作" />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <EmptyStateSky Icon="@Icons.Material.Filled.Inbox"
+                       Title="@(_result is null ? "加载失败" : "未找到实体")">
+            @if (_result is not null && _result.Items.Count == 0)
             {
-                <text>当前查询条件无匹配结果，试试清空过滤条件。</text>
+                @if (_filters.Count > 0)
+                {
+                    <text>当前查询条件无匹配结果，试试清空过滤条件。</text>
+                }
+                else
+                {
+                    <text>点击"新建实体"创建第一个</text>
+                }
             }
             else
             {
-                <text>点击右上角"新建实体"创建第一个</text>
+                <text>请检查后端服务是否正常</text>
             }
-        </MudText>
-        @if (_filters.Count == 0)
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Success"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="CreateNew" Class="mt-3">
-                新建实体
-            </MudButton>
-        }
-    </MudPaper>
-}
-else if (Platform.IsCompact)
-{
-    @* 紧凑布局：卡片列表替换表格 *@
-    <MudPaper Class="pa-2 mb-4">
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-            共 <b>@_result.Total</b> 个实体，第 @_result.Page / @TotalPages 页
-        </MudText>
-
-        <MudStack Spacing="3">
-            @foreach (var item in _result.Items)
-            {
-                <MudCard Elevation="1" Outlined="true">
-                    <MudCardContent Class="pa-3">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            <code>@item.EntityId</code>
-                        </MudText>
-                        @foreach (var col in _previewColumns)
-                        {
-                            <MudText Typo="Typo.body2">
-                                @GetColumnDisplayName(col)：@FormatPreview(item.Properties.GetValueOrDefault(col))
-                            </MudText>
-                        }
-                    </MudCardContent>
-                    <MudCardActions Class="pa-2">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                       Size="Size.Medium"
-                                       Color="Color.Primary"
-                                       OnClick="@(() => OpenEdit(item.EntityId))"
-                                       title="编辑" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Size="Size.Medium"
-                                       Color="Color.Error"
-                                       OnClick="@(() => ConfirmDelete(item.EntityId))"
-                                       title="删除" />
-                    </MudCardActions>
-                </MudCard>
-            }
-        </MudStack>
-
-        @* 卡片模式保留分页 *@
-        <div class="d-flex align-center pa-2 mt-2" style="gap: 8px;">
+        </EmptyStateSky>
+    </NoRecordsContent>
+    <PagerContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudSelect T="int"
                        Value="_pageSize"
                        ValueChanged="OnPageSizeChanged"
                        Label="每页"
                        Variant="Variant.Outlined"
                        Margin="Margin.Dense"
-                       Style="width: 120px;">
+                       Size="Size.Small">
                 <MudSelectItem T="int" Value="10">10</MudSelectItem>
                 <MudSelectItem T="int" Value="20">20</MudSelectItem>
                 <MudSelectItem T="int" Value="50">50</MudSelectItem>
                 <MudSelectItem T="int" Value="100">100</MudSelectItem>
             </MudSelect>
-
             <MudSpacer />
-
             <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
-                           Size="Size.Medium"
-                           Disabled="@(_result.Page <= 1)"
-                           OnClick="@(() => GoToPage(_result.Page - 1))" />
-            <MudText Typo="Typo.body2">@_result.Page / @TotalPages</MudText>
+                           Size="Size.Small"
+                           Disabled="@(_result is null || _result.Page <= 1)"
+                           OnClick="@(() => GoToPage(_result!.Page - 1))" />
+            <MudText Typo="Typo.body2">@(_result?.Page ?? 0) / @TotalPages</MudText>
             <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
-                           Size="Size.Medium"
-                           Disabled="@(_result.Page >= TotalPages)"
-                           OnClick="@(() => GoToPage(_result.Page + 1))" />
-        </div>
-    </MudPaper>
-}
-else
-{
-    <MudPaper Class="pa-4 mb-4">
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            共 <b>@_result.Total</b> 个实体，第 @_result.Page / @TotalPages 页
-        </MudText>
-
-        <MudTable Items="_result.Items" Hover="true" Bordered="true"
-                  @key="(_result.Page, _result.Total, _filters.Count)">
-            <HeaderContent>
-                <MudTh>EntityId</MudTh>
-                @foreach (var col in _previewColumns)
-                {
-                    <MudTh>@GetColumnDisplayName(col)</MudTh>
-                }
-                <MudTh>操作</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd>
-                    <code>@context.EntityId</code>
-                </MudTd>
-                @foreach (var col in _previewColumns)
-                {
-                    <MudTd>@FormatPreview(context.Properties.GetValueOrDefault(col))</MudTd>
-                }
-                <MudTd>
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                   Size="Size.Medium"
-                                   Color="Color.Primary"
-                                   OnClick="@(() => OpenEdit(context.EntityId))"
-                                   title="编辑" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Medium"
-                                   Color="Color.Error"
-                                   OnClick="@(() => ConfirmDelete(context.EntityId))"
-                                   title="删除" />
-                </MudTd>
-            </RowTemplate>
-            <PagerContent>
-                <div class="d-flex align-center pa-2" style="gap: 8px;">
-                    <MudSelect T="int"
-                               Value="_pageSize"
-                               ValueChanged="OnPageSizeChanged"
-                               Label="每页"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               Style="width: 120px;">
-                        <MudSelectItem T="int" Value="10">10</MudSelectItem>
-                        <MudSelectItem T="int" Value="20">20</MudSelectItem>
-                        <MudSelectItem T="int" Value="50">50</MudSelectItem>
-                        <MudSelectItem T="int" Value="100">100</MudSelectItem>
-                    </MudSelect>
-
-                    <MudSpacer />
-
-                    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
-                                   Size="Size.Medium"
-                                   Disabled="@(_result.Page <= 1)"
-                                   OnClick="@(() => GoToPage(_result.Page - 1))" />
-                    <MudText Typo="Typo.body2">@_result.Page / @TotalPages</MudText>
-                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
-                                   Size="Size.Medium"
-                                   Disabled="@(_result.Page >= TotalPages)"
-                                   OnClick="@(() => GoToPage(_result.Page + 1))" />
-                </div>
-            </PagerContent>
-        </MudTable>
-    </MudPaper>
-}
+                           Size="Size.Small"
+                           Disabled="@(_result is null || _result.Page >= TotalPages)"
+                           OnClick="@(() => GoToPage(_result!.Page + 1))" />
+        </MudStack>
+    </PagerContent>
+</MudTable>
 
 @code {
     [Parameter] public string EntityType { get; set; } = "";
 
-    /// <summary>显示用中文名；DisplayName 空时回退到 EntityType。</summary>
     private string GetDisplayTitle() => EntityTypeDisplay.GetDisplayName(EntityType);
 
     private IReadOnlyList<AttributeSchemaDto>? _schema;
@@ -252,13 +159,11 @@ else
         {
             _schema = schema;
 
-            // 可搜索属性（用于过滤器）
             _searchableAttributes = schema
                 .Where(a => a.IsSearchable && FilterOperatorCatalog.IsSupported(a))
                 .OrderBy(a => a.DisplayOrder)
                 .ToList();
 
-            // 预览列（前 3 个可搜索的简单属性）
             _previewColumns = schema
                 .Where(a => a.IsSearchable && a.DataType != "table" && a.DataType != "composite")
                 .OrderBy(a => a.DisplayOrder)
@@ -294,10 +199,9 @@ else
         }
     }
 
-    /// <summary>过滤器条件变化时（点击"应用查询"或条件增删）触发。</summary>
     private async Task OnFilterChanged()
     {
-        _page = 1;  // 重置到第一页
+        _page = 1;
         await LoadAsync();
         StateHasChanged();
     }
@@ -316,9 +220,47 @@ else
         await LoadAsync();
     }
 
-    private void OpenEdit(string entityId)
+    /// <summary>
+    /// 行 MoreHoriz → 打开 EntityRowActionsDialog，聚合该实体的全部操作。
+    /// 对齐 DiberyTree TreeNodeActionsDialog 模式。
+    /// </summary>
+    private async Task ShowRowActionsAsync(DynamicEntityDto item)
     {
-        Nav.NavigateTo($"/entities/{EntityType}/{entityId}");
+        var summaryLines = _previewColumns
+            .Select(col => new SummaryLine(
+                GetColumnDisplayName(col),
+                FormatPreview(item.Properties.GetValueOrDefault(col))))
+            .ToList();
+
+        var parameters = new DialogParameters<EntityRowActionsDialog>
+        {
+            { x => x.EntityTypeDisplayName, GetDisplayTitle() },
+            { x => x.EntityId, item.EntityId },
+            { x => x.SummaryLines, summaryLines }
+        };
+
+        var dialog = await DialogService.ShowAsync<EntityRowActionsDialog>(
+            null, parameters, new DialogOptions { MaxWidth = MaxWidth.Small });
+        var result = await dialog.Result;
+
+        if (result.Canceled) return;
+        if (result.Data is not EntityRowAction action) return;
+
+        switch (action)
+        {
+            case EntityRowAction.Edit:
+                Nav.NavigateTo($"/entities/{EntityType}/{item.EntityId}");
+                break;
+            case EntityRowAction.CopyId:
+                Snackbar.Add($"EntityId: {item.EntityId}", Severity.Info);
+                break;
+            case EntityRowAction.History:
+                Nav.NavigateTo($"/entities/{EntityType}/{item.EntityId}/history");
+                break;
+            case EntityRowAction.Delete:
+                await ConfirmDelete(item.EntityId);
+                break;
+        }
     }
 
     private async Task ConfirmDelete(string entityId)
@@ -343,10 +285,6 @@ else
         StateHasChanged();
     }
 
-    /// <summary>
-    /// ★ 一键新建：自动生成 GUID 并直接进入编辑页。
-    /// 用户无需手动输入 / 生成 EntityId。
-    /// </summary>
     private void CreateNew()
     {
         var newId = Guid.NewGuid().ToString("D");
@@ -379,12 +317,6 @@ else
         };
     }
 
-    /// <summary>
-    /// 对象形态的属性值预览。后端两类已知对象：
-    ///   - SingleChoiceValue {value,label}（single_choice 绑定选项集）→ 显示 label
-    ///   - NumericValue {value,unitId}（数值绑定单位）→ 显示数值
-    /// 其余对象保留 {…} 占位。
-    /// </summary>
     private static string FormatObjectPreview(System.Text.Json.JsonElement e)
     {
         if (e.TryGetProperty("label", out var lbl)

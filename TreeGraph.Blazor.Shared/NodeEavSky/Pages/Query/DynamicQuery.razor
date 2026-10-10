@@ -2,13 +2,16 @@
 @page "/query"
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
-@* DynamicQuery.razor *@
+@inject NavigationManager Nav
+@inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <PageTitle>动态查询</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4">动态查询</MudText>
+<PageHeaderSky Title="动态查询"
+               ArrowBackVisible="true"
+               OnArrowBackClick="BackToHome" />
 
-<MudPaper Class="pa-4 mb-4">
+<MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-4 mb-4")">
     <MudGrid>
         <MudItem xs="12" md="4">
             <MudTextField @bind-Value="_entityType" Label="实体类型"
@@ -67,13 +70,13 @@
 
 @if (_ids is not null)
 {
-    <MudPaper Class="pa-4">
+    <MudPaper Class="@(Platform.IsCompact ? "pa-2" : "pa-4")">
         <MudText Typo="Typo.h6" Class="mb-2">
             结果（@_ids.Count 个）
         </MudText>
         @if (_ids.Count == 0)
         {
-            <MudAlert Severity="Severity.Info">无结果</MudAlert>
+            <EmptyStateSky Icon="@Icons.Material.Filled.SearchOff" Title="无结果" />
         }
         else
         {
@@ -90,18 +93,22 @@
 }
 else if (_entities is not null)
 {
-    <MudPaper Class="pa-4">
+    <MudPaper Class="@(Platform.IsCompact ? "pa-2" : "pa-4")">
         <MudText Typo="Typo.h6" Class="mb-2">
             结果（共 @_entities.Total 条）
         </MudText>
-        <MudTable Items="_entities.Items" Hover="true" Bordered="true">
+        <MudTable Items="_entities.Items" Hover="true" Bordered="true"
+                  Dense="true"
+                  Breakpoint="Breakpoint.Sm"
+                  Loading="@_loading"
+                  LoadingProgressColor="Color.Primary">
             <HeaderContent>
                 <MudTh>EntityId</MudTh>
                 <MudTh>属性预览</MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd>@context.EntityId</MudTd>
-                <MudTd>
+                <MudTd DataLabel="EntityId">@context.EntityId</MudTd>
+                <MudTd DataLabel="属性预览">
                     @foreach (var (k, v) in context.Properties.Take(3))
                     {
                         <MudChip T="string" Size="Size.Small">
@@ -110,6 +117,9 @@ else if (_entities is not null)
                     }
                 </MudTd>
             </RowTemplate>
+            <NoRecordsContent>
+                <EmptyStateSky Icon="@Icons.Material.Filled.SearchOff" Title="无匹配结果" />
+            </NoRecordsContent>
         </MudTable>
     </MudPaper>
 }
@@ -182,4 +192,6 @@ else if (_entities is not null)
             _loading = false;
         }
     }
+
+    private void BackToHome() => Nav.NavigateTo("/");
 }

@@ -1,0 +1,71 @@
+@* EntityRowActionsDialog.razor — 实体行操作对话框（对齐 DiberyTree TreeNodeActionsDialog 模式）
+   PageDialogSky 外壳 + 只读实体摘要 + 左侧删除 + 右侧编辑/复制ID/历史。
+   关闭时回传 EntityRowAction 枚举。 *@
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+@using TreeGraph.Shared.NodeEavSky.Dtos
+
+<PageDialogSky Title="实体操作" TitleClass="mud-theme-success px-0 pa-0"
+               SubmitButtonVisible="false" CancelButtonVisible="true">
+    <ToolBarContent>
+        <MudText Color="Color.Info">@EntityTypeDisplayName</MudText>
+        <MudSpacer />
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
+            <MudStack Spacing="2">
+                <MudTextField T="string"
+                              Value="@EntityId"
+                              Label="EntityId"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true" />
+                @foreach (var line in SummaryLines)
+                {
+                    <MudTextField T="string"
+                                  Value="@line.Value"
+                                  Label="@line.Label"
+                                  Variant="Variant.Outlined"
+                                  ReadOnly="true" />
+                }
+            </MudStack>
+        </MudContainer>
+    </DialogContent>
+    <DialogLeftActions>
+        <MudButton OnClick="@(() => Close(EntityRowAction.Delete))"
+                   Variant="Variant.Text"
+                   Color="Color.Error"
+                   StartIcon="@Icons.Material.Outlined.Delete">
+            删除
+        </MudButton>
+    </DialogLeftActions>
+    <DialogRightActions>
+        <MudButton OnClick="@(() => Close(EntityRowAction.Edit))"
+                   Variant="Variant.Text"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Outlined.Edit">
+            编辑
+        </MudButton>
+        <MudButton OnClick="@(() => Close(EntityRowAction.CopyId))"
+                   Variant="Variant.Text"
+                   Color="Color.Default"
+                   StartIcon="@Icons.Material.Outlined.ContentCopy">
+            复制 ID
+        </MudButton>
+        <MudButton OnClick="@(() => Close(EntityRowAction.History))"
+                   Variant="Variant.Text"
+                   Color="Color.Info"
+                   StartIcon="@Icons.Material.Outlined.History">
+            历史记录
+        </MudButton>
+    </DialogRightActions>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string EntityTypeDisplayName { get; set; } = "";
+    [Parameter] public string EntityId { get; set; } = "";
+    [Parameter] public IReadOnlyList<SummaryLine> SummaryLines { get; set; } = Array.Empty<SummaryLine>();
+
+    private void Close(EntityRowAction action) =>
+        MudDialog.Close(DialogResult.Ok(action));
+}
