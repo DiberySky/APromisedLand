@@ -65,7 +65,7 @@ public class StringTreeCascadeTests(EavApiFactory factory) : IntegrationTestBase
         var resp = await Client.GetAsync(
             $"/api/eav/{StringTreeEntityTypes.Node}/entities/{nodeId}");
         resp.EnsureSuccessStatusCode();
-        var doc = await resp.Content.ReadFromJsonAsync<JsonDoc>();
+        var doc = await resp.Content.ReadEavAsync<JsonDoc>();
         return doc!.Properties.ContainsKey(AttrName);
     }
 

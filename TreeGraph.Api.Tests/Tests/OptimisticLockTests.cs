@@ -26,7 +26,7 @@ public class OptimisticLockTests : IntegrationTestBase
         // 拿 UpdatedAt
         var getResp = await Client.GetAsync(
             $"/api/eav/{TestData.EntityType}/entities/{id}");
-        var entity = await getResp.Content.ReadFromJsonAsync<DynamicEntityDto>();
+        var entity = await getResp.Content.ReadEavAsync<DynamicEntityDto>();
         Assert.NotNull(entity?.UpdatedAt);
 
         // 把 UTC 时间转 +08:00，序列化后回传

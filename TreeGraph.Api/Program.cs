@@ -11,7 +11,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // Add services to the container.
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+    {
+        // ★ NodeEavSky 全局 ApiResponse 信封（过滤器内部按控制器命名空间自行判定生效范围）
+        options.Filters.Add<ApiEnvelopeFilter>();
+    })
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new NumericValueJsonConverter());

@@ -67,7 +67,7 @@ public class StringTreeSkySummaryTests : BunitTestBase
     }
 
     private static string SchemaJson() =>
-        NodeEavTestSetup.Json.Serialize(new
+        NodeEavTestSetup.Json.Envelope(new
         {
             entityType = "StringTreeNode",
             attributes = new object[]
@@ -101,7 +101,7 @@ public class StringTreeSkySummaryTests : BunitTestBase
         if (brand is not null) props["brand"] = brand;
         if (price is not null) props["price"] = price;
 
-        return NodeEavTestSetup.Json.Serialize(new
+        return NodeEavTestSetup.Json.Envelope(new
         {
             entityId = NodeId,
             entityType = "StringTreeNode",

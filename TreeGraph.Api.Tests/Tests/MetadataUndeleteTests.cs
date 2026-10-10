@@ -39,7 +39,7 @@ public class MetadataUndeleteTests : IntegrationTestBase
             });
         createResp.EnsureSuccessStatusCode();
 
-        var created = await createResp.Content.ReadFromJsonAsync<IdResponse>();
+        var created = await createResp.Content.ReadEavAsync<IdResponse>();
         Assert.NotNull(created);
 
         // 软删除
@@ -57,7 +57,7 @@ public class MetadataUndeleteTests : IntegrationTestBase
         var listResp = await Client.GetAsync(
             "/api/eav/metadata/attributes?entityType=UndeleteTest");
         var list = await listResp.Content
-            .ReadFromJsonAsync<List<AttributeDetailDto>>();
+            .ReadEavAsync<List<AttributeDetailDto>>();
         Assert.NotNull(list);
         Assert.Contains(list!, a =>
             a.AttributeId == created.AttributeId && !a.IsDeleted);

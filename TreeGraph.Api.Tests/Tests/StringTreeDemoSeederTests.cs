@@ -349,7 +349,7 @@ public class StringTreeDemoSeederTests(EavApiFactory factory)
             .GetAsync($"/api/eav/{StringTreeDemoSeeder.SpaceEntityType}/entities/demo-node-001");
         resp.EnsureSuccessStatusCode();
 
-        var body = await resp.Content.ReadFromJsonAsync<DynamicEntityDto>(JsonOpt);
+        var body = await resp.Content.ReadEavAsync<DynamicEntityDto>(JsonOpt);
         Assert.NotNull(body);
         Assert.Equal("demo-node-001", body!.EntityId);
         Assert.Equal(StringTreeDemoSeeder.SpaceEntityType, body.EntityType);
@@ -395,9 +395,10 @@ public class StringTreeDemoSeederTests(EavApiFactory factory)
         resp.EnsureSuccessStatusCode();
 
         // 直接拿原始字符串解析——避免 camelCase / PascalCase 假设
+        // ★ NodeEavSky 统一 ApiResponse 信封：业务字段在 data 节点下
         var rawJson = await resp.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(rawJson);
-        var root = doc.RootElement;
+        var root = doc.RootElement.GetProperty("data");
 
         // EntityType 字段（PascalCase 序列化）
         var entityTypeProp = root.EnumerateObject()
@@ -976,7 +977,7 @@ public class StringTreeDemoSeederTests(EavApiFactory factory)
             // 3. GET 验证 7 字段全部保持
             var get = await client.GetAsync(url);
             get.EnsureSuccessStatusCode();
-            var body = await get.Content.ReadFromJsonAsync<DynamicEntityDto>(JsonOpt);
+            var body = await get.Content.ReadEavAsync<DynamicEntityDto>(JsonOpt);
             Assert.NotNull(body);
 
             var att = body!.Properties["attachment"];

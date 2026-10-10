@@ -103,8 +103,8 @@ public class MetadataOptionSetsTests : E2ETestBase
             createResp.EnsureSuccessStatusCode();
 
             var created = await createResp.Content
-                .ReadFromJsonAsync<IdResponse>();
-            setId = created!.OptionSetId;
+                .ReadFromJsonAsync<TreeGraph.Shared.NodeEavSky.Dtos.ApiResponse<IdResponse>>();
+            setId = created!.Data!.OptionSetId;
 
             await BlazorHelpers.GoToAsync(Page, "/metadata/option-sets");
             await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
@@ -165,8 +165,8 @@ public class MetadataOptionSetsTests : E2ETestBase
             createResp.EnsureSuccessStatusCode();
 
             var created = await createResp.Content
-                .ReadFromJsonAsync<IdResponse>();
-            setId = created!.OptionSetId;
+                .ReadFromJsonAsync<TreeGraph.Shared.NodeEavSky.Dtos.ApiResponse<IdResponse>>();
+            setId = created!.Data!.OptionSetId;
 
             foreach (var v in new[] { "a", "b" })
             {

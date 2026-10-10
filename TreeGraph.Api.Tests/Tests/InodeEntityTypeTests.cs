@@ -31,7 +31,7 @@ public class InodeEntityTypeTests : IntegrationTestBase
             $"/api/inode/{inodeId}/types/{EntityType}", content: null);
         Assert.Equal(HttpStatusCode.NoContent, attach.StatusCode);
 
-        var list = await Client.GetFromJsonAsync<List<InodeTypeCardDto>>(
+        var list = await Client.GetEavAsync<List<InodeTypeCardDto>>(
             $"/api/inode/{inodeId}/types");
 
         Assert.NotNull(list);
@@ -55,7 +55,7 @@ public class InodeEntityTypeTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.NoContent, r1.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, r2.StatusCode);
 
-        var list = await Client.GetFromJsonAsync<List<InodeTypeCardDto>>(
+        var list = await Client.GetEavAsync<List<InodeTypeCardDto>>(
             $"/api/inode/{inodeId}/types");
         Assert.Single(list!);
     }
@@ -91,7 +91,7 @@ public class InodeEntityTypeTests : IntegrationTestBase
             $"/api/inode/{inodeId}/types/{EntityType}");
         Assert.Equal(HttpStatusCode.NoContent, detach.StatusCode);
 
-        var list = await Client.GetFromJsonAsync<List<InodeTypeCardDto>>(
+        var list = await Client.GetEavAsync<List<InodeTypeCardDto>>(
             $"/api/inode/{inodeId}/types");
         Assert.Empty(list!);
     }
@@ -141,7 +141,7 @@ public class InodeEntityTypeTests : IntegrationTestBase
         await Client.PostAsync($"/api/inode/{inodeId}/types/{EntityType}", null);
         await Client.PostAsync($"/api/inode/{inodeId}/types/{EntityType}B", null);
 
-        var list = await Client.GetFromJsonAsync<List<InodeTypeCardDto>>(
+        var list = await Client.GetEavAsync<List<InodeTypeCardDto>>(
             $"/api/inode/{inodeId}/types");
 
         Assert.NotNull(list);
@@ -166,7 +166,7 @@ public class InodeEntityTypeTests : IntegrationTestBase
         createResp.EnsureSuccessStatusCode();
 
         var created = await createResp.Content
-            .ReadFromJsonAsync<CreateTypeResponse>();
+            .ReadEavAsync<CreateTypeResponse>();
         Assert.NotNull(created);
 
         var inodeId = NewInodeId();
@@ -177,7 +177,7 @@ public class InodeEntityTypeTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
         // 列表能看到
-        var list = await Client.GetFromJsonAsync<List<InodeTypeCardDto>>(
+        var list = await Client.GetEavAsync<List<InodeTypeCardDto>>(
             $"/api/inode/{inodeId}/types");
         Assert.NotNull(list);
         var card = Assert.Single(list!);

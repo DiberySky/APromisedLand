@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.Infrastructure;
 
@@ -29,11 +30,9 @@ public sealed class DbExceptionHandler : IExceptionHandler
         {
             _logger.LogWarning("唯一约束冲突: {Constraint}", pg.ConstraintName);
             context.Response.StatusCode = StatusCodes.Status409Conflict;
-            await context.Response.WriteAsJsonAsync(new
-            {
-                error = "资源已存在",
-                constraint = pg.ConstraintName
-            }, ct);
+            await context.Response.WriteAsJsonAsync(
+                ApiResponse<object>.Fail("资源已存在",
+                    new { constraint = pg.ConstraintName }), ct);
             return true;
         }
 
@@ -41,11 +40,9 @@ public sealed class DbExceptionHandler : IExceptionHandler
         {
             _logger.LogWarning("外键约束冲突: {Constraint}", pg.ConstraintName);
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new
-            {
-                error = "外键约束冲突",
-                constraint = pg.ConstraintName
-            }, ct);
+            await context.Response.WriteAsJsonAsync(
+                ApiResponse<object>.Fail("外键约束冲突",
+                    new { constraint = pg.ConstraintName }), ct);
             return true;
         }
 
@@ -54,11 +51,9 @@ public sealed class DbExceptionHandler : IExceptionHandler
         {
             _logger.LogWarning("CHECK 约束冲突: {Constraint}", pg.ConstraintName);
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new
-            {
-                error = "约束校验失败",
-                constraint = pg.ConstraintName
-            }, ct);
+            await context.Response.WriteAsJsonAsync(
+                ApiResponse<object>.Fail("约束校验失败",
+                    new { constraint = pg.ConstraintName }), ct);
             return true;
         }
 

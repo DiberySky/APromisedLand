@@ -54,7 +54,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
                 });
             tableResp.EnsureSuccessStatusCode();
             _tableDefId = (await tableResp.Content
-                .ReadFromJsonAsync<IdResponse>())!.TableDefinitionId;
+                .ReadEavAsync<IdResponse>())!.TableDefinitionId;
 
             // 2. 加列（IsUnique = true）
             var colResp = await Client.PostAsJsonAsync(
@@ -85,7 +85,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
             attrResp.EnsureSuccessStatusCode();
             // 顺带验证建属性响应字段名 attributeId 可解析
             var attrId = (await attrResp.Content
-                .ReadFromJsonAsync<AttrIdResponse>())!.AttributeId;
+                .ReadEavAsync<AttrIdResponse>())!.AttributeId;
             Assert.False(string.IsNullOrEmpty(attrId));
 
             _schemaReady = true;
@@ -124,11 +124,12 @@ public class CrossRowUniqueTests : IntegrationTestBase
     }
 
     // ============================================================
-    // 同父实体同值 → 400
+    // 同父实体同值、30 秒幂等窗口内重复提交 → 重放首次结果（204），不产生第二行
+    // （跨行唯一约束本身在窗口外/不同载荷下仍会 400，由其余用例覆盖）
     // ============================================================
 
     [Fact]
-    public async Task Upsert_DuplicateInSameParent_Returns400()
+    public async Task Upsert_IdenticalResubmitWithinWindow_ReplaysFirstResult()
     {
         await EnsureSchemaAsync();
 
@@ -136,11 +137,12 @@ public class CrossRowUniqueTests : IntegrationTestBase
         var first = await UpsertRowAsync(parent, "CERT-DUP");
         Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
 
-        var second = await UpsertRowAsync(parent, "CERT-DUP");   // 新增第二行，同值
-        Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
+        var second = await UpsertRowAsync(parent, "CERT-DUP");   // 同载荷重复提交
+        Assert.Equal(HttpStatusCode.NoContent, second.StatusCode);
 
-        var body = await second.Content.ReadAsStringAsync();
-        Assert.Contains("CERT-DUP", body);
+        var table = await Client.GetEavAsync<CustomTableValue>(
+            $"/api/eav/{EntityType}/entities/{parent}/tables/unique_certs");
+        Assert.Single(table!.Rows);
     }
 
     // ============================================================
@@ -156,7 +158,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
         await UpsertRowAsync(parent, "SELF-X");
 
         // 拿到 rowId
-        var tableValue = await Client.GetFromJsonAsync<CustomTableValue>(
+        var tableValue = await Client.GetEavAsync<CustomTableValue>(
             $"/api/eav/{EntityType}/entities/{parent}/tables/unique_certs");
         var rowId = tableValue!.Rows[0].RowId!;
 
@@ -193,7 +195,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
         var parent = GuidFromInt(96006);
         await UpsertRowAsync(parent, "RELEASE-X");
 
-        var tableValue = await Client.GetFromJsonAsync<CustomTableValue>(
+        var tableValue = await Client.GetEavAsync<CustomTableValue>(
             $"/api/eav/{EntityType}/entities/{parent}/tables/unique_certs");
         var rowId = tableValue!.Rows[0].RowId!;
 

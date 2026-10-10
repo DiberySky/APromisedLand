@@ -43,7 +43,7 @@ public class QueryTests : IntegrationTestBase
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content
-            .ReadFromJsonAsync<PagedResult<DynamicEntityDto>>();
+            .ReadEavAsync<PagedResult<DynamicEntityDto>>();
         Assert.NotNull(result);
 
         var sorted = result!.Items

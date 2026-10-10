@@ -24,7 +24,9 @@ public sealed class TestHttpMessageHandler : HttpMessageHandler
 
     public TestHttpMessageHandler Map(string method, string urlKey, object payload)
     {
-        var json = JsonSerializer.Serialize(payload, JsonOptions);
+        // ★ NodeEavSky 统一 ApiResponse 信封：桩数据放在 data 节点
+        var envelope = new { success = true, message = (string?)null, data = payload };
+        var json = JsonSerializer.Serialize(envelope, JsonOptions);
         _routes.Add((method.ToUpperInvariant(), urlKey, json));
         return this;
     }

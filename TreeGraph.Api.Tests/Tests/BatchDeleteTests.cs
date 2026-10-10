@@ -33,7 +33,7 @@ public class BatchDeleteTests : IntegrationTestBase
             $"/api/eav/{TestData.EntityType}/entities/batch-delete", req);
         resp.EnsureSuccessStatusCode();
 
-        var result = await resp.Content.ReadFromJsonAsync<BatchDeleteResultDto>();
+        var result = await resp.Content.ReadEavAsync<BatchDeleteResultDto>();
         Assert.NotNull(result);
         Assert.Equal(new[] { GuidFromInt(94001), GuidFromInt(94002) }, result!.Deleted.OrderBy(x => x));
         Assert.Contains(GuidFromInt(94999), result.NotFound);
@@ -48,7 +48,7 @@ public class BatchDeleteTests : IntegrationTestBase
             new BatchDeleteRequest { EntityIds = new List<string>() });
         resp.EnsureSuccessStatusCode();
 
-        var result = await resp.Content.ReadFromJsonAsync<BatchDeleteResultDto>();
+        var result = await resp.Content.ReadEavAsync<BatchDeleteResultDto>();
         Assert.NotNull(result);
         Assert.Empty(result!.Deleted);
         Assert.Empty(result.NotFound);

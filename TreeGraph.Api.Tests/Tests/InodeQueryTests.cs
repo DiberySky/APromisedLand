@@ -66,7 +66,7 @@ public class InodeQueryTests : IntegrationTestBase
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content
-            .ReadFromJsonAsync<PagedResult<InodeEntityDto>>();
+            .ReadEavAsync<PagedResult<InodeEntityDto>>();
 
         Assert.NotNull(result);
         Assert.Single(result!.Items);
@@ -96,7 +96,7 @@ public class InodeQueryTests : IntegrationTestBase
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content
-            .ReadFromJsonAsync<PagedResult<InodeEntityDto>>();
+            .ReadEavAsync<PagedResult<InodeEntityDto>>();
 
         Assert.NotNull(result);
         Assert.Equal(2, result!.Items.Count);
@@ -142,7 +142,7 @@ public class InodeQueryTests : IntegrationTestBase
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content
-            .ReadFromJsonAsync<PagedResult<InodeEntityDto>>();
+            .ReadEavAsync<PagedResult<InodeEntityDto>>();
 
         Assert.NotNull(result);
         Assert.Single(result!.Items);
@@ -180,7 +180,7 @@ public class InodeQueryTests : IntegrationTestBase
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content
-            .ReadFromJsonAsync<PagedResult<InodeEntityDto>>();
+            .ReadEavAsync<PagedResult<InodeEntityDto>>();
 
         Assert.NotNull(result);
         Assert.Single(result!.Items);
@@ -209,7 +209,7 @@ public class InodeQueryTests : IntegrationTestBase
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content
-            .ReadFromJsonAsync<PagedResult<InodeEntityDto>>();
+            .ReadEavAsync<PagedResult<InodeEntityDto>>();
 
         Assert.NotNull(result);
         Assert.Empty(result!.Items);

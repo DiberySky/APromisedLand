@@ -22,7 +22,7 @@ public class NodePropertySummaryServiceTests
     private const string NodeId2 = "22222222-3333-4444-5555-666666666666";
 
     private static string SchemaJson() =>
-        NodeEavTestSetup.Json.Serialize(new
+        NodeEavTestSetup.Json.Envelope(new
         {
             entityType = "StringTreeNode",
             attributes = new object[]
@@ -50,7 +50,7 @@ public class NodePropertySummaryServiceTests
     };
 
     private static string EntityJson(string id, Dictionary<string, object?> props) =>
-        NodeEavTestSetup.Json.Serialize(new
+        NodeEavTestSetup.Json.Envelope(new
         {
             entityId = id,
             entityType = "StringTreeNode",
@@ -214,7 +214,7 @@ public class NodePropertySummaryServiceTests
     {
         var (service, _) = BuildWithCounter(
             (path, _) => path.EndsWith("/schema", StringComparison.Ordinal)
-                ? (HttpStatusCode.OK, NodeEavTestSetup.Json.Serialize(
+                ? (HttpStatusCode.OK, NodeEavTestSetup.Json.Envelope(
                     new { entityType = "StringTreeNode", attributes = Array.Empty<object>() }))
                 : (HttpStatusCode.OK, EntityJson(NodeId, new() { ["brand"] = "华为" })),
             new() { "brand" });

@@ -19,7 +19,7 @@ public class NodeSchemaCacheTests
     private const string ProductsType = "StringTreeNode:products";
 
     private static string SchemaJson(string attributeName = "brand") =>
-        NodeEavTestSetup.Json.Serialize(new
+        NodeEavTestSetup.Json.Envelope(new
         {
             entityType = "StringTreeNode",
             attributes = new object[]
@@ -107,7 +107,7 @@ public class NodeSchemaCacheTests
                 return (HttpStatusCode.NotFound, null);
 
             version++;
-            var body = NodeEavTestSetup.Json.Serialize(new
+            var body = NodeEavTestSetup.Json.Envelope(new
             {
                 entityType = "StringTreeNode",
                 attributes = version == 1

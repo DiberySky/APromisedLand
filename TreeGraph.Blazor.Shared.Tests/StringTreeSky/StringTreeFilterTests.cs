@@ -203,7 +203,7 @@ public class StringTreeFilterTests : BunitTestBase
     }
 
     private static string SchemaJson() =>
-        NodeEavTestSetup.Json.Serialize(new
+        NodeEavTestSetup.Json.Envelope(new
         {
             entityType = "StringTreeNode",
             attributes = new object[]
@@ -232,7 +232,7 @@ public class StringTreeFilterTests : BunitTestBase
         });
 
     private static string QueryJson(bool match) =>
-        NodeEavTestSetup.Json.Serialize(new
+        NodeEavTestSetup.Json.Envelope(new
         {
             items = match
                 ? new[]

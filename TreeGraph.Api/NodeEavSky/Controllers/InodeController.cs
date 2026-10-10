@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
@@ -171,6 +172,7 @@ public class InodeController : ControllerBase
     /// PUT 全量替换。首次调用自动创建实体。
     /// </summary>
     [HttpPut("entities/{entityType}")]
+    [IdempotentWrite]
     public async Task<IActionResult> Put(
         string inodeId, string entityType,
         [FromBody] Dictionary<string, JsonElement> values,
@@ -214,6 +216,7 @@ public class InodeController : ControllerBase
     /// PATCH 部分更新。
     /// </summary>
     [HttpPatch("entities/{entityType}")]
+    [IdempotentWrite]
     public async Task<IActionResult> Patch(
         string inodeId, string entityType,
         [FromBody] Dictionary<string, JsonElement> values,
@@ -254,6 +257,7 @@ public class InodeController : ControllerBase
     }
 
     [HttpDelete("entities/{entityType}")]
+    [IdempotentWrite]
     public async Task<IActionResult> DeleteEntity(
         string inodeId, string entityType,
         CancellationToken ct)

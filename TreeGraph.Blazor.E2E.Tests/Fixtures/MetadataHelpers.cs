@@ -28,8 +28,8 @@ public static class MetadataHelpers
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content
-            .ReadFromJsonAsync<CreateTypeResponse>();
-        return (result!.EntityTypeId, result.EntityType, displayName);
+            .ReadFromJsonAsync<ApiResponse<CreateTypeResponse>>();
+        return (result!.Data!.EntityTypeId, result.Data.EntityType, displayName);
     }
 
     /// <summary>删除实体类型（尽力而为，失败忽略）。</summary>
@@ -52,9 +52,9 @@ public static class MetadataHelpers
     {
         try
         {
-            var list = await http.GetFromJsonAsync<List<EntityTypeDetailDto>>(
+            var list = await http.GetFromJsonAsync<ApiResponse<List<EntityTypeDetailDto>>>(
                 "/api/eav/entity-types/details");
-            var target = list?.FirstOrDefault(t => t.DisplayName == displayName);
+            var target = list?.Data?.FirstOrDefault(t => t.DisplayName == displayName);
             if (target is not null)
                 await http.DeleteAsync($"/api/eav/entity-types/{target.EntityTypeId}");
         }
@@ -98,9 +98,9 @@ public static class MetadataHelpers
     {
         try
         {
-            var list = await http.GetFromJsonAsync<List<OptionSetSummaryDto>>(
+            var list = await http.GetFromJsonAsync<ApiResponse<List<OptionSetSummaryDto>>>(
                 "/api/eav/metadata/option-sets");
-            var target = list?.FirstOrDefault(s => s.SetName == setName);
+            var target = list?.Data?.FirstOrDefault(s => s.SetName == setName);
             if (target is null) return;
 
             // DeleteSet 会级联软删 items（后端实现）

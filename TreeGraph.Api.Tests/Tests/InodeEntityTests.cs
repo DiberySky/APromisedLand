@@ -37,7 +37,7 @@ public class InodeEntityTests : IntegrationTestBase
             });
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
-        var dto = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dto = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
 
         Assert.NotNull(dto);
@@ -57,14 +57,14 @@ public class InodeEntityTests : IntegrationTestBase
             $"/api/inode/{inodeId}/entities/{EntityType}",
             new Dictionary<string, object?> { ["name"] = "first" });
 
-        var dto1 = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dto1 = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
 
         await Client.PutAsJsonAsync(
             $"/api/inode/{inodeId}/entities/{EntityType}",
             new Dictionary<string, object?> { ["name"] = "second" });
 
-        var dto2 = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dto2 = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
 
         Assert.Equal(dto1!.EntityId, dto2!.EntityId);
@@ -113,7 +113,7 @@ public class InodeEntityTests : IntegrationTestBase
         var resp = await Client.SendAsync(req);
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
-        var dto = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dto = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
 
         Assert.Equal("orig", dto!.Properties["name"].GetString());
@@ -165,7 +165,7 @@ public class InodeEntityTests : IntegrationTestBase
             $"/api/inode/{inodeId}/entities/{EntityType}",
             new Dictionary<string, object?> { ["name"] = "v1" });
 
-        var dto1 = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dto1 = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
 
         await Client.DeleteAsync(
@@ -175,7 +175,7 @@ public class InodeEntityTests : IntegrationTestBase
             $"/api/inode/{inodeId}/entities/{EntityType}",
             new Dictionary<string, object?> { ["name"] = "v2" });
 
-        var dto2 = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dto2 = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
 
         // 新 GUID
@@ -202,7 +202,7 @@ public class InodeEntityTests : IntegrationTestBase
             $"/api/inode/{inodeId}/entities/{EntityType}B",
             new Dictionary<string, object?> { ["name"] = "B" });
 
-        var list = await Client.GetFromJsonAsync<List<DynamicEntityDto>>(
+        var list = await Client.GetEavAsync<List<DynamicEntityDto>>(
             $"/api/inode/{inodeId}/entities");
 
         Assert.NotNull(list);
@@ -214,7 +214,7 @@ public class InodeEntityTests : IntegrationTestBase
     {
         var inodeId = NewInodeId();
 
-        var list = await Client.GetFromJsonAsync<List<DynamicEntityDto>>(
+        var list = await Client.GetEavAsync<List<DynamicEntityDto>>(
             $"/api/inode/{inodeId}/entities");
 
         Assert.NotNull(list);
@@ -240,9 +240,9 @@ public class InodeEntityTests : IntegrationTestBase
             $"/api/inode/{inodeB}/entities/{EntityType}",
             new Dictionary<string, object?> { ["name"] = "B-value" });
 
-        var dtoA = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dtoA = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeA}/entities/{EntityType}");
-        var dtoB = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dtoB = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeB}/entities/{EntityType}");
 
         // 两个不同 entityId
@@ -269,7 +269,7 @@ public class InodeEntityTests : IntegrationTestBase
             new { displayName = $"无属性写入_{Guid.NewGuid():N}" });
         createResp.EnsureSuccessStatusCode();
         var created = await createResp.Content
-            .ReadFromJsonAsync<CreateTypeResponse>();
+            .ReadEavAsync<CreateTypeResponse>();
         Assert.NotNull(created);
 
         var inodeId = NewInodeId();

@@ -41,7 +41,7 @@ internal static class NodeEavTestSetup
         private static readonly JsonSerializerOptions Web =
             new(JsonSerializerDefaults.Web);
 
-        public static string Schema() => Serialize(new
+        public static string Schema() => Envelope(new
         {
             attributes = new object[]
             {
@@ -58,7 +58,7 @@ internal static class NodeEavTestSetup
             }
         });
 
-        public static string Entity() => Serialize(new
+        public static string Entity() => Envelope(new
         {
             entityId = "e1",
             entityType = "item",
@@ -66,7 +66,7 @@ internal static class NodeEavTestSetup
             updatedAt = (DateTimeOffset?)null
         });
 
-        public static string Paged() => Serialize(new
+        public static string Paged() => Envelope(new
         {
             items = new object[]
             {
@@ -85,7 +85,11 @@ internal static class NodeEavTestSetup
             pageSize = 20
         });
 
-        public static string EmptyArray() => "[]";
+        public static string EmptyArray() => Envelope(Array.Empty<object>());
+
+        // ★ NodeEavSky 统一 ApiResponse 信封
+        public static string Envelope(object? data)
+            => Serialize(new { success = true, message = (string?)null, data });
 
         public static string Serialize(object obj)
             => JsonSerializer.Serialize(obj, Web);

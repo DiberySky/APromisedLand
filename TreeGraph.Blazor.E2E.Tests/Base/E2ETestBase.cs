@@ -82,8 +82,9 @@ public abstract class E2ETestBase : IAsyncLifetime
         });
         resp.EnsureSuccessStatusCode();
 
-        var result = await resp.Content.ReadFromJsonAsync<CreateTypeResponse>();
-        return (result!.EntityTypeId, result.EntityType);
+        var result = await resp.Content
+            .ReadFromJsonAsync<TreeGraph.Shared.NodeEavSky.Dtos.ApiResponse<CreateTypeResponse>>();
+        return (result!.Data!.EntityTypeId, result.Data.EntityType);
     }
 
     /// <summary>

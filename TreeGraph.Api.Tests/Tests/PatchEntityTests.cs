@@ -48,7 +48,7 @@ public class PatchEntityTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
         // 核对：price=200，其它未变
-        var after = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var after = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/eav/{TestData.EntityType}/entities/{id}");
         Assert.NotNull(after);
         Assert.Equal(1L, after!.Properties["amount"].GetInt64());
@@ -81,7 +81,7 @@ public class PatchEntityTests : IntegrationTestBase
             $"/api/eav/{TestData.EntityType}/entities/{id}", patch);
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
-        var after = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var after = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/eav/{TestData.EntityType}/entities/{id}");
         Assert.NotNull(after);
         Assert.False(after!.Properties.ContainsKey("label"));   // 已删除
@@ -163,7 +163,7 @@ public class PatchEntityTests : IntegrationTestBase
             $"/api/eav/{TestData.EntityType}/entities/{id}", patch);
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
-        var after = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var after = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/eav/{TestData.EntityType}/entities/{id}");
         Assert.NotNull(after);
         Assert.Equal(42L, after!.Properties["amount"].GetInt64());
@@ -191,7 +191,7 @@ public class PatchEntityTests : IntegrationTestBase
             ["amount"] = 2L   // 没提供 label
         });
 
-        var afterA = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var afterA = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/eav/{TestData.EntityType}/entities/{idA}");
         Assert.NotNull(afterA);
         Assert.False(afterA!.Properties.ContainsKey("label"));   // PUT 删除了
@@ -212,7 +212,7 @@ public class PatchEntityTests : IntegrationTestBase
             $"/api/eav/{TestData.EntityType}/entities/{idB}", patch);
         Assert.Equal(HttpStatusCode.NoContent, patchResp.StatusCode);
 
-        var afterB = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var afterB = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/eav/{TestData.EntityType}/entities/{idB}");
         Assert.NotNull(afterB);
         Assert.Equal("will-be-kept-by-patch", afterB!.Properties["label"].GetString());

@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
@@ -86,6 +87,7 @@ public class EavController : ControllerBase
     /// header 缺失时跳过冲突检测（向后兼容）。
     /// </summary>
     [HttpPut("entities/{id}")]
+    [IdempotentWrite]
     public async Task<IActionResult> Put(
         string id, string entityType,
         [FromBody] Dictionary<string, JsonElement> values,
@@ -208,6 +210,7 @@ public class EavController : ControllerBase
     /// 实体不存在时返回 404。
     /// </summary>
     [HttpDelete("entities/{id}")]
+    [IdempotentWrite]
     public async Task<IActionResult> Delete(
         string id, string entityType,
         CancellationToken ct)
@@ -232,6 +235,7 @@ public class EavController : ControllerBase
     /// 乐观锁、未知属性检查、验证流程与 PUT 完全一致。
     /// </summary>
     [HttpPatch("entities/{id}")]
+    [IdempotentWrite]
     public async Task<IActionResult> Patch(
         string id, string entityType,
         [FromBody] Dictionary<string, JsonElement> values,

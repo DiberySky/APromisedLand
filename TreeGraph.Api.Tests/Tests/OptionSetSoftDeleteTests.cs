@@ -47,7 +47,7 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
             new { entityType, setName, displayName = setName });
         resp.EnsureSuccessStatusCode();
 
-        var created = await resp.Content.ReadFromJsonAsync<IdResponse>();
+        var created = await resp.Content.ReadEavAsync<IdResponse>();
         Assert.NotNull(created);
 
         foreach (var (value, label) in items)
@@ -97,7 +97,7 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
             $"/api/eav/metadata/option-sets/{setId}?includeDeleted=true");
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
 
-        var detail = await resp.Content.ReadFromJsonAsync<OptionSetDetailDto>();
+        var detail = await resp.Content.ReadEavAsync<OptionSetDetailDto>();
         Assert.NotNull(detail);
         Assert.True(detail!.IsDeleted);
         Assert.Equal(setId, detail.OptionSetId);
@@ -113,7 +113,7 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
             "/api/eav/metadata/option-sets?entityType=OptSoftListExc");
         resp.EnsureSuccessStatusCode();
 
-        var list = await resp.Content.ReadFromJsonAsync<List<OptionSetSummaryDto>>();
+        var list = await resp.Content.ReadEavAsync<List<OptionSetSummaryDto>>();
         Assert.NotNull(list);
         Assert.DoesNotContain(list!, s => s.OptionSetId == setId);
     }
@@ -128,7 +128,7 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
             "/api/eav/metadata/option-sets?entityType=OptSoftListInc&includeDeleted=true");
         resp.EnsureSuccessStatusCode();
 
-        var list = await resp.Content.ReadFromJsonAsync<List<OptionSetSummaryDto>>();
+        var list = await resp.Content.ReadEavAsync<List<OptionSetSummaryDto>>();
         Assert.NotNull(list);
         var found = list!.FirstOrDefault(s => s.OptionSetId == setId);
         Assert.NotNull(found);
@@ -200,7 +200,7 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
             $"/api/eav/metadata/option-sets/{setId}");
         getResp.EnsureSuccessStatusCode();
 
-        var detail = await getResp.Content.ReadFromJsonAsync<OptionSetDetailDto>();
+        var detail = await getResp.Content.ReadEavAsync<OptionSetDetailDto>();
         Assert.NotNull(detail);
         Assert.False(detail!.IsDeleted);
         Assert.Equal(3, detail.Items.Count);
@@ -235,7 +235,7 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
         resp.EnsureSuccessStatusCode();
 
         var items = await resp.Content
-            .ReadFromJsonAsync<List<OptionItemDetailDto>>();
+            .ReadEavAsync<List<OptionItemDetailDto>>();
         Assert.NotNull(items);
         Assert.Equal(2, items!.Count);
         Assert.All(items, i => Assert.True(i.IsDeleted));
@@ -273,7 +273,7 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
         resp.EnsureSuccessStatusCode();
 
         var refs = await resp.Content
-            .ReadFromJsonAsync<List<OptionSetReferenceDto>>();
+            .ReadEavAsync<List<OptionSetReferenceDto>>();
         Assert.NotNull(refs);
         Assert.Single(refs!);
         Assert.Equal("choice", refs![0].AttributeName);

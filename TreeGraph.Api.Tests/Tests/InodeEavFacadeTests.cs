@@ -40,12 +40,12 @@ public class InodeEavFacadeTests : IntegrationTestBase
             });
 
         // 从 iNode 拿到 entityId
-        var viaInode = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var viaInode = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
         Assert.NotNull(viaInode);
 
         // 用旧 EAV API 读
-        var viaEav = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var viaEav = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/eav/{EntityType}/entities/{viaInode!.EntityId}");
 
         Assert.NotNull(viaEav);
@@ -69,7 +69,7 @@ public class InodeEavFacadeTests : IntegrationTestBase
             $"/api/inode/{inodeId}/entities/{EntityType}",
             new Dictionary<string, object?> { ["name"] = "seed" });
 
-        var created = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var created = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
         Assert.NotNull(created);
         var entityId = created!.EntityId;
@@ -84,7 +84,7 @@ public class InodeEavFacadeTests : IntegrationTestBase
             });
 
         // 从 iNode 读
-        var viaInode = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var viaInode = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
 
         Assert.NotNull(viaInode);
@@ -110,7 +110,7 @@ public class InodeEavFacadeTests : IntegrationTestBase
             $"/api/inode/{inodeId}/entities/{EntityType}",
             new Dictionary<string, object?> { ["name"] = "v2" });
 
-        var history = await Client.GetFromJsonAsync<List<EntityHistoryDto>>(
+        var history = await Client.GetEavAsync<List<EntityHistoryDto>>(
             $"/api/inode/{inodeId}/entities/{EntityType}/history");
 
         Assert.NotNull(history);
@@ -126,7 +126,7 @@ public class InodeEavFacadeTests : IntegrationTestBase
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
-        var history = await Client.GetFromJsonAsync<List<EntityHistoryDto>>(
+        var history = await Client.GetEavAsync<List<EntityHistoryDto>>(
             $"/api/inode/{inodeId}/entities/{EntityType}/history");
 
         Assert.NotNull(history);
@@ -147,7 +147,7 @@ public class InodeEavFacadeTests : IntegrationTestBase
             $"/api/inode/{inodeId}/entities/{EntityType}",
             new Dictionary<string, object?> { ["name"] = "to-delete" });
 
-        var created = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var created = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
         var entityId = created!.EntityId;
 
@@ -157,7 +157,7 @@ public class InodeEavFacadeTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.NoContent, del.StatusCode);
 
         // 旧 EAV API 契约：不存在的实体返回 200 + 空 Properties（无 404 分支）
-        var viaEav = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var viaEav = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/eav/{EntityType}/entities/{entityId}");
         Assert.NotNull(viaEav);
         Assert.False(viaEav!.Properties.ContainsKey("name"));

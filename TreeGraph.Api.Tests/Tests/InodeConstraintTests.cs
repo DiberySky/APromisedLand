@@ -41,7 +41,7 @@ public class InodeConstraintTests : IntegrationTestBase
         }
 
         // 只有 1 个实体
-        var list = await Client.GetFromJsonAsync<List<DynamicEntityDto>>(
+        var list = await Client.GetEavAsync<List<DynamicEntityDto>>(
             $"/api/inode/{inodeId}/entities");
         Assert.NotNull(list);
         Assert.Single(list!);
@@ -70,11 +70,11 @@ public class InodeConstraintTests : IntegrationTestBase
                 new Dictionary<string, object?> { ["name"] = inodeId[..8] });
         }
 
-        var dtoA = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dtoA = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeA}/entities/{EntityType}");
-        var dtoB = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dtoB = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeB}/entities/{EntityType}");
-        var dtoC = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dtoC = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeC}/entities/{EntityType}");
 
         var ids = new[] { dtoA!.EntityId, dtoB!.EntityId, dtoC!.EntityId };
@@ -100,9 +100,9 @@ public class InodeConstraintTests : IntegrationTestBase
             $"/api/inode/{inodeId}/entities/{EntityType}B",
             new Dictionary<string, object?> { ["name"] = "B" });
 
-        var dtoA = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dtoA = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}");
-        var dtoB = await Client.GetFromJsonAsync<DynamicEntityDto>(
+        var dtoB = await Client.GetEavAsync<DynamicEntityDto>(
             $"/api/inode/{inodeId}/entities/{EntityType}B");
 
         Assert.NotEqual(dtoA!.EntityId, dtoB!.EntityId);
@@ -129,7 +129,7 @@ public class InodeConstraintTests : IntegrationTestBase
             new Dictionary<string, object?> { ["name"] = "x" });
 
         // 声明列表里只有 1 条
-        var list = await Client.GetFromJsonAsync<List<InodeTypeCardDto>>(
+        var list = await Client.GetEavAsync<List<InodeTypeCardDto>>(
             $"/api/inode/{inodeId}/types");
         Assert.NotNull(list);
         Assert.Single(list!);
@@ -163,7 +163,7 @@ public class InodeConstraintTests : IntegrationTestBase
         await Client.SendAsync(req);
 
         // 仍然只有 1 个实体
-        var list = await Client.GetFromJsonAsync<List<DynamicEntityDto>>(
+        var list = await Client.GetEavAsync<List<DynamicEntityDto>>(
             $"/api/inode/{inodeId}/entities");
         Assert.NotNull(list);
         Assert.Single(list!);

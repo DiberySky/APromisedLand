@@ -75,8 +75,8 @@ public class EavApiClient
                 DateTimeOffset? currentUpdatedAt = null;
                 try
                 {
-                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(text, JsonOptions);
-                    currentUpdatedAt = conflict?.CurrentUpdatedAt;
+                    var conflict = JsonSerializer.Deserialize<ApiResponse<ConflictResponse>>(text, JsonOptions);
+                    currentUpdatedAt = conflict?.Data?.CurrentUpdatedAt;
                 }
                 catch (Exception parseEx)
                 {
@@ -131,8 +131,8 @@ public class EavApiClient
                 DateTimeOffset? currentUpdatedAt = null;
                 try
                 {
-                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(text, JsonOptions);
-                    currentUpdatedAt = conflict?.CurrentUpdatedAt;
+                    var conflict = JsonSerializer.Deserialize<ApiResponse<ConflictResponse>>(text, JsonOptions);
+                    currentUpdatedAt = conflict?.Data?.CurrentUpdatedAt;
                 }
                 catch { }
 
@@ -571,8 +571,9 @@ public class EavApiClient
                 _logger.LogWarning("POST api/units → {Status}", resp.StatusCode);
                 return null;
             }
-            var doc = await resp.Content.ReadFromJsonAsync<IdResponse<Guid>>(JsonOptions, ct);
-            return doc?.Id;
+            var doc = await resp.Content
+                .ReadFromJsonAsync<ApiResponse<IdResponse<Guid>>>(JsonOptions, ct);
+            return doc?.Data?.Id;
         }
         catch (Exception ex)
         {
@@ -621,8 +622,8 @@ public class EavApiClient
             }
 
             var result = await resp.Content
-                .ReadFromJsonAsync<RecalculateUnitFactorResult>(JsonOptions, ct);
-            return (true, result, null);
+                .ReadFromJsonAsync<ApiResponse<RecalculateUnitFactorResult>>(JsonOptions, ct);
+            return (true, result?.Data, null);
         }
         catch (Exception ex)
         {
@@ -643,7 +644,7 @@ public class EavApiClient
     // 通用助手
     // ============================================================
 
-    private async Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct)
+    private async Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct) where T : class
     {
         try
         {
@@ -653,7 +654,12 @@ public class EavApiClient
                 _logger.LogWarning("GET {Url} → {Status}", relativeUrl, resp.StatusCode);
                 return default;
             }
-            return await resp.Content.ReadFromJsonAsync<T>(JsonOptions, ct);
+            // ★ 统一 ApiResponse 信封：返回体 { success, message, data }，这里解包 data
+            var envelope = await resp.Content
+                .ReadFromJsonAsync<ApiResponse<T>>(JsonOptions, ct);
+            return envelope is not null && !envelope.Success
+                ? default
+                : envelope?.Data;
         }
         catch (Exception ex)
         {
@@ -663,7 +669,7 @@ public class EavApiClient
     }
 
     private async Task<T?> PostAsync<T>(
-        string relativeUrl, object body, CancellationToken ct)
+        string relativeUrl, object body, CancellationToken ct) where T : class
     {
         try
         {
@@ -673,7 +679,12 @@ public class EavApiClient
                 _logger.LogWarning("POST {Url} → {Status}", relativeUrl, resp.StatusCode);
                 return default;
             }
-            return await resp.Content.ReadFromJsonAsync<T>(JsonOptions, ct);
+            // ★ 统一 ApiResponse 信封：解包 data
+            var envelope = await resp.Content
+                .ReadFromJsonAsync<ApiResponse<T>>(JsonOptions, ct);
+            return envelope is not null && !envelope.Success
+                ? default
+                : envelope?.Data;
         }
         catch (Exception ex)
         {
@@ -747,12 +758,44 @@ public class EavApiClient
     {
         try
         {
-            var body = await resp.Content
-                .ReadFromJsonAsync<ErrorResponse>(JsonOptions, ct);
-            if (body?.Errors is { Count: > 0 })
-                return string.Join("; ",
-                    body.Errors.Select(e => $"{e.Field}: {e.Message}"));
-            return body?.Error ?? resp.ReasonPhrase;
+            // ★ NodeEavSky 统一信封：{ success, message, data: { error?, errors? } }
+            var envelope = await resp.Content
+                .ReadFromJsonAsync<ApiResponse<JsonElement>>(JsonOptions, ct);
+            if (envelope is null) return resp.ReasonPhrase;
+
+            var data = envelope.Data;
+            string? detail = null;
+            if (data.ValueKind == JsonValueKind.Object)
+            {
+                if (data.TryGetProperty("error", out var err)
+                    && err.ValueKind == JsonValueKind.String)
+                {
+                    detail = err.GetString();
+                }
+
+                if (data.TryGetProperty("errors", out var errors)
+                    && errors.ValueKind == JsonValueKind.Array)
+                {
+                    var parts = new List<string>();
+                    foreach (var item in errors.EnumerateArray())
+                    {
+                        if (item.ValueKind != JsonValueKind.Object) continue;
+                        var field = item.TryGetProperty("field", out var f)
+                            && f.ValueKind == JsonValueKind.String
+                            ? f.GetString()
+                            : null;
+                        var msg = item.TryGetProperty("message", out var m)
+                            && m.ValueKind == JsonValueKind.String
+                            ? m.GetString()
+                            : item.ToString();
+                        parts.Add(string.IsNullOrEmpty(field) ? msg! : $"{field}: {msg}");
+                    }
+                    if (parts.Count > 0) detail = string.Join("; ", parts);
+                }
+            }
+
+            return detail
+                ?? (string.IsNullOrEmpty(envelope.Message) ? resp.ReasonPhrase : envelope.Message);
         }
         catch
         {
@@ -778,15 +821,19 @@ public class EavApiClient
                 return null;
             }
 
-            using var doc = await JsonDocument.ParseAsync(
-                await resp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-            if (doc.RootElement.TryGetProperty(idPropertyName, out var p)
+            // ★ 统一信封：ID 位于 data 节点内
+            var envelope = await resp.Content
+                .ReadFromJsonAsync<ApiResponse<JsonElement>>(JsonOptions, ct);
+            if (envelope?.Data.ValueKind == JsonValueKind.Object
+                && envelope.Data.TryGetProperty(idPropertyName, out var p)
                 && p.ValueKind == JsonValueKind.String)
+            {
                 return p.GetString();
+            }
 
             _logger.LogWarning(
                 "POST {Url} → 响应缺少或类型不符 {IdProperty}: {Body}",
-                relativeUrl, idPropertyName, doc.RootElement.GetRawText());
+                relativeUrl, idPropertyName, envelope?.Data.GetRawText() ?? "(空响应)");
             return null;
         }
         catch (Exception ex)
@@ -1019,9 +1066,9 @@ public class EavApiClient
                 DateTimeOffset? current = null;
                 try
                 {
-                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(
-                        text, JsonOptions);
-                    current = conflict?.CurrentUpdatedAt;
+                    var conflict = JsonSerializer.Deserialize<ApiResponse<ConflictResponse>>(
+                    text, JsonOptions);
+                current = conflict?.Data?.CurrentUpdatedAt;
                 }
                 catch { }
 
@@ -1067,9 +1114,9 @@ public class EavApiClient
                 DateTimeOffset? current = null;
                 try
                 {
-                    var conflict = JsonSerializer.Deserialize<ConflictResponse>(
-                        text, JsonOptions);
-                    current = conflict?.CurrentUpdatedAt;
+                    var conflict = JsonSerializer.Deserialize<ApiResponse<ConflictResponse>>(
+                    text, JsonOptions);
+                current = conflict?.Data?.CurrentUpdatedAt;
                 }
                 catch { }
 
@@ -1096,11 +1143,6 @@ public class EavApiClient
     private sealed record QueryByTableResponse(List<string> EntityIds);
 
     private sealed record IdResponse<T>(T Id);
-
-    private sealed record ErrorResponse(
-        string? Error, List<ValidationErrorDto>? Errors);
-
-    private sealed record ValidationErrorDto(string Field, string Message);
 
     private sealed record ConflictResponse(
         string? Error,

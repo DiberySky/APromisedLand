@@ -52,7 +52,7 @@ public class StringNodePropertiesDialogTests : BunitTestBase
     }
 
     private static string SchemaJson(params (string Name, string Display, string Type)[] attrs)
-        => NodeEavTestSetup.Json.Serialize(new
+        => NodeEavTestSetup.Json.Envelope(new
         {
             attributes = attrs.Select(a => new
             {
@@ -67,10 +67,10 @@ public class StringNodePropertiesDialogTests : BunitTestBase
         });
 
     private static string EmptySchemaJson() =>
-        NodeEavTestSetup.Json.Serialize(new { attributes = Array.Empty<object>() });
+        NodeEavTestSetup.Json.Envelope(new { attributes = Array.Empty<object>() });
 
     private static string EntityJson(string? note) =>
-        NodeEavTestSetup.Json.Serialize(new
+        NodeEavTestSetup.Json.Envelope(new
         {
             entityId = NodeId,
             entityType = "StringTreeNode",

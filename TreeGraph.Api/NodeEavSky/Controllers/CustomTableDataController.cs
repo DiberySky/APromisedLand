@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -36,6 +37,7 @@ public class CustomTableDataController : ControllerBase
     }
 
     [HttpPut("{tableName}")]
+    [IdempotentWrite]
     public async Task<IActionResult> Replace(
         string entityType, string entityId, string tableName,
         [FromBody] CustomTableValue value, CancellationToken ct)
@@ -57,6 +59,7 @@ public class CustomTableDataController : ControllerBase
     }
 
     [HttpPut("{tableName}/rows")]
+    [IdempotentWrite]
     public async Task<IActionResult> UpsertRow(
         string entityType, string entityId, string tableName,
         [FromBody] CustomTableRowValue rowValue, CancellationToken ct)
@@ -84,6 +87,7 @@ public class CustomTableDataController : ControllerBase
 
     /// <summary>删除单行（★ 修复 P0-3：带归属校验；rowId 是 GUID 字符串）</summary>
     [HttpDelete("{tableName}/rows/{rowId}")]
+    [IdempotentWrite]
     public async Task<IActionResult> DeleteRow(
         string entityType, string entityId, string tableName,
         string rowId, CancellationToken ct)
