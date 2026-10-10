@@ -2,10 +2,10 @@ using MudBlazor.Services;
 using TreeGraph.Blazor.Components;
 using TreeGraph.Blazor.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
-using TreeGraph.Blazor.Shared.TreeSky.Extensions;
-using TreeGraph.Blazor.Shared.TreeSky.Models;
-using TreeGraph.Blazor.Shared.TreeSky.Services;
-using TreeGraph.Shared.TreeSky.Entities;
+using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
+using TreeGraph.Blazor.Shared.TreeEavSky.Models;
+using TreeGraph.Blazor.Shared.TreeEavSky.Services;
+using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
@@ -27,9 +27,9 @@ builder.Services.AddMudServices();
 // ★ 平台上下文：JS 视口检测（600/960 断点），Scoped。Hybrid 可覆盖注册。
 builder.Services.AddTreeGraphPlatform();
 
-// ★ TreeSky 树组件库（BlazorService/MessageService/TreeNodeDialogService/导航/泛型树 API 客户端 + MudExtensions）
+// ★ TreeEavSky 树组件库（BlazorService/MessageService/TreeNodeDialogService/导航/泛型树 API 客户端 + MudExtensions）
 //   named HttpClient 指向 treegrapheavapi（Aspire 服务发现），写操作统一 NonIdempotentResilience。
-builder.Services.AddTreeSky(
+builder.Services.AddTreeEavSky(
     configureClient: client =>
     {
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
@@ -38,7 +38,7 @@ builder.Services.AddTreeSky(
         httpBuilder.AddStandardResilienceHandler(NonIdempotentResilience.Configure));
 
 // ★ 泛型树组件读操作适配器（ITreeClientService<T>）：包装 TreeApiClient<T>，
-//   添加排序逻辑与 UI 属性，供 TreeSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
+//   添加排序逻辑与 UI 属性，供 TreeEavSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
 builder.Services.AddScoped<ITreeClientService<UnitTree>, UnitTreeClientService>();
 builder.Services.AddScoped<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
 builder.Services.AddScoped<ITreeClientService<StringTreeNode>, StringTreeNodeClientService>();
@@ -90,7 +90,7 @@ builder.Services.AddScoped<EntityTypeDisplayService>();
 
 // ★ EavApiClient：通过 Aspire 服务发现访问 treegrapheavapi。
 //   弹性策略（禁止重试、超时、熔断器采样窗口）统一由 NonIdempotentResilience 提供，
-//   与 TreeSky 客户端保持一致，避免同一后端操作在不同客户端上行为不同。
+//   与 TreeEavSky 客户端保持一致，避免同一后端操作在不同客户端上行为不同。
 builder.Services
     .AddHttpClient<EavApiClient>(client =>
     {

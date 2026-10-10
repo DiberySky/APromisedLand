@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
-using TreeGraph.Api.TreeSky.Services;
-using TreeGraph.Shared.TreeSky;
-using TreeGraph.Shared.TreeSky.Entities;
-using TreeGraph.Shared.TreeSky.Models;
+using TreeGraph.Api.TreeEavSky.Services;
+using TreeGraph.Shared.TreeEavSky;
+using TreeGraph.Shared.TreeEavSky.Entities;
+using TreeGraph.Shared.TreeEavSky.Models;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Tests;

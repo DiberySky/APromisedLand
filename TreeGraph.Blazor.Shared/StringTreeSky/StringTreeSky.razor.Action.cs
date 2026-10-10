@@ -1,6 +1,6 @@
 
 using MudBlazor;
-using TreeGraph.Blazor.Shared.TreeSky.Contracts;
+using TreeGraph.Blazor.Shared.TreeEavSky.Contracts;
 using TreeGraph.Shared.StringTreeSky.Contracts;
 
 namespace TreeGraph.Blazor.Shared.StringTreeSky;

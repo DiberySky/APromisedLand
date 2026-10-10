@@ -27,7 +27,7 @@ namespace TreeGraph.Blazor.Infrastructure;
 /// </para>
 /// <para>
 /// <b>为什么两个客户端共用同一套参数。</b>
-/// TreeSky 客户端与 <c>EavApiClient</c> 访问的是同一个后端。
+/// TreeEavSky 客户端与 <c>EavApiClient</c> 访问的是同一个后端。
 /// 若超时参数不一致，同一后端操作在不同客户端上的行为会不同，
 /// 排查问题时容易误判。统一后行为可预期。
 /// </para>

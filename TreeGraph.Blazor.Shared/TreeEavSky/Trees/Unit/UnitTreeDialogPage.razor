@@ -1,0 +1,22 @@
+@* UnitTreeDialogPage.razor
+   单位树对话框页（复制自 APromisedLand.Razor/DiberyTree/Trees/Unit/UnitTreeDialogPage.razor）：
+   基于 TreeDialogPageSky 包装 TreeEavSky<UnitTree>，点击节点文本经 ShowDialogFunc 递归弹窗。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Trees.Unit
+@using TreeGraph.Shared.TreeEavSky.Entities
+
+@inject BlazorService BlazorService
+
+<TreeDialogPageSky TItem="UnitTree"
+                   Title="单位注册"
+                   TitleToolBar="@(ClickNode?.Value?.Parent?.Text() ?? "单位")"
+                   RootId="@ClickNode?.Value?.Id"
+                   ShowDialogFunc="@ShowDialogAsync" />
+
+@code {
+    [Parameter] public ITreeItemData<UnitTree>? ClickNode { get; set; }
+
+    private async Task ShowDialogAsync(ITreeItemData<UnitTree> node)
+    {
+        await BlazorService.ShowUnitTreeDialogPageAsync(node);
+    }
+}

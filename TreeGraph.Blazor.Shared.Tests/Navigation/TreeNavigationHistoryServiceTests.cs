@@ -1,4 +1,4 @@
-using TreeGraph.Blazor.Shared.TreeSky.Navigation;
+using TreeGraph.Blazor.Shared.TreeEavSky.Navigation;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Navigation;

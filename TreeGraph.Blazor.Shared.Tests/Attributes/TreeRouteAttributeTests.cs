@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text;
-using TreeGraph.Blazor.Shared.TreeSky.Attributes;
-using TreeGraph.Blazor.Shared.TreeSky.Models;
-using TreeGraph.Blazor.Shared.TreeSky.Services;
-using TreeGraph.Shared.TreeSky.Abstractions;
+using TreeGraph.Blazor.Shared.TreeEavSky.Attributes;
+using TreeGraph.Blazor.Shared.TreeEavSky.Models;
+using TreeGraph.Blazor.Shared.TreeEavSky.Services;
+using TreeGraph.Shared.TreeEavSky.Abstractions;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Attributes;

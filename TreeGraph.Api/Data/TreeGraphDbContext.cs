@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.StringTreeSky.Entities;
 using TreeGraph.Shared.StringTreeSky.Contracts;
-using TreeGraph.Shared.TreeSky.Entities;
+using TreeGraph.Shared.TreeEavSky.Entities;
 
 namespace TreeGraph.Api.Data;
 
@@ -27,7 +27,7 @@ public class TreeGraphDbContext : DbContext
 
     public DbSet<StringNodeEntity> StringTreeSkyNodes => Set<StringNodeEntity>();
 
-    // TreeSky：计量单位树 / 分类树
+    // TreeEavSky：计量单位树 / 分类树
     public DbSet<UnitTree> UnitTrees => Set<UnitTree>();
     public DbSet<CategoryTree> CategoryTrees => Set<CategoryTree>();
 
@@ -51,7 +51,7 @@ public class TreeGraphDbContext : DbContext
     }
 
     // ============================================================
-    // TreeSky：计量单位树 / 分类树
+    // TreeEavSky：计量单位树 / 分类树
     // ============================================================
     private static void ConfigureUnitTrees(ModelBuilder mb)
     {

@@ -1067,7 +1067,7 @@ namespace TreeGraph.Api.Data.Migrations
                     b.ToTable("string_tree_sky_nodes", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Shared.TreeSky.Entities.CategoryTree", b =>
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(36)
@@ -1221,7 +1221,7 @@ namespace TreeGraph.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("TreeGraph.Shared.TreeSky.Entities.UnitTree", b =>
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(36)
@@ -2246,9 +2246,9 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Navigation("Parent");
                 });
 
-            modelBuilder.Entity("TreeGraph.Shared.TreeSky.Entities.UnitTree", b =>
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", b =>
                 {
-                    b.HasOne("TreeGraph.Shared.TreeSky.Entities.UnitTree", "Parent")
+                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Parent")
                         .WithMany()
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Restrict);

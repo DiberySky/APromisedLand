@@ -7,10 +7,10 @@ using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.StringTreeSky;
 using TreeGraph.Blazor.Shared.StringTreeSky.Services;
-using TreeGraph.Blazor.Shared.TreeSky.Extensions;
-using TreeGraph.Blazor.Shared.TreeSky.Models;
-using TreeGraph.Blazor.Shared.TreeSky.Services;
-using TreeGraph.Shared.TreeSky.Entities;
+using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
+using TreeGraph.Blazor.Shared.TreeEavSky.Models;
+using TreeGraph.Blazor.Shared.TreeEavSky.Services;
+using TreeGraph.Shared.TreeEavSky.Entities;
 
 namespace TreeGraph.Blazor.Maui;
 
@@ -33,7 +33,7 @@ public static class MauiProgram
 
         // ★ TreeSky 树组件库（BlazorService/MessageService/TreeNodeDialogService/导航/泛型树 API 客户端 + MudExtensions）
         //   named HttpClient 指向 treegrapheavapi（Aspire 服务发现），写操作统一 NonIdempotentResilience。
-        builder.Services.AddTreeSky(
+        builder.Services.AddTreeEavSky(
             configureClient: client =>
             {
                 client.BaseAddress = new Uri("https+http://treegrapheavapi");

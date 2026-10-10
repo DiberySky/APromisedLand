@@ -26,8 +26,10 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
 
     private static bool AppliesTo(FilterContext context)
         => context.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor cad
-           && cad.ControllerTypeInfo.Namespace?.Contains(
-               "NodeEavSky.Controllers", StringComparison.Ordinal) == true;
+           && (cad.ControllerTypeInfo.Namespace?.Contains(
+                   "NodeEavSky.Controllers", StringComparison.Ordinal) == true
+               || cad.ControllerTypeInfo.Namespace?.Contains(
+                   "TreeEavSky.Controllers", StringComparison.Ordinal) == true);
 
     // ------------------------------------------------------------
     // 结果包装
