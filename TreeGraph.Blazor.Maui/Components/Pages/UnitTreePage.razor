@@ -3,5 +3,70 @@
 @using TreeGraph.Blazor.Shared.TreeEavSky
 @using TreeGraph.Shared.TreeEavSky.Entities
 
+@{
+    RenderFragment<UnitTree> actionTemplate = (context) =>
+        @<div class="node-detail">
+            <MudTextField T="string"
+                          Value="@context.Text()"
+                          Label="名称"
+                          Variant="Variant.Outlined"
+                          ReadOnly="true"/>
+
+            <MudTextField T="string"
+                          Value="@context.Abbreviation"
+                          Label="缩写"
+                          Variant="Variant.Outlined"
+                          ReadOnly="true"/>
+
+            <MudTextField T="string"
+                          Value="@context.Description"
+                          Label="描述"
+                          Variant="Variant.Outlined"
+                          ReadOnly="true"
+                          Lines="3"/>
+        </div>;
+}
+
+@{
+    RenderFragment<UnitTree> editTemplate = (context) =>
+        @<div class="node-detail">
+            <MudStack Spacing="3">
+                <MudTextField T="string"
+                              @bind-Value="context.Name"
+                              Label="名称"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="名称不能为空"
+                              MaxLength="100"
+                              Counter="100"
+                              Immediate="true"/>
+
+                <MudTextField T="string"
+                              @bind-Value="context.Abbreviation"
+                              Label="缩写"
+                              Variant="Variant.Outlined"
+                              MaxLength="20"
+                              Counter="20"
+                              Immediate="true"/>
+
+                <MudTextField T="string"
+                              @bind-Value="context.Description"
+                              Label="描述"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              MaxLength="500"
+                              Counter="500"
+                              Immediate="true"/>
+
+                <MudSwitch T="bool"
+                           @bind-Value="context.CanHaveChildren"
+                           Label="启用状态"
+                           Color="Color.Primary"/>
+            </MudStack>
+        </div>;
+}
+
 <h3>单位树（UnitTree）</h3>
-<TreeEavSky TItem="UnitTree" />
+<TreeEavSky TItem="UnitTree"
+            ActionTemplate="@actionTemplate"
+            EditTemplate="@editTemplate" />

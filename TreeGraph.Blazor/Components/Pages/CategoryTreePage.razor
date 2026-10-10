@@ -4,5 +4,62 @@
 @using TreeGraph.Blazor.Shared.TreeEavSky
 @using TreeGraph.Shared.TreeEavSky.Entities
 
+@{
+    RenderFragment<CategoryTree> actionTemplate = (context) =>
+        @<div class="node-detail">
+            <MudTextField T="string"
+                          Value="@context.Text()"
+                          Label="名称"
+                          Variant="Variant.Outlined"
+                          ReadOnly="true"/>
+
+            <MudTextField T="string"
+                          Value="@context.Description"
+                          Label="描述"
+                          Variant="Variant.Outlined"
+                          ReadOnly="true"
+                          Lines="3"/>
+
+            <MudChip T="string"
+                     Color="@(context.CanHaveChildren ? Color.Success : Color.Error)"
+                     Size="Size.Small">
+                @(context.CanHaveChildren ? "已启用" : "已禁用")
+            </MudChip>
+        </div>;
+}
+
+@{
+    RenderFragment<CategoryTree> editTemplate = (context) =>
+        @<div class="node-detail">
+            <MudStack Spacing="3">
+                <MudTextField T="string"
+                              @bind-Value="context.Name"
+                              Label="名称"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="名称不能为空"
+                              MaxLength="100"
+                              Counter="100"
+                              Immediate="true"/>
+
+                <MudTextField T="string"
+                              @bind-Value="context.Description"
+                              Label="描述"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              MaxLength="500"
+                              Counter="500"
+                              Immediate="true"/>
+
+                <MudSwitch T="bool"
+                           @bind-Value="context.CanHaveChildren"
+                           Label="启用状态"
+                           Color="Color.Primary"/>
+            </MudStack>
+        </div>;
+}
+
 <h3>分类树（CategoryTree）</h3>
-<TreeEavSky TItem="CategoryTree" />
+<TreeEavSky TItem="CategoryTree"
+            ActionTemplate="@actionTemplate"
+            EditTemplate="@editTemplate" />
