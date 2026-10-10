@@ -131,5 +131,6 @@ public class AppHostResourceContext
     // Maui
     public IResourceBuilder<MauiProjectResource>? DiberySky { get; set; }
     public IResourceBuilder<MauiProjectResource>? DiberyMauiSky { get; set; }
+    public IResourceBuilder<MauiProjectResource>? TreeGraphBlazorMauiSky { get; set; }
     public IResourceBuilder<MauiProjectResource>? TreeGraphMauiSky { get; set; }
 }

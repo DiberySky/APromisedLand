@@ -70,6 +70,15 @@
         <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.110" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.110" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.12" />
+        <PackageReference Include="MudBlazor" Version="9.11.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\TreeGraph.Blazor.Shared\TreeGraph.Blazor.Shared.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\APromisedLand.MauiServiceDefaults\APromisedLand.MauiServiceDefaults.csproj" />
     </ItemGroup>
 
 </Project>
