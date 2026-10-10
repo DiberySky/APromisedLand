@@ -3,7 +3,8 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>
 @implements IDisposable
 
-<PageDialogSky Title="选择父节点" TitleClass="mud-theme-success px-0 pa-0">
+ @* Title="选择父节点" *@
+<MudDialog>
     <DialogContent>
         <MudContainer Class="py-2" Style="min-height: 300px; max-height: 500px; overflow-y: auto;">
             <MudAlert Severity="Severity.Info"
@@ -62,7 +63,7 @@
             确认选择
         </MudButton>
     </DialogActions>
-</PageDialogSky>
+</MudDialog>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

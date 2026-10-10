@@ -3,8 +3,7 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @* 精简移植版：移除文件/图片/视频/位置附件按钮（附件子系统未包含） *@
-<PageDialogSky Title="@Title"
-           TitleClass="mud-theme-success px-0 pa-0"
+<DialogSky Title="@Title"
            CancelButtonVisible="@CancelButtonVisible"
            SubmitButtonVisible="@SubmitButtonVisible"
            OnCanceledClick="e => OnCanceledClick.InvokeAsync()"
@@ -27,7 +26,7 @@
             @DialogActions
         }
     </DialogRightActions>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

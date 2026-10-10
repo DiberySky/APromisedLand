@@ -2,8 +2,7 @@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-<PageDialogSky Title="拖拽排序" SubmitButtonVisible
-           TitleClass="mud-theme-success px-0 pa-0"
+<DialogSky Title="拖拽排序" SubmitButtonVisible
            OnSubmitClick="@Submit">
     <DialogContent>
         <MudList T="string" SelectionMode="SelectionMode.SingleSelection">
@@ -31,7 +30,7 @@
             }
         </MudList>
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
