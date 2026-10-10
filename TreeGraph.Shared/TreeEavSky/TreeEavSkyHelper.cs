@@ -4,9 +4,9 @@ using TreeGraph.Shared.TreeEavSky.Models;
 namespace TreeGraph.Shared.TreeEavSky;
 
 /// <summary>
-/// TreeSky 实体与 DTO 之间的映射辅助。
+/// TreeEavSky 实体与 DTO 之间的映射辅助。
 /// </summary>
-public static class TreeSkyHelper
+public static class TreeEavSkyHelper
 {
     /// <summary>
     /// 将树节点实体映射为 <see cref="TreeNodeDto{T}"/>。
