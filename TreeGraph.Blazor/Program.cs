@@ -12,6 +12,9 @@ using TreeGraph.Blazor.Shared.StringTreeSky.Services;
 using TreeGraph.Blazor.Shared.FileStorageSky;
 using TreeGraph.Blazor.Shared.FileStorageSky.Services;
 using TreeGraph.Blazor.Shared.Responsive.Extensions;
+#if DEBUG
+using TreeGraph.Blazor.Shared.Common.Dev;
+#endif
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +26,11 @@ builder.Services.AddRazorComponents()
 
 // MudBlazor
 builder.Services.AddMudServices();
+
+#if DEBUG
+// 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService，PageDialogSky 标题栏 DevDialogSourceButton 据此反查 .razor 文件
+builder.Services.AddDialogSourceTracker();
+#endif
 
 // ★ 平台上下文：JS 视口检测（600/960 断点），Scoped。Hybrid 可覆盖注册。
 builder.Services.AddTreeGraphPlatform();

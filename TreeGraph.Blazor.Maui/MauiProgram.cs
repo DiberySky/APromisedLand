@@ -11,6 +11,9 @@ using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
 using TreeGraph.Blazor.Shared.TreeEavSky.Models;
 using TreeGraph.Blazor.Shared.TreeEavSky.Services;
 using TreeGraph.Shared.TreeEavSky.Entities;
+#if DEBUG
+using TreeGraph.Blazor.Shared.Common.Dev;
+#endif
 
 namespace TreeGraph.Blazor.Maui;
 
@@ -92,6 +95,9 @@ public static class MauiProgram
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
+
+        // 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService，PageDialogSky 标题栏 DevDialogSourceButton 据此反查 .razor 文件
+        builder.Services.AddDialogSourceTracker();
 #endif
 
         return builder.Build();

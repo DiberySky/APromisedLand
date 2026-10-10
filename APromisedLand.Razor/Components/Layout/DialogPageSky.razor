@@ -18,12 +18,12 @@
 
                 @if (StartButtonVisible)
                 {
-                    <MudSpacer/>
                     <MudIconButton Icon="@Icons.Material.Outlined.Menu"
                                    Color="Color.Success"
                                    OnClick="@(e => OnStartClick.InvokeAsync())"/>
                 }
-               
+
+                <DevDialogSourceButton/>
             </MudToolBar>
         }
         @if (ToolBarContent != null)

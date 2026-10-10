@@ -39,6 +39,10 @@ void TreeGraph()
 
     // ★ TreeGraph.Maui(MAUI+Blazor 混合模板起步项目,引用 EavApi 供后续服务发现)
     builder.AddTreeGraphMaui(context);
+    
+    builder.AddDiberyTreeService(context);
+    builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
+
 }
 
 void MafRagApi()
@@ -181,8 +185,8 @@ void AddService()
 //     builder.AddMafStateful(context); // MafStateful
 // // builder.AddMafAi(context); // MafAi
 //
-//     builder.AddDiberyTreeService(context);
-//     builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
+     builder.AddDiberyTreeService(context);
+     builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
 //
 //     // builder.AddFoundry(context); // Foundry Local
 //

@@ -1,0 +1,75 @@
+@* DevDialogSourceButton.razor — DEBUG 专用开发辅助：
+   弹窗标题栏的「定位源文件」按钮。点击后反查当前弹窗内容组件类型，
+   Snackbar 显示 .razor 文件名并尝试把完整路径复制到剪贴板。
+   Release 构建中 Enabled=false 不渲染任何内容（实现体也被条件编译为空）。 *@
+@namespace APromisedLand.Razor.Components.Layout
+@using Microsoft.JSInterop
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+@if (Enabled)
+{
+    <MudTooltip Text="@(_lastFileName ?? "定位源文件（DEBUG）")">
+        <MudIconButton Class="dev-dialog-source-btn"
+                       Icon="@Icons.Material.Outlined.Code"
+                       Color="Color.Default"
+                       Size="Size.Small"
+                       OnClick="ShowSourceAsync"/>
+    </MudTooltip>
+}
+
+@code {
+    /// <summary>仅 DEBUG 渲染（Release 下整块不输出，方法体为空）。</summary>
+    private const bool Enabled =
+#if DEBUG
+        true;
+#else
+        false;
+#endif
+
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private string? _lastFileName;
+
+    private async Task ShowSourceAsync()
+    {
+#if DEBUG
+        // 注：MudDialog 级联值在 MudDialog TitleContent 区域可能为 null，
+        // Resolve 内置 LIFO 回退，传 null 也能解析到最近打开的弹窗。
+        if (!Dev.DialogSourceTracker.IsActive)
+        {
+            Snackbar.Add("装饰器未注册（AddDialogSourceTracker 未生效）", Severity.Error);
+            return;
+        }
+
+        var type = Dev.DialogSourceTracker.Resolve(MudDialog);
+        if (type is null)
+        {
+            Snackbar.Add("未跟踪到弹窗类型（可能未经 DialogService 打开或未注册 DialogSourceTracker）", Severity.Warning);
+            return;
+        }
+
+        var path = Dev.DevSourceFileLocator.Locate(type);
+        _lastFileName = Dev.DevSourceFileLocator.DisplayFileName(type);
+
+        if (path is null)
+        {
+            Snackbar.Add($"{_lastFileName}（路径未定位到）", Severity.Info);
+        }
+        else
+        {
+            Snackbar.Add($"{_lastFileName} — 路径已复制", Severity.Success);
+            try
+            {
+                await JS.InvokeVoidAsync("navigator.clipboard.writeText", path);
+            }
+            catch
+            {
+                // BlazorWebView 等环境无剪贴板权限时忽略，Snackbar 已显示文件名
+            }
+        }
+#else
+        await Task.CompletedTask;
+#endif
+    }
+}

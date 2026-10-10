@@ -1,5 +1,6 @@
-﻿using APromisedLand.Maui.Configs;
+using APromisedLand.Maui.Configs;
 using APromisedLand.Maui.DiberyTree;
+using APromisedLand.Razor.Dev;
 using APromisedLand.Razor.DiberyTree;
 using APromisedLand.Razor.DiberyTree.Navigation;
 using APromisedLand.Razor.DiberyTree.Services;
@@ -37,6 +38,10 @@ namespace DiberyMauiSky
 #if DEBUG
     		builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
+
+    		// 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService 记录弹窗组件类型，
+    		// DialogSky/DialogPageSky 标题栏 DevDialogSourceButton 据此反查 .razor 文件
+    		builder.Services.AddDialogSourceTracker();
 #endif
 
             var app = builder.Build();
