@@ -42,7 +42,7 @@ public static class MauiProgram
                 httpBuilder.AddStandardResilienceHandler(NonIdempotentResilience.Configure));
 
         // ★ 泛型树组件读操作适配器（ITreeClientService<T>）：包装 TreeApiClient<T>，
-        //   添加排序逻辑与 UI 属性，供 TreeSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
+        //   添加排序逻辑与 UI 属性，供 TreeEavSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
         builder.Services.AddScoped<ITreeClientService<UnitTree>, UnitTreeClientService>();
         builder.Services.AddScoped<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
 

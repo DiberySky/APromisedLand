@@ -33,8 +33,8 @@ TreeGraph.Blazor.Shared/
 │   ├── DialogPageSky.razor            # 工具栏/取消/提交按钮
 │   ├── ProgressCircularSky.razor
 │   └── BoolFieldSky.razor
-└── Trees/                             # TreeSky 组件的全部闭包（命名空间 ...Trees.*）
-    ├── TreeSky.razor (+ 4 partial)    # 核心树组件
+└── Trees/                             # TreeEavSky 组件的全部闭包（命名空间 ...Trees.*）
+    ├── TreeEavSky.razor (+ 4 partial)  # 核心树组件
     ├── TreeDialogPageSky.razor
     ├── TreeSelectDialogSky.razor      # 节点/父节点选择对话框
     ├── TreeHelper.cs                  # TreeItemData 扩展 + 常量
@@ -71,7 +71,7 @@ TreeGraph.Blazor.Shared/
     ├── Attributes/
     │   └── TreeRouteAttribute.cs      # 树节点路由标注（API 端控制器/客户端共用）
     └── Extensions/
-        └── TreeSkyServiceCollectionExtensions.cs   # AddTreeSky()
+        └── TreeEavSkyServiceCollectionExtensions.cs  # AddTreeEavSky()
 ```
 
 ## 使用方法
@@ -88,17 +88,17 @@ TreeGraph.Blazor.Shared/
 // MudBlazor 基础服务（宿主原有）
 builder.Services.AddMudServices();
 
-// TreeSky 组件库（含 BlazorService/MessageService/TreeNodeDialogService<>/导航历史/TreeApiClient<> + MudExtensions）
-builder.Services.AddTreeSky();
+// TreeEavSky 组件库（含 BlazorService/MessageService/TreeNodeDialogService<>/导航历史/TreeApiClient<> + MudExtensions）
+builder.Services.AddTreeEavSky();
 
 // ★ 由宿主自行注册：具体节点类型的客户端服务
 builder.Services.AddScoped<ITreeClientService<YourNode>, YourNodeClientService>();
 ```
 
-`AddTreeSky` 内部会注册一个命名 `HttpClient("TreeSky")`；如果后端有真实地址：
+`AddTreeEavSky` 内部会注册一个命名 `HttpClient("TreeEavSky")`；如果后端有真实地址：
 
 ```csharp
-builder.Services.AddTreeSky(configureClient: c => c.BaseAddress = new Uri("https://your-api/"));
+builder.Services.AddTreeEavSky(configureClient: c => c.BaseAddress = new Uri("https://your-api/"));
 ```
 
 ### 3. 页面中使用
@@ -107,11 +107,11 @@ builder.Services.AddTreeSky(configureClient: c => c.BaseAddress = new Uri("https
 @page "/your-tree-page"
 @rendermode InteractiveServer
 
-<TreeSky TItem="YourNode">
+<TreeEavSky TItem="YourNode">
     <EditTemplate>
         <MudTextField @bind-Value="context.Name" Label="名称" Required="true" />
     </EditTemplate>
-</TreeSky>
+</TreeEavSky>
 ```
 
 ### 4. 静态资源（若需 MudBlazor.Extensions 的 CSS/JS）
@@ -141,9 +141,9 @@ builder.Services.AddTreeSky(configureClient: c => c.BaseAddress = new Uri("https
 
 ### 1. DI 注册：`TryAddTransient<HttpClient>` 导致 ApiClient 拿到空配置
 
-**问题**：`AddHttpClient("TreeSky")` 内部通过 `TryAddTransient<HttpClient>()` 注册了一个无名 HttpClient。库内若同样用 `TryAddTransient` 注册 `HttpClient`，会因服务已存在而静默失效，导致 `TreeApiClient<>` 注入的 `HttpClient` 没有 `BaseAddress`，也无任何消息处理器。
+**问题**：`AddHttpClient("TreeEavSky")` 内部通过 `TryAddTransient<HttpClient>()` 注册了一个无名 HttpClient。库内若同样用 `TryAddTransient` 注册 `HttpClient`，会因服务已存在而静默失效，导致 `TreeApiClient<>` 注入的 `HttpClient` 没有 `BaseAddress`，也无任何消息处理器。
 
-**修复**（`Trees/Extensions/TreeSkyServiceCollectionExtensions.cs`）：将 `TryAddTransient` 改为 `AddTransient`：
+**修复**（`TreeEavSky/Extensions/TreeEavSkyServiceCollectionExtensions.cs`）：将 `TryAddTransient` 改为 `AddTransient`：
 
 ```csharp
 services.AddTransient(sp =>
@@ -170,11 +170,11 @@ services.AddTransient(sp =>
 库自带 `StringTreeNode`（`TreeGraph.Blazor.Shared.Trees.Models`）：以 `Name` 字符串为显示文本，满足泛型约束 `class, ITreeNodeBase<T>, new()`。`System.String` 本身不可用作 `TItem`（sealed、无无参构造），需要字符串节点时直接用 `StringTreeNode` 即可，也可继承扩展字段。
 
 ```razor
-<TreeSky TItem="StringTreeNode">
+<TreeEavSky TItem="StringTreeNode">
     <EditTemplate>
         <MudTextField @bind-Value="context.Name" Label="名称" Required="true" />
     </EditTemplate>
-</TreeSky>
+</TreeEavSky>
 ```
 
 ## 演示示例
@@ -184,7 +184,7 @@ services.AddTransient(sp =>
 - `InMemoryTreeStore`：进程内单例内存存储，构造时一次性播种演示数据。
 - `DemoTreeClientService`：`ITreeClientService<StringTreeNode>` 实现。
 - `DemoTreeApiHandler`：终端 `DelegatingHandler`，拦截 `StringTreeNode/*` HTTP 请求并转发到同一内存存储。
-- 演示页：`/tree-sky-demo`（菜单入口「TreeSky 演示」）。
+- 演示页：`/string-tree-sky`（菜单入口「字符串树」）。
 
 浏览器实测验证通过：浏览/创建/编辑/排序/移动/删除全部可用。新增 7 个管道集成测试（ApiClient → Handler → Store），全量 88 个测试零回归。
 
