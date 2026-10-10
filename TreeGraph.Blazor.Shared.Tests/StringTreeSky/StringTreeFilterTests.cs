@@ -284,25 +284,33 @@ public class StringTreeFilterTests : BunitTestBase
             () => cut.Markup.Contains("已过滤：1 个匹配", StringComparison.Ordinal),
             TimeSpan.FromSeconds(2));
 
-        // 匹配节点 + 祖先均渲染
-        Assert.Contains("电子产品", cut.Markup, StringComparison.Ordinal);
-        Assert.Contains("华为手机", cut.Markup, StringComparison.Ordinal);
+        // 匹配节点 + 祖先均渲染（命中词被 MudHighlighter 包进 <mark>，按文本内容断言）
+        var treeText = string.Concat(
+            cut.FindAll("li.mud-treeview-item").Select(e => e.TextContent));
+        Assert.Contains("电子产品", treeText, StringComparison.Ordinal);
+        Assert.Contains("华为手机", treeText, StringComparison.Ordinal);
 
-        var matches = cut.FindAll("li.string-tree-sky__item--match");
-        Assert.Single(matches);
-        Assert.Contains("华为手机", matches[0].TextContent, StringComparison.Ordinal);
+        var treeItems = cut.FindComponents<MudTreeViewItem<string>>();
 
-        // 过滤态标记：匹配 ★、祖先 ·，懒加载折叠三角消失
-        Assert.Contains("★", cut.Markup, StringComparison.Ordinal);
-        Assert.Contains("·", cut.Markup, StringComparison.Ordinal);
-        Assert.DoesNotContain("▶", cut.Markup, StringComparison.Ordinal);
-        Assert.DoesNotContain("▼", cut.Markup, StringComparison.Ordinal);
+        // 过滤态无折叠语义：所有节点（含含子级的祖先）都不显示展开箭头
+        Assert.All(treeItems, item => Assert.False(item.Instance.CanExpand));
 
-        // 增/删/改按钮隐藏，属性按钮保留
-        Assert.DoesNotContain("＋子节点", cut.Markup, StringComparison.Ordinal);
-        Assert.DoesNotContain("重命名", cut.Markup, StringComparison.Ordinal);
-        Assert.DoesNotContain(">删除<", cut.Markup, StringComparison.Ordinal);
-        Assert.Contains("属性", cut.Markup, StringComparison.Ordinal);
+        // 命中节点：唯一星形高亮（TreeSky 风格图标标记）
+        var stars = treeItems.Where(i => i.Instance.Icon == Icons.Material.Filled.Star).ToList();
+        Assert.Single(stars);
+        Assert.Equal(ChildId, stars[0].Instance.Value);
+        Assert.Equal(Color.Warning, stars[0].Instance.IconColor);
+
+        // 增/删/改操作在 TreeSky 风格的操作对话框中；过滤态打开 MoreHoriz 应只剩「属性」
+        var provider = Render<MudDialogProvider>();
+        ClickMoreHoriz(cut);
+
+        provider.WaitForAssertion(
+            () => Assert.Contains("属性", provider.Markup, StringComparison.Ordinal),
+            TimeSpan.FromSeconds(2));
+        Assert.DoesNotContain("新建子节点", provider.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("重命名", provider.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("删除", provider.Markup, StringComparison.Ordinal);
 
         // 确实打到了查询端点
         Assert.Contains(_paths, p =>
@@ -346,12 +354,27 @@ public class StringTreeFilterTests : BunitTestBase
             () => !cut.Markup.Contains("已过滤", StringComparison.Ordinal),
             TimeSpan.FromSeconds(2));
 
-        // 懒加载树回归：根节点折叠三角回来，过滤态的 ·/★ 消失，子节点不再可见
-        Assert.Contains("▶", cut.Markup, StringComparison.Ordinal);
-        Assert.DoesNotContain("★", cut.Markup, StringComparison.Ordinal);
-        Assert.Empty(cut.FindAll(".string-tree-sky__toggle--leaf"));
+        // 懒加载树回归：根节点恢复可折叠（默认折叠 → 子节点不渲染），过滤标记消失
+        var rootItem = cut.FindComponents<MudTreeViewItem<string>>()
+            .Single(i => i.Instance.Value == RootId);
+
+        Assert.True(rootItem.Instance.CanExpand);
+        Assert.Empty(cut.FindComponents<MudTreeViewItem<string>>()
+            .Where(i => i.Instance.Icon == Icons.Material.Filled.Star));
         Assert.Contains("电子产品", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("华为手机", cut.Markup, StringComparison.Ordinal);
+    }
+
+    // ============================================================
+    // 辅助
+    // ============================================================
+
+    /// <summary>点击行内 MoreHoriz 操作按钮（范围限定树容器，排除展开箭头按钮）。</summary>
+    private static void ClickMoreHoriz(IRenderedComponent<StringTreeSky> cut)
+    {
+        cut.FindAll(".mud-treeview button.mud-icon-button")
+            .First(b => !b.ClassList.Contains("mud-treeview-item-expand-button"))
+            .Click();
     }
 
     // ============================================================

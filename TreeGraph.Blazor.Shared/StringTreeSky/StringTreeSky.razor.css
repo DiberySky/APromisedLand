@@ -10,3 +10,9 @@
     display: inline-block;
     vertical-align: middle;
 }
+
+/* 过滤态：全部展开且不可折叠（对齐旧版 ★/· 无三角语义），隐藏展开按钮 */
+.string-tree-sky--filtered .mud-treeview-item-expand-button {
+    display: none;
+}
+

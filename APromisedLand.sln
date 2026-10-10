@@ -125,6 +125,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.FileStorageApi.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeGraph.Maui", "TreeGraph.Maui\TreeGraph.Maui.csproj", "{C1934DDE-D00D-4566-8B7B-907AAD2517F3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APromisedLand.SharedRazor", "APromisedLand.SharedRazor\APromisedLand.SharedRazor.csproj", "{E4B541A1-B841-4164-A4F7-FD89AAF52921}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -773,6 +775,18 @@ Global
 		{C1934DDE-D00D-4566-8B7B-907AAD2517F3}.Release|x64.Build.0 = Release|Any CPU
 		{C1934DDE-D00D-4566-8B7B-907AAD2517F3}.Release|x86.ActiveCfg = Release|Any CPU
 		{C1934DDE-D00D-4566-8B7B-907AAD2517F3}.Release|x86.Build.0 = Release|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Debug|x64.Build.0 = Debug|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Debug|x86.Build.0 = Debug|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Release|x64.ActiveCfg = Release|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Release|x64.Build.0 = Release|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Release|x86.ActiveCfg = Release|Any CPU
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -832,6 +846,7 @@ Global
 		{A2577980-4B41-43E4-994B-A67878D90107} = {27300449-A741-4AD0-89C8-99BA2EE87EA8}
 		{F6446417-89B7-42D1-BA3C-E2052FBFB326} = {27300449-A741-4AD0-89C8-99BA2EE87EA8}
 		{C1934DDE-D00D-4566-8B7B-907AAD2517F3} = {27300449-A741-4AD0-89C8-99BA2EE87EA8}
+		{E4B541A1-B841-4164-A4F7-FD89AAF52921} = {DC357836-6548-4918-9C56-E876B4E81A44}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9647CF65-ABDB-4637-B56C-E0CDAC22FFFB}

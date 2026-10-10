@@ -21,11 +21,12 @@ namespace TreeGraph.Blazor.Shared.Tests.Services;
 public class TreeNodeDialogServiceTests
 {
     private readonly Mock<IDialogService> _dialogService = new();
-    private readonly BlazorService _blazorService = new();
+    private readonly BlazorService _blazorService;
     private readonly TreeNodeDialogService<StringTreeNode> _sut;
 
     public TreeNodeDialogServiceTests()
     {
+        _blazorService = new BlazorService(_dialogService.Object);
         _sut = new TreeNodeDialogService<StringTreeNode>(
             _dialogService.Object, _blazorService);
     }
@@ -38,7 +39,7 @@ public class TreeNodeDialogServiceTests
         where TDialog : IComponent
     {
         var dialogRef = new Mock<IDialogReference>();
-        dialogRef.SetupGet(r => r.Result).Returns(Task.FromResult(result)!);
+        dialogRef.SetupGet(r => r.Result).Returns(Task.FromResult(result));
 
         _dialogService
             .Setup(s => s.ShowAsync<TDialog>(
@@ -53,7 +54,7 @@ public class TreeNodeDialogServiceTests
         where TDialog : IComponent
     {
         var dialogRef = new Mock<IDialogReference>();
-        dialogRef.SetupGet(r => r.Result).Returns(Task.FromResult(result)!);
+        dialogRef.SetupGet(r => r.Result).Returns(Task.FromResult(result));
 
         _dialogService
             .Setup(s => s.ShowAsync(
@@ -97,7 +98,7 @@ public class TreeNodeDialogServiceTests
         var result = await _sut.ShowActionsDialogAsync(MakeTemplate("1"));
 
         Assert.NotNull(result);
-        Assert.Equal(NodeAction.Edit, result!.Action);
+        Assert.Equal(NodeAction.Edit, result.Action);
         Assert.Equal("1", result.Node.Id);
     }
 
@@ -124,7 +125,7 @@ public class TreeNodeDialogServiceTests
         var result = await _sut.ShowCreateDialogAsync();
 
         Assert.NotNull(result);
-        Assert.Equal("new-1", result!.Id);
+        Assert.Equal("new-1", result.Id);
     }
 
     // ============================================================
@@ -150,7 +151,7 @@ public class TreeNodeDialogServiceTests
         var result = await _sut.ShowEditDialogAsync(MakeTemplate("1"));
 
         Assert.NotNull(result);
-        Assert.Equal("1", result!.Id);
+        Assert.Equal("1", result.Id);
     }
 
     // ============================================================
@@ -202,7 +203,7 @@ public class TreeNodeDialogServiceTests
             new TreeItemData<StringTreeNode> { Value = MakeNode("1") });
 
         Assert.NotNull(result);
-        Assert.Equal(2, result!.Count);
+        Assert.Equal(2, result.Count);
         Assert.Equal("2", result[0].Id);
     }
 
@@ -225,7 +226,7 @@ public class TreeNodeDialogServiceTests
             [MakeNode("1")], currentNode: MakeNode("1"));
 
         Assert.NotNull(result);
-        Assert.True(result!.IsConfirmed);
+        Assert.True(result.IsConfirmed);
         Assert.Equal("parent-2", result.SelectedParent?.Id);
     }
 
@@ -315,7 +316,7 @@ public class TreeNodeDialogServiceTests
         var result = await _sut.ExecuteNodeOperationAsync(MakeTemplate("1"));
 
         Assert.NotNull(result);
-        Assert.Equal(NodeAction.Delete, result!.Action);
+        Assert.Equal(NodeAction.Delete, result.Action);
         Assert.Equal("1", result.Node.Id);
     }
 }

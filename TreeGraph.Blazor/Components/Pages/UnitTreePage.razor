@@ -1,0 +1,8 @@
+@* UnitTreePage.razor — UnitTree 单位树入口（TreeSky 泛型组件） *@
+@page "/unit-tree"
+@rendermode InteractiveServer
+@using TreeGraph.Blazor.Shared.TreeSky
+@using TreeGraph.Shared.TreeSky.Entities
+
+<h3>单位树（UnitTree）</h3>
+<TreeSky TItem="UnitTree" />

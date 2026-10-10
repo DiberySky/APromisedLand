@@ -232,8 +232,14 @@ public class StringTreeSkySummaryTests : BunitTestBase
             () => cut.Markup.Contains("品牌: 旧值", StringComparison.Ordinal),
             TimeSpan.FromSeconds(2));
 
-        // 打开属性对话框并触发表单保存（DynamicForm 的“保存”按钮）
-        cut.FindAll("button")
+        // MoreHoriz → 节点操作对话框 → 属性（范围限定树容器，排除展开箭头按钮）
+        cut.FindAll(".mud-treeview button.mud-icon-button")
+            .First(b => !b.ClassList.Contains("mud-treeview-item-expand-button"))
+            .Click();
+        provider.WaitForAssertion(
+            () => Assert.Contains("属性", provider.Markup, StringComparison.Ordinal),
+            TimeSpan.FromSeconds(2));
+        provider.FindAll("button")
             .First(b => b.TextContent.Contains("属性", StringComparison.Ordinal))
             .Click();
 

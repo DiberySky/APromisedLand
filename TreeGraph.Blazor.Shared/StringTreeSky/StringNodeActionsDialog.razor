@@ -1,0 +1,119 @@
+@* StringNodeActionsDialog.razor
+   节点操作对话框（版式克隆 TreeSky TreeNodeActionsDialog）：
+   PageDialogSky 外壳 + 只读节点信息 + 工具栏「移动」+ 左侧「删除」+ 右侧操作按钮组，
+   关闭时回传 TreeSky.Contracts.NodeAction。 *@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky
+
+<PageDialogSky Title="节点操作" TitleClass="mud-theme-success px-0 pa-0">
+    <ToolBarContent>
+        @if (IsRoot)
+        {
+            <MudText Color="Color.Info">根节点</MudText>
+        }
+        else
+        {
+            <MudText Color="Color.Info">@ParentName</MudText>
+        }
+        <MudSpacer/>
+        @if (!IsRoot && !IsFiltered)
+        {
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Outlined.MoveUp"
+                       Color="Color.Warning"
+                       OnClick="@(() => Close(NodeAction.Move))">
+                移动
+            </MudButton>
+        }
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
+            <MudStack Spacing="2">
+                <MudTextField T="string"
+                              Value="@NodeName"
+                              Label="名称"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true"/>
+                <MudTextField T="string"
+                              Value="@Description"
+                              Label="描述"
+                              Variant="Variant.Outlined"
+                              ReadOnly="true"
+                              Lines="3"/>
+            </MudStack>
+        </MudContainer>
+    </DialogContent>
+    <DialogLeftActions>
+        @if (!HasChildren && !IsFiltered && AllowDelete)
+        {
+            <MudButton OnClick="@(() => Close(NodeAction.Delete))"
+                       Variant="Variant.Text"
+                       Color="Color.Error"
+                       StartIcon="@Icons.Material.Outlined.Delete">
+                删除
+            </MudButton>
+        }
+    </DialogLeftActions>
+    <DialogRightActions>
+        <MudButton OnClick="@(() => Close(NodeAction.View))"
+                   Variant="Variant.Text"
+                   Color="Color.Info"
+                   StartIcon="@Icons.Material.Outlined.Visibility">
+            查看详情
+        </MudButton>
+
+        @if (HasChildren && !IsFiltered && AllowSort)
+        {
+            <MudButton OnClick="@(() => Close(NodeAction.Sort))"
+                       Variant="Variant.Text"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Outlined.ImportExport">
+                子项排序
+            </MudButton>
+        }
+
+        @if (!IsRoot && !IsFiltered && AllowRename)
+        {
+            <MudButton OnClick="@(() => Close(NodeAction.Edit))"
+                       Variant="Variant.Text"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Outlined.Edit">
+                设置修改
+            </MudButton>
+        }
+
+        @if (!IsFiltered && AllowCreate)
+        {
+            <MudButton OnClick="@(() => Close(NodeAction.AddChild))"
+                       Variant="Variant.Text"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Outlined.Add">
+                创建子项
+            </MudButton>
+        }
+
+        <MudButton OnClick="@(() => Close(NodeAction.Attribute))"
+                   Variant="Variant.Text"
+                   Color="Color.Default"
+                   StartIcon="@Icons.Material.Outlined.Info">
+            属性
+        </MudButton>
+    </DialogRightActions>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string NodeId { get; set; } = string.Empty;
+    [Parameter] public string NodeName { get; set; } = string.Empty;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? ParentName { get; set; }
+    [Parameter] public bool IsRoot { get; set; }
+    [Parameter] public bool HasChildren { get; set; }
+    [Parameter] public bool AllowCreate { get; set; } = true;
+    [Parameter] public bool AllowRename { get; set; } = true;
+    [Parameter] public bool AllowSort { get; set; } = true;
+    [Parameter] public bool AllowDelete { get; set; } = true;
+    [Parameter] public bool IsFiltered { get; set; }
+
+    private void Close(NodeAction action) => MudDialog.Close(DialogResult.Ok(action));
+}

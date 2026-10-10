@@ -1,29 +1,49 @@
-
-@* StringTreeSky.razor *@
+@* StringTreeSky.razor
+   基于 MudBlazor MudTreeView 重构，UI 严格对齐 TreeSky：
+   - 泛型参数直接使用 string（Value = 节点 Id），同官方 ServerData 示例；
+   - 节点业务元数据（Name/ParentId/SortOrder/HasChildren）由组件内 _nodes 字典承载，
+     StringNodeDto 只出现在服务适配层，不进入模板；
+   - ServerData 懒加载；@bind-Items / @bind-Expanded 双向绑定；
+   - 行结构同 TreeSky：MudContainer + MudText/MudHighlighter + MoreHoriz 操作按钮，
+     点击按钮弹出节点操作对话框；
+   - 保留既有公开契约：OnTreeChanged / TreeKey / ExplicitEntityType / RootNodeId
+     （OnNodeSelected 回传节点 Id）。 *@
 @namespace TreeGraph.Blazor.Shared.StringTreeSky
 @using TreeGraph.Shared.StringTreeSky.Contracts
 @using TreeGraph.Blazor.Shared.StringTreeSky.Services
 @inject IStringTreeClient Client
 @inject StringTreeSkyOptions Options
 
-<div class="string-tree-sky">
-    <div class="string-tree-sky__toolbar">
+<div class="string-tree-sky@(_isFiltered ? " string-tree-sky--filtered" : "")">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="string-tree-sky__toolbar mb-3">
         @if (Options.AllowCreate)
         {
-            <button class="btn btn-sm btn-primary" @onclick="CreateRootAsync">@(string.IsNullOrEmpty(RootNodeId) ? "新建根节点" : "新建子节点")</button>
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="CreateRootAsync">
+                @(string.IsNullOrEmpty(RootNodeId) ? "新建根节点" : "新建子节点")
+            </MudButton>
         }
-        <button class="btn btn-sm btn-outline-secondary" @onclick="ReloadAsync">刷新</button>
+        <MudButton Variant="Variant.Outlined"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="ReloadAsync">
+            刷新
+        </MudButton>
 
         @if (_isFiltered)
         {
-            <span class="badge bg-info text-dark ms-2">已过滤：@_matchedIds?.Count 个匹配</span>
+            <MudChip T="string" Variant="Variant.Filled" Color="Color.Info" Size="Size.Small">
+                已过滤：@(_matchedIds?.Count ?? 0) 个匹配
+            </MudChip>
         }
-    </div>
+    </MudStack>
 
-    @* ★ 新增：过滤面板 *@
     @if (Options.AllowFilter && _schema.Count > 0)
     {
-        <div class="string-tree-sky__filter mb-2">
+        <div class="string-tree-sky__filter mb-3">
             <StringTreeFilterPanel Schema="_schema"
                                    IsFiltered="_isFiltered"
                                    OnApply="ApplyFilterAsync"
@@ -33,88 +53,59 @@
 
     @if (_loading)
     {
-        <div class="string-tree-sky__loading">加载中…</div>
+        <ProgressCircularSky />
     }
-    else if (_visible.Count == 0)
+    else if (_items.Count == 0)
     {
-        <div class="string-tree-sky__empty">
+        <MudText Typo="Typo.body2" Class="text-grey pa-4 d-block text-center">
             @(_isFiltered ? "无匹配节点" : "暂无节点")
-        </div>
+        </MudText>
     }
     else
     {
-        <ul class="string-tree-sky__list">
-            @foreach (var row in _visible)
-            {
-                var isMatch = _isFiltered && _matchedIds?.Contains(row.Node.Id) == true;
-                <li class="string-tree-sky__item @(isMatch ? "string-tree-sky__item--match" : "")"
-                    style="padding-left:@(row.Level * 20)px" @key="row.Node.Id">
+        <MudTreeView T="string"
+                     Items="@_items"
+                     ServerData="@LoadServerData">
+            <ItemTemplate>
+                <MudTreeViewItem T="string"
+                                 Text="@context.Text"
+                                 Value="@context.Value"
+                                 @bind-Items="context.Children"
+                                 @bind-Expanded="context.Expanded"
+                                 CanExpand="@context.Expandable"
+                                 Icon="@(IsMatch(context.Value) ? Icons.Material.Filled.Star : context.Icon)"
+                                 IconColor="@(IsMatch(context.Value) ? Color.Warning : Color.Info)"
+                                 LoadingIconColor="Color.Info"
+                                 OnClick="@(() => SelectNodeAsync(context.Value))">
+                    @* BodyContent 的 context 是 MudTreeViewItem 组件实例（同 TreeSky，不使用），
+                       节点数据取 ItemTemplate 的 context *@
+                    <BodyContent Context="itemComponent">
+                        <MudContainer Class="d-flex justify-space-between align-center mx-0 px-0">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudText>
+                                    <MudHighlighter Text="@context.Text"
+                                                    HighlightedText="@HighlightedText"
+                                                    Class="mud-theme-primary" />
+                                </MudText>
 
-                    @if (_isFiltered)
-                    {
-                        @* 过滤态：无折叠按钮，全部展开 *@
-                        <span class="string-tree-sky__toggle string-tree-sky__toggle--leaf">
-                            @(isMatch ? "★" : "·")
-                        </span>
-                    }
-                    else if (row.Node.HasChildren)
-                    {
-                        <span class="string-tree-sky__toggle" @onclick="() => ToggleAsync(row)">@(row.Expanded ? "▼" : "▶")</span>
-                    }
-                    else
-                    {
-                        <span class="string-tree-sky__toggle string-tree-sky__toggle--leaf">•</span>
-                    }
+                                @if (!string.IsNullOrEmpty(GetSummary(context.Value)))
+                                {
+                                    <MudText Typo="Typo.caption"
+                                             Class="string-tree-sky__summary text-grey"
+                                             title="@GetSummary(context.Value)">
+                                        @GetSummary(context.Value)
+                                    </MudText>
+                                }
+                            </MudStack>
 
-                    @if (_editingId == row.Node.Id)
-                    {
-                        <input class="form-control form-control-sm d-inline-block"
-                               style="width:220px"
-                               @bind="_editingName"
-                               @bind:event="oninput"
-                               @onkeydown="OnEditKeyDown" />
-                        <button class="btn btn-sm btn-success" @onclick="() => CommitEditAsync(row.Node)">保存</button>
-                        <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">取消</button>
-                    }
-                    else
-                    {
-                        <span class="string-tree-sky__name" @ondblclick="() => StartEdit(row.Node)">@row.Node.Name</span>
-
-                        @if (!string.IsNullOrEmpty(row.Summary))
-                        {
-                            <span class="string-tree-sky__summary" title="@row.Summary">@row.Summary</span>
-                        }
-
-                        <span class="string-tree-sky__actions">
-                            @if (!_isFiltered && Options.AllowCreate)
-                            {
-                                <button class="btn btn-sm btn-link" @onclick="() => AddChildAsync(row)">＋子节点</button>
-                            }
-                            @if (!_isFiltered && Options.AllowRename)
-                            {
-                                <button class="btn btn-sm btn-link" @onclick="() => StartEdit(row.Node)">重命名</button>
-                            }
-                            @if (!_isFiltered && Options.AllowSort && row.Node.ParentId is not null)
-                            {
-                                <button class="btn btn-sm btn-link" @onclick="() => MoveUpAsync(row)">↑上移</button>
-                                <button class="btn btn-sm btn-link" @onclick="() => MoveDownAsync(row)">↓下移</button>
-                            }
-                            <button class="btn btn-sm btn-link" @onclick="() => OpenPropertiesAsync(row.Node)">属性</button>
-                            @if (!_isFiltered && Options.AllowDelete)
-                            {
-                                <button class="btn btn-sm btn-link text-danger" @onclick="() => DeleteAsync(row)">删除</button>
-                            }
-                        </span>
-                    }
-                </li>
-            }
-        </ul>
+                            <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz"
+                                           Size="Size.Medium"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => ShowNodeActionsAsync(context))" />
+                        </MudContainer>
+                    </BodyContent>
+                </MudTreeViewItem>
+            </ItemTemplate>
+        </MudTreeView>
     }
 </div>
-
-<style>
-    .string-tree-sky__item--match {
-        background-color: #fff8e1;
-        font-weight: 600;
-    }
-</style>

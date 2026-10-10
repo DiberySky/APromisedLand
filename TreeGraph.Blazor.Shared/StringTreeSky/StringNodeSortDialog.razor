@@ -1,0 +1,68 @@
+@* StringNodeSortDialog.razor
+   子项排序对话框（克隆 TreeSky TreeNodeSortDialog：上移/下移调整顺序，提交返回新顺序）。 *@
+@namespace TreeGraph.Blazor.Shared.StringTreeSky
+@using TreeGraph.Shared.StringTreeSky.Contracts
+
+<PageDialogSky Title="拖拽排序" SubmitButtonVisible
+               TitleClass="mud-theme-success px-0 pa-0"
+               OnSubmitClick="@Submit">
+    <DialogContent>
+        <MudList T="string" SelectionMode="SelectionMode.SingleSelection">
+            @for (int i = 0; i < _children.Count; i++)
+            {
+                int index = i;
+                <MudListItem T="string">
+                    <MudContainer class="d-flex align-items-center">
+                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward"
+                                       Class="mr-2"
+                                       Size="Size.Medium"
+                                       Color="Color.Info"
+                                       Disabled="@(index == 0)"
+                                       OnClick="@(() => Move(index, -1))" />
+
+                        <MudText Typo="Typo.body1">@_children[index].Name</MudText>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward"
+                                       Size="Size.Medium"
+                                       Color="Color.Info"
+                                       Disabled="@(index == _children.Count - 1)"
+                                       OnClick="@(() => Move(index, 1))"/>
+                    </MudContainer>
+                </MudListItem>
+            }
+        </MudList>
+    </DialogContent>
+</PageDialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>待排序的子节点列表（按当前 SortOrder 传入）。</summary>
+    [Parameter] public required List<StringNodeDto> Children { get; set; }
+
+    private List<StringNodeDto> _children = [];
+
+    protected override void OnInitialized()
+    {
+        _children = Children.ToList();
+    }
+
+    private void Move(int currentIndex, int offset)
+    {
+        int newIndex = currentIndex + offset;
+        if (newIndex < 0 || newIndex >= _children.Count)
+            return;
+
+        (_children[currentIndex], _children[newIndex]) = (_children[newIndex], _children[currentIndex]);
+    }
+
+    private void Submit()
+    {
+        for (int i = 0; i < _children.Count; i++)
+        {
+            _children[i].SortOrder = i;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_children));
+    }
+}

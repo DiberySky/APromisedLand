@@ -1,0 +1,8 @@
+@* CategoryTreePage.razor — CategoryTree 分类树入口（TreeSky 泛型组件） *@
+@page "/category-tree"
+@rendermode InteractiveServer
+@using TreeGraph.Blazor.Shared.TreeSky
+@using TreeGraph.Shared.TreeSky.Entities
+
+<h3>分类树（CategoryTree）</h3>
+<TreeSky TItem="CategoryTree" />

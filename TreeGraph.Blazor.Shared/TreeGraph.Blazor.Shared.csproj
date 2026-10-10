@@ -27,6 +27,12 @@
     <Compile Update="TreeSky\TreeSky.razor.Node.cs">
       <DependentUpon>TreeSky.razor</DependentUpon>
     </Compile>
+    <Compile Update="StringTreeSky\StringTreeSky.razor.Action.cs">
+      <DependentUpon>StringTreeSky.razor</DependentUpon>
+    </Compile>
+    <Compile Update="StringTreeSky\StringTreeSky.razor.Loading.cs">
+      <DependentUpon>StringTreeSky.razor</DependentUpon>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup>
