@@ -13,7 +13,7 @@
                     <MudContainer class="@("d-flex align-items-center")">
                         <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward"
                                        Class="mr-2"
-                                       Size="Size.Medium"
+                                       Size="Size.Small"
                                        Color="Color.Info"
                                        Disabled="@(index == 0)"
                                        OnClick="@(() => Move(index, -1))" />
@@ -21,7 +21,7 @@
                         <MudText Typo="Typo.body1">@_children[index].Text()</MudText>
                         <MudSpacer />
                         <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward"
-                                       Size="Size.Medium"
+                                       Size="Size.Small"
                                        Color="Color.Info"
                                        Disabled="@(index == _children.Count - 1)"
                                        OnClick="@(() => Move(index, 1))"/>
@@ -41,13 +41,7 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
-
-        // Node.Children 可能为 null（节点未展开）；x.Value 可能为 null（懒加载占位）
-        _children = Node.Children?
-            .Where(x => x.Value is not null)
-            .Select(x => x.Value!)
-            .ToList()
-            ?? new List<TItem>();
+        _children = Node.Children?.Select(x => x.Value).ToList();
     }
 
     private void Move(int currentIndex, int offset)

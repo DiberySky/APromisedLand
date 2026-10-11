@@ -3,7 +3,7 @@ using MudBlazor.Extensions;
 using TreeGraph.Blazor.Shared.TreeEavSky;
 using TreeGraph.Blazor.Shared.TreeEavSky.Nodes;
 using TreeGraph.Blazor.Shared.TreeEavSky.Contracts;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
+using TreeGraph.Blazor.Shared.TreeEavSky.Pages;
 using TreeGraph.Shared.TreeEavSky.Models;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 
@@ -274,6 +274,98 @@ public class TreeNodeDialogService<TItem>(
             Action = actionResult.Action,
             Node = actionResult.Node
         };
+    }
+
+    #endregion
+
+    #region 文件附件
+
+    public async Task<NodeActionResult<TItem>?> ShowTreeFileDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters();
+
+        var options = (config ?? new DialogConfig
+        {
+            FullScreen = true,
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowExAsync<TreeFileDialogPage<TItem>>("文件附件", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
+            return null;
+
+        return actionResult;
+    }
+
+    #endregion
+
+    #region 图片附件
+
+    public async Task<NodeActionResult<TItem>?> ShowTreeImageDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters();
+
+        var options = (config ?? new DialogConfig
+        {
+            FullScreen = true,
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowExAsync<TreeImageDialogPage<TItem>>("图片附件", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
+            return null;
+
+        return actionResult;
+    }
+
+    #endregion
+
+    #region 视频附件
+
+    public async Task<NodeActionResult<TItem>?> ShowTreeVideoDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters();
+
+        var options = (config ?? new DialogConfig
+        {
+            FullScreen = true,
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowExAsync<TreeVideoDialogPage<TItem>>("视频附件", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
+            return null;
+
+        return actionResult;
+    }
+
+    #endregion
+
+    #region 位置附件
+
+    public async Task<NodeActionResult<TItem>?> ShowTreeLocationDialogAsync(
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters();
+
+        var options = (config ?? new DialogConfig
+        {
+            FullScreen = true,
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowExAsync<TreeLocationDialogPage<TItem>>("位置附件", parameters, options);
+
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
+            return null;
+
+        return actionResult;
     }
 
     #endregion

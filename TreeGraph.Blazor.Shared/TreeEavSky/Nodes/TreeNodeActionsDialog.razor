@@ -60,13 +60,6 @@
         }
     </DialogLeftActions>
     <DialogRightActions>
-        <MudButton OnClick="OnView"
-                   Variant="Variant.Text"
-                   Color="Color.Info"
-                   StartIcon="@Icons.Material.Outlined.Visibility">
-            查看详情
-        </MudButton>
-
         @if (NodeTemplate.Node.Value!.CanHaveChildren
              || NodeTemplate.Node.Children?.Count > 1)
         {
@@ -99,12 +92,13 @@
             </MudButton>
         }
 
-        <MudButton OnClick="OnAttribute"
-                   Variant="Variant.Text"
-                   Color="Color.Default"
-                   StartIcon="@Icons.Material.Outlined.Info">
-            属性
-        </MudButton>
+        @* <MudButton OnClick="@OnAttribute" *@
+        @*            Variant="Variant.Text" *@
+        @*            Color="Color.Info" *@
+        @*            StartIcon="@Icons.Material.Outlined.EditAttributes"> *@
+        @*     属性 *@
+        @* </MudButton> *@
+
     </DialogRightActions>
 </DialogSky>
 
@@ -114,11 +108,6 @@
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
-
-    private void OnView()
-    {
-        CloseWithAction(NodeAction.View);
-    }
 
     private void OnAttribute()
     {
