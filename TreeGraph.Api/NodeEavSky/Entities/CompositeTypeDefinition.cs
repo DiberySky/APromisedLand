@@ -34,9 +34,9 @@ public class CompositeFieldDefinition
     public string? RefCompositeTypeId { get; set; }
     public CompositeTypeDefinition? RefCompositeType { get; set; }
 
-    /// <summary>数量字段的基准单位（仅 DataType = "decimal" 允许）</summary>
-    public Guid? UnitId { get; set; }
-    public Unit? Unit { get; set; }
+    /// <summary>数量字段绑定的单位（指向 unit_trees 节点 Id，仅 DataType = "decimal" 允许）</summary>
+    public string? UnitId { get; set; }
+    public TreeGraph.Shared.TreeEavSky.Entities.UnitTree? Unit { get; set; }
 
     /// <summary>
     /// ★ #8：选项集引用（仅 DataType = "single_choice" 允许）。

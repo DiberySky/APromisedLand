@@ -1,0 +1,267 @@
+@* TableRowManageDialog.razor — 自定义表行管理（一级弹窗）
+   MudTable 行摘要 + 添加/编辑（二级弹窗 TableRowEditDialog，行级增量 Upsert）+ 删除（DELETE 行端点）。 *@
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+@using System.Text.Json
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<DialogSky Title="@DisplayName"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭">
+    <DialogContent>
+        <div class="d-flex align-center mb-3">
+            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">行数据</MudText>
+            <MudSpacer />
+            @if (!ReadOnly)
+            {
+                <MudButton Size="Size.Small"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@(() => OpenEditDialogAsync(null))"
+                           Disabled="@(_tableDef is null || _activeColumns.Count == 0)">
+                    添加行
+                </MudButton>
+            }
+        </div>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_loadError is not null)
+        {
+            <MudAlert Severity="Severity.Warning">@_loadError</MudAlert>
+        }
+        else if (_activeColumns.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">
+                该表没有定义任何活动列，无法录入数据。
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable T="CustomTableRowValue"
+                      Items="_rows"
+                      Dense="true"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      FixedHeader="true"
+                      Class="table-row-manage-table">
+                <HeaderContent>
+                    @if (!RecordMode)
+                    {
+                        <MudTh Style="width:56px">序号</MudTh>
+                    }
+                    @foreach (var col in _activeColumns)
+                    {
+                        <MudTh>@col.DisplayName</MudTh>
+                    }
+                    @if (!ReadOnly)
+                    {
+                        <MudTh Style="width:96px;text-align:right">操作</MudTh>
+                    }
+                </HeaderContent>
+                <RowTemplate>
+                    @if (!RecordMode)
+                    {
+                        <MudTd DataLabel="序号" Class="mud-text-secondary">
+                            @(_rows.IndexOf(context) + 1)
+                        </MudTd>
+                    }
+                    @foreach (var col in _activeColumns)
+                    {
+                        <MudTd DataLabel="@col.DisplayName">
+                            @FormatCell(context, col.ColumnName)
+                        </MudTd>
+                    }
+                    @if (!ReadOnly)
+                    {
+                        <MudTd DataLabel="操作" Style="text-align:right">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => OpenEditDialogAsync(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteRowAsync(context))" />
+                        </MudTd>
+                    }
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Align="Align.Center" Class="py-8">暂无行数据</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter, EditorRequired] public string EntityType { get; set; } = "";
+    [Parameter, EditorRequired] public string EntityId { get; set; } = "";
+    [Parameter, EditorRequired] public string TableName { get; set; } = "";
+    [Parameter, EditorRequired] public string DisplayName { get; set; } = "";
+    [Parameter, EditorRequired] public string RefTableDefinitionId { get; set; } = "";
+    [Parameter] public bool ReadOnly { get; set; }
+    /// <summary>记录模式（record 类型）：屏蔽序号列。</summary>
+    [Parameter] public bool RecordMode { get; set; }
+
+    private CustomTableDetailDto? _tableDef;
+    private List<CustomTableRowValue> _rows = new();
+    private List<CustomTableColumnDto> _activeColumns = new();
+    private bool _loading;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _tableDef = await Api.GetCustomTableAsync(RefTableDefinitionId);
+            if (_tableDef is null)
+            {
+                _loadError = "无法加载表结构。请检查后端服务或该表的元数据。";
+                return;
+            }
+
+            _activeColumns = _tableDef.Columns
+                .Where(c => !c.IsDeleted)
+                .OrderBy(c => c.DisplayOrder)
+                .ToList();
+
+            var tableValue = await Api.LoadCustomTableAsync(EntityType, EntityId, TableName);
+            if (tableValue is null)
+            {
+                _loadError = $"加载表数据「{TableName}」失败";
+                return;
+            }
+
+            var activeNames = _activeColumns.Select(c => c.ColumnName).ToHashSet();
+            _rows = tableValue.Rows
+                .OrderBy(r => r.RowOrder)
+                .Select(r => new CustomTableRowValue
+                {
+                    RowId = r.RowId,
+                    RowOrder = r.RowOrder,
+                    Fields = r.Fields
+                        .Where(kv => activeNames.Contains(kv.Key))
+                        .ToDictionary(kv => kv.Key, kv => kv.Value)
+                })
+                .ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>打开二级弹窗：row 为 null 时新增。保存成功后重新加载行列表。</summary>
+    private async Task OpenEditDialogAsync(CustomTableRowValue? row)
+    {
+        if (_tableDef is null) return;
+
+        var parameters = new DialogParameters<TableRowEditDialog>
+        {
+            { x => x.EntityType, EntityType },
+            { x => x.EntityId, EntityId },
+            { x => x.TableName, TableName },
+            { x => x.TableDef, _tableDef },
+            { x => x.EditRow, row },
+            { x => x.NextRowOrder, _rows.Count }
+        };
+
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+
+        var dialog = await DialogService.ShowExAsync<TableRowEditDialog>(
+            row is null ? $"新增行 · {DisplayName}" : $"编辑行 · {DisplayName}",
+            parameters, options);
+
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteRowAsync(CustomTableRowValue row)
+    {
+        var index = _rows.IndexOf(row) + 1;
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除第 {index} 行？此操作不可撤销。",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        if (row.RowId is null)
+        {
+            // 理论上不会出现：新增行在二级弹窗保存时即落库
+            _rows.Remove(row);
+            return;
+        }
+
+        var (ok, error) = await Api.DeleteCustomTableRowAsync(
+            EntityType, EntityId, TableName, row.RowId);
+
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error}", Severity.Error);
+        }
+    }
+
+    /// <summary>行摘要单元格文本：空值占位、布尔中文化、JSON 压缩截断。</summary>
+    private static string FormatCell(CustomTableRowValue row, string columnName)
+    {
+        if (!row.Fields.TryGetValue(columnName, out var raw) || raw is null)
+            return "-";
+
+        var text = raw switch
+        {
+            JsonElement je => je.ValueKind switch
+            {
+                JsonValueKind.Null => "-",
+                JsonValueKind.True => "是",
+                JsonValueKind.False => "否",
+                JsonValueKind.String => je.GetString() ?? "",
+                JsonValueKind.Object or JsonValueKind.Array => CompactJson(je.GetRawText()),
+                _ => je.ToString()
+            },
+            bool b => b ? "是" : "否",
+            _ => raw.ToString() ?? ""
+        };
+
+        const int max = 40;
+        return text.Length > max ? text[..max] + "…" : text;
+    }
+
+    private static string CompactJson(string raw)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            return JsonSerializer.Serialize(doc.RootElement,
+                new JsonSerializerOptions { WriteIndented = false });
+        }
+        catch
+        {
+            return raw;
+        }
+    }
+}

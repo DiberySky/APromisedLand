@@ -84,12 +84,10 @@ else
             <MudText Typo="Typo.h6" Class="mb-3">子表数据</MudText>
             @foreach (var attr in _tableAttributes)
             {
-                <CustomTableEditor EntityType="@EntityType"
-                                   EntityId="@(_entityId ?? "")"
-                                   AttributeName="@attr.AttributeName"
-                                   TableName="@attr.AttributeName"
-                                   DisplayName="@attr.DisplayName"
-                                   RefTableDefinitionId="@attr.RefTableDefinitionId" />
+                <TableField Attr="attr"
+                            EntityType="EntityType"
+                            EntityId="@(_entityId ?? "")"
+                            RecordMode="@(attr.DataType == "record")" />
             }
         </MudPaper>
     }
@@ -189,8 +187,8 @@ else
             var schema = await Api.GetSchemaAsync(EntityType);
             _schema = schema ?? Array.Empty<AttributeSchemaDto>();
 
-            _regularAttributes = _schema.Where(a => a.DataType != "table").ToList();
-            _tableAttributes = _schema.Where(a => a.DataType == "table").ToList();
+            _regularAttributes = _schema.Where(a => a.DataType is not ("table" or "record")).ToList();
+            _tableAttributes = _schema.Where(a => a.DataType is "table" or "record").ToList();
 
             _values.Clear();
             var entity = await Api.GetInodeEntityAsync(InodeId, EntityType);
@@ -364,7 +362,7 @@ else
         {
             "string" => elem.ValueKind == JsonValueKind.String
                 ? elem.GetString() : elem.ToString(),
-            "int" => schema.Unit is not null
+            "int" => !string.IsNullOrEmpty(schema.UnitId)
                 ? JsonToNumeric(elem)
                 : (elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
                   : elem.ValueKind == JsonValueKind.String
@@ -396,9 +394,9 @@ else
         if (elem.ValueKind == JsonValueKind.Object)
         {
             var val = elem.GetProperty("value").GetDecimal();
-            Guid? unitId = elem.TryGetProperty("unitId", out var u)
-                            && u.ValueKind == JsonValueKind.String
-                ? Guid.Parse(u.GetString()!)
+            string? unitId = elem.TryGetProperty("unitId", out var u)
+                             && u.ValueKind == JsonValueKind.String
+                ? u.GetString()
                 : null;
             return new NumericInput { Value = val, UnitId = unitId };
         }

@@ -38,7 +38,7 @@ builder.Services.AddTreeEavSky(
         httpBuilder.AddStandardResilienceHandler(NonIdempotentResilience.Configure));
 
 #if DEBUG
-// 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService，PageDialogSky 标题栏 DevDialogSourceButton 据此反查 .razor 文件。
+// 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService，DialogSky 等对话框标题栏 DevDialogSourceButton 据此反查 .razor 文件。
 // 必须排在 AddTreeEavSky（内部 AddMudExtensions 会重注册 MudExDialogService）之后注册，
 // 否则 AddMudExtensions 的 Remove(首个 IDialogService) 会把本装饰器删掉；装饰器自身实现
 // IMudExDialogService 并透传，保证 ShowExAsync 的「is IMudExDialogService」判定仍成立、最大化按钮不丢失。

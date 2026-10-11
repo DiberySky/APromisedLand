@@ -1,29 +1,34 @@
-@* OptionSets.razor — 选项集管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/OptionSet*Dialog.razor） *@
+@* OptionSets.razor — 选项集管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/OptionSet*Dialog.razor）
+   支持对话框模式：IsDialogMode=true 时隐藏 PageHeaderSky。 *@
 @page "/metadata/option-sets"
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-<PageTitle>选项集管理</PageTitle>
 
-<PageHeaderSky Title="选项集管理">
-    <Actions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   Size="Size.Small"
-                   OnClick="LoadAsync" Disabled="_loading"
-                   StartIcon="@Icons.Material.Filled.Refresh">
-            刷新
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Success"
-                   Size="Size.Small"
-                   OnClick="OpenCreateSetAsync"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   Class="ml-2">
-            新建选项集
-        </MudButton>
-    </Actions>
-</PageHeaderSky>
+@if (!IsDialogMode)
+{
+    <PageTitle>选项集管理</PageTitle>
 
-@* 过滤器栏（无 MudPaper 包裹） *@
+    <PageHeaderSky Title="选项集管理">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Size="Size.Small"
+                       OnClick="LoadAsync" Disabled="_loading"
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       Size="Size.Small"
+                       OnClick="OpenCreateSetAsync"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Class="ml-2">
+                新建选项集
+            </MudButton>
+        </Actions>
+    </PageHeaderSky>
+}
+
+@* 过滤器栏（无 MudPaper 包裹）；对话框模式下追加新建按钮 *@
 <MudGrid Class="mb-4">
     <MudItem xs="12" md="4" Class="d-flex align-center">
         <MudTextField @bind-Value="_entityType" Label="实体类型（可选）"
@@ -31,11 +36,28 @@
                       Placeholder="留空显示全部（含 Shared）" />
     </MudItem>
     <MudItem xs="12" md="2" Class="d-flex align-center">
-        @* ★ 显示已删除开关 *@
         <MudSwitch T="bool" @bind-Value="_includeDeleted"
                    Label="显示已删除"
                    Color="Color.Warning" />
     </MudItem>
+    @if (IsDialogMode)
+    {
+        <MudItem xs="12" md="6" Class="d-flex justify-end align-center">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Size="Size.Small"
+                       OnClick="LoadAsync" Disabled="@_loading"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Class="mr-2">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       Size="Size.Small"
+                       OnClick="OpenCreateSetAsync"
+                       StartIcon="@Icons.Material.Filled.Add">
+                新建选项集
+            </MudButton>
+        </MudItem>
+    }
 </MudGrid>
 
 @if (_loading)
@@ -250,6 +272,9 @@ else
 }
 
 @code {
+    /// <summary>对话框模式：隐藏页头，刷新/新建按钮移至过滤器栏右侧。</summary>
+    [Parameter] public bool IsDialogMode { get; set; }
+
     private string? _entityType;
     private bool _includeDeleted;               // ★ 新增
     private IReadOnlyList<OptionSetSummaryDto>? _sets;
@@ -257,7 +282,7 @@ else
     private bool _loading;
     private bool _initialized;
 
-    /// <summary>桌面端对话框选项：PageDialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
+    /// <summary>桌面端对话框选项：DialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
     private static readonly DialogOptions DialogOptions = new()
     {
         MaxWidth = MaxWidth.Small,

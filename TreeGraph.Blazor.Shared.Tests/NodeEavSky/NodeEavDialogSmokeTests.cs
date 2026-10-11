@@ -16,9 +16,9 @@ namespace TreeGraph.Blazor.Shared.Tests.NodeEavSky;
 /// <summary>
 /// NodeEav 对话框组件冒烟测试。
 ///
-/// 目的：验证 17 个由内联 MudDialog 抽取为独立 DialogService 组件的对话框
-/// 能经真实 MudDialogProvider + IDialogService 链路正常渲染（不抛异常、
-/// PageDialogSky 外壳生效、标题正确）。提交逻辑涉及 API 调用，不在本冒烟范围。
+/// 目的：验证由内联 MudDialog 抽取为独立 DialogService 组件的对话框（含行管理/
+/// 行编辑两级弹窗）能经真实 MudDialogProvider + IDialogService 链路正常渲染
+/// （不抛异常、DialogSky 外壳生效、标题正确）。提交逻辑涉及 API 调用，不在本冒烟范围。
 /// </summary>
 public class NodeEavDialogSmokeTests : BunitTestBase
 {
@@ -33,6 +33,10 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             BaseAddress = new Uri("http://localhost/")
         });
         Services.AddSingleton<EavApiClient>();
+        // UnitTreeField 注入 TreeNodeDialogService<UnitTree>（仅渲染，不弹窗）
+        Services.AddScoped<TreeGraph.Blazor.Shared.TreeEavSky.Dialogs.BlazorService>();
+        Services.AddScoped(
+            typeof(TreeGraph.Blazor.Shared.TreeEavSky.Dialogs.TreeNodeDialogService<>));
     }
 
     private async Task<IRenderedComponent<MudDialogProvider>> OpenAsync<TDialog>(
@@ -54,14 +58,6 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         Assert.Contains(title, provider.Find(".mud-dialog-title").TextContent,
             StringComparison.Ordinal);
     }
-
-    private static UnitDto Unit() => new(
-        Id: Guid.NewGuid(), Category: "长度", Name: "米", Symbol: "m",
-        ToBaseFactor: 1m, IsBaseUnit: true, DisplayOrder: 1);
-
-    private static UnitCategoryDto Category() => new(
-        Category: "长度", BaseUnit: Unit(),
-        Units: new List<UnitDto> { Unit() });
 
     private static OptionSetSummaryDto OptionSet() => new(
         OptionSetId: "os-1", EntityType: "Product", SetName: "colors",
@@ -87,7 +83,8 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         DataType: "string", RefCompositeTypeId: null, IsArray: false,
         IsRequired: false, IsSearchable: true, IsSortable: true,
         DisplayOrder: 1, DefaultValue: null, AllowedValues: null,
-        ValidationRule: null, UnitId: null, RefOptionSetId: null,
+        ValidationRule: null, UnitId: null, UnitName: null, UnitAbbreviation: null,
+        RefOptionSetId: null,
         OptionSetName: null, OptionSetDisplayName: null, IsDeleted: false);
 
     private static CustomTableDetailDto CustomTable() => new(
@@ -108,47 +105,11 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         IsSearchable: true, IsSortable: true, IsDeleted: false, Version: 1,
         DisplayOrder: 1, DefaultValue: null, CreatedAt: DateTimeOffset.UtcNow,
         UpdatedAt: DateTimeOffset.UtcNow, AllowedValues: null, ValidationRule: null,
-        UnitId: null, UnitName: null, UnitSymbol: null, UnitCategory: null,
+        UnitId: null, UnitName: null, UnitAbbreviation: null,
         RefCompositeTypeId: null, CompositeTypeName: null,
         CompositeTypeDisplayName: null, RefTableDefinitionId: null,
         TableName: null, TableDisplayName: null, RefOptionSetId: null,
         OptionSetName: null, OptionSetDisplayName: null);
-
-    // ─── Units ───
-
-    [Fact]
-    public async Task UnitCreateDialog_Renders()
-        => AssertDialog(await OpenAsync<UnitCreateDialog>(), "新建单位");
-
-    [Fact]
-    public async Task UnitEditDialog_Renders()
-        => AssertDialog(await OpenAsync<UnitEditDialog>(new DialogParameters<UnitEditDialog>
-        {
-            { x => x.Unit, Unit() },
-            { x => x.Categories, new[] { "长度" } },
-        }), "编辑单位");
-
-    [Fact]
-    public async Task UnitMigrateDialog_Renders()
-        => AssertDialog(await OpenAsync<UnitMigrateDialog>(new DialogParameters<UnitMigrateDialog>
-        {
-            { x => x.Unit, Unit() },
-            { x => x.Categories, new[] { "长度" } },
-        }), "迁移到其它分类");
-
-    [Fact]
-    public async Task UnitRecalculateDialog_Renders()
-        => AssertDialog(await OpenAsync<UnitRecalculateDialog>(new DialogParameters<UnitRecalculateDialog>
-        {
-            { x => x.Unit, Unit() },
-        }), "修改换算系数并重算");
-
-    [Fact]
-    public async Task UnitAssignBaseDialog_Renders()
-        => AssertDialog(await OpenAsync<UnitAssignBaseDialog>(new DialogParameters<UnitAssignBaseDialog>
-        {
-            { x => x.Category, Category() },
-        }), "指定基准单位");
 
     // ─── OptionSets ───
 
@@ -202,7 +163,6 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             { x => x.Type, CompositeType() },
             { x => x.EditingField, CompositeField() },
             { x => x.InitialDisplayOrder, 1 },
-            { x => x.Units, new[] { Unit() } },
             { x => x.OptionSets, new[] { OptionSet() } },
             { x => x.NestedTypes, new[] { CompositeType() } },
         }), "编辑字段");
@@ -229,6 +189,48 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             { x => x.CompositeTypes, new[] { CompositeType() } },
         }), "编辑列");
 
+    [Fact]
+    public async Task TableRowManageDialog_Renders()
+        => AssertDialog(await OpenAsync<TableRowManageDialog>(new DialogParameters<TableRowManageDialog>
+        {
+            { x => x.EntityType, "Product" },
+            { x => x.EntityId, "p-1" },
+            { x => x.TableName, "specs" },
+            { x => x.DisplayName, "规格" },
+            { x => x.RefTableDefinitionId, "t-1" },
+        }), "规格");
+
+    [Fact]
+    public async Task TableRowEditDialog_Create_Renders()
+        => AssertDialog(await OpenAsync<TableRowEditDialog>(new DialogParameters<TableRowEditDialog>
+        {
+            { x => x.EntityType, "Product" },
+            { x => x.EntityId, "p-1" },
+            { x => x.TableName, "specs" },
+            { x => x.TableDef, CustomTableWithColumn() },
+            { x => x.NextRowOrder, 0 },
+        }), "新增行");
+
+    [Fact]
+    public async Task TableRowEditDialog_Edit_Renders()
+        => AssertDialog(await OpenAsync<TableRowEditDialog>(new DialogParameters<TableRowEditDialog>
+        {
+            { x => x.EntityType, "Product" },
+            { x => x.EntityId, "p-1" },
+            { x => x.TableName, "specs" },
+            { x => x.TableDef, CustomTableWithColumn() },
+            { x => x.EditRow, new CustomTableRowValue
+                {
+                    RowId = "r-1", RowOrder = 0,
+                    Fields = new Dictionary<string, object?> { ["weight"] = 12m }
+                } },
+        }), "编辑行");
+
+    private static CustomTableDetailDto CustomTableWithColumn() => new(
+        TableDefinitionId: "t-1", EntityType: "Product", TableName: "specs",
+        DisplayName: "规格", Version: 1, DisplayOrder: 1,
+        Columns: new[] { CustomColumn() }, IsDeleted: false);
+
     // ─── Attributes ───
 
     [Fact]
@@ -238,7 +240,6 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             { x => x.EntityType, "Product" },
             { x => x.InitialDisplayOrder, 1 },
             { x => x.EntityTypes, new[] { new EntityTypeSummaryDto("Product", 0, 0, "产品", "et-1", "产品") } },
-            { x => x.Units, new[] { Unit() } },
             { x => x.CompositeTypes, new[] { CompositeType() } },
             { x => x.CustomTables, new[] { CustomTable() } },
             { x => x.OptionSets, new[] { OptionSet() } },
@@ -249,7 +250,6 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         => AssertDialog(await OpenAsync<AttributeEditDialog>(new DialogParameters<AttributeEditDialog>
         {
             { x => x.Attribute, Attribute() },
-            { x => x.Units, new[] { Unit() } },
             { x => x.CompositeTypes, new[] { CompositeType() } },
             { x => x.CustomTables, new[] { CustomTable() } },
             { x => x.OptionSets, new[] { OptionSet() } },

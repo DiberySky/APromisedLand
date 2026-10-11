@@ -1,30 +1,34 @@
-@* CompositeTypes.razor — 组合类型管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/CompositeType*Dialog.razor） *@
+@* CompositeTypes.razor — 组合类型管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/CompositeType*Dialog.razor）
+   支持对话框模式：IsDialogMode=true 时隐藏 PageHeaderSky。 *@
 @page "/metadata/composite-types"
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageTitle>组合类型管理</PageTitle>
+@if (!IsDialogMode)
+{
+    <PageTitle>组合类型管理</PageTitle>
 
-<PageHeaderSky Title="组合类型管理">
-    <Actions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   Size="Size.Small"
-                   OnClick="LoadAsync" Disabled="_loading"
-                   StartIcon="@Icons.Material.Filled.Refresh">
-            刷新
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Success"
-                   Size="Size.Small"
-                   OnClick="OpenCreateTypeAsync"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   Class="ml-2">
-            新建组合类型
-        </MudButton>
-    </Actions>
-</PageHeaderSky>
+    <PageHeaderSky Title="组合类型管理">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Size="Size.Small"
+                       OnClick="LoadAsync" Disabled="_loading"
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       Size="Size.Small"
+                       OnClick="OpenCreateTypeAsync"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Class="ml-2">
+                新建组合类型
+            </MudButton>
+        </Actions>
+    </PageHeaderSky>
+}
 
-@* 过滤器栏（无 MudPaper 包裹） *@
+@* 过滤器栏；对话框模式下追加刷新/新建按钮 *@
 <MudGrid Class="mb-4">
     <MudItem xs="12" md="4" Class="d-flex align-center">
         <MudTextField @bind-Value="_entityType" Label="实体类型（可选）"
@@ -32,11 +36,28 @@
                       Placeholder="留空显示全部" />
     </MudItem>
     <MudItem xs="12" md="2" Class="d-flex align-center">
-        @* ★ 显示已删除开关 *@
         <MudSwitch T="bool" @bind-Value="_includeDeleted"
                    Label="显示已删除"
                    Color="Color.Warning" />
     </MudItem>
+    @if (IsDialogMode)
+    {
+        <MudItem xs="12" md="6" Class="d-flex justify-end align-center">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Size="Size.Small"
+                       OnClick="LoadAsync" Disabled="@_loading"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Class="mr-2">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       Size="Size.Small"
+                       OnClick="OpenCreateTypeAsync"
+                       StartIcon="@Icons.Material.Filled.Add">
+                新建组合类型
+            </MudButton>
+        </MudItem>
+    }
 </MudGrid>
 
 @if (_loading)
@@ -258,6 +279,9 @@ else
 }
 
 @code {
+    /// <summary>对话框模式：隐藏页头，刷新/新建按钮移至过滤器栏右侧。</summary>
+    [Parameter] public bool IsDialogMode { get; set; }
+
     private string? _entityType;
     private bool _includeDeleted;               // ★ 新增
     private IReadOnlyList<CompositeTypeDetailDto>? _types;
@@ -265,10 +289,9 @@ else
     private bool _initialized;
 
     // 引用数据（供字段对话框使用）
-    private IReadOnlyList<UnitDto>? _units;
     private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
 
-    /// <summary>桌面端对话框选项：PageDialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
+    /// <summary>桌面端对话框选项：DialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
     private static readonly DialogOptions DialogOptions = new()
     {
         MaxWidth = MaxWidth.Medium,
@@ -285,21 +308,13 @@ else
         StateHasChanged();
     }
 
-    /// <summary>并行加载单位与选项集。</summary>
+    /// <summary>加载选项集引用。</summary>
     private async Task LoadReferencesAsync()
     {
-        var unitsTask = Api.ListUnitsAsync();
-        var optTask = Api.ListOptionSetsAsync();
-        await Task.WhenAll(unitsTask, optTask);
+        _optionSets = await Api.ListOptionSetsAsync();
 
-        _units = unitsTask.Result;
-        _optionSets = optTask.Result;
-
-        var failed = new List<string>();
-        if (_units is null) failed.Add("单位");
-        if (_optionSets is null) failed.Add("选项集");
-        if (failed.Count > 0)
-            Snackbar.Add($"引用加载失败：{string.Join("、", failed)}", Severity.Warning);
+        if (_optionSets is null)
+            Snackbar.Add("引用加载失败：选项集", Severity.Warning);
     }
 
     private async Task LoadAsync()
@@ -436,7 +451,6 @@ else
         {
             { x => x.Type, type },
             { x => x.InitialDisplayOrder, type.Fields.Count(f => !f.IsDeleted) + 1 },
-            { x => x.Units, _units },
             { x => x.OptionSets, _optionSets },
             { x => x.NestedTypes, GetNestedTypeOptions(type) }
         };
@@ -458,7 +472,6 @@ else
         {
             { x => x.Type, type },
             { x => x.EditingField, field },
-            { x => x.Units, _units },
             { x => x.OptionSets, _optionSets },
             { x => x.NestedTypes, GetNestedTypeOptions(type) }
         };

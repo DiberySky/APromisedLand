@@ -165,7 +165,7 @@
                 .ToList();
 
             _previewColumns = schema
-                .Where(a => a.IsSearchable && a.DataType != "table" && a.DataType != "composite")
+                .Where(a => a.IsSearchable && a.DataType is not ("table" or "record" or "composite"))
                 .OrderBy(a => a.DisplayOrder)
                 .Take(3)
                 .Select(a => a.AttributeName)

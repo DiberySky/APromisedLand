@@ -1,8 +1,8 @@
-@* CompositeTypeCreateDialog.razor — 新建组合类型（PageDialogSky 外壳，DialogService 模式） *@
+@* CompositeTypeCreateDialog.razor — 新建组合类型（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
-<PageDialogSky Title="新建组合类型"
+<DialogSky Title="新建组合类型"
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
                SubmitButtonDisabled="@_submitting"
@@ -23,7 +23,7 @@
                       Placeholder="地址"
                       Variant="Variant.Outlined" />
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

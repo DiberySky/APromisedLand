@@ -11,25 +11,20 @@ public class EavReadService
     private readonly TreeGraphDbContext _db;
     private readonly IAttributeCache _attrCache;
     private readonly CompositeValueService _composite;
-    private readonly IUnitCache _unitCache;
-    private readonly UnitConverter _converter;
     private readonly IOptionSetCache _optionSetCache;
 
     public EavReadService(
         TreeGraphDbContext db, IAttributeCache attrCache, CompositeValueService composite,
-        IUnitCache unitCache, UnitConverter converter, IOptionSetCache optionSetCache)
+        IOptionSetCache optionSetCache)
     {
         _db = db;
         _attrCache = attrCache;
         _composite = composite;
-        _unitCache = unitCache;
-        _converter = converter;
         _optionSetCache = optionSetCache;
     }
 
-    /// <param name="originalUnits">true 时数量值按原始输入单位还原（UI 展示）；默认返回基准单位</param>
     public async Task<DynamicEntity> LoadAsync(
-        string entityId, string entityType, bool originalUnits = false,
+        string entityId, string entityType,
         CancellationToken ct = default)
     {
         var definitions = _attrCache.GetDefinitions(entityType);
@@ -49,7 +44,7 @@ public class EavReadService
         foreach (var row in rows)
         {
             if (!defMap.TryGetValue(row.AttributeId, out var def)) continue;
-            var value = ExtractTypedValue(row, def, originalUnits);
+            var value = ExtractTypedValue(row, def);
             result.SetProperty(def.AttributeName, value);
         }
 
@@ -58,7 +53,7 @@ public class EavReadService
 
     public async Task<List<DynamicEntity>> LoadBatchAsync(
         IEnumerable<string> entityIds, string entityType,
-        bool originalUnits = false, CancellationToken ct = default)
+        CancellationToken ct = default)
     {
         var ids = entityIds.ToList();
         var definitions = _attrCache.GetDefinitions(entityType);
@@ -86,7 +81,7 @@ public class EavReadService
                 if (defMap.TryGetValue(row.AttributeId, out var def))
                 {
                     entity.SetProperty(def.AttributeName,
-                        ExtractTypedValue(row, def, originalUnits));
+                        ExtractTypedValue(row, def));
                 }
             }
             return entity;
@@ -95,23 +90,23 @@ public class EavReadService
         .ToList();
     }
 
-    private object? ExtractTypedValue(AttributeValue row, AttributeDefinition def, bool originalUnits)
+    private object? ExtractTypedValue(AttributeValue row, AttributeDefinition def)
     {
         return def.DataType switch
         {
             EavDataTypes.String => row.ValueString,
             EavDataTypes.SingleChoice => ExtractSingleChoice(row, def),
 
-            // ★ int + 单位：读 ValueDecimal（归一化后的值）
+            // ★ int + 单位：读 ValueDecimal
             EavDataTypes.Int when def.UnitId is not null => ExtractNumericValue(
-                row.ValueDecimal, row.UnitId, def, originalUnits),
+                row.ValueDecimal, row.UnitId, def),
 
             // int 无单位：读 ValueInt
             EavDataTypes.Int => ExtractNumericValue(
-                row.ValueInt is { } i ? i : null, row.UnitId, def, originalUnits),
+                row.ValueInt is { } i ? i : null, row.UnitId, def),
 
             EavDataTypes.Decimal => ExtractNumericValue(
-                row.ValueDecimal, row.UnitId, def, originalUnits),
+                row.ValueDecimal, row.UnitId, def),
             EavDataTypes.Bool => row.ValueBool,
             EavDataTypes.Datetime => row.ValueDatetime,
             EavDataTypes.Date => row.ValueDateOnly,
@@ -120,9 +115,7 @@ public class EavReadService
             EavDataTypes.Json => row.ValueJsonb,
             EavDataTypes.Composite => row.ValueJsonb is null
                 ? null
-                // ★ #4：组合反序列化支持 originalUnits 参数
-                : _composite.Deserialize(
-                    row.ValueJsonb, def.RefCompositeTypeId!, originalUnits),
+                : _composite.Deserialize(row.ValueJsonb, def.RefCompositeTypeId!),
             _ => null
         };
     }
@@ -147,37 +140,24 @@ public class EavReadService
     /// <summary>
     /// 数值列还原。
     ///
-    /// ★ 修复：当属性未绑定基准单位时，int 类型必须返回 long（而非 decimal），
+    /// ★ 当属性未绑定单位时，int 类型必须返回 long（而非 decimal），
     /// 否则前端会收到 decimal 的 JSON 数字（含小数位）与 API 契约不符。
+    /// 绑定单位时返回 NumericValue（单位仅作记录，取输入时记录的单位）。
     /// </summary>
     private object? ExtractNumericValue(
-        decimal? baseValue, Guid? originalUnitId, AttributeDefinition def, bool originalUnits)
+        decimal? value, string? recordUnitId, AttributeDefinition def)
     {
-        if (baseValue is null) return null;
+        if (value is null) return null;
 
-        if (def.UnitId is not { } baseUnitId)
+        if (def.UnitId is not { } unitId)
         {
             // 无单位绑定：按数据类型返回对应 C# 类型
             return def.DataType == EavDataTypes.Int
-                ? (object)(long)baseValue.Value
-                : baseValue.Value;
+                ? (object)(long)value.Value
+                : value.Value;
         }
 
-        if (!originalUnits)
-            return new NumericValue(baseValue.Value, baseUnitId);
-
-        if (originalUnitId is not { } ou || ou == baseUnitId)
-            return new NumericValue(baseValue.Value, baseUnitId);
-
-        try
-        {
-            var restored = _converter.FromBase(baseValue.Value, baseUnitId, ou);
-            return new NumericValue(restored, ou);
-        }
-        catch (InvalidOperationException)
-        {
-            return new NumericValue(baseValue.Value, baseUnitId);
-        }
+        return new NumericValue(value.Value, recordUnitId ?? unitId);
     }
 
     public async Task<List<AttributeAuditLog>> GetHistoryAsync(

@@ -18,25 +18,6 @@ public sealed class InMemoryCompositeTypeCache : ICompositeTypeCache
     public void Invalidate(string id) => _types.Remove(id);
 }
 
-public sealed class InMemoryUnitCache : IUnitCache
-{
-    private readonly List<Unit> _units = new();
-
-    public void Add(Unit u) => _units.Add(u);
-    public void Clear() => _units.Clear();
-
-    public Unit Get(Guid id)
-        => _units.FirstOrDefault(u => u.Id == id)
-           ?? throw new InvalidOperationException($"Unit {id} 不存在");
-
-    public IReadOnlyList<Unit> GetAll() => _units;
-    public IReadOnlyList<Unit> GetByCategory(string category)
-        => _units.Where(u => u.Category == category).ToList();
-    public Unit? GetBaseUnit(string category)
-        => _units.FirstOrDefault(u => u.Category == category && u.IsBaseUnit);
-    public void Invalidate() { }
-}
-
 public sealed class InMemoryOptionSetCache : IOptionSetCache
 {
     private readonly Dictionary<string, OptionSet> _sets = new();

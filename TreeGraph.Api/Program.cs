@@ -41,11 +41,8 @@ builder.Services.AddScoped<IInodeEntityService, InodeEntityService>();
 builder.Services.AddScoped<InodeEavFacade>();
 builder.Services.AddSingleton<IAttributeCache, AttributeCache>();
 builder.Services.AddSingleton<ICompositeTypeCache, CompositeTypeCache>();
-builder.Services.AddSingleton<IUnitCache, UnitCache>();
-builder.Services.AddSingleton<UnitConverter>();
 builder.Services.AddSingleton<ICustomTableCache, CustomTableCache>();
 builder.Services.AddSingleton<IOptionSetCache, OptionSetCache>();
-builder.Services.AddScoped<UnitSeedService>();
 builder.Services.AddScoped<CustomTableValidationService>();
 builder.Services.AddScoped<CustomTableWriteService>();
 builder.Services.AddScoped<CustomTableReadService>();
@@ -87,7 +84,6 @@ if (!EF.IsDesignTime)
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
     await db.Database.MigrateAsync();
-    await scope.ServiceProvider.GetRequiredService<UnitSeedService>().SeedAsync();
     await EavSeeder.SeedAsync(db);
 
     // E2E 基线（item/user/project + 固定 EntityId 示例值）仅开发/测试环境注入

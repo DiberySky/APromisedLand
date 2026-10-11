@@ -11,28 +11,22 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 public class EavValidationService
 {
     private readonly ICompositeTypeCache _compositeCache;
-    private readonly IUnitCache _unitCache;
-    private readonly UnitConverter _converter;
     private readonly IOptionSetCache _optionSetCache;
 
     public EavValidationService(
         ICompositeTypeCache compositeCache,
-        IUnitCache unitCache,
-        UnitConverter converter,
         IOptionSetCache optionSetCache)
     {
         _compositeCache = compositeCache;
-        _unitCache = unitCache;
-        _converter = converter;
         _optionSetCache = optionSetCache;
     }
 
     /// <summary>
     /// 验证属性值（基础类型）。
     ///
-    /// ★ int / decimal 均可绑定单位。
+    /// ★ int / decimal 均可绑定单位（单位仅作记录，不参与校验与换算）。
     ///   - int 无单位：必须为整数，写入 ValueInt
-    ///   - int 有单位：允许小数（归一化到基准单位可能产生），写入 ValueDecimal
+    ///   - int 有单位：允许小数，写入 ValueDecimal
     ///   - decimal：无论有无单位，写入 ValueDecimal
     /// </summary>
     public ValidationResult ValidateBaseValue(AttributeDefinition def, object? value)
@@ -51,17 +45,17 @@ public class EavValidationService
         }
         if (value is null) return new ValidationResult(true, errors);
 
-        // 数量类型：解包 NumericValue，校验单位并归一化
+        // 数量类型：解包 NumericValue（单位仅作记录，不参与校验与换算）
         if (def.DataType is EavDataTypes.Int or EavDataTypes.Decimal)
         {
-            var (numericValue, unitId) = UnwrapNumeric(value);
+            var (numericValue, _) = UnwrapNumeric(value);
             if (numericValue is null)
             {
                 errors.Add(new(def.AttributeName, "数值格式错误"));
                 return new ValidationResult(false, errors);
             }
 
-            // ★ int 无单位时必须为整数（有单位时允许小数）
+            // ★ int 无单位时必须为整数
             if (def.DataType == EavDataTypes.Int
                 && def.UnitId is null
                 && numericValue.Value != Math.Truncate(numericValue.Value))
@@ -71,29 +65,7 @@ public class EavValidationService
                 return new ValidationResult(false, errors);
             }
 
-            // 单位分类校验
-            if (def.UnitId is { } baseUnitId)
-            {
-                var baseUnit = _unitCache.Get(baseUnitId);
-
-                if (unitId is { } inputUnitId)
-                {
-                    var inputUnit = _unitCache.Get(inputUnitId);
-                    if (inputUnit.Category != baseUnit.Category)
-                    {
-                        errors.Add(new(def.AttributeName,
-                            $"单位分类不匹配：期望 {baseUnit.Category}，实际 {inputUnit.Category}"));
-                    }
-                }
-            }
-            else if (unitId is not null)
-            {
-                errors.Add(new(def.AttributeName, "该属性未绑定基准单位，不允许指定单位"));
-            }
-
-            // 用归一化后的值做范围校验（min/max 始终按基准单位书写）
-            var normalized = NormalizeToBase(def, numericValue.Value, unitId);
-            ValidateNumericRange(def, normalized, errors);
+            ValidateNumericRange(def, numericValue.Value, errors);
 
             return new ValidationResult(errors.Count == 0, errors);
         }
@@ -155,8 +127,8 @@ public class EavValidationService
         return new ValidationResult(errors.Count == 0, errors);
     }
 
-    /// <summary>解包数量值：支持 NumericValue 与裸数值</summary>
-    private static (decimal? Value, Guid? UnitId) UnwrapNumeric(object value)
+    /// <summary>解包数量值：支持 NumericValue 与裸数值（单位仅作记录，不参与校验）</summary>
+    private static (decimal? Value, string? UnitId) UnwrapNumeric(object value)
     {
         return value switch
         {
@@ -169,18 +141,6 @@ public class EavValidationService
                 CultureInfo.InvariantCulture, out var parsed) => (parsed, null),
             _ => (null, null)
         };
-    }
-
-    /// <summary>把输入值归一化到属性基准单位</summary>
-    private decimal NormalizeToBase(
-        AttributeDefinition def, decimal value, Guid? inputUnitId)
-    {
-        if (def.UnitId is not { } baseUnitId || inputUnitId is null)
-            return value;
-        if (inputUnitId == baseUnitId)
-            return value;
-
-        return _converter.ToBase(value, inputUnitId.Value, baseUnitId);
     }
 
     private static void ValidateNumericRange(

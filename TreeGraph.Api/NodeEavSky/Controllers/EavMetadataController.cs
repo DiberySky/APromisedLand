@@ -72,17 +72,18 @@ public class EavMetadataController : ControllerBase
         // ---- 类型与引用匹配 ----
         if (req.DataType == EavDataTypes.Composite && req.RefCompositeTypeId is null)
             return BadRequest(new { error = "composite 必须指定 refCompositeTypeId" });
-        if (req.DataType == EavDataTypes.Table && req.RefTableDefinitionId is null)
-            return BadRequest(new { error = "table 必须指定 refTableDefinitionId" });
+        if (req.DataType is EavDataTypes.Table or EavDataTypes.Record
+            && req.RefTableDefinitionId is null)
+            return BadRequest(new { error = $"{req.DataType} 必须指定 refTableDefinitionId" });
         if (req.DataType == EavDataTypes.SingleChoice && req.RefOptionSetId is null)
             return BadRequest(new { error = "single_choice 必须指定 refOptionSetId" });
         if (req.DataType is not (EavDataTypes.Composite or EavDataTypes.Table
-            or EavDataTypes.SingleChoice) && refCount > 0)
+            or EavDataTypes.Record or EavDataTypes.SingleChoice) && refCount > 0)
             return BadRequest(new { error = "当前 dataType 不支持引用" });
 
         // ---- 引用存在性 ----
         if (req.UnitId is { } uid
-            && !await _db.Units.AnyAsync(u => u.Id == uid && !u.IsDeleted, ct))
+            && !await _db.UnitTrees.AnyAsync(u => u.Id == uid, ct))
             return BadRequest(new { error = $"单位不存在: {uid}" });
         if (req.RefCompositeTypeId is { } cid
             && !await _db.CompositeTypes.AnyAsync(
@@ -95,6 +96,13 @@ public class EavMetadataController : ControllerBase
         if (req.RefOptionSetId is { } sid
             && !await _db.OptionSets.AnyAsync(s => s.OptionSetId == sid, ct))
             return BadRequest(new { error = $"选项集不存在: {sid}" });
+
+        // ---- record：所引用表的活动列第 1 列须 date、第 2 列须 time ----
+        if (req.DataType == EavDataTypes.Record && req.RefTableDefinitionId is { } recTid)
+        {
+            var colError = await ValidateRecordTableColumnsAsync(recTid, ct);
+            if (colError is not null) return BadRequest(new { error = colError });
+        }
 
         // ---- AttributeName 生成 / 校验 ----
         string attributeName;
@@ -172,6 +180,29 @@ public class EavMetadataController : ControllerBase
     /// </summary>
     private static string GenerateAttributeName()
         => "attr_" + Guid.NewGuid().ToString("N")[..12];
+
+    /// <summary>
+    /// record 类型表约束：活动列（!IsDeleted，按 DisplayOrder）第 1 列须 date、第 2 列须 time。
+    /// 不满足时返回中文错误信息，满足返回 null。
+    /// </summary>
+    private async Task<string?> ValidateRecordTableColumnsAsync(
+        string tableDefinitionId, CancellationToken ct)
+    {
+        var firstTwo = await _db.CustomTableColumns
+            .Where(c => c.TableDefinitionId == tableDefinitionId && !c.IsDeleted)
+            .OrderBy(c => c.DisplayOrder)
+            .Take(2)
+            .Select(c => c.DataType)
+            .ToListAsync(ct);
+
+        if (firstTwo.Count < 2
+            || firstTwo[0] != EavDataTypes.Date
+            || firstTwo[1] != EavDataTypes.Time)
+        {
+            return "record 类型要求所引用表的第一列为 date（仅日期）、第二列为 time（仅时间）";
+        }
+        return null;
+    }
 
     [HttpPost("composite-types")]
     public async Task<IActionResult> CreateCompositeType(
@@ -311,8 +342,8 @@ public class EavMetadataController : ControllerBase
                     error = "只有 decimal 类型可以绑定单位（数据库 CHECK 约束）"
                 });
 
-            var unitExists = await _db.Units
-                .AnyAsync(u => u.Id == req.UnitId.Value && !u.IsDeleted, ct);
+            var unitExists = await _db.UnitTrees
+                .AnyAsync(u => u.Id == req.UnitId, ct);
             if (!unitExists)
                 return BadRequest(new { error = $"单位不存在: {req.UnitId}" });
         }
@@ -520,6 +551,7 @@ public class EavMetadataController : ControllerBase
     {
         var query = _db.CompositeTypes
             .Include(t => t.Fields).ThenInclude(f => f.RefOptionSet)
+            .Include(t => t.Fields).ThenInclude(f => f.Unit)
             .AsQueryable();
 
         if (!includeDeleted) query = query.Where(t => !t.IsDeleted);
@@ -543,6 +575,7 @@ public class EavMetadataController : ControllerBase
     {
         var type = await _db.CompositeTypes
             .Include(t => t.Fields).ThenInclude(f => f.RefOptionSet)
+            .Include(t => t.Fields).ThenInclude(f => f.Unit)
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.CompositeTypeId == id, ct);
         if (type is null) return NotFound();
@@ -643,8 +676,8 @@ public class EavMetadataController : ControllerBase
             if (field.DataType != EavDataTypes.Decimal)
                 return BadRequest(new { error = "只有 decimal 类型可以绑定单位" });
 
-            var unitExists = await _db.Units
-                .AnyAsync(u => u.Id == uid && !u.IsDeleted, ct);
+            var unitExists = await _db.UnitTrees
+                .AnyAsync(u => u.Id == uid, ct);
             if (!unitExists) return BadRequest(new { error = $"单位不存在: {uid}" });
             field.UnitId = uid;
         }
@@ -738,8 +771,8 @@ public class EavMetadataController : ControllerBase
         }
         else if (req.UnitId is not null)
         {
-            var exists = await _db.Units.AnyAsync(
-                u => u.Id == req.UnitId.Value && !u.IsDeleted, ct);
+            var exists = await _db.UnitTrees.AnyAsync(
+                u => u.Id == req.UnitId, ct);
             if (!exists) return BadRequest(new { error = $"单位不存在: {req.UnitId}" });
             def.UnitId = req.UnitId;
         }
@@ -767,12 +800,19 @@ public class EavMetadataController : ControllerBase
         }
         else if (req.RefTableDefinitionId is not null)
         {
-            if (def.DataType != EavDataTypes.Table)
-                return BadRequest(new { error = "只有 table 类型可以引用自定义表" });
+            if (def.DataType is not (EavDataTypes.Table or EavDataTypes.Record))
+                return BadRequest(new { error = "只有 table/record 类型可以引用自定义表" });
 
             var exists = await _db.CustomTables.AnyAsync(
                 t => t.TableDefinitionId == req.RefTableDefinitionId && !t.IsDeleted, ct);
             if (!exists) return BadRequest(new { error = $"自定义表不存在: {req.RefTableDefinitionId}" });
+
+            if (def.DataType == EavDataTypes.Record)
+            {
+                var colError = await ValidateRecordTableColumnsAsync(
+                    req.RefTableDefinitionId, ct);
+                if (colError is not null) return BadRequest(new { error = colError });
+            }
             def.RefTableDefinitionId = req.RefTableDefinitionId;
         }
 
@@ -821,7 +861,7 @@ public class EavMetadataController : ControllerBase
         a.Version, a.DisplayOrder, a.DefaultValue, a.CreatedAt, a.UpdatedAt,
         a.AllowedValues != null ? a.AllowedValues.RootElement.Clone() : (JsonElement?)null,
         a.ValidationRule != null ? a.ValidationRule.RootElement.Clone() : (JsonElement?)null,
-        a.UnitId, a.Unit?.Name, a.Unit?.Symbol, a.Unit?.Category,
+        a.UnitId, a.Unit?.Name, a.Unit?.Abbreviation,
         a.RefCompositeTypeId, a.RefCompositeType?.TypeName, a.RefCompositeType?.DisplayName,
         a.RefTableDefinitionId, a.RefTableDefinition?.TableName, a.RefTableDefinition?.DisplayName,
         a.RefOptionSetId, a.RefOptionSet?.SetName, a.RefOptionSet?.DisplayName);
@@ -854,6 +894,8 @@ public class EavMetadataController : ControllerBase
                 f.AllowedValues != null ? f.AllowedValues.RootElement.Clone() : (JsonElement?)null,
                 f.ValidationRule != null ? f.ValidationRule.RootElement.Clone() : (JsonElement?)null,
                 f.UnitId,
+                f.Unit?.Name,
+                f.Unit?.Abbreviation,
                 f.RefOptionSetId,
                 f.RefOptionSet?.SetName,
                 f.RefOptionSet?.DisplayName,

@@ -177,26 +177,6 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "units",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    category = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    symbol = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    to_base_factor = table.Column<decimal>(type: "numeric(38,15)", precision: 38, scale: 15, nullable: false),
-                    is_base_unit = table.Column<bool>(type: "boolean", nullable: false),
-                    display_order = table.Column<int>(type: "integer", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_units", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "custom_table_columns",
                 columns: table => new
                 {
@@ -278,7 +258,7 @@ namespace TreeGraph.Api.Data.Migrations
                     ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     ref_table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    unit_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    unit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -304,9 +284,9 @@ namespace TreeGraph.Api.Data.Migrations
                         principalColumn: "option_set_id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_attribute_catalog_units_unit_id",
+                        name: "FK_attribute_catalog_unit_trees_unit_id",
                         column: x => x.unit_id,
-                        principalTable: "units",
+                        principalTable: "unit_trees",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -321,7 +301,7 @@ namespace TreeGraph.Api.Data.Migrations
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    unit_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    unit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     is_array = table.Column<bool>(type: "boolean", nullable: false),
                     is_required = table.Column<bool>(type: "boolean", nullable: false),
@@ -357,9 +337,9 @@ namespace TreeGraph.Api.Data.Migrations
                         principalColumn: "option_set_id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_composite_field_definitions_units_unit_id",
+                        name: "FK_composite_field_definitions_unit_trees_unit_id",
                         column: x => x.unit_id,
-                        principalTable: "units",
+                        principalTable: "unit_trees",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -383,7 +363,7 @@ namespace TreeGraph.Api.Data.Migrations
                     value_jsonb = table.Column<JsonDocument>(type: "jsonb", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    unit_id = table.Column<Guid>(type: "uuid", nullable: true)
+                    unit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -395,9 +375,9 @@ namespace TreeGraph.Api.Data.Migrations
                         principalColumn: "attribute_id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_attribute_values_units_unit_id",
+                        name: "FK_attribute_values_unit_trees_unit_id",
                         column: x => x.unit_id,
-                        principalTable: "units",
+                        principalTable: "unit_trees",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -785,19 +765,6 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "ix_unit_trees_parent",
                 table: "unit_trees",
                 column: "parent_id");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_unit_category_base",
-                table: "units",
-                column: "category",
-                unique: true,
-                filter: "is_base_unit = true");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_unit_category_name",
-                table: "units",
-                columns: new[] { "category", "name" },
-                unique: true);
         }
 
         /// <inheritdoc />
@@ -834,9 +801,6 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "option_items");
 
             migrationBuilder.DropTable(
-                name: "unit_trees");
-
-            migrationBuilder.DropTable(
                 name: "attribute_catalog");
 
             migrationBuilder.DropTable(
@@ -849,7 +813,7 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "option_sets");
 
             migrationBuilder.DropTable(
-                name: "units");
+                name: "unit_trees");
         }
     }
 }

@@ -14,20 +14,13 @@ public sealed record CompositeFieldSchemaDto(
     CompositeTypeSchemaDto? NestedType = null,
     JsonElement? ValidationRule = null,
     JsonElement? AllowedValues = null,
-    UnitSchemaDto? Unit = null,
-    IReadOnlyList<UnitSchemaDto>? AvailableUnits = null,
+    string? UnitId = null,
+    string? UnitName = null,
     OptionSetSchemaDto? OptionSet = null);
 
 public sealed record CompositeTypeSchemaDto(
     string TypeName,
     IReadOnlyList<CompositeFieldSchemaDto> Fields);
-
-public sealed record UnitSchemaDto(
-    Guid Id,
-    string Category,
-    string Name,
-    string Symbol,
-    bool IsBaseUnit);
 
 public sealed record OptionItemSchemaDto(
     string OptionItemId,
@@ -53,7 +46,7 @@ public sealed record AttributeSchemaDto(
     JsonElement? AllowedValues,
     JsonElement? ValidationRule,
     CompositeTypeSchemaDto? CompositeType,
-    UnitSchemaDto? Unit = null,
-    IReadOnlyList<UnitSchemaDto>? AvailableUnits = null,
+    string? UnitId = null,
+    string? UnitName = null,
     OptionSetSchemaDto? OptionSet = null,
     string? RefTableDefinitionId = null);

@@ -1,94 +1,43 @@
 @* TableField.razor *@
-@* 自定义表字段渲染器：内嵌行编辑器，数据走 CustomTableData 端点独立保存 *@
+@* 自定义表字段渲染器：行面板入口。
+   点击「管理行数据」打开一级弹窗 TableRowManageDialog（行摘要表），
+   其内部再打开二级弹窗 TableRowEditDialog 做行级增量保存；本组件只展示行数。 *@
 @inject EavApiClient Api
-@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudPaper Class="pa-3" Elevation="1" Outlined="true">
-    <div class="d-flex align-center mb-2">
+    <div class="d-flex align-center">
         <MudIcon Icon="@Icons.Material.Filled.TableChart"
                  Size="Size.Small" Color="Color.Primary" Class="mr-1" />
         <MudText Typo="Typo.subtitle2">@Attr.DisplayName</MudText>
-        <MudChip T="string" Size="Size.Small" Class="ml-2">
-            @(_rows.Count) 行
-        </MudChip>
+        @if (_available)
+        {
+            <MudChip T="string" Size="Size.Small" Class="ml-2">
+                @(_loading ? "加载中…" : $"{_rowCount} 行")
+            </MudChip>
+        }
         <MudSpacer />
-        <MudButton Size="Size.Medium" Variant="Variant.Outlined"
+        <MudButton Size="Size.Small"
+                   Variant="Variant.Outlined"
                    Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="AddRow" Disabled="@(!CanEdit)">
-            添加行
+                   StartIcon="@(ReadOnly ? Icons.Material.Filled.Visibility : Icons.Material.Filled.Settings)"
+                   OnClick="OpenManageAsync"
+                   Disabled="@(!_available || _loading)">
+            @(ReadOnly ? "查看行数据" : "管理行数据")
         </MudButton>
     </div>
 
-    @if (!CanEdit)
+    @if (string.IsNullOrEmpty(EntityId))
     {
-        <MudAlert Severity="Severity.Info">
-            请先保存实体，然后再添加 @Attr.DisplayName 数据
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+            请先保存实体，然后再维护 @Attr.DisplayName 数据
         </MudAlert>
     }
-    else if (_loading)
+    else if (Attr.RefTableDefinitionId is null)
     {
-        <MudProgressLinear Indeterminate="true" />
-    }
-    else if (_rows.Count == 0)
-    {
-        <MudAlert Severity="Severity.Info">
-            暂无数据，点击"添加行"开始
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+            该属性未关联自定义表定义，无法维护行数据
         </MudAlert>
-    }
-    else
-    {
-        @for (int i = 0; i < _rows.Count; i++)
-        {
-            var idx = i;
-            var row = _rows[i];
-
-            <MudPaper Class="pa-2 mb-2" Elevation="0" Outlined="true">
-                <div class="d-flex align-center mb-1">
-                    <MudText Typo="Typo.caption">#@(idx + 1)</MudText>
-                    @if (row.RowId is not null)
-                    {
-                        <MudChip T="string" Size="Size.Small" Class="ml-2">
-                            RowId: @row.RowId
-                        </MudChip>
-                    }
-                    <MudSpacer />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Medium" Color="Color.Error"
-                                   OnClick="@(() => RemoveRow(idx))" />
-                </div>
-
-                @foreach (var col in _columns)
-                {
-                    var key = col.ColumnName;
-                    var value = row.Fields.TryGetValue(key, out var v) ? v : null;
-
-                    <MudTextField T="string"
-                                  Label="@col.DisplayName"
-                                  Value="@(value?.ToString())"
-                                  ValueChanged="@(nv => UpdateField(row, key, nv))"
-                                  Required="@col.IsRequired"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense"
-                                  Class="mb-2" />
-                }
-            </MudPaper>
-        }
-    }
-
-    @if (CanEdit && _hasChanges)
-    {
-        <div class="d-flex mt-2">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Save"
-                       OnClick="SaveAsync" Disabled="@_saving">
-                @(_saving ? "保存中..." : "保存表数据")
-            </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Default"
-                       OnClick="ReloadAsync" Class="ml-2" Disabled="@_saving">
-                放弃修改
-            </MudButton>
-        </div>
     }
 </MudPaper>
 
@@ -96,141 +45,77 @@
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter, EditorRequired] public string EntityType { get; set; } = "";
     [Parameter] public string EntityId { get; set; } = "";
+    [Parameter] public bool ReadOnly { get; set; }
+    /// <summary>记录模式（record 类型）：透传给行管理弹窗以屏蔽序号列。</summary>
+    [Parameter] public bool RecordMode { get; set; }
+
+    // 表数据独立端点加载/保存，不参与 DynamicForm 提交；保留兼容参数
     [Parameter] public JsonElement? Value { get; set; }
     [Parameter] public EventCallback<JsonElement?> ValueChanged { get; set; }
 
-    private List<TableRowForm> _rows = new();
-    private List<CustomTableColumnDto> _columns = new();
+    private int _rowCount;
     private bool _loading;
-    private bool _saving;
-    private bool _hasChanges;
+    private string? _loadedKey;
 
-    private bool CanEdit => !string.IsNullOrEmpty(EntityId) && Attr.RefTableDefinitionId is not null;
+    private bool _available =>
+        !string.IsNullOrEmpty(EntityId) && Attr.RefTableDefinitionId is not null;
 
     protected override async Task OnParametersSetAsync()
     {
-        if (!CanEdit) return;
+        if (!_available) return;
 
-        // 只在初次加载时从后端拉取
-        if (_columns.Count == 0)
-        {
-            await LoadDefinitionAsync();
-        }
-        if (!_loading && _rows.Count == 0)
-        {
-            await LoadRowsAsync();
-        }
+        var key = $"{EntityType}|{EntityId}|{Attr.AttributeName}";
+        if (key == _loadedKey) return;
+        _loadedKey = key;
+
+        await ReloadCountAsync();
     }
 
-    // 列定义：端点 ㉝ GET api/eav/metadata/custom-tables
-    private async Task LoadDefinitionAsync()
-    {
-        var tables = await Api.ListCustomTablesAsync();
-        var table = tables?.FirstOrDefault(t =>
-            t.TableDefinitionId == Attr.RefTableDefinitionId);
-        if (table is not null)
-        {
-            _columns = table.Columns.OrderBy(c => c.DisplayOrder).ToList();
-        }
-    }
-
-    // 行数据：端点 ⑦ GET api/eav/{entityType}/entities/{id}/tables/{tableName}
-    private async Task LoadRowsAsync()
+    private async Task ReloadCountAsync()
     {
         _loading = true;
         try
         {
             var table = await Api.LoadCustomTableAsync(
                 EntityType, EntityId, Attr.AttributeName);
-            if (table is not null)
-            {
-                _rows = table.Rows.Select(r => new TableRowForm
-                {
-                    RowId = r.RowId,
-                    RowOrder = r.RowOrder,
-                    Fields = r.Fields.ToDictionary(
-                        k => k.Key,
-                        v => v.Value?.ToString() ?? "")
-                }).ToList();
-            }
+            _rowCount = table?.Rows.Count ?? 0;
         }
         finally
         {
             _loading = false;
-            _hasChanges = false;
         }
     }
 
-    private async Task ReloadAsync()
+    private async Task OpenManageAsync()
     {
-        await LoadRowsAsync();
-        StateHasChanged();
-    }
+        if (!_available) return;
 
-    private void AddRow()
-    {
-        _rows.Add(new TableRowForm
+        var parameters = new DialogParameters<TableRowManageDialog>
         {
-            RowOrder = _rows.Count,
-            Fields = _columns.ToDictionary(c => c.ColumnName, _ => "")
-        });
-        _hasChanges = true;
-    }
+            { x => x.EntityType, EntityType },
+            { x => x.EntityId, EntityId },
+            { x => x.TableName, Attr.AttributeName },
+            { x => x.DisplayName, Attr.DisplayName },
+            { x => x.RefTableDefinitionId, Attr.RefTableDefinitionId! },
+            { x => x.ReadOnly, ReadOnly },
+            { x => x.RecordMode, RecordMode }
+        };
 
-    private void RemoveRow(int index)
-    {
-        _rows.RemoveAt(index);
-        _hasChanges = true;
-    }
-
-    private void UpdateField(TableRowForm row, string key, string? value)
-    {
-        row.Fields[key] = value ?? "";
-        _hasChanges = true;
-    }
-
-    // 端点 ⑧：PUT api/eav/{entityType}/entities/{id}/tables/{tableName}（整表替换）
-    private async Task SaveAsync()
-    {
-        _saving = true;
-        try
+        var options = new DialogOptionsEx
         {
-            var value = new CustomTableValue
-            {
-                TableName = Attr.AttributeName,
-                Rows = _rows.Select(r => new CustomTableRowValue
-                {
-                    RowId = r.RowId,
-                    RowOrder = r.RowOrder,
-                    Fields = r.Fields.ToDictionary(
-                        k => k.Key,
-                        v => (object?)v.Value)
-                }).ToList()
-            };
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true
+        };
 
-            var (ok, error) = await Api.ReplaceCustomTableAsync(
-                EntityType, EntityId, Attr.AttributeName, value);
+        var dialog = await DialogService.ShowExAsync<TableRowManageDialog>(
+            Attr.DisplayName, parameters, options);
 
-            if (ok)
-            {
-                Snackbar.Add("表数据保存成功", Severity.Success);
-                await LoadRowsAsync();
-            }
-            else
-            {
-                Snackbar.Add($"保存失败：{error}", Severity.Error);
-            }
+        // 行增删改后刷新行数
+        var result = await dialog.Result;
+        if (result is not null)
+        {
+            await ReloadCountAsync();
         }
-        finally
-        {
-            _saving = false;
-        }
-    }
-
-    private class TableRowForm
-    {
-        public string? RowId { get; set; }
-        public int RowOrder { get; set; }
-        public Dictionary<string, string> Fields { get; set; } = new();
     }
 }

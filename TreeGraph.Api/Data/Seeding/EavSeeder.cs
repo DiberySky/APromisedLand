@@ -15,7 +15,7 @@ namespace TreeGraph.Api.Data.Seeding;
 ///   - 整个 seed 包裹在事务中（含 execution strategy 重试兼容）
 ///   - 失败时事务回滚，不会留下部分数据
 ///
-/// 依赖：UnitSeedService 已先行写入单位（net_weight 需要按符号查 kg 的 Id）。
+/// 依赖：单位树随迁移 HasData 播种（net_weight 按缩写查 kg 节点 Id）。
 /// </summary>
 public static class EavSeeder
 {
@@ -147,17 +147,17 @@ public static class EavSeeder
         await db.SaveChangesAsync(ct);
 
         // ============================================================
-        // 步骤 3：查 kg 单位（UnitSeedService 已先执行）
+        // 步骤 3：查 kg 单位树节点（随迁移 HasData 播种）
         // ============================================================
-        var kgUnitId = await db.Units
-            .Where(u => u.Category == "weight" && u.Symbol == "kg")
+        var kgUnitId = await db.UnitTrees
+            .Where(u => u.Abbreviation == "kg")
             .Select(u => u.Id)
             .FirstOrDefaultAsync(ct);
 
-        if (kgUnitId == Guid.Empty)
+        if (kgUnitId is null)
         {
             throw new InvalidOperationException(
-                "kg 单位未找到。请确认 UnitSeedService 已在 EavSeeder 之前执行。");
+                "kg 单位树节点未找到。请确认 UnitTree 种子数据已随迁移写入。");
         }
 
         // ============================================================
@@ -194,7 +194,7 @@ public static class EavSeeder
                 IsSearchable = true,
                 IsSortable = true,
                 DisplayOrder = 3,
-                UnitId = kgUnitId, // 基准单位：千克
+                UnitId = kgUnitId, // 单位：千克
                 ValidationRule = JsonDocument.Parse("""{"min": 0, "max": 10000}""")
             },
             new AttributeDefinition

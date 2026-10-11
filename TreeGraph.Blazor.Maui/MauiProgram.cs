@@ -65,7 +65,7 @@ public static class MauiProgram
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
 
-        // 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService，PageDialogSky 标题栏 DevDialogSourceButton 据此反查 .razor 文件
+        // 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService，DialogSky 等对话框标题栏 DevDialogSourceButton 据此反查 .razor 文件
         builder.Services.AddDialogSourceTracker();
 #endif
 

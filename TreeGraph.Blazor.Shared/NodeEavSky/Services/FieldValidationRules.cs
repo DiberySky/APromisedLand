@@ -7,7 +7,7 @@ namespace TreeGraph.Blazor.Shared.NodeEavSky.Services;
 /// <summary>
 /// 字段校验规则引擎（纯静态，无状态）。
 ///
-/// 被 EavFieldValidator 与 CustomTableEditor 共用，
+/// 被 EavFieldValidator 与 TableRowEditDialog 共用，
 /// 保证顶层属性 / 组合字段 / 自定义表列的规则语义一致。
 /// </summary>
 public static class FieldValidationRules

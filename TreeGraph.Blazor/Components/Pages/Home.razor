@@ -1,7 +1,8 @@
 @* Home.razor *@
 @page "/"
 @rendermode Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer
-@inject EavApiClient Api
+@inject IDialogService DialogService
+@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @* Home.razor *@
 
 <PageTitle>首页</PageTitle>
@@ -9,32 +10,6 @@
 <MudText Typo="Typo.h4" Class="mb-4">TreeGraph EAV 管理台</MudText>
 
 <MudGrid>
-    <MudItem xs="12" md="6">
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.h6">单位分类</MudText>
-            @if (_categories is null)
-            {
-                <MudProgressLinear Indeterminate="true" />
-            }
-            else
-            {
-                <MudList T="string">
-                    @foreach (var c in _categories)
-                    {
-                        <MudListItem T="string">
-                            <div class="d-flex justify-space-between">
-                                <span>@c.Category</span>
-                                <MudChip T="string" Size="Size.Small">
-                                    @c.Units.Count 个
-                                </MudChip>
-                            </div>
-                        </MudListItem>
-                    }
-                </MudList>
-            }
-        </MudPaper>
-    </MudItem>
-
     <MudItem xs="12" md="6">
         <MudPaper Class="pa-4">
             <MudText Typo="Typo.h6">快速操作</MudText>
@@ -45,7 +20,7 @@
                 <MudButton Href="/query" StartIcon="@Icons.Material.Filled.Search">
                     动态查询
                 </MudButton>
-                <MudButton Href="/metadata/attributes" StartIcon="@Icons.Material.Filled.Add">
+                <MudButton OnClick="OpenAttributesManage" StartIcon="@Icons.Material.Filled.Add">
                     定义属性
                 </MudButton>
             </MudButtonGroup>
@@ -54,11 +29,17 @@
 </MudGrid>
 
 @code {
-    private IReadOnlyList<UnitCategoryDto>? _categories;
-
-    // 调用端点 ㉕：GET api/units/categories
-    protected override async Task OnInitializedAsync()
+    /// <summary>打开属性定义管理对话框（通用模式，可在对话框内切换实体类型）。</summary>
+    private async Task OpenAttributesManage()
     {
-        _categories = await Api.GetUnitCategoriesAsync();
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+
+        await DialogService.ShowExAsync<AttributesManageDialog>(
+            string.Empty, new DialogParameters<AttributesManageDialog>(), options);
     }
 }

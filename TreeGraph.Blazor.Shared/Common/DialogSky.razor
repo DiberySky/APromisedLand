@@ -51,7 +51,7 @@
                 @if (SubmitButtonVisible)
                 {
                     <MudButton Variant="Variant.Text"
-                               Color="Color.Success"
+                               Color="@SubmitButtonColor"
                                Disabled="@SubmitButtonDisabled"
                                StartIcon="@(IconsVisible ? Icons.Material.Filled.SaveAs : null)"
                                OnClick="@SubmitAsync">
@@ -89,6 +89,8 @@
     [Parameter] public bool IconsVisible { get; set; } = true;
     /// <summary>禁用提交按钮（如提交中防重复点击）。</summary>
     [Parameter] public bool SubmitButtonDisabled { get; set; }
+    /// <summary>提交按钮颜色：默认 Success（与编辑对话框一致）；危险操作对话框可传 Color.Error。</summary>
+    [Parameter] public Color SubmitButtonColor { get; set; } = Color.Success;
 
     [Parameter] public string CancelButtonText { get; set; } = "取消";
     [Parameter] public string SubmitButtonText { get; set; } = "提交";

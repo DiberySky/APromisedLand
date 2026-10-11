@@ -26,7 +26,7 @@ public class MainActivity : MauiAppCompatActivity
 
         // 退出 .NET MAUI 默认 edge-to-edge：实测（Pixel 7 / API 33）BlazorWebView 会铺满
         // 整个窗口，而 WebView 内 CSS env(safe-area-inset-*) 取不到值（insets 被宿主根
-        // 布局消费），导致全屏对话框（手机端 PageDialogSky 默认形态）标题栏被不透明
+        // 布局消费），导致全屏对话框（手机端 MudDialog 最大化形态）标题栏被不透明
         // 状态栏（@color/colorPrimaryDark）物理遮挡、标题按钮无法点按。
         // 退回经典 fitsSystemWindows：状态栏保留不透明占位，WebView 从状态栏下方开始
         // 布局，AdjustResize 也继续按经典路径工作。

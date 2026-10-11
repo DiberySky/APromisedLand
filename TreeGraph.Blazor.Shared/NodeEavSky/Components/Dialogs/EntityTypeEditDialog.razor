@@ -1,8 +1,8 @@
-@* EntityTypeEditDialog.razor — 新建 / 编辑实体类型（PageDialogSky 外壳，DialogService 模式） *@
+@* EntityTypeEditDialog.razor — 新建 / 编辑实体类型（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
-<PageDialogSky Title="@(Editing is null ? "新建实体类型" : "编辑实体类型")"
+<DialogSky Title="@(Editing is null ? "新建实体类型" : "编辑实体类型")"
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
@@ -38,7 +38,7 @@
                          Label="显示顺序"
                          Variant="Variant.Outlined" />
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

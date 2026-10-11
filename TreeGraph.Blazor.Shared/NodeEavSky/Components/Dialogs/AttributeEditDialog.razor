@@ -1,12 +1,12 @@
-@* AttributeEditDialog.razor — 编辑属性（PageDialogSky 外壳，DialogService 模式） *@
+@* AttributeEditDialog.razor — 编辑属性（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
-<PageDialogSky Title="编辑属性"
-               SubmitButtonVisible="true"
-               SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
-               SubmitButtonDisabled="@_submitting"
-               OnSubmitClick="UpdateAsync">
+<DialogSky Title="编辑属性"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="UpdateAsync">
     <DialogContent>
         @if (Attribute is not null)
         {
@@ -23,24 +23,10 @@
 
         @if (Attribute?.DataType is "decimal" or "int")
         {
-            <MudSelect T="Guid?"
-                       Value="_editForm.UnitId"
-                       ValueChanged="@(v => _editForm.UnitId = v)"
-                       Label="基准单位"
-                       Variant="Variant.Outlined"
-                       Class="mb-3">
-                <MudSelectItem T="Guid?" Value="@((Guid?)null)">
-                    （不使用单位）
-                </MudSelectItem>
-                @foreach (var u in Units ?? new List<UnitDto>())
-                {
-                    <MudSelectItem T="Guid?" Value="@u.Id">
-                        @u.Name (@u.Symbol) - @u.Category
-                    </MudSelectItem>
-                }
-            </MudSelect>
+            <UnitTreeField @bind-UnitId="_editForm.UnitId"
+                           @bind-UnitName="_editForm.UnitName" />
             <MudAlert Severity="Severity.Warning" Class="mb-3">
-                修改基准单位不会自动转换已有数据。如需变更，请先规划数据迁移。
+                修改单位不会自动转换已有数据。如需变更，请先规划数据迁移。
             </MudAlert>
         }
 
@@ -61,7 +47,7 @@
             </MudSelect>
         }
 
-        @if (Attribute?.DataType == "table")
+        @if (Attribute?.DataType is "table" or "record")
         {
             <MudSelect T="string"
                        Value="@(_editForm.RefTableDefinitionId ?? "")"
@@ -76,6 +62,12 @@
                     </MudSelectItem>
                 }
             </MudSelect>
+            @if (Attribute?.DataType == "record")
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    记录类型要求所选表的第一列为「日期」、第二列为「时间」，且行列表不显示序号。
+                </MudAlert>
+            }
         }
 
         @if (Attribute?.DataType == "single_choice")
@@ -116,14 +108,13 @@
             </MudItem>
         </MudGrid>
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     /// <summary>编辑目标（页面已通过 GetAttributeAsync 取详情）。</summary>
     [Parameter] public AttributeDetailDto? Attribute { get; set; }
-    [Parameter] public IReadOnlyList<UnitDto>? Units { get; set; }
     [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
     [Parameter] public IReadOnlyList<CustomTableDetailDto>? CustomTables { get; set; }
     [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
@@ -143,6 +134,7 @@
                 IsSortable = Attribute.IsSortable,
                 DisplayOrder = Attribute.DisplayOrder,
                 UnitId = Attribute.UnitId,
+                UnitName = FormatUnitName(Attribute.UnitName, Attribute.UnitAbbreviation),
                 RefCompositeTypeId = Attribute.RefCompositeTypeId,
                 RefTableDefinitionId = Attribute.RefTableDefinitionId,
                 RefOptionSetId = Attribute.RefOptionSetId
@@ -157,6 +149,25 @@
         var (unitId, clearUnit) = Diff(_editForm.UnitId, Attribute.UnitId);
         var (ctId, clearCt) = Diff(_editForm.RefCompositeTypeId, Attribute.RefCompositeTypeId);
         var (tblId, clearTbl) = Diff(_editForm.RefTableDefinitionId, Attribute.RefTableDefinitionId);
+
+        // record：换绑表时前端预校验前两列类型（后端仍会校验）
+        if (Attribute.DataType == "record" && tblId is not null)
+        {
+            var tbl = CustomTables?.FirstOrDefault(t => t.TableDefinitionId == tblId);
+            var cols = tbl?.Columns
+                .Where(c => !c.IsDeleted)
+                .OrderBy(c => c.DisplayOrder)
+                .Take(2)
+                .ToList();
+            if (cols is null || cols.Count < 2
+                || cols[0].DataType != "date" || cols[1].DataType != "time")
+            {
+                Snackbar.Add(
+                    "记录类型要求所选表的第一列为「日期」、第二列为「时间」",
+                    Severity.Warning);
+                return;
+            }
+        }
         var (optId, clearOpt) = Diff(_editForm.RefOptionSetId, Attribute.RefOptionSetId);
 
         _submitting = true;
@@ -200,19 +211,17 @@
         }
     }
 
-    private static (T? Value, bool Clear) Diff<T>(T? current, T? original) where T : struct
-    {
-        if (current is null && original is not null) return (null, true);
-        if (current is not null && !current.Value.Equals(original)) return (current, false);
-        return (null, false);
-    }
-
     private static (string? Value, bool Clear) Diff(string? current, string? original)
     {
         if (current is null && original is not null) return (null, true);
         if (current is not null && current != original) return (current, false);
         return (null, false);
     }
+
+    private static string? FormatUnitName(string? name, string? abbreviation)
+        => name is null ? null
+            : string.IsNullOrEmpty(abbreviation) ? name
+            : $"{name} 【{abbreviation}】";
 
     private class UpdateAttributeForm
     {
@@ -221,7 +230,8 @@
         public bool IsSearchable { get; set; }
         public bool IsSortable { get; set; }
         public int DisplayOrder { get; set; }
-        public Guid? UnitId { get; set; }
+        public string? UnitId { get; set; }
+        public string? UnitName { get; set; }
         public string? RefCompositeTypeId { get; set; }
         public string? RefTableDefinitionId { get; set; }
         public string? RefOptionSetId { get; set; }

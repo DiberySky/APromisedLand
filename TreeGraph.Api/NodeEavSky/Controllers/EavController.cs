@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using TreeGraph.Api.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
@@ -19,15 +21,15 @@ public class EavController : ControllerBase
     private readonly CustomTableQueryService _tableQuery;
     private readonly IAttributeCache _attrCache;
     private readonly ICompositeTypeCache _compositeCache;
-    private readonly IUnitCache _unitCache;
     private readonly IOptionSetCache _optionSetCache;
+    private readonly TreeGraphDbContext _db;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public EavController(
         EavWriteService write, EavReadService read, EavQueryService query,
         CustomTableQueryService tableQuery,
         IAttributeCache attrCache, ICompositeTypeCache compositeCache,
-        IUnitCache unitCache, IOptionSetCache optionSetCache,
+        IOptionSetCache optionSetCache, TreeGraphDbContext db,
         IOptions<JsonOptions> jsonOptions)
     {
         _write = write;
@@ -36,8 +38,8 @@ public class EavController : ControllerBase
         _tableQuery = tableQuery;
         _attrCache = attrCache;
         _compositeCache = compositeCache;
-        _unitCache = unitCache;
         _optionSetCache = optionSetCache;
+        _db = db;
         _jsonOptions = jsonOptions.Value.JsonSerializerOptions;
     }
 
@@ -59,21 +61,35 @@ public class EavController : ControllerBase
     }
 
     [HttpGet("schema")]
-    public IActionResult GetSchema(string entityType)
+    public async Task<IActionResult> GetSchema(string entityType, CancellationToken ct)
     {
         var defs = _attrCache.GetDefinitions(entityType);
-        var schema = defs.Select(ToSchemaDto).ToList();
+
+        // 单位名称投影（unit_trees 节点，仅作展示；含组合内字段的单位）
+        var unitIds = defs.Select(d => d.UnitId)
+            .Where(id => id is not null).Select(id => id!)
+            .ToList();
+
+        foreach (var d in defs.Where(d => d.RefCompositeTypeId is not null))
+            CollectFieldUnitIds(d.RefCompositeTypeId!, unitIds);
+
+        unitIds = unitIds.Distinct().ToList();
+        var unitNames = unitIds.Count == 0
+            ? new Dictionary<string, string>()
+            : await _db.UnitTrees
+                .Where(u => unitIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+
+        var schema = defs.Select(d => ToSchemaDto(d, unitNames)).ToList();
         return Ok(new { EntityType = entityType, Attributes = schema });
     }
 
     [HttpGet("entities/{id}")]
     public async Task<IActionResult> Get(
         string id, string entityType,
-        [FromQuery] string? unit,
         CancellationToken ct)
     {
-        var originalUnits = unit == "original";
-        var entity = await _read.LoadAsync(id, entityType, originalUnits, ct);
+        var entity = await _read.LoadAsync(id, entityType, ct);
         return Ok(ToDto(entity));
     }
 
@@ -314,25 +330,28 @@ public class EavController : ControllerBase
 
     // ---------- Schema 映射 ----------
 
-    private AttributeSchemaDto ToSchemaDto(AttributeDefinition d)
+    /// <summary>递归收集组合类型字段上的单位 Id（含嵌套组合）。</summary>
+    private void CollectFieldUnitIds(string compositeTypeId, List<string> unitIds)
+    {
+        var ct = _compositeCache.GetType(compositeTypeId);
+        foreach (var f in ct.Fields.Where(f => !f.IsDeleted))
+        {
+            if (f.UnitId is { } uid) unitIds.Add(uid);
+            if (f.DataType == EavDataTypes.Composite && f.RefCompositeTypeId is { } rid)
+                CollectFieldUnitIds(rid, unitIds);
+        }
+    }
+
+    private AttributeSchemaDto ToSchemaDto(
+        AttributeDefinition d, IReadOnlyDictionary<string, string> unitNames)
     {
         CompositeTypeSchemaDto? composite = null;
         if (d.RefCompositeTypeId is not null)
-            composite = BuildCompositeSchema(d.RefCompositeTypeId);
+            composite = BuildCompositeSchema(d.RefCompositeTypeId, unitNames);
 
-        UnitSchemaDto? unit = null;
-        IReadOnlyList<UnitSchemaDto>? availableUnits = null;
+        string? unitName = null;
         if (d.UnitId is { } uid)
-        {
-            try
-            {
-                var baseUnit = _unitCache.Get(uid);
-                unit = ToUnitDto(baseUnit);
-                availableUnits = _unitCache.GetByCategory(baseUnit.Category)
-                    .Select(ToUnitDto).ToList();
-            }
-            catch (InvalidOperationException) { }
-        }
+            unitNames.TryGetValue(uid, out unitName);
 
         OptionSetSchemaDto? optionSet = null;
         if (d.DataType == EavDataTypes.SingleChoice && d.RefOptionSetId is { } osid)
@@ -354,44 +373,36 @@ public class EavController : ControllerBase
             d.IsRequired, d.IsSearchable, d.IsSortable, d.DisplayOrder,
             d.AllowedValues?.RootElement.Clone(),
             d.ValidationRule?.RootElement.Clone(),
-            composite, unit, availableUnits, optionSet,
+            composite, d.UnitId, unitName, optionSet,
             d.RefTableDefinitionId);
     }
 
     /// <summary>
     /// 递归构造组合类型 Schema。
     ///
-    /// ★ #4：字段的 Unit / AvailableUnits 一并下放（仅 decimal 字段可能非空）。
+    /// ★ #4：字段的 UnitId / UnitName 一并下放（仅 decimal 字段可能非空）。
     /// </summary>
-    private CompositeTypeSchemaDto BuildCompositeSchema(string compositeTypeId)
+    private CompositeTypeSchemaDto BuildCompositeSchema(
+        string compositeTypeId, IReadOnlyDictionary<string, string> unitNames)
     {
         var ct = _compositeCache.GetType(compositeTypeId);
 
         var fields = ct.Fields
             .Where(f => !f.IsDeleted)
             .OrderBy(f => f.DisplayOrder)
-            .Select(BuildFieldSchema)
+            .Select(f => BuildFieldSchema(f, unitNames))
             .ToList();
 
         return new CompositeTypeSchemaDto(ct.TypeName, fields);
     }
 
-    private CompositeFieldSchemaDto BuildFieldSchema(CompositeFieldDefinition f)
+    private CompositeFieldSchemaDto BuildFieldSchema(
+        CompositeFieldDefinition f, IReadOnlyDictionary<string, string> unitNames)
     {
-        // ★ #4：解析单位
-        UnitSchemaDto? unit = null;
-        IReadOnlyList<UnitSchemaDto>? availableUnits = null;
+        // ★ #4：单位名称投影
+        string? unitName = null;
         if (f.UnitId is { } uid)
-        {
-            try
-            {
-                var baseUnit = _unitCache.Get(uid);
-                unit = ToUnitDto(baseUnit);
-                availableUnits = _unitCache.GetByCategory(baseUnit.Category)
-                    .Select(ToUnitDto).ToList();
-            }
-            catch (InvalidOperationException) { }
-        }
+            unitNames.TryGetValue(uid, out unitName);
 
         // ★ #8：选项集
         OptionSetSchemaDto? optionSet = null;
@@ -414,17 +425,14 @@ public class EavController : ControllerBase
             f.IsArray, f.IsRequired, f.IsSearchable, f.DisplayOrder,
             f.RefCompositeTypeId,
             f.DataType == EavDataTypes.Composite && f.RefCompositeTypeId is { } rid
-                ? BuildCompositeSchema(rid)
+                ? BuildCompositeSchema(rid, unitNames)
                 : null,
             f.ValidationRule?.RootElement.Clone(),
             f.AllowedValues?.RootElement.Clone(),
-            unit,
-            availableUnits,
+            f.UnitId,
+            unitName,
             optionSet);   // ★ #8
     }
-
-    private static UnitSchemaDto ToUnitDto(Unit u)
-        => new(u.Id, u.Category, u.Name, u.Symbol, u.IsBaseUnit);
 
     // ---------- 请求体 JsonElement -> 强类型值 ----------
 
@@ -448,10 +456,10 @@ public class EavController : ControllerBase
         {
             var def = defs[name];
 
-            // ★ P2-3：table 类型属性不能通过 PUT entities 写入。
+            // ★ P2-3：table/record 类型属性不能通过 PUT entities 写入。
             //   行数据必须走 CustomTableDataController（PUT .../tables/{tableName}）。
             //   收集后统一抛错，避免静默忽略导致客户端误判"保存成功"。
-            if (def.DataType == EavDataTypes.Table)
+            if (def.DataType is EavDataTypes.Table or EavDataTypes.Record)
             {
                 tableAttrs.Add(name);
                 continue;
@@ -463,7 +471,7 @@ public class EavController : ControllerBase
         if (tableAttrs.Count > 0)
         {
             throw new ArgumentException(
-                $"table 类型属性不能通过 PUT entities 写入，请使用 " +
+                $"table/record 类型属性不能通过 PUT entities 写入，请使用 " +
                 $"PUT /api/eav/{{entityType}}/entities/{{entityId}}/tables/{{tableName}}。" +
                 $"涉及属性: {string.Join(", ", tableAttrs)}");
         }
@@ -498,9 +506,9 @@ public class EavController : ControllerBase
         if (elem.ValueKind == JsonValueKind.Object)
         {
             var value = elem.GetProperty("value").GetDecimal();
-            Guid? unitId = elem.TryGetProperty("unitId", out var u)
-                           && u.ValueKind == JsonValueKind.String
-                ? Guid.Parse(u.GetString()!)
+            string? unitId = elem.TryGetProperty("unitId", out var u)
+                             && u.ValueKind == JsonValueKind.String
+                ? u.GetString()
                 : null;
             return new NumericValue(value, unitId);
         }
@@ -549,9 +557,9 @@ public class EavController : ControllerBase
         if (field.DataType == EavDataTypes.Decimal && elem.ValueKind == JsonValueKind.Object)
         {
             var v = elem.GetProperty("value").GetDecimal();
-            Guid? unitId = elem.TryGetProperty("unitId", out var u)
-                            && u.ValueKind == JsonValueKind.String
-                ? Guid.Parse(u.GetString()!)
+            string? unitId = elem.TryGetProperty("unitId", out var u)
+                             && u.ValueKind == JsonValueKind.String
+                ? u.GetString()
                 : null;
             return new NumericValue(v, unitId);
         }

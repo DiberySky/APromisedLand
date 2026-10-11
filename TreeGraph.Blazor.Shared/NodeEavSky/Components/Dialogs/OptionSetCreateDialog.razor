@@ -1,8 +1,8 @@
-@* OptionSetCreateDialog.razor — 新建选项集（PageDialogSky 外壳，DialogService 模式） *@
+@* OptionSetCreateDialog.razor — 新建选项集（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
-<PageDialogSky Title="新建选项集"
+<DialogSky Title="新建选项集"
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
                SubmitButtonDisabled="@_submitting"
@@ -23,7 +23,7 @@
                       Placeholder="性别"
                       Variant="Variant.Outlined" />
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

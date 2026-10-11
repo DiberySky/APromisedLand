@@ -1,8 +1,10 @@
 @* NavMenu.razor *@
 @using TreeGraph.Shared.NodeEavSky.Dtos
+@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @inject EavApiClient Api
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @* NavMenu.razor *@
 <MudNavMenu>
     <MudNavLink Href="/" Match="NavLinkMatch.All"
@@ -92,9 +94,8 @@
                     Match="NavLinkMatch.Prefix">
             实体类型
         </MudNavLink>
-        <MudNavLink Href="/metadata/attributes"
-                    Icon="@Icons.Material.Filled.EditAttributes"
-                    Match="NavLinkMatch.Prefix">
+        <MudNavLink Icon="@Icons.Material.Filled.EditAttributes"
+                    OnClick="OpenAttributesManage">
             属性定义
         </MudNavLink>
         <MudNavLink Href="/metadata/composite-types"
@@ -112,11 +113,6 @@
                     Match="NavLinkMatch.Prefix">
             选项集
         </MudNavLink>
-        <MudNavLink Href="/metadata/units"
-                    Icon="@Icons.Material.Filled.Straighten"
-                    Match="NavLinkMatch.Prefix">
-            单位
-        </MudNavLink>
     </MudNavGroup>
 </MudNavMenu>
 
@@ -124,6 +120,20 @@
     private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
     private bool _entityGroupExpanded = true;
     private bool _initialized;
+
+    /// <summary>打开属性定义管理对话框（通用模式，可在对话框内切换实体类型）。</summary>
+    private async Task OpenAttributesManage()
+    {
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+
+        await DialogService.ShowExAsync<AttributesManageDialog>(
+            string.Empty, new DialogParameters<AttributesManageDialog>(), options);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

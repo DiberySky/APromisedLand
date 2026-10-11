@@ -1,14 +1,38 @@
-@* EntityTypes.razor — 实体类型管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/EntityTypeEditDialog.razor） *@
+@* EntityTypes.razor — 实体类型管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/EntityTypeEditDialog.razor）
+   支持对话框模式：IsDialogMode=true 时隐藏 PageHeaderSky，新建按钮移至内容区顶部。 *@
 @page "/metadata/entity-types"
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
 @using TreeGraph.Shared.NodeEavSky.Dtos
-<PageTitle>实体类型管理</PageTitle>
 
-<PageHeaderSky Title="实体类型管理">
-    <Actions>
+@if (!IsDialogMode)
+{
+    <PageTitle>实体类型管理</PageTitle>
+
+    <PageHeaderSky Title="实体类型管理">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Size="Size.Small"
+                       OnClick="LoadAsync" Disabled="@_loading"
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       Size="Size.Small"
+                       OnClick="OpenCreateAsync"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Class="ml-2">
+                新建实体类型
+            </MudButton>
+        </Actions>
+    </PageHeaderSky>
+}
+else
+{
+    @* 对话框模式：顶部工具栏 *@
+    <MudStack Row Class="mb-4" Justify="Justify.FlexEnd">
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    Size="Size.Small"
                    OnClick="LoadAsync" Disabled="@_loading"
@@ -22,8 +46,8 @@
                    Class="ml-2">
             新建实体类型
         </MudButton>
-    </Actions>
-</PageHeaderSky>
+    </MudStack>
+}
 
 <MudTable Items="_types" Hover="true" Bordered="true"
           Dense="true"
@@ -99,11 +123,14 @@
 </MudTable>
 
 @code {
+    /// <summary>对话框模式：隐藏页头，新建按钮移至内容区顶部。</summary>
+    [Parameter] public bool IsDialogMode { get; set; }
+
     private IReadOnlyList<EntityTypeDetailDto>? _types;
     private bool _loading;
     private bool _initialized;
 
-    /// <summary>桌面端对话框选项：PageDialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
+    /// <summary>桌面端对话框选项：DialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
     private static readonly DialogOptions DialogOptions = new()
     {
         MaxWidth = MaxWidth.Medium,

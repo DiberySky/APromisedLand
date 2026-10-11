@@ -12,7 +12,6 @@ public class TreeGraphDbContext : DbContext
     public DbSet<CompositeTypeDefinition> CompositeTypes => Set<CompositeTypeDefinition>();
     public DbSet<CompositeFieldDefinition> CompositeFields => Set<CompositeFieldDefinition>();
     public DbSet<AttributeAuditLog> AttributeAuditLogs => Set<AttributeAuditLog>();
-    public DbSet<Unit> Units => Set<Unit>();
     public DbSet<OptionSet> OptionSets => Set<OptionSet>();
     public DbSet<OptionItem> OptionItems => Set<OptionItem>();
     public DbSet<CustomTableDefinition> CustomTables => Set<CustomTableDefinition>();
@@ -34,7 +33,6 @@ public class TreeGraphDbContext : DbContext
         ConfigureEntityTypes(mb);
         ConfigureInodeEntityTypes(mb);
         ConfigureInodeEntities(mb);
-        ConfigureUnits(mb);
         ConfigureOptionSets(mb);
         ConfigureAttributeCatalog(mb);
         ConfigureAttributeValues(mb);
@@ -184,41 +182,10 @@ public class TreeGraphDbContext : DbContext
         });
     }
 
-    private static void ConfigureUnits(ModelBuilder mb)
-    {
-        mb.Entity<Unit>(e =>
-        {
-            e.ToTable("units");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("id");
-            e.Property(x => x.Category).HasColumnName("category").HasMaxLength(50).IsRequired();
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
-            e.Property(x => x.Symbol).HasColumnName("symbol").HasMaxLength(20).IsRequired();
-            e.Property(x => x.ToBaseFactor).HasColumnName("to_base_factor").HasPrecision(38, 15);
-            e.Property(x => x.IsBaseUnit).HasColumnName("is_base_unit");
-            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            e.HasIndex(x => new { x.Category, x.Name })
-                .IsUnique()
-                .HasDatabaseName("uq_unit_category_name");
-
-            e.HasIndex(x => x.Category)
-                .IsUnique()
-                .HasDatabaseName("uq_unit_category_base")
-                .HasFilter("is_base_unit = true");
-        });
-    }
-
     private static void ConfigureAttributeCatalog(ModelBuilder mb)
     {
         mb.Entity<AttributeDefinition>(e =>
         {
-            // ★ 移除原 ck_attr_int_no_unit CHECK 约束。
-            //   现在 int 类型也可以绑定单位：归一化到基准单位产生的小数
-            //   会写入 ValueDecimal 列（见 EavWriteService.SetTypedValue）。
             e.ToTable("attribute_catalog");
 
             e.HasKey(x => x.AttributeId);
@@ -244,7 +211,7 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
             e.Property(x => x.RefTableDefinitionId).HasColumnName("ref_table_definition_id").HasMaxLength(36);
             e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
-            e.Property(x => x.UnitId).HasColumnName("unit_id");
+            e.Property(x => x.UnitId).HasColumnName("unit_id").HasMaxLength(36);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
@@ -288,8 +255,6 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.ValueString).HasColumnName("value_string").HasMaxLength(2000);
             e.Property(x => x.ValueInt).HasColumnName("value_int");
 
-            // ★ 修复 P1-1：value_decimal 精度从 (18,4) 提升到 (38,15)，
-            // 与 units.to_base_factor 一致，避免单位换算（如 1 mg → kg）截断为 0
             e.Property(x => x.ValueDecimal)
                 .HasColumnName("value_decimal")
                 .HasPrecision(38, 15);
@@ -302,7 +267,7 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.ValueJsonb).HasColumnName("value_jsonb").HasColumnType("jsonb");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-            e.Property(x => x.UnitId).HasColumnName("unit_id");
+            e.Property(x => x.UnitId).HasColumnName("unit_id").HasMaxLength(36);
 
             e.HasIndex(x => new { x.EntityId, x.EntityType, x.AttributeId })
                 .IsUnique().HasDatabaseName("uq_av_entity_attr");
@@ -394,8 +359,8 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
             e.Property(x => x.RefCompositeTypeId).HasColumnName("ref_composite_type_id").HasMaxLength(36);
 
-            // ★ #4：单位外键列
-            e.Property(x => x.UnitId).HasColumnName("unit_id");
+            // ★ #4：单位外键列（指向 unit_trees 节点）
+            e.Property(x => x.UnitId).HasColumnName("unit_id").HasMaxLength(36);
             // ★ #8：选项集外键列
             e.Property(x => x.RefOptionSetId).HasColumnName("ref_option_set_id").HasMaxLength(36);
 

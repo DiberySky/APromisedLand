@@ -33,7 +33,7 @@
 else if (_schema is null || _schema.Count == 0)
 {
     <MudAlert Severity="Severity.Warning">
-        实体类型 @EntityType 没有属性定义。请先在元数据管理页配置。
+        实体类型 @EntityType 没有属性定义。请先打开「属性定义管理」为该类型配置属性。
     </MudAlert>
 }
 else
@@ -62,12 +62,10 @@ else
             <MudText Typo="Typo.h6" Class="mb-3">子表数据</MudText>
             @foreach (var attr in _tableAttributes)
             {
-                <CustomTableEditor EntityType="@EntityType"
-                                   EntityId="@EntityId"
-                                   AttributeName="@attr.AttributeName"
-                                   TableName="@attr.AttributeName"
-                                   DisplayName="@attr.DisplayName"
-                                   RefTableDefinitionId="@attr.RefTableDefinitionId" />
+                <TableField Attr="attr"
+                            EntityType="EntityType"
+                            EntityId="EntityId"
+                            RecordMode="@(attr.DataType == "record")" />
             }
         </MudPaper>
     }
@@ -184,8 +182,8 @@ else
             var schema = await Api.GetSchemaAsync(EntityType);
             _schema = schema ?? Array.Empty<AttributeSchemaDto>();
 
-            _regularAttributes = _schema.Where(a => a.DataType != "table").ToList();
-            _tableAttributes = _schema.Where(a => a.DataType == "table").ToList();
+            _regularAttributes = _schema.Where(a => a.DataType is not ("table" or "record")).ToList();
+            _tableAttributes = _schema.Where(a => a.DataType is "table" or "record").ToList();
 
             _values.Clear();
             var entity = await Api.GetEntityAsync(EntityType, EntityId);
@@ -426,7 +424,7 @@ else
             "string" => elem.ValueKind == JsonValueKind.String ? elem.GetString() : elem.ToString(),
 
             // int：有单位走 JsonToNumeric，无单位走裸数字 → long
-            "int" => schema.Unit is not null
+            "int" => !string.IsNullOrEmpty(schema.UnitId)
                 ? JsonToNumeric(elem)
                 : (elem.ValueKind == JsonValueKind.Number ? elem.GetInt64()
                   : elem.ValueKind == JsonValueKind.String
@@ -464,17 +462,17 @@ else
     /// 数值 JSON → NumericInput。
     ///
     /// 支持两种形态：
-    ///   - { value: 1.5, unitId: "..." }  → 归一化后的值 + 原始输入单位
-    ///   - 裸数字                          → 视为基准单位值
+    ///   - { value: 1.5, unitId: "..." }  → 值 + 单位（单位仅记录，不换算）
+    ///   - 裸数字                          → 单位取属性定义绑定的单位
     /// </summary>
     private NumericInput JsonToNumeric(JsonElement elem)
     {
         if (elem.ValueKind == JsonValueKind.Object)
         {
             var val = elem.GetProperty("value").GetDecimal();
-            Guid? unitId = elem.TryGetProperty("unitId", out var u)
-                            && u.ValueKind == JsonValueKind.String
-                ? Guid.Parse(u.GetString()!)
+            string? unitId = elem.TryGetProperty("unitId", out var u)
+                             && u.ValueKind == JsonValueKind.String
+                ? u.GetString()
                 : null;
             return new NumericInput { Value = val, UnitId = unitId };
         }

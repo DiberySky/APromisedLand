@@ -1,8 +1,8 @@
-@* CompositeTypeEditDialog.razor — 编辑组合类型（PageDialogSky 外壳，DialogService 模式） *@
+@* CompositeTypeEditDialog.razor — 编辑组合类型（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
-<PageDialogSky Title="编辑组合类型"
+<DialogSky Title="编辑组合类型"
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
@@ -24,7 +24,7 @@
             TypeName 与 EntityType 是引用标识，不可修改。如需更名，请新建并迁移引用。
         </MudAlert>
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

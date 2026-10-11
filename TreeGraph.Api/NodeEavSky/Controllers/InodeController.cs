@@ -132,11 +132,9 @@ public class InodeController : ControllerBase
     [HttpGet("entities")]
     public async Task<IActionResult> ListEntities(
         string inodeId,
-        [FromQuery] string? unit,
         CancellationToken ct)
     {
-        var originalUnits = unit == "original";
-        var all = await _facade.LoadAllByInodeAsync(inodeId, originalUnits, ct);
+        var all = await _facade.LoadAllByInodeAsync(inodeId, ct);
 
         var result = all.Values.Select(e => new DynamicEntityDto(
             e.EntityId,
@@ -153,12 +151,10 @@ public class InodeController : ControllerBase
     [HttpGet("entities/{entityType}")]
     public async Task<IActionResult> GetEntity(
         string inodeId, string entityType,
-        [FromQuery] string? unit,
         CancellationToken ct)
     {
-        var originalUnits = unit == "original";
         var entity = await _facade.LoadAsync(
-            inodeId, entityType, originalUnits, ct);
+            inodeId, entityType, ct);
         if (entity is null) return NotFound();
 
         return Ok(new DynamicEntityDto(
@@ -378,14 +374,11 @@ public class InodeController : ControllerBase
             });
         }
 
-        // base 和 original 都返回裸数字，但取值方式不同：
-        //   - base:     归一化值（后端默认存储）
-        //   - original: 还原到用户原始输入单位
-        var originalUnits = unitsMode == "original";
+        // 单位不做换算：base 和 original 等价，都返回裸数字（存储值即输入值）
         var bareValue = unitsMode is "base" or "original";
 
         // ---- 2. 加载所有实体（复用现有 Facade） ----
-        var all = await _facade.LoadAllByInodeAsync(inodeId, originalUnits, ct);
+        var all = await _facade.LoadAllByInodeAsync(inodeId, ct);
 
         // ---- 3. 构建 entities 字典 ----
         var entitiesDict = new Dictionary<string, object>(StringComparer.Ordinal);

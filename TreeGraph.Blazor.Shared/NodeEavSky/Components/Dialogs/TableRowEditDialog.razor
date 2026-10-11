@@ -1,0 +1,501 @@
+@* TableRowEditDialog.razor — 自定义表单行编辑（二级弹窗）
+   按列定义渲染类型化表单，保存走行级增量端点 PUT .../tables/{t}/rows（新增/更新同一端点）。
+   必填/类型/规则由本弹窗前端校验；跨行唯一性由后端校验，400 错误回填到字段或顶部 Alert。 *@
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+@using System.Text.Json
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@(_isEdit ? "编辑行" : "新增行")"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_saving ? "保存中..." : "保存")"
+           SubmitButtonDisabled="@_saving"
+           OnSubmitClick="SaveAsync">
+    <DialogContent>
+        @if (_serverError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">
+                @_serverError
+            </MudAlert>
+        }
+
+        <MudGrid>
+            @foreach (var col in _activeColumns)
+            {
+                var colCaptured = col;
+                var errorText = _errors.TryGetValue(col.ColumnName, out var list)
+                    ? string.Join("；", list) : null;
+
+                <MudItem xs="12" md="@(IsWideColumn(col.DataType) ? 12 : 6)">
+                    @switch (col.DataType)
+                    {
+                        case EavDataTypes.Int:
+                            <MudNumericField T="long?"
+                                             Value="@GetLong(col.ColumnName)"
+                                             ValueChanged="@(v => SetField(col, v))"
+                                             Label="@ColLabel(col)"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             Error="@(errorText is not null)"
+                                             ErrorText="@errorText"
+                                             FullWidth="true" />
+                            break;
+
+                        case EavDataTypes.Decimal:
+                            <MudNumericField T="decimal?"
+                                             Value="@GetDecimal(col.ColumnName)"
+                                             ValueChanged="@(v => SetField(col, v))"
+                                             Label="@ColLabel(col)"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             Error="@(errorText is not null)"
+                                             ErrorText="@errorText"
+                                             FullWidth="true" />
+                            break;
+
+                        case EavDataTypes.Bool:
+                            <MudSwitch T="bool"
+                                       Value="@GetBool(col.ColumnName)"
+                                       ValueChanged="@(v => SetField(col, v))"
+                                       Label="@col.DisplayName"
+                                       Color="Color.Primary" />
+                            break;
+
+                        case EavDataTypes.Date:
+                            <MudDatePicker Date="@GetDate(col.ColumnName)"
+                                           DateChanged="@((DateTime? v) => OnDateChanged(col, v))"
+                                           Label="@ColLabel(col)"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Error="@(errorText is not null)"
+                                           ErrorText="@errorText"
+                                           FullWidth="true" />
+                            break;
+
+                        case EavDataTypes.Time:
+                            <MudTimePicker Time="@GetTime(col.ColumnName)"
+                                           TimeChanged="@((TimeSpan? v) => OnTimeChanged(col, v))"
+                                           Label="@ColLabel(col)"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Error="@(errorText is not null)"
+                                           ErrorText="@errorText"
+                                           FullWidth="true" />
+                            break;
+
+                        case EavDataTypes.Datetime:
+                            <MudTextField T="string"
+                                          Value="@GetString(col.ColumnName)"
+                                          ValueChanged="@(v => SetField(col, v))"
+                                          Label="@(ColLabel(col) + "（ISO 8601）")"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Error="@(errorText is not null)"
+                                          ErrorText="@errorText"
+                                          Immediate="true"
+                                          FullWidth="true" />
+                            break;
+
+                        case EavDataTypes.SingleChoice when ExtractAllowedValues(col.AllowedValues).Count > 0:
+                            <MudSelect T="string"
+                                       Value="@GetString(col.ColumnName)"
+                                       ValueChanged="@(v => SetField(col, v))"
+                                       Label="@ColLabel(col)"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Error="@(errorText is not null)"
+                                       ErrorText="@errorText"
+                                       FullWidth="true">
+                                @if (!col.IsRequired)
+                                {
+                                    <MudSelectItem T="string" Value="@("")">（未选择）</MudSelectItem>
+                                }
+                                @foreach (var opt in ExtractAllowedValues(col.AllowedValues))
+                                {
+                                    <MudSelectItem T="string" Value="@opt">@opt</MudSelectItem>
+                                }
+                            </MudSelect>
+                            break;
+
+                        case EavDataTypes.Composite:
+                        case EavDataTypes.Json:
+                        case EavDataTypes.File:
+                            <MudTextField T="string"
+                                          Value="@GetJsonText(col.ColumnName)"
+                                          ValueChanged="@((string? v) => OnJsonChanged(col, v))"
+                                          Label="@(ColLabel(col) + "（JSON）")"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Lines="4"
+                                          Error="@(errorText is not null)"
+                                          ErrorText="@errorText"
+                                          Immediate="true"
+                                          FullWidth="true" />
+                            break;
+
+                        default:
+                            <MudTextField T="string"
+                                          Value="@GetString(col.ColumnName)"
+                                          ValueChanged="@(v => SetField(col, v))"
+                                          Label="@ColLabel(col)"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Error="@(errorText is not null)"
+                                          ErrorText="@errorText"
+                                          Immediate="true"
+                                          FullWidth="true" />
+                            break;
+                    }
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter, EditorRequired] public string EntityType { get; set; } = "";
+    [Parameter, EditorRequired] public string EntityId { get; set; } = "";
+    [Parameter, EditorRequired] public string TableName { get; set; } = "";
+    [Parameter, EditorRequired] public CustomTableDetailDto TableDef { get; set; } = null!;
+
+    /// <summary>编辑的行；null 表示新增。</summary>
+    [Parameter] public CustomTableRowValue? EditRow { get; set; }
+
+    /// <summary>新增行的初始排序号（通常为当前行数）。</summary>
+    [Parameter] public int NextRowOrder { get; set; }
+
+    private readonly Dictionary<string, object?> _fields = new();
+    private readonly Dictionary<string, List<string>> _errors = new();
+    private string? _serverError;
+    private bool _saving;
+
+    private bool _isEdit => EditRow is not null;
+    private List<CustomTableColumnDto> _activeColumns = new();
+
+    protected override void OnInitialized()
+    {
+        _activeColumns = TableDef.Columns
+            .Where(c => !c.IsDeleted)
+            .OrderBy(c => c.DisplayOrder)
+            .ToList();
+
+        if (EditRow?.Fields is not null)
+        {
+            var activeNames = _activeColumns.Select(c => c.ColumnName).ToHashSet();
+            // 只回显活动列：已删除列既不渲染也不能回传（后端按未知列拒绝）
+            foreach (var kv in EditRow.Fields.Where(kv => activeNames.Contains(kv.Key)))
+            {
+                _fields[kv.Key] = UnwrapValue(kv.Value);
+            }
+        }
+    }
+
+    // ============================================================
+    // 控件取值
+    // ============================================================
+
+    private string? GetString(string key)
+        => _fields.TryGetValue(key, out var v) ? v as string : null;
+
+    private long? GetLong(string key) => UnwrapValue(_fields.GetValueOrDefault(key)) switch
+    {
+        long l => l,
+        int i => i,
+        _ => null
+    };
+
+    private decimal? GetDecimal(string key) => UnwrapValue(_fields.GetValueOrDefault(key)) switch
+    {
+        decimal d => d,
+        double db => (decimal)db,
+        long l => l,
+        int i => i,
+        _ => null
+    };
+
+    private bool GetBool(string key)
+        => UnwrapValue(_fields.GetValueOrDefault(key)) is bool b && b;
+
+    private DateTime? GetDate(string key)
+        => GetString(key) is { } s && DateOnly.TryParse(s, out var d)
+            ? d.ToDateTime(TimeOnly.MinValue)
+            : null;
+
+    private TimeSpan? GetTime(string key)
+        => GetString(key) is { } ts && TimeOnly.TryParse(ts, out var t)
+            ? t.ToTimeSpan()
+            : null;
+
+    private string GetJsonText(string key) => UnwrapValue(_fields.GetValueOrDefault(key)) switch
+    {
+        null => "",
+        JsonElement je => je.GetRawText(),
+        string s => s,
+        var other => JsonSerializer.Serialize(other)
+    };
+
+    // ============================================================
+    // 控件赋值
+    // ============================================================
+
+    private void SetField(CustomTableColumnDto col, object? value)
+    {
+        if (value is null || (value is string s && string.IsNullOrEmpty(s)))
+            _fields.Remove(col.ColumnName);
+        else
+            _fields[col.ColumnName] = value;
+
+        _serverError = null;
+        ValidateColumn(col);
+    }
+
+    private void OnDateChanged(CustomTableColumnDto col, DateTime? dt)
+        => SetField(col, dt.HasValue ? dt.Value.ToString("yyyy-MM-dd") : null);
+
+    private void OnTimeChanged(CustomTableColumnDto col, TimeSpan? ts)
+        => SetField(col, ts.HasValue
+            ? new TimeOnly(ts.Value.Hours, ts.Value.Minutes, ts.Value.Seconds).ToString("HH:mm:ss")
+            : null);
+
+    private void OnJsonChanged(CustomTableColumnDto col, string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _fields.Remove(col.ColumnName);
+            _errors.Remove(col.ColumnName);
+            _serverError = null;
+            return;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            _fields[col.ColumnName] = doc.RootElement.Clone();
+            _errors.Remove(col.ColumnName);
+            _serverError = null;
+        }
+        catch (JsonException ex)
+        {
+            // 解析失败：报错但不污染已保存的值
+            _errors[col.ColumnName] = new List<string> { $"JSON 格式错误：{ex.Message}" };
+        }
+    }
+
+    // ============================================================
+    // 校验
+    // ============================================================
+
+    private void ValidateColumn(CustomTableColumnDto col)
+    {
+        _errors.Remove(col.ColumnName);
+        var value = _fields.GetValueOrDefault(col.ColumnName);
+        var errors = new List<string>();
+
+        var isNull = value is null;
+        var isEmptyString = value is string s && string.IsNullOrWhiteSpace(s);
+
+        if (col.IsRequired && col.DataType != EavDataTypes.Bool && (isNull || isEmptyString))
+        {
+            errors.Add("必填字段");
+        }
+        else if (!isNull && !isEmptyString)
+        {
+            errors.AddRange(ValidateByType(col, value!));
+
+            if (col.DataType == EavDataTypes.SingleChoice)
+            {
+                var allowed = ExtractAllowedValues(col.AllowedValues);
+                var choiceText = value!.ToString() ?? "";
+                if (allowed.Count > 0 && !allowed.Contains(choiceText))
+                    errors.Add($"值必须是以下之一：{string.Join("、", allowed)}");
+            }
+        }
+
+        if (errors.Count > 0)
+            _errors[col.ColumnName] = errors;
+    }
+
+    private static IEnumerable<string> ValidateByType(CustomTableColumnDto col, object value)
+    {
+        switch (col.DataType)
+        {
+            case EavDataTypes.String:
+                foreach (var msg in FieldValidationRules.ValidateString(
+                    value.ToString() ?? "", col.ValidationRule, allowedValues: null))
+                    yield return msg;
+                break;
+
+            case EavDataTypes.Int:
+            case EavDataTypes.Decimal:
+                if (TryGetDecimal(value, out var d))
+                {
+                    if (col.DataType == EavDataTypes.Int && d != Math.Truncate(d))
+                        yield return "int 类型不接受小数";
+                    else
+                        foreach (var msg in FieldValidationRules.ValidateNumeric(d, col.ValidationRule))
+                            yield return msg;
+                }
+                else
+                {
+                    yield return "数值格式错误";
+                }
+                break;
+
+            case EavDataTypes.Date:
+                if (value is string ds && DateOnly.TryParse(ds, out var dt))
+                    foreach (var msg in FieldValidationRules.ValidateDate(dt, col.ValidationRule))
+                        yield return msg;
+                else
+                    yield return "日期格式错误（应为 yyyy-MM-dd）";
+                break;
+
+            case EavDataTypes.Time:
+                if (value is string ts && TimeOnly.TryParse(ts, out var t))
+                    foreach (var msg in FieldValidationRules.ValidateTime(t, col.ValidationRule))
+                        yield return msg;
+                else
+                    yield return "时间格式错误（应为 HH:mm:ss）";
+                break;
+
+            case EavDataTypes.Datetime:
+                if (!DateTimeOffset.TryParse(value.ToString(), out _))
+                    yield return "日期时间格式错误（应为 ISO 8601，如 2026-10-12T08:30:00+08:00）";
+                break;
+
+            // bool / single_choice / composite / json / file：控件或 JSON 解析已保证格式
+            default:
+                yield break;
+        }
+    }
+
+    private bool ValidateAll()
+    {
+        _errors.Clear();
+        foreach (var col in _activeColumns)
+            ValidateColumn(col);
+        return _errors.Count == 0;
+    }
+
+    // ============================================================
+    // 保存（行级增量 Upsert）
+    // ============================================================
+
+    private async Task SaveAsync()
+    {
+        _serverError = null;
+        if (!ValidateAll())
+        {
+            Snackbar.Add("存在校验错误，请先修正", Severity.Warning);
+            return;
+        }
+
+        var row = new CustomTableRowValue
+        {
+            RowId = EditRow?.RowId,
+            RowOrder = _isEdit ? EditRow!.RowOrder : NextRowOrder,
+            Fields = new Dictionary<string, object?>(_fields)
+        };
+
+        _saving = true;
+        try
+        {
+            var (ok, error) = await Api.UpsertCustomTableRowAsync(
+                EntityType, EntityId, TableName, row);
+
+            if (ok)
+            {
+                Snackbar.Add("保存成功", Severity.Success);
+                MudDialog?.Close(DialogResult.Ok(true));
+                return;
+            }
+
+            // 后端信封错误形如 "cert_name: 值 ... 已存在（跨行唯一）"，尝试回填到对应列
+            _serverError = ApplyServerErrors(error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>把 "field: message" 形式的后端错误映射到字段；无法映射的汇总为顶部错误。</summary>
+    private string? ApplyServerErrors(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error)) return "保存失败";
+
+        var leftovers = new List<string>();
+        foreach (var part in error.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                                  .Select(p => p.Trim()))
+        {
+            var sep = part.IndexOf(':');
+            if (sep > 0)
+            {
+                var field = part[..sep].Trim();
+                var message = part[(sep + 1)..].Trim();
+                if (_activeColumns.Any(c => c.ColumnName == field))
+                {
+                    if (!_errors.TryGetValue(field, out var list))
+                        _errors[field] = list = new List<string>();
+                    list.Add(message);
+                    continue;
+                }
+            }
+            leftovers.Add(part);
+        }
+
+        return leftovers.Count > 0 ? string.Join("；", leftovers) : null;
+    }
+
+    // ============================================================
+    // 辅助
+    // ============================================================
+
+    /// <summary>加载数据为 JsonElement 时归一化为 CLR 类型，与校验/比较路径对齐。</summary>
+    private static object? UnwrapValue(object? value)
+    {
+        if (value is not JsonElement je) return value;
+        return je.ValueKind switch
+        {
+            JsonValueKind.Null => null,
+            JsonValueKind.String => je.GetString(),
+            JsonValueKind.Number => je.TryGetInt64(out var l) ? l : je.GetDecimal(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => value   // Object / Array 保持 JsonElement
+        };
+    }
+
+    private static bool IsWideColumn(string dataType)
+        => dataType is EavDataTypes.Composite or EavDataTypes.Json or EavDataTypes.File;
+
+    private static string ColLabel(CustomTableColumnDto col)
+        => col.IsRequired ? $"{col.DisplayName} *" : col.DisplayName;
+
+    private static bool TryGetDecimal(object? v, out decimal d)
+    {
+        switch (v)
+        {
+            case decimal dd: d = dd; return true;
+            case double db: d = (decimal)db; return true;
+            case int i: d = i; return true;
+            case long l: d = l; return true;
+            default: d = 0; return false;
+        }
+    }
+
+    private static List<string> ExtractAllowedValues(JsonElement? allowedValues)
+    {
+        var result = new List<string>();
+        if (allowedValues is JsonElement av && av.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in av.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                    result.Add(item.GetString()!);
+            }
+        }
+        return result;
+    }
+}

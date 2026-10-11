@@ -1,0 +1,46 @@
+@* UnitTreeField.razor — 计量单位选择字段（复制自原系统 APromisedLand.Razor/DiberyTree/Trees/Unit/UintTreeField.razor）。
+   只读文本框显示单位全名，点击尾部图标弹出单位树选择对话框（TreeSelectDialogSky<UnitTree>）。
+   与原系统差异：原系统绑定整个 UnitTree 对象，本系统绑定 UnitId（string）+ UnitName（显示用）。 *@
+@using TreeGraph.Shared.TreeEavSky.Entities
+
+@inject TreeNodeDialogService<UnitTree> TreeNodeDialogService
+
+<MudTextField @bind-Value="@_fullName"
+              Label="计量单位"
+              Variant="Variant.Outlined" ReadOnly="true"
+              InputType="@InputType.Text" Adornment="Adornment.End"
+              AdornmentIcon="@Icons.Material.Outlined.EditNote"
+              AdornmentColor="Color.Info"
+              OnAdornmentClick="@EditClick"
+              AdornmentAriaLabel="" />
+
+@code {
+    /// <summary>绑定的单位树节点 Id。</summary>
+    [Parameter] public string? UnitId { get; set; }
+    [Parameter] public EventCallback<string?> UnitIdChanged { get; set; }
+
+    /// <summary>单位显示名（编辑场景由详情 DTO 提供，选择后由选中节点覆盖）。</summary>
+    [Parameter] public string? UnitName { get; set; }
+    [Parameter] public EventCallback<string?> UnitNameChanged { get; set; }
+
+    string? _fullName;
+
+    protected override void OnParametersSet()
+    {
+        _fullName = UnitName;
+    }
+
+    private async Task EditClick()
+    {
+        var result = await TreeNodeDialogService.ShowTreeSelectDialogAsync();
+
+        if (result == null) return;
+
+        UnitId = result.Id;
+        UnitName = result.Text();
+        _fullName = UnitName;
+
+        await UnitIdChanged.InvokeAsync(UnitId);
+        await UnitNameChanged.InvokeAsync(UnitName);
+    }
+}

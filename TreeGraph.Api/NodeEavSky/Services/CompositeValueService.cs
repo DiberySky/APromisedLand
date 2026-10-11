@@ -11,24 +11,12 @@ public class CompositeValueService
     private readonly ICompositeTypeCache _cache;
     private readonly EavValidationService _validator;
 
-    /// <summary>
-    /// ★ #4：注入单位服务以支持组合内 decimal 字段的单位换算。
-    /// UnitId 存在于 CompositeFieldDefinition 上（数据库 CHECK 约束：
-    /// 仅 decimal 类型可以绑定）。
-    /// </summary>
-    private readonly IUnitCache _unitCache;
-    private readonly UnitConverter _converter;
-
     public CompositeValueService(
         ICompositeTypeCache cache,
-        EavValidationService validator,
-        IUnitCache unitCache,
-        UnitConverter converter)
+        EavValidationService validator)
     {
         _cache = cache;
         _validator = validator;
-        _unitCache = unitCache;
-        _converter = converter;
     }
 
     // ============================================================
@@ -91,35 +79,12 @@ public class CompositeValueService
             return;
         }
 
-        // ★ #4：组合内 decimal 带单位时，校验单位分类与归一化后的范围
+        // ★ #4：组合内 decimal 带单位（NumericValue）时，单位仅作记录，直接校验数值范围
         if (field.DataType == EavDataTypes.Decimal && value is NumericValue nv)
         {
-            if (field.UnitId is { } baseUnitId && nv.UnitId is { } inputUnitId)
-            {
-                try
-                {
-                    var baseUnit = _unitCache.Get(baseUnitId);
-                    var inputUnit = _unitCache.Get(inputUnitId);
-                    if (inputUnit.Category != baseUnit.Category)
-                    {
-                        errors.Add(new(path,
-                            $"单位分类不匹配：期望 {baseUnit.Category}，实际 {inputUnit.Category}"));
-                    }
-                }
-                catch (InvalidOperationException)
-                {
-                    errors.Add(new(path, "单位不存在"));
-                }
-            }
-            else if (field.UnitId is null && nv.UnitId is not null)
-            {
-                errors.Add(new(path, "该字段未绑定基准单位，不允许指定单位"));
-            }
-            // 用归一化后的值做范围校验
             if (field.ValidationRule is not null)
             {
-                var normalized = NormalizeToBase(field, nv.Value, nv.UnitId);
-                var result = ValidateNumericRange(field, normalized);
+                var result = ValidateNumericRange(field, nv.Value);
                 if (result is not null)
                     errors.Add(new(path, result));
             }
@@ -137,14 +102,6 @@ public class CompositeValueService
         };
         var result2 = _validator.ValidateBaseValue(tempDef, value);
         errors.AddRange(result2.Errors);
-    }
-
-    private decimal NormalizeToBase(
-        CompositeFieldDefinition field, decimal value, Guid? inputUnitId)
-    {
-        if (field.UnitId is not { } baseUnitId) return value;
-        if (inputUnitId is null || inputUnitId == baseUnitId) return value;
-        return _converter.ToBase(value, inputUnitId.Value, baseUnitId);
     }
 
     private static string? ValidateNumericRange(
@@ -173,9 +130,8 @@ public class CompositeValueService
     /// <summary>
     /// 序列化为 JsonDocument（用于存储 ValueJsonb）。
     ///
-    /// ★ #4：组合内 decimal 字段带单位时，序列化为
-    /// `{ value: <归一化到基准单位的数值>, unitId: <原始输入单位 Guid> }`。
-    /// 读取端（Deserialize）根据 originalUnits 决定是否还原。
+    /// ★ #4：组合内 decimal 字段带输入单位时，序列化为
+    /// `{ value: <输入数值>, unitId: <unit_trees 节点 Id> }`（单位仅作记录，不做换算）。
     /// </summary>
     public JsonDocument Serialize(DynamicCompositeValue value, string compositeTypeId)
     {
@@ -204,14 +160,13 @@ public class CompositeValueService
             return inner.RootElement.Clone();
         }
 
-        // ★ #4：组合内 decimal 的 NumericValue 序列化
+        // ★ #4：组合内 decimal 的 NumericValue 序列化（单位仅作记录）
         if (field.DataType == EavDataTypes.Decimal && value is NumericValue nv)
         {
-            if (field.UnitId is not { } baseUnitId || nv.UnitId is null)
+            if (nv.UnitId is null)
                 return nv.Value;  // 无单位：存裸数值
 
-            var baseValue = _converter.ToBase(nv.Value, nv.UnitId.Value, baseUnitId);
-            return new { value = baseValue, unitId = nv.UnitId.Value };
+            return new { value = nv.Value, unitId = nv.UnitId };
         }
 
         // 基础类型：按类型返回可序列化对象
@@ -230,13 +185,10 @@ public class CompositeValueService
 
     /// <summary>
     /// 从 JsonDocument 反序列化为运行时值。
-    ///
-    /// ★ #4：新增 originalUnits 参数。
-    ///   - false（默认）：组合内 decimal 返回基准单位值
-    ///   - true：按原始输入单位还原
+    /// 组合内 decimal 的 {value, unitId} 对象还原为 NumericValue（单位仅作记录）。
     /// </summary>
     public DynamicCompositeValue Deserialize(
-        JsonDocument doc, string compositeTypeId, bool originalUnits = false)
+        JsonDocument doc, string compositeTypeId)
     {
         var typeDef = _cache.GetType(compositeTypeId);
         var result = new DynamicCompositeValue(typeDef.TypeName);
@@ -245,61 +197,47 @@ public class CompositeValueService
         foreach (var field in typeDef.Fields.Where(f => !f.IsDeleted))
         {
             if (!root.TryGetProperty(field.FieldName, out var elem)) continue;
-            result[field.FieldName] = DeserializeFieldValue(elem, field, originalUnits);
+            result[field.FieldName] = DeserializeFieldValue(elem, field);
         }
 
         return result;
     }
 
     private object? DeserializeFieldValue(
-        JsonElement elem, CompositeFieldDefinition field, bool originalUnits)
+        JsonElement elem, CompositeFieldDefinition field)
     {
         if (elem.ValueKind == JsonValueKind.Null) return null;
 
         if (field.IsArray)
             return elem.EnumerateArray()
-                .Select(e => DeserializeFieldValue(e, field, originalUnits)).ToList();
+                .Select(e => DeserializeFieldValue(e, field)).ToList();
 
         if (field.DataType == EavDataTypes.Composite)
         {
             using var nestedDoc = JsonDocument.Parse(elem.GetRawText());
-            return Deserialize(nestedDoc, field.RefCompositeTypeId!, originalUnits);
+            return Deserialize(nestedDoc, field.RefCompositeTypeId!);
         }
 
         // ★ #4：组合内 decimal 的 {value, unitId} 对象
         if (field.DataType == EavDataTypes.Decimal && elem.ValueKind == JsonValueKind.Object)
         {
-            var baseValue = elem.GetProperty("value").GetDecimal();
-            Guid? originalUnitId = elem.TryGetProperty("unitId", out var u)
-                                    && u.ValueKind == JsonValueKind.String
-                ? Guid.Parse(u.GetString()!)
+            var value = elem.GetProperty("value").GetDecimal();
+            string? unitId = elem.TryGetProperty("unitId", out var u)
+                             && u.ValueKind == JsonValueKind.String
+                ? u.GetString()
                 : null;
 
-            if (field.UnitId is not { } baseUnitId)
-                return new NumericValue(baseValue, null);
-
-            if (!originalUnits || originalUnitId is null || originalUnitId == baseUnitId)
-                return new NumericValue(baseValue, baseUnitId);
-
-            try
-            {
-                var restored = _converter.FromBase(baseValue, baseUnitId, originalUnitId.Value);
-                return new NumericValue(restored, originalUnitId);
-            }
-            catch (InvalidOperationException)
-            {
-                return new NumericValue(baseValue, baseUnitId);
-            }
+            return new NumericValue(value, unitId ?? field.UnitId);
         }
 
-        // ★ 修复 D1：decimal 字段绑定了基准单位时，裸数字（旧数据形态）也返回
+        // ★ 修复 D1：decimal 字段绑定了单位时，裸数字（旧数据形态）也返回
         //   NumericValue，与 Object 分支（{ value, unitId }）保持类型一致；
         //   未绑定单位时仍返回裸 decimal。when 子句必须在裸 Decimal 分支之前。
         return field.DataType switch
         {
             EavDataTypes.Int => elem.GetInt64(),
-            EavDataTypes.Decimal when field.UnitId is { } baseUnitId
-                => new NumericValue(elem.GetDecimal(), baseUnitId),
+            EavDataTypes.Decimal when field.UnitId is { } unitId
+                => new NumericValue(elem.GetDecimal(), unitId),
             EavDataTypes.Decimal => elem.GetDecimal(),
             EavDataTypes.Bool => elem.GetBoolean(),
             EavDataTypes.Datetime => elem.GetDateTimeOffset(),

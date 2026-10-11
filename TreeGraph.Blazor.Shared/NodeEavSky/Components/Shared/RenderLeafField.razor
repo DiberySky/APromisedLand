@@ -39,47 +39,26 @@ else if (Field.DataType == "int")
 }
 else if (Field.DataType == "decimal")
 {
-    @if (Field.Unit is not null)
+    @if (!string.IsNullOrEmpty(Field.UnitId))
     {
-        var numeric = Value as NumericInput ?? new NumericInput();
-        <MudGrid>
-            <MudItem xs="12" md="8">
-                <MudNumericField T="decimal?"
-                                 Label="@Field.DisplayName"
-                                 Value="@numeric.Value"
-                                 ValueChanged="@(v =>
-                                 {
-                                     var n = Value as NumericInput ?? new NumericInput();
-                                     n.Value = v ?? 0;
-                                     ValueChanged.InvokeAsync(n);
-                                 })"
-                                 Variant="Variant.Outlined"
-                                 Required="@Field.IsRequired"
-                                 Error="@hasError"
-                                 ErrorText="@errorText"
-                                 FullWidth="true" />
-            </MudItem>
-            <MudItem xs="12" md="4">
-                <MudSelect T="Guid?"
-                           Label="单位"
-                           Value="@numeric.UnitId"
-                           ValueChanged="@(u =>
-                           {
-                               var n = Value as NumericInput ?? new NumericInput();
-                               n.UnitId = u;
-                               ValueChanged.InvokeAsync(n);
-                           })"
-                           Variant="Variant.Outlined"
-                           FullWidth="true">
-                    @foreach (var u in Field.AvailableUnits ?? Array.Empty<UnitSchemaDto>())
-                    {
-                        <MudSelectItem T="Guid?" Value="@u.Id">
-                            @u.Name (@u.Symbol)
-                        </MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-        </MudGrid>
+        var numeric = Value as NumericInput ?? new NumericInput { UnitId = Field.UnitId };
+        <MudNumericField T="decimal?"
+                         Label="@Field.DisplayName"
+                         Value="@numeric.Value"
+                         ValueChanged="@(v =>
+                         {
+                             var n = Value as NumericInput ?? new NumericInput { UnitId = Field.UnitId };
+                             n.Value = v ?? 0;
+                             n.UnitId = Field.UnitId;
+                             ValueChanged.InvokeAsync(n);
+                         })"
+                         Variant="Variant.Outlined"
+                         Required="@Field.IsRequired"
+                         Error="@hasError"
+                         ErrorText="@errorText"
+                         Adornment="Adornment.End"
+                         AdornmentText="@Field.UnitName"
+                         FullWidth="true" />
     }
     else
     {

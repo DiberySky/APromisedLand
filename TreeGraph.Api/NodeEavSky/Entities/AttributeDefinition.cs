@@ -38,9 +38,9 @@ public class AttributeDefinition
     public string? RefOptionSetId { get; set; }
     public OptionSet? RefOptionSet { get; set; }
 
-    /// <summary>数值属性的基准单位（所有值归一化到此单位存储）</summary>
-    public Guid? UnitId { get; set; }
-    public Unit? Unit { get; set; }
+    /// <summary>数值属性绑定的单位（指向 unit_trees 节点 Id，仅作记录不参与换算）</summary>
+    public string? UnitId { get; set; }
+    public TreeGraph.Shared.TreeEavSky.Entities.UnitTree? Unit { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

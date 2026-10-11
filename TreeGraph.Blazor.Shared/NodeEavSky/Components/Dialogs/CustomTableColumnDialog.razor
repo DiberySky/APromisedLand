@@ -1,8 +1,8 @@
-@* CustomTableColumnDialog.razor — 添加 / 编辑自定义表列（PageDialogSky 外壳，DialogService 模式；供 Metadata/CustomTables 页面使用） *@
+@* CustomTableColumnDialog.razor — 添加 / 编辑自定义表列（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
-<PageDialogSky Title="@(EditingColumn is null ? "添加列" : "编辑列")"
+<DialogSky Title="@(EditingColumn is null ? "添加列" : "编辑列")"
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
@@ -90,7 +90,7 @@
             </MudItem>
         </MudGrid>
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

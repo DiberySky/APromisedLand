@@ -1,13 +1,14 @@
 @* AttributesList.razor *@
 @page "/attributes"
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
-@inject NavigationManager Nav
+@inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
 @* AttributesList.razor *@
-@* 全局属性列表（跨实体类型）：只读浏览 + 快速过滤 + 分页。 *@
+@* 全局属性列表（跨实体类型）：只读浏览 + 快速过滤 + 分页；维护操作统一走属性定义管理对话框。 *@
 
 <PageTitle>属性列表</PageTitle>
 
@@ -23,8 +24,8 @@
     </MudButton>
     <MudButton Variant="Variant.Filled" Color="Color.Primary"
                StartIcon="@Icons.Material.Filled.Settings"
-               OnClick="GoToManage">
-        进入管理页
+               OnClick="@(() => OpenManageAsync(null))">
+        属性定义管理
     </MudButton>
 </div>
 
@@ -112,7 +113,7 @@ else if (_filteredAll.Count == 0)
                  Size="Size.Large" Color="Color.Default" />
         <MudText Typo="Typo.h6" Class="mt-2">无匹配属性</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            试试清空过滤条件，或前往管理页新建属性
+            试试清空过滤条件，或打开「属性定义管理」新建属性
         </MudText>
     </MudPaper>
 }
@@ -164,7 +165,7 @@ else
                     {
                         <MudChip T="string" Size="Size.Small" Color="Color.Warning"
                                  Class="mr-1">
-                            单位: @context.UnitSymbol
+                            单位: @context.UnitAbbreviation
                         </MudChip>
                     }
                     @if (context.RefCompositeTypeId is not null)
@@ -211,11 +212,11 @@ else
                 </MudTd>
                 <MudTd>@context.DisplayOrder</MudTd>
                 <MudTd>
-                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                    <MudIconButton Icon="@Icons.Material.Filled.Settings"
                                    Size="Size.Medium"
                                    Color="Color.Primary"
-                                   OnClick="@(() => GoToManage(context.EntityType))"
-                                   title="在管理页打开" />
+                                   OnClick="@(() => OpenManageAsync(context.EntityType))"
+                                   title="管理该类型的属性" />
                 </MudTd>
             </RowTemplate>
             <PagerContent>
@@ -345,10 +346,29 @@ else
         _page = page;
     }
 
-    private void GoToManage() => Nav.NavigateTo("/metadata/attributes");
+    /// <summary>打开属性定义管理对话框：entityType 为 null 时通用模式（对话框内可切换类型）。
+    /// 属性增删改后经 OnAttributesChanged 回调刷新本列表与统计卡。</summary>
+    private async Task OpenManageAsync(string? entityType)
+    {
+        var parameters = new DialogParameters<AttributesManageDialog>
+        {
+            { x => x.OnAttributesChanged, EventCallback.Factory.Create(this, LoadAsync) }
+        };
+        if (!string.IsNullOrEmpty(entityType))
+        {
+            parameters.Add(x => x.EntityType, entityType);
+        }
 
-    private void GoToManage(string entityType)
-        => Nav.NavigateTo("/metadata/attributes");
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+
+        await DialogService.ShowExAsync<AttributesManageDialog>(
+            string.Empty, parameters, options);
+    }
 
     private static Color GetDataTypeColor(string dataType) => dataType switch
     {
@@ -358,7 +378,7 @@ else
         "datetime" or "date" or "time" => Color.Warning,
         "single_choice" => Color.Tertiary,
         "composite" => Color.Dark,
-        "table" => Color.Info,
+        "table" or "record" => Color.Info,
         "file" => Color.Default,
         _ => Color.Default
     };

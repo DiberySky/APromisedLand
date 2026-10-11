@@ -15,8 +15,6 @@ public class EavWriteService
     private readonly IAttributeCache _attrCache;
     private readonly EavValidationService _validator;
     private readonly CompositeValueService _composite;
-    private readonly IUnitCache _unitCache;
-    private readonly UnitConverter _converter;
     private readonly IOptionSetCache _optionSetCache;
     private readonly EntityOwnerGuardRegistry _ownerGuards;
 
@@ -25,8 +23,6 @@ public class EavWriteService
         IAttributeCache attrCache,
         EavValidationService validator,
         CompositeValueService composite,
-        IUnitCache unitCache,
-        UnitConverter converter,
         IOptionSetCache optionSetCache,
         EntityOwnerGuardRegistry ownerGuards)
     {
@@ -34,8 +30,6 @@ public class EavWriteService
         _attrCache = attrCache;
         _validator = validator;
         _composite = composite;
-        _unitCache = unitCache;
-        _converter = converter;
         _optionSetCache = optionSetCache;
         _ownerGuards = ownerGuards;
     }
@@ -287,22 +281,14 @@ public class EavWriteService
                 if (numericValue is null)
                     throw new InvalidOperationException("数值格式错误");
 
-                decimal normalized = numericValue.Value;
-                if (def.UnitId is { } baseUnitId && inputUnitId is { } iu)
-                {
-                    normalized = _converter.ToBase(numericValue.Value, iu, baseUnitId);
-                    target.UnitId = iu;
-                }
-                else
-                {
-                    target.UnitId = null;
-                }
+                // 单位仅作记录：存储输入值本身与输入单位，不做任何换算
+                target.UnitId = inputUnitId;
 
                 // ★ int 无单位 → ValueInt；int 有单位 → ValueDecimal；decimal → ValueDecimal
                 if (def.DataType == EavDataTypes.Int && def.UnitId is null)
-                    target.ValueInt = (long)normalized;
+                    target.ValueInt = (long)numericValue.Value;
                 else
-                    target.ValueDecimal = normalized;
+                    target.ValueDecimal = numericValue.Value;
                 break;
             }
             case EavDataTypes.Bool:
@@ -357,7 +343,7 @@ public class EavWriteService
         v.UnitId = null;
     }
 
-    private static (decimal? Value, Guid? UnitId) UnwrapNumeric(object value)
+    private static (decimal? Value, string? UnitId) UnwrapNumeric(object value)
     {
         return value switch
         {
@@ -382,12 +368,13 @@ public class EavWriteService
             // ★ int 无单位：ValueInt
             EavDataTypes.Int when v.ValueInt is { } i && def.UnitId is null
                 => i.ToString(CultureInfo.InvariantCulture),
-            // ★ int 有单位：ValueDecimal（归一化后的值 + 原始单位符号）
+            // ★ int 有单位：ValueDecimal
             EavDataTypes.Int when v.ValueDecimal is { } di
-                => FormatNumeric(di, v.UnitId),
+                => di.ToString(CultureInfo.InvariantCulture),
             EavDataTypes.Int => null,
 
-            EavDataTypes.Decimal when v.ValueDecimal is { } d => FormatNumeric(d, v.UnitId),
+            EavDataTypes.Decimal when v.ValueDecimal is { } d
+                => d.ToString(CultureInfo.InvariantCulture),
             EavDataTypes.Decimal => null,
             EavDataTypes.Bool => v.ValueBool?.ToString(),
             EavDataTypes.Datetime => v.ValueDatetime?.ToString("o"),
@@ -414,22 +401,6 @@ public class EavWriteService
         catch (KeyNotFoundException)
         {
             return value;
-        }
-    }
-
-    private string FormatNumeric(decimal value, Guid? originalUnitId)
-    {
-        if (originalUnitId is not { } uid)
-            return value.ToString(CultureInfo.InvariantCulture);
-
-        try
-        {
-            var unit = _unitCache.Get(uid);
-            return $"{value} {unit.Symbol}";
-        }
-        catch (InvalidOperationException)
-        {
-            return value.ToString(CultureInfo.InvariantCulture);
         }
     }
 

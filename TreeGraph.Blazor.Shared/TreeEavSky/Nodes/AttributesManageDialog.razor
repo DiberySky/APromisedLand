@@ -1,0 +1,38 @@
+@* AttributesManageDialog.razor
+   属性定义管理对话框：以 DialogSky 外壳包裹 Attributes 组件，
+   与编辑节点对话框保持一致的视觉风格（绿色标题栏、文字按钮）。
+   传入 EntityType 时锁定该类型；不传时为通用模式，可在对话框内切换实体类型。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
+
+<DialogSky Title="@_title"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭"
+           OnCanceledClick="@Close">
+    <DialogContent>
+        <Attributes EntityType="@EntityType"
+                    OnAttributesChanged="@OnAttributesChanged" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>锁定的实体类型；为空时对话框内可切换实体类型（通用模式）。</summary>
+    [Parameter] public string? EntityType { get; set; }
+
+    /// <summary>属性变更回调。</summary>
+    [Parameter] public EventCallback OnAttributesChanged { get; set; }
+
+    private string _title => string.IsNullOrEmpty(EntityType)
+        ? "属性定义管理"
+        : $"属性定义管理 · {EntityType}";
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+}

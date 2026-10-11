@@ -9,14 +9,13 @@ namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
 /// CompositeValueService 的序列化/反序列化单测。
-/// 不触 DB：用内存 stub 提供 type / unit / option set。
+/// 不触 DB：用内存 stub 提供 type / option set。
+/// 单位仅作字符串记录（unit_trees 节点 Id），不做任何换算。
 /// </summary>
 public class CompositeValueServiceTests
 {
     private readonly InMemoryCompositeTypeCache _compositeCache = new();
-    private readonly InMemoryUnitCache _unitCache = new();
     private readonly InMemoryOptionSetCache _optionSetCache = new();
-    private readonly UnitConverter _converter;
     private readonly CompositeValueService _service;
 
     // 测试类型 ID（GUID 字符串）
@@ -24,33 +23,12 @@ public class CompositeValueServiceTests
     private const string BrandTypeId = "00000000-0000-0000-0000-000000000101";
     private const string NoUnitTypeId = "00000000-0000-0000-0000-000000000200";
 
-    private Guid _kg;
-    private Guid _g;
-    private Guid _cm;
+    // 单位树节点 Id（仅作记录）
+    private const string Kg = "unit-kg";
+    private const string G = "unit-g";
 
     public CompositeValueServiceTests()
     {
-        _converter = new UnitConverter(_unitCache);
-
-        _kg = Guid.NewGuid();
-        _g = Guid.NewGuid();
-        _cm = Guid.NewGuid();
-        _unitCache.Add(new Unit
-        {
-            Id = _kg, Category = "weight", Name = "千克", Symbol = "kg",
-            ToBaseFactor = 1m, IsBaseUnit = true
-        });
-        _unitCache.Add(new Unit
-        {
-            Id = _g, Category = "weight", Name = "克", Symbol = "g",
-            ToBaseFactor = 0.001m, IsBaseUnit = false
-        });
-        _unitCache.Add(new Unit
-        {
-            Id = _cm, Category = "length", Name = "厘米", Symbol = "cm",
-            ToBaseFactor = 0.01m, IsBaseUnit = false
-        });
-
         // Brand 组合
         var brandType = new CompositeTypeDefinition
         {
@@ -79,7 +57,7 @@ public class CompositeValueServiceTests
                         FieldName = "color", DataType = EavDataTypes.String, DisplayOrder = 1 },
                 new() { FieldId = "00000000-0000-0000-0002-000000000002",
                         FieldName = "weight", DataType = EavDataTypes.Decimal,
-                        UnitId = _kg, DisplayOrder = 2 },
+                        UnitId = Kg, DisplayOrder = 2 },
                 new() { FieldId = "00000000-0000-0000-0002-000000000003",
                         FieldName = "brand", DataType = EavDataTypes.Composite,
                         RefCompositeTypeId = BrandTypeId, DisplayOrder = 3 }
@@ -100,10 +78,8 @@ public class CompositeValueServiceTests
         };
         _compositeCache.Add(noUnitType);
 
-        var validator = new EavValidationService(
-            _compositeCache, _unitCache, _converter, _optionSetCache);
-        _service = new CompositeValueService(
-            _compositeCache, validator, _unitCache, _converter);
+        var validator = new EavValidationService(_compositeCache, _optionSetCache);
+        _service = new CompositeValueService(_compositeCache, validator);
     }
 
     // ============================================================
@@ -148,11 +124,11 @@ public class CompositeValueServiceTests
     }
 
     // ============================================================
-    // Serialize — 带单位 decimal
+    // Serialize — 带单位 decimal（单位仅作记录，不换算）
     // ============================================================
 
     [Fact]
-    public void Serialize_DecimalWithUnit_WhenInputIsBaseUnit_OutputsBareNumber()
+    public void Serialize_DecimalWithUnit_WhenInputIsBareNumber_OutputsBareNumber()
     {
         var v = MakeValue("Specs", ("weight", 5m));
         var doc = _service.Serialize(v, SpecsTypeId);
@@ -162,27 +138,27 @@ public class CompositeValueServiceTests
     }
 
     [Fact]
-    public void Serialize_DecimalWithUnit_WhenInputHasUnit_OutputsObjectWithNormalizedValue()
+    public void Serialize_DecimalWithUnit_WhenInputHasUnit_OutputsValueAsIsWithUnitId()
     {
-        var v = MakeValue("Specs", ("weight", new NumericValue(1000m, _g)));
+        var v = MakeValue("Specs", ("weight", new NumericValue(1000m, G)));
         var doc = _service.Serialize(v, SpecsTypeId);
 
         var weight = Root(doc).GetProperty("weight");
         Assert.Equal(JsonValueKind.Object, weight.ValueKind);
-        Assert.Equal(1m, weight.GetProperty("value").GetDecimal());
-        Assert.Equal(_g, weight.GetProperty("unitId").GetGuid());
+        Assert.Equal(1000m, weight.GetProperty("value").GetDecimal());
+        Assert.Equal(G, weight.GetProperty("unitId").GetString());
     }
 
     [Fact]
-    public void Serialize_DecimalWithUnit_WhenInputIsExplicitNumericValueWithBaseUnit_OutputsObject()
+    public void Serialize_DecimalWithUnit_WhenInputIsNumericValueWithFieldUnit_OutputsObject()
     {
-        var v = MakeValue("Specs", ("weight", new NumericValue(3m, _kg)));
+        var v = MakeValue("Specs", ("weight", new NumericValue(3m, Kg)));
         var doc = _service.Serialize(v, SpecsTypeId);
 
         var weight = Root(doc).GetProperty("weight");
         Assert.Equal(JsonValueKind.Object, weight.ValueKind);
         Assert.Equal(3m, weight.GetProperty("value").GetDecimal());
-        Assert.Equal(_kg, weight.GetProperty("unitId").GetGuid());
+        Assert.Equal(Kg, weight.GetProperty("unitId").GetString());
     }
 
     // ============================================================
@@ -207,70 +183,48 @@ public class CompositeValueServiceTests
     // ============================================================
 
     [Fact]
-    public void Deserialize_WithUnitObject_DefaultReturnsBaseUnitValue()
+    public void Deserialize_WithUnitObject_RestoresValueAndUnitAsIs()
     {
         var json = $$"""
         {
-            "weight": { "value": 1, "unitId": "{{_g}}" }
+            "weight": { "value": 1, "unitId": "{{G}}" }
         }
         """;
 
         using var doc = JsonDocument.Parse(json);
-        var result = _service.Deserialize(doc, SpecsTypeId, originalUnits: false);
+        var result = _service.Deserialize(doc, SpecsTypeId);
 
         var weight = result["weight"];
         Assert.IsType<NumericValue>(weight);
         var nv = (NumericValue)weight!;
         Assert.Equal(1m, nv.Value);
-        Assert.Equal(_kg, nv.UnitId);
+        Assert.Equal(G, nv.UnitId);
     }
 
     [Fact]
-    public void Deserialize_WithUnitObject_OriginalUnits_RestoresInputUnit()
-    {
-        var json = $$"""
-        {
-            "weight": { "value": 1, "unitId": "{{_g}}" }
-        }
-        """;
-
-        using var doc = JsonDocument.Parse(json);
-        var result = _service.Deserialize(doc, SpecsTypeId, originalUnits: true);
-
-        var nv = (NumericValue)result["weight"]!;
-        Assert.Equal(1000m, nv.Value);
-        Assert.Equal(_g, nv.UnitId);
-    }
-
-    [Fact]
-    public void Deserialize_BareNumberWithUnitField_DefaultsToBaseUnit()
+    public void Deserialize_BareNumberWithUnitField_UsesFieldUnit()
     {
         var json = """{"weight": 5}""";
 
         using var doc = JsonDocument.Parse(json);
-        var result = _service.Deserialize(doc, SpecsTypeId, originalUnits: true);
+        var result = _service.Deserialize(doc, SpecsTypeId);
 
         var nv = (NumericValue)result["weight"]!;
         Assert.Equal(5m, nv.Value);
-        Assert.Equal(_kg, nv.UnitId);
+        Assert.Equal(Kg, nv.UnitId);
     }
 
     [Fact]
-    public void Deserialize_UnknownUnitId_FallsBackToBaseUnit()
+    public void Deserialize_UnitObjectWithoutUnitId_FallsBackToFieldUnit()
     {
-        var orphanUnit = Guid.NewGuid();
-        var json = $$"""
-        {
-            "weight": { "value": 2, "unitId": "{{orphanUnit}}" }
-        }
-        """;
+        var json = """{"weight": { "value": 2 }}""";
 
         using var doc = JsonDocument.Parse(json);
-        var result = _service.Deserialize(doc, SpecsTypeId, originalUnits: true);
+        var result = _service.Deserialize(doc, SpecsTypeId);
 
         var nv = (NumericValue)result["weight"]!;
         Assert.Equal(2m, nv.Value);
-        Assert.Equal(_kg, nv.UnitId);
+        Assert.Equal(Kg, nv.UnitId);
     }
 
     // ============================================================
@@ -278,19 +232,19 @@ public class CompositeValueServiceTests
     // ============================================================
 
     [Fact]
-    public void RoundTrip_WithUnit_PreservesOriginalValue()
+    public void RoundTrip_WithUnit_PreservesOriginalValueAndUnit()
     {
-        var v = MakeValue("Specs", ("weight", new NumericValue(1500m, _g)));
+        var v = MakeValue("Specs", ("weight", new NumericValue(1500m, G)));
 
         var doc = _service.Serialize(v, SpecsTypeId);
 
         var stored = Root(doc).GetProperty("weight");
-        Assert.Equal(1.5m, stored.GetProperty("value").GetDecimal());
+        Assert.Equal(1500m, stored.GetProperty("value").GetDecimal());
 
-        var result = _service.Deserialize(doc, SpecsTypeId, originalUnits: true);
+        var result = _service.Deserialize(doc, SpecsTypeId);
         var nv = (NumericValue)result["weight"]!;
         Assert.Equal(1500m, nv.Value);
-        Assert.Equal(_g, nv.UnitId);
+        Assert.Equal(G, nv.UnitId);
     }
 
     [Fact]

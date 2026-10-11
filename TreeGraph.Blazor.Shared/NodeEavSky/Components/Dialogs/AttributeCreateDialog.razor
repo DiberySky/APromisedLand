@@ -1,12 +1,12 @@
-@* AttributeCreateDialog.razor — 新建属性（PageDialogSky 外壳，DialogService 模式） *@
+@* AttributeCreateDialog.razor — 新建属性（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
-<PageDialogSky Title="新建属性"
-               SubmitButtonVisible="true"
-               SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
-               SubmitButtonDisabled="@_submitting"
-               OnSubmitClick="CreateAsync">
+<DialogSky Title="新建属性"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="CreateAsync">
     <DialogContent>
         @* 实体类型（下拉） *@
         <MudSelect T="string"
@@ -45,25 +45,11 @@
             }
         </MudSelect>
 
-        @* int / decimal：单位 *@
+        @* int / decimal：单位（复制原系统 UintTreeField 调用方式：只读文本 + 单位树选择对话框） *@
         @if (_createForm.DataType is "decimal" or "int")
         {
-            <MudSelect T="Guid?"
-                       Value="_createForm.UnitId"
-                       ValueChanged="@(v => _createForm.UnitId = v)"
-                       Label="基准单位（可选）"
-                       Variant="Variant.Outlined"
-                       Class="mb-3">
-                <MudSelectItem T="Guid?" Value="@((Guid?)null)">
-                    （不使用单位）
-                </MudSelectItem>
-                @foreach (var u in Units ?? new List<UnitDto>())
-                {
-                    <MudSelectItem T="Guid?" Value="@u.Id">
-                        @u.Name (@u.Symbol) - @u.Category
-                    </MudSelectItem>
-                }
-            </MudSelect>
+            <UnitTreeField @bind-UnitId="_createForm.UnitId"
+                           @bind-UnitName="_createForm.UnitName" />
         }
 
         @* composite *@
@@ -84,8 +70,8 @@
             </MudSelect>
         }
 
-        @* table *@
-        @if (_createForm.DataType == "table")
+        @* table / record *@
+        @if (_createForm.DataType is "table" or "record")
         {
             <MudSelect T="string"
                        Value="@(_createForm.RefTableDefinitionId ?? "")"
@@ -100,6 +86,12 @@
                     </MudSelectItem>
                 }
             </MudSelect>
+            @if (_createForm.DataType == "record")
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    记录类型要求所选表的第一列为「日期」、第二列为「时间」，且行列表不显示序号。
+                </MudAlert>
+            }
         }
 
         @* single_choice *@
@@ -161,7 +153,7 @@
             </MudExpansionPanel>
         </MudExpansionPanels>
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
@@ -171,7 +163,6 @@
     /// <summary>新建模式下的初始显示顺序（现有属性数 + 1）。</summary>
     [Parameter] public int InitialDisplayOrder { get; set; }
     [Parameter] public IReadOnlyList<EntityTypeSummaryDto>? EntityTypes { get; set; }
-    [Parameter] public IReadOnlyList<UnitDto>? Units { get; set; }
     [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
     [Parameter] public IReadOnlyList<CustomTableDetailDto>? CustomTables { get; set; }
     [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
@@ -192,6 +183,7 @@
         ("file",     "文件"),
         ("composite", "组合类型"),
         ("table",    "自定义表"),
+        ("record",   "记录"),
         ("json",     "JSON")
     };
 
@@ -213,9 +205,9 @@
     private void OnCreateDataTypeChanged(string dt)
     {
         _createForm.DataType = dt;
-        if (dt is not ("decimal" or "int")) _createForm.UnitId = null;
+        if (dt is not ("decimal" or "int")) { _createForm.UnitId = null; _createForm.UnitName = null; }
         if (dt != "composite") _createForm.RefCompositeTypeId = null;
-        if (dt != "table") _createForm.RefTableDefinitionId = null;
+        if (dt is not ("table" or "record")) _createForm.RefTableDefinitionId = null;
         if (dt != "single_choice") _createForm.RefOptionSetId = null;
     }
 
@@ -233,10 +225,29 @@
             Snackbar.Add("组合类型必须选择引用的类型", Severity.Warning);
             return;
         }
-        if (f.DataType == "table" && f.RefTableDefinitionId is null)
+        if (f.DataType is "table" or "record" && f.RefTableDefinitionId is null)
         {
-            Snackbar.Add("自定义表必须选择引用的表", Severity.Warning);
+            Snackbar.Add("自定义表/记录必须选择引用的表", Severity.Warning);
             return;
+        }
+        // record：前端预校验所选表前两列类型（后端仍会校验）
+        if (f.DataType == "record" && f.RefTableDefinitionId is not null)
+        {
+            var tbl = CustomTables?.FirstOrDefault(
+                t => t.TableDefinitionId == f.RefTableDefinitionId);
+            var cols = tbl?.Columns
+                .Where(c => !c.IsDeleted)
+                .OrderBy(c => c.DisplayOrder)
+                .Take(2)
+                .ToList();
+            if (cols is null || cols.Count < 2
+                || cols[0].DataType != "date" || cols[1].DataType != "time")
+            {
+                Snackbar.Add(
+                    "记录类型要求所选表的第一列为「日期」、第二列为「时间」",
+                    Severity.Warning);
+                return;
+            }
         }
         if (f.DataType == "single_choice" && f.RefOptionSetId is null)
         {
@@ -305,7 +316,8 @@
         public bool IsSearchable { get; set; }
         public bool IsSortable { get; set; }
         public int DisplayOrder { get; set; }
-        public Guid? UnitId { get; set; }
+        public string? UnitId { get; set; }
+        public string? UnitName { get; set; }
         public string? RefCompositeTypeId { get; set; }
         public string? RefTableDefinitionId { get; set; }
         public string? RefOptionSetId { get; set; }

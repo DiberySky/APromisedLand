@@ -36,10 +36,9 @@ public class EavApiClient
 
     public async Task<DynamicEntityDto?> GetEntityAsync(
         string entityType, string entityId,
-        bool originalUnits = false, CancellationToken ct = default)
+        CancellationToken ct = default)
     {
         var url = $"api/eav/{entityType}/entities/{entityId}";
-        if (originalUnits) url += "?unit=original";
         return await GetAsync<DynamicEntityDto>(url, ct);
     }
 
@@ -544,103 +543,6 @@ public class EavApiClient
             $"api/eav/metadata/option-sets/{optionSetId}/items/{itemId}/undelete", ct);
 
     // ============================================================
-    // 单位
-    // ============================================================
-
-    public async Task<IReadOnlyList<UnitDto>?> ListUnitsAsync(
-        string? category = null, CancellationToken ct = default)
-    {
-        var url = "api/units";
-        if (!string.IsNullOrEmpty(category))
-            url += $"?category={Uri.EscapeDataString(category)}";
-        return await GetAsync<IReadOnlyList<UnitDto>>(url, ct);
-    }
-
-    public Task<IReadOnlyList<UnitCategoryDto>?> GetUnitCategoriesAsync(
-        CancellationToken ct = default)
-        => GetAsync<IReadOnlyList<UnitCategoryDto>>("api/units/categories", ct);
-
-    public async Task<Guid?> CreateUnitAsync(
-        CreateUnitRequest request, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PostAsJsonAsync("api/units", request, JsonOptions, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("POST api/units → {Status}", resp.StatusCode);
-                return null;
-            }
-            var doc = await resp.Content
-                .ReadFromJsonAsync<ApiResponse<IdResponse<Guid>>>(JsonOptions, ct);
-            return doc?.Data?.Id;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "POST api/units 失败");
-            return null;
-        }
-    }
-
-    public async Task<(bool Ok, string? Error)> MigrateUnitCategoryAsync(
-        Guid unitId, MigrateUnitCategoryRequest request, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PostAsJsonAsync(
-                $"api/units/{unitId}/migrate-category", request, JsonOptions, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var msg = await ExtractErrorAsync(resp, ct);
-                _logger.LogWarning("POST migrate-category → {Status}: {Error}",
-                    resp.StatusCode, msg);
-                return (false, msg);
-            }
-            return (true, null);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "POST migrate-category 失败");
-            return (false, ex.Message);
-        }
-    }
-
-    public async Task<(bool Ok, RecalculateUnitFactorResult? Result, string? Error)>
-        RecalculateUnitFactorAsync(
-        Guid unitId, RecalculateUnitFactorRequest request, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PostAsJsonAsync(
-                $"api/units/{unitId}/recalculate-factor", request, JsonOptions, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var msg = await ExtractErrorAsync(resp, ct);
-                _logger.LogWarning("POST recalculate-factor → {Status}: {Error}",
-                    resp.StatusCode, msg);
-                return (false, null, msg);
-            }
-
-            var result = await resp.Content
-                .ReadFromJsonAsync<ApiResponse<RecalculateUnitFactorResult>>(JsonOptions, ct);
-            return (true, result?.Data, null);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "POST recalculate-factor 失败");
-            return (false, null, ex.Message);
-        }
-    }
-
-    public async Task<(bool Ok, string? Error)> UpdateUnitAsync(
-        Guid unitId, UpdateUnitRequest request, CancellationToken ct = default)
-        => await PutAsync($"api/units/{unitId}", request, ct);
-
-    public async Task<(bool Ok, string? Error)> DeleteUnitAsync(
-        Guid unitId, CancellationToken ct = default)
-        => await DeleteWithErrorAsync($"api/units/{unitId}", ct);
-
-    // ============================================================
     // 通用助手
     // ============================================================
 
@@ -869,20 +771,18 @@ public class EavApiClient
     // ============================================================
 
     public async Task<IReadOnlyList<DynamicEntityDto>?> ListInodeEntitiesAsync(
-        string inodeId, bool originalUnits = false, CancellationToken ct = default)
+        string inodeId, CancellationToken ct = default)
     {
         var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities";
-        if (originalUnits) url += "?unit=original";
         return await GetAsync<IReadOnlyList<DynamicEntityDto>>(url, ct);
     }
 
     public async Task<DynamicEntityDto?> GetInodeEntityAsync(
         string inodeId, string entityType,
-        bool originalUnits = false, CancellationToken ct = default)
+        CancellationToken ct = default)
     {
         var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
                   $"{Uri.EscapeDataString(entityType)}";
-        if (originalUnits) url += "?unit=original";
         return await GetAsync<DynamicEntityDto>(url, ct);
     }
 
@@ -998,7 +898,6 @@ public class EavApiClient
     /// 参数：
     ///   includeNull      - true 时未写入的属性也以 null 出现
     ///   displayName      - true 时属性 key 用中文 DisplayName
-    ///   originalUnits    - true 时数量值按原始输入单位还原（?units=original）
     ///
     /// 返回原始 JSON 字符串；失败返回 null。
     /// </summary>
@@ -1006,13 +905,11 @@ public class EavApiClient
         string inodeId,
         bool includeNull = false,
         bool displayName = false,
-        bool originalUnits = false,
         CancellationToken ct = default)
     {
         var query = new List<string>();
         if (includeNull) query.Add("includeNull=true");
         if (displayName) query.Add("displayName=true");
-        if (originalUnits) query.Add("units=original");
 
         var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/json";
         if (query.Count > 0) url += "?" + string.Join("&", query);

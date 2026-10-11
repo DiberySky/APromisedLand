@@ -1,9 +1,9 @@
-@* AttachTypeDialog.razor — 为 iNode 声明新实体类型（PageDialogSky 外壳） *@
+@* AttachTypeDialog.razor — 为 iNode 声明新实体类型（DialogSky 外壳） *@
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @namespace TreeGraph.Blazor.Shared.NodeEavSky.Pages.Inodes
 
-<PageDialogSky Title="声明新类型"
+<DialogSky Title="声明新类型"
                SubmitButtonVisible="true"
                SubmitButtonText="声明"
                OnSubmitClick="Submit">
@@ -33,7 +33,7 @@
             </MudSelect>
         }
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

@@ -34,7 +34,7 @@ public static class EavRequestBodyConverter
         {
             var def = defs[name];
 
-            if (def.DataType == EavDataTypes.Table)
+            if (def.DataType is EavDataTypes.Table or EavDataTypes.Record)
             {
                 tableAttrs.Add(name);
                 continue;
@@ -46,7 +46,7 @@ public static class EavRequestBodyConverter
         if (tableAttrs.Count > 0)
         {
             throw new ArgumentException(
-                $"table 类型属性不能通过此端点写入，请使用子表端点。" +
+                $"table/record 类型属性不能通过此端点写入，请使用子表端点。" +
                 $"涉及属性: {string.Join(", ", tableAttrs)}");
         }
 
@@ -83,9 +83,9 @@ public static class EavRequestBodyConverter
         if (elem.ValueKind == JsonValueKind.Object)
         {
             var value = elem.GetProperty("value").GetDecimal();
-            Guid? unitId = elem.TryGetProperty("unitId", out var u)
-                           && u.ValueKind == JsonValueKind.String
-                ? Guid.Parse(u.GetString()!)
+            string? unitId = elem.TryGetProperty("unitId", out var u)
+                             && u.ValueKind == JsonValueKind.String
+                ? u.GetString()
                 : null;
             return new NumericValue(value, unitId);
         }

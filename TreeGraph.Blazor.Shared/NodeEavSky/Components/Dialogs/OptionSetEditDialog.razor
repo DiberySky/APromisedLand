@@ -1,8 +1,8 @@
-@* OptionSetEditDialog.razor — 编辑选项集（PageDialogSky 外壳，DialogService 模式） *@
+@* OptionSetEditDialog.razor — 编辑选项集（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
-<PageDialogSky Title="编辑选项集"
+<DialogSky Title="编辑选项集"
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
@@ -19,7 +19,7 @@
                       Label="显示名"
                       Variant="Variant.Outlined" />
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }

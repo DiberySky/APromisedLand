@@ -67,10 +67,10 @@
             }
         </MudTd>
         <MudTd DataLabel="附加信息">
-            @if (context.Unit is not null)
+            @if (!string.IsNullOrEmpty(context.UnitId))
             {
                 <MudChip T="string" Size="Size.Small" Color="Color.Warning">
-                    单位: @context.Unit.Symbol
+                    单位: @context.UnitName
                 </MudChip>
             }
             @if (context.OptionSet is not null)

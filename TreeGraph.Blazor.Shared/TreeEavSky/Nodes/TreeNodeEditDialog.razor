@@ -3,6 +3,7 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject ITreeClientService<TItem> ClientService
+@inject IDialogService DialogService
 @implements IDisposable
 
 <DialogTreeSky TItem="@TItem"
@@ -11,6 +12,15 @@
                SubmitButtonVisible="true"
                OnSubmitClick="@SubmitAsync"
                OnCanceledClick="@Close">
+    <ToolBarContent>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Info"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Settings"
+                   OnClick="@OpenAttributesManageAsync">
+            管理属性定义
+        </MudButton>
+    </ToolBarContent>
     <DialogContent>
         <MudContainer Class="py-8">
             <MudForm @ref="_form" Model="@_node">
@@ -65,17 +75,47 @@
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
 
-        // 先关闭对话框返回节点（基础字段由调用方保存）
-        MudDialog?.Close(DialogResult.Ok(_node));
-
-        // 再异步保存属性
+        // 先保存属性（失败时不关闭对话框，用户可重试）
         if (_attrItems != null)
             await _attrItems.SubmitUpdateNodeAttributesAsync();
+
+        // 再关闭对话框返回节点（基础字段由调用方保存）
+        MudDialog?.Close(DialogResult.Ok(_node));
     }
 
     private void Close()
     {
         MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    /// <summary>打开属性定义管理对话框（锁定当前实体类型），关闭后刷新属性区。</summary>
+    private async Task OpenAttributesManageAsync()
+    {
+        var parameters = new DialogParameters<AttributesManageDialog>
+        {
+            { x => x.EntityType, _entityType },
+            { x => x.OnAttributesChanged, EventCallback.Factory.Create(this, RefreshAttributesAsync) }
+        };
+
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+
+        var dialog = await DialogService.ShowExAsync<AttributesManageDialog>(
+            string.Empty, parameters, options);
+        await dialog.Result;
+    }
+
+    /// <summary>属性定义变更后重新加载属性区。</summary>
+    private async Task RefreshAttributesAsync()
+    {
+        if (_attrItems != null)
+        {
+            await _attrItems.ReloadAsync();
+        }
     }
 
     public void Dispose()

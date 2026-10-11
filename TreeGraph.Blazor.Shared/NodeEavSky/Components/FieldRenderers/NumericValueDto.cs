@@ -7,5 +7,5 @@ namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.FieldRenderers;
 public class NumericValueDto
 {
     public decimal? Value { get; set; }
-    public Guid? UnitId { get; set; }
+    public string? UnitId { get; set; }
 }

@@ -38,15 +38,13 @@ public class InodeEavFacade
     /// </summary>
     public async Task<DynamicEntity?> LoadAsync(
         string inodeId, string entityType,
-        bool originalUnits = false,
         CancellationToken ct = default)
     {
         var entityId = await _inodeEntities.GetEntityIdAsync(
             inodeId, entityType, ct);
         if (entityId is null) return null;
 
-        return await _read.LoadAsync(
-            entityId, entityType, originalUnits, ct);
+        return await _read.LoadAsync(entityId, entityType, ct);
     }
 
     /// <summary>审计历史。</summary>
@@ -126,7 +124,6 @@ public class InodeEavFacade
     /// </summary>
     public async Task<Dictionary<string, DynamicEntity>> LoadAllByInodeAsync(
         string inodeId,
-        bool originalUnits = false,
         CancellationToken ct = default)
     {
         var mappings = await _inodeEntities.ListByInodeAsync(inodeId, ct);
@@ -137,7 +134,7 @@ public class InodeEavFacade
         foreach (var m in mappings)
         {
             var entity = await _read.LoadAsync(
-                m.EntityId, m.EntityType, originalUnits, ct);
+                m.EntityId, m.EntityType, ct);
             result[m.EntityType] = entity;
         }
         return result;

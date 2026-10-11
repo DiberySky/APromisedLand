@@ -51,6 +51,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await ReloadAsync();
+    }
+
+    /// <summary>重新加载属性 Schema 与当前值（供属性定义变更后刷新）。</summary>
+    public async Task ReloadAsync()
+    {
         if (string.IsNullOrEmpty(NodeId) || string.IsNullOrEmpty(EntityType))
             return;
 

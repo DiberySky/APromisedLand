@@ -1,8 +1,8 @@
-@* CompositeTypeFieldDialog.razor — 添加 / 编辑组合类型字段（PageDialogSky 外壳，DialogService 模式） *@
+@* CompositeTypeFieldDialog.razor — 添加 / 编辑组合类型字段（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
-<PageDialogSky Title="@(EditingField is null ? "添加字段" : "编辑字段")"
+<DialogSky Title="@(EditingField is null ? "添加字段" : "编辑字段")"
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
@@ -40,25 +40,11 @@
             }
         </MudSelect>
 
-        @* decimal 类型的基准单位 *@
+        @* decimal 类型的单位（复制原系统 UintTreeField 调用方式：只读文本 + 单位树选择对话框） *@
         @if (_fieldForm.DataType == "decimal")
         {
-            <MudSelect T="Guid?"
-                       Value="_fieldForm.UnitId"
-                       ValueChanged="@(v => _fieldForm.UnitId = v)"
-                       Label="基准单位（可选）"
-                       Variant="Variant.Outlined"
-                       Class="mb-3">
-                <MudSelectItem T="Guid?" Value="@((Guid?)null)">
-                    （不使用单位）
-                </MudSelectItem>
-                @foreach (var u in Units ?? (IReadOnlyList<UnitDto>)Array.Empty<UnitDto>())
-                {
-                    <MudSelectItem T="Guid?" Value="@u.Id">
-                        @u.Name (@u.Symbol) - @u.Category
-                    </MudSelectItem>
-                }
-            </MudSelect>
+            <UnitTreeField @bind-UnitId="_fieldForm.UnitId"
+                           @bind-UnitName="_fieldForm.UnitName" />
         }
 
         @* single_choice 的选项集 *@
@@ -139,7 +125,7 @@
             </MudItem>
         </MudGrid>
     </DialogContent>
-</PageDialogSky>
+</DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
@@ -150,8 +136,6 @@
     [Parameter] public CompositeFieldDetailDto? EditingField { get; set; }
     /// <summary>添加模式下的初始显示顺序（现有活动字段数 + 1）。</summary>
     [Parameter] public int InitialDisplayOrder { get; set; }
-    /// <summary>单位引用候选（decimal 类型用）。</summary>
-    [Parameter] public IReadOnlyList<UnitDto>? Units { get; set; }
     /// <summary>选项集候选（single_choice 类型用）。</summary>
     [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
     /// <summary>嵌套组合类型候选（已排除自身与已删除类型）。</summary>
@@ -191,6 +175,7 @@
                 DataType = EditingField.DataType,
                 RefCompositeTypeId = EditingField.RefCompositeTypeId,
                 UnitId = EditingField.UnitId,
+                UnitName = FormatUnitName(EditingField.UnitName, EditingField.UnitAbbreviation),
                 RefOptionSetId = EditingField.RefOptionSetId,
                 IsArray = EditingField.IsArray,
                 IsRequired = EditingField.IsRequired,
@@ -211,7 +196,7 @@
     {
         _fieldForm.DataType = dt;
 
-        if (dt != "decimal") _fieldForm.UnitId = null;
+        if (dt != "decimal") { _fieldForm.UnitId = null; _fieldForm.UnitName = null; }
         if (dt != "single_choice") _fieldForm.RefOptionSetId = null;
         if (dt != "composite") _fieldForm.RefCompositeTypeId = null;
     }
@@ -313,13 +298,10 @@
         return (null, false);
     }
 
-    /// <summary>Guid 版 diff（单位引用用）。</summary>
-    private static (Guid? Value, bool Clear) Diff(Guid? current, Guid? original)
-    {
-        if (current is null && original is not null) return (null, true);
-        if (current is not null && current != original) return (current, false);
-        return (null, false);
-    }
+    private static string? FormatUnitName(string? name, string? abbreviation)
+        => name is null ? null
+            : string.IsNullOrEmpty(abbreviation) ? name
+            : $"{name} 【{abbreviation}】";
 
     /// <summary>string 版 diff（ID 字符串化后用）。</summary>
     private static (string? Value, bool Clear) Diff(string? current, string? original)
@@ -335,7 +317,8 @@
         public string DisplayName { get; set; } = "";
         public string DataType { get; set; } = "string";
         public string? RefCompositeTypeId { get; set; }
-        public Guid? UnitId { get; set; }
+        public string? UnitId { get; set; }
+        public string? UnitName { get; set; }
         public string? RefOptionSetId { get; set; }
         public bool IsArray { get; set; }
         public bool IsRequired { get; set; }

@@ -16,21 +16,16 @@ public class EavQueryService
     private readonly ICompositeTypeCache _compositeCache;
     private readonly EavReadService _readService;
     private readonly CompositeValueService _composite;
-    private readonly IUnitCache _unitCache;
-    private readonly UnitConverter _converter;
 
     public EavQueryService(
         TreeGraphDbContext db, IAttributeCache attrCache, ICompositeTypeCache compositeCache,
-        EavReadService readService, CompositeValueService composite,
-        IUnitCache unitCache, UnitConverter converter)
+        EavReadService readService, CompositeValueService composite)
     {
         _db = db;
         _attrCache = attrCache;
         _compositeCache = compositeCache;
         _readService = readService;
         _composite = composite;
-        _unitCache = unitCache;
-        _converter = converter;
     }
 
     public async Task<PagedResult<string>> FilterEntityIdsAsync(
@@ -181,7 +176,7 @@ public class EavQueryService
     {
         var idResult = await FilterEntityIdsAsync(request, ct);
         var entities = await _readService.LoadBatchAsync(
-            idResult.Items, request.EntityType, originalUnits: false, ct);
+            idResult.Items, request.EntityType, ct);
 
         return new PagedResult<DynamicEntity>
         {
@@ -203,7 +198,7 @@ public class EavQueryService
 
         if (filter.Operator == "unit_eq")
         {
-            var unitId = Guid.Parse(filter.Value!.ToString()!);
+            var unitId = filter.Value!.ToString()!;
             return baseQuery
                 .Where(x => x.UnitId == unitId)
                 .Select(x => x.EntityId)
@@ -243,10 +238,10 @@ public class EavQueryService
                              && values.Contains(x.ValueInt.Value));
         }
 
-        var (rawValue, filterUnitId) = ParseNumericFilterValue(f.Value);
+        var (rawValue, _) = ParseNumericFilterValue(f.Value);
         if (rawValue is null) throw new ArgumentException("过滤值格式错误");
-        var v = NormalizeFilterValue(def, rawValue.Value, filterUnitId);
-        decimal? v2 = f.Value2 is null ? null : NormalizeFilterValue2(def, f.Value2);
+        var v = rawValue.Value;
+        decimal? v2 = f.Value2 is null ? null : ParseNumericFilterValue2(f.Value2);
 
         return f.Operator switch
         {
@@ -274,10 +269,10 @@ public class EavQueryService
                              && values.Contains(x.ValueDecimal.Value));
         }
 
-        var (rawValue, filterUnitId) = ParseNumericFilterValue(f.Value);
+        var (rawValue, _) = ParseNumericFilterValue(f.Value);
         if (rawValue is null) throw new ArgumentException("过滤值格式错误");
-        var v = NormalizeFilterValue(def, rawValue.Value, filterUnitId);
-        decimal? v2 = f.Value2 is null ? null : NormalizeFilterValue2(def, f.Value2);
+        var v = rawValue.Value;
+        decimal? v2 = f.Value2 is null ? null : ParseNumericFilterValue2(f.Value2);
 
         return f.Operator switch
         {
@@ -293,22 +288,14 @@ public class EavQueryService
     }
 
 
-    private decimal NormalizeFilterValue(
-        AttributeDefinition def, decimal value, Guid? filterUnitId)
+    private static decimal ParseNumericFilterValue2(object? value2)
     {
-        if (def.UnitId is not { } baseUnitId) return value;
-        if (filterUnitId is null || filterUnitId == baseUnitId) return value;
-        return _converter.ToBase(value, filterUnitId.Value, baseUnitId);
-    }
-
-    private decimal NormalizeFilterValue2(AttributeDefinition def, object? value2)
-    {
-        var (rawValue, filterUnitId) = ParseNumericFilterValue(value2);
+        var (rawValue, _) = ParseNumericFilterValue(value2);
         if (rawValue is null) throw new ArgumentException("过滤值格式错误");
-        return NormalizeFilterValue(def, rawValue.Value, filterUnitId);
+        return rawValue.Value;
     }
 
-    private static (decimal? Value, Guid? UnitId) ParseNumericFilterValue(object? value)
+    private static (decimal? Value, string? UnitId) ParseNumericFilterValue(object? value)
     {
         return value switch
         {
@@ -317,7 +304,7 @@ public class EavQueryService
             JsonElement je when je.ValueKind == JsonValueKind.Object =>
                 (je.GetProperty("value").GetDecimal(),
                  je.TryGetProperty("unitId", out var uid) && uid.ValueKind == JsonValueKind.String
-                     ? Guid.Parse(uid.GetString()!) : null),
+                     ? uid.GetString() : null),
             JsonElement je when je.ValueKind == JsonValueKind.Number => (je.GetDecimal(), null),
             decimal d => (d, null),
             string s when decimal.TryParse(s, NumberStyles.Float,
@@ -853,7 +840,7 @@ public class EavQueryService
 
         // 4. 批量加载实体
         var entities = await _readService.LoadBatchAsync(
-            pageIds, entityType, originalUnits: false, ct);
+            pageIds, entityType, ct);
 
         // 5. 保持 pageIds 的顺序
         var inputOrder = pageIds

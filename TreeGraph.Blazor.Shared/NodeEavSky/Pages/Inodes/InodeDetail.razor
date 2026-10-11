@@ -182,11 +182,6 @@ else
                            ValueChanged="OnDisplayNameChanged"
                            Label="displayName"
                            Color="Color.Primary" />
-                <MudSwitch T="bool"
-                           Value="_jsonOriginalUnits"
-                           ValueChanged="OnOriginalUnitsChanged"
-                           Label="originalUnits"
-                           Color="Color.Primary" />
             </div>
         </MudPaper>
 
@@ -257,7 +252,6 @@ else
     private string? _jsonText;
     private bool _jsonIncludeNull;
     private bool _jsonDisplayName;
-    private bool _jsonOriginalUnits;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -324,8 +318,7 @@ else
             var raw = await Api.GetInodeJsonAsync(
                 InodeId,
                 includeNull: _jsonIncludeNull,
-                displayName: _jsonDisplayName,
-                originalUnits: _jsonOriginalUnits);
+                displayName: _jsonDisplayName);
 
             _jsonText = PrettyPrint(raw);
         }
@@ -346,12 +339,6 @@ else
     private async Task OnDisplayNameChanged(bool value)
     {
         _jsonDisplayName = value;
-        await LoadJsonAsync();
-    }
-
-    private async Task OnOriginalUnitsChanged(bool value)
-    {
-        _jsonOriginalUnits = value;
         await LoadJsonAsync();
     }
 

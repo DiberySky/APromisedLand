@@ -1,67 +1,59 @@
-@* Attributes.razor — 属性定义管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/Attribute*Dialog.razor） *@
-@page "/metadata/attributes"
+@* Attributes.razor — 属性定义管理（对话框内容组件，由 AttributesManageDialog 承载）
+   传入 EntityType 时锁定实体类型并隐藏选择器；不传时为通用模式，可在对话框内切换实体类型。 *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
-<PageTitle>属性定义管理</PageTitle>
 
-<PageHeaderSky Title="属性定义管理">
-    <Actions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   Size="Size.Small"
-                   OnClick="LoadAsync" Disabled="@_loading"
-                   StartIcon="@Icons.Material.Filled.Refresh">
-            刷新
-        </MudButton>
+@* 过滤器栏（无 MudPaper 包裹）；锁定模式下不渲染实体类型选择器 *@
+<MudGrid Class="mb-4">
+    @if (!_locked)
+    {
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudSelect T="string"
+                       Value="_entityType"
+                       ValueChanged="OnEntityTypeChanged"
+                       Label="实体类型"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       FullWidth="true">
+                @if (_entityTypes is null)
+                {
+                    <MudSelectItem T="string" Value="@("")" Disabled="true">
+                        加载中...
+                    </MudSelectItem>
+                }
+                else if (_entityTypes.Count == 0)
+                {
+                    <MudSelectItem T="string" Value="@("")" Disabled="true">
+                        （暂无实体类型）
+                    </MudSelectItem>
+                }
+                else
+                {
+                    @foreach (var et in _entityTypes)
+                    {
+                        <MudSelectItem T="string" Value="@et.EntityType">
+                            @GetDisplayName(et) (@et.AttributeCount)
+                        </MudSelectItem>
+                    }
+                }
+            </MudSelect>
+        </MudItem>
+    }
+    <MudItem xs="6" md="3" Class="d-flex align-center">
+        <MudSwitch T="bool" @bind-Value="_includeDeleted"
+                   Label="显示已删除"
+                   Color="Color.Warning" />
+    </MudItem>
+    <MudItem xs="6" md="@(_locked ? 6 : 5)" Class="d-flex justify-end align-center">
         <MudButton Variant="Variant.Filled" Color="Color.Success"
                    Size="Size.Small"
                    OnClick="OpenCreateAsync"
                    StartIcon="@Icons.Material.Filled.Add"
-                   Class="ml-2"
                    Disabled="@(string.IsNullOrEmpty(_entityType))">
             新建属性
         </MudButton>
-    </Actions>
-</PageHeaderSky>
-
-@* 过滤器栏（无 MudPaper 包裹） *@
-<MudGrid Class="mb-4">
-    <MudItem xs="12" md="3" Class="d-flex align-center">
-        <MudSelect T="string"
-                   Value="_entityType"
-                   ValueChanged="OnEntityTypeChanged"
-                   Label="实体类型"
-                   Variant="Variant.Outlined"
-                   Margin="Margin.Dense"
-                   FullWidth="true">
-            @if (_entityTypes is null)
-            {
-                <MudSelectItem T="string" Value="@("")" Disabled="true">
-                    加载中...
-                </MudSelectItem>
-            }
-            else if (_entityTypes.Count == 0)
-            {
-                <MudSelectItem T="string" Value="@("")" Disabled="true">
-                    （暂无实体类型）
-                </MudSelectItem>
-            }
-            else
-            {
-                @foreach (var et in _entityTypes)
-                {
-                    <MudSelectItem T="string" Value="@et.EntityType">
-                        @GetDisplayName(et) (@et.AttributeCount)
-                    </MudSelectItem>
-                }
-            }
-        </MudSelect>
-    </MudItem>
-    <MudItem xs="12" md="3" Class="d-flex align-center">
-        <MudSwitch T="bool" @bind-Value="_includeDeleted"
-                   Label="显示已删除"
-                   Color="Color.Warning" />
     </MudItem>
 </MudGrid>
 
@@ -86,13 +78,8 @@
     </ToolBarContent>
     <HeaderContent>
         <MudTh>属性名</MudTh>
-        <MudTh>显示名</MudTh>
         <MudTh>类型</MudTh>
-        <MudTh>引用</MudTh>
         <MudTh>必填</MudTh>
-        <MudTh>可搜索</MudTh>
-        <MudTh>可排序</MudTh>
-        <MudTh>顺序</MudTh>
         <MudTh>操作</MudTh>
     </HeaderContent>
     <RowTemplate>
@@ -110,41 +97,11 @@
                 </MudChip>
             }
         </MudTd>
-        <MudTd DataLabel="显示名">@context.DisplayName</MudTd>
         <MudTd DataLabel="类型">
             <MudChip T="string" Size="Size.Small"
                      Color="@GetDataTypeColor(context.DataType)">
                 @context.DataType
             </MudChip>
-        </MudTd>
-        <MudTd DataLabel="引用">
-            @if (context.UnitId is not null)
-            {
-                <MudChip T="string" Size="Size.Small" Color="Color.Warning"
-                         Class="mr-1">
-                    单位: @context.UnitSymbol
-                </MudChip>
-            }
-            @if (context.RefCompositeTypeId is not null)
-            {
-                <MudChip T="string" Size="Size.Small" Color="Color.Dark"
-                         Class="mr-1">
-                    组合: @context.CompositeTypeName
-                </MudChip>
-            }
-            @if (context.RefTableDefinitionId is not null)
-            {
-                <MudChip T="string" Size="Size.Small" Color="Color.Info"
-                         Class="mr-1">
-                    表: @context.TableName
-                </MudChip>
-            }
-            @if (context.RefOptionSetId is not null)
-            {
-                <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
-                    选项: @context.OptionSetName
-                </MudChip>
-            }
         </MudTd>
         <MudTd DataLabel="必填">
             @if (context.IsRequired)
@@ -153,22 +110,12 @@
                          Color="Color.Success" Size="Size.Small" />
             }
         </MudTd>
-        <MudTd DataLabel="可搜索">
-            @if (context.IsSearchable)
-            {
-                <MudIcon Icon="@Icons.Material.Filled.Check"
-                         Color="Color.Success" Size="Size.Small" />
-            }
-        </MudTd>
-        <MudTd DataLabel="可排序">
-            @if (context.IsSortable)
-            {
-                <MudIcon Icon="@Icons.Material.Filled.Check"
-                         Color="Color.Success" Size="Size.Small" />
-            }
-        </MudTd>
-        <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
         <MudTd DataLabel="操作">
+            <MudIconButton Icon="@Icons.Material.Filled.Info"
+                           Size="Size.Medium"
+                           Color="Color.Info"
+                           OnClick="@(async () => await OpenDetailAsync(context))"
+                           title="详情" />
             @if (!context.IsDeleted)
             {
                 <MudIconButton Icon="@Icons.Material.Filled.Edit"
@@ -213,6 +160,15 @@
 </MudTable>
 
 @code {
+    /// <summary>锁定的实体类型：提供时隐藏类型选择器；为空时为通用模式（可切换类型）。</summary>
+    [Parameter] public string? EntityType { get; set; }
+
+    /// <summary>属性变更后回调（通知父对话框/宿主刷新）。</summary>
+    [Parameter] public EventCallback OnAttributesChanged { get; set; }
+
+    /// <summary>是否锁定单一实体类型。</summary>
+    private bool _locked => !string.IsNullOrEmpty(EntityType);
+
     private string? _entityType;
     private bool _includeDeleted;
     private string? _searchString;
@@ -221,22 +177,28 @@
     private bool _initialized;
 
     private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
-    private IReadOnlyList<UnitDto>? _units;
     private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
     private IReadOnlyList<CustomTableDetailDto>? _customTables;
     private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
 
-    /// <summary>桌面端对话框选项：PageDialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
-    private static readonly DialogOptions DialogOptions = new()
+    /// <summary>二级弹窗选项：与父弹窗一致，带最大化按钮；层叠于属性定义管理弹窗之上。</summary>
+    private static readonly DialogOptionsEx DialogOptions = new()
     {
         MaxWidth = MaxWidth.Medium,
-        FullWidth = true
+        FullWidth = true,
+        MaximizeButton = true
     };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || _initialized) return;
         _initialized = true;
+
+        // 锁定模式：固定为传入的实体类型；通用模式由 LoadEntityTypesAsync 默认选第一个
+        if (_locked)
+        {
+            _entityType = EntityType;
+        }
 
         await LoadReferencesAsync();
         await LoadEntityTypesAsync();
@@ -246,19 +208,16 @@
 
     private async Task LoadReferencesAsync()
     {
-        var unitsTask = Api.ListUnitsAsync();
         var compTask = Api.ListCompositeTypesAsync();
         var tablesTask = Api.ListCustomTablesAsync();
         var optTask = Api.ListOptionSetsAsync();
-        await Task.WhenAll(unitsTask, compTask, tablesTask, optTask);
+        await Task.WhenAll(compTask, tablesTask, optTask);
 
-        _units = unitsTask.Result;
         _compositeTypes = compTask.Result;
         _customTables = tablesTask.Result;
         _optionSets = optTask.Result;
 
         var failed = new List<string>();
-        if (_units is null) failed.Add("单位");
         if (_compositeTypes is null) failed.Add("组合类型");
         if (_customTables is null) failed.Add("自定义表");
         if (_optionSets is null) failed.Add("选项集");
@@ -329,20 +288,33 @@
             { x => x.EntityType, _entityType },
             { x => x.InitialDisplayOrder, (_attributes?.Count ?? 0) + 1 },
             { x => x.EntityTypes, _entityTypes },
-            { x => x.Units, _units },
             { x => x.CompositeTypes, _compositeTypes },
             { x => x.CustomTables, _customTables },
             { x => x.OptionSets, _optionSets }
         };
 
-        var dialog = await DialogService.ShowAsync<AttributeCreateDialog>(
+        var dialog = await DialogService.ShowExAsync<AttributeCreateDialog>(
             string.Empty, parameters, DialogOptions);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
         {
             await LoadAsync();
+            await OnAttributesChanged.InvokeAsync();
         }
+    }
+
+    // ---------- 详情 ----------
+
+    private async Task OpenDetailAsync(AttributeDetailDto attr)
+    {
+        var parameters = new DialogParameters<AttributeDetailDialog>
+        {
+            { x => x.AttributeId, attr.AttributeId }
+        };
+
+        await DialogService.ShowExAsync<AttributeDetailDialog>(
+            string.Empty, parameters, DialogOptions);
     }
 
     // ---------- 编辑 ----------
@@ -359,19 +331,19 @@
         var parameters = new DialogParameters<AttributeEditDialog>
         {
             { x => x.Attribute, detail },
-            { x => x.Units, _units },
             { x => x.CompositeTypes, _compositeTypes },
             { x => x.CustomTables, _customTables },
             { x => x.OptionSets, _optionSets }
         };
 
-        var dialog = await DialogService.ShowAsync<AttributeEditDialog>(
+        var dialog = await DialogService.ShowExAsync<AttributeEditDialog>(
             string.Empty, parameters, DialogOptions);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
         {
             await LoadAsync();
+            await OnAttributesChanged.InvokeAsync();
         }
     }
 
@@ -392,6 +364,7 @@
         {
             Snackbar.Add("删除成功", Severity.Success);
             await LoadAsync();
+            await OnAttributesChanged.InvokeAsync();
         }
         else
         {
@@ -413,6 +386,7 @@
         {
             Snackbar.Add("恢复成功", Severity.Success);
             await LoadAsync();
+            await OnAttributesChanged.InvokeAsync();
         }
         else
         {
@@ -439,7 +413,7 @@
         "datetime" or "date" or "time" => Color.Warning,
         "single_choice" => Color.Tertiary,
         "composite" => Color.Dark,
-        "table" => Color.Info,
+        "table" or "record" => Color.Info,
         "file" => Color.Default,
         _ => Color.Default
     };

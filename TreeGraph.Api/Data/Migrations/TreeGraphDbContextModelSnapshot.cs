@@ -183,8 +183,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("ref_table_definition_id");
 
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("UnitId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("unit_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -251,8 +252,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("entity_type");
 
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("UnitId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("unit_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -431,8 +433,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("ref_option_set_id");
 
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("UnitId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
                         .HasColumnName("unit_id");
 
                     b.Property<JsonDocument>("ValidationRule")
@@ -942,70 +945,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("option_sets", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.Unit", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("category");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<bool>("IsBaseUnit")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_base_unit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Symbol")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("symbol");
-
-                    b.Property<decimal>("ToBaseFactor")
-                        .HasPrecision(38, 15)
-                        .HasColumnType("numeric(38,15)")
-                        .HasColumnName("to_base_factor");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Category")
-                        .IsUnique()
-                        .HasDatabaseName("uq_unit_category_base")
-                        .HasFilter("is_base_unit = true");
-
-                    b.HasIndex("Category", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("uq_unit_category_name");
-
-                    b.ToTable("units", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", b =>
@@ -2065,7 +2004,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasForeignKey("RefTableDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -2087,7 +2026,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -2115,7 +2054,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasForeignKey("RefOptionSetId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.Unit", "Unit")
+                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict);
