@@ -2,6 +2,8 @@ using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using MudBlazor;
 using Xunit;
 
 namespace TreeGraph.Blazor.Tests;
@@ -49,6 +51,28 @@ public class StartupTests : IClassFixture<BlazorAppFactory>
         // 若注册未生效（环境判断出错），会 404，我们把它视为异常。
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
+
+#if DEBUG
+    /// <summary>
+    /// 回归守卫：DEBUG 下解析到的 IDialogService 必须是 DialogSourceTracker，
+    /// 且装饰器实现 IMudExDialogService（inner 为 MudExDialogService）。
+    /// 若 AddDialogSourceTracker 误排到 AddTreeEavSky（内含 AddMudExtensions）之前，
+    /// AddMudExtensions 重注册时会把装饰器移除；若装饰器只实现 IDialogService，
+    /// ShowExAsync 的「is IMudExDialogService」判定失败，最大化/最小化按钮会在
+    /// Blazor Server / WebView 下静默消失。两种回归都由本测试拦截。
+    /// </summary>
+    [Fact]
+    public void DialogService_Tracker_Preserves_MudExDialogService_Contract()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dialogService = scope.ServiceProvider.GetRequiredService<IDialogService>();
+
+        Assert.Equal("TreeGraph.Blazor.Shared.Common.Dev.DialogSourceTracker",
+            dialogService.GetType().FullName);
+        Assert.NotNull(dialogService.GetType()
+            .GetInterface("MudBlazor.Extensions.Core.IMudExDialogService"));
+    }
+#endif
 }
 
 /// <summary>

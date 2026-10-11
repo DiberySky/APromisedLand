@@ -2,7 +2,11 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
 using MudBlazor;
+using MudBlazor.Extensions.Core;
+using MudBlazor.Extensions.Options;
+using MudBlazor.Extensions.Services;
 
 namespace APromisedLand.Razor.Dev;
 
@@ -10,10 +14,15 @@ namespace APromisedLand.Razor.Dev;
 /// DEBUG 专用：IDialogService 装饰器，拦截 ShowAsync 记录「弹窗引用 → 内容组件类型」，
 /// 供 <see cref="DevDialogSourceButton"/> 反查当前弹窗对应的 .razor 源文件。
 /// 仅 Dev 环境注册（DiberyMauiSky.MauiProgram），Release 不编译。
+/// 同时实现 <see cref="IMudExDialogService"/> 并委托 inner：MudBlazor.Extensions 的
+/// ShowExAsync 以「dialogService is IMudExDialogService」为运行时判定来设置 JSRuntime
+/// 并经 JS 注入最大化/最小化按钮，纯 IDialogService 包装会导致该能力静默失效
+/// （Blazor WebView / Server 下 WASM 静态回退取不到 JSRuntime）。
 /// </summary>
-public sealed class DialogSourceTracker : IDialogService
+public sealed class DialogSourceTracker : IMudExDialogService
 {
     private readonly IDialogService _inner;
+    private readonly IMudExDialogService? _innerEx;
 
     /// <summary>按引用 Id 索引的内容组件类型（Id 匹配为主策略）。</summary>
     private static readonly ConcurrentDictionary<Guid, Type> ById = new();
@@ -25,10 +34,30 @@ public sealed class DialogSourceTracker : IDialogService
     public DialogSourceTracker(IDialogService inner)
     {
         _inner = inner;
+        _innerEx = inner as IMudExDialogService;
         IsActive = true;
         _inner.OnDialogCloseRequested += OnInnerCloseRequested;
         _inner.DialogInstanceAddedAsync += OnInnerDialogInstanceAddedAsync;
     }
+
+    // ───────── IMudExDialogService 委托（inner 为 MudExDialogService 时透传） ─────────
+    // 关键：ShowExAsync 据此设置 options.JsRuntime 并经 JS 注入最大化/最小化按钮。
+
+    public IJSRuntime JSRuntime => InnerEx.JSRuntime;
+
+    public IServiceProvider ServiceProvider => InnerEx.ServiceProvider;
+
+    public MudExAppearanceService AppearanceService => InnerEx.AppearanceService;
+
+    public IDialogReference GetDialogReference(Guid dialogGuid)
+        => InnerEx.GetDialogReference(dialogGuid);
+
+    public DialogOptionsEx GetDialogUsedDialogOptions(Guid dialogGuid)
+        => InnerEx.GetDialogUsedDialogOptions(dialogGuid);
+
+    /// <summary>inner 必须是 MudExDialogService；否则 ShowExAsync 链路本身不可用，快速失败优于静默返回 null。</summary>
+    private IMudExDialogService InnerEx => _innerEx
+        ?? throw new InvalidOperationException("内部 IDialogService 不是 IMudExDialogService，ShowExAsync 不可用。");
 
     /// <summary>装饰器是否已进入 DI 链（构造即置位）。供按钮区分「未注册」与「未命中」。</summary>
     public static bool IsActive { get; private set; }

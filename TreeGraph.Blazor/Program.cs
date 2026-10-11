@@ -27,11 +27,6 @@ builder.Services.AddRazorComponents()
 // MudBlazor
 builder.Services.AddMudServices();
 
-#if DEBUG
-// 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService，PageDialogSky 标题栏 DevDialogSourceButton 据此反查 .razor 文件
-builder.Services.AddDialogSourceTracker();
-#endif
-
 // ★ 平台上下文：JS 视口检测（600/960 断点），Scoped。Hybrid 可覆盖注册。
 builder.Services.AddTreeGraphPlatform();
 
@@ -44,6 +39,14 @@ builder.Services.AddTreeEavSky(
     },
     configureClientBuilder: httpBuilder =>
         httpBuilder.AddStandardResilienceHandler(NonIdempotentResilience.Configure));
+
+#if DEBUG
+// 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService，PageDialogSky 标题栏 DevDialogSourceButton 据此反查 .razor 文件。
+// 必须排在 AddTreeEavSky（内部 AddMudExtensions 会重注册 MudExDialogService）之后注册，
+// 否则 AddMudExtensions 的 Remove(首个 IDialogService) 会把本装饰器删掉；装饰器自身实现
+// IMudExDialogService 并透传，保证 ShowExAsync 的「is IMudExDialogService」判定仍成立、最大化按钮不丢失。
+builder.Services.AddDialogSourceTracker();
+#endif
 
 // ★ 泛型树组件读操作适配器（ITreeClientService<T>）：包装 TreeApiClient<T>，
 //   添加排序逻辑与 UI 属性，供 TreeEavSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
