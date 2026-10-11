@@ -225,7 +225,8 @@ public class PageDialogSkyTests : BunitTestBase {
             { "FullScreenToggleVisible", false },
         });
 
-        Assert.Empty(provider.FindAll(".mud-dialog-title .mud-toolbar button:not(.dev-dialog-source-btn)"));
+        // DevDialogSourceButton 现为标题文字上的 span 触发器（非 button），无需再排除
+        Assert.Empty(provider.FindAll(".mud-dialog-title .mud-toolbar button"));
     }
 
     // ============================================================

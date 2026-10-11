@@ -1,0 +1,10 @@
+/* DEBUG 专用：弹窗标题作为「定位源文件」触发区的轻量可点击提示。
+   Release 构建中该 span 不渲染（组件原样输出标题），此样式无附着元素。 */
+.dev-dialog-source-title {
+    cursor: pointer;
+}
+
+.dev-dialog-source-title:hover {
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+}

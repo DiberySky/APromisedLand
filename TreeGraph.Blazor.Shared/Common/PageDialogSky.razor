@@ -25,7 +25,9 @@
                 }
 
                 <MudSpacer/>
-                <MudText Color="Color.Inherit">@Title</MudText>
+                <DevDialogSourceButton>
+                    <MudText Color="Color.Inherit">@Title</MudText>
+                </DevDialogSourceButton>
                 <MudSpacer/>
 
                 @if (StartButtonVisible)
@@ -47,8 +49,6 @@
                                        OnClick="@ToggleFullScreenAsync"/>
                     </MudTooltip>
                 }
-
-                <DevDialogSourceButton/>
 
                 @if (_isMobile && ShowCloseIconInTitleOnMobile)
                 {

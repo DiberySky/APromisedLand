@@ -12,21 +12,21 @@
                 {
                     <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
                                    Edge="Edge.Start" Color="Color.Warning"
-                                   OnClick=@(e => CancelAsync())/>
+                                   OnClick="@CancelAsync"/>
                 }
 
                 <MudSpacer/>
-                <MudText>@Title</MudText>
+                <DevDialogSourceButton>
+                    <MudText>@Title</MudText>
+                </DevDialogSourceButton>
                 <MudSpacer/>
 
                 @if (StartButtonVisible)
                 {
                     <MudIconButton Icon="@Icons.Material.Outlined.Menu"
                                    Color="Color.Success"
-                                   OnClick="@(e => OnStartClick.InvokeAsync())"/>
+                                   OnClick="@StartAsync"/>
                 }
-
-                <DevDialogSourceButton/>
             </MudToolBar>
         }
         @if (ToolBarContent != null)
@@ -46,16 +46,16 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudContainer MaxWidth="@MaxWidth">
+        <MudContainer MaxWidth="@ActionsMaxWidth">
 
             <MudStack Row Class="@ActionsContentClass">
                 @if (CancelButtonVisible)
                 {
                     <MudButton Variant="Variant.Text"
-                               StartIcon="@Icons.Material.Filled.Close"
+                               StartIcon="@(IconsVisible ? Icons.Material.Filled.Close : null)"
                                Color="Color.Default"
                                OnClick="@CancelAsync">
-                        取消
+                        @CancelButtonText
                     </MudButton>
                 }
 
@@ -63,9 +63,10 @@
                 {
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.SaveAs"
-                               OnClick="@(() => OnSubmitClick.InvokeAsync())">
-                        提交
+                               Disabled="@SubmitButtonDisabled"
+                               StartIcon="@(IconsVisible ? Icons.Material.Filled.SaveAs : null)"
+                               OnClick="@SubmitAsync">
+                        @SubmitButtonText
                     </MudButton>
                 }
 
@@ -83,19 +84,26 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required string Title { get; set; }
-    [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
+
+    /// <summary>操作区容器的最大宽度（仅影响 DialogActions 区域，不控制弹窗体宽度）。</summary>
+    [Parameter] public MaxWidth ActionsMaxWidth { get; set; } = MaxWidth.Small;
 
     [Parameter] public bool ArrowBackVisible { get; set; } = true;
     [Parameter] public bool CancelButtonVisible { get; set; }
     [Parameter] public bool SubmitButtonVisible { get; set; }
     [Parameter] public bool StartButtonVisible { get; set; }
+    [Parameter] public bool IconsVisible { get; set; } = true;
+    /// <summary>禁用提交按钮（如提交中防重复点击）。</summary>
+    [Parameter] public bool SubmitButtonDisabled { get; set; }
+
+    [Parameter] public string CancelButtonText { get; set; } = "取消";
+    [Parameter] public string SubmitButtonText { get; set; } = "提交";
 
     [Parameter] public string TitleClass { get; set; } = "mud-theme-primary px-0 pa-0";
     [Parameter] public string ContentClass { get; set; } = "mud-theme-dark";
     [Parameter] public string ActionsClass { get; set; } = "mud-theme-default";
     [Parameter] public string ActionsContentClass { get; set; } = "mr-8 py-3";
 
-    [Parameter] public RenderFragment? TitleContent { get; set; }
     [Parameter] public RenderFragment? ToolBarContent { get; set; }
     [Parameter] public RenderFragment? DialogContent { get; set; }
     [Parameter] public RenderFragment? DialogActions { get; set; }
@@ -104,10 +112,51 @@
     [Parameter] public EventCallback OnCanceledClick { get; set; }
     [Parameter] public EventCallback OnSubmitClick { get; set; }
 
+    /// <summary>关闭流程已开始：阻断取消/返回箭头的重入触发。</summary>
+    private bool _closing;
+
     private async Task CancelAsync()
     {
+        if (_closing)
+        {
+            return;
+        }
+        _closing = true;
+
         MudDialog?.Close(DialogResult.Cancel());
 
-        await OnCanceledClick.InvokeAsync();
+        try
+        {
+            await OnCanceledClick.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[DialogPageSky] OnCanceledClick failed: {ex}");
+        }
+    }
+
+    private async Task StartAsync()
+    {
+        try
+        {
+            await OnStartClick.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[DialogPageSky] OnStartClick failed: {ex}");
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        // 默认不关闭对话框，由父组件决定；重入防护由 SubmitButtonDisabled 负责。
+        try
+        {
+            await OnSubmitClick.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[DialogPageSky] OnSubmitClick failed: {ex}");
+        }
     }
 }

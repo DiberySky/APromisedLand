@@ -13,7 +13,9 @@
                 }
 
                 <MudSpacer/>
-                <MudText>@Title</MudText>
+                <DevDialogSourceButton>
+                    <MudText>@Title</MudText>
+                </DevDialogSourceButton>
                 <MudSpacer/>
 
                 @if (StartButtonVisible)
@@ -22,8 +24,6 @@
                                    Color="Color.Success"
                                    OnClick="@(e => OnStartClick.InvokeAsync())"/>
                 }
-
-                <DevDialogSourceButton/>
             </MudToolBar>
         }
         @if (ToolBarContent != null)

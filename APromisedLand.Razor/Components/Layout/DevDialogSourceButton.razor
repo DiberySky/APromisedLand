@@ -1,7 +1,8 @@
 @* DevDialogSourceButton.razor — DEBUG 专用开发辅助：
-   弹窗标题栏的「定位源文件」按钮。点击后反查当前弹窗内容组件类型，
-   Snackbar 显示 .razor 文件名并尝试把完整路径复制到剪贴板。
-   Release 构建中 Enabled=false 不渲染任何内容（实现体也被条件编译为空）。 *@
+   弹窗标题「定位源文件」触发器。以子内容（标题文字）作为触发区，
+   点击后反查当前弹窗内容组件类型，Snackbar 显示 .razor 文件名并尝试把完整路径复制到剪贴板。
+   不占用标题栏右侧位置，避免与 MudExDialog 内置最大化/关闭按钮（绝对定位）重叠。
+   Release 构建中 Enabled=false：原样输出子内容，不附加任何包裹、交互或样式。 *@
 @namespace APromisedLand.Razor.Components.Layout
 @using Microsoft.JSInterop
 @inject ISnackbar Snackbar
@@ -9,23 +10,30 @@
 
 @if (Enabled)
 {
-    <MudTooltip Text="@(_lastFileName ?? "定位源文件（DEBUG）")">
-        <MudIconButton Class="dev-dialog-source-btn"
-                       Icon="@Icons.Material.Outlined.Code"
-                       Color="Color.Default"
-                       Size="Size.Small"
-                       OnClick="ShowSourceAsync"/>
+    <MudTooltip Text="@(_lastFileName ?? "点击复制源文件路径（DEBUG）")">
+        <span class="dev-dialog-source-title"
+              role="button"
+              @onclick="ShowSourceAsync">
+            @ChildContent
+        </span>
     </MudTooltip>
+}
+else
+{
+    @ChildContent
 }
 
 @code {
-    /// <summary>仅 DEBUG 渲染（Release 下整块不输出，方法体为空）。</summary>
+    /// <summary>仅 DEBUG 渲染触发区（Release 下原样输出子内容，方法体为空）。</summary>
     private const bool Enabled =
 #if DEBUG
         true;
 #else
         false;
 #endif
+
+    /// <summary>触发区内容，通常为弹窗标题。</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
 
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
