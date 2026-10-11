@@ -6,7 +6,7 @@
    json/file/composite/table 等复杂类型暂不编辑，提交时跳过以避免误清空。
    值存于内部字典 _values，保存时由 BuildSubmitValues 转换为 PUT 提交格式。 *@
 
-<MudForm @ref="_form">
+<MudForm @ref="_form" Disabled="@ReadOnly">
     <MudGrid>
         @foreach (var attr in SortedAttributes)
         {
@@ -104,13 +104,16 @@
         }
     </MudGrid>
 
-    <MudStack Row Justify="Justify.FlexEnd" Class="mt-4">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   OnClick="SubmitAsync" Disabled="_submitting"
-                   StartIcon="@Icons.Material.Filled.Save">
-            @(_submitting ? "保存中..." : "保存")
-        </MudButton>
-    </MudStack>
+    @if (!ReadOnly)
+    {
+        <MudStack Row Justify="Justify.FlexEnd" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="SubmitAsync" Disabled="_submitting"
+                       StartIcon="@Icons.Material.Filled.Save">
+                @(_submitting ? "保存中..." : "保存")
+            </MudButton>
+        </MudStack>
+    }
 </MudForm>
 
 @code {
@@ -125,6 +128,9 @@
 
     /// <summary>紧凑布局：为 true 时所有 MudItem 固定 xs="12"（供窄面板/对话框内复用）。</summary>
     [Parameter] public bool CompactLayout { get; set; }
+
+    /// <summary>只读模式：禁用所有输入控件并隐藏保存按钮。</summary>
+    [Parameter] public bool ReadOnly { get; set; }
 
     private MudForm _form = null!;
     private bool _submitting;
@@ -168,7 +174,7 @@
     private string? GetJsonText(string key)
         => _values.TryGetValue(key, out var v) ? v?.ToString() : null;
 
-    private async Task SubmitAsync()
+    public async Task SubmitAsync()
     {
         await _form.ValidateAsync();
         if (!_form.IsValid) return;

@@ -5,6 +5,9 @@ namespace TreeGraph.Blazor.Shared.TreeEavSky.Services;
 
 public interface ITreeClientService<TTree> where TTree : class
 {
+    /// <summary>EAV 实体类型名（= TreeRoute 或 typeof(T).Name），供属性系统查询 Schema。</summary>
+    string EntityType { get; }
+
     string Title { get; set; }
     bool NewPageShow { get; set; }
     bool SelectLeaf { get; set; }

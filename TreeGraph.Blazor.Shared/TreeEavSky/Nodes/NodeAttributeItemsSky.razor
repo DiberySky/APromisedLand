@@ -1,0 +1,116 @@
+@* NodeAttributeItemsSky.razor
+   适配器组件：对外保持旧项目 DiberyTree.NodeAttributeItemsSky 的参数接口，
+   内部桥接 NodeEavSky 的 DynamicForm + EavApiClient，实现属性系统无缝切换。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>
+
+@using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+
+@inject EavApiClient EavApi
+@inject MessageService Message
+
+@if (_loading)
+{
+    <MudStack Class="py-8" AlignItems="AlignItems.Center">
+        <MudProgressCircular Indeterminate="true" />
+        <MudText Class="mt-2">加载属性...</MudText>
+    </MudStack>
+}
+else if (_schema == null || _schema.Count == 0)
+{
+    <MudText Color="Color.Secondary" Class="py-4">该节点类型暂无属性定义。</MudText>
+}
+else
+{
+    <DynamicForm @ref="_dynamicForm"
+                 EntityType="@EntityType"
+                 EntityId="@NodeId"
+                 Schema="@_schema"
+                 CompactLayout="true"
+                 ReadOnly="@ReadOnly"
+                 OnSubmit="HandleSubmitAsync" />
+}
+
+@code {
+    /// <summary>节点 ID（= EAV EntityId）。</summary>
+    [Parameter] public required string NodeId { get; set; }
+
+    /// <summary>EAV 实体类型名。</summary>
+    [Parameter] public required string EntityType { get; set; }
+
+    /// <summary>只读模式（禁用编辑、隐藏保存按钮）。</summary>
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private DynamicForm? _dynamicForm;
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private bool _loading;
+    private DateTimeOffset? _updatedAt;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(NodeId) || string.IsNullOrEmpty(EntityType))
+            return;
+
+        try
+        {
+            _loading = true;
+
+            // 并行拉取 Schema 与当前实体属性值
+            var schemaTask = EavApi.GetSchemaAsync(EntityType);
+            var entityTask = EavApi.GetEntityAsync(EntityType, NodeId);
+
+            await Task.WhenAll(schemaTask, entityTask);
+
+            _schema = schemaTask.Result ?? [];
+            var entity = entityTask.Result;
+
+            if (entity != null)
+            {
+                _updatedAt = entity.UpdatedAt;
+                _dynamicForm?.LoadFrom(entity.Properties);
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Details("加载属性失败", ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>提交属性更新（供编辑对话框在保存节点后调用）。</summary>
+    public async Task SubmitUpdateNodeAttributesAsync()
+    {
+        if (_dynamicForm == null) return;
+        // 触发 DynamicForm 内部的 SubmitAsync → OnSubmit 回调
+        await _dynamicForm.SubmitAsync();
+    }
+
+    private async Task HandleSubmitAsync(Dictionary<string, object?> values)
+    {
+        try
+        {
+            var (ok, error, current) = await EavApi.SaveEntityAsync(
+                EntityType, NodeId, values, _updatedAt);
+
+            if (ok)
+            {
+                Message.Success("属性已更新");
+            }
+            else
+            {
+                _updatedAt = current;
+                Message.Details("属性更新失败", error ?? "未知错误");
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Details("属性更新失败", ex.Message);
+        }
+    }
+}

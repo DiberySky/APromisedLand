@@ -9,6 +9,7 @@ namespace TreeGraph.Blazor.Shared.TreeEavSky.Services;
 /// </summary>
 public class CategoryTreeClientService(TreeApiClient<CategoryTree> treeClient) : ITreeClientService<CategoryTree>
 {
+    public string EntityType => treeClient.EntityType;
     public string Title { get; set; } = "分类树";
     public bool NewPageShow { get; set; }
     public bool SelectLeaf { get; set; } = false;

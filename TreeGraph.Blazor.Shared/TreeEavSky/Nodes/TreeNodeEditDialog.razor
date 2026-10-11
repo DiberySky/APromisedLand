@@ -2,7 +2,7 @@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-@* 精简移植版：移除节点属性区（NodeAttributeItemsSky/属性定义选择），仅保留 EditTemplate 表单 *@
+@inject ITreeClientService<TItem> ClientService
 @implements IDisposable
 
 <DialogTreeSky TItem="@TItem"
@@ -25,6 +25,13 @@
                     @NodeTemplate.EditTemplate(_node)
                 }
             </MudForm>
+
+            @* 属性区：桥接 NodeEavSky 动态表单 *@
+            <NodeAttributeItemsSky @ref="_attrItems"
+                                   TItem="@TItem"
+                                   NodeId="@_node.Id"
+                                   EntityType="@_entityType"
+                                   ReadOnly="false" />
         </MudContainer>
     </DialogContent>
 </DialogTreeSky>
@@ -37,14 +44,16 @@
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
 
     private MudForm _form = null!;
+    private NodeAttributeItemsSky<TItem>? _attrItems;
 
     private TItem _node = null!;
-
     private string _title = null!;
+    private string _entityType = null!;
 
     protected override void OnInitialized()
     {
         _node = NodeTemplate.Node.Value!;
+        _entityType = ClientService.EntityType;
 
         _title = IsCreate ? $"创建【{_node.Parent!.Text()}】子节点" : _node.Text();
 
@@ -56,7 +65,12 @@
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
 
+        // 先关闭对话框返回节点（基础字段由调用方保存）
         MudDialog?.Close(DialogResult.Ok(_node));
+
+        // 再异步保存属性
+        if (_attrItems != null)
+            await _attrItems.SubmitUpdateNodeAttributesAsync();
     }
 
     private void Close()

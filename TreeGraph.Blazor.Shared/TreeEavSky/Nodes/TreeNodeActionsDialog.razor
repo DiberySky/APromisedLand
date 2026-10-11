@@ -2,6 +2,7 @@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
+@inject ITreeClientService<TItem> ClientService
 @implements IDisposable
 
 <DialogSky Title="节点操作">
@@ -44,6 +45,12 @@
 
                 <BoolFieldSky Label="是否允许添加子节点" ReadOnly="true"
                               @bind-Value="NodeTemplate.Node.Value!.CanHaveChildren" />
+
+                @* 属性区：只读展示，桥接 NodeEavSky 动态表单 *@
+                <NodeAttributeItemsSky TItem="@TItem"
+                                       NodeId="@NodeTemplate.Node.Value!.Id"
+                                       EntityType="@_entityType"
+                                       ReadOnly="true" />
 
             </MudStack>
         </MudContainer>
@@ -108,6 +115,14 @@
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
+
+    private string _entityType = null!;
+
+    protected override void OnInitialized()
+    {
+        _entityType = ClientService.EntityType;
+        base.OnInitialized();
+    }
 
     private void OnAttribute()
     {

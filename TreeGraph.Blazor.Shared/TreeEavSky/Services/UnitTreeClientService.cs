@@ -9,6 +9,7 @@ namespace TreeGraph.Blazor.Shared.TreeEavSky.Services;
 /// </summary>
 public class UnitTreeClientService(TreeApiClient<UnitTree> treeClient) : ITreeClientService<UnitTree>
 {
+    public string EntityType => treeClient.EntityType;
     public string Title { get; set; } = "计量单位";
     public bool NewPageShow { get; set; }
     public bool SelectLeaf { get; set; } = true;
