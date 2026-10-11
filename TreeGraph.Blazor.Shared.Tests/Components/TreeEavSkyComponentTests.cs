@@ -6,8 +6,8 @@ using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
 using TreeGraph.Blazor.Shared.TreeEavSky;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
 using TreeGraph.Blazor.Shared.TreeEavSky.Services;
+using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Models;
 using Xunit;
 
@@ -19,7 +19,7 @@ namespace TreeGraph.Blazor.Shared.Tests.Components;
 /// 加载中占位、数据到达后渲染树、空数据、加载异常不崩溃、初始加载调用一次。
 /// </summary>
 public class TreeEavSkyComponentTests : BunitTestBase {
-    private readonly Mock<ITreeClientService<StringTreeNode>> _clientService = new();
+    private readonly Mock<ITreeClientService<UnitTree>> _clientService = new();
 
     public TreeEavSkyComponentTests()
     {
@@ -38,11 +38,11 @@ public class TreeEavSkyComponentTests : BunitTestBase {
         Services.AddSingleton(_clientService.Object);
     }
 
-    private static TreeNodeDto<StringTreeNode> RootDto() => new()
+    private static TreeNodeDto<UnitTree> RootDto() => new()
     {
         Id = "1",
         Text = "根节点",
-        Value = new StringTreeNode { Id = "1", Name = "根节点" },
+        Value = new UnitTree { Id = "1", Name = "根节点" },
         HasChildren = false,
     };
 
@@ -54,12 +54,12 @@ public class TreeEavSkyComponentTests : BunitTestBase {
     public void Render_WhileLoading_ShowsProgressCircular()
     {
         // 永不完成 → 组件停在首次 await，保持 loading
-        var tcs = new TaskCompletionSource<IReadOnlyList<TreeNodeDto<StringTreeNode>>>();
+        var tcs = new TaskCompletionSource<IReadOnlyList<TreeNodeDto<UnitTree>>>();
         _clientService
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(tcs.Task);
 
-        var cut = Render<TreeEavSky<StringTreeNode>>();
+        var cut = Render<TreeEavSky<UnitTree>>();
 
         Assert.Contains("mud-progress-circular", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("mud-treeview", cut.Markup, StringComparison.Ordinal);
@@ -74,9 +74,9 @@ public class TreeEavSkyComponentTests : BunitTestBase {
     {
         _clientService
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>> { RootDto() });
+            .ReturnsAsync(new List<TreeNodeDto<UnitTree>> { RootDto() });
 
-        var cut = Render<TreeEavSky<StringTreeNode>>();
+        var cut = Render<TreeEavSky<UnitTree>>();
 
         cut.WaitForState(
             () => cut.Markup.Contains("mud-treeview", StringComparison.Ordinal),
@@ -94,9 +94,9 @@ public class TreeEavSkyComponentTests : BunitTestBase {
     {
         _clientService
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>>());
+            .ReturnsAsync(new List<TreeNodeDto<UnitTree>>());
 
-        var cut = Render<TreeEavSky<StringTreeNode>>();
+        var cut = Render<TreeEavSky<UnitTree>>();
 
         cut.WaitForState(
             () => cut.Markup.Contains("mud-progress-circular", StringComparison.Ordinal),
@@ -115,7 +115,7 @@ public class TreeEavSkyComponentTests : BunitTestBase {
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("API 挂了"));
 
-        var exception = Record.Exception(() => Render<TreeEavSky<StringTreeNode>>());
+        var exception = Record.Exception(() => Render<TreeEavSky<UnitTree>>());
 
         Assert.Null(exception);
     }
@@ -129,9 +129,9 @@ public class TreeEavSkyComponentTests : BunitTestBase {
     {
         _clientService
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>> { RootDto() });
+            .ReturnsAsync(new List<TreeNodeDto<UnitTree>> { RootDto() });
 
-        Render<TreeEavSky<StringTreeNode>>();
+        Render<TreeEavSky<UnitTree>>();
 
         _clientService.Verify(
             s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()),
@@ -145,29 +145,29 @@ public class TreeEavSkyComponentTests : BunitTestBase {
     [Fact]
     public void DeepLink_ClickNodeIdNotLoaded_ExpandsAncestorPathAndSelects()
     {
-        var root = new TreeNodeDto<StringTreeNode>
+        var root = new TreeNodeDto<UnitTree>
         {
             Id = "1",
             Text = "根",
-            Value = new StringTreeNode { Id = "1", Name = "根" },
+            Value = new UnitTree { Id = "1", Name = "根" },
             HasChildren = true,
         };
         _clientService
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<TreeNodeDto<StringTreeNode>> { root });
+            .ReturnsAsync(new List<TreeNodeDto<UnitTree>> { root });
 
         _clientService
             .Setup(s => s.GetAncestorPathFromApiAsync("3", It.IsAny<CancellationToken>()))
             .ReturnsAsync(["1", "2", "3"]);
 
         _clientService
-            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
+            .Setup(s => s.LoadChildrenAsync(It.Is<UnitTree>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("2", hasChildren: true)]);
         _clientService
-            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "2"), It.IsAny<CancellationToken>()))
+            .Setup(s => s.LoadChildrenAsync(It.Is<UnitTree>(n => n.Id == "2"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("3")]);
 
-        var cut = Render<TreeEavSky<StringTreeNode>>(
+        var cut = Render<TreeEavSky<UnitTree>>(
             p => p.Add(x => x.ClickNodeId, "3"));
 
         cut.WaitForAssertion(
@@ -178,10 +178,10 @@ public class TreeEavSkyComponentTests : BunitTestBase {
         _clientService.Verify(
             s => s.GetAncestorPathFromApiAsync("3", It.IsAny<CancellationToken>()), Times.Once);
         _clientService.Verify(
-            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()),
+            s => s.LoadChildrenAsync(It.Is<UnitTree>(n => n.Id == "1"), It.IsAny<CancellationToken>()),
             Times.Once);
         _clientService.Verify(
-            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "2"), It.IsAny<CancellationToken>()),
+            s => s.LoadChildrenAsync(It.Is<UnitTree>(n => n.Id == "2"), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -196,22 +196,22 @@ public class TreeEavSkyComponentTests : BunitTestBase {
             .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("1", hasChildren: true)]);
         _clientService
-            .Setup(s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
+            .Setup(s => s.LoadChildrenAsync(It.Is<UnitTree>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("2")]);
 
-        var cut = Render<TreeEavSky<StringTreeNode>>();
+        var cut = Render<TreeEavSky<UnitTree>>();
         cut.WaitForState(() => cut.Instance.GetAllLoadedNodes().Count == 1,
             TimeSpan.FromSeconds(2));
 
         Assert.Single(cut.Instance.GetAllLoadedNodes());
         _clientService.Verify(
-            s => s.LoadChildrenAsync(It.IsAny<StringTreeNode>(), It.IsAny<CancellationToken>()), Times.Never);
+            s => s.LoadChildrenAsync(It.IsAny<UnitTree>(), It.IsAny<CancellationToken>()), Times.Never);
 
         var all = await cut.Instance.EnsureAllNodesLoadedAsync();
 
         Assert.Equal(2, all.Count);
         _clientService.Verify(
-            s => s.LoadChildrenAsync(It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()),
+            s => s.LoadChildrenAsync(It.Is<UnitTree>(n => n.Id == "1"), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -222,30 +222,30 @@ public class TreeEavSkyComponentTests : BunitTestBase {
     [Fact]
     public void RemoveNodeFromParent_DeepRemoval_WritesBackToOwner()
     {
-        TreeItemData<StringTreeNode> Leaf(string id) => new()
+        TreeItemData<UnitTree> Leaf(string id) => new()
         {
-            Value = new StringTreeNode { Id = id, Name = id },
+            Value = new UnitTree { Id = id, Name = id },
         };
 
-        var root = new TreeItemData<StringTreeNode>
+        var root = new TreeItemData<UnitTree>
         {
-            Value = new StringTreeNode { Id = "1", Name = "根", HasChildren = true },
-            Children = new List<ITreeItemData<StringTreeNode>>
+            Value = new UnitTree { Id = "1", Name = "根", HasChildren = true },
+            Children = new List<ITreeItemData<UnitTree>>
             {
-                new TreeItemData<StringTreeNode>
+                new TreeItemData<UnitTree>
                 {
-                    Value = new StringTreeNode { Id = "2", Name = "父", HasChildren = true },
-                    Children = new List<ITreeItemData<StringTreeNode>> { Leaf("3"), Leaf("4") },
+                    Value = new UnitTree { Id = "2", Name = "父", HasChildren = true },
+                    Children = new List<ITreeItemData<UnitTree>> { Leaf("3"), Leaf("4") },
                 },
             },
         };
-        var roots = new List<TreeItemData<StringTreeNode>> { root };
+        var roots = new List<TreeItemData<UnitTree>> { root };
 
-        var cut = Render<TreeEavSky<StringTreeNode>>();
+        var cut = Render<TreeEavSky<UnitTree>>();
 
         Assert.True(cut.Instance.RemoveNodeFromParent(roots, "3"));
 
-        var parent = (TreeItemData<StringTreeNode>)root.Children!.Single();
+        var parent = (TreeItemData<UnitTree>)root.Children!.Single();
         Assert.Single(parent.Children!);
         Assert.Equal("4", parent.Children!.Single().Value?.Id);
         Assert.True(parent.Value!.HasChildren);
@@ -255,11 +255,11 @@ public class TreeEavSkyComponentTests : BunitTestBase {
         Assert.False(parent.Value.HasChildren);
     }
 
-    private static TreeNodeDto<StringTreeNode> NodeDto(string id, bool hasChildren = false) => new()
+    private static TreeNodeDto<UnitTree> NodeDto(string id, bool hasChildren = false) => new()
     {
         Id = id,
         Text = id,
-        Value = new StringTreeNode { Id = id, Name = id, HasChildren = hasChildren },
+        Value = new UnitTree { Id = id, Name = id, HasChildren = hasChildren },
         HasChildren = hasChildren,
     };
 
@@ -277,10 +277,10 @@ public class TreeEavSkyComponentTests : BunitTestBase {
             .ReturnsAsync([NodeDto("1", hasChildren: true)]);
         _clientService
             .Setup(s => s.LoadChildrenAsync(
-                It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
+                It.Is<UnitTree>(n => n.Id == "1"), It.IsAny<CancellationToken>()))
             .ReturnsAsync([NodeDto("2")]);
 
-        var cut = Render<TreeEavSky<StringTreeNode>>();
+        var cut = Render<TreeEavSky<UnitTree>>();
 
         // 初始：组件侧 _items 只有 1，2 尚未加载
         Assert.Single(cut.Instance.GetAllLoadedNodes());
@@ -306,7 +306,7 @@ public class TreeEavSkyComponentTests : BunitTestBase {
         toggle.Click(); // 重新展开
         _clientService.Verify(
             s => s.LoadChildrenAsync(
-                It.Is<StringTreeNode>(n => n.Id == "1"), It.IsAny<CancellationToken>()),
+                It.Is<UnitTree>(n => n.Id == "1"), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

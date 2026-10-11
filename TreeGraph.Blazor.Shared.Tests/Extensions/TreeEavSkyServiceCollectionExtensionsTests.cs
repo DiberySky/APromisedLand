@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
 using TreeGraph.Blazor.Shared.TreeEavSky.Services;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
+using TreeGraph.Shared.TreeEavSky.Entities;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Extensions;
@@ -16,7 +16,7 @@ namespace TreeGraph.Blazor.Shared.Tests.Extensions;
 /// </summary>
 public class TreeEavSkyServiceCollectionExtensionsTests
 {
-    /// <summary>与 StringTreeNode 不同的第二个节点类型，用于证明开放泛型不依赖具体 T。</summary>
+    /// <summary>与 UnitTree 不同的第二个节点类型，用于证明开放泛型不依赖具体 T。</summary>
     private sealed class DiSmokeNode : ITreeNodeBase<DiSmokeNode>
     {
         public string Id { get; set; } = "";
@@ -57,16 +57,16 @@ public class TreeEavSkyServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddTreeEavSky_ResolvesDefaultHandler_AndApiClient_ForStringTreeNode()
+    public void AddTreeEavSky_ResolvesDefaultHandler_AndApiClient_ForUnitTree()
     {
         using var provider = BuildProvider();
         using var scope = provider.CreateScope();
         var sp = scope.ServiceProvider;
 
-        var handler = sp.GetRequiredService<ITreeActionHandler<StringTreeNode>>();
-        var apiClient = sp.GetRequiredService<TreeApiClient<StringTreeNode>>();
+        var handler = sp.GetRequiredService<ITreeActionHandler<UnitTree>>();
+        var apiClient = sp.GetRequiredService<TreeApiClient<UnitTree>>();
 
-        Assert.IsType<DefaultTreeActionHandler<StringTreeNode>>(handler);
+        Assert.IsType<DefaultTreeActionHandler<UnitTree>>(handler);
         Assert.NotNull(apiClient);
     }
 
@@ -91,16 +91,16 @@ public class TreeEavSkyServiceCollectionExtensionsTests
         services.AddMudServices();
         services.AddTreeEavSky();
         // 模拟宿主用自定义实现覆盖（AddTreeEavSky 用 AddScoped，后注册者胜）
-        services.AddScoped<ITreeActionHandler<StringTreeNode>,
-            CustomHandler<StringTreeNode>>();
+        services.AddScoped<ITreeActionHandler<UnitTree>,
+            CustomHandler<UnitTree>>();
 
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         using var scope = provider.CreateScope();
 
         var handler = scope.ServiceProvider
-            .GetRequiredService<ITreeActionHandler<StringTreeNode>>();
+            .GetRequiredService<ITreeActionHandler<UnitTree>>();
 
-        Assert.IsType<CustomHandler<StringTreeNode>>(handler);
+        Assert.IsType<CustomHandler<UnitTree>>(handler);
 
         // 未被覆盖的另一个 T 仍走默认实现
         var otherHandler = scope.ServiceProvider
@@ -114,12 +114,12 @@ public class TreeEavSkyServiceCollectionExtensionsTests
         using var provider = BuildProvider();
 
         using var scopeA = provider.CreateScope();
-        var a1 = scopeA.ServiceProvider.GetRequiredService<ITreeActionHandler<StringTreeNode>>();
-        var a2 = scopeA.ServiceProvider.GetRequiredService<ITreeActionHandler<StringTreeNode>>();
+        var a1 = scopeA.ServiceProvider.GetRequiredService<ITreeActionHandler<UnitTree>>();
+        var a2 = scopeA.ServiceProvider.GetRequiredService<ITreeActionHandler<UnitTree>>();
         Assert.Same(a1, a2);
 
         using var scopeB = provider.CreateScope();
-        var b = scopeB.ServiceProvider.GetRequiredService<ITreeActionHandler<StringTreeNode>>();
+        var b = scopeB.ServiceProvider.GetRequiredService<ITreeActionHandler<UnitTree>>();
         Assert.NotSame(a1, b);
     }
 }

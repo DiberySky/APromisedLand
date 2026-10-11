@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using TreeGraph.Blazor.Shared.TreeEavSky.Attributes;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using TreeGraph.Shared.TreeEavSky.Models;
 
@@ -19,7 +18,7 @@ public class TreeApiClient<T>(HttpClient httpClient)
     /// URL 前缀。优先读类型上的 <see cref="TreeRouteAttribute"/>；
     /// 未标注则回退到 typeof(T).Name（与后端 [Route("[controller]")] 约定一致）。
     /// </summary>
-    // 例如标注 [TreeRoute("StringTreeNode")] 或未标注时回退 "StringTreeNode"
+    // 例如标注 [TreeRoute("UnitTree")] 或未标注时回退 "UnitTree"
     private readonly string _basePath =
         typeof(T).GetCustomAttribute<TreeRouteAttribute>()?.Route
         ?? typeof(T).Name;

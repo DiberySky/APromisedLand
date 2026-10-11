@@ -5,7 +5,7 @@ using TreeGraph.Blazor.Shared.TreeEavSky;
 using TreeGraph.Blazor.Shared.TreeEavSky.Contracts;
 using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs;
 using TreeGraph.Blazor.Shared.TreeEavSky.Nodes;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
+using TreeGraph.Shared.TreeEavSky.Entities;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Services;
@@ -22,12 +22,12 @@ public class TreeNodeDialogServiceTests
 {
     private readonly Mock<IDialogService> _dialogService = new();
     private readonly BlazorService _blazorService;
-    private readonly TreeNodeDialogService<StringTreeNode> _sut;
+    private readonly TreeNodeDialogService<UnitTree> _sut;
 
     public TreeNodeDialogServiceTests()
     {
         _blazorService = new BlazorService(_dialogService.Object);
-        _sut = new TreeNodeDialogService<StringTreeNode>(
+        _sut = new TreeNodeDialogService<UnitTree>(
             _dialogService.Object, _blazorService);
     }
 
@@ -51,11 +51,11 @@ public class TreeNodeDialogServiceTests
             .ReturnsAsync(dialogRef.Object);
     }
 
-    private static StringTreeNode MakeNode(string id, string? parentId = null) =>
+    private static UnitTree MakeNode(string id, string? parentId = null) =>
         new() { Id = id, Name = $"Node-{id}", ParentId = parentId };
 
-    private static NodeTemplate<StringTreeNode> MakeTemplate(string id) =>
-        new() { Node = new TreeItemData<StringTreeNode> { Value = MakeNode(id) } };
+    private static NodeTemplate<UnitTree> MakeTemplate(string id) =>
+        new() { Node = new TreeItemData<UnitTree> { Value = MakeNode(id) } };
 
     // ============================================================
     // ShowActionsDialogAsync
@@ -64,7 +64,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowActionsDialogAsync_Canceled_ReturnsNull()
     {
-        SetupExDialogResult<TreeNodeActionsDialog<StringTreeNode>>(DialogResult.Cancel());
+        SetupExDialogResult<TreeNodeActionsDialog<UnitTree>>(DialogResult.Cancel());
 
         var result = await _sut.ShowActionsDialogAsync(MakeTemplate("1"));
 
@@ -74,12 +74,12 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowActionsDialogAsync_ReturnsActionResult()
     {
-        var expected = new NodeActionResult<StringTreeNode>
+        var expected = new NodeActionResult<UnitTree>
         {
             Action = NodeAction.Edit,
             Node = MakeNode("1"),
         };
-        SetupExDialogResult<TreeNodeActionsDialog<StringTreeNode>>(DialogResult.Ok(expected));
+        SetupExDialogResult<TreeNodeActionsDialog<UnitTree>>(DialogResult.Ok(expected));
 
         var result = await _sut.ShowActionsDialogAsync(MakeTemplate("1"));
 
@@ -95,7 +95,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowCreateDialogAsync_Canceled_ReturnsNull()
     {
-        SetupExDialogResult<TreeNodeEditDialog<StringTreeNode>>(DialogResult.Cancel());
+        SetupExDialogResult<TreeNodeEditDialog<UnitTree>>(DialogResult.Cancel());
 
         var result = await _sut.ShowCreateDialogAsync();
 
@@ -105,7 +105,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowCreateDialogAsync_ReturnsNode()
     {
-        SetupExDialogResult<TreeNodeEditDialog<StringTreeNode>>(
+        SetupExDialogResult<TreeNodeEditDialog<UnitTree>>(
             DialogResult.Ok(MakeNode("new-1")));
 
         var result = await _sut.ShowCreateDialogAsync();
@@ -121,7 +121,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowEditDialogAsync_Canceled_ReturnsNull()
     {
-        SetupExDialogResult<TreeNodeEditDialog<StringTreeNode>>(DialogResult.Cancel());
+        SetupExDialogResult<TreeNodeEditDialog<UnitTree>>(DialogResult.Cancel());
 
         var result = await _sut.ShowEditDialogAsync(MakeTemplate("1"));
 
@@ -131,7 +131,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowEditDialogAsync_ReturnsNode()
     {
-        SetupExDialogResult<TreeNodeEditDialog<StringTreeNode>>(
+        SetupExDialogResult<TreeNodeEditDialog<UnitTree>>(
             DialogResult.Ok(MakeNode("1")));
 
         var result = await _sut.ShowEditDialogAsync(MakeTemplate("1"));
@@ -147,7 +147,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowViewDialogAsync_Ok_ReturnsTrue()
     {
-        SetupExDialogResult<TreeNodeViewDialog<StringTreeNode>>(DialogResult.Ok(true));
+        SetupExDialogResult<TreeNodeViewDialog<UnitTree>>(DialogResult.Ok(true));
 
         var result = await _sut.ShowViewDialogAsync(MakeNode("1"));
 
@@ -157,7 +157,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowViewDialogAsync_Canceled_ReturnsFalse()
     {
-        SetupExDialogResult<TreeNodeViewDialog<StringTreeNode>>(DialogResult.Cancel());
+        SetupExDialogResult<TreeNodeViewDialog<UnitTree>>(DialogResult.Cancel());
 
         var result = await _sut.ShowViewDialogAsync(MakeNode("1"));
 
@@ -171,10 +171,10 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowSortDialogAsync_Canceled_ReturnsNull()
     {
-        SetupExDialogResult<TreeNodeSortDialog<StringTreeNode>>(DialogResult.Cancel());
+        SetupExDialogResult<TreeNodeSortDialog<UnitTree>>(DialogResult.Cancel());
 
         var result = await _sut.ShowSortDialogAsync(
-            new TreeItemData<StringTreeNode> { Value = MakeNode("1") });
+            new TreeItemData<UnitTree> { Value = MakeNode("1") });
 
         Assert.Null(result);
     }
@@ -182,11 +182,11 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowSortDialogAsync_ReturnsSortedList()
     {
-        var sorted = new List<StringTreeNode> { MakeNode("2"), MakeNode("1") };
-        SetupExDialogResult<TreeNodeSortDialog<StringTreeNode>>(DialogResult.Ok(sorted));
+        var sorted = new List<UnitTree> { MakeNode("2"), MakeNode("1") };
+        SetupExDialogResult<TreeNodeSortDialog<UnitTree>>(DialogResult.Ok(sorted));
 
         var result = await _sut.ShowSortDialogAsync(
-            new TreeItemData<StringTreeNode> { Value = MakeNode("1") });
+            new TreeItemData<UnitTree> { Value = MakeNode("1") });
 
         Assert.NotNull(result);
         Assert.Equal(2, result.Count);
@@ -200,13 +200,13 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowParentSelectDialogAsync_ListVersion_ReturnsResult()
     {
-        var expected = new ParentSelectResult<StringTreeNode>
+        var expected = new ParentSelectResult<UnitTree>
         {
             IsConfirmed = true,
             SelectedParent = MakeNode("parent-2"),
             SelectedPath = ["parent-2"],
         };
-        SetupExDialogResult<TreeNodeParentSelectDialog<StringTreeNode>>(DialogResult.Ok(expected));
+        SetupExDialogResult<TreeNodeParentSelectDialog<UnitTree>>(DialogResult.Ok(expected));
 
         var result = await _sut.ShowParentSelectDialogAsync(
             [MakeNode("1")], currentNode: MakeNode("1"));
@@ -219,7 +219,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowParentSelectDialogAsync_ListVersion_Canceled_ReturnsNull()
     {
-        SetupExDialogResult<TreeNodeParentSelectDialog<StringTreeNode>>(DialogResult.Cancel());
+        SetupExDialogResult<TreeNodeParentSelectDialog<UnitTree>>(DialogResult.Cancel());
 
         var result = await _sut.ShowParentSelectDialogAsync([MakeNode("1")]);
 
@@ -233,7 +233,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowDialogPageAsync_Ok_ReturnsNode()
     {
-        SetupExDialogResult<TreeDialogPageSky<StringTreeNode>>(
+        SetupExDialogResult<TreeDialogPageSky<UnitTree>>(
             DialogResult.Ok(MakeNode("reg-1")));
 
         var result = await _sut.ShowDialogPageAsync();
@@ -244,7 +244,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowTreeSelectDialogAsync_Ok_ReturnsNode()
     {
-        SetupExDialogResult<TreeSelectDialogSky<StringTreeNode>>(
+        SetupExDialogResult<TreeSelectDialogSky<UnitTree>>(
             DialogResult.Ok(MakeNode("pick-1")));
 
         var result = await _sut.ShowTreeSelectDialogAsync();
@@ -256,9 +256,9 @@ public class TreeNodeDialogServiceTests
     public async Task ShowParentSelectDialogAsync_SingleNode_SameParent_ReturnsNull()
     {
         var currentParent = MakeNode("parent-1");
-        var node = new TreeItemData<StringTreeNode>
+        var node = new TreeItemData<UnitTree>
         {
-            Value = new StringTreeNode
+            Value = new UnitTree
             {
                 Id = "child-1",
                 Name = "Child",
@@ -267,7 +267,7 @@ public class TreeNodeDialogServiceTests
             }
         };
         // 选中的节点 Id 与当前 ParentId 相同 → 无变化
-        SetupExDialogResult<TreeSelectDialogSky<StringTreeNode>>(
+        SetupExDialogResult<TreeSelectDialogSky<UnitTree>>(
             DialogResult.Ok(MakeNode("parent-1")));
 
         var result = await _sut.ShowParentSelectDialogAsync(node);
@@ -282,7 +282,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ExecuteNodeOperationAsync_Canceled_ReturnsNull()
     {
-        SetupExDialogResult<TreeNodeActionsDialog<StringTreeNode>>(DialogResult.Cancel());
+        SetupExDialogResult<TreeNodeActionsDialog<UnitTree>>(DialogResult.Cancel());
 
         var result = await _sut.ExecuteNodeOperationAsync(MakeTemplate("1"));
 
@@ -292,12 +292,12 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ExecuteNodeOperationAsync_ReturnsOutcome()
     {
-        var actionResult = new NodeActionResult<StringTreeNode>
+        var actionResult = new NodeActionResult<UnitTree>
         {
             Action = NodeAction.Delete,
             Node = MakeNode("1"),
         };
-        SetupExDialogResult<TreeNodeActionsDialog<StringTreeNode>>(DialogResult.Ok(actionResult));
+        SetupExDialogResult<TreeNodeActionsDialog<UnitTree>>(DialogResult.Ok(actionResult));
 
         var result = await _sut.ExecuteNodeOperationAsync(MakeTemplate("1"));
 

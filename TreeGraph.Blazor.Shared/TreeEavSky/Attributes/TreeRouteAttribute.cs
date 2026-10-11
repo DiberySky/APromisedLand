@@ -15,7 +15,7 @@ namespace TreeGraph.Blazor.Shared.TreeEavSky.Attributes;
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public sealed class TreeRouteAttribute : Attribute
 {
-    /// <summary>URL 路径前缀（如 "StringTreeNode" 或 "string-tree-nodes"）。</summary>
+    /// <summary>URL 路径前缀（如 "UnitTree" 或 "unit-trees"）。</summary>
     public string Route { get; }
 
     public TreeRouteAttribute(string route)

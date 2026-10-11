@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Api.StringTreeSky.Entities;
-using TreeGraph.Shared.StringTreeSky.Contracts;
 using TreeGraph.Shared.TreeEavSky.Entities;
 
 namespace TreeGraph.Api.Data;
@@ -25,8 +23,6 @@ public class TreeGraphDbContext : DbContext
     public DbSet<InodeEntityType> InodeEntityTypes => Set<InodeEntityType>();
     public DbSet<InodeEntity> InodeEntities => Set<InodeEntity>();
 
-    public DbSet<StringNodeEntity> StringTreeSkyNodes => Set<StringNodeEntity>();
-
     // TreeEavSky：计量单位树 / 分类树
     public DbSet<UnitTree> UnitTrees => Set<UnitTree>();
     public DbSet<CategoryTree> CategoryTrees => Set<CategoryTree>();
@@ -45,7 +41,6 @@ public class TreeGraphDbContext : DbContext
         ConfigureCompositeTypes(mb);
         ConfigureCustomTables(mb);
         ConfigureAuditLog(mb);
-        ConfigureStringTreeSkyNodes(mb);
         ConfigureUnitTrees(mb);
         ConfigureCategoryTrees(mb);
     }
@@ -100,42 +95,8 @@ public class TreeGraphDbContext : DbContext
     }
 
     // ============================================================
-    // StringTreeSky：StringNodeEntity 树节点（GUID 字符串主键）
+    // StringTreeSky：已移除
     // ============================================================
-    private static void ConfigureStringTreeSkyNodes(ModelBuilder mb)
-    {
-        mb.Entity<StringNodeEntity>(e =>
-        {
-            e.ToTable("string_tree_sky_nodes");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id)
-                .HasColumnName("id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(256).IsRequired();
-            e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
-            e.Property(x => x.SortOrder).HasColumnName("sort_order");
-            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1024);
-            e.Property(x => x.EntityType)
-                .HasColumnName("entity_type")
-                .HasMaxLength(120)
-                .IsRequired()
-                .HasDefaultValue(StringTreeEntityTypes.Node);
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            e.HasOne(x => x.Parent)
-                .WithMany(x => x.Children)
-                .HasForeignKey(x => x.ParentId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            e.HasIndex(x => x.ParentId).HasDatabaseName("ix_string_tree_sky_nodes_parent");
-            e.HasIndex(x => new { x.ParentId, x.SortOrder }).HasDatabaseName("ix_string_tree_sky_nodes_parent_sort");
-            e.HasIndex(x => x.EntityType)
-                .HasDatabaseName("ix_string_tree_sky_nodes_entity_type");
-        });
-    }
 
     private static void ConfigureEntityTypes(ModelBuilder mb)
     {

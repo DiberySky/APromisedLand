@@ -1,6 +1,6 @@
 using MudBlazor;
 using TreeGraph.Blazor.Shared.TreeEavSky;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
+using TreeGraph.Shared.TreeEavSky.Entities;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests;
@@ -13,15 +13,15 @@ public class TreeHelperIterationTests
     private const int Depth = 10_000;
 
     /// <summary>构造 1→2→…→Depth 的单链，子集合在构造期就全部挂好。</summary>
-    private static List<TreeItemData<StringTreeNode>> BuildChain(int depth)
+    private static List<TreeItemData<UnitTree>> BuildChain(int depth)
     {
-        TreeItemData<StringTreeNode>? leaf = null;
+        TreeItemData<UnitTree>? leaf = null;
 
         for (int i = depth; i >= 1; i--)
         {
-            var node = new TreeItemData<StringTreeNode>
+            var node = new TreeItemData<UnitTree>
             {
-                Value = new StringTreeNode { Id = i.ToString(), Name = $"N{i}" },
+                Value = new UnitTree { Id = i.ToString(), Name = $"N{i}" },
                 Children = leaf is null ? null : [leaf],
             };
             leaf = node;
@@ -57,18 +57,18 @@ public class TreeHelperIterationTests
     public void GetPathToNode_CyclicGraph_DoesNotInfiniteLoop()
     {
         // 手工构造环：a ↔ b
-        var a = new TreeItemData<StringTreeNode>
+        var a = new TreeItemData<UnitTree>
         {
-            Value = new StringTreeNode { Id = "a", Name = "A" },
+            Value = new UnitTree { Id = "a", Name = "A" },
         };
-        var b = new TreeItemData<StringTreeNode>
+        var b = new TreeItemData<UnitTree>
         {
-            Value = new StringTreeNode { Id = "b", Name = "B" },
+            Value = new UnitTree { Id = "b", Name = "B" },
             Children = [a],
         };
         a.Children = [b];
 
-        var path = new List<TreeItemData<StringTreeNode>> { a }.GetPathToNode("b");
+        var path = new List<TreeItemData<UnitTree>> { a }.GetPathToNode("b");
 
         Assert.Equal(["a", "b"], path);
     }

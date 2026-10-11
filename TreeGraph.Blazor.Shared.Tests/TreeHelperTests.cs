@@ -1,6 +1,6 @@
 using MudBlazor;
 using TreeGraph.Blazor.Shared.TreeEavSky;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
+using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Models;
 using Xunit;
 
@@ -16,11 +16,11 @@ public class TreeHelperTests
     // 测试数据辅助
     // ============================================================
 
-    private static StringTreeNode Node(
+    private static UnitTree Node(
         string id, string? parentId = null, string? name = null)
         => new() { Id = id, Name = name ?? $"Node-{id}", ParentId = parentId };
 
-    private static TreeNodeDto<StringTreeNode> Dto(
+    private static TreeNodeDto<UnitTree> Dto(
         string id,
         string? parentId = null,
         string? text = null,
@@ -45,7 +45,7 @@ public class TreeHelperTests
     {
         var dto = Dto("1", text: "Hello", hasChildren: true, sortOrder: 5);
 
-        var item = dto.ToTreeItemData<StringTreeNode>();
+        var item = dto.ToTreeItemData<UnitTree>();
 
         Assert.Equal("1", item.Value?.Id);
         Assert.Equal("Hello", item.Text);
@@ -56,7 +56,7 @@ public class TreeHelperTests
     [Fact]
     public void ToTreeItemData_WithNullValue_DoesNotThrow()
     {
-        var dto = new TreeNodeDto<StringTreeNode>
+        var dto = new TreeNodeDto<UnitTree>
         {
             Id = "1",
             Text = "Orphan",
@@ -64,7 +64,7 @@ public class TreeHelperTests
         };
 
         // 修复前会 NRE；现在应该正常返回
-        var item = dto.ToTreeItemData<StringTreeNode>();
+        var item = dto.ToTreeItemData<UnitTree>();
 
         Assert.Null(item.Value);
         Assert.Equal("Orphan", item.Text);
@@ -74,7 +74,7 @@ public class TreeHelperTests
     public void ToTreeItemData_WithChildren_Recurses()
     {
         var childDto = Dto("2", parentId: "1");
-        var dto = new TreeNodeDto<StringTreeNode>
+        var dto = new TreeNodeDto<UnitTree>
         {
             Id = "1",
             Text = "Parent",
@@ -82,7 +82,7 @@ public class TreeHelperTests
             Children = [childDto],
         };
 
-        var item = dto.ToTreeItemData<StringTreeNode>();
+        var item = dto.ToTreeItemData<UnitTree>();
 
         Assert.NotNull(item.Children);
         var child = Assert.Single(item.Children);
@@ -93,7 +93,7 @@ public class TreeHelperTests
     public void ToTreeItemData_SetsParentOnValue()
     {
         var parent = Node("p1");
-        var dto = new TreeNodeDto<StringTreeNode>
+        var dto = new TreeNodeDto<UnitTree>
         {
             Id = "1",
             Text = "Child",
@@ -101,7 +101,7 @@ public class TreeHelperTests
             Parent = parent,
         };
 
-        var item = dto.ToTreeItemData<StringTreeNode>();
+        var item = dto.ToTreeItemData<UnitTree>();
 
         Assert.Same(parent, item.Value?.Parent);
     }
@@ -113,7 +113,7 @@ public class TreeHelperTests
     [Fact]
     public void FindTreeItem_DirectChild_Found()
     {
-        var items = new List<TreeItemData<StringTreeNode>>
+        var items = new List<TreeItemData<UnitTree>>
         {
             new() { Value = Node("1") },
             new() { Value = Node("2") },
@@ -128,19 +128,19 @@ public class TreeHelperTests
     [Fact]
     public void FindTreeItem_DeepChild_Found()
     {
-        var grandChild = new TreeItemData<StringTreeNode> { Value = Node("3") };
-        var child = new TreeItemData<StringTreeNode>
+        var grandChild = new TreeItemData<UnitTree> { Value = Node("3") };
+        var child = new TreeItemData<UnitTree>
         {
             Value = Node("2"),
             Children = [grandChild],
         };
-        var root = new TreeItemData<StringTreeNode>
+        var root = new TreeItemData<UnitTree>
         {
             Value = Node("1"),
             Children = [child],
         };
 
-        var result = new List<TreeItemData<StringTreeNode>> { root }.FindTreeItem("3");
+        var result = new List<TreeItemData<UnitTree>> { root }.FindTreeItem("3");
 
         Assert.NotNull(result);
         Assert.Equal("3", result!.Value?.Id);
@@ -149,7 +149,7 @@ public class TreeHelperTests
     [Fact]
     public void FindTreeItem_NotFound_ReturnsNull()
     {
-        var items = new List<TreeItemData<StringTreeNode>>
+        var items = new List<TreeItemData<UnitTree>>
         {
             new() { Value = Node("1") },
         };
@@ -164,7 +164,7 @@ public class TreeHelperTests
     [Fact]
     public void GetPathToNode_Root_ReturnsSingleElement()
     {
-        var items = new List<TreeItemData<StringTreeNode>>
+        var items = new List<TreeItemData<UnitTree>>
         {
             new() { Value = Node("1") },
         };
@@ -178,19 +178,19 @@ public class TreeHelperTests
     [Fact]
     public void GetPathToNode_DeepNode_ReturnsFullPath()
     {
-        var grandChild = new TreeItemData<StringTreeNode> { Value = Node("3") };
-        var child = new TreeItemData<StringTreeNode>
+        var grandChild = new TreeItemData<UnitTree> { Value = Node("3") };
+        var child = new TreeItemData<UnitTree>
         {
             Value = Node("2"),
             Children = [grandChild],
         };
-        var root = new TreeItemData<StringTreeNode>
+        var root = new TreeItemData<UnitTree>
         {
             Value = Node("1"),
             Children = [child],
         };
 
-        var path = new List<TreeItemData<StringTreeNode>> { root }.GetPathToNode("3");
+        var path = new List<TreeItemData<UnitTree>> { root }.GetPathToNode("3");
 
         Assert.NotNull(path);
         Assert.Equal(["1", "2", "3"], path);
@@ -199,7 +199,7 @@ public class TreeHelperTests
     [Fact]
     public void GetPathToNode_NotFound_ReturnsNull()
     {
-        var items = new List<TreeItemData<StringTreeNode>>
+        var items = new List<TreeItemData<UnitTree>>
         {
             new() { Value = Node("1") },
         };
@@ -214,14 +214,14 @@ public class TreeHelperTests
     [Fact]
     public async Task ExpandAsync_LoadsChildren()
     {
-        var item = new TreeItemData<StringTreeNode> { Value = Node("1") };
+        var item = new TreeItemData<UnitTree> { Value = Node("1") };
 
         var loadCount = 0;
-        Task<IReadOnlyCollection<TreeItemData<StringTreeNode>>> Load(StringTreeNode? _)
+        Task<IReadOnlyCollection<TreeItemData<UnitTree>>> Load(UnitTree? _)
         {
             loadCount++;
-            return Task.FromResult<IReadOnlyCollection<TreeItemData<StringTreeNode>>>(
-                new List<TreeItemData<StringTreeNode>>
+            return Task.FromResult<IReadOnlyCollection<TreeItemData<UnitTree>>>(
+                new List<TreeItemData<UnitTree>>
                 {
                     new() { Value = Node("2", parentId: "1") },
                     new() { Value = Node("3", parentId: "1") },
@@ -238,19 +238,19 @@ public class TreeHelperTests
     [Fact]
     public async Task ExpandAsync_AlreadyLoaded_DoesNotReload()
     {
-        var existingChild = new TreeItemData<StringTreeNode> { Value = Node("2") };
-        var item = new TreeItemData<StringTreeNode>
+        var existingChild = new TreeItemData<UnitTree> { Value = Node("2") };
+        var item = new TreeItemData<UnitTree>
         {
             Value = Node("1"),
             Children = [existingChild],
         };
 
         var loadCount = 0;
-        Task<IReadOnlyCollection<TreeItemData<StringTreeNode>>> Load(StringTreeNode? _)
+        Task<IReadOnlyCollection<TreeItemData<UnitTree>>> Load(UnitTree? _)
         {
             loadCount++;
-            return Task.FromResult<IReadOnlyCollection<TreeItemData<StringTreeNode>>>(
-                Array.Empty<TreeItemData<StringTreeNode>>());
+            return Task.FromResult<IReadOnlyCollection<TreeItemData<UnitTree>>>(
+                Array.Empty<TreeItemData<UnitTree>>());
         }
 
         await item.ExpandAsync(Load);
@@ -268,29 +268,29 @@ public class TreeHelperTests
     public async Task ExpandToNodeAsync_ExpandsAlongPath()
     {
         // 预置：根节点
-        var root = new TreeItemData<StringTreeNode> { Value = Node("1") };
-        var items = new List<TreeItemData<StringTreeNode>> { root };
+        var root = new TreeItemData<UnitTree> { Value = Node("1") };
+        var items = new List<TreeItemData<UnitTree>> { root };
 
         // 模拟 API：加载 "1" 的子节点 → 返回 "2"；加载 "2" 的子节点 → 返回 "3"
-        Task<IReadOnlyCollection<TreeItemData<StringTreeNode>>> Load(
-            StringTreeNode? parent)
+        Task<IReadOnlyCollection<TreeItemData<UnitTree>>> Load(
+            UnitTree? parent)
         {
             var result = parent?.Id switch
             {
-                "1" => new List<TreeItemData<StringTreeNode>>
+                "1" => new List<TreeItemData<UnitTree>>
                 {
                     new() { Value = Node("2", parentId: "1") },
                 },
-                "2" => new List<TreeItemData<StringTreeNode>>
+                "2" => new List<TreeItemData<UnitTree>>
                 {
                     new() { Value = Node("3", parentId: "2") },
                 },
-                _ => new List<TreeItemData<StringTreeNode>>(),
+                _ => new List<TreeItemData<UnitTree>>(),
             };
-            return Task.FromResult<IReadOnlyCollection<TreeItemData<StringTreeNode>>>(result);
+            return Task.FromResult<IReadOnlyCollection<TreeItemData<UnitTree>>>(result);
         }
 
-        StringTreeNode? selected = null;
+        UnitTree? selected = null;
         await items.ExpandToNodeAsync(
             path: ["1", "2", "3"],
             loadChildren: Load,

@@ -3,12 +3,9 @@ using TreeGraph.Blazor.Components;
 using TreeGraph.Blazor.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
 using TreeGraph.Blazor.Shared.TreeEavSky.Services;
 using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Blazor.Shared.Platform;
-using TreeGraph.Blazor.Shared.StringTreeSky;
-using TreeGraph.Blazor.Shared.StringTreeSky.Services;
 using TreeGraph.Blazor.Shared.FileStorageSky;
 using TreeGraph.Blazor.Shared.FileStorageSky.Services;
 using TreeGraph.Blazor.Shared.Responsive.Extensions;
@@ -52,45 +49,6 @@ builder.Services.AddDialogSourceTracker();
 //   添加排序逻辑与 UI 属性，供 TreeEavSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
 builder.Services.AddScoped<ITreeClientService<UnitTree>, UnitTreeClientService>();
 builder.Services.AddScoped<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
-builder.Services.AddScoped<ITreeClientService<StringTreeNode>, StringTreeNodeClientService>();
-
-// ★ StringTreeSky（解耦版）：独立契约层 + 非泛型 HTTP 客户端，端点 api/string-tree/*。
-//   与 EavApiClient 同一 Aspire 服务发现与弹性策略。
-//   注：不采用文档片段的 AddHttpClient + AddStringTreeSky 双注册——
-//   AddStringTreeSky 内部 AddScoped<IStringTreeClient, StringTreeApiClient> 无
-//   HttpClient 可注入，会覆盖类型化客户端注册导致 BaseAddress 丢失。
-builder.Services.AddSingleton<StringTreeSkyOptions>(_ => new StringTreeSkyOptions
-{
-    BasePath = "api/string-tree",
-    DefaultExpandLevel = 1,
-    AllowFilter = true,
-});
-builder.Services
-    .AddHttpClient<IStringTreeClient, StringTreeApiClient>(client =>
-    {
-        client.BaseAddress = new Uri("https+http://treegrapheavapi");
-    })
-    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
-
-// ★ 空间客户端（api/string-tree/spaces）：与 StringTreeApiClient 同地址、同弹性策略。
-builder.Services
-    .AddHttpClient<ISpaceClient, SpaceApiClient>(client =>
-    {
-        client.BaseAddress = new Uri("https+http://treegrapheavapi");
-    })
-    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
-
-// ★ 节点属性摘要 + Schema 缓存（增强项，默认旁路：SummaryAttributeNames 为空即零请求）。
-//   解耦版 AddStringTreeSky 扩展内含同注册；宿主手工注册 IStringTreeClient，
-//   故此处补注册，避免组件 [Inject] 无法解析。
-builder.Services.AddScoped<NodeSchemaCache>();
-builder.Services.AddScoped<NodePropertySummaryService>();
-
-// ★ 空间-EntityType 解析 + 属性统计（空间管理徽章列 / 元数据按空间分组页使用）。
-//   宿主无参 AddStringTreeSky() 绑定的是 Trees\StringTree 旧扩展，未含解耦版
-//   StringTreeSky\Extensions 中的这两项注册，故与上方相同方式补注册。
-builder.Services.AddScoped<SpaceEntityTypeResolver>();
-builder.Services.AddScoped<SpaceAttributeStatsService>();
 
 // ★ 通用响应式模块（ResponsiveView / ResponsiveSplit 的 ViewportService）。
 builder.Services.AddResponsive();

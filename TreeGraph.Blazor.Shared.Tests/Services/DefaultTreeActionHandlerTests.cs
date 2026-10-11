@@ -1,8 +1,8 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
 using TreeGraph.Blazor.Shared.TreeEavSky.Services;
+using TreeGraph.Shared.TreeEavSky.Entities;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.Services;
@@ -38,15 +38,15 @@ public class DefaultTreeActionHandlerTests
         }
     }
 
-    private static (DefaultTreeActionHandler<StringTreeNode> Handler, StubHttpHandler Stub) CreateHandler()
+    private static (DefaultTreeActionHandler<UnitTree> Handler, StubHttpHandler Stub) CreateHandler()
     {
         var stub = new StubHttpHandler();
-        var client = new TreeApiClient<StringTreeNode>(
+        var client = new TreeApiClient<UnitTree>(
             new HttpClient(stub) { BaseAddress = new Uri("https://test/") });
-        return (new DefaultTreeActionHandler<StringTreeNode>(client), stub);
+        return (new DefaultTreeActionHandler<UnitTree>(client), stub);
     }
 
-    private static StringTreeNode Node(string id, string? parentId = null, int sortOrder = 0)
+    private static UnitTree Node(string id, string? parentId = null, int sortOrder = 0)
         => new() { Id = id, Name = id, ParentId = parentId, SortOrder = sortOrder };
 
     private static string OkDataJson(string json) => $$"""{"success":true,"data":{{json}}}""";
@@ -71,7 +71,7 @@ public class DefaultTreeActionHandlerTests
         Assert.NotNull(result);
         Assert.Equal("new-id", result!.Id);
         Assert.Equal(HttpMethod.Post, stub.Request!.Method);
-        Assert.Equal("https://test/StringTreeNode", stub.Request.RequestUri!.ToString());
+        Assert.Equal("https://test/UnitTree", stub.Request.RequestUri!.ToString());
 
         var body = JsonDocument.Parse(stub.RequestBody!);
         Assert.Equal("p1", body.RootElement.GetProperty("parentId").GetString());
@@ -93,7 +93,7 @@ public class DefaultTreeActionHandlerTests
         Assert.NotNull(result);
         Assert.Equal("新名", result!.Name);
         Assert.Equal(HttpMethod.Put, stub.Request!.Method);
-        Assert.Equal("https://test/StringTreeNode/n1", stub.Request.RequestUri!.ToString());
+        Assert.Equal("https://test/UnitTree/n1", stub.Request.RequestUri!.ToString());
 
         var body = JsonDocument.Parse(stub.RequestBody!);
         Assert.Equal("p9", body.RootElement.GetProperty("parentId").GetString());
@@ -113,7 +113,7 @@ public class DefaultTreeActionHandlerTests
 
         Assert.True(ok);
         Assert.Equal(HttpMethod.Delete, stub.Request!.Method);
-        Assert.Equal("https://test/StringTreeNode/n1", stub.Request.RequestUri!.ToString());
+        Assert.Equal("https://test/UnitTree/n1", stub.Request.RequestUri!.ToString());
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public class DefaultTreeActionHandlerTests
 
         Assert.True(ok);
         Assert.Equal(HttpMethod.Post, stub.Request!.Method);
-        Assert.Equal("/StringTreeNode/move", stub.Request.RequestUri!.AbsolutePath);
+        Assert.Equal("/UnitTree/move", stub.Request.RequestUri!.AbsolutePath);
         var query = System.Web.HttpUtility.ParseQueryString(stub.Request.RequestUri.Query);
         Assert.Equal("n1", query["nodeId"]);
         Assert.Equal("p2", query["newParentId"]);
@@ -181,7 +181,7 @@ public class DefaultTreeActionHandlerTests
 
         Assert.True(ok);
         Assert.Equal(HttpMethod.Post, stub.Request!.Method);
-        Assert.Equal("https://test/StringTreeNode/children", stub.Request.RequestUri!.ToString());
+        Assert.Equal("https://test/UnitTree/children", stub.Request.RequestUri!.ToString());
 
         var body = JsonDocument.Parse(stub.RequestBody!);
         var children = body.RootElement.GetProperty("children");

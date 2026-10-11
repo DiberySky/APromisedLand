@@ -13,7 +13,7 @@ using TreeGraph.Api.Data;
 namespace TreeGraph.Api.Data.Migrations
 {
     [DbContext(typeof(TreeGraphDbContext))]
-    [Migration("20261010132331_Initial")]
+    [Migration("20261011141754_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -1009,65 +1009,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("uq_unit_category_name");
 
                     b.ToTable("units", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.StringTreeSky.Entities.StringNodeEntity", b =>
-                {
-                    b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)")
-                        .HasColumnName("description");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasDefaultValue("StringTreeNode")
-                        .HasColumnName("entity_type");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("ParentId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("parent_id");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EntityType")
-                        .HasDatabaseName("ix_string_tree_sky_nodes_entity_type");
-
-                    b.HasIndex("ParentId")
-                        .HasDatabaseName("ix_string_tree_sky_nodes_parent");
-
-                    b.HasIndex("ParentId", "SortOrder")
-                        .HasDatabaseName("ix_string_tree_sky_nodes_parent_sort");
-
-                    b.ToTable("string_tree_sky_nodes", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", b =>
@@ -2239,16 +2180,6 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Navigation("OptionSet");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.StringTreeSky.Entities.StringNodeEntity", b =>
-                {
-                    b.HasOne("TreeGraph.Api.StringTreeSky.Entities.StringNodeEntity", "Parent")
-                        .WithMany("Children")
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Parent");
-                });
-
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", b =>
                 {
                     b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Parent")
@@ -2272,11 +2203,6 @@ namespace TreeGraph.Api.Data.Migrations
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>
                 {
                     b.Navigation("Items");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.StringTreeSky.Entities.StringNodeEntity", b =>
-                {
-                    b.Navigation("Children");
                 });
 #pragma warning restore 612, 618
         }

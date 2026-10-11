@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using TreeGraph.Blazor.Shared.TreeEavSky.Attributes;
-using TreeGraph.Blazor.Shared.TreeEavSky.Models;
 using TreeGraph.Blazor.Shared.TreeEavSky.Services;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 using Xunit;
@@ -13,18 +12,6 @@ public class TreeRouteAttributeTests
     // ============================================================
     // 特性声明
     // ============================================================
-
-    [Fact]
-    public void StringTreeNode_IsDecorated_WithCurrentUrlPrefix()
-    {
-        var attr = typeof(StringTreeNode).GetCustomAttributes(false)
-            .OfType<TreeRouteAttribute>()
-            .SingleOrDefault();
-
-        Assert.NotNull(attr);
-        // 与后端 [Route("[controller]")] 的 StringTreeNodeController 一致
-        Assert.Equal("StringTreeNode", attr!.Route);
-    }
 
     [Theory]
     [InlineData("")]
@@ -102,18 +89,5 @@ public class TreeRouteAttributeTests
 
         // 未标注 → typeof(T).Name，即 "PlainNode"
         Assert.Equal("https://test/PlainNode/roots", handler.LastUrl!.ToString());
-    }
-
-    [Fact]
-    public async Task Client_StringTreeNode_UrlUnchanged()
-    {
-        // 回归护栏：A 方案下现有 URL 一个字符都不能变
-        var handler = new RecordingHandler();
-        var client = new TreeApiClient<StringTreeNode>(
-            new HttpClient(handler) { BaseAddress = new Uri("https://test/") });
-
-        await client.GetRootNodesAsync();
-
-        Assert.Equal("https://test/StringTreeNode/roots", handler.LastUrl!.ToString());
     }
 }

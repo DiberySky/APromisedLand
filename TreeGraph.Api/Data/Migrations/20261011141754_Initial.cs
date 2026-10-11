@@ -153,30 +153,6 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "string_tree_sky_nodes",
-                columns: table => new
-                {
-                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    parent_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    sort_order = table.Column<int>(type: "integer", nullable: false),
-                    description = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
-                    entity_type = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false, defaultValue: "StringTreeNode"),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_string_tree_sky_nodes", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_string_tree_sky_nodes_string_tree_sky_nodes_parent_id",
-                        column: x => x.parent_id,
-                        principalTable: "string_tree_sky_nodes",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "unit_trees",
                 columns: table => new
                 {
@@ -806,21 +782,6 @@ namespace TreeGraph.Api.Data.Migrations
                 filter: "is_deleted = false");
 
             migrationBuilder.CreateIndex(
-                name: "ix_string_tree_sky_nodes_entity_type",
-                table: "string_tree_sky_nodes",
-                column: "entity_type");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_string_tree_sky_nodes_parent",
-                table: "string_tree_sky_nodes",
-                column: "parent_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_string_tree_sky_nodes_parent_sort",
-                table: "string_tree_sky_nodes",
-                columns: new[] { "parent_id", "sort_order" });
-
-            migrationBuilder.CreateIndex(
                 name: "ix_unit_trees_parent",
                 table: "unit_trees",
                 column: "parent_id");
@@ -871,9 +832,6 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "option_items");
-
-            migrationBuilder.DropTable(
-                name: "string_tree_sky_nodes");
 
             migrationBuilder.DropTable(
                 name: "unit_trees");

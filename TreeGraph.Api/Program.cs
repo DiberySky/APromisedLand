@@ -3,7 +3,6 @@ using TreeGraph.Api.Data;
 using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Api.StringTreeSky.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,9 +51,6 @@ builder.Services.AddScoped<CustomTableWriteService>();
 builder.Services.AddScoped<CustomTableReadService>();
 builder.Services.AddScoped<CustomTableQueryService>();
 
-// ★ StringTreeSky 解耦版：表 string_tree_sky_nodes 在 TreeGraphDbContext（treegraphdb）。
-builder.Services.AddStringTreeApi();
-
 // ★ TreeEavSky：计量单位树 / 分类树（表 unit_trees、category_trees，随迁移 HasData 播种；
 //   自 DiberyTreeService clone，响应信封由 ApiEnvelopeFilter 统一包装）
 builder.Services.AddScoped<TreeGraph.Api.TreeEavSky.Services.ITreeService<
@@ -94,16 +90,10 @@ if (!EF.IsDesignTime)
     await scope.ServiceProvider.GetRequiredService<UnitSeedService>().SeedAsync();
     await EavSeeder.SeedAsync(db);
 
-    // ★ StringTreeSky：空库播种（幂等）
-    await TreeGraph.Api.StringTreeSky.Seeding.StringTreeNodeSeeder.SeedAsync(db);
-
     // E2E 基线（item/user/project + 固定 EntityId 示例值）仅开发/测试环境注入
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
     {
         await E2eBaselineSeeder.SeedAsync(db);
-
-        // ★ StringTreeSky + EAV 集成演示种子：Space → StringTree → 全套 EAV 属性
-        await StringTreeDemoSeeder.SeedAsync(db);
     }
 }
 

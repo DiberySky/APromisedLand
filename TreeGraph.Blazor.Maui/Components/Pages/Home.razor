@@ -1,9 +1,8 @@
-@* Home.razor — 应用入口：空间浏览器（PageSky 外壳 + 抽屉导航） *@
+@* Home.razor — 应用入口（PageSky 外壳 + 抽屉导航） *@
 @page "/"
 @layout SkyLayout
-@using TreeGraph.Blazor.Shared.StringTreeSky
 
-<PageTitle>空间</PageTitle>
+<PageTitle>首页</PageTitle>
 
 @* 抽屉导航：承接原侧栏 NavMenu 的全部链接（Temporary 覆盖式，不挤压内容） *@
 <MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.Start" Elevation="1"
@@ -13,7 +12,7 @@
     </MudDrawerHeader>
     <MudNavMenu>
         <MudNavLink Href="" Match="NavLinkMatch.All"
-                    Icon="@Icons.Material.Outlined.Home">空间</MudNavLink>
+                    Icon="@Icons.Material.Outlined.Home">首页</MudNavLink>
         <MudNavLink Href="counter"
                     Icon="@Icons.Material.Outlined.PlusOne">Counter</MudNavLink>
         <MudNavLink Href="weather"
@@ -41,14 +40,15 @@
     </MudNavMenu>
 </MudDrawer>
 
-<PageSky Title="空间"
+<PageSky Title="首页"
          ArrowBackVisible="false"
          StartButtonVisible="true"
          OnStartClick="ToggleDrawer">
     <PageContent>
-        <div style="height: 80vh;">
-            <StringTreeSpace/>
-        </div>
+        <MudText Typo="Typo.h5">欢迎使用 TreeGraph</MudText>
+        <MudText Typo="Typo.body1" Class="mt-4">
+            请从左侧菜单选择功能模块。
+        </MudText>
     </PageContent>
 </PageSky>
 
