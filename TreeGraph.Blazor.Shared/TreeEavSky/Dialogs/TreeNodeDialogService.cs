@@ -77,7 +77,7 @@ public class TreeNodeDialogService<TItem>(
             MaxWidth = MaxWidth.Small,
         }).ToDialogOptions();
 
-        var dialog = await dialogService.ShowAsync<TreeNodeActionsDialog<TItem>>("节点操作", parameters, options);
+        var dialog = await dialogService.ShowExAsync<TreeNodeActionsDialog<TItem>>("节点操作", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not NodeActionResult<TItem> actionResult)
@@ -104,7 +104,7 @@ public class TreeNodeDialogService<TItem>(
         };
 
         var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
-        var dialog = await dialogService.ShowAsync<TreeNodeViewDialog<TItem>>("节点详情", parameters, options);
+        var dialog = await dialogService.ShowExAsync<TreeNodeViewDialog<TItem>>("节点详情", parameters, options);
 
         var result = await dialog.Result;
         return result is { Canceled: false };
@@ -125,7 +125,7 @@ public class TreeNodeDialogService<TItem>(
         };
 
         var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
-        var dialog = await dialogService.ShowAsync<TreeNodeEditDialog<TItem>>("创建节点", parameters, options);
+        var dialog = await dialogService.ShowExAsync<TreeNodeEditDialog<TItem>>("创建节点", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not TItem formModel)
@@ -145,7 +145,7 @@ public class TreeNodeDialogService<TItem>(
         };
 
         var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
-        var dialog = await dialogService.ShowAsync<TreeNodeEditDialog<TItem>>("编辑节点", parameters, options);
+        var dialog = await dialogService.ShowExAsync<TreeNodeEditDialog<TItem>>("编辑节点", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not TItem formModel)
@@ -205,7 +205,7 @@ public class TreeNodeDialogService<TItem>(
             CloseButton = true
         }).ToDialogOptions();
 
-        var dialog = await dialogService.ShowAsync<TreeNodeParentSelectDialog<TItem>>(
+        var dialog = await dialogService.ShowExAsync<TreeNodeParentSelectDialog<TItem>>(
             "选择父节点", parameters, options);
 
         var result = await dialog.Result;
@@ -246,7 +246,7 @@ public class TreeNodeDialogService<TItem>(
             BackdropClick = false
         }).ToDialogOptions();
 
-        var dialog = await dialogService.ShowAsync<TreeNodeSortDialog<TItem>>(
+        var dialog = await dialogService.ShowExAsync<TreeNodeSortDialog<TItem>>(
             "拖拽排序", parameters, options);
 
         var result = await dialog.Result;

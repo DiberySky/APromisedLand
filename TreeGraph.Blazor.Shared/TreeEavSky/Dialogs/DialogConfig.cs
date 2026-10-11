@@ -1,4 +1,5 @@
 using MudBlazor;
+using MudBlazor.Extensions.Options;
 
 namespace TreeGraph.Blazor.Shared.TreeEavSky.Dialogs;
 /// <summary>
@@ -24,14 +25,24 @@ public class DialogConfig
     /// <summary>位置</summary>
     public DialogPosition Position { get; set; } = DialogPosition.TopCenter;
 
-    /// <summary>转换为 MudBlazor DialogOptions</summary>
-    public DialogOptions ToDialogOptions() => new()
+    /// <summary>
+    /// 是否显示最大化/还原按钮（默认 true）。
+    /// 经 ShowExAsync 打开时由 MudBlazor.Extensions 按此选项经 JS 注入按钮到标题栏右上角。
+    /// 设为 false 可对特定对话框隐藏该按钮。
+    /// </summary>
+    public bool MaximizeButton { get; set; } = true;
+
+    /// <summary>
+    /// 转换为 DialogOptionsEx（MudBlazor.Extensions）。
+    /// </summary>
+    public DialogOptionsEx ToDialogOptions() => new()
     {
         MaxWidth = MaxWidth,
         CloseButton = CloseButton,
         BackdropClick = BackdropClick,
         FullScreen = FullScreen,
         FullWidth = FullWidth,
-        Position = Position
+        Position = Position,
+        MaximizeButton = MaximizeButton
     };
 }
