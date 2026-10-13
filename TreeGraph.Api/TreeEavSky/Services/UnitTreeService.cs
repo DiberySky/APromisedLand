@@ -307,7 +307,7 @@ public class UnitTreeService(TreeGraphDbContext dbContext) : ITreeService<UnitTr
                 SELECT c.id FROM ""unit_trees"" c
                 INNER JOIN descendants d ON c.""parent_id"" = d.id
             )
-            SELECT EXISTS (SELECT 1 FROM descendants WHERE id = @nodeId);";
+            SELECT EXISTS (SELECT 1 FROM descendants WHERE id = @nodeId) AS ""Value""";
 
         var param1 = new NpgsqlParameter("@ancestorId", ancestorId);
         var param2 = new NpgsqlParameter("@nodeId", nodeId);

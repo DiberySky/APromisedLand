@@ -334,7 +334,7 @@ public class CategoryTreeService(TreeGraphDbContext dbContext) : ITreeService<Ca
                 SELECT c.id FROM ""category_trees"" c
                 INNER JOIN descendants d ON c.""parent_id"" = d.id
             )
-            SELECT EXISTS (SELECT 1 FROM descendants WHERE id = @nodeId);";
+            SELECT EXISTS (SELECT 1 FROM descendants WHERE id = @nodeId) AS ""Value""";
 
         var param1 = new NpgsqlParameter("@ancestorId", ancestorId);
         var param2 = new NpgsqlParameter("@nodeId", nodeId);
