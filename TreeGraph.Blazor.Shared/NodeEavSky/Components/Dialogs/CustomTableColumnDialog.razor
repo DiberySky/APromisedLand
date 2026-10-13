@@ -15,16 +15,16 @@
             </MudText>
         }
 
-        <MudTextField @bind-Value="_columnForm.ColumnName"
-                      Label="列名 (snake_case)"
-                      Placeholder="weight"
-                      Variant="Variant.Outlined"
-                      Disabled="@(EditingColumn is not null)"
-                      Class="mb-3" />
         <MudTextField @bind-Value="_columnForm.DisplayName"
                       Label="显示名"
-                      Placeholder="重量"
+                      Placeholder="界面上展示的中文名称"
                       Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_columnForm.ColumnName"
+                      Label="列名（小写英文+下划线）"
+                      Placeholder="小写英文+下划线，如 weight"
+                      Variant="Variant.Outlined"
+                      Disabled="@(EditingColumn is not null)"
                       Class="mb-3" />
 
         <MudSelect T="string"
@@ -55,6 +55,25 @@
                     </MudSelectItem>
                 }
             </MudSelect>
+        }
+
+        @* int / decimal：单位（只读文本 + 单位树选择对话框） *@
+        @if (_columnForm.DataType is "int" or "decimal")
+        {
+            <UnitTreeField @bind-UnitId="_columnForm.UnitId"
+                           @bind-UnitName="_columnForm.UnitName" />
+        }
+
+        @* decimal：小数精度（ValidationRule.precision） *@
+        @if (_columnForm.DataType == "decimal")
+        {
+            <MudNumericField T="int?"
+                             @bind-Value="_columnForm.Precision"
+                             Label="小数精度（可选）"
+                             Min="0" Max="10" Step="1"
+                             Variant="Variant.Outlined"
+                             Class="mb-3"
+                             HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
         }
 
         <MudNumericField T="int"
@@ -139,7 +158,13 @@
                 IsSearchable = EditingColumn.IsSearchable,
                 IsSortable = EditingColumn.IsSortable,
                 IsUnique = EditingColumn.IsUnique,
-                DisplayOrder = EditingColumn.DisplayOrder
+                DisplayOrder = EditingColumn.DisplayOrder,
+                Precision = ExtractPrecision(EditingColumn.ValidationRule),
+                UnitId = EditingColumn.UnitId,
+                UnitName = EditingColumn.UnitName is null ? null
+                    : string.IsNullOrEmpty(EditingColumn.UnitAbbreviation)
+                        ? EditingColumn.UnitName
+                        : $"{EditingColumn.UnitName} 【{EditingColumn.UnitAbbreviation}】"
             };
     }
 
@@ -147,6 +172,8 @@
     {
         _columnForm.DataType = dt;
         if (dt != "composite") _columnForm.RefCompositeTypeId = null;
+        if (dt != "decimal") _columnForm.Precision = null;
+        if (dt != "int" && dt != "decimal") { _columnForm.UnitId = null; _columnForm.UnitName = null; }
     }
 
     private async Task SaveColumnAsync()
@@ -184,7 +211,12 @@
                         IsSearchable = _columnForm.IsSearchable,
                         IsSortable = _columnForm.IsSortable,
                         IsUnique = _columnForm.IsUnique,
-                        DisplayOrder = _columnForm.DisplayOrder
+                        DisplayOrder = _columnForm.DisplayOrder,
+                        // decimal 精度 → ValidationRule.precision
+                        ValidationRule = _columnForm.Precision is int p
+                            ? System.Text.Json.JsonSerializer.SerializeToElement(new { precision = p })
+                            : null,
+                        UnitId = _columnForm.UnitId
                     });
 
                 if (id is null)
@@ -196,6 +228,10 @@
             }
             else
             {
+                // UnitId diff：当前 vs 原始
+                var unitChanged = _columnForm.UnitId != EditingColumn.UnitId;
+                var unitCleared = unitChanged && _columnForm.UnitId is null;
+
                 var (ok, error) = await Api.UpdateTableColumnAsync(
                     Table.TableDefinitionId,
                     EditingColumn.ColumnId,
@@ -206,7 +242,13 @@
                         IsSearchable = _columnForm.IsSearchable,
                         IsSortable = _columnForm.IsSortable,
                         IsUnique = _columnForm.IsUnique,
-                        DisplayOrder = _columnForm.DisplayOrder
+                        DisplayOrder = _columnForm.DisplayOrder,
+                        // 合并 ValidationRule：保留既有规则键，仅增删 precision
+                        ValidationRule = MergeValidationRule(
+                            EditingColumn.ValidationRule, _columnForm.Precision),
+                        // UnitId 更新
+                        UnitId = unitChanged ? _columnForm.UnitId : null,
+                        ClearUnitId = unitCleared
                     });
 
                 if (!ok)
@@ -236,5 +278,43 @@
         public bool IsSortable { get; set; }
         public bool IsUnique { get; set; }
         public int DisplayOrder { get; set; }
+        public int? Precision { get; set; }  // decimal 精度 → ValidationRule.precision
+        public string? UnitId { get; set; }
+        public string? UnitName { get; set; }
+    }
+
+    /// <summary>从既有 ValidationRule 解析 precision；缺失/非法返回 null。</summary>
+    private static int? ExtractPrecision(System.Text.Json.JsonElement? rule)
+        => rule is { ValueKind: System.Text.Json.JsonValueKind.Object } obj
+            && obj.TryGetProperty("precision", out var p)
+            && p.TryGetInt32(out var n)
+            ? n : null;
+
+    /// <summary>
+    /// 合并 ValidationRule：保留既有规则键，仅写入/移除 precision。
+    /// 置空精度且原规则无其他键时返回 null（清空整个规则对象）。
+    /// </summary>
+    private static System.Text.Json.JsonElement? MergeValidationRule(
+        System.Text.Json.JsonElement? original, int? precision)
+    {
+        var hasPrecision = precision is int p && p >= 0;
+        if (original is not { ValueKind: System.Text.Json.JsonValueKind.Object } obj)
+        {
+            return hasPrecision
+                ? System.Text.Json.JsonSerializer.SerializeToElement(
+                    new { precision = precision })
+                : null;
+        }
+
+        var dict = new Dictionary<string, System.Text.Json.JsonElement>();
+        foreach (var prop in obj.EnumerateObject())
+            dict[prop.Name] = prop.Value.Clone();
+
+        if (hasPrecision)
+            dict["precision"] = System.Text.Json.JsonSerializer.SerializeToElement(precision);
+        else if (!dict.Remove("precision"))
+            return null;
+
+        return System.Text.Json.JsonSerializer.SerializeToElement(dict);
     }
 }

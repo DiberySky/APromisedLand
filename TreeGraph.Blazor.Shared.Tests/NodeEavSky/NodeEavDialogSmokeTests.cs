@@ -147,7 +147,14 @@ public class NodeEavDialogSmokeTests : BunitTestBase
 
     [Fact]
     public async Task CompositeTypeCreateDialog_Renders()
-        => AssertDialog(await OpenAsync<CompositeTypeCreateDialog>(), "新建组合类型");
+    {
+        var provider = await OpenAsync<CompositeTypeCreateDialog>();
+        AssertDialog(provider, "新建组合类型");
+        // 回归：全局共享勾选框必须渲染（曾误用不存在的 MudCheckbox 组件名被当成普通 HTML 元素）
+        var html = provider.Find(".mud-dialog").InnerHtml;
+        Assert.Contains("mud-checkbox", html);
+        Assert.Contains("全局共享", html);
+    }
 
     [Fact]
     public async Task CompositeTypeEditDialog_Renders()

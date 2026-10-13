@@ -25,7 +25,7 @@ else
 
 @code {
     /// <summary>仅 DEBUG 渲染触发区（Release 下原样输出子内容，方法体为空）。</summary>
-    private const bool Enabled =
+    private static readonly bool Enabled =
 #if DEBUG
         true;
 #else

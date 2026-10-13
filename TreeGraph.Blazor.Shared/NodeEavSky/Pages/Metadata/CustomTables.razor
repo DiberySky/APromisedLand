@@ -95,9 +95,6 @@ else
                                  Class="ml-2">
                             @table.EntityType
                         </MudChip>
-                        <MudChip T="string" Size="Size.Small" Class="ml-2">
-                            v@table.Version
-                        </MudChip>
                         <MudChip T="string" Size="Size.Small" Color="Color.Warning"
                                  Class="ml-2">
                             @table.Columns.Count(c => !c.IsDeleted) 列
@@ -142,8 +139,8 @@ else
                 <ChildContent>
                     @if (!table.IsDeleted)
                     {
-                        <div class="d-flex mb-3">
-                            <MudButton Size="Size.Medium"
+                       <div class="d-flex mb-3 justify-end">
+                                添加列<MudButton Size="Size.Medium"
                                        Variant="Variant.Outlined"
                                        Color="Color.Primary"
                                        StartIcon="@Icons.Material.Filled.Add"

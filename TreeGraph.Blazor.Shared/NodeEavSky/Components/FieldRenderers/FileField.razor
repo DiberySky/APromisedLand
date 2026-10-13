@@ -46,9 +46,9 @@ else if (_isUploading)
 else
 {
     <MudPaper Class="pa-2 mb-2" Elevation="0" Outlined="true">
-        <MudText Typo="Typo.body2">@_meta.FileName</MudText>
+        <MudText Typo="Typo.body2">@_meta!.FileName</MudText>
         <MudText Typo="Typo.caption" Color="Color.Secondary">
-            类型: @_meta.ContentType | 大小: @FormatSize(_meta.Size) | 版本: v@_meta.Version
+            类型: @_meta!.ContentType | 大小: @FormatSize(_meta!.Size) | 版本: v@_meta!.Version
         </MudText>
         @if (!string.IsNullOrEmpty(_meta.Sha256))
         {

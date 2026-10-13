@@ -153,10 +153,10 @@ public sealed class DialogSourceTracker : IMudExDialogService
     public Task<IDialogReference> ShowAsync<TComponent>() where TComponent : IComponent
         => Track(_inner.ShowAsync<TComponent>(), typeof(TComponent));
 
-    public Task<IDialogReference> ShowAsync<TComponent>(string title) where TComponent : IComponent
+    public Task<IDialogReference> ShowAsync<TComponent>(string? title) where TComponent : IComponent
         => Track(_inner.ShowAsync<TComponent>(title), typeof(TComponent));
 
-    public Task<IDialogReference> ShowAsync<TComponent>(string title, DialogOptions options) where TComponent : IComponent
+    public Task<IDialogReference> ShowAsync<TComponent>(string? title, DialogOptions options) where TComponent : IComponent
         => Track(_inner.ShowAsync<TComponent>(title, options), typeof(TComponent));
 
     public Task<IDialogReference> ShowAsync<TComponent>(DialogOptions options) where TComponent : IComponent
@@ -165,10 +165,10 @@ public sealed class DialogSourceTracker : IMudExDialogService
     public Task<IDialogReference> ShowAsync<TComponent>(DialogParameters parameters) where TComponent : IComponent
         => Track(_inner.ShowAsync<TComponent>(parameters), typeof(TComponent));
 
-    public Task<IDialogReference> ShowAsync<TComponent>(string title, DialogParameters parameters) where TComponent : IComponent
+    public Task<IDialogReference> ShowAsync<TComponent>(string? title, DialogParameters parameters) where TComponent : IComponent
         => Track(_inner.ShowAsync<TComponent>(title, parameters), typeof(TComponent));
 
-    public Task<IDialogReference> ShowAsync<TComponent>(string title, DialogParameters parameters, DialogOptions options) where TComponent : IComponent
+    public Task<IDialogReference> ShowAsync<TComponent>(string? title, DialogParameters parameters, DialogOptions? options) where TComponent : IComponent
         => Track(_inner.ShowAsync<TComponent>(title, parameters, options), typeof(TComponent));
 
     public Task<IDialogReference> ShowAsync<TComponent>(DialogParameters parameters, DialogOptions options) where TComponent : IComponent
@@ -179,16 +179,16 @@ public sealed class DialogSourceTracker : IMudExDialogService
     public Task<IDialogReference> ShowAsync(Type componentType)
         => Track(_inner.ShowAsync(componentType), componentType);
 
-    public Task<IDialogReference> ShowAsync(Type componentType, string title)
+    public Task<IDialogReference> ShowAsync(Type componentType, string? title)
         => Track(_inner.ShowAsync(componentType, title), componentType);
 
-    public Task<IDialogReference> ShowAsync(Type componentType, string title, DialogOptions options)
+    public Task<IDialogReference> ShowAsync(Type componentType, string? title, DialogOptions options)
         => Track(_inner.ShowAsync(componentType, title, options), componentType);
 
-    public Task<IDialogReference> ShowAsync(Type componentType, string title, DialogParameters parameters)
+    public Task<IDialogReference> ShowAsync(Type componentType, string? title, DialogParameters parameters)
         => Track(_inner.ShowAsync(componentType, title, parameters), componentType);
 
-    public Task<IDialogReference> ShowAsync(Type componentType, string title, DialogParameters parameters, DialogOptions options)
+    public Task<IDialogReference> ShowAsync(Type componentType, string? title, DialogParameters parameters, DialogOptions? options)
         => Track(_inner.ShowAsync(componentType, title, parameters, options), componentType);
 
     // ───────── 其余成员原样委托 ─────────
@@ -197,13 +197,13 @@ public sealed class DialogSourceTracker : IMudExDialogService
 
     public void Close(IDialogReference dialog) => _inner.Close(dialog);
 
-    public void Close(IDialogReference dialog, DialogResult result) => _inner.Close(dialog, result);
+    public void Close(IDialogReference dialog, DialogResult? result) => _inner.Close(dialog, result);
 
-    public Task<bool?> ShowMessageBoxAsync(string title, string message, string yesText = "OK",
+    public Task<bool?> ShowMessageBoxAsync(string? title, string message, string yesText = "OK",
         string? cancelText = null, string? noText = null, DialogOptions? options = null)
         => _inner.ShowMessageBoxAsync(title, message, yesText, cancelText, noText, options);
 
-    public Task<bool?> ShowMessageBoxAsync(string title, MarkupString markupMessage, string yesText = "OK",
+    public Task<bool?> ShowMessageBoxAsync(string? title, MarkupString markupMessage, string yesText = "OK",
         string? cancelText = null, string? noText = null, DialogOptions? options = null)
         => _inner.ShowMessageBoxAsync(title, markupMessage, yesText, cancelText, noText, options);
 

@@ -585,6 +585,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("table_definition_id");
 
+                    b.Property<string>("UnitId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("unit_id");
+
                     b.Property<JsonDocument>("ValidationRule")
                         .HasColumnType("jsonb")
                         .HasColumnName("validation_rule");
@@ -593,11 +598,16 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("RefCompositeTypeId");
 
+                    b.HasIndex("UnitId");
+
                     b.HasIndex("TableDefinitionId", "ColumnName")
                         .IsUnique()
                         .HasDatabaseName("uq_custom_table_column");
 
-                    b.ToTable("custom_table_columns", (string)null);
+                    b.ToTable("custom_table_columns", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_custom_table_column_numeric_unit", "data_type IN ('int', 'decimal') OR unit_id IS NULL");
+                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
@@ -725,6 +735,132 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("ix_ctr_parent");
 
                     b.ToTable("custom_table_rows", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EdgeDefinition", b =>
+                {
+                    b.Property<string>("EdgeTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("edge_type_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("FromNodeType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("from_node_type");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDirected")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_directed");
+
+                    b.Property<bool>("IsGlobal")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_global");
+
+                    b.Property<string>("ToNodeType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("to_node_type");
+
+                    b.Property<string>("TypeName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("type_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("EdgeTypeId");
+
+                    b.HasIndex("TypeName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_edge_definition_type_name");
+
+                    b.ToTable("edge_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EdgeInstance", b =>
+                {
+                    b.Property<string>("EdgeId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("edge_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EdgeTypeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("edge_type_id");
+
+                    b.Property<string>("FromNodeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("from_node_id");
+
+                    b.Property<string>("ToNodeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("to_node_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<decimal?>("Weight")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("weight");
+
+                    b.HasKey("EdgeId");
+
+                    b.HasIndex("FromNodeId")
+                        .HasDatabaseName("ix_ei_from_node");
+
+                    b.HasIndex("ToNodeId")
+                        .HasDatabaseName("ix_ei_to_node");
+
+                    b.HasIndex("EdgeTypeId", "FromNodeId")
+                        .HasDatabaseName("ix_ei_from");
+
+                    b.HasIndex("EdgeTypeId", "ToNodeId")
+                        .HasDatabaseName("ix_ei_to");
+
+                    b.HasIndex("EdgeTypeId", "FromNodeId", "ToNodeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_edge_instance");
+
+                    b.ToTable("edge_instances", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EntityTypeDefinition", b =>
@@ -2160,9 +2296,16 @@ namespace TreeGraph.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("RefCompositeType");
 
                     b.Navigation("Table");
+
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableRow", b =>
@@ -2182,6 +2325,17 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Navigation("Attribute");
 
                     b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EdgeInstance", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.EdgeDefinition", "EdgeType")
+                        .WithMany("Instances")
+                        .HasForeignKey("EdgeTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EdgeType");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.LocationAttributeValue", b =>
@@ -2224,6 +2378,11 @@ namespace TreeGraph.Api.Data.Migrations
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", b =>
                 {
                     b.Navigation("Columns");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.EdgeDefinition", b =>
+                {
+                    b.Navigation("Instances");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionSet", b =>

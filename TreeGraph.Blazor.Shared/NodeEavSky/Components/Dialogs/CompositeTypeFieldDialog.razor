@@ -15,16 +15,16 @@
             </MudText>
         }
 
-        <MudTextField @bind-Value="_fieldForm.FieldName"
-                      Label="字段名 (snake_case)"
-                      Placeholder="street_name"
-                      Variant="Variant.Outlined"
-                      Disabled="@(EditingField is not null)"
-                      Class="mb-3" />
         <MudTextField @bind-Value="_fieldForm.DisplayName"
                       Label="显示名"
-                      Placeholder="街道名称"
+                      Placeholder="界面上展示的中文名称"
                       Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_fieldForm.FieldName"
+                      Label="字段名（小写英文+下划线）"
+                      Placeholder="小写英文+下划线，如 street_name"
+                      Variant="Variant.Outlined"
+                      Disabled="@(EditingField is not null)"
                       Class="mb-3" />
 
         <MudSelect T="string"
@@ -40,11 +40,23 @@
             }
         </MudSelect>
 
-        @* decimal 类型的单位（复制原系统 UintTreeField 调用方式：只读文本 + 单位树选择对话框） *@
-        @if (_fieldForm.DataType == "decimal")
+        @* int / decimal 的单位（只读文本 + 单位树选择对话框） *@
+        @if (_fieldForm.DataType is "int" or "decimal")
         {
             <UnitTreeField @bind-UnitId="_fieldForm.UnitId"
                            @bind-UnitName="_fieldForm.UnitName" />
+        }
+
+        @* decimal：小数精度（ValidationRule.precision） *@
+        @if (_fieldForm.DataType == "decimal")
+        {
+            <MudNumericField T="int?"
+                             @bind-Value="_fieldForm.Precision"
+                             Label="小数精度（可选）"
+                             Min="0" Max="10" Step="1"
+                             Variant="Variant.Outlined"
+                             Class="mb-3"
+                             HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
         }
 
         @* single_choice 的选项集 *@
@@ -97,10 +109,14 @@
                                  Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="6" Class="d-flex align-center">
-                <MudSwitch T="bool"
-                           @bind-Value="_fieldForm.IsArray"
-                           Label="数组"
-                           Color="Color.Primary" />
+                <MudCheckBox T="bool"
+                             @bind-Value="_fieldForm.IsArray"
+                             Label="数组（可填写多行）"
+                             Color="Color.Primary" />
+                <MudText Typo="Typo.caption" Class="ml-2"
+                         Style="color: var(--mud-palette-text-secondary)">
+                    开启后该字段支持填写多条记录
+                </MudText>
             </MudItem>
         </MudGrid>
 
@@ -181,13 +197,14 @@
                 IsRequired = EditingField.IsRequired,
                 IsSearchable = EditingField.IsSearchable,
                 IsSortable = EditingField.IsSortable,
-                DisplayOrder = EditingField.DisplayOrder
+                DisplayOrder = EditingField.DisplayOrder,
+                Precision = ExtractPrecision(EditingField.ValidationRule)
             };
     }
 
     /// <summary>
     /// 切换类型时清空不适用的引用。
-    ///   - decimal 保留 UnitId，清空 RefOptionSetId / RefCompositeTypeId
+    ///   - int / decimal 保留 UnitId，清空 RefOptionSetId / RefCompositeTypeId
     ///   - single_choice 保留 RefOptionSetId，清空 UnitId / RefCompositeTypeId
     ///   - composite 保留 RefCompositeTypeId，清空 UnitId / RefOptionSetId
     ///   - 其它类型全部清空
@@ -196,7 +213,8 @@
     {
         _fieldForm.DataType = dt;
 
-        if (dt != "decimal") { _fieldForm.UnitId = null; _fieldForm.UnitName = null; }
+        if (dt != "int" && dt != "decimal") { _fieldForm.UnitId = null; _fieldForm.UnitName = null; }
+        if (dt != "decimal") _fieldForm.Precision = null;
         if (dt != "single_choice") _fieldForm.RefOptionSetId = null;
         if (dt != "composite") _fieldForm.RefCompositeTypeId = null;
     }
@@ -238,7 +256,11 @@
                         IsRequired = _fieldForm.IsRequired,
                         IsSearchable = _fieldForm.IsSearchable,
                         IsSortable = _fieldForm.IsSortable,
-                        DisplayOrder = _fieldForm.DisplayOrder
+                        DisplayOrder = _fieldForm.DisplayOrder,
+                        // decimal 精度 → ValidationRule.precision
+                        ValidationRule = _fieldForm.Precision is int p
+                            ? System.Text.Json.JsonSerializer.SerializeToElement(new { precision = p })
+                            : null
                     });
 
                 if (id is null)
@@ -271,7 +293,11 @@
                         ClearRefOptionSetId = clearOpt,
 
                         UnitId = unitId,
-                        ClearUnitId = clearUnit
+                        ClearUnitId = clearUnit,
+
+                        // 合并 ValidationRule：保留既有规则键，仅增删 precision
+                        ValidationRule = MergeValidationRule(
+                            EditingField.ValidationRule, _fieldForm.Precision)
                     });
 
                 if (!ok)
@@ -303,6 +329,41 @@
             : string.IsNullOrEmpty(abbreviation) ? name
             : $"{name} 【{abbreviation}】";
 
+    /// <summary>从既有 ValidationRule 解析 precision；缺失/非法返回 null。</summary>
+    private static int? ExtractPrecision(System.Text.Json.JsonElement? rule)
+        => rule is { ValueKind: System.Text.Json.JsonValueKind.Object } obj
+            && obj.TryGetProperty("precision", out var p)
+            && p.TryGetInt32(out var n)
+            ? n : null;
+
+    /// <summary>
+    /// 合并 ValidationRule：保留既有规则键，仅写入/移除 precision。
+    /// 置空精度且原规则无其他键时返回 null（清空整个规则对象）。
+    /// </summary>
+    private static System.Text.Json.JsonElement? MergeValidationRule(
+        System.Text.Json.JsonElement? original, int? precision)
+    {
+        var hasPrecision = precision is int p && p >= 0;
+        if (original is not { ValueKind: System.Text.Json.JsonValueKind.Object } obj)
+        {
+            return hasPrecision
+                ? System.Text.Json.JsonSerializer.SerializeToElement(
+                    new { precision = precision })
+                : null;
+        }
+
+        var dict = new Dictionary<string, System.Text.Json.JsonElement>();
+        foreach (var prop in obj.EnumerateObject())
+            dict[prop.Name] = prop.Value.Clone();
+
+        if (hasPrecision)
+            dict["precision"] = System.Text.Json.JsonSerializer.SerializeToElement(precision);
+        else if (!dict.Remove("precision"))
+            return null;
+
+        return System.Text.Json.JsonSerializer.SerializeToElement(dict);
+    }
+
     /// <summary>string 版 diff（ID 字符串化后用）。</summary>
     private static (string? Value, bool Clear) Diff(string? current, string? original)
     {
@@ -325,5 +386,6 @@
         public bool IsSearchable { get; set; }
         public bool IsSortable { get; set; }
         public int DisplayOrder { get; set; }
+        public int? Precision { get; set; }  // decimal 精度 → ValidationRule.precision
     }
 }

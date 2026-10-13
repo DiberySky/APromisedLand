@@ -108,8 +108,7 @@
                        ValueChanged="OnPageSizeChanged"
                        Label="每页"
                        Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Size="Size.Small">
+                       Margin="Margin.Dense">
                 <MudSelectItem T="int" Value="10">10</MudSelectItem>
                 <MudSelectItem T="int" Value="20">20</MudSelectItem>
                 <MudSelectItem T="int" Value="50">50</MudSelectItem>
@@ -242,8 +241,7 @@
         var dialog = await DialogService.ShowAsync<EntityRowActionsDialog>(
             null, parameters, new DialogOptions { MaxWidth = MaxWidth.Small });
         var result = await dialog.Result;
-
-        if (result.Canceled) return;
+        if (result is null || result.Canceled) return;
         if (result.Data is not EntityRowAction action) return;
 
         switch (action)

@@ -81,8 +81,8 @@
     [Parameter] public required string Title { get; set; }
     [Parameter] public bool TitleDense { get; set; } = true;
 
-    /// <summary>操作区容器的最大宽度（仅影响 DialogActions 区域，不控制弹窗体宽度）。</summary>
-    [Parameter] public MaxWidth ActionsMaxWidth { get; set; } = MaxWidth.Small;
+    /// <summary>操作区容器的最大宽度（默认 False 铺满全宽，按钮靠右对齐）。</summary>
+    [Parameter] public MaxWidth ActionsMaxWidth { get; set; } = MaxWidth.False;
 
     [Parameter] public bool CancelButtonVisible { get; set; } = true;
     [Parameter] public bool SubmitButtonVisible { get; set; }

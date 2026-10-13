@@ -41,7 +41,7 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        _children = Node.Children?.Select(x => x.Value).ToList();
+        _children = Node.Children?.Select(x => x.Value!).ToList() ?? [];
     }
 
     private void Move(int currentIndex, int offset)

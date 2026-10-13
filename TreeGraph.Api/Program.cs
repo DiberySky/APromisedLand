@@ -51,6 +51,10 @@ builder.Services.AddScoped<CustomTableWriteService>();
 builder.Services.AddScoped<CustomTableReadService>();
 builder.Services.AddScoped<CustomTableQueryService>();
 
+// Edge（关系/边）
+builder.Services.AddScoped<EdgeMetadataService>();
+builder.Services.AddScoped<EdgeInstanceService>();
+
 // ★ TreeEavSky iNode 宿主守卫：节点关注类型 / 写入实体数据前校验 inodeId 是
 //   真实的 UnitTree/CategoryTree 节点，防止属性数据脱离宿主节点产生孤儿数据。
 builder.Services.AddScoped<IInodeOwnerGuard, UnitTreeInodeGuard>();

@@ -93,10 +93,7 @@ else
                         </MudChip>
                         <MudChip T="string" Size="Size.Small" Color="Color.Secondary"
                                  Class="ml-2">
-                            @type.EntityType
-                        </MudChip>
-                        <MudChip T="string" Size="Size.Small" Class="ml-2">
-                            v@type.Version
+                            @(GetEntityTypeLabel(type.EntityType))
                         </MudChip>
                         <MudChip T="string" Size="Size.Small" Color="Color.Warning"
                                  Class="ml-2">
@@ -141,7 +138,7 @@ else
                 <ChildContent>
                     @if (!type.IsDeleted)
                     {
-                        <div class="d-flex mb-3">
+                        <div class="d-flex mb-3 justify-end">
                             <MudButton Size="Size.Medium"
                                        Variant="Variant.Outlined"
                                        Color="Color.Primary"
@@ -294,7 +291,7 @@ else
     /// <summary>桌面端对话框选项：DialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
     private static readonly DialogOptions DialogOptions = new()
     {
-        MaxWidth = MaxWidth.Medium,
+        MaxWidth = MaxWidth.Small,
         FullWidth = true
     };
 
@@ -544,4 +541,9 @@ else
         "composite" => Color.Dark,
         _ => Color.Default
     };
+
+    /// <summary>实体类型显示名：Shared → 全局共享，其余原样返回。</summary>
+    private static string GetEntityTypeLabel(string entityType)
+        => string.Equals(entityType, "Shared", StringComparison.OrdinalIgnoreCase)
+            ? "全局共享" : entityType;
 }

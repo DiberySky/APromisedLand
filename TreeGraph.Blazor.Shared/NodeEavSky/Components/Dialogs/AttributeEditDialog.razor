@@ -6,6 +6,7 @@
            SubmitButtonVisible="true"
            SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
            SubmitButtonDisabled="@_submitting"
+           ActionsMaxWidth="MaxWidth.False"
            OnSubmitClick="UpdateAsync">
     <DialogContent>
         @if (Attribute is not null)
