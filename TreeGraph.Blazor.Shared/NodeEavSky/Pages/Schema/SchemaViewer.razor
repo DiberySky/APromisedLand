@@ -45,7 +45,7 @@
         <MudTd DataLabel="显示名">@context.DisplayName</MudTd>
         <MudTd DataLabel="类型">
             <MudChip T="string" Size="Size.Small" Color="Color.Info">
-                @context.DataType
+                @EavDataTypeLabels.GetLabel(context.DataType)
             </MudChip>
         </MudTd>
         <MudTd DataLabel="必填">
@@ -94,7 +94,7 @@
 </MudTable>
 
 @code {
-    private string _entityType = "Product";
+    private string _entityType = "";
     private IReadOnlyList<AttributeSchemaDto>? _schema;
     private bool _loading;
     private bool _loaded;

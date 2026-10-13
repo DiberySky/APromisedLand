@@ -1,11 +1,14 @@
 @* UnitNumberField.razor *@
 @* 带单位数值字段渲染器：数值可编辑，单位仅作只读展示（单位树节点，绑定在属性定义上）。
-   修正文档两处问题：数值变化需回传父组件；外部 LoadFrom 后需重新同步本地状态。 *@
+   编辑与只读均应用格式：int 固定 F0；decimal 按 ValidationRule.precision 用 F{n}。
+   输入值在提交时按精度实际舍入（AwayFromZero），保证真实值与显示一致、可通过服务端校验。 *@
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudNumericField T="decimal?" Label="@Attr.DisplayName"
                  Value="_value" ValueChanged="OnValueChanged"
                  Required="@Attr.IsRequired"
+                 ReadOnly="@ReadOnly"
+                 Format="@NumberFormat"
                  Variant="Variant.Outlined"
                  Adornment="Adornment.End"
                  AdornmentText="@Attr.UnitName"
@@ -15,6 +18,20 @@
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter] public NumericValueDto? Value { get; set; }
     [Parameter] public EventCallback<NumericValueDto?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>小数精度（ValidationRule.precision）；int 固定 0；未配置的 decimal 为 null。</summary>
+    private int? Precision
+        => Attr.DataType == EavDataTypes.Int ? 0
+        : Attr.DataType == EavDataTypes.Decimal
+            && Attr.ValidationRule is { } rule
+            && rule.TryGetProperty("precision", out var p)
+            && p.TryGetInt32(out var n)
+            && n is >= 0 and <= 10
+            ? n : null;
+
+    /// <summary>显示格式：int 固定 F0；decimal 有精度时 F{n}；否则不设。</summary>
+    private string? NumberFormat => Precision is int d ? $"F{d}" : null;
 
     private decimal? _value;
 
@@ -29,9 +46,15 @@
 
     private Task OnValueChanged(decimal? v)
     {
-        _value = v;
+        // 按精度实际舍入，保证提交值与失焦后的格式化显示一致
+        _value = ApplyPrecision(v);
         return NotifyAsync();
     }
+
+    private decimal? ApplyPrecision(decimal? v)
+        => v is { } d && Precision is { } digits
+            ? Math.Round(d, digits, MidpointRounding.AwayFromZero)
+            : v;
 
     // 始终回传 dto（单位固定为属性定义绑定的单位树节点）；Value 为 null 时 DynamicForm 提交 null
     private Task NotifyAsync()

@@ -1,0 +1,100 @@
+@* NodeAttributesDialog.razor — 独立节点属性管理对话框
+   与节点基础字段编辑解耦：管理本节点关注了哪些实体类型，并编辑各类型属性值。
+   节点（NodeId = iNode）是属性宿主：未关注的类型不显示。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@inject IDialogService DialogService
+
+<DialogSky Title="@_title"
+           SubmitButtonVisible="true"
+           CancelButtonVisible="true"
+           SubmitButtonText="保存属性"
+           OnSubmitClick="@SubmitAsync"
+           OnCanceledClick="@Close">
+    <ToolBarContent>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Info"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Settings"
+                   OnClick="@OpenAttributesManageAsync">
+            管理属性定义
+        </MudButton>
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
+            <NodeAttributeItemsSky @ref="_attrItems"
+                                   TItem="@TItem"
+                                   NodeId="@NodeId"
+                                   ReadOnly="false"
+                                   AllowManage="true" />
+        </MudContainer>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required string NodeId { get; set; }
+
+    private NodeAttributeItemsSky<TItem>? _attrItems;
+    private string _title = null!;
+
+    protected override void OnInitialized()
+    {
+        _title = $"节点属性 - {NodeId}";
+        base.OnInitialized();
+    }
+
+    /// <summary>保存各已关注类型的属性；任一失败则保留对话框。</summary>
+    private async Task SubmitAsync()
+    {
+        if (_attrItems is null)
+        {
+            MudDialog?.Close(DialogResult.Ok(true));
+            return;
+        }
+
+        var ok = await _attrItems.SubmitUpdateNodeAttributesAsync();
+        if (ok)
+            MudDialog?.Close(DialogResult.Ok(true));
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    /// <summary>打开元数据维护对话框（通用模式，不锁定实体类型）。</summary>
+    private async Task OpenAttributesManageAsync()
+    {
+        var parameters = new DialogParameters<AttributesManageDialog>
+        {
+            { x => x.OnAttributesChanged, EventCallback.Factory.Create(this, RefreshAttributesAsync) }
+        };
+
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+
+        var dialog = await DialogService.ShowExAsync<AttributesManageDialog>(
+            string.Empty, parameters, options);
+        await dialog.Result;
+
+        // 定义可能在多个类型上发生变更，关闭后整体刷新
+        await RefreshAttributesAsync();
+    }
+
+    /// <summary>属性定义/关注关系变更后重新加载属性区。</summary>
+    private async Task RefreshAttributesAsync()
+    {
+        if (_attrItems != null)
+        {
+            await _attrItems.ReloadAsync();
+        }
+    }
+}

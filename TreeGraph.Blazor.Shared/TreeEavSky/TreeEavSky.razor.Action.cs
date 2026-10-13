@@ -30,13 +30,28 @@ public partial class TreeEavSky<TItem>
     {
         if (nodeTemplate.Node.Value == null) return;
 
-        var parent = GetParentNode(nodeTemplate.Node.Value.ParentId!);
-        var isBoot = nodeTemplate.Node.Value!.Id == RootId;
+        // 对话框编排：查看/编辑/属性/排序等不改变树结构的动作执行完后，
+        // 重新打开宿主「节点操作」对话框，便于继续操作同一节点；
+        // 用户在宿主点取消（result == null）才结束。
+        // 新增子项/删除/移动会改变树结构或使当前节点失效，执行完直接退出。
+        while (true)
+        {
+            var parent = GetParentNode(nodeTemplate.Node.Value.ParentId!);
+            var isBoot = nodeTemplate.Node.Value!.Id == RootId;
 
-        var result = await NodeDialogSvc.ShowActionsDialogAsync(nodeTemplate, parent, isBoot);
-        if (result == null) return;
+            var result = await NodeDialogSvc.ShowActionsDialogAsync(nodeTemplate, parent, isBoot);
+            if (result == null) return;
 
-        await ExecuteNodeActionAsync(result.Action, nodeTemplate.Node);
+            await ExecuteNodeActionAsync(result.Action, nodeTemplate.Node);
+
+            if (result.Action is not (NodeAction.View
+                or NodeAction.Edit
+                or NodeAction.Attribute
+                or NodeAction.Sort))
+            {
+                return;
+            }
+        }
     }
 
     public async Task ExecuteNodeActionAsync(NodeAction action, ITreeItemData<TItem> node)
@@ -216,16 +231,24 @@ public partial class TreeEavSky<TItem>
     }
 
     /// <summary>
-    /// 节点属性：属性子系统（NodeAttributesDialog 等）未包含在本次精简移植范围内。
+    /// 节点属性：打开独立属性管理对话框（与节点基础字段编辑解耦），
+    /// 内部桥接 NodeEavSky 动态表单实现属性值的查看/编辑/定义管理。
     /// </summary>
-    private Task HandleAttributeAsync(ITreeItemData<TItem> node)
+    private async Task HandleAttributeAsync(ITreeItemData<TItem> node)
     {
-        Message.Info("节点属性模块未包含在 TreeEavSky 精简组件库中。");
-        return Task.CompletedTask;
+        if (node.Value == null) return;
+        await NodeDialogSvc.ShowNodeAttributesDialogAsync(node.Value!.Id);
     }
 
     private async Task HandleSortAsync(ITreeItemData<TItem> node)
     {
+        // 懒加载：节点未展开时 Children 为空，排序对话框依赖 Children 渲染，先确保已加载
+        if ((node.Children?.Count ?? 0) == 0)
+        {
+            var loaded = await LoadChildrenAsync(node.Value, _cts.Token);
+            node.Children = loaded.ToList();
+        }
+
         // 返回列表的顺序即用户拖拽后的新顺序（后端按列表位置重新编号 SortOrder）
         var sortResult = await NodeDialogSvc.ShowSortDialogAsync(node);
 

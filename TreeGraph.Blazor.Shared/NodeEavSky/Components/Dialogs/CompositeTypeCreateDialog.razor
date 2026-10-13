@@ -1,4 +1,5 @@
 @* CompositeTypeCreateDialog.razor — 新建组合类型（DialogSky 外壳，与树节点对话框风格一致） *@
+@using TreeGraph.Shared.NodeEavSky.Dtos
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
@@ -8,11 +9,40 @@
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="CreateAsync">
     <DialogContent>
-        <MudTextField @bind-Value="_newType.EntityType"
-                      Label="实体类型"
-                      HelperText="填 Shared 表示全局共享"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
+        <MudSelect T="string"
+                   Value="_newType.EntityType"
+                   ValueChanged="OnEntityTypeChanged"
+                   Label="实体类型"
+                   Variant="Variant.Outlined"
+                   Class="mb-2"
+                   Disabled="_isShared"
+                   HelperText="@(_isShared ? "已勾选全局共享，将归属 Shared" : "选择该组合类型归属的实体类型")"
+                   AnchorOrigin="Origin.BottomLeft"
+                   TransformOrigin="Origin.TopLeft">
+            @foreach (var et in _entityTypes)
+            {
+                <MudSelectItem T="string" Value="@et.EntityType">
+                    @(string.IsNullOrWhiteSpace(et.DisplayName) ? et.EntityType : $"{et.DisplayName}（{et.EntityType}）")
+                </MudSelectItem>
+            }
+        </MudSelect>
+
+        @if (!_isShared && _entityTypes.Count == 0)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true">
+                暂无实体类型，请先到「实体类型管理」创建，或直接勾选下方「全局共享」。
+            </MudAlert>
+        }
+
+        <MudCheckbox T="bool"
+                     Value="_isShared"
+                     ValueChanged="OnSharedChanged"
+                     Label="全局共享（Shared）"
+                     HelperText="勾选后所有实体类型均可引用该组合类型"
+                     Color="Color.Primary"
+                     Dense="true"
+                     Class="mb-3" />
+
         <MudTextField @bind-Value="_newType.TypeName"
                       Label="类型名 (PascalCase)"
                       Placeholder="Address"
@@ -29,7 +59,39 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     private CreateCompositeTypeRequest _newType = new() { EntityType = "Shared" };
+    private bool _isShared = true;
     private bool _submitting;
+    private IReadOnlyList<EntityTypeSummaryDto> _entityTypes = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _entityTypes = (await Api.ListEntityTypesAsync())
+                ?.Where(t => !string.Equals(t.EntityType, "Shared", StringComparison.OrdinalIgnoreCase))
+                .ToList() ?? [];
+        }
+        catch
+        {
+            _entityTypes = [];
+        }
+    }
+
+    private Task OnEntityTypeChanged(string? value)
+    {
+        _newType.EntityType = value ?? "";
+        return Task.CompletedTask;
+    }
+
+    private Task OnSharedChanged(bool shared)
+    {
+        _isShared = shared;
+        // 勾选：归属固定为全局共享；取消勾选：回落到第一个实体类型，等待用户选择
+        _newType.EntityType = shared
+            ? "Shared"
+            : (_entityTypes.FirstOrDefault()?.EntityType ?? "");
+        return Task.CompletedTask;
+    }
 
     private async Task CreateAsync()
     {

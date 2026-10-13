@@ -18,24 +18,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="TreeSky\TreeSky.razor.Action.cs">
-      <DependentUpon>TreeSky.razor</DependentUpon>
-    </Compile>
-    <Compile Update="TreeSky\TreeSky.razor.Loading.cs">
-      <DependentUpon>TreeSky.razor</DependentUpon>
-    </Compile>
-    <Compile Update="TreeSky\TreeSky.razor.Node.cs">
-      <DependentUpon>TreeSky.razor</DependentUpon>
-    </Compile>
-    <Compile Update="StringTreeSky\StringTreeSky.razor.Action.cs">
-      <DependentUpon>StringTreeSky.razor</DependentUpon>
-    </Compile>
-    <Compile Update="StringTreeSky\StringTreeSky.razor.Loading.cs">
-      <DependentUpon>StringTreeSky.razor</DependentUpon>
-    </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
   </ItemGroup>
 

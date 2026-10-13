@@ -8,14 +8,15 @@
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="CreateAsync">
     <DialogContent>
-        @* 实体类型（下拉） *@
+        @* 实体类型（下拉）；锁定模式下禁用，强制使用父级传入的实体类型 *@
         <MudSelect T="string"
                    Value="_createForm.EntityType"
                    ValueChanged="@(v => _createForm.EntityType = v)"
                    Label="实体类型"
                    Variant="Variant.Outlined"
                    Class="mb-3"
-                   HelperText="如需新类型，请先到「实体类型管理」创建">
+                   Disabled="@IsEntityTypeLocked"
+                   HelperText="@(IsEntityTypeLocked ? "当前已锁定实体类型" : "如需新类型，请先到「实体类型管理」创建")">
             @foreach (var et in EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
             {
                 <MudSelectItem T="string" Value="@et.EntityType">
@@ -27,7 +28,7 @@
         @* 显示名（必填，中文） *@
         <MudTextField @bind-Value="_createForm.DisplayName"
                       Label="显示名"
-                      Placeholder="屏幕尺寸"
+                      Placeholder="如：名称、长度、价格"
                       Variant="Variant.Outlined"
                       Class="mb-3"
                       HelperText="用户在界面上看到的名字" />
@@ -52,6 +53,18 @@
                            @bind-UnitName="_createForm.UnitName" />
         }
 
+        @* decimal：小数精度（ValidationRule.precision） *@
+        @if (_createForm.DataType == "decimal")
+        {
+            <MudNumericField T="int?"
+                             @bind-Value="_createForm.Precision"
+                             Label="小数精度（可选）"
+                             Min="0" Max="10" Step="1"
+                             Variant="Variant.Outlined"
+                             Class="mb-3"
+                             HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
+        }
+
         @* composite *@
         @if (_createForm.DataType == "composite")
         {
@@ -68,6 +81,12 @@
                     </MudSelectItem>
                 }
             </MudSelect>
+            @if (CompositeTypes is null || CompositeTypes.Count == 0)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                    暂无组合类型，请先到「组合类型」标签页创建后再使用。
+                </MudAlert>
+            }
         }
 
         @* table / record *@
@@ -86,6 +105,12 @@
                     </MudSelectItem>
                 }
             </MudSelect>
+            @if (CustomTables is null || CustomTables.Count == 0)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                    暂无自定义表，请先到「自定义表」标签页创建后再使用。
+                </MudAlert>
+            }
             @if (_createForm.DataType == "record")
             {
                 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
@@ -110,6 +135,12 @@
                     </MudSelectItem>
                 }
             </MudSelect>
+            @if (OptionSets is null || OptionSets.Count == 0)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                    暂无选项集，请先到「选项集」标签页创建后再使用。
+                </MudAlert>
+            }
         }
 
         <MudNumericField T="int"
@@ -146,7 +177,7 @@
                 </MudAlert>
                 <MudTextField @bind-Value="_createForm.AttributeName"
                               Label="内部标识（可选）"
-                              Placeholder="screen_size"
+                              Placeholder="如：name、length"
                               Variant="Variant.Outlined"
                               HelperText="留空自动生成；填了则：字母开头，只含字母/数字/下划线"
                               Immediate="true" />
@@ -160,6 +191,8 @@
 
     /// <summary>初始实体类型（页面当前选中项）。</summary>
     [Parameter] public string? EntityType { get; set; }
+    /// <summary>是否锁定实体类型（锁定时禁止切换，强制使用 EntityType）。</summary>
+    [Parameter] public bool IsEntityTypeLocked { get; set; }
     /// <summary>新建模式下的初始显示顺序（现有属性数 + 1）。</summary>
     [Parameter] public int InitialDisplayOrder { get; set; }
     [Parameter] public IReadOnlyList<EntityTypeSummaryDto>? EntityTypes { get; set; }
@@ -180,6 +213,7 @@
         ("date",     "日期"),
         ("time",     "时间"),
         ("single_choice", "单选"),
+        ("location", "位置"),
         ("file",     "文件"),
         ("composite", "组合类型"),
         ("table",    "自定义表"),
@@ -206,9 +240,12 @@
     {
         _createForm.DataType = dt;
         if (dt is not ("decimal" or "int")) { _createForm.UnitId = null; _createForm.UnitName = null; }
+        if (dt != "decimal") _createForm.Precision = null;
         if (dt != "composite") _createForm.RefCompositeTypeId = null;
         if (dt is not ("table" or "record")) _createForm.RefTableDefinitionId = null;
         if (dt != "single_choice") _createForm.RefOptionSetId = null;
+        // 位置（经纬度坐标）不参与文本筛选/搜索
+        _createForm.IsSearchable = dt != "location";
     }
 
     private async Task CreateAsync()
@@ -222,12 +259,12 @@
         }
         if (f.DataType == "composite" && f.RefCompositeTypeId is null)
         {
-            Snackbar.Add("组合类型必须选择引用的类型", Severity.Warning);
+            Snackbar.Add("请先选择组合类型；如无可用类型，请先到「组合类型」标签页创建", Severity.Warning);
             return;
         }
         if (f.DataType is "table" or "record" && f.RefTableDefinitionId is null)
         {
-            Snackbar.Add("自定义表/记录必须选择引用的表", Severity.Warning);
+            Snackbar.Add("请先选择自定义表；如无可用表，请先到「自定义表」标签页创建", Severity.Warning);
             return;
         }
         // record：前端预校验所选表前两列类型（后端仍会校验）
@@ -251,7 +288,7 @@
         }
         if (f.DataType == "single_choice" && f.RefOptionSetId is null)
         {
-            Snackbar.Add("单选类型必须选择选项集", Severity.Warning);
+            Snackbar.Add("请先选择选项集；如无可用选项集，请先到「选项集」标签页创建", Severity.Warning);
             return;
         }
 
@@ -286,6 +323,10 @@
                 IsSortable = f.IsSortable,
                 DisplayOrder = f.DisplayOrder,
                 UnitId = f.UnitId,
+                // decimal 精度 → ValidationRule.precision
+                ValidationRule = f.Precision is int p
+                    ? System.Text.Json.JsonSerializer.SerializeToElement(new { precision = p })
+                    : null,
                 RefCompositeTypeId = f.RefCompositeTypeId,
                 RefTableDefinitionId = f.RefTableDefinitionId,
                 RefOptionSetId = f.RefOptionSetId
@@ -318,6 +359,8 @@
         public int DisplayOrder { get; set; }
         public string? UnitId { get; set; }
         public string? UnitName { get; set; }
+        /// <summary>decimal 小数精度（0–10，null 不限制）→ ValidationRule.precision</summary>
+        public int? Precision { get; set; }
         public string? RefCompositeTypeId { get; set; }
         public string? RefTableDefinitionId { get; set; }
         public string? RefOptionSetId { get; set; }

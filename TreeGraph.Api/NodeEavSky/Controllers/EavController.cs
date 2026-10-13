@@ -494,6 +494,7 @@ public class EavController : ControllerBase
             EavDataTypes.Json => JsonDocument.Parse(elem.GetRawText()),
             EavDataTypes.File => JsonDocument.Parse(elem.GetRawText()),
             EavDataTypes.Composite => JsonToComposite(elem, def),
+            EavDataTypes.Location => EavRequestBodyConverter.ParseLocation(elem),
             _ => elem.GetString()
         };
     }

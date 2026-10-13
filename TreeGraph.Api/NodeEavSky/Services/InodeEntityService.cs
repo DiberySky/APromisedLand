@@ -51,10 +51,14 @@ public interface IInodeEntityService
 public class InodeEntityService : IInodeEntityService
 {
     private readonly TreeGraphDbContext _db;
+    private readonly InodeOwnerGuardRegistry _ownerGuards;
 
-    public InodeEntityService(TreeGraphDbContext db)
+    public InodeEntityService(
+        TreeGraphDbContext db,
+        InodeOwnerGuardRegistry ownerGuards)
     {
         _db = db;
+        _ownerGuards = ownerGuards;
     }
 
     // ============================================================
@@ -81,6 +85,9 @@ public class InodeEntityService : IInodeEntityService
         // 1. 查现有映射
         var existing = await GetEntityIdAsync(inodeId, entityType, ct);
         if (existing is not null) return existing;
+
+        // 1.5 宿主存在性：inodeId 必须是真实节点（树节点守卫等）
+        await _ownerGuards.EnsureNodeExistsAsync(inodeId, ct);
 
         // 2. 类型存在性（查 entity_type_catalog）
         if (!await TypeExistsAsync(entityType, ct))
@@ -174,6 +181,9 @@ public class InodeEntityService : IInodeEntityService
         var exists = await _db.InodeEntityTypes
             .AnyAsync(x => x.InodeId == inodeId && x.EntityType == entityType, ct);
         if (exists) return;
+
+        // 宿主存在性：只有真实节点才能关注实体类型
+        await _ownerGuards.EnsureNodeExistsAsync(inodeId, ct);
 
         // 类型存在性（查 entity_type_catalog）
         if (!await TypeExistsAsync(entityType, ct))

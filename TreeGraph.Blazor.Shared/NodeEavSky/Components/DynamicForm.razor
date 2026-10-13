@@ -6,7 +6,7 @@
    json/file/composite/table 等复杂类型暂不编辑，提交时跳过以避免误清空。
    值存于内部字典 _values，保存时由 BuildSubmitValues 转换为 PUT 提交格式。 *@
 
-<MudForm @ref="_form" Disabled="@ReadOnly">
+<MudForm @ref="_form">
     <MudGrid>
         @foreach (var attr in SortedAttributes)
         {
@@ -15,6 +15,7 @@
                 {
                     case EavDataTypes.String:
                         <StringField Attr="attr"
+                                     ReadOnly="@ReadOnly"
                                      Value="@GetString(attr.AttributeName)"
                                      ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
@@ -24,12 +25,14 @@
                         if (!string.IsNullOrEmpty(attr.UnitId))
                         {
                             <UnitNumberField Attr="attr"
+                                             ReadOnly="@ReadOnly"
                                              Value="GetNumeric(attr.AttributeName)"
                                              ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         }
                         else
                         {
                             <NumberField Attr="attr"
+                                         ReadOnly="@ReadOnly"
                                          Value="GetDecimal(attr.AttributeName)"
                                          ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         }
@@ -37,36 +40,49 @@
 
                     case EavDataTypes.Bool:
                         <BoolField Attr="attr"
+                                   ReadOnly="@ReadOnly"
                                    Value="GetBool(attr.AttributeName)"
                                    ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
                     case EavDataTypes.Date:
                         <DateField Attr="attr"
+                                   ReadOnly="@ReadOnly"
                                    Value="GetDateTime(attr.AttributeName)"
                                    ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
                     case EavDataTypes.Datetime:
                         <DateTimeField Attr="attr"
+                                       ReadOnly="@ReadOnly"
                                        Value="GetDateTime(attr.AttributeName)"
                                        ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
                     case EavDataTypes.Time:
                         <TimeField Attr="attr"
+                                   ReadOnly="@ReadOnly"
                                    Value="GetTime(attr.AttributeName)"
                                    ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
                     case EavDataTypes.SingleChoice:
                         <SingleChoiceField Attr="attr"
+                                           ReadOnly="@ReadOnly"
                                            Value="@GetString(attr.AttributeName)"
                                            ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
+                    case EavDataTypes.Location:
+                        <LocationField Attr="attr"
+                                       ReadOnly="@ReadOnly"
+                                       Value="GetLocation(attr.AttributeName)"
+                                       ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        break;
+
                     case EavDataTypes.Composite:
                         <CompositeField Attr="attr"
+                                        ReadOnly="@ReadOnly"
                                         Value="GetJson(attr.AttributeName)"
                                         ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
@@ -85,6 +101,7 @@
 
                     case EavDataTypes.File:
                         <FileField Attr="attr"
+                                   ReadOnly="@ReadOnly"
                                    Value="GetJson(attr.AttributeName)"
                                    ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
@@ -92,13 +109,14 @@
                     case EavDataTypes.Json:
                         @* json：StringField 兜底，原文本编辑 *@
                         <StringField Attr="attr"
+                                     ReadOnly="@ReadOnly"
                                      Value="@GetJsonText(attr.AttributeName)"
                                      ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
                     default:
                         <MudAlert Severity="Severity.Info">
-                            @attr.DisplayName：类型 @attr.DataType 暂不支持在表单中编辑（保存时不会提交此字段）
+                            @attr.DisplayName：类型 @EavDataTypeLabels.GetLabel(attr.DataType) 暂不支持在表单中编辑（保存时不会提交此字段）
                         </MudAlert>
                         break;
                 }
@@ -131,7 +149,7 @@
     /// <summary>紧凑布局：为 true 时所有 MudItem 固定 xs="12"（供窄面板/对话框内复用）。</summary>
     [Parameter] public bool CompactLayout { get; set; }
 
-    /// <summary>只读模式：禁用所有输入控件并隐藏保存按钮。</summary>
+    /// <summary>只读模式：字段以只读样式呈现（正常配色、不可编辑）并隐藏保存按钮。</summary>
     [Parameter] public bool ReadOnly { get; set; }
 
     private MudForm _form = null!;
@@ -172,6 +190,12 @@
     private JsonElement? GetJson(string key)
         => _values.TryGetValue(key, out var v) && v is JsonElement je ? je : null;
 
+    // location：位置坐标对象（手动编辑后为 EavLocationValue；初次加载由 ConvertElement 写入）
+    private TreeGraph.Shared.NodeEavSky.Dtos.EavLocationValue? GetLocation(string key)
+        => _values.TryGetValue(key, out var v)
+            ? v as TreeGraph.Shared.NodeEavSky.Dtos.EavLocationValue
+            : null;
+
     // json 类型：以原文本编辑（StringField 兜底）
     private string? GetJsonText(string key)
         => _values.TryGetValue(key, out var v) ? v?.ToString() : null;
@@ -189,6 +213,9 @@
         finally
         {
             _submitting = false;
+            // 显式触发重渲染：嵌套 EventCallback 链（对话框提交 → section → 本表单）
+            // 中，最后一次渲染可能丢失，导致按钮停留在"保存中"
+            StateHasChanged();
         }
     }
 
@@ -219,9 +246,31 @@
                 : elem.ValueKind == JsonValueKind.String ? elem.GetString() : null,
             // composite/file：保留原始 JSON（克隆避免节点归属冲突），由对应组件自行解析
             EavDataTypes.Composite or EavDataTypes.File => elem.Clone(),
+            EavDataTypes.Location => ConvertLocation(elem),
             // json：以原文本编辑，提交时再尝试解析回 JSON
             EavDataTypes.Json => elem.GetRawText(),
             _ => null
+        };
+    }
+
+    /// <summary>位置：把后端返回的 { latitude, longitude, label?, address?, coordinateSystem? } 转为 EavLocationValue。</summary>
+    private static TreeGraph.Shared.NodeEavSky.Dtos.EavLocationValue? ConvertLocation(JsonElement elem)
+    {
+        if (elem.ValueKind != JsonValueKind.Object) return null;
+        if (!elem.TryGetProperty("latitude", out var la) || la.ValueKind != JsonValueKind.Number) return null;
+        if (!elem.TryGetProperty("longitude", out var lo) || lo.ValueKind != JsonValueKind.Number) return null;
+
+        return new TreeGraph.Shared.NodeEavSky.Dtos.EavLocationValue
+        {
+            Latitude = la.GetDouble(),
+            Longitude = lo.GetDouble(),
+            Label = elem.TryGetProperty("label", out var lb) && lb.ValueKind == JsonValueKind.String
+                ? lb.GetString() : null,
+            Address = elem.TryGetProperty("address", out var ad) && ad.ValueKind == JsonValueKind.String
+                ? ad.GetString() : null,
+            CoordinateSystem = elem.TryGetProperty("coordinateSystem", out var cs)
+                && cs.ValueKind == JsonValueKind.String
+                ? cs.GetString() ?? "gcj02" : "gcj02"
         };
     }
 

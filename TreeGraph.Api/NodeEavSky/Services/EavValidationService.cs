@@ -70,6 +70,10 @@ public class EavValidationService
             return new ValidationResult(errors.Count == 0, errors);
         }
 
+        // 位置类型：结构 + 经纬度范围校验（GCJ-02 坐标）
+        if (def.DataType == EavDataTypes.Location)
+            return ValidateLocation(def, value);
+
         // 类型转换
         if (!TryConvert(def.DataType, value, out var converted))
         {
@@ -127,7 +131,37 @@ public class EavValidationService
         return new ValidationResult(errors.Count == 0, errors);
     }
 
-    /// <summary>解包数量值：支持 NumericValue 与裸数值（单位仅作记录，不参与校验）</summary>
+    /// <summary>
+    /// 位置值校验：必须为 EavLocationValue，纬度 [-90,90]、经度 [-180,180]，
+    /// 坐标系当前只接受 gcj02。地点名 / 地址做长度约束。
+    /// </summary>
+    private ValidationResult ValidateLocation(AttributeDefinition def, object? value)
+    {
+        var errors = new List<ValidationError>();
+
+        if (value is not EavLocationValue loc)
+        {
+            errors.Add(new(def.AttributeName, "位置值格式错误，应包含纬度 latitude 与经度 longitude"));
+            return new ValidationResult(false, errors);
+        }
+
+        if (loc.Latitude < -90 || loc.Latitude > 90)
+            errors.Add(new(def.AttributeName, $"纬度必须在 -90 到 90 之间，收到 {loc.Latitude}"));
+        if (loc.Longitude < -180 || loc.Longitude > 180)
+            errors.Add(new(def.AttributeName, $"经度必须在 -180 到 180 之间，收到 {loc.Longitude}"));
+
+        if (!string.Equals(loc.CoordinateSystem, "gcj02", StringComparison.OrdinalIgnoreCase))
+            errors.Add(new(def.AttributeName, $"当前仅支持 GCJ-02（火星坐标），收到 {loc.CoordinateSystem}"));
+
+        if (loc.Label is { Length: > 200 })
+            errors.Add(new(def.AttributeName, "地点名称不能超过 200 个字符"));
+        if (loc.Address is { Length: > 500 })
+            errors.Add(new(def.AttributeName, "地址不能超过 500 个字符"));
+
+        return new ValidationResult(errors.Count == 0, errors);
+    }
+
+
     private static (decimal? Value, string? UnitId) UnwrapNumeric(object value)
     {
         return value switch
@@ -160,6 +194,14 @@ public class EavValidationService
                 CultureInfo.InvariantCulture, out var maxVal)
             && value > maxVal)
             errors.Add(new(def.AttributeName, $"不能大于 {maxVal}"));
+
+        // 小数精度（ValidationRule.precision）：仅对 decimal 生效，约束小数位上限
+        if (def.DataType == EavDataTypes.Decimal
+            && rule.TryGetProperty("precision", out var prec)
+            && prec.TryGetInt32(out var p)
+            && p >= 0
+            && value != decimal.Round(value, p))
+            errors.Add(new(def.AttributeName, $"小数位不能超过 {p} 位"));
     }
 
     public bool TryConvert(string dataType, object value, out object? converted)

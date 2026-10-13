@@ -157,7 +157,7 @@ else
                 <MudTd>
                     <MudChip T="string" Size="Size.Small"
                              Color="@GetDataTypeColor(context.DataType)">
-                        @context.DataType
+                        @EavDataTypeLabels.GetLabel(context.DataType)
                     </MudChip>
                 </MudTd>
                 <MudTd>
@@ -361,6 +361,7 @@ else
 
         var options = new DialogOptionsEx
         {
+            Position = DialogPosition.TopCenter,
             MaxWidth = MaxWidth.Large,
             FullWidth = true,
             MaximizeButton = true

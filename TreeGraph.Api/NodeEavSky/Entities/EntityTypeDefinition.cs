@@ -7,8 +7,8 @@ namespace TreeGraph.Api.NodeEavSky.Entities;
 public class EntityTypeDefinition
 {
     public string EntityTypeId { get; set; } = "";
-    public string EntityType { get; set; } = "";         // "Product"
-    public string DisplayName { get; set; } = "";        // "商品"
+    public string EntityType { get; set; } = "";         // "UnitTree"
+    public string DisplayName { get; set; } = "";        // "单位树"
     public string? Description { get; set; }             // 说明
     public int DisplayOrder { get; set; }
     public bool IsDeleted { get; set; }

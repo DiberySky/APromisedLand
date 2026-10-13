@@ -31,7 +31,7 @@ public class InodeQueryController : ControllerBase
     /// 请求体：
     /// {
     ///   "inodeId": "可选",
-    ///   "entityType": "Product",      // 类型名
+    ///   "entityType": "UnitTree",     // 类型名
     ///   "filters": [...],
     ///   "orderByAttribute": "可选",
     ///   "orderDescending": false,

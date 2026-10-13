@@ -12,17 +12,27 @@
 
 @if (_meta is null && !_isUploading)
 {
-    <div class="d-flex align-center gap-2 mb-2">
-        <label class="mud-button-root mud-button mud-button-filled mud-button-filled-size-medium
-                     mud-button-filled-primary mud-button-filled">
-            <InputFile OnChange="OnFileSelected" accept="*/*" class="d-none" />
-            <span class="mud-button-label">@($"上传{Attr.DisplayName}")</span>
-        </label>
-        @if (Attr.IsRequired)
-        {
-            <MudText Typo="Typo.caption" Color="Color.Error">必填</MudText>
-        }
-    </div>
+    @if (ReadOnly)
+    {
+        @* 只读模式：无文件仅展示占位提示，不显示上传按钮 *@
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+            @Attr.DisplayName：暂无文件
+        </MudText>
+    }
+    else
+    {
+        <div class="d-flex align-center gap-2 mb-2">
+            <label class="mud-button-root mud-button mud-button-filled mud-button-filled-size-medium
+                         mud-button-filled-primary mud-button-filled">
+                <InputFile OnChange="OnFileSelected" accept="*/*" class="d-none" />
+                <span class="mud-button-label">@($"上传{Attr.DisplayName}")</span>
+            </label>
+            @if (Attr.IsRequired)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error">必填</MudText>
+            }
+        </div>
+    }
 }
 else if (_isUploading)
 {
@@ -50,9 +60,12 @@ else
             <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Download"
                        OnClick="OnDownloadAsync">下载</MudButton>
-            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error"
-                       StartIcon="@Icons.Material.Filled.Delete"
-                       OnClick="OnDeleteAsync">删除</MudButton>
+            @if (!ReadOnly)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.Delete"
+                           OnClick="OnDeleteAsync">删除</MudButton>
+            }
         </div>
     </MudPaper>
 }
@@ -65,6 +78,8 @@ else
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter] public JsonElement? Value { get; set; }
     [Parameter] public EventCallback<JsonElement?> ValueChanged { get; set; }
+    /// <summary>只读模式：隐藏上传/删除，仅保留下载。</summary>
+    [Parameter] public bool ReadOnly { get; set; }
 
     private FileMeta? _meta;
     private bool _isUploading;

@@ -13,15 +13,19 @@
     <MudPaper Class="pa-2 mb-2" Elevation="0" Outlined="true">
         <div class="d-flex align-center mb-1">
             <MudText Typo="Typo.caption">#@(idx + 1)</MudText>
-            <MudSpacer />
-            <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                           Size="Size.Medium" Color="Color.Error"
-                           OnClick="@(() => RemoveAt(idx))" />
+            @if (!ReadOnly)
+            {
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Medium" Color="Color.Error"
+                               OnClick="@(() => RemoveAt(idx))" />
+            }
         </div>
 
         @if (Field.DataType == EavDataTypes.Composite && Field.NestedType is not null)
         {
             <CompositeField Attr="MakeChildAttr(Field)"
+                            ReadOnly="@ReadOnly"
                             Value="item"
                             ValueChanged="v => UpdateAt(idx, v)" />
         }
@@ -31,23 +35,28 @@
                           Value="@(item?.ToString())"
                           ValueChanged="@(v => UpdateAt(idx, v is null ? null
                               : JsonSerializer.SerializeToElement(v)))"
+                          ReadOnly="@ReadOnly"
                           Variant="Variant.Outlined"
                           Margin="Margin.Dense" />
         }
     </MudPaper>
 }
 
-<MudButton Size="Size.Medium" Variant="Variant.Outlined"
-           Color="Color.Primary"
-           StartIcon="@Icons.Material.Filled.Add"
-           OnClick="AddNew">
-    添加一项
-</MudButton>
+@if (!ReadOnly)
+{
+    <MudButton Size="Size.Medium" Variant="Variant.Outlined"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="AddNew">
+        添加一项
+    </MudButton>
+}
 
 @code {
     [Parameter, EditorRequired] public CompositeFieldSchemaDto Field { get; set; } = null!;
     [Parameter] public List<JsonElement?> Values { get; set; } = new();
     [Parameter] public EventCallback<List<JsonElement?>> ValuesChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
 
     private Task AddNew()
     {

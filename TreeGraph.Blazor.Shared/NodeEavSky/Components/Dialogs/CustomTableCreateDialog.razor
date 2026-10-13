@@ -10,7 +10,7 @@
     <DialogContent>
         <MudTextField @bind-Value="_newTable.EntityType"
                       Label="实体类型"
-                      Placeholder="Product"
+                      Placeholder="例如：UnitTree"
                       Variant="Variant.Outlined"
                       Class="mb-3" />
         <MudTextField @bind-Value="_newTable.TableName"
@@ -33,7 +33,7 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    private CreateCustomTableRequest _newTable = new() { EntityType = "Product" };
+    private CreateCustomTableRequest _newTable = new() { EntityType = "" };
     private bool _submitting;
 
     private async Task CreateAsync()

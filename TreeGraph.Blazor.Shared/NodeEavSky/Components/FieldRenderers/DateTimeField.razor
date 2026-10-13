@@ -1,5 +1,6 @@
 @* DateTimeField.razor *@
-@* 日期时间字段渲染器（按文档 6.x 同模式实现）：日期 + 时间组合为 DateTime *@
+@* 日期时间字段渲染器（按文档 6.x 同模式实现）：日期 + 时间组合为 DateTime。
+   空值（新建或已存数据该字段为空）默认填入当前日期时间；用户手动清空后不再自动填。 *@
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudGrid>
@@ -7,12 +8,16 @@
         <MudDatePicker Label="@Attr.DisplayName"
                        Date="_date" DateChanged="OnDateChanged"
                        Required="@Attr.IsRequired"
+                       ReadOnly="@ReadOnly"
+                       Clearable="!ReadOnly && !Attr.IsRequired"
                        Variant="Variant.Outlined"
                        PickerVariant="@(Platform.IsMobile ? PickerVariant.Dialog : PickerVariant.Inline)" />
     </MudItem>
     <MudItem xs="12" sm="6">
         <MudTimePicker Label="时间"
                        Time="_time" TimeChanged="OnTimeChanged"
+                       ReadOnly="@ReadOnly"
+                       Clearable="!ReadOnly && !Attr.IsRequired"
                        Variant="Variant.Outlined"
                        PickerVariant="@(Platform.IsMobile ? PickerVariant.Dialog : PickerVariant.Inline)" />
     </MudItem>
@@ -22,23 +27,43 @@
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter] public DateTime? Value { get; set; }
     [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
 
     private DateTime? _date;
     private TimeSpan? _time;
 
+    // 用户是否手动清空过：清空后不再自动填默认值；外部加载到非空值时重置
+    private bool _userCleared;
+
     protected override void OnParametersSet()
     {
-        // 外部值变化时拆分同步；本地编辑回传值与本地组合一致，不会触发覆盖
-        if (Value != Combine(_date, _time))
+        var combined = Combine(_date, _time);
+        // 仅当变化来自外部（加载/重置）时同步；本地编辑回传与组合值相等，不干预
+        if (Value != combined)
         {
             _date = Value?.Date;
             _time = Value?.TimeOfDay;
+            _userCleared = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // 空值且非只读、用户未手动清空：默认填入当前日期时间（本地时区）
+        if (!ReadOnly && Value is null && !_userCleared)
+        {
+            var now = DateTime.Now;
+            _date = now.Date;
+            _time = now.TimeOfDay;
+            await NotifyAsync();
         }
     }
 
     private Task OnDateChanged(DateTime? d)
     {
         _date = d;
+        // 日期清空即视为整个日期时间被用户清空，不再自动补默认
+        if (d is null) _userCleared = true;
         return NotifyAsync();
     }
 

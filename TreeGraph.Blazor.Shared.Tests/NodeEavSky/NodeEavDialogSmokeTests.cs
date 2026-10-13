@@ -255,6 +255,20 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             { x => x.OptionSets, new[] { OptionSet() } },
         }), "编辑属性");
 
+    // ─── LocationPick ───
+
+    [Fact]
+    public async Task LocationPickDialog_Renders()
+        => AssertDialog(await OpenAsync<LocationPickDialog>(), "地图选点");
+
+    [Fact]
+    public async Task LocationPickDialog_WithCoords_Renders()
+        => AssertDialog(await OpenAsync<LocationPickDialog>(new DialogParameters<LocationPickDialog>
+        {
+            { x => x.Latitude, 30.67 },
+            { x => x.Longitude, 104.06 },
+        }), "地图选点");
+
     /// <summary>返回 200 OK 的桩 HttpClient（渲染阶段不发请求，仅为满足 DI）。</summary>
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {

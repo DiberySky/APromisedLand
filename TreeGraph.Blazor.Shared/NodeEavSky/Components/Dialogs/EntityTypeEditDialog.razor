@@ -20,12 +20,23 @@
 
         <MudTextField @bind-Value="_form.DisplayName"
                       Label="实体类型名称"
-                      Placeholder="商品"
+                      Placeholder="请输入中文名称"
                       Variant="Variant.Outlined"
                       Class="mb-3"
                       HelperText="@(Editing is null
-                          ? "例如：商品、订单、客户"
-                          : "创建后名称不可修改")" />
+                          ? "界面上显示的名称，例如：分类树、单位树、订单"
+                          : "实体类型在界面上显示的名称")" />
+
+        @* 内部标识（仅新建时可填，用于与树类型名等外部系统对齐） *@
+        @if (Editing is null)
+        {
+            <MudTextField @bind-Value="_form.EntityType"
+                          Label="内部标识（可选）"
+                          Placeholder="普通使用请留空"
+                          Variant="Variant.Outlined"
+                          Class="mb-3"
+                          HelperText="系统内部使用的英文标识。一般留空即可（自动生成 et_xxx）；仅当要在树节点上挂此类型属性时才需填写：分类树填 CategoryTree，单位树填 UnitTree。" />
+        }
 
         <MudTextField @bind-Value="_form.Description"
                       Label="说明（可选）"
@@ -76,9 +87,11 @@
         {
             if (Editing is null)
             {
-                // 新建：不传 EntityType，服务端自动生成 et_xxxx
+                // 新建：EntityType 为空时服务端自动生成 et_xxxx，否则使用用户指定值
                 var id = await Api.CreateEntityTypeAsync(new CreateEntityTypeRequest
                 {
+                    EntityType = string.IsNullOrWhiteSpace(_form.EntityType)
+                        ? null : _form.EntityType.Trim(),
                     DisplayName = _form.DisplayName.Trim(),
                     Description = string.IsNullOrWhiteSpace(_form.Description)
                         ? null : _form.Description,
@@ -125,6 +138,7 @@
     private class FormModel
     {
         public string DisplayName { get; set; } = "";
+        public string EntityType { get; set; } = "";
         public string Description { get; set; } = "";
         public int DisplayOrder { get; set; }
     }

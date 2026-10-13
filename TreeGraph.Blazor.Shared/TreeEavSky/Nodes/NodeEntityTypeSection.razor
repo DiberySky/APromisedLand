@@ -1,0 +1,172 @@
+@* NodeEntityTypeSection.razor
+   节点已关注的单个实体类型属性区块。
+   读写走 iNode 实体端点 /api/inode/{inodeId}/entities/{entityType}，
+   EntityId 由服务端首次保存时生成并映射，组件不关心其具体值。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+
+@inject EavApiClient EavApi
+@inject MessageService Message
+
+<MudPaper Elevation="0" Outlined="true" Class="mb-3 pa-3">
+    <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.Category"
+                 Color="@(_hasEntity ? Color.Success : Color.Default)"
+                 Size="Size.Small" />
+        <MudText Typo="Typo.subtitle2">@(string.IsNullOrWhiteSpace(DisplayName) ? EntityType : DisplayName)</MudText>
+        <MudChip T="string" Size="Size.Small"
+                 Color="@(_hasEntity ? Color.Success : Color.Warning)">
+            @(_hasEntity ? "已填写" : "未填写")
+        </MudChip>
+        <MudSpacer />
+        @if (AllowDetach)
+        {
+            <MudTooltip Text="取消关注（该类型已有数据时需先清空）">
+                <MudIconButton Icon="@Icons.Material.Filled.LinkOff"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               Disabled="_hasEntity"
+                               OnClick="@(() => OnDetachRequested.InvokeAsync())" />
+            </MudTooltip>
+        }
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_schema is null || _schema.Count == 0)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            该实体类型暂无属性定义，可通过「管理属性定义」创建。
+        </MudText>
+    }
+    else
+    {
+        <DynamicForm @ref="_form"
+                     EntityType="@EntityType"
+                     EntityId="@(_entity?.EntityId ?? "")"
+                     Schema="@_schema"
+                     CompactLayout="true"
+                     ReadOnly="@ReadOnly"
+                     OnSubmit="HandleSubmitAsync" />
+    }
+</MudPaper>
+
+@code {
+    /// <summary>宿主节点 ID（iNode Id）。</summary>
+    [Parameter, EditorRequired] public string InodeId { get; set; } = default!;
+
+    /// <summary>本区块对应的实体类型名。</summary>
+    [Parameter, EditorRequired] public string EntityType { get; set; } = default!;
+
+    /// <summary>实体类型显示名。</summary>
+    [Parameter] public string? DisplayName { get; set; }
+
+    /// <summary>只读模式（节点操作对话框用）。</summary>
+    [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>是否允许取消关注（仅属性管理对话框开启）。</summary>
+    [Parameter] public bool AllowDetach { get; set; }
+
+    /// <summary>请求取消关注（由父组件弹确认框并调 API）。</summary>
+    [Parameter] public EventCallback OnDetachRequested { get; set; }
+
+    private DynamicForm? _form;
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private DynamicEntityDto? _entity;
+    private DateTimeOffset? _updatedAt;
+    private bool _loading;
+    private bool _hasEntity;
+    private bool _lastSubmitOk = true;
+
+    // 已取到实体值、等待表单渲染完成后灌入（@ref 要到渲染后才可用）
+    private bool _pendingLoad;
+
+    protected override async Task OnInitializedAsync()
+        => await ReloadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // DynamicForm 的 @ref 在本次渲染后才可用；ReloadAsync 中直接调用时
+        // _form 尚为 null（首帧在显示进度条），灌值会被静默跳过导致表单空白。
+        if (_pendingLoad && _form is not null)
+        {
+            _pendingLoad = false;
+            _form.LoadFrom(_entity!.Properties);
+        }
+
+        await Task.CompletedTask;
+    }
+
+    /// <summary>重新加载本类型的 Schema 与实体值。</summary>
+    public async Task ReloadAsync()
+    {
+        try
+        {
+            _loading = true;
+
+            var schemaTask = EavApi.GetSchemaAsync(EntityType);
+            var entityTask = EavApi.GetInodeEntityAsync(InodeId, EntityType);
+            await Task.WhenAll(schemaTask, entityTask);
+
+            _schema = schemaTask.Result ?? [];
+            _entity = entityTask.Result;
+            _hasEntity = _entity is not null;
+            _updatedAt = _entity?.UpdatedAt;
+            _pendingLoad = _entity is not null && _schema.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            Message.Details("加载属性失败", ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// 提交本类型的属性值。返回 false 表示表单校验失败或保存失败，
+    /// 调用方应停止后续流程并保留对话框。
+    /// </summary>
+    public async Task<bool> SubmitAsync()
+    {
+        if (_form is null || _schema is null || _schema.Count == 0)
+            return true;
+
+        // 先置 false：DynamicForm 校验不通过时不会触发 OnSubmit，自然保持 false
+        _lastSubmitOk = false;
+        await _form.SubmitAsync();
+        return _lastSubmitOk;
+    }
+
+    private async Task HandleSubmitAsync(Dictionary<string, object?> values)
+    {
+        try
+        {
+            var (ok, error, current) = await EavApi.SaveInodeEntityAsync(
+                InodeId, EntityType, values, _updatedAt);
+
+            if (ok)
+            {
+                _lastSubmitOk = true;
+                Message.Success($"【{DisplayName ?? EntityType}】属性已保存");
+                // 重新加载：首次保存后拿到真实 EntityId / UpdatedAt
+                await ReloadAsync();
+            }
+            else
+            {
+                _updatedAt = current;
+                Message.Details("属性保存失败", error ?? "未知错误");
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Details("属性保存失败", ex.Message);
+        }
+    }
+}

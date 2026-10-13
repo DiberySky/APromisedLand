@@ -37,6 +37,21 @@ public class MainActivity : MauiAppCompatActivity
 
         Window!.SetSoftInputMode(Android.Views.SoftInput.AdjustResize);
 
+        // 定位运行时权限（危险权限，Android 6+ 必须运行时申请）：
+        // 位置字段「获取当前位置」/ 地图选点初始中心 / 导航起点依赖 WebView 定位，
+        // WebView 侧授权由 GeolocationWebChromeClient 按 App 权限放行。
+        if (CheckSelfPermission(Android.Manifest.Permission.AccessFineLocation!)
+                != Permission.Granted)
+        {
+            RequestPermissions(
+                new[]
+                {
+                    Android.Manifest.Permission.AccessFineLocation!,
+                    Android.Manifest.Permission.AccessCoarseLocation!
+                },
+                requestCode: 1001);
+        }
+
         // 物理返回键：当前 MAUI 版本默认直接 moveTaskToBack，不会自动走 BlazorWebView 的
         // 浏览器历史。经 OnBackPressedDispatcher 挂一个回调（API33+ 非过时路径），
         // 先问 JS 栈（wwwroot/js/platform-back.js）：

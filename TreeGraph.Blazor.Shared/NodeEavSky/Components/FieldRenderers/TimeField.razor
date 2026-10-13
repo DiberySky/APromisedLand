@@ -1,10 +1,13 @@
 @* TimeField.razor *@
-@* 时间字段渲染器（按文档 6.x 同模式实现） *@
+@* 时间字段渲染器（按文档 6.x 同模式实现）。
+   空值（新建或已存数据该字段为空）默认填入当前时间；用户手动清空后不再自动填。 *@
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudTimePicker Label="@Attr.DisplayName"
-               Time="Value" TimeChanged="ValueChanged"
+               Time="Value" TimeChanged="OnChanged"
                Required="@Attr.IsRequired"
+               ReadOnly="@ReadOnly"
+               Clearable="!ReadOnly && !Attr.IsRequired"
                Variant="Variant.Outlined"
                PickerVariant="@(Platform.IsMobile ? PickerVariant.Dialog : PickerVariant.Inline)" />
 
@@ -12,4 +15,28 @@
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter] public TimeSpan? Value { get; set; }
     [Parameter] public EventCallback<TimeSpan?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    // 用户是否手动清空过：清空后不再自动填默认值；外部加载到非空值时重置
+    private bool _userCleared;
+
+    protected override void OnParametersSet()
+    {
+        if (Value is not null) _userCleared = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // 空值且非只读、用户未手动清空：默认填入当前时间（本地时区）
+        if (!ReadOnly && Value is null && !_userCleared)
+        {
+            await ValueChanged.InvokeAsync(DateTime.Now.TimeOfDay);
+        }
+    }
+
+    private Task OnChanged(TimeSpan? t)
+    {
+        if (t is null) _userCleared = true;
+        return ValueChanged.InvokeAsync(t);
+    }
 }

@@ -1,7 +1,8 @@
-@* AttributesManageDialog.razor
-   属性定义管理对话框：以 DialogSky 外壳包裹 Attributes 组件，
-   与编辑节点对话框保持一致的视觉风格（绿色标题栏、文字按钮）。
-   传入 EntityType 时锁定该类型；不传时为通用模式，可在对话框内切换实体类型。 *@
+@* AttributesManageDialog.razor — NodeEavSky 全量元数据维护入口（二级弹窗）
+   一级弹窗：本对话框以 DialogSky 外壳承载 5 个维护标签页；
+   二级弹窗：各列表内"新建/编辑/详情"操作通过 DialogService 打开子对话框，
+            全部子对话框均使用 DialogSky，与本对话框视觉风格一致。
+   传入 EntityType 时锁定该类型（仅属性定义页生效）；不传时为通用模式。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 
 @using TreeGraph.Blazor.Shared.Common
@@ -13,8 +14,24 @@
            CancelButtonText="关闭"
            OnCanceledClick="@Close">
     <DialogContent>
-        <Attributes EntityType="@EntityType"
-                    OnAttributesChanged="@OnAttributesChanged" />
+        <MudTabs Elevation="0" Rounded="true" Outlined="true">
+            <MudTabPanel Text="属性定义" Icon="@Icons.Material.Filled.EditAttributes">
+                <Attributes EntityType="@EntityType"
+                            OnAttributesChanged="@OnAttributesChanged" />
+            </MudTabPanel>
+            <MudTabPanel Text="实体类型" Icon="@Icons.Material.Filled.Category">
+                <EntityTypes IsDialogMode="true" />
+            </MudTabPanel>
+            <MudTabPanel Text="组合类型" Icon="@Icons.Material.Filled.ViewModule">
+                <CompositeTypes IsDialogMode="true" />
+            </MudTabPanel>
+            <MudTabPanel Text="自定义表" Icon="@Icons.Material.Filled.TableChart">
+                <CustomTables IsDialogMode="true" />
+            </MudTabPanel>
+            <MudTabPanel Text="选项集" Icon="@Icons.Material.Filled.FormatListBulleted">
+                <OptionSets IsDialogMode="true" />
+            </MudTabPanel>
+        </MudTabs>
     </DialogContent>
 </DialogSky>
 
@@ -28,8 +45,8 @@
     [Parameter] public EventCallback OnAttributesChanged { get; set; }
 
     private string _title => string.IsNullOrEmpty(EntityType)
-        ? "属性定义管理"
-        : $"属性定义管理 · {EntityType}";
+        ? "元数据维护"
+        : $"元数据维护 · {EntityType}";
 
     private void Close()
     {

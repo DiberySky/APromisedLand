@@ -1,0 +1,171 @@
+@* LocationPickDialog.razor — 地图选点：Leaflet + 高德瓦片（GCJ-02），点击取点 *@
+@* 宿主需引用 _content/TreeGraph.Blazor.Shared/js/locationPicker.js（Leaflet 走 CDN，需联网） *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject EavApiClient Api
+
+<DialogSky Title="地图选点（GCJ-02 坐标）"
+           ActionsMaxWidth="MaxWidth.False"
+           SubmitButtonVisible="true"
+           SubmitButtonText="确定"
+           SubmitButtonDisabled="!_hasPicked"
+           OnSubmitClick="Confirm">
+    <DialogContent>
+        @if (_loadError)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">
+                地图组件加载失败，请检查网络后重试（Leaflet 从 CDN 加载）。
+            </MudAlert>
+        }
+        else
+        {
+            <div id="@_mapId" style="height: 62vh; min-height: 320px; width: 100%; border-radius: 4px;"></div>
+
+            <MudText Typo="Typo.body2" Class="mt-2">
+                @if (_hasPicked)
+                {
+                    <span>已选：纬度 @_lat?.ToString("0.######")　经度 @_lng?.ToString("0.######")</span>
+                }
+                else
+                {
+                    <span style="color: var(--mud-palette-text-secondary);">点击地图任意位置放置标记</span>
+                }
+            </MudText>
+
+            @if (_geocoding)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">正在获取地名地址…</MudText>
+            }
+            else if (!string.IsNullOrWhiteSpace(_geoLabel) || !string.IsNullOrWhiteSpace(_geoAddress))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @(_geoLabel is null ? "" : $"📍 {_geoLabel}　")@_geoAddress
+                </MudText>
+            }
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>已有坐标（编辑回填）：提供时地图初始定位到该点并放置标记。</summary>
+    [Parameter] public double? Latitude { get; set; }
+    [Parameter] public double? Longitude { get; set; }
+
+    private readonly string _mapId = "location-pick-" + Guid.NewGuid().ToString("N");
+    private double? _lat;
+    private double? _lng;
+    private bool _hasPicked;
+    private bool _loadError;
+    private bool _geocoding;
+    private string? _geoLabel;
+    private string? _geoAddress;
+    private DotNetObjectReference<LocationPickDialog>? _ref;
+
+    protected override void OnParametersSet()
+    {
+        _lat = Latitude;
+        _lng = Longitude;
+        _hasPicked = Latitude is not null && Longitude is not null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _ref = DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("treegraphMapPicker.init",
+                _mapId, _lat ?? 0, _lng ?? 0, _hasPicked, _ref);
+        }
+        catch (JSException)
+        {
+            // 宿主未引用 locationPicker.js 或 CDN 加载失败
+            _loadError = true;
+            StateHasChanged();
+            return;
+        }
+
+        // 无已有坐标：尝试用浏览器定位作为初始视野中心（失败则保持全国视图）
+        if (!_hasPicked)
+        {
+            try
+            {
+                var geo = await JS.InvokeAsync<GeoResult>("treegraphGeo.getCurrentPosition");
+                if (geo is { Error: null, Latitude: not null, Longitude: not null })
+                {
+                    var (lat, lng) = Gcj02Converter.Wgs84ToGcj02(
+                        geo.Latitude.Value, geo.Longitude.Value);
+                    await JS.InvokeVoidAsync("treegraphMapPicker.setView", _mapId, lat, lng, 15);
+                }
+            }
+            catch (JSException)
+            {
+                // 定位组件不可用，忽略
+            }
+        }
+    }
+
+    /// <summary>JS 定位返回（geolocation.js）。</summary>
+    private sealed class GeoResult
+    {
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public string? Error { get; set; }
+    }
+
+    /// <summary>地图点击回调（JS → .NET）。GCJ-02 坐标直接可用，随后逆地理编码取地名地址。</summary>
+    [JSInvokable]
+    public async Task OnMapClicked(double latitude, double longitude)
+    {
+        _lat = Math.Round(latitude, 6);
+        _lng = Math.Round(longitude, 6);
+        _hasPicked = true;
+        _geoLabel = null;
+        _geoAddress = null;
+        _geocoding = true;
+        StateHasChanged();
+
+        try
+        {
+            var regeo = await Api.ReverseGeocodeAsync(_lat.Value, _lng.Value);
+            _geoLabel = regeo?.Label;
+            _geoAddress = regeo?.Address;
+        }
+        catch (Exception)
+        {
+            // 逆地理编码失败（未配 Key / 网络问题）：静默降级，仅保留坐标
+        }
+        finally
+        {
+            _geocoding = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Confirm()
+    {
+        if (!_hasPicked) return;
+        MudDialog.Close(DialogResult.Ok(
+            new LocationPickResult(_lat!.Value, _lng!.Value, _geoLabel, _geoAddress)));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("treegraphMapPicker.dispose", _mapId);
+        }
+        catch (Exception)
+        {
+            // 组件卸载时 JS 可能已不可用（如页面跳转），忽略
+        }
+        _ref?.Dispose();
+    }
+
+    /// <summary>地图选点结果（Label/Address 来自逆地理编码，可能为 null）。</summary>
+    public sealed record LocationPickResult(
+        double Latitude, double Longitude,
+        string? Label = null, string? Address = null);
+}

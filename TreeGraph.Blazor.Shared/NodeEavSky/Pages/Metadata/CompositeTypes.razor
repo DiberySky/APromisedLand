@@ -191,7 +191,7 @@ else
                                 <MudTd DataLabel="类型">
                                     <MudChip T="string" Size="Size.Small"
                                              Color="@GetDataTypeColor(context.DataType)">
-                                        @context.DataType
+                                        @EavDataTypeLabels.GetLabel(context.DataType)
                                     </MudChip>
                                 </MudTd>
                                 <MudTd DataLabel="引用">

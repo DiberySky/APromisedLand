@@ -1,6 +1,9 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
+#if ANDROID
+using Microsoft.AspNetCore.Components.WebView.Maui;
+#endif
 using TreeGraph.Blazor.Maui;
 using TreeGraph.Blazor.Maui.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
@@ -26,6 +29,16 @@ public static class MauiProgram
         builder.AddServiceDefaults();
         
         builder.Services.AddMauiBlazorWebView();
+
+#if ANDROID
+        // 替换 BlazorWebView 默认 WebChromeClient：支持 navigator.geolocation（定位授权）
+        // 并保留文件选择（InputFile）能力
+        builder.ConfigureMauiHandlers(handlers =>
+        {
+            handlers.AddHandler<IBlazorWebView, CustomBlazorWebViewHandler>();
+        });
+#endif
+
         builder.Services.AddMudServices();
 
         // 用 MAUI 实现覆盖 Web 平台检测（TryAdd 语义）

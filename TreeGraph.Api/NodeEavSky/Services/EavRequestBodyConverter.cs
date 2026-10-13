@@ -71,7 +71,36 @@ public static class EavRequestBodyConverter
             EavDataTypes.Json => JsonDocument.Parse(elem.GetRawText()),
             EavDataTypes.File => JsonDocument.Parse(elem.GetRawText()),
             EavDataTypes.Composite => ParseComposite(elem, def, compositeService),
+            EavDataTypes.Location => ParseLocation(elem),
             _ => elem.GetString()
+        };
+    }
+
+    public static EavLocationValue ParseLocation(JsonElement elem)
+    {
+        if (elem.ValueKind != JsonValueKind.Object)
+            throw new ArgumentException("位置（location）值必须是对象 { latitude, longitude, label?, address? }");
+
+        if (!elem.TryGetProperty("latitude", out var latEl)
+            || !elem.TryGetProperty("longitude", out var lngEl)
+            || latEl.ValueKind != JsonValueKind.Number
+            || lngEl.ValueKind != JsonValueKind.Number)
+        {
+            throw new ArgumentException("位置值必须包含数值型 latitude（纬度）与 longitude（经度）");
+        }
+
+        return new EavLocationValue
+        {
+            Latitude = latEl.GetDouble(),
+            Longitude = lngEl.GetDouble(),
+            Label = elem.TryGetProperty("label", out var lb) && lb.ValueKind == JsonValueKind.String
+                ? lb.GetString() : null,
+            Address = elem.TryGetProperty("address", out var ad) && ad.ValueKind == JsonValueKind.String
+                ? ad.GetString() : null,
+            CoordinateSystem = elem.TryGetProperty("coordinateSystem", out var cs)
+                && cs.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(cs.GetString())
+                    ? cs.GetString()! : "gcj02"
         };
     }
 

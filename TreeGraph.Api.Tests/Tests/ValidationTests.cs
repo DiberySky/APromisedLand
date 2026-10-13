@@ -56,14 +56,67 @@ public class ValidationTests : IntegrationTestBase
     [Fact]
     public async Task Put_TableAttribute_Returns400WithGuidance()
     {
-        // 依赖 EavSeeder 的 Product.certifications 属性
+        await TestData.EnsureSchemaAsync(Client);
+
+        // 先查询已有 custom table，避免重复创建（响应被 ApiEnvelope 包装）
+        var listHttpResp = await Client.GetAsync(
+            $"/api/eav/metadata/custom-tables?entityType={TestData.EntityType}");
+        listHttpResp.EnsureSuccessStatusCode();
+        var listJson = await listHttpResp.Content.ReadAsStringAsync();
+        using var listDoc = JsonDocument.Parse(listJson);
+        var listData = listDoc.RootElement.GetProperty("data");
+        string? tableId = null;
+        if (listData.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var t in listData.EnumerateArray())
+            {
+                if (t.GetProperty("tableName").GetString() == "certifications")
+                {
+                    tableId = t.GetProperty("tableDefinitionId").GetString();
+                    break;
+                }
+            }
+        }
+
+        if (tableId is null)
+        {
+            var tableResp = await Client.PostAsJsonAsync("/api/eav/metadata/custom-tables", new
+            {
+                entityType = TestData.EntityType,
+                tableName = "certifications",
+                displayName = "认证资质",
+                displayOrder = 1
+            });
+            tableResp.EnsureSuccessStatusCode();
+            var tableJson = await tableResp.Content.ReadAsStringAsync();
+            using var tableDoc = JsonDocument.Parse(tableJson);
+            tableId = tableDoc.RootElement.GetProperty("data")
+                .GetProperty("tableDefinitionId").GetString()!;
+        }
+
+        var attrResp = await Client.PostAsJsonAsync("/api/eav/metadata/attributes", new
+        {
+            entityType = TestData.EntityType,
+            attributeName = "certifications",
+            displayName = "认证资质",
+            dataType = "table",
+            isRequired = false,
+            isSearchable = false,
+            isSortable = false,
+            displayOrder = 1,
+            refTableDefinitionId = tableId
+        });
+        // 409 = 已存在，视为成功
+        if (attrResp.StatusCode != HttpStatusCode.Conflict)
+            attrResp.EnsureSuccessStatusCode();
+
         var payload = new Dictionary<string, object?>
         {
             ["certifications"] = Array.Empty<object>()
         };
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/Product/entities/{GuidFromInt(92001)}", payload);
+            $"/api/eav/{TestData.EntityType}/entities/{GuidFromInt(92001)}", payload);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();

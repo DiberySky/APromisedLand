@@ -12,7 +12,7 @@
         {
             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
                 @Attribute.EntityType / @Attribute.AttributeName
-                （类型: @Attribute.DataType，不可修改）
+                （类型: @EavDataTypeLabels.GetLabel(Attribute.DataType)，不可修改）
             </MudText>
         }
 
@@ -28,6 +28,18 @@
             <MudAlert Severity="Severity.Warning" Class="mb-3">
                 修改单位不会自动转换已有数据。如需变更，请先规划数据迁移。
             </MudAlert>
+        }
+
+        @* decimal：小数精度（ValidationRule.precision） *@
+        @if (Attribute?.DataType == "decimal")
+        {
+            <MudNumericField T="int?"
+                             @bind-Value="_editForm.Precision"
+                             Label="小数精度（可选）"
+                             Min="0" Max="10" Step="1"
+                             Variant="Variant.Outlined"
+                             Class="mb-3"
+                             HelperText="显示与保存的小数位上限（0–10），留空不限制" />
         }
 
         @if (Attribute?.DataType == "composite")
@@ -137,7 +149,9 @@
                 UnitName = FormatUnitName(Attribute.UnitName, Attribute.UnitAbbreviation),
                 RefCompositeTypeId = Attribute.RefCompositeTypeId,
                 RefTableDefinitionId = Attribute.RefTableDefinitionId,
-                RefOptionSetId = Attribute.RefOptionSetId
+                RefOptionSetId = Attribute.RefOptionSetId,
+                // 从既有 ValidationRule 解析 decimal 精度
+                Precision = ExtractPrecision(Attribute.ValidationRule)
             };
         }
     }
@@ -170,6 +184,9 @@
         }
         var (optId, clearOpt) = Diff(_editForm.RefOptionSetId, Attribute.RefOptionSetId);
 
+        // 合并 ValidationRule：保留既有规则键，仅增删 precision（避免覆盖其他规则）
+        var rule = MergeValidationRule(Attribute.ValidationRule, _editForm.Precision);
+
         _submitting = true;
         try
         {
@@ -182,6 +199,7 @@
                     IsSearchable = _editForm.IsSearchable,
                     IsSortable = _editForm.IsSortable,
                     DisplayOrder = _editForm.DisplayOrder,
+                    ValidationRule = rule,
 
                     UnitId = unitId,
                     ClearUnitId = clearUnit,
@@ -218,6 +236,41 @@
         return (null, false);
     }
 
+    /// <summary>从既有 ValidationRule 解析 precision；缺失/非法返回 null。</summary>
+    private static int? ExtractPrecision(System.Text.Json.JsonElement? rule)
+        => rule is { ValueKind: System.Text.Json.JsonValueKind.Object } obj
+            && obj.TryGetProperty("precision", out var p)
+            && p.TryGetInt32(out var n)
+            ? n : null;
+
+    /// <summary>
+    /// 合并 ValidationRule：保留既有规则键，仅写入/移除 precision。
+    /// 置空精度且原规则无其他键时返回 null（清空整个规则对象）。
+    /// </summary>
+    private static System.Text.Json.JsonElement? MergeValidationRule(
+        System.Text.Json.JsonElement? original, int? precision)
+    {
+        var hasPrecision = precision is int p && p >= 0;
+        if (original is not { ValueKind: System.Text.Json.JsonValueKind.Object } obj)
+        {
+            return hasPrecision
+                ? System.Text.Json.JsonSerializer.SerializeToElement(
+                    new { precision = precision })
+                : null;
+        }
+
+        var dict = new Dictionary<string, System.Text.Json.JsonElement>();
+        foreach (var prop in obj.EnumerateObject())
+            dict[prop.Name] = prop.Value.Clone();
+
+        if (hasPrecision)
+            dict["precision"] = System.Text.Json.JsonSerializer.SerializeToElement(precision);
+        else if (!dict.Remove("precision"))
+            return null; // 原本就没有 precision，也无新增 → 不发送规则
+
+        return System.Text.Json.JsonSerializer.SerializeToElement(dict);
+    }
+
     private static string? FormatUnitName(string? name, string? abbreviation)
         => name is null ? null
             : string.IsNullOrEmpty(abbreviation) ? name
@@ -232,6 +285,8 @@
         public int DisplayOrder { get; set; }
         public string? UnitId { get; set; }
         public string? UnitName { get; set; }
+        /// <summary>decimal 小数精度（0–10，null 不限制）→ ValidationRule.precision</summary>
+        public int? Precision { get; set; }
         public string? RefCompositeTypeId { get; set; }
         public string? RefTableDefinitionId { get; set; }
         public string? RefOptionSetId { get; set; }

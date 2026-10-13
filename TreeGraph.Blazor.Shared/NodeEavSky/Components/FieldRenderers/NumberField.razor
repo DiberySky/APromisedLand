@@ -1,10 +1,14 @@
 @* NumberField.razor *@
-@* 数值字段渲染器（文档 6.2），int / decimal（无单位）共用 *@
+@* 数值字段渲染器（文档 6.2），int / decimal（无单位）共用。
+   编辑与只读均应用格式：int 固定 F0；decimal 按 ValidationRule.precision 用 F{n}。
+   输入值在提交时按精度实际舍入（AwayFromZero），保证真实值与显示一致、可通过服务端校验。 *@
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudNumericField T="decimal?" Label="@Attr.DisplayName"
-                 Value="Value" ValueChanged="ValueChanged"
+                 Value="_value" ValueChanged="OnValueChanged"
                  Required="@Attr.IsRequired"
+                 ReadOnly="@ReadOnly"
+                 Format="@NumberFormat"
                  Variant="Variant.Outlined"
                  InputMode="@(Platform.IsMobile ? InputMode.numeric : InputMode.none)" />
 
@@ -12,4 +16,39 @@
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter] public decimal? Value { get; set; }
     [Parameter] public EventCallback<decimal?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private decimal? _value;
+
+    /// <summary>小数精度（ValidationRule.precision）；int 固定 0；未配置的 decimal 为 null。</summary>
+    private int? Precision
+        => Attr.DataType == EavDataTypes.Int ? 0
+        : Attr.DataType == EavDataTypes.Decimal
+            && Attr.ValidationRule is { } rule
+            && rule.TryGetProperty("precision", out var p)
+            && p.TryGetInt32(out var n)
+            && n is >= 0 and <= 10
+            ? n : null;
+
+    /// <summary>显示格式：int 固定 F0；decimal 有精度时 F{n}；否则不设。</summary>
+    private string? NumberFormat => Precision is int d ? $"F{d}" : null;
+
+    protected override void OnParametersSet()
+    {
+        // 仅当外部值与本地状态不一致时才同步（本地编辑回传的值与本地一致，不会触发覆盖）
+        if (Value != _value)
+            _value = Value;
+    }
+
+    private Task OnValueChanged(decimal? v)
+    {
+        // 按精度实际舍入，保证提交值与失焦后的格式化显示一致
+        _value = ApplyPrecision(v);
+        return ValueChanged.InvokeAsync(_value);
+    }
+
+    private decimal? ApplyPrecision(decimal? v)
+        => v is { } d && Precision is { } digits
+            ? Math.Round(d, digits, MidpointRounding.AwayFromZero)
+            : v;
 }

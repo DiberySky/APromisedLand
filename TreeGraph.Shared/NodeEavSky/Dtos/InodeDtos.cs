@@ -6,7 +6,7 @@ namespace TreeGraph.Shared.NodeEavSky.Dtos;
 /// iNode 下的类型卡片（UI 展示用）。
 /// </summary>
 public record InodeTypeCardDto(
-    string EntityType,                    // 类型名，如 "Product"
+    string EntityType,                    // 类型名，如 "UnitTree"
     string DisplayName,                   // 中文显示名
     string? EntityTypeId,                 // 对应 entity_type_catalog 的 ID（可空）
     string? Description,
@@ -33,7 +33,7 @@ public class InodeQueryRequest
     /// <summary>可选：限定 iNode。null = 跨所有 iNode 查询。</summary>
     public string? InodeId { get; set; }
 
-    /// <summary>必填：实体类型名（如 "Product"）。</summary>
+    /// <summary>必填：实体类型名（如 "UnitTree"）。</summary>
     public string EntityType { get; set; } = "";
 
     public List<AttributeFilter> Filters { get; set; } = new();

@@ -104,6 +104,10 @@ public class InodeController : ControllerBase
         {
             return BadRequest(new { error = ex.Message });
         }
+        catch (EavValidationException ex)
+        {
+            return BadRequest(new { errors = ex.Errors });
+        }
     }
 
     [HttpDelete("types/{entityType}")]

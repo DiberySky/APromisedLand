@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.NodeEavSky;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.Services;
 
@@ -35,17 +36,35 @@ public class EavReadService
             .AsNoTracking()
             .ToListAsync(ct);
 
+        var locRows = await _db.LocationAttributeValues
+            .Where(l => l.EntityType == entityType && l.EntityId == entityId)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
         var result = new DynamicEntity(entityId, entityType);
 
-        // ★ #3：填充 UpdatedAt（供乐观锁使用）
-        if (rows.Count > 0)
-            result.UpdatedAt = rows.Max(r => r.UpdatedAt);
+        // ★ #3：填充 UpdatedAt（供乐观锁使用），需合并类型化值表与位置表
+        var valuesMax = rows.Count > 0 ? rows.Max(r => r.UpdatedAt) : (DateTimeOffset?)null;
+        var locMax = locRows.Count > 0 ? locRows.Max(r => r.UpdatedAt) : (DateTimeOffset?)null;
+        result.UpdatedAt = valuesMax is null
+            ? locMax
+            : locMax is null ? valuesMax
+            : valuesMax > locMax ? valuesMax : locMax;
 
         foreach (var row in rows)
         {
             if (!defMap.TryGetValue(row.AttributeId, out var def)) continue;
             var value = ExtractTypedValue(row, def);
             result.SetProperty(def.AttributeName, value);
+        }
+
+        foreach (var loc in locRows)
+        {
+            if (defMap.TryGetValue(loc.AttributeId, out var def)
+                && def.DataType == EavDataTypes.Location)
+            {
+                result.SetProperty(def.AttributeName, ToLocationValue(loc));
+            }
         }
 
         return result;
@@ -64,7 +83,14 @@ public class EavReadService
             .AsNoTracking()
             .ToListAsync(ct);
 
+        var allLocRows = await _db.LocationAttributeValues
+            .Where(l => l.EntityType == entityType && ids.Contains(l.EntityId))
+            .AsNoTracking()
+            .ToListAsync(ct);
+
         var grouped = allRows.GroupBy(r => r.EntityId);
+        var locGrouped = allLocRows.GroupBy(l => l.EntityId)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         // ★ 保持输入 ids 的顺序——FilterEntityIdsAsync 已按业务键排好序，
         //   GroupBy 的输出顺序由 DB 行序决定，必须显式按输入序重排。
@@ -72,23 +98,56 @@ public class EavReadService
             .Select((id, idx) => (id, idx))
             .ToDictionary(x => x.id, x => x.idx);
 
-        return grouped.Select(g =>
+        // 普通值表与位置表出现过的实体并集（实体可能仅有位置坐标）
+        var allEntityIds = grouped.Select(g => g.Key)
+            .Union(locGrouped.Keys)
+            .ToList();
+
+        return allEntityIds.Select(entityId =>
         {
-            var entity = new DynamicEntity(g.Key, entityType);
-            entity.UpdatedAt = g.Max(r => r.UpdatedAt);  // ★
-            foreach (var row in g)
+            var entity = new DynamicEntity(entityId, entityType);
+
+            DateTimeOffset? maxUpdated = null;
+
+            if (grouped.FirstOrDefault(g => g.Key == entityId) is { } gv)
             {
-                if (defMap.TryGetValue(row.AttributeId, out var def))
+                maxUpdated = gv.Max(r => r.UpdatedAt);
+                foreach (var row in gv)
                 {
-                    entity.SetProperty(def.AttributeName,
-                        ExtractTypedValue(row, def));
+                    if (defMap.TryGetValue(row.AttributeId, out var def))
+                        entity.SetProperty(def.AttributeName, ExtractTypedValue(row, def));
                 }
             }
+
+            if (locGrouped.TryGetValue(entityId, out var locs))
+            {
+                var locMax = locs.Max(l => l.UpdatedAt);
+                maxUpdated = maxUpdated is null || locMax > maxUpdated ? locMax : maxUpdated;
+                foreach (var loc in locs)
+                {
+                    if (defMap.TryGetValue(loc.AttributeId, out var def)
+                        && def.DataType == EavDataTypes.Location)
+                    {
+                        entity.SetProperty(def.AttributeName, ToLocationValue(loc));
+                    }
+                }
+            }
+
+            entity.UpdatedAt = maxUpdated;
             return entity;
         })
         .OrderBy(e => inputOrder.GetValueOrDefault(e.EntityId, int.MaxValue))
         .ToList();
     }
+
+    private static EavLocationValue ToLocationValue(LocationAttributeValue l) => new()
+    {
+        Latitude = l.Latitude,
+        Longitude = l.Longitude,
+        Label = l.Label,
+        Address = l.Address,
+        CoordinateSystem = l.CoordinateSystem
+    };
 
     private object? ExtractTypedValue(AttributeValue row, AttributeDefinition def)
     {

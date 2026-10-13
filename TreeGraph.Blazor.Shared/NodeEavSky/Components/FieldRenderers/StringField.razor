@@ -4,6 +4,9 @@
 <MudTextField T="string" Label="@Attr.DisplayName"
               Value="Value" ValueChanged="ValueChanged"
               Required="@Attr.IsRequired"
+              ReadOnly="@ReadOnly"
+              Clearable="!ReadOnly"
+              ClearIcon="@Icons.Material.Filled.Close"
               Variant="Variant.Outlined"
               HelperText="@Attr.DisplayName" />
 
@@ -11,4 +14,5 @@
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
 }

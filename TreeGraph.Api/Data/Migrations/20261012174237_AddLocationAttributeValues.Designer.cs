@@ -13,8 +13,8 @@ using TreeGraph.Api.Data;
 namespace TreeGraph.Api.Data.Migrations
 {
     [DbContext(typeof(TreeGraphDbContext))]
-    [Migration("20261011193836_Initial")]
-    partial class Initial
+    [Migration("20261012174237_AddLocationAttributeValues")]
+    partial class AddLocationAttributeValues
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -844,6 +844,85 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("ix_inode_et_inode");
 
                     b.ToTable("inode_entitytype", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.LocationAttributeValue", b =>
+                {
+                    b.Property<string>("ValueId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("value_id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("AttributeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("attribute_id");
+
+                    b.Property<string>("CoordinateSystem")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("gcj02")
+                        .HasColumnName("coordinate_system");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("label");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitude");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitude");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("ValueId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .HasDatabaseName("ix_lav_entity");
+
+                    b.HasIndex("EntityId", "EntityType", "AttributeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_lav_entity_attr");
+
+                    b.HasIndex("EntityType", "EntityId", "UpdatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_lav_entity_updated");
+
+                    b.ToTable("location_attribute_values", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>
@@ -2106,6 +2185,17 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Navigation("Attribute");
 
                     b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.LocationAttributeValue", b =>
+                {
+                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
+                        .WithMany()
+                        .HasForeignKey("AttributeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Attribute");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.OptionItem", b =>

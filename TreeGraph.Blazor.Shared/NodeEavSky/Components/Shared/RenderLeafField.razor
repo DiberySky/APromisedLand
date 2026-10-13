@@ -82,11 +82,21 @@ else if (Field.DataType == "decimal")
 }
 else if (Field.DataType == "bool")
 {
-    <MudSwitch T="bool"
+    <MudSelect T="bool?"
                Label="@Field.DisplayName"
-               Value="@(Value is bool b && b)"
-               ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-               Color="Color.Primary" />
+               Value="@(Value is bool b2 ? b2 : (bool?)null)"
+               ValueChanged="@(v => ValueChanged.InvokeAsync(v ?? false))"
+               Variant="Variant.Outlined"
+               Required="@Field.IsRequired"
+               Error="@hasError"
+               ErrorText="@errorText"
+               AnchorOrigin="Origin.BottomRight"
+               TransformOrigin="Origin.TopRight"
+               Clearable="!Field.IsRequired"
+               FullWidth="true">
+        <MudSelectItem T="bool?" Value="true">是</MudSelectItem>
+        <MudSelectItem T="bool?" Value="false">否</MudSelectItem>
+    </MudSelect>
 }
 else if (Field.DataType == "datetime")
 {

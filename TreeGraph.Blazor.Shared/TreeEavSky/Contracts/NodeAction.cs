@@ -16,6 +16,6 @@ public enum NodeAction
     Move,
     /// <summary>排序节点</summary>
     Sort,
-    /// <summary>属性</summary>
+    /// <summary>属性（独立属性管理对话框，与基础字段编辑解耦）</summary>
     Attribute
 }

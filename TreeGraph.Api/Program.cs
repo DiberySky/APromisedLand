@@ -3,6 +3,7 @@ using TreeGraph.Api.Data;
 using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Api.TreeEavSky.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +33,8 @@ builder.AddNpgsqlDbContext<TreeGraphDbContext>("TreeGraphDb");
 builder.Services.AddMemoryCache();
 // 实体归属守卫聚合器（具体 guard 由各业务模块注册；无守卫时安全放行）
 builder.Services.AddScoped<EntityOwnerGuardRegistry>();
+// iNode 宿主守卫聚合器：inode 写链路（关注类型/首次写实体）校验宿主节点存在
+builder.Services.AddScoped<InodeOwnerGuardRegistry>();
 builder.Services.AddScoped<EavWriteService>();
 builder.Services.AddScoped<EavReadService>();
 builder.Services.AddScoped<EavQueryService>();
@@ -47,6 +50,11 @@ builder.Services.AddScoped<CustomTableValidationService>();
 builder.Services.AddScoped<CustomTableWriteService>();
 builder.Services.AddScoped<CustomTableReadService>();
 builder.Services.AddScoped<CustomTableQueryService>();
+
+// ★ TreeEavSky iNode 宿主守卫：节点关注类型 / 写入实体数据前校验 inodeId 是
+//   真实的 UnitTree/CategoryTree 节点，防止属性数据脱离宿主节点产生孤儿数据。
+builder.Services.AddScoped<IInodeOwnerGuard, UnitTreeInodeGuard>();
+builder.Services.AddScoped<IInodeOwnerGuard, CategoryTreeInodeGuard>();
 
 // ★ TreeEavSky：计量单位树 / 分类树（表 unit_trees、category_trees，随迁移 HasData 播种；
 //   自 DiberyTreeService clone，响应信封由 ApiEnvelopeFilter 统一包装）

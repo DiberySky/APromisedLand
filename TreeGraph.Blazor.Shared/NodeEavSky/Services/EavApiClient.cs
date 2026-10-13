@@ -42,6 +42,19 @@ public class EavApiClient
         return await GetAsync<DynamicEntityDto>(url, ct);
     }
 
+    /// <summary>
+    /// 逆地理编码（GET api/eav/geo/regeo）：GCJ-02 坐标 → 地名 / 地址。
+    /// 服务端未配置高德 Key 或高德返回失败时返回 null（调用方静默降级）。
+    /// </summary>
+    public async Task<RegeoResultDto?> ReverseGeocodeAsync(
+        double latitude, double longitude,
+        CancellationToken ct = default)
+    {
+        var url = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"api/eav/geo/regeo?latitude={latitude:0.######}&longitude={longitude:0.######}");
+        return await GetAsync<RegeoResultDto>(url, ct);
+    }
+
     public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
         SaveEntityAsync(
         string entityType, string entityId,

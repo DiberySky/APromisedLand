@@ -54,11 +54,19 @@
                             break;
 
                         case EavDataTypes.Bool:
-                            <MudSwitch T="bool"
-                                       Value="@GetBool(col.ColumnName)"
-                                       ValueChanged="@(v => SetField(col, v))"
+                            <MudSelect T="bool?"
+                                       Value="@GetBoolNullable(col.ColumnName)"
+                                       ValueChanged="@(v => SetField(col, v ?? false))"
                                        Label="@col.DisplayName"
-                                       Color="Color.Primary" />
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       AnchorOrigin="Origin.BottomRight"
+                                       TransformOrigin="Origin.TopRight"
+                                       Clearable="!col.IsRequired"
+                                       FullWidth="true">
+                                <MudSelectItem T="bool?" Value="true">是</MudSelectItem>
+                                <MudSelectItem T="bool?" Value="false">否</MudSelectItem>
+                            </MudSelect>
                             break;
 
                         case EavDataTypes.Date:
@@ -217,6 +225,10 @@
 
     private bool GetBool(string key)
         => UnwrapValue(_fields.GetValueOrDefault(key)) is bool b && b;
+
+    // 可空版本：区分「已填 false（否）」与「未填写」
+    private bool? GetBoolNullable(string key)
+        => UnwrapValue(_fields.GetValueOrDefault(key)) is bool b ? b : null;
 
     private DateTime? GetDate(string key)
         => GetString(key) is { } s && DateOnly.TryParse(s, out var d)

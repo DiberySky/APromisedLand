@@ -27,6 +27,7 @@
                 {
                     @* 数组字段：渲染为多行列表 *@
                     <ArrayFieldRenderer Field="field"
+                                        ReadOnly="@ReadOnly"
                                         Values="GetArrayValues(field.FieldName)"
                                         ValuesChanged="v => SetArrayValues(field.FieldName, v)" />
                 }
@@ -41,6 +42,7 @@
                                           Value="GetString(field.FieldName)"
                                           ValueChanged="v => SetString(field.FieldName, v)"
                                           Required="field.IsRequired"
+                                          ReadOnly="@ReadOnly"
                                           Variant="Variant.Outlined"
                                           Immediate="true" />
                             break;
@@ -52,15 +54,24 @@
                                              Value="GetDecimal(field.FieldName)"
                                              ValueChanged="v => SetDecimal(field.FieldName, v)"
                                              Required="field.IsRequired"
+                                             ReadOnly="@ReadOnly"
                                              Variant="Variant.Outlined" />
                             break;
 
                         case EavDataTypes.Bool:
-                            <MudSwitch T="bool?"
+                            <MudSelect T="bool?"
                                        Label="@field.DisplayName"
                                        Value="GetBool(field.FieldName)"
                                        ValueChanged="v => SetBool(field.FieldName, v)"
-                                       Color="Color.Primary" />
+                                       ReadOnly="@ReadOnly"
+                                       Required="field.IsRequired"
+                                       Variant="Variant.Outlined"
+                                       AnchorOrigin="Origin.BottomRight"
+                                       TransformOrigin="Origin.TopRight"
+                                       Clearable="!field.IsRequired">
+                                <MudSelectItem T="bool?" Value="true">是</MudSelectItem>
+                                <MudSelectItem T="bool?" Value="false">否</MudSelectItem>
+                            </MudSelect>
                             break;
 
                         case EavDataTypes.Date:
@@ -68,6 +79,7 @@
                                            Date="GetDateTime(field.FieldName)"
                                            DateChanged="v => SetDate(field.FieldName, v)"
                                            Required="field.IsRequired"
+                                           ReadOnly="@ReadOnly"
                                            Variant="Variant.Outlined"
                                            DateFormat="yyyy-MM-dd" />
                             break;
@@ -77,6 +89,7 @@
                                           Label="@field.DisplayName"
                                           Value="@(GetDateTime(field.FieldName)?.ToString("yyyy-MM-dd HH:mm:ss"))"
                                           ValueChanged="v => SetDateTimeText(field.FieldName, v)"
+                                          ReadOnly="@ReadOnly"
                                           Variant="Variant.Outlined"
                                           Placeholder="yyyy-MM-dd HH:mm:ss" />
                             break;
@@ -85,6 +98,7 @@
                             <MudTimePicker Label="@field.DisplayName"
                                            Time="GetTime(field.FieldName)"
                                            TimeChanged="v => SetTime(field.FieldName, v)"
+                                           ReadOnly="@ReadOnly"
                                            Variant="Variant.Outlined" />
                             break;
 
@@ -99,6 +113,7 @@
                             {
                                 @* 嵌套组合：递归渲染自身 *@
                                 <CompositeField Attr="MakeChildAttr(field)"
+                                                ReadOnly="@ReadOnly"
                                                 Value="GetObject(field.FieldName)"
                                                 ValueChanged="v => SetObject(field.FieldName, v)" />
                             }
@@ -109,6 +124,7 @@
                                           Label="@field.DisplayName"
                                           Value="GetString(field.FieldName)"
                                           ValueChanged="v => SetString(field.FieldName, v)"
+                                          ReadOnly="@ReadOnly"
                                           Variant="Variant.Outlined"
                                           Immediate="true" />
                             break;
@@ -128,6 +144,10 @@
 
     [Parameter]
     public EventCallback<JsonElement?> ValueChanged { get; set; }
+
+    /// <summary>只读模式：嵌套字段全部以只读样式呈现。</summary>
+    [Parameter]
+    public bool ReadOnly { get; set; }
 
     /// <summary>内部字段值存储：字段名 → JSON 值</summary>
     private Dictionary<string, JsonElement?> _fields = new();

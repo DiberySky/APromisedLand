@@ -100,7 +100,7 @@
         <MudTd DataLabel="类型">
             <MudChip T="string" Size="Size.Small"
                      Color="@GetDataTypeColor(context.DataType)">
-                @context.DataType
+                @EavDataTypeLabels.GetLabel(context.DataType)
             </MudChip>
         </MudTd>
         <MudTd DataLabel="必填">
@@ -174,7 +174,6 @@
     private string? _searchString;
     private IReadOnlyList<AttributeDetailDto>? _attributes;
     private bool _loading;
-    private bool _initialized;
 
     private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
     private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
@@ -189,11 +188,8 @@
         MaximizeButton = true
     };
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (!firstRender || _initialized) return;
-        _initialized = true;
-
         // 锁定模式：固定为传入的实体类型；通用模式由 LoadEntityTypesAsync 默认选第一个
         if (_locked)
         {
@@ -203,7 +199,6 @@
         await LoadReferencesAsync();
         await LoadEntityTypesAsync();
         await LoadAsync();
-        StateHasChanged();
     }
 
     private async Task LoadReferencesAsync()
@@ -286,6 +281,7 @@
         var parameters = new DialogParameters<AttributeCreateDialog>
         {
             { x => x.EntityType, _entityType },
+            { x => x.IsEntityTypeLocked, _locked },
             { x => x.InitialDisplayOrder, (_attributes?.Count ?? 0) + 1 },
             { x => x.EntityTypes, _entityTypes },
             { x => x.CompositeTypes, _compositeTypes },

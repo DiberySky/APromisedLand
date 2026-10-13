@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
+using TreeGraph.Api.NodeEavSky.Services;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Fixtures;
@@ -33,6 +35,13 @@ public class EavApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         builder.UseSetting("ConnectionStrings:TreeGraphDb", _postgres.GetConnectionString());
         builder.UseEnvironment("Testing");
+
+        // iNode 测试使用任意 inodeId，不依赖树节点主表；
+        // 移除树模块注册的宿主守卫，使 inode 链路处于"外部模式"（无守卫放行）。
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IInodeOwnerGuard>();
+        });
     }
 }
 

@@ -10,7 +10,7 @@ using TreeGraph.Shared.TreeEavSky.Abstractions;
 namespace TreeGraph.Blazor.Shared.TreeEavSky.Dialogs;
 /// <summary>
 /// 树节点对话框服务（精简移植版：保留 TreeEavSky 组件自身使用的对话框，
-/// 不含文件/图片/视频/位置附件页与节点属性子系统）。
+/// 不含文件/图片/视频/位置附件页；节点属性通过 NodeAttributesDialog 桥接 NodeEavSky）。
 /// </summary>
 /// <typeparam name="TItem">节点类型，必须实现 ITreeNodeBase</typeparam>
 public class TreeNodeDialogService<TItem>(
@@ -254,6 +254,40 @@ public class TreeNodeDialogService<TItem>(
             return null;
 
         return sortResult;
+    }
+
+    #endregion
+
+    #region 节点属性管理对话框
+
+    /// <summary>
+    /// 显示节点属性管理对话框（查看/编辑属性值、管理属性定义），
+    /// 内部桥接 NodeEavSky 动态表单，与节点基础字段编辑解耦。
+    /// </summary>
+    /// <param name="nodeId">节点 ID（作为 EAV 实体 ID）</param>
+    /// <param name="config">对话框配置</param>
+    /// <returns>是否进行了修改（保存返回 true，取消返回 false）</returns>
+    public async Task<bool> ShowNodeAttributesDialogAsync(
+        string nodeId,
+        DialogConfig? config = null)
+    {
+        var parameters = new DialogParameters
+        {
+            { "NodeId", nodeId }
+        };
+
+        var options = (config ?? new DialogConfig
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+        }).ToDialogOptions();
+
+        var dialog = await dialogService.ShowExAsync<NodeAttributesDialog<TItem>>(
+            "节点属性", parameters, options);
+
+        var result = await dialog.Result;
+        // 只要不是取消就返回 true（表示可能已修改）
+        return result is not { Canceled: true };
     }
 
     #endregion

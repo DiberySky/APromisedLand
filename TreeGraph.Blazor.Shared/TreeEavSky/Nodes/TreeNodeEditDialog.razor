@@ -2,7 +2,6 @@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-@inject ITreeClientService<TItem> ClientService
 @inject IDialogService DialogService
 @implements IDisposable
 
@@ -13,13 +12,16 @@
                OnSubmitClick="@SubmitAsync"
                OnCanceledClick="@Close">
     <ToolBarContent>
-        <MudButton Variant="Variant.Text"
-                   Color="Color.Info"
-                   Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Settings"
-                   OnClick="@OpenAttributesManageAsync">
-            管理属性定义
-        </MudButton>
+        @if (!IsCreate)
+        {
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Info"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Settings"
+                       OnClick="@OpenAttributesManageAsync">
+                管理属性定义
+            </MudButton>
+        }
     </ToolBarContent>
     <DialogContent>
         <MudContainer Class="py-8">
@@ -36,12 +38,21 @@
                 }
             </MudForm>
 
-            @* 属性区：桥接 NodeEavSky 动态表单 *@
-            <NodeAttributeItemsSky @ref="_attrItems"
-                                   TItem="@TItem"
-                                   NodeId="@_node.Id"
-                                   EntityType="@_entityType"
-                                   ReadOnly="false" />
+            @* 属性区：节点保存后（编辑模式）才可关注类型与填写属性 *@
+            @if (IsCreate)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block py-2">
+                    节点创建保存后，可通过节点操作中的「属性」按钮关注实体类型并填写属性。
+                </MudText>
+            }
+            else
+            {
+                <NodeAttributeItemsSky @ref="_attrItems"
+                                       TItem="@TItem"
+                                       NodeId="@_node.Id"
+                                       ReadOnly="false"
+                                       AllowManage="true" />
+            }
         </MudContainer>
     </DialogContent>
 </DialogTreeSky>
@@ -58,13 +69,10 @@
 
     private TItem _node = null!;
     private string _title = null!;
-    private string _entityType = null!;
 
     protected override void OnInitialized()
     {
         _node = NodeTemplate.Node.Value!;
-        _entityType = ClientService.EntityType;
-
         _title = IsCreate ? $"创建【{_node.Parent!.Text()}】子节点" : _node.Text();
 
         base.OnInitialized();
@@ -75,9 +83,12 @@
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
 
-        // 先保存属性（失败时不关闭对话框，用户可重试）
-        if (_attrItems != null)
-            await _attrItems.SubmitUpdateNodeAttributesAsync();
+        // 编辑模式：先保存属性（任一类型失败时不关闭对话框，用户可重试）
+        if (!IsCreate && _attrItems != null)
+        {
+            var ok = await _attrItems.SubmitUpdateNodeAttributesAsync();
+            if (!ok) return;
+        }
 
         // 再关闭对话框返回节点（基础字段由调用方保存）
         MudDialog?.Close(DialogResult.Ok(_node));
@@ -88,18 +99,18 @@
         MudDialog?.Close(DialogResult.Cancel());
     }
 
-    /// <summary>打开属性定义管理对话框（锁定当前实体类型），关闭后刷新属性区。</summary>
+    /// <summary>打开元数据维护对话框（通用模式，不锁定实体类型）。</summary>
     private async Task OpenAttributesManageAsync()
     {
         var parameters = new DialogParameters<AttributesManageDialog>
         {
-            { x => x.EntityType, _entityType },
             { x => x.OnAttributesChanged, EventCallback.Factory.Create(this, RefreshAttributesAsync) }
         };
 
         var options = new DialogOptionsEx
         {
-            MaxWidth = MaxWidth.Large,
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
             FullWidth = true,
             MaximizeButton = true
         };

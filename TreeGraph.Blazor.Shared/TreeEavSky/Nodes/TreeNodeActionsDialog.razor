@@ -2,7 +2,6 @@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-@inject ITreeClientService<TItem> ClientService
 @implements IDisposable
 
 <DialogSky Title="节点操作">
@@ -46,10 +45,9 @@
                 <BoolFieldSky Label="是否允许添加子节点" ReadOnly="true"
                               @bind-Value="NodeTemplate.Node.Value!.CanHaveChildren" />
 
-                @* 属性区：只读展示，桥接 NodeEavSky 动态表单 *@
+                @* 属性区：仅展示本节点已关注实体类型的属性（只读） *@
                 <NodeAttributeItemsSky TItem="@TItem"
                                        NodeId="@NodeTemplate.Node.Value!.Id"
-                                       EntityType="@_entityType"
                                        ReadOnly="true" />
 
             </MudStack>
@@ -67,7 +65,9 @@
         }
     </DialogLeftActions>
     <DialogRightActions>
+        @* 懒加载树：节点未展开时 Children 为 null，需以后端返回的 HasChildren 标志判断 *@
         @if (NodeTemplate.Node.Value!.CanHaveChildren
+             || NodeTemplate.Node.Value!.HasChildren
              || NodeTemplate.Node.Children?.Count > 1)
         {
             <MudButton OnClick="OnSort"
@@ -87,6 +87,12 @@
                 设置修改
             </MudButton>
 
+            <MudButton OnClick="@OnAttribute"
+                       Variant="Variant.Text"
+                       Color="Color.Info"
+                       StartIcon="@Icons.Material.Outlined.EditAttributes">
+                属性
+            </MudButton>
         }
 
         @if (NodeTemplate.Node.Value!.CanHaveChildren)
@@ -99,13 +105,6 @@
             </MudButton>
         }
 
-        @* <MudButton OnClick="@OnAttribute" *@
-        @*            Variant="Variant.Text" *@
-        @*            Color="Color.Info" *@
-        @*            StartIcon="@Icons.Material.Outlined.EditAttributes"> *@
-        @*     属性 *@
-        @* </MudButton> *@
-
     </DialogRightActions>
 </DialogSky>
 
@@ -115,19 +114,6 @@
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
-
-    private string _entityType = null!;
-
-    protected override void OnInitialized()
-    {
-        _entityType = ClientService.EntityType;
-        base.OnInitialized();
-    }
-
-    private void OnAttribute()
-    {
-        CloseWithAction(NodeAction.Attribute);
-    }
 
     private void OnAddChild()
     {
@@ -152,6 +138,11 @@
     private void OnSort()
     {
         CloseWithAction(NodeAction.Sort);
+    }
+
+    private void OnAttribute()
+    {
+        CloseWithAction(NodeAction.Attribute);
     }
 
     private void CloseWithAction(NodeAction action)

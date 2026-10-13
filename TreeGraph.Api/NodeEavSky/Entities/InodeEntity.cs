@@ -15,7 +15,7 @@ public class InodeEntity
     /// <summary>iNode ID（GUID 字符串）</summary>
     public string InodeId { get; set; } = "";
 
-    /// <summary>实体类型名（如 "Product"）</summary>
+    /// <summary>实体类型名（如 "UnitTree"）</summary>
     public string EntityType { get; set; } = "";
 
     /// <summary>实体 ID（GUID 字符串）</summary>

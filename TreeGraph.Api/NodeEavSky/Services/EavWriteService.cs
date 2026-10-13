@@ -120,9 +120,18 @@ public class EavWriteService
         // ---- 1. 乐观锁检测（用 UtcDateTime 语义比较）----
         if (expectedUpdatedAt is { } expected)
         {
-            var currentMax = await _db.AttributeValues
+            // ★ 位置值存独立表 location_attribute_values，UpdatedAt 上界需合并两表。
+            var currentMaxValues = await _db.AttributeValues
                 .Where(v => v.EntityType == entityType && v.EntityId == entityId)
                 .MaxAsync(v => (DateTimeOffset?)v.UpdatedAt, ct);
+            var currentMaxLocations = await _db.LocationAttributeValues
+                .Where(l => l.EntityType == entityType && l.EntityId == entityId)
+                .MaxAsync(l => (DateTimeOffset?)l.UpdatedAt, ct);
+            var currentMax = currentMaxValues is null
+                ? currentMaxLocations
+                : currentMaxLocations is null
+                    ? currentMaxValues
+                    : currentMaxValues > currentMaxLocations ? currentMaxValues : currentMaxLocations;
 
             // ★ 修复：DateTimeOffset.!= 会比较 instant + offset，
             //   同一瞬间但 offset 不同会误判冲突。改用 UtcDateTime。
@@ -176,6 +185,12 @@ public class EavWriteService
             .ToListAsync(ct);
         var existingMap = existing.ToDictionary(v => v.AttributeId);
 
+        // location 类型值存独立表，单独加载已存在的坐标点
+        var existingLocations = await _db.LocationAttributeValues
+            .Where(l => l.EntityType == entityType && l.EntityId == entityId)
+            .ToListAsync(ct);
+        var existingLocationMap = existingLocations.ToDictionary(l => l.AttributeId);
+
         var audits = new List<AttributeAuditLog>();
         var now = DateTimeOffset.UtcNow;
 
@@ -190,6 +205,14 @@ public class EavWriteService
             {
                 valueToWrite = _optionSetCache.GetSet(osid)
                     .Items.FirstOrDefault(i => i.IsDefault)?.Value;
+            }
+
+            // location 走独立坐标表，显式 null 同样表示删除该坐标点
+            if (def.DataType == EavDataTypes.Location)
+            {
+                ApplyLocation(entityId, entityType, def, valueToWrite,
+                    existingLocationMap, audits, changedBy, correlationId, now);
+                continue;
             }
 
             existingMap.TryGetValue(def.AttributeId, out var existingValue);
@@ -246,8 +269,20 @@ public class EavWriteService
         {
             foreach (var def in definitions.Values)
             {
-                if (!values.ContainsKey(def.AttributeName)
-                    && existingMap.TryGetValue(def.AttributeId, out var oldVal))
+                if (values.ContainsKey(def.AttributeName)) continue;
+
+                // location 未提供：删除独立坐标表中的坐标点
+                if (def.DataType == EavDataTypes.Location)
+                {
+                    if (existingLocationMap.ContainsKey(def.AttributeId))
+                    {
+                        ApplyLocation(entityId, entityType, def, null,
+                            existingLocationMap, audits, changedBy, correlationId, now);
+                    }
+                    continue;
+                }
+
+                if (existingMap.TryGetValue(def.AttributeId, out var oldVal))
                 {
                     _db.AttributeValues.Remove(oldVal);
                     audits.Add(CreateAudit(entityId, entityType, def,
@@ -260,6 +295,88 @@ public class EavWriteService
         _db.AttributeAuditLogs.AddRange(audits);
         await _db.SaveChangesAsync(ct);
     }
+
+    /// <summary>
+    /// location 类型独立坐标表的 upsert / delete，并写审计。
+    /// value 为 null 表示删除坐标点；与 AttributeValue 写入在同一 SaveChanges 事务提交。
+    /// </summary>
+    private void ApplyLocation(
+        string entityId, string entityType, AttributeDefinition def, object? value,
+        Dictionary<string, LocationAttributeValue> existingMap,
+        List<AttributeAuditLog> audits,
+        string changedBy, string? correlationId, DateTimeOffset now)
+    {
+        existingMap.TryGetValue(def.AttributeId, out var oldLoc);
+
+        if (value is null)
+        {
+            if (oldLoc is not null)
+            {
+                _db.LocationAttributeValues.Remove(oldLoc);
+                existingMap.Remove(def.AttributeId);
+                audits.Add(CreateAudit(entityId, entityType, def,
+                    SerializeLocation(oldLoc), null, "Delete",
+                    changedBy, correlationId, now));
+            }
+            return;
+        }
+
+        if (value is not EavLocationValue loc)
+            throw new InvalidOperationException("location 值类型错误");
+
+        var cs = string.IsNullOrWhiteSpace(loc.CoordinateSystem)
+            ? "gcj02" : loc.CoordinateSystem;
+
+        if (oldLoc is null)
+        {
+            var row = new LocationAttributeValue
+            {
+                EntityId = entityId,
+                EntityType = entityType,
+                AttributeId = def.AttributeId,
+                Latitude = loc.Latitude,
+                Longitude = loc.Longitude,
+                Label = loc.Label,
+                Address = loc.Address,
+                CoordinateSystem = cs,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            _db.LocationAttributeValues.Add(row);
+            existingMap[def.AttributeId] = row;
+            audits.Add(CreateAudit(entityId, entityType, def,
+                null, SerializeLocation(row), "Insert",
+                changedBy, correlationId, now));
+        }
+        else
+        {
+            var oldJson = SerializeLocation(oldLoc);
+            oldLoc.Latitude = loc.Latitude;
+            oldLoc.Longitude = loc.Longitude;
+            oldLoc.Label = loc.Label;
+            oldLoc.Address = loc.Address;
+            oldLoc.CoordinateSystem = cs;
+            oldLoc.UpdatedAt = now;
+
+            var newJson = SerializeLocation(oldLoc);
+            if (oldJson != newJson)
+            {
+                audits.Add(CreateAudit(entityId, entityType, def,
+                    oldJson, newJson, "Update",
+                    changedBy, correlationId, now));
+            }
+        }
+    }
+
+    private static string SerializeLocation(LocationAttributeValue l) =>
+        JsonSerializer.Serialize(new
+        {
+            latitude = l.Latitude,
+            longitude = l.Longitude,
+            label = l.Label,
+            address = l.Address,
+            coordinateSystem = l.CoordinateSystem
+        });
 
     private void SetTypedValue(
         AttributeValue target, AttributeDefinition def, object? value)
@@ -295,8 +412,10 @@ public class EavWriteService
                 target.ValueBool = Convert.ToBoolean(value);
                 break;
             case EavDataTypes.Datetime:
+                // Npgsql 写 timestamptz 只接受 offset=0(UTC) 的 DateTimeOffset；
+                // 前端可能提交本地时区(如 +08:00)，这里统一归一化到 UTC，避免写库抛 ArgumentException。
                 target.ValueDatetime = value is DateTimeOffset dto
-                    ? dto
+                    ? dto.ToUniversalTime()
                     : DateTimeOffset.Parse(value.ToString()!,
                         CultureInfo.InvariantCulture,
                         DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
@@ -434,11 +553,14 @@ public class EavWriteService
         var hasValues = await _db.AttributeValues
             .AnyAsync(v => v.EntityType == entityType && v.EntityId == entityId, ct);
 
+        var hasLocations = await _db.LocationAttributeValues
+            .AnyAsync(l => l.EntityType == entityType && l.EntityId == entityId, ct);
+
         var hasRows = await _db.CustomTableRows
             .AnyAsync(r => r.ParentEntityType == entityType
                         && r.ParentEntityId == entityId, ct);
 
-        if (!hasValues && !hasRows)
+        if (!hasValues && !hasLocations && !hasRows)
             return false;
 
         var strategy = _db.Database.CreateExecutionStrategy();
@@ -481,6 +603,36 @@ public class EavWriteService
             }
 
             _db.AttributeValues.RemoveRange(values);
+
+            // 删除位置坐标点（独立表）并写审计
+            var locations = await _db.LocationAttributeValues
+                .Where(l => l.EntityType == entityType && l.EntityId == entityId)
+                .ToListAsync(ct);
+            if (locations.Count > 0)
+            {
+                var locDefs = _attrCache.GetDefinitions(entityType)
+                    .ToDictionary(d => d.AttributeId);
+                var locAudits = new List<AttributeAuditLog>(locations.Count);
+                foreach (var l in locations)
+                {
+                    if (!locDefs.TryGetValue(l.AttributeId, out var def)) continue;
+                    locAudits.Add(new AttributeAuditLog
+                    {
+                        EntityId = entityId,
+                        EntityType = entityType,
+                        AttributeId = def.AttributeId,
+                        AttributeName = def.AttributeName,
+                        OldValue = SerializeLocation(l),
+                        NewValue = null,
+                        ChangeType = "Delete",
+                        ChangedBy = changedBy,
+                        ChangedAt = now,
+                        CorrelationId = correlationId
+                    });
+                }
+                _db.AttributeAuditLogs.AddRange(locAudits);
+            }
+            _db.LocationAttributeValues.RemoveRange(locations);
 
             var rows = await _db.CustomTableRows
                 .Where(r => r.ParentEntityType == entityType
@@ -531,7 +683,14 @@ public class EavWriteService
             .Distinct()
             .ToListAsync(ct);
 
-        var existingSet = hasValues.Union(hasRows).ToHashSet();
+        var hasLocations = await _db.LocationAttributeValues
+            .Where(l => l.EntityType == entityType
+                     && requested.Contains(l.EntityId))
+            .Select(l => l.EntityId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var existingSet = hasValues.Union(hasRows).Union(hasLocations).ToHashSet();
         var toDelete = requested.Where(id => existingSet.Contains(id)).ToList();
         var notFound = requested.Where(id => !existingSet.Contains(id)).ToList();
 
@@ -584,6 +743,37 @@ public class EavWriteService
 
             // 3. 删除属性值
             _db.AttributeValues.RemoveRange(values);
+
+            // 3b. 删除位置坐标点（独立表）并写审计
+            var locations = await _db.LocationAttributeValues
+                .Where(l => l.EntityType == entityType
+                         && toDelete.Contains(l.EntityId))
+                .ToListAsync(ct);
+            if (locations.Count > 0)
+            {
+                var locDefs = _attrCache.GetDefinitions(entityType)
+                    .ToDictionary(d => d.AttributeId);
+                var locAudits = new List<AttributeAuditLog>(locations.Count);
+                foreach (var l in locations)
+                {
+                    if (!locDefs.TryGetValue(l.AttributeId, out var def)) continue;
+                    locAudits.Add(new AttributeAuditLog
+                    {
+                        EntityId = l.EntityId,
+                        EntityType = entityType,
+                        AttributeId = def.AttributeId,
+                        AttributeName = def.AttributeName,
+                        OldValue = SerializeLocation(l),
+                        NewValue = null,
+                        ChangeType = "Delete",
+                        ChangedBy = changedBy,
+                        ChangedAt = now,
+                        CorrelationId = correlationId
+                    });
+                }
+                _db.AttributeAuditLogs.AddRange(locAudits);
+            }
+            _db.LocationAttributeValues.RemoveRange(locations);
 
             // 4. 删除自定义表行
             var rows = await _db.CustomTableRows
