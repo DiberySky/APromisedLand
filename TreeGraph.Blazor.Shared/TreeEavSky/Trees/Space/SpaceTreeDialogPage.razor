@@ -1,0 +1,22 @@
+@* SpaceTreeDialogPage.razor
+   空间树对话框页（克隆自 UnitTreeDialogPage.razor）：
+   基于 TreeDialogPageSky 包装 TreeEavSky<SpaceTree>，点击节点文本经 ShowDialogFunc 递归弹窗。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space
+@using TreeGraph.Shared.TreeEavSky.Entities
+
+@inject BlazorService BlazorService
+
+<TreeDialogPageSky TItem="SpaceTree"
+                   Title="空间注册"
+                   TitleToolBar="@(ClickNode?.Value?.Parent?.Text() ?? "空间")"
+                   RootId="@ClickNode?.Value?.Id"
+                   ShowDialogFunc="@ShowDialogAsync" />
+
+@code {
+    [Parameter] public ITreeItemData<SpaceTree>? ClickNode { get; set; }
+
+    private async Task ShowDialogAsync(ITreeItemData<SpaceTree> node)
+    {
+        await BlazorService.ShowSpaceTreeDialogPageAsync(node);
+    }
+}

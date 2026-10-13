@@ -57,18 +57,22 @@ builder.Services.AddScoped<EdgeInstanceService>();
 builder.Services.AddScoped<ChainService>();
 
 // ★ TreeEavSky iNode 宿主守卫：节点关注类型 / 写入实体数据前校验 inodeId 是
-//   真实的 UnitTree/CategoryTree 节点，防止属性数据脱离宿主节点产生孤儿数据。
+//   真实的 UnitTree/CategoryTree/SpaceTree 节点，防止属性数据脱离宿主节点产生孤儿数据。
 builder.Services.AddScoped<IInodeOwnerGuard, UnitTreeInodeGuard>();
 builder.Services.AddScoped<IInodeOwnerGuard, CategoryTreeInodeGuard>();
+builder.Services.AddScoped<IInodeOwnerGuard, SpaceTreeInodeGuard>();
 
-// ★ TreeEavSky：计量单位树 / 分类树（表 unit_trees、category_trees，随迁移 HasData 播种；
-//   自 DiberyTreeService clone，响应信封由 ApiEnvelopeFilter 统一包装）
+// ★ TreeEavSky：计量单位树 / 分类树 / 空间树（表 unit_trees、category_trees、space_trees，
+//   前两棵随迁移 HasData 播种；自 DiberyTreeService clone，响应信封由 ApiEnvelopeFilter 统一包装）
 builder.Services.AddScoped<TreeGraph.Api.TreeEavSky.Services.ITreeService<
     TreeGraph.Shared.TreeEavSky.Entities.UnitTree>,
     TreeGraph.Api.TreeEavSky.Services.UnitTreeService>();
 builder.Services.AddScoped<TreeGraph.Api.TreeEavSky.Services.ITreeService<
     TreeGraph.Shared.TreeEavSky.Entities.CategoryTree>,
     TreeGraph.Api.TreeEavSky.Services.CategoryTreeService>();
+builder.Services.AddScoped<TreeGraph.Api.TreeEavSky.Services.ITreeService<
+    TreeGraph.Shared.TreeEavSky.Entities.SpaceTree>,
+    TreeGraph.Api.TreeEavSky.Services.SpaceTreeService>();
 
 var app = builder.Build();
 

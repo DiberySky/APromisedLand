@@ -58,6 +58,7 @@ public static class MauiProgram
         //   添加排序逻辑与 UI 属性，供 TreeEavSky.razor / TreeDialogPageSky.razor / TreeSelectDialogSky.razor 注入。
         builder.Services.AddScoped<ITreeClientService<UnitTree>, UnitTreeClientService>();
         builder.Services.AddScoped<ITreeClientService<CategoryTree>, CategoryTreeClientService>();
+        builder.Services.AddScoped<ITreeClientService<SpaceTree>, SpaceTreeClientService>();
 
         // ★ NodeEav 业务页面依赖
         //   通过 Aspire 服务发现访问 treegrapheavapi：

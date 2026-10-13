@@ -1322,6 +1322,67 @@ namespace TreeGraph.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.SpaceTree", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Abbreviation")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("abbreviation");
+
+                    b.Property<bool>("CanHaveChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_have_children");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("HasChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_children");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParentId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("parent_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("ix_space_trees_parent");
+
+                    b.ToTable("space_trees", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "EBBAD64B-2119-47EB-95C3-01D3DD796774",
+                            Abbreviation = "",
+                            CanHaveChildren = true,
+                            Description = "",
+                            HasChildren = false,
+                            Name = "空间树",
+                            SortOrder = 0
+                        });
+                });
+
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", b =>
                 {
                     b.Property<string>("Id")
@@ -2364,6 +2425,16 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.SpaceTree", b =>
+                {
+                    b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.SpaceTree", "Parent")
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", b =>

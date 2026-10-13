@@ -23,3 +23,13 @@ public sealed class CategoryTreeInodeGuard(TreeGraphDbContext db) : IInodeOwnerG
         string inodeId, CancellationToken ct = default)
         => await db.CategoryTrees.AnyAsync(c => c.Id == inodeId, ct);
 }
+
+/// <summary>
+/// 空间树节点 iNode 宿主守卫：inodeId 是真实空间树节点时认领。
+/// </summary>
+public sealed class SpaceTreeInodeGuard(TreeGraphDbContext db) : IInodeOwnerGuard
+{
+    public async Task<bool> NodeExistsAsync(
+        string inodeId, CancellationToken ct = default)
+        => await db.SpaceTrees.AnyAsync(c => c.Id == inodeId, ct);
+}

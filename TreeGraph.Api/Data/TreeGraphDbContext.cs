@@ -28,9 +28,10 @@ public class TreeGraphDbContext : DbContext
     public DbSet<EdgeDefinition> EdgeDefinitions => Set<EdgeDefinition>();
     public DbSet<EdgeInstance> EdgeInstances => Set<EdgeInstance>();
 
-    // TreeEavSky：计量单位树 / 分类树
+    // TreeEavSky：计量单位树 / 分类树 / 空间树
     public DbSet<UnitTree> UnitTrees => Set<UnitTree>();
     public DbSet<CategoryTree> CategoryTrees => Set<CategoryTree>();
+    public DbSet<SpaceTree> SpaceTrees => Set<SpaceTree>();
 
     public TreeGraphDbContext(DbContextOptions<TreeGraphDbContext> options) : base(options) { }
 
@@ -49,6 +50,7 @@ public class TreeGraphDbContext : DbContext
         ConfigureEdges(mb);
         ConfigureUnitTrees(mb);
         ConfigureCategoryTrees(mb);
+        ConfigureSpaceTrees(mb);
     }
 
     // ============================================================
@@ -97,6 +99,33 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => x.ParentId).HasDatabaseName("ix_category_trees_parent");
 
             e.HasData(CategoryTree.SeedData());
+        });
+    }
+
+    private static void ConfigureSpaceTrees(ModelBuilder mb)
+    {
+        mb.Entity<SpaceTree>(e =>
+        {
+            e.ToTable("space_trees");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Abbreviation).HasColumnName("abbreviation").HasMaxLength(50);
+            e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.HasChildren).HasColumnName("has_children");
+
+            e.HasOne(x => x.Parent)
+                .WithMany()
+                .HasForeignKey(x => x.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => x.ParentId).HasDatabaseName("ix_space_trees_parent");
+
+            // 仅播种唯一根节点「空间树」，其余节点全部由界面创建
+            e.HasData(SpaceTree.SeedData());
         });
     }
 
