@@ -1024,6 +1024,46 @@ public class EavApiClient
             request, ct);
 
     // ============================================================
+    // ★ 链式结构（Chain）
+    // ============================================================
+
+    public Task<List<EdgeInstanceDto>?> CreateChainAsync(
+        string edgeTypeId, CreateChainRequest request, CancellationToken ct = default)
+        => PostAsync<List<EdgeInstanceDto>>(
+            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/create",
+            request, ct);
+
+    public Task<ChainPathResult?> GetChainUpstreamAsync(
+        string edgeTypeId, string nodeId, CancellationToken ct = default)
+        => GetAsync<ChainPathResult>(
+            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/upstream/{Uri.EscapeDataString(nodeId)}",
+            ct);
+
+    public Task<ChainPathResult?> GetChainDownstreamAsync(
+        string edgeTypeId, string nodeId, CancellationToken ct = default)
+        => GetAsync<ChainPathResult>(
+            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/downstream/{Uri.EscapeDataString(nodeId)}",
+            ct);
+
+    public Task<ChainPathResult?> GetChainFullPathAsync(
+        string edgeTypeId, string nodeId, CancellationToken ct = default)
+        => GetAsync<ChainPathResult>(
+            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/path/{Uri.EscapeDataString(nodeId)}",
+            ct);
+
+    public Task<ChainValidationResult?> ValidateChainTopologyAsync(
+        string edgeTypeId, CancellationToken ct = default)
+        => GetAsync<ChainValidationResult>(
+            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/validate",
+            ct);
+
+    public Task<IReadOnlyList<ChainConnectedComponent>?> GetChainComponentsAsync(
+        string edgeTypeId, CancellationToken ct = default)
+        => GetAsync<IReadOnlyList<ChainConnectedComponent>>(
+            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/components",
+            ct);
+
+    // ============================================================
     // ★ 内部辅助：带乐观锁的 PUT / PATCH
     // ============================================================
 

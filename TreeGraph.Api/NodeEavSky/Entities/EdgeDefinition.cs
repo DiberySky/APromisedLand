@@ -37,6 +37,20 @@ public class EdgeDefinition
 
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// 是否为链式结构类型（如输电线路、物流线路）。
+    /// 链式结构支持：批量创建链、完整路径查询（WITH RECURSIVE）、
+    /// 入度/成环校验、连通分量。
+    /// </summary>
+    public bool IsChain { get; set; } = false;
+
+    /// <summary>
+    /// 严格线性链式（入度 ≤ 1，无环）。true 时创建边会自动校验入度约束。
+    /// false 时允许 T 接分支（入度 ≤ 1 但出度可多）。
+    /// 仅 IsChain=true 时生效。
+    /// </summary>
+    public bool IsLinear { get; set; } = true;
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

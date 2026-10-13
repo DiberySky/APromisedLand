@@ -45,6 +45,8 @@ public class EdgeMetadataService
             IsDirected = req.IsDirected,
             Description = req.Description,
             IsActive = true,
+            IsChain = req.IsChain,
+            IsLinear = req.IsLinear,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -82,6 +84,8 @@ public class EdgeMetadataService
         if (req.IsGlobal.HasValue) def.IsGlobal = req.IsGlobal.Value;
         if (req.IsDirected.HasValue) def.IsDirected = req.IsDirected.Value;
         if (req.Description is not null) def.Description = req.Description;
+        if (req.IsChain.HasValue) def.IsChain = req.IsChain.Value;
+        if (req.IsLinear.HasValue) def.IsLinear = req.IsLinear.Value;
         def.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
@@ -129,7 +133,8 @@ public class EdgeMetadataService
         d.EdgeTypeId, d.TypeName, d.DisplayName,
         d.FromNodeType, d.ToNodeType,
         d.IsGlobal, d.IsDirected,
-        d.Description, d.IsActive);
+        d.Description, d.IsActive,
+        d.IsChain, d.IsLinear);
 
     private static bool IsPascalCase(string s)
         => char.IsUpper(s[0])
@@ -180,6 +185,17 @@ public class EdgeInstanceService
                 && i.ToNodeId == req.ToNodeId, ct);
         if (duplicate)
             throw new InvalidOperationException("该边已存在（同类型同方向不重复）");
+
+        // 链式结构：入度 ≤ 1 校验（IsLinear=true 强制；IsLinear=false 仍建议 ≤1 但允许出度多）
+        if (def.IsChain && def.IsLinear)
+        {
+            var indegree = await _db.EdgeInstances
+                .CountAsync(i => i.EdgeTypeId == edgeTypeId
+                    && i.ToNodeId == req.ToNodeId, ct);
+            if (indegree > 0)
+                throw new InvalidOperationException(
+                    $"链式结构 {def.DisplayName} 是严格线性，节点 {req.ToNodeId} 入度已 = 1，不能再接");
+        }
 
         var instance = new EdgeInstance
         {

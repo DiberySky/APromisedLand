@@ -770,6 +770,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("IsChain")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsDirected")
                         .HasColumnType("boolean")
                         .HasColumnName("is_directed");
@@ -777,6 +780,9 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Property<bool>("IsGlobal")
                         .HasColumnType("boolean")
                         .HasColumnName("is_global");
+
+                    b.Property<bool>("IsLinear")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("ToNodeType")
                         .HasMaxLength(100)

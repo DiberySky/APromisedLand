@@ -63,7 +63,7 @@ public class EdgeDialogSmokeTests : BunitTestBase
         EdgeTypeId: "et-edge-1", TypeName: "Collaboration", DisplayName: "协作关系",
         FromNodeType: "Department", ToNodeType: "Department",
         IsGlobal: true, IsDirected: true,
-        Description: null, IsActive: true);
+        Description: null, IsActive: true, IsChain: false, IsLinear: true);
 
     private static EdgeInstanceDto EdgeInstance() => new(
         EdgeId: "e-1", EdgeTypeId: "et-edge-1",

@@ -16,9 +16,13 @@ public class CreateEdgeTypeRequest
     public string? ToNodeType { get; set; }
     /// <summary>全局共享（所有节点类型可用），默认 true。</summary>
     public bool IsGlobal { get; set; } = true;
-    /// <summary>有向（true：from→to 有方向）/无向（false：边无方向），默认 true。</summary>
+    /// <summary>有向（true：from→to 有方向）/无向（false：边等同双向），默认 true。</summary>
     public bool IsDirected { get; set; } = true;
     public string? Description { get; set; }
+    /// <summary>链式结构类型（如输电线路），默认 false。</summary>
+    public bool IsChain { get; set; } = false;
+    /// <summary>严格线性（入度≤1，创建边时自动校验），仅 IsChain=true 时生效。</summary>
+    public bool IsLinear { get; set; } = true;
 }
 
 public class UpdateEdgeTypeRequest
@@ -29,6 +33,8 @@ public class UpdateEdgeTypeRequest
     public bool? IsGlobal { get; set; }
     public bool? IsDirected { get; set; }
     public string? Description { get; set; }
+    public bool? IsChain { get; set; }
+    public bool? IsLinear { get; set; }
 }
 
 public record EdgeTypeDto(
@@ -40,7 +46,9 @@ public record EdgeTypeDto(
     bool IsGlobal,
     bool IsDirected,
     string? Description,
-    bool IsActive);
+    bool IsActive,
+    bool IsChain,
+    bool IsLinear);
 
 // ============ Edge Instance（关系实例） ============
 
@@ -91,3 +99,42 @@ public record EdgeDeleteResult(
     int InstancesDeleted,
     int AttributeValuesDeleted,
     int AttributeDefinitionsDeleted);
+
+// ============ 链式结构（Chain）专用 ============
+
+/// <summary>批量创建链：按 orderedNodeIds 顺序创建 from→to 边。</summary>
+public class CreateChainRequest
+{
+    /// <summary>有序节点列表，如 ["A", "B", "C", "D"] → 创建 A→B, B→C, C→D。</summary>
+    public List<string> OrderedNodeIds { get; set; } = new();
+    /// <summary>可选：给每段边分配权重。按顺序与节点对一一对应，长度应 = OrderedNodeIds.Count - 1。</summary>
+    public List<decimal?>? Weights { get; set; }
+}
+
+/// <summary>链式完整路径查询结果（WITH RECURSIVE CTE 返回）。</summary>
+public record ChainPathResult(
+    /// <summary>路径上的节点 ID 列表（按方向排列，起点在索引 0）。</summary>
+    IReadOnlyList<string> NodeIds,
+    /// <summary>路径上的边（段）列表，与 NodeIds 对应。</summary>
+    IReadOnlyList<EdgeInstanceDto> Edges,
+    /// <summary>路径长度（边数）。</summary>
+    int Length);
+
+/// <summary>链式拓扑校验结果（入度/成环检测）。</summary>
+public record ChainValidationResult(
+    bool Valid,
+    IReadOnlyList<string> Errors,
+    /// <summary>入度超标的节点（入度值）。</summary>
+    IReadOnlyDictionary<string, int> InDegreeMap,
+    /// <summary>出度超标的节点（仅 IsLinear=false 时收集）。</summary>
+    IReadOnlyDictionary<string, int> OutDegreeMap,
+    /// <summary>成环节点（DFS 发现回边）。</summary>
+    IReadOnlyList<string> CyclicNodeIds,
+    int EdgeCount,
+    int NodeCount);
+
+/// <summary>连通分量：互不相连的节点组。</summary>
+public record ChainConnectedComponent(
+    IReadOnlyList<string> NodeIds,
+    IReadOnlyList<EdgeInstanceDto> Edges,
+    int Size);
