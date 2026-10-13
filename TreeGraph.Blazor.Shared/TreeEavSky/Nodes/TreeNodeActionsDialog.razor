@@ -3,6 +3,9 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @implements IDisposable
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 
 <DialogSky Title="节点操作">
     <ToolBarContent>
@@ -27,30 +30,161 @@
     </ToolBarContent>
     <DialogContent>
         <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
-            <MudStack Spacing="2">
+            <MudTabs Elevation="0" Rounded="true">
 
-                <MudTextField T="string"
-                              Value="NodeTemplate.Node.Value!.Text()"
-                              Label="名称"
-                              Variant="Variant.Outlined"
-                              ReadOnly="true"/>
+                @* ===== Tab 1: 基本信息 ===== *@
+                <MudTabPanel Text="基本信息"
+                             Icon="@Icons.Material.Filled.Info">
+                    <MudStack Spacing="2">
 
-                <MudTextField T="string"
-                              Value="NodeTemplate.Node.Value!.Description"
-                              Label="描述"
-                              Variant="Variant.Outlined"
-                              ReadOnly="true"
-                              Lines="3"/>
+                        <MudTextField T="string"
+                                      Value="NodeTemplate.Node.Value!.Text()"
+                                      Label="名称"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="true"/>
 
-                <BoolFieldSky Label="是否允许添加子节点" ReadOnly="true"
-                              @bind-Value="NodeTemplate.Node.Value!.CanHaveChildren" />
+                        <MudTextField T="string"
+                                      Value="NodeTemplate.Node.Value!.Description"
+                                      Label="描述"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="true"
+                                      Lines="3"/>
 
-                @* 属性区：仅展示本节点已关注实体类型的属性（只读） *@
-                <NodeAttributeItemsSky TItem="@TItem"
-                                       NodeId="@NodeTemplate.Node.Value!.Id"
-                                       ReadOnly="true" />
+                        <BoolFieldSky Label="是否允许添加子节点" ReadOnly="true"
+                                      @bind-Value="NodeTemplate.Node.Value!.CanHaveChildren" />
 
-            </MudStack>
+                        @* 属性区：仅展示本节点已关注实体类型的属性（只读） *@
+                        <NodeAttributeItemsSky TItem="@TItem"
+                                               NodeId="@NodeTemplate.Node.Value!.Id"
+                                               ReadOnly="true" />
+
+                    </MudStack>
+                </MudTabPanel>
+
+                @* ===== Tab 2: 关系 ===== *@
+                <MudTabPanel Text="@RelationsTabText"
+                             Icon="@Icons.Material.Filled.Hub">
+
+                    @* 顶部：边类型过滤器 + 创建按钮 *@
+                    <div Class="d-flex mb-3 align-center">
+                        <MudSelect T="string"
+                                   Value="_filterEdgeTypeId"
+                                   ValueChanged="OnFilterChanged"
+                                   Label="边类型（可选过滤）"
+                                   Variant="Variant.Outlined"
+                                   Class="flex-grow-1 mr-3"
+                                   Clearable="true"
+                                   Dense="true">
+                            <MudSelectItem T="string" Value="@("")">全部类型</MudSelectItem>
+                            @foreach (var et in _edgeTypes)
+                            {
+                                <MudSelectItem T="string" Value="@et.EdgeTypeId">
+                                    @et.DisplayName
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Size="Size.Small"
+                                   OnClick="@OpenCreateEdgeAsync">
+                            创建关系
+                        </MudButton>
+                    </div>
+
+                    @if (_edgesLoading)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                    }
+                    else if (!HasAnyEdges)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            当前节点没有关系。点击「创建关系」建立第一条边。
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        @* 出边 *@
+                        @if (_outgoing.Count > 0)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">
+                                出边（@_outgoing.Count）
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowForward"
+                                         Class="ml-1" Size="Size.Small" />
+                            </MudText>
+                            <MudTable Items="_outgoing" Dense="true" Bordered="true"
+                                      Hover="true" Breakpoint="Breakpoint.Sm"
+                                      Class="mb-3">
+                                <HeaderContent>
+                                    <MudTh>类型</MudTh>
+                                    <MudTh>终点节点 ID</MudTh>
+                                    <MudTh>权重</MudTh>
+                                    <MudTh>操作</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="类型">
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                                            @context.EdgeTypeDisplayName
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="终点">
+                                        <code>@context.ToNodeId</code>
+                                    </MudTd>
+                                    <MudTd DataLabel="权重">
+                                        @(context.Weight.HasValue ? context.Weight.Value.ToString("0.####") : "—")
+                                    </MudTd>
+                                    <MudTd DataLabel="操作">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Size="Size.Small"
+                                                       Color="Color.Error"
+                                                       OnClick="@(async () => await DeleteEdgeAsync(context))"
+                                                       title="删除" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+
+                        @* 入边 *@
+                        @if (_incoming.Count > 0)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">
+                                入边（@_incoming.Count）
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowBack"
+                                         Class="ml-1" Size="Size.Small" />
+                            </MudText>
+                            <MudTable Items="_incoming" Dense="true" Bordered="true"
+                                      Hover="true" Breakpoint="Breakpoint.Sm">
+                                <HeaderContent>
+                                    <MudTh>类型</MudTh>
+                                    <MudTh>起点节点 ID</MudTh>
+                                    <MudTh>权重</MudTh>
+                                    <MudTh>操作</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="类型">
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                                            @context.EdgeTypeDisplayName
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="起点">
+                                        <code>@context.FromNodeId</code>
+                                    </MudTd>
+                                    <MudTd DataLabel="权重">
+                                        @(context.Weight.HasValue ? context.Weight.Value.ToString("0.####") : "—")
+                                    </MudTd>
+                                    <MudTd DataLabel="操作">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Size="Size.Small"
+                                                       Color="Color.Error"
+                                                       OnClick="@(async () => await DeleteEdgeAsync(context))"
+                                                       title="删除" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    }
+                </MudTabPanel>
+
+            </MudTabs>
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
@@ -115,35 +249,127 @@
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
 
-    private void OnAddChild()
+    @inject EavApiClient Api
+    @inject ISnackbar Snackbar
+    @inject IDialogService DialogService
+
+    // ---- 关系数据 ----
+    private IReadOnlyList<EdgeTypeDto> _edgeTypes = [];
+    private string _filterEdgeTypeId = "";
+    private bool _edgesLoading;
+    private List<EdgeInstanceDto> _outgoing = [];
+    private List<EdgeInstanceDto> _incoming = [];
+    private bool _edgesInitialized;
+
+    private string NodeId => NodeTemplate.Node.Value!.Id;
+
+    private bool HasAnyEdges => _outgoing.Count > 0 || _incoming.Count > 0;
+
+    private string RelationsTabText
     {
-        CloseWithAction(NodeAction.AddChild);
+        get
+        {
+            var total = _outgoing.Count + _incoming.Count;
+            return total > 0 ? $"关系 ({total})" : "关系";
+        }
     }
 
-    private void OnEdit()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        CloseWithAction(NodeAction.Edit);
+        if (firstRender && !_edgesInitialized)
+        {
+            _edgesInitialized = true;
+            await LoadEdgesAsync();
+            StateHasChanged();
+        }
     }
 
-    private void OnDelete()
+    private async Task LoadEdgesAsync()
     {
-        CloseWithAction(NodeAction.Delete);
+        _edgesLoading = true;
+        try
+        {
+            if (string.IsNullOrEmpty(_filterEdgeTypeId))
+            {
+                // 查所有边类型
+                _edgeTypes = await Api.ListEdgeTypesAsync() ?? [];
+                var allOut = new List<EdgeInstanceDto>();
+                var allIn = new List<EdgeInstanceDto>();
+
+                foreach (var et in _edgeTypes)
+                {
+                    var o = await Api.FindOutgoingEdgesAsync(et.EdgeTypeId, NodeId);
+                    var i = await Api.FindIncomingEdgesAsync(et.EdgeTypeId, NodeId);
+                    if (o != null) allOut.AddRange(o);
+                    if (i != null) allIn.AddRange(i);
+                }
+
+                _outgoing = allOut;
+                _incoming = allIn;
+            }
+            else
+            {
+                var o = await Api.FindOutgoingEdgesAsync(_filterEdgeTypeId, NodeId);
+                var i = await Api.FindIncomingEdgesAsync(_filterEdgeTypeId, NodeId);
+                _outgoing = (o ?? []).ToList();
+                _incoming = (i ?? []).ToList();
+            }
+        }
+        finally { _edgesLoading = false; }
     }
 
-    private void OnMove()
+    private Task OnFilterChanged(string? edgeTypeId)
     {
-        CloseWithAction(NodeAction.Move);
+        _filterEdgeTypeId = edgeTypeId ?? "";
+        _ = LoadEdgesAsync();
+        return Task.CompletedTask;
     }
 
-    private void OnSort()
+    private async Task OpenCreateEdgeAsync()
     {
-        CloseWithAction(NodeAction.Sort);
+        var parameters = new DialogParameters
+        {
+            { "PreFillFromNodeId", NodeId },
+            { "PreFillEdgeTypeId", string.IsNullOrEmpty(_filterEdgeTypeId) ? null : _filterEdgeTypeId }
+        };
+
+        var dialog = await DialogService.ShowAsync<EdgeDialog>(
+            string.Empty, parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadEdgesAsync();
+        }
     }
 
-    private void OnAttribute()
+    private async Task DeleteEdgeAsync(EdgeInstanceDto edge)
     {
-        CloseWithAction(NodeAction.Attribute);
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除这条关系吗？\n\n类型：{edge.EdgeTypeDisplayName}\n从 {edge.FromNodeId} → {edge.ToNodeId}",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteEdgeAsync(edge.EdgeTypeId, edge.EdgeId);
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await LoadEdgesAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知"}", Severity.Error);
+        }
     }
+
+    private void OnAddChild() => CloseWithAction(NodeAction.AddChild);
+    private void OnEdit() => CloseWithAction(NodeAction.Edit);
+    private void OnDelete() => CloseWithAction(NodeAction.Delete);
+    private void OnMove() => CloseWithAction(NodeAction.Move);
+    private void OnSort() => CloseWithAction(NodeAction.Sort);
+    private void OnAttribute() => CloseWithAction(NodeAction.Attribute);
 
     private void CloseWithAction(NodeAction action)
     {
@@ -154,12 +380,7 @@
         }));
     }
 
-    private void Close()
-    {
-        MudDialog?.Close(DialogResult.Cancel());
-    }
+    private void Close() => MudDialog?.Close(DialogResult.Cancel());
 
-    public void Dispose()
-    {
-    }
+    public void Dispose() { }
 }

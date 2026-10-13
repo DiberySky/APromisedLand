@@ -1,0 +1,180 @@
+@* EdgeMetadata.razor — 边类型管理 *@
+@page "/metadata/edge-types"
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>边类型管理</PageTitle>
+
+<PageHeaderSky Title="边类型管理">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   Size="Size.Small"
+                   OnClick="LoadAsync" Disabled="@_loading"
+                   StartIcon="@Icons.Material.Filled.Refresh">
+            刷新
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   Size="Size.Small"
+                   OnClick="OpenCreateAsync"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Class="ml-2">
+            新建边类型
+        </MudButton>
+    </Actions>
+</PageHeaderSky>
+
+<MudTable Items="_types" Hover="true" Bordered="true"
+          Dense="true"
+          Breakpoint="Breakpoint.Sm"
+          Loading="@_loading"
+          LoadingProgressColor="Color.Primary">
+    <HeaderContent>
+        <MudTh>类型名</MudTh>
+        <MudTh>显示名</MudTh>
+        <MudTh>起点类型</MudTh>
+        <MudTh>终点类型</MudTh>
+        <MudTh>全局</MudTh>
+        <MudTh>有向</MudTh>
+        <MudTh>描述</MudTh>
+        <MudTh>操作</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="类型名">
+            <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.TypeName</MudChip>
+        </MudTd>
+        <MudTd DataLabel="显示名">@context.DisplayName</MudTd>
+        <MudTd DataLabel="起点类型">
+            @if (!string.IsNullOrEmpty(context.FromNodeType))
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                    @context.FromNodeType
+                </MudChip>
+            }
+            else { <MudText Typo="Typo.caption" Color="Color.Secondary">不限</MudText> }
+        </MudTd>
+        <MudTd DataLabel="终点类型">
+            @if (!string.IsNullOrEmpty(context.ToNodeType))
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                    @context.ToNodeType
+                </MudChip>
+            }
+            else { <MudText Typo="Typo.caption" Color="Color.Secondary">不限</MudText> }
+        </MudTd>
+        <MudTd DataLabel="全局">
+            @if (context.IsGlobal) { <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" /> }
+        </MudTd>
+        <MudTd DataLabel="有向">
+            @if (context.IsDirected)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Color="Color.Primary" Size="Size.Small" />
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Color="Color.Tertiary" Size="Size.Small" />
+            }
+        </MudTd>
+        <MudTd DataLabel="描述">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @(string.IsNullOrEmpty(context.Description) ? "—" : context.Description)
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="操作">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                           Size="Size.Medium"
+                           Color="Color.Primary"
+                           OnClick="@(async () => await OpenEditAsync(context))"
+                           title="编辑" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Medium"
+                           Color="Color.Error"
+                           OnClick="@(async () => await DeleteAsync(context))"
+                           title="删除（硬删，会同时清理属性定义和所有边实例）" />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <EmptyStateSky Icon="@Icons.Material.Filled.AccountTree"
+                       Title="暂无边类型">
+            <Description>
+                <text>点击"新建边类型"创建第一个关系类型</text>
+            </Description>
+        </EmptyStateSky>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<EdgeTypeDto>? _types;
+    private bool _loading;
+    private bool _initialized;
+
+    private static readonly DialogOptions DialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _types = await Api.ListEdgeTypesAsync() ?? Array.Empty<EdgeTypeDto>();
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<EdgeDefinitionCreateDialog>(
+            string.Empty, DialogOptions);
+        var result = await dialog.Result;
+        if (result is { Canceled: false }) await LoadAsync();
+    }
+
+    private async Task OpenEditAsync(EdgeTypeDto type)
+    {
+        var parameters = new DialogParameters<EdgeDefinitionEditDialog>
+        {
+            { x => x.Type, type }
+        };
+        var dialog = await DialogService.ShowAsync<EdgeDefinitionEditDialog>(
+            string.Empty, parameters, DialogOptions);
+        var result = await dialog.Result;
+        if (result is { Canceled: false }) await LoadAsync();
+    }
+
+    private async Task DeleteAsync(EdgeTypeDto type)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除边类型「{type.DisplayName}」({type.TypeName})？\n\n" +
+            "★ 此为硬删除，将同时：\n" +
+            "  · 删除所有关联的边实例\n" +
+            "  · 删除该类型在 EAV 中的所有属性定义\n" +
+            "  · 删除所有属性值\n\n" +
+            "请确认已无其他引用。",
+            yesText: "确认删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteEdgeTypeAsync(type.EdgeTypeId);
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+}

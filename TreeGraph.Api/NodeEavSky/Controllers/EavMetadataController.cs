@@ -54,12 +54,15 @@ public class EavMetadataController : ControllerBase
             return BadRequest(new { error = $"未知的 dataType: {req.DataType}" });
 
         // ---- 实体类型存在性 ----
+        // 同时支持 entity_types（iNode 实体类型）和 edge_definitions（边类型）的 TypeName
         var entityTypeExists = await _db.EntityTypes
             .AnyAsync(t => t.EntityType == req.EntityType && !t.IsDeleted, ct);
-        if (!entityTypeExists)
+        var edgeTypeExists = await _db.EdgeDefinitions
+            .AnyAsync(e => e.TypeName == req.EntityType, ct);
+        if (!entityTypeExists && !edgeTypeExists)
             return BadRequest(new
             {
-                error = $"实体类型不存在: {req.EntityType}。请先在「实体类型管理」中创建"
+                error = $"实体类型不存在: {req.EntityType}。请先在「实体类型管理」或「边类型管理」中创建"
             });
 
         // ---- 引用互斥 ----
@@ -269,6 +272,21 @@ public class EavMetadataController : ControllerBase
             return BadRequest(new { error = "只有 composite 类型可以引用组合类型" });
         }
 
+        // ★ 单位只允许 int / decimal
+        if (req.UnitId is not null)
+        {
+            if (req.DataType != EavDataTypes.Decimal && req.DataType != "int")
+                return BadRequest(new
+                {
+                    error = "只有 int / decimal 类型可以绑定单位（数据库 CHECK 约束）"
+                });
+
+            var unitExists = await _db.UnitTrees
+                .AnyAsync(u => u.Id == req.UnitId, ct);
+            if (!unitExists)
+                return BadRequest(new { error = $"单位不存在: {req.UnitId}" });
+        }
+
         var col = new CustomTableColumn
         {
             TableDefinitionId = id,
@@ -285,7 +303,8 @@ public class EavMetadataController : ControllerBase
             ValidationRule = req.ValidationRule is null
                 ? null : JsonDocument.Parse(req.ValidationRule.Value.GetRawText()),
             AllowedValues = req.AllowedValues is null
-                ? null : JsonDocument.Parse(req.AllowedValues.Value.GetRawText())
+                ? null : JsonDocument.Parse(req.AllowedValues.Value.GetRawText()),
+            UnitId = req.UnitId
         };
         _db.CustomTableColumns.Add(col);
         await _db.SaveChangesAsync(ct);
@@ -333,13 +352,13 @@ public class EavMetadataController : ControllerBase
             return BadRequest(new { error = "只有 composite 类型可以引用组合类型" });
         }
 
-        // ★ 单位只允许 decimal
+        // ★ 单位只允许 int / decimal
         if (req.UnitId is not null)
         {
-            if (req.DataType != EavDataTypes.Decimal)
+            if (req.DataType != EavDataTypes.Decimal && req.DataType != "int")
                 return BadRequest(new
                 {
-                    error = "只有 decimal 类型可以绑定单位（数据库 CHECK 约束）"
+                    error = "只有 int / decimal 类型可以绑定单位（数据库 CHECK 约束）"
                 });
 
             var unitExists = await _db.UnitTrees
@@ -433,7 +452,9 @@ public class EavMetadataController : ControllerBase
         [FromQuery] bool includeDeleted = false,
         CancellationToken ct = default)
     {
-        var query = _db.CustomTables.Include(t => t.Columns).AsQueryable();
+        var query = _db.CustomTables
+            .Include(t => t.Columns).ThenInclude(c => c.Unit)
+            .AsQueryable();
         if (!includeDeleted) query = query.Where(t => !t.IsDeleted);
         if (!string.IsNullOrEmpty(entityType))
             query = query.Where(t => t.EntityType == entityType);
@@ -475,7 +496,8 @@ public class EavMetadataController : ControllerBase
     [HttpDelete("custom-tables/{id}")]
     public async Task<IActionResult> DeleteCustomTable(string id, CancellationToken ct)
     {
-        var table = await _db.CustomTables.Include(t => t.Columns)
+        var table = await _db.CustomTables
+            .Include(t => t.Columns).ThenInclude(c => c.Unit)
             .FirstOrDefaultAsync(t => t.TableDefinitionId == id, ct);
         if (table is null) return NotFound();
 
@@ -515,6 +537,25 @@ public class EavMetadataController : ControllerBase
             col.AllowedValues = JsonDocument.Parse(req.AllowedValues.Value.GetRawText());
         if (req.ValidationRule is not null)
             col.ValidationRule = JsonDocument.Parse(req.ValidationRule.Value.GetRawText());
+
+        // ★ UnitId 更新：ClearUnitId 优先；否则校验后写入
+        if (req.ClearUnitId)
+            col.UnitId = null;
+        else if (req.UnitId is not null)
+        {
+            if (col.DataType != EavDataTypes.Decimal && col.DataType != "int")
+                return BadRequest(new
+                {
+                    error = "只有 int / decimal 类型可以绑定单位（数据库 CHECK 约束）"
+                });
+
+            var unitExists = await _db.UnitTrees
+                .AnyAsync(u => u.Id == req.UnitId, ct);
+            if (!unitExists)
+                return BadRequest(new { error = $"单位不存在: {req.UnitId}" });
+
+            col.UnitId = req.UnitId;
+        }
 
         await _db.SaveChangesAsync(ct);
         _customTableCache.Invalidate(id);
@@ -878,7 +919,8 @@ public class EavMetadataController : ControllerBase
                 c.DefaultValue,
                 c.AllowedValues != null ? c.AllowedValues.RootElement.Clone() : (JsonElement?)null,
                 c.ValidationRule != null ? c.ValidationRule.RootElement.Clone() : (JsonElement?)null,
-                c.IsDeleted))                    // ★ 透出列的删除状态
+                c.UnitId, c.Unit?.Name, c.Unit?.Abbreviation,
+                c.IsDeleted))
             .ToList(),
         t.IsDeleted);                            // ★ 透出表的删除状态
 

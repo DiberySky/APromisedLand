@@ -78,6 +78,7 @@ public class CreateTableColumnRequest
     public string? DefaultValue { get; set; }
     public JsonElement? AllowedValues { get; set; }
     public JsonElement? ValidationRule { get; set; }
+    public string? UnitId { get; set; }
 }
 
 public record CompositeTypeDetailDto(
@@ -158,6 +159,9 @@ public record CustomTableColumnDto(
     string? DefaultValue,
     JsonElement? AllowedValues,
     JsonElement? ValidationRule,
+    string? UnitId = null,
+    string? UnitName = null,
+    string? UnitAbbreviation = null,
     bool IsDeleted = false);
 
 public class UpdateCustomTableRequest
@@ -177,6 +181,9 @@ public class UpdateTableColumnRequest
     public string? DefaultValue { get; set; }
     public JsonElement? AllowedValues { get; set; }
     public JsonElement? ValidationRule { get; set; }
+
+    public string? UnitId { get; set; }
+    public bool ClearUnitId { get; set; }
 }
 
 public record AttributeDetailDto(

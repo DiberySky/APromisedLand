@@ -1,0 +1,310 @@
+@* EdgeDialog.razor — 创建 / 编辑边实例 *@
+@using System.Text.Json
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@(IsEdit ? "编辑边" : "创建边")"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+           SubmitButtonDisabled="@_submitting"
+           ActionsMaxWidth="MaxWidth.False"
+           OnSubmitClick="SaveAsync">
+    <DialogContent>
+        @if (!IsEdit)
+        {
+            @* 创建模式：选类型 *@
+            <MudSelect T="string"
+                       Value="_form.EdgeTypeId"
+                       ValueChanged="OnEdgeTypeChanged"
+                       Label="边类型"
+                       Variant="Variant.Outlined"
+                       Class="mb-3"
+                       Clearable="false">
+                <MudSelectItem T="string" Value="@("")">请选择边类型</MudSelectItem>
+                @foreach (var et in _edgeTypes)
+                {
+                    <MudSelectItem T="string" Value="@et.EdgeTypeId">
+                        @et.DisplayName（@et.TypeName）
+                        @if (!et.IsGlobal)
+                        {
+                            <MudText Typo="Typo.caption" Class="ml-1" Color="Color.Secondary">
+                                [@et.FromNodeType → @et.ToNodeType]
+                            </MudText>
+                        }
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+        else
+        {
+            @* 编辑模式：展示类型名（只读） *@
+            <MudTextField T="string"
+                          Value="@_form.EdgeTypeDisplayName"
+                          Label="边类型"
+                          Variant="Variant.Outlined"
+                          ReadOnly="true"
+                          Class="mb-3" />
+        }
+
+        @* 节点对 + 权重 *@
+        <div Class="d-flex mb-3">
+            <MudTextField @bind-Value="_form.FromNodeId"
+                          Label="起点节点 ID"
+                          Variant="Variant.Outlined"
+                          Class="flex-grow-1 mr-3"
+                          Placeholder="UnitTree / CategoryTree 节点 ID"
+                          ReadOnly="@IsEdit" />
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward"
+                     Class="d-flex align-center mr-3"
+                     Color="@(_currentEdgeType?.IsDirected == false
+                         ? Color.Tertiary : Color.Primary)" />
+            <MudTextField @bind-Value="_form.ToNodeId"
+                          Label="终点节点 ID"
+                          Variant="Variant.Outlined"
+                          Class="flex-grow-1"
+                          Placeholder="目标节点 ID"
+                          ReadOnly="@IsEdit" />
+        </div>
+
+        @* 权重 *@
+        <MudNumericField T="decimal?"
+                         @bind-Value="_form.Weight"
+                         Label="权重（可选）"
+                         Variant="Variant.Outlined"
+                         Class="mb-3"
+                         Step="0.0001M"
+                         Precision="4" />
+
+        @* EAV 属性（DynamicForm） *@
+        @if (_schema is { Count: > 0 })
+        {
+            <MudDivider Class="my-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    关系属性（复用 EAV 属性系统）
+                </MudText>
+            </MudDivider>
+
+            <DynamicForm @ref="_formRef"
+                         EntityType="@EdgeTypeName"
+                         EntityId="@(IsEdit ? _form.EdgeId : "")"
+                         Schema="@_schema"
+                         CompactLayout="true"
+                         ReadOnly="false"
+                         OnSubmit="CaptureEavValues" />
+        }
+        else if (!string.IsNullOrEmpty(_form.EdgeTypeId))
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                当前边类型未定义属性。可到「边类型 → 属性定义」中为
+                <code>@_currentEdgeType?.TypeName</code> 创建属性。
+            </MudAlert>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public EdgeInstanceDto? Editing { get; set; }
+    [Parameter] public string? PreFillFromNodeId { get; set; }
+    [Parameter] public string? PreFillToNodeId { get; set; }
+    [Parameter] public string? PreFillEdgeTypeId { get; set; }
+
+    private bool IsEdit => Editing is not null;
+
+    private string EdgeTypeName => _currentEdgeType?.TypeName ?? "";
+
+    private EdgeFormModel _form = new();
+    private bool _submitting;
+
+    private IReadOnlyList<EdgeTypeDto> _edgeTypes = [];
+    private EdgeTypeDto? _currentEdgeType;
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+
+    private DynamicForm? _formRef;
+    private Dictionary<string, object?> _eavValues = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _edgeTypes = await Api.ListEdgeTypesAsync() ?? [];
+
+        if (IsEdit && Editing is not null)
+        {
+            var type = _edgeTypes.FirstOrDefault(t => t.EdgeTypeId == Editing.EdgeTypeId);
+            _currentEdgeType = type;
+
+            _form = new EdgeFormModel
+            {
+                EdgeId = Editing.EdgeId,
+                EdgeTypeId = Editing.EdgeTypeId,
+                EdgeTypeDisplayName = Editing.EdgeTypeDisplayName,
+                FromNodeId = Editing.FromNodeId,
+                ToNodeId = Editing.ToNodeId,
+                Weight = Editing.Weight
+            };
+
+            if (type is not null)
+            {
+                _schema = await Api.GetSchemaAsync(type.TypeName);
+                if (_schema is { Count: > 0 } && Editing.Properties is not null)
+                {
+                    // DynamicForm.LoadFrom 接受 Dictionary<string, JsonElement>
+                    _formRef?.LoadFrom(Editing.Properties);
+                }
+            }
+        }
+        else
+        {
+            _form = new EdgeFormModel
+            {
+                FromNodeId = PreFillFromNodeId ?? "",
+                ToNodeId = PreFillToNodeId ?? "",
+                EdgeTypeId = PreFillEdgeTypeId ?? ""
+            };
+
+            if (!string.IsNullOrEmpty(PreFillEdgeTypeId))
+                await OnEdgeTypeChanged(PreFillEdgeTypeId);
+        }
+    }
+
+    private async Task OnEdgeTypeChanged(string? edgeTypeId)
+    {
+        _form.EdgeTypeId = edgeTypeId ?? "";
+        _currentEdgeType = _edgeTypes.FirstOrDefault(t => t.EdgeTypeId == edgeTypeId);
+        _eavValues.Clear();
+
+        if (_currentEdgeType is not null)
+        {
+            _schema = await Api.GetSchemaAsync(_currentEdgeType.TypeName);
+        }
+        else
+        {
+            _schema = null;
+        }
+    }
+
+    private void CaptureEavValues(Dictionary<string, object?> values)
+    {
+        _eavValues = new Dictionary<string, object?>(values);
+    }
+
+    private async Task SaveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            // 1. 让 DynamicForm 先把值收集好
+            if (_schema is { Count: > 0 } && _formRef is not null)
+            {
+                await _formRef.SubmitAsync();
+                // SubmitAsync 内部调 OnSubmit → CaptureEavValues
+                // 如果表单不合法会提前 return，但这里我们没简单办法知道
+                // 保守策略：即便有验证失败也继续保存边实例本身
+            }
+
+            if (IsEdit)
+                await UpdateEdgeAsync();
+            else
+                await CreateEdgeAsync();
+        }
+        finally { _submitting = false; }
+    }
+
+    private async Task CreateEdgeAsync()
+    {
+        if (string.IsNullOrEmpty(_form.EdgeTypeId))
+        {
+            Snackbar.Add("请选择边类型", Severity.Warning);
+            return;
+        }
+        if (string.IsNullOrEmpty(_form.FromNodeId) || string.IsNullOrEmpty(_form.ToNodeId))
+        {
+            Snackbar.Add("请填写起点和终点节点 ID", Severity.Warning);
+            return;
+        }
+
+        // 构造 CreateEdgeRequest（EAV 属性放 Properties）
+        var request = new CreateEdgeRequest
+        {
+            FromNodeId = _form.FromNodeId,
+            ToNodeId = _form.ToNodeId,
+            Weight = _form.Weight,
+            Properties = _eavValues.Count > 0
+                ? ToJsonElementDict(_eavValues)
+                : null
+        };
+
+        var edgeId = await Api.CreateEdgeAsync(_form.EdgeTypeId, request);
+        if (edgeId is null)
+        {
+            Snackbar.Add("创建失败（节点可能不存在，或该边已存在）", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("创建成功", Severity.Success);
+        MudDialog?.Close(DialogResult.Ok(true));
+    }
+
+    private async Task UpdateEdgeAsync()
+    {
+        if (Editing is null || _currentEdgeType is null) return;
+
+        // 2a. 更新边实例本身（Weight）
+        var req = new UpdateEdgeRequest { Weight = _form.Weight };
+        var (ok, error) = await Api.UpdateEdgeAsync(
+            Editing.EdgeTypeId, Editing.EdgeId, req);
+
+        if (!ok)
+        {
+            Snackbar.Add($"更新失败：{error ?? "未知"}", Severity.Error);
+            return;
+        }
+
+        // 2b. 更新 EAV 属性（如果有）
+        if (_eavValues.Count > 0)
+        {
+            var (eavOk, eavError, _) = await Api.SaveEntityAsync(
+                _currentEdgeType.TypeName, Editing.EdgeId, _eavValues);
+
+            if (!eavOk)
+            {
+                Snackbar.Add($"边实例已更新，但属性保存失败：{eavError ?? ""}",
+                    Severity.Warning);
+                return;
+            }
+        }
+
+        Snackbar.Add("保存成功", Severity.Success);
+        MudDialog?.Close(DialogResult.Ok(true));
+    }
+
+    /// <summary>object? → JsonElement（为 CreateEdgeRequest.Properties）。</summary>
+    private static Dictionary<string, JsonElement>? ToJsonElementDict(
+        Dictionary<string, object?> values)
+    {
+        var dict = new Dictionary<string, JsonElement>();
+        foreach (var (k, v) in values)
+        {
+            try
+            {
+                dict[k] = JsonSerializer.SerializeToElement(v);
+            }
+            catch
+            {
+                dict[k] = JsonSerializer.SerializeToElement(v?.ToString());
+            }
+        }
+        return dict;
+    }
+
+    private class EdgeFormModel
+    {
+        public string EdgeId { get; set; } = "";
+        public string EdgeTypeId { get; set; } = "";
+        public string EdgeTypeDisplayName { get; set; } = "";
+        public string FromNodeId { get; set; } = "";
+        public string ToNodeId { get; set; } = "";
+        public decimal? Weight { get; set; }
+    }
+}

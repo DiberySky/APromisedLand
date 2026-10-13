@@ -24,6 +24,10 @@ public class TreeGraphDbContext : DbContext
     public DbSet<InodeEntityType> InodeEntityTypes => Set<InodeEntityType>();
     public DbSet<InodeEntity> InodeEntities => Set<InodeEntity>();
 
+    // Edge（关系/边）
+    public DbSet<EdgeDefinition> EdgeDefinitions => Set<EdgeDefinition>();
+    public DbSet<EdgeInstance> EdgeInstances => Set<EdgeInstance>();
+
     // TreeEavSky：计量单位树 / 分类树
     public DbSet<UnitTree> UnitTrees => Set<UnitTree>();
     public DbSet<CategoryTree> CategoryTrees => Set<CategoryTree>();
@@ -42,6 +46,7 @@ public class TreeGraphDbContext : DbContext
         ConfigureCompositeTypes(mb);
         ConfigureCustomTables(mb);
         ConfigureAuditLog(mb);
+        ConfigureEdges(mb);
         ConfigureUnitTrees(mb);
         ConfigureCategoryTrees(mb);
     }
@@ -514,7 +519,14 @@ public class TreeGraphDbContext : DbContext
 
         mb.Entity<CustomTableColumn>(e =>
         {
-            e.ToTable("custom_table_columns");
+            // CHECK：int / decimal 才能绑单位
+            e.ToTable("custom_table_columns", t =>
+            {
+                t.HasCheckConstraint(
+                    "ck_custom_table_column_numeric_unit",
+                    "data_type IN ('int', 'decimal') OR unit_id IS NULL");
+            });
+
             e.HasKey(x => x.ColumnId);
             e.Property(x => x.ColumnId)
                 .HasColumnName("column_id")
@@ -535,6 +547,7 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.DefaultValue).HasColumnName("default_value").HasMaxLength(500);
             e.Property(x => x.ValidationRule).HasColumnName("validation_rule").HasColumnType("jsonb");
             e.Property(x => x.AllowedValues).HasColumnName("allowed_values").HasColumnType("jsonb");
+            e.Property(x => x.UnitId).HasColumnName("unit_id").HasMaxLength(36);
 
             e.HasIndex(x => new { x.TableDefinitionId, x.ColumnName })
                 .IsUnique().HasDatabaseName("uq_custom_table_column");
@@ -543,6 +556,8 @@ public class TreeGraphDbContext : DbContext
                 .HasForeignKey(x => x.TableDefinitionId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.RefCompositeType).WithMany()
                 .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Unit).WithMany()
+                .HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
         });
 
         mb.Entity<CustomTableRow>(e =>
@@ -604,6 +619,75 @@ public class TreeGraphDbContext : DbContext
                 .HasDatabaseName("ix_audit_entity")
                 .IsDescending(false, false, true);
             e.HasIndex(x => x.ChangedAt).HasDatabaseName("ix_audit_time");
+        });
+    }
+
+    // ============================================================
+    // Edge（关系/边）
+    // ============================================================
+    private static void ConfigureEdges(ModelBuilder mb)
+    {
+        mb.Entity<EdgeDefinition>(e =>
+        {
+            e.ToTable("edge_definitions");
+            e.HasKey(x => x.EdgeTypeId);
+            e.Property(x => x.EdgeTypeId)
+                .HasColumnName("edge_type_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(100).IsRequired();
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.FromNodeType).HasColumnName("from_node_type").HasMaxLength(100);
+            e.Property(x => x.ToNodeType).HasColumnName("to_node_type").HasMaxLength(100);
+            e.Property(x => x.IsGlobal).HasColumnName("is_global");
+            e.Property(x => x.IsDirected).HasColumnName("is_directed");
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasIndex(x => x.TypeName)
+                .IsUnique()
+                .HasDatabaseName("uq_edge_definition_type_name");
+        });
+
+        mb.Entity<EdgeInstance>(e =>
+        {
+            e.ToTable("edge_instances");
+            e.HasKey(x => x.EdgeId);
+            e.Property(x => x.EdgeId)
+                .HasColumnName("edge_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EdgeTypeId).HasColumnName("edge_type_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.FromNodeId).HasColumnName("from_node_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.ToNodeId).HasColumnName("to_node_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.Weight).HasColumnName("weight").HasPrecision(18, 4);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // 同类型同方向不重复（UNIQUE）
+            e.HasIndex(x => new { x.EdgeTypeId, x.FromNodeId, x.ToNodeId })
+                .IsUnique()
+                .HasDatabaseName("uq_edge_instance");
+
+            // 图查询索引：from 出边 / to 入边
+            e.HasIndex(x => new { x.EdgeTypeId, x.FromNodeId })
+                .HasDatabaseName("ix_ei_from");
+            e.HasIndex(x => new { x.EdgeTypeId, x.ToNodeId })
+                .HasDatabaseName("ix_ei_to");
+
+            // 反向图查询：按 node_id 查所有关联边（不分类型）
+            e.HasIndex(x => x.FromNodeId).HasDatabaseName("ix_ei_from_node");
+            e.HasIndex(x => x.ToNodeId).HasDatabaseName("ix_ei_to_node");
+
+            // FK：级联删 Definition → 级联删 Instance
+            e.HasOne(x => x.EdgeType)
+                .WithMany(d => d.Instances)
+                .HasForeignKey(x => x.EdgeTypeId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
