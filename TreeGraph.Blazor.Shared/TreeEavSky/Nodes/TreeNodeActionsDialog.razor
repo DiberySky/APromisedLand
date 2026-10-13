@@ -7,6 +7,10 @@
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
 <DialogSky Title="节点操作">
     <ToolBarContent>
         @if (IsBoot)
@@ -249,9 +253,7 @@
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
 
-    @inject EavApiClient Api
-    @inject ISnackbar Snackbar
-    @inject IDialogService DialogService
+   
 
     // ---- 关系数据 ----
     private IReadOnlyList<EdgeTypeDto> _edgeTypes = [];
