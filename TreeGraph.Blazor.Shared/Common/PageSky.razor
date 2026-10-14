@@ -62,7 +62,7 @@
 }
 
 @code {
-    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public required string Title { get; set; }
     [Parameter] public bool ArrowBackVisible { get; set; } = true;
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.False;
     [Parameter] public bool BottomBarVisible { get; set; } = false;

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Components.WebView.Maui;
 using TreeGraph.Blazor.Maui;
 using TreeGraph.Blazor.Maui.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
+using TreeGraph.Blazor.Shared.SpaceSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
 using TreeGraph.Blazor.Shared.TreeEavSky.Services;
@@ -70,6 +71,14 @@ public static class MauiProgram
         builder.Services.AddScoped<EntityTypeDisplayService>();
         builder.Services
             .AddHttpClient<EavApiClient>(client =>
+            {
+                client.BaseAddress = new Uri("https+http://treegrapheavapi");
+            })
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+        // ★ SpaceSky 空间 CRUD 客户端（/Space）：与 EavApiClient 同款服务发现与弹性策略。
+        builder.Services
+            .AddHttpClient<SpaceApiClient>(client =>
             {
                 client.BaseAddress = new Uri("https+http://treegrapheavapi");
             })

@@ -21,6 +21,11 @@
                 </DevDialogSourceButton>
                 <MudSpacer/>
 
+                @if (TopBarRightContent != null)
+                {
+                    @TopBarRightContent
+                }
+
                 @if (StartButtonVisible)
                 {
                     <MudIconButton Icon="@Icons.Material.Outlined.Menu"
@@ -105,6 +110,8 @@
     [Parameter] public string ActionsContentClass { get; set; } = "mr-8 py-3";
 
     [Parameter] public RenderFragment? ToolBarContent { get; set; }
+    /// <summary>标题栏右上角内容（图标按钮等）。</summary>
+    [Parameter] public RenderFragment? TopBarRightContent { get; set; }
     [Parameter] public RenderFragment? DialogContent { get; set; }
     [Parameter] public RenderFragment? DialogActions { get; set; }
 

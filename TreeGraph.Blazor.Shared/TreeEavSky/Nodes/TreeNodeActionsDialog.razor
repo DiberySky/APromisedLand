@@ -11,6 +11,15 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
+<style>
+    /* 选项卡图标小号（MudTabPanel 无 Size 参数，用作用域 CSS 控制） */
+    .tna-tabs .mud-tab .mud-icon-root {
+        width: 12px;
+        height: 12px;
+        font-size: 12px;
+    }
+</style>
+
 <DialogSky Title="节点操作">
     <ToolBarContent>
         @if (IsBoot)
@@ -34,7 +43,7 @@
     </ToolBarContent>
     <DialogContent>
         <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
-            <MudTabs Elevation="0" Rounded="true">
+            <MudTabs Elevation="0" Rounded="true" Class="tna-tabs">
 
                 @* ===== Tab 1: 基本信息 ===== *@
                 <MudTabPanel Text="基本信息"

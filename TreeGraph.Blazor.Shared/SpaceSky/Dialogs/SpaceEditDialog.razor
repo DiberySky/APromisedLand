@@ -1,0 +1,72 @@
+@* SpaceEditDialog.razor — 编辑空间（DialogSky 外壳） *@
+@using TreeGraph.Blazor.Shared.SpaceSky
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
+@inject SpaceApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="编辑空间"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="UpdateAsync">
+    <DialogContent>
+        <MudTextField @bind-Value="_form.Name"
+                      Label="名称"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_form.Description"
+                      Label="描述"
+                      Variant="Variant.Outlined"
+                      Lines="3" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public SpaceDto? Space { get; set; }
+
+    private readonly SpaceDto _form = new();
+    private bool _submitting;
+
+    protected override void OnParametersSet()
+    {
+        if (Space is not null)
+        {
+            _form.Name = Space.Name;
+            _form.Description = Space.Description;
+        }
+    }
+
+    private async Task UpdateAsync()
+    {
+        if (Space is null) return;
+
+        if (string.IsNullOrWhiteSpace(_form.Name))
+        {
+            Snackbar.Add("请填写名称", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var updated = await Api.UpdateAsync(Space.Id, _form);
+            if (updated is null)
+            {
+                Snackbar.Add("更新失败：空间不存在或已被删除", Severity.Error);
+                return;
+            }
+            Snackbar.Add("更新成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(updated));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"更新失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

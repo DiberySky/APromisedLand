@@ -1168,6 +1168,29 @@ namespace TreeGraph.Api.Data.Migrations
                     b.ToTable("option_sets", (string)null);
                 });
 
+            modelBuilder.Entity("TreeGraph.Api.SpaceSky.Entities.Space", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("spaces", (string)null);
+                });
+
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", b =>
                 {
                     b.Property<string>("Id")
@@ -1329,12 +1352,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("id");
 
-                    b.Property<string>("Abbreviation")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("abbreviation");
-
                     b.Property<bool>("CanHaveChildren")
                         .HasColumnType("boolean")
                         .HasColumnName("can_have_children");
@@ -1374,7 +1391,6 @@ namespace TreeGraph.Api.Data.Migrations
                         new
                         {
                             Id = "EBBAD64B-2119-47EB-95C3-01D3DD796774",
-                            Abbreviation = "",
                             CanHaveChildren = true,
                             Description = "",
                             HasChildren = false,

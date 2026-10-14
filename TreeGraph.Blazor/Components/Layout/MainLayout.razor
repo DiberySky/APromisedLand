@@ -29,9 +29,8 @@
     </MudDrawer>
 
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
-            @Body
-        </MudContainer>
+        @* 全出血：外层不再加容器/边距，留白由各页面骨架（PageSky 等）自控 *@
+        @Body
     </MudMainContent>
 </MudLayout>
 

@@ -1,0 +1,158 @@
+@* SpaceListPage.razor — 空间管理页（Tab 集成）：「空间」只读列表（Tree 图标打开空间树对话框）+「空间维护」CRUD 面板。 *@
+@page "/spaces"
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.SpaceSky
+@using TreeGraph.Blazor.Shared.SpaceSky.Components
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space
+@using TreeGraph.Blazor.Shared.TreeEavSky.Services
+@using TreeGraph.Shared.TreeEavSky.Entities
+@using TreeGraph.Shared.TreeEavSky.Models
+@inject SpaceApiClient Api
+@inject TreeApiClient<SpaceTree> TreeApi
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>空间管理</PageTitle>
+
+@* 选项卡图标缩至 12px（scoped 类限定本页，不影响全局 MudTabs） *@
+<style>
+    .spaces-tabs .mud-tab .mud-icon-root {
+        font-size: 12px;
+        width: 12px;
+        height: 12px;
+    }
+</style>
+
+<PageSky Title="空间管理" ArrowBackVisible="false">
+    <PageContent>
+        <MudTabs Elevation="0" ApplyEffectsToContainer="true" Class="spaces-tabs">
+            <MudTabPanel Text="空间" Icon="@Icons.Material.Filled.Workspaces">
+                @if (_loading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                }
+                else if (_spaces is null || _spaces.Count == 0)
+                {
+                    <EmptyStateSky Icon="@Icons.Material.Filled.Workspaces"
+                                   Title="暂无空间">
+                        <Description>
+                            <text>切换到"空间维护"创建第一个</text>
+                        </Description>
+                    </EmptyStateSky>
+                }
+                else
+                {
+                    @* 表格底色纯黑，与页面底色拉开对比 *@
+                    <MudTable Items="_spaces" Hover="true"
+                              Style="background-color: #000;">
+                        <HeaderContent>
+                            <MudTh>名称</MudTh>
+                            <MudTh>描述</MudTh>
+                            <MudTh Style="width: 80px;">操作</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Name</MudTd>
+                            <MudTd>@context.Description</MudTd>
+                            <MudTd>
+                                @* 打开该空间对应的空间树（TreeDialogPageSky，RootId = Space.Id） *@
+                                <MudIconButton Icon="@Icons.Material.Filled.AccountTree"
+                                               Color="Color.Info"
+                                               Size="Size.Small"
+                                               OnClick="@(async () => await OpenTreeAsync(context))"
+                                               title="空间树" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudTabPanel>
+            <MudTabPanel Text="空间维护" Icon="@Icons.Material.Filled.Settings">
+                <SpaceManagePanel OnChanged="LoadAsync" />
+            </MudTabPanel>
+        </MudTabs>
+    </PageContent>
+</PageSky>
+
+@code {
+    private IReadOnlyList<SpaceDto>? _spaces;
+    private bool _loading;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _spaces = await Api.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+            _spaces = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>打开该空间对应的空间树对话框（RootId = Space.Id）。打开前自检：根节点不存在则补建。</summary>
+    private async Task OpenTreeAsync(SpaceDto space)
+    {
+        try
+        {
+            var root = await TreeApi.GetFullTreeAsync(space.Id);
+            if (root is null)
+            {
+                var entity = new SpaceTree
+                {
+                    Id = space.Id,
+                    Name = space.Name,
+                    Description = space.Description ?? "",
+                    ParentId = null,
+                    CanHaveChildren = true,
+                    SortOrder = 0,
+                    HasChildren = false
+                };
+                await TreeApi.CreateNodeAsync(new TreeNodeDto<SpaceTree>
+                {
+                    Id = entity.Id,
+                    Text = entity.Text(),
+                    ParentId = null,
+                    Value = entity
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"空间树检查失败：{ex.Message}", Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters<SpaceTreeDialogPage>
+        {
+            { x => x.RootId, space.Id },
+            { x => x.Title, $"空间树：{space.Name}" }
+        };
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            Position = DialogPosition.TopCenter,
+            MaximizeButton = true
+        };
+
+        await DialogService.ShowExAsync<SpaceTreeDialogPage>(
+            string.Empty, parameters, options);
+    }
+}

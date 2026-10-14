@@ -1,0 +1,149 @@
+@* SpaceManagePanel.razor — 空间维护面板（工具栏 + 列表 + CRUD 对话框），供对话框/选项卡复用 *@
+@namespace TreeGraph.Blazor.Shared.SpaceSky.Components
+@using TreeGraph.Blazor.Shared.SpaceSky
+@using TreeGraph.Blazor.Shared.SpaceSky.Dialogs
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
+@inject SpaceApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_spaces is null || _spaces.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">
+        暂无空间，点击
+        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                       Color="Color.Success"
+                       Size="Size.Small"
+                       OnClick="OpenCreateAsync"
+                       title="新建空间" />
+        创建第一个。
+    </MudAlert>
+}
+else
+{
+    <MudTable Items="_spaces" Hover="true" Bordered="true" Dense="true">
+        <HeaderContent>
+            <MudTh>名称</MudTh>
+            <MudTh>描述</MudTh>
+            <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="OpenCreateAsync"
+                               title="新建空间" />
+            </MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>@context.Description</MudTd>
+            <MudTd Style="white-space: nowrap; text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Color="Color.Error"
+                               Size="Size.Small"
+                               OnClick="@(async () => await OpenDeleteAsync(context))"
+                               title="删除空间" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               OnClick="@(async () => await OpenEditAsync(context))"
+                               title="编辑空间" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    /// <summary>CRUD 变更后触发（供宿主刷新自身列表）。</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private IReadOnlyList<SpaceDto>? _spaces;
+    private bool _loading;
+    private bool _initialized;
+
+    /// <summary>CRUD 子对话框选项（与 OptionSets 页面一致：小宽度全宽）。</summary>
+    private static readonly DialogOptions DialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _spaces = await Api.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+            _spaces = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<SpaceCreateDialog>(
+            string.Empty, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OpenEditAsync(SpaceDto space)
+    {
+        var parameters = new DialogParameters<SpaceEditDialog>
+        {
+            { x => x.Space, space }
+        };
+
+        var dialog = await DialogService.ShowAsync<SpaceEditDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OpenDeleteAsync(SpaceDto space)
+    {
+        var parameters = new DialogParameters<SpaceDeleteDialog>
+        {
+            { x => x.Space, space }
+        };
+
+        var dialog = await DialogService.ShowAsync<SpaceDeleteDialog>(
+            null, parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+    }
+}

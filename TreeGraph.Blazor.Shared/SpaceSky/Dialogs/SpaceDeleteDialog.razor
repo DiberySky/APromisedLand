@@ -1,0 +1,50 @@
+@* SpaceDeleteDialog.razor — 删除空间确认（DialogSky 外壳，危险色提交按钮） *@
+@using TreeGraph.Blazor.Shared.SpaceSky
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
+@inject SpaceApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="删除空间"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "删除中..." : "确认删除")"
+           SubmitButtonColor="Color.Error"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="DeleteAsync">
+    <DialogContent>
+        <MudText>确定要删除空间 <strong>"@Space?.Name"</strong> 吗？此操作不可撤销。</MudText>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public SpaceDto? Space { get; set; }
+
+    private bool _submitting;
+
+    private async Task DeleteAsync()
+    {
+        if (Space is null) return;
+
+        _submitting = true;
+        try
+        {
+            var ok = await Api.DeleteAsync(Space.Id);
+            if (!ok)
+            {
+                Snackbar.Add("删除失败：空间不存在或已被删除", Severity.Error);
+                return;
+            }
+            Snackbar.Add("删除成功", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"删除失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

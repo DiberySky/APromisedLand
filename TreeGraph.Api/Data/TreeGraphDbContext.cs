@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Api.SpaceSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Entities;
 
 namespace TreeGraph.Api.Data;
@@ -33,6 +34,9 @@ public class TreeGraphDbContext : DbContext
     public DbSet<CategoryTree> CategoryTrees => Set<CategoryTree>();
     public DbSet<SpaceTree> SpaceTrees => Set<SpaceTree>();
 
+    // 空间（独立简单实体）
+    public DbSet<Space> Spaces => Set<Space>();
+
     public TreeGraphDbContext(DbContextOptions<TreeGraphDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -51,6 +55,7 @@ public class TreeGraphDbContext : DbContext
         ConfigureUnitTrees(mb);
         ConfigureCategoryTrees(mb);
         ConfigureSpaceTrees(mb);
+        ConfigureSpaces(mb);
     }
 
     // ============================================================
@@ -110,7 +115,6 @@ public class TreeGraphDbContext : DbContext
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
             e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.Abbreviation).HasColumnName("abbreviation").HasMaxLength(50);
             e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
@@ -126,6 +130,18 @@ public class TreeGraphDbContext : DbContext
 
             // 仅播种唯一根节点「空间树」，其余节点全部由界面创建
             e.HasData(SpaceTree.SeedData());
+        });
+    }
+
+    private static void ConfigureSpaces(ModelBuilder mb)
+    {
+        mb.Entity<Space>(e =>
+        {
+            e.ToTable("spaces");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
         });
     }
 

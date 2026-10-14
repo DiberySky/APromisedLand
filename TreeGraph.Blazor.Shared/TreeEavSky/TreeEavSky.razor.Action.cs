@@ -166,8 +166,17 @@ public partial class TreeEavSky<TItem>
                 return;
             }
 
-            var parent = _items?.FindTreeItem(node.Value!.ParentId!);
-            await RefreshNodeChildrenAsync(parent!, _cts.Token);
+            var parentId = node.Value!.ParentId;
+            var parent = string.IsNullOrEmpty(parentId) ? null : _items?.FindTreeItem(parentId);
+            if (parent != null)
+            {
+                await RefreshNodeChildrenAsync(parent, _cts.Token);
+            }
+            else
+            {
+                // 删除的是根节点（或父节点未加载）：整树刷新
+                await RefreshTreeAsync(_cts.Token);
+            }
 
             Message.Success("删除成功");
         }

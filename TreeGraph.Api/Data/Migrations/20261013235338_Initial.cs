@@ -181,7 +181,6 @@ namespace TreeGraph.Api.Data.Migrations
                 {
                     id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    abbreviation = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     parent_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     can_have_children = table.Column<bool>(type: "boolean", nullable: false),
@@ -197,6 +196,19 @@ namespace TreeGraph.Api.Data.Migrations
                         principalTable: "space_trees",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "spaces",
+                columns: table => new
+                {
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_spaces", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -535,6 +547,11 @@ namespace TreeGraph.Api.Data.Migrations
                     { "C8969ED0-C018-4FDC-AE55-C363BD95C853", false, "子分类 2", false, "Sample 2", "55705350-7071-43A4-AFAF-2F30B3CE2718", 2 },
                     { "ED0990CF-5BB7-4C36-A3BB-3AF606AD1974", false, "子分类 2.1", false, "Sample 2.1", "C8969ED0-C018-4FDC-AE55-C363BD95C853", 0 }
                 });
+
+            migrationBuilder.InsertData(
+                table: "space_trees",
+                columns: new[] { "id", "can_have_children", "description", "has_children", "name", "parent_id", "sort_order" },
+                values: new object[] { "EBBAD64B-2119-47EB-95C3-01D3DD796774", true, "", false, "空间树", null, 0 });
 
             migrationBuilder.InsertData(
                 table: "unit_trees",
@@ -977,6 +994,9 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "space_trees");
+
+            migrationBuilder.DropTable(
+                name: "spaces");
 
             migrationBuilder.DropTable(
                 name: "edge_definitions");

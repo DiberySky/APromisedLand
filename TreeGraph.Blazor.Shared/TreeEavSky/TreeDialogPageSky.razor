@@ -4,7 +4,7 @@
 
 @inject ITreeClientService<TItem> ClientService
 
-<DialogPageSky Title="@Title" ActionsMaxWidth="@MaxWidth">
+<DialogPageSky Title="@Title" ActionsMaxWidth="@MaxWidth" TopBarRightContent="@TopBarRightContent">
     <ToolBarContent>
         @if (!string.IsNullOrEmpty(TitleToolBar))
         {

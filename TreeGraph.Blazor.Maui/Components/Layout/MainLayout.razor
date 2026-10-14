@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
 <MudThemeProvider IsDarkMode="true"/>
@@ -16,7 +16,8 @@
             <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
         </div>
 
-        <article class="content px-4">
+        @* 全出血：去除 px-4，留白由各页面骨架（PageSky 等）自控 *@
+        <article class="content">
             @Body
         </article>
     </main>

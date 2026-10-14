@@ -11,7 +11,6 @@ public class SpaceTree : ITreeNodeBase<SpaceTree>
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Name { get; set; } = string.Empty;
 
-    public string Abbreviation { get; set; } = string.Empty;
     public string? ParentId { get; set; }
     public string? Description { get; set; }
     public bool CanHaveChildren { get; set; }
@@ -24,8 +23,7 @@ public class SpaceTree : ITreeNodeBase<SpaceTree>
 
     public string Text()
     {
-        var text = string.IsNullOrEmpty(Abbreviation) ? Name : $"{Name} 【{Abbreviation}】";
-        return text;
+        return Name;
     }
 
     public static List<SpaceTree> SeedData()
@@ -37,7 +35,6 @@ public class SpaceTree : ITreeNodeBase<SpaceTree>
             {
                 Id = "EBBAD64B-2119-47EB-95C3-01D3DD796774",
                 Name = "空间树",
-                Abbreviation = "",
                 Description = "",
                 ParentId = null,
                 CanHaveChildren = true,
