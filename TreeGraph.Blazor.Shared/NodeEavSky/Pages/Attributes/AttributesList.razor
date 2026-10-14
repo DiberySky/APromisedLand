@@ -302,7 +302,7 @@ else
         try
         {
             // 并行加载实体类型 + 全部属性（含已删除，前端过滤）
-            var entityTypesTask = Api.ListEntityTypesAsync();
+            var entityTypesTask = Api.ListEntityTypesAsync(sharedOnly: true);
             var attributesTask = Api.ListAttributesAsync(
                 entityType: null, includeDeleted: true);
 

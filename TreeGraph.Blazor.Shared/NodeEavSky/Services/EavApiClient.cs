@@ -374,20 +374,31 @@ public class EavApiClient
         string id, CancellationToken ct = default)
         => GetAsync<AttributeDetailDto>($"api/eav/metadata/attributes/{id}", ct);
 
+    /// <summary>
+    /// 实体类型摘要列表。
+    /// sharedOnly=true 时仅返回共享类型（全局选择器场景：树节点属性、实体选择等）。
+    /// </summary>
     public async Task<IReadOnlyList<EntityTypeSummaryDto>?> ListEntityTypesAsync(
-        CancellationToken ct = default)
+        CancellationToken ct = default, bool sharedOnly = false)
         => await GetAsync<IReadOnlyList<EntityTypeSummaryDto>>(
-            "api/eav/entity-types", ct);
+            sharedOnly ? "api/eav/entity-types?sharedOnly=true" : "api/eav/entity-types", ct);
 
     /// <summary>
     /// 一次拉取所有实体类型详情（含属性计数）。
     /// 替代"ListEntityTypesAsync + N 次 GetEntityTypeAsync"的 N+1 模式。
+    /// 带 spaceId 时仅返回 共享类型 ∪ 该空间独占类型；sharedOnly 时仅返回共享类型。
     /// </summary>
     public async Task<IReadOnlyList<EntityTypeDetailDto>?> ListEntityTypeDetailsAsync(
-        bool includeDeleted = false, CancellationToken ct = default)
+        bool includeDeleted = false, string? spaceId = null,
+        bool sharedOnly = false, bool exclusiveOnly = false,
+        CancellationToken ct = default)
     {
         var url = "api/eav/entity-types/details";
-        if (includeDeleted) url += "?includeDeleted=true";
+        var sep = '?';
+        if (includeDeleted) { url += "?includeDeleted=true"; sep = '&'; }
+        if (!string.IsNullOrEmpty(spaceId)) { url += $"{sep}spaceId={Uri.EscapeDataString(spaceId)}"; sep = '&'; }
+        if (sharedOnly) { url += $"{sep}sharedOnly=true"; sep = '&'; }
+        if (exclusiveOnly) url += $"{sep}exclusiveOnly=true";
         return await GetAsync<IReadOnlyList<EntityTypeDetailDto>>(url, ct);
     }
 

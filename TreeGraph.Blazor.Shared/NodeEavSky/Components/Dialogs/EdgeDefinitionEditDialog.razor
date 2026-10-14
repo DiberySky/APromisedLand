@@ -83,7 +83,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try { _entityTypes = await Api.ListEntityTypesAsync() ?? []; }
+        try { _entityTypes = await Api.ListEntityTypesAsync(sharedOnly: true) ?? []; }
         catch { _entityTypes = []; }
     }
 

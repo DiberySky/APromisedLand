@@ -87,7 +87,7 @@
     {
         try
         {
-            _entityTypes = await Api.ListEntityTypesAsync() ?? [];
+            _entityTypes = await Api.ListEntityTypesAsync(sharedOnly: true) ?? [];
         }
         catch { _entityTypes = []; }
     }

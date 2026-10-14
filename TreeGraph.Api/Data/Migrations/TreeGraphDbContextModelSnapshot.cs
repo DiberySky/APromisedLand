@@ -32,6 +32,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnName("audit_id")
                         .HasDefaultValueSql("gen_random_uuid()::text");
 
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
                     b.Property<string>("AttributeId")
                         .IsRequired()
                         .HasMaxLength(36)
@@ -49,10 +53,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("change_type");
-
-                    b.Property<DateTimeOffset>("ChangedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("changed_at");
 
                     b.Property<string>("ChangedBy")
                         .IsRequired()
@@ -90,7 +90,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("old_value");
 
-                    b.HasKey("AuditId");
+                    b.HasKey("AuditId", "ChangedAt");
 
                     b.HasIndex("ChangedAt")
                         .HasDatabaseName("ix_audit_time");
@@ -99,7 +99,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsDescending(false, false, true)
                         .HasDatabaseName("ix_audit_entity");
 
-                    b.ToTable("attribute_audit_log", (string)null);
+                    b.ToTable("attribute_audit_log", null, t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
@@ -918,6 +921,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<string>("OwnerSpaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("owner_space_id");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -928,6 +936,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_entity_type")
                         .HasFilter("is_deleted = false");
+
+                    b.HasIndex("OwnerSpaceId")
+                        .HasDatabaseName("ix_entity_type_owner_space");
 
                     b.ToTable("entity_type_catalog", (string)null);
                 });
@@ -1248,7 +1259,7 @@ namespace TreeGraph.Api.Data.Migrations
                         new
                         {
                             Id = "55705350-7071-43A4-AFAF-2F30B3CE2718",
-                            CanHaveChildren = false,
+                            CanHaveChildren = true,
                             Description = "根分类示例",
                             IsArchived = false,
                             Name = "Sample Root",
@@ -1257,7 +1268,7 @@ namespace TreeGraph.Api.Data.Migrations
                         new
                         {
                             Id = "39EA6315-0A74-40F6-A096-8E15CCC98579",
-                            CanHaveChildren = false,
+                            CanHaveChildren = true,
                             Description = "子分类 1",
                             IsArchived = false,
                             Name = "Sample 1",
@@ -1277,7 +1288,7 @@ namespace TreeGraph.Api.Data.Migrations
                         new
                         {
                             Id = "C8969ED0-C018-4FDC-AE55-C363BD95C853",
-                            CanHaveChildren = false,
+                            CanHaveChildren = true,
                             Description = "子分类 2",
                             IsArchived = false,
                             Name = "Sample 2",
@@ -1307,7 +1318,7 @@ namespace TreeGraph.Api.Data.Migrations
                         new
                         {
                             Id = "27EE32B0-0F30-4331-AA85-61457B7A0912",
-                            CanHaveChildren = false,
+                            CanHaveChildren = true,
                             Description = "子分类 3",
                             IsArchived = false,
                             Name = "Sample 3",
@@ -1337,7 +1348,7 @@ namespace TreeGraph.Api.Data.Migrations
                         new
                         {
                             Id = "1B16336D-FB7F-42AA-AFD2-F78388883336",
-                            CanHaveChildren = false,
+                            CanHaveChildren = true,
                             Description = "子分类 3.3",
                             IsArchived = false,
                             Name = "Sample 3.3",

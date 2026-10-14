@@ -106,6 +106,11 @@ public abstract class TreeControllerBase<T>(
             var created = await TreeService.CreateNodeAsync(node, cancellationToken);
             return CreatedAtAction(nameof(GetFullTree), new { rootId = created.Id }, created);
         }
+        catch (InvalidOperationException ex)
+        {
+            // 业务校验失败（如父节点不允许包含子节点）→ 400
+            return BadRequest(new { error = ex.Message });
+        }
         catch (Exception ex)
         {
             Logger.LogError(ex, "创建节点失败");
@@ -219,6 +224,11 @@ public abstract class TreeControllerBase<T>(
         catch (KeyNotFoundException)
         {
             return NotFound(new { error = $"节点 '{nodeId}' 不存在" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            // 业务校验失败（如目标父节点不允许包含子节点）→ 400
+            return BadRequest(new { error = ex.Message });
         }
         catch (Exception ex)
         {

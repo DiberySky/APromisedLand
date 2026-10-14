@@ -94,9 +94,15 @@ public class EavController : ControllerBase
     }
 
     /// <summary>
-    /// ★ #3：PUT 支持乐观锁。
+    /// PUT 全量替换实体属性（支持乐观锁）。
     ///
-    /// 客户端从 GET 拿到的 UpdatedAt 通过 header 传回：
+    /// ⚠️ 删除语义（务必注意）：本端点为【全量替换】——
+    ///   - values 中出现的属性：验证 + 写入
+    ///   - values 中值为 null 的属性：删除
+    ///   - values 中【未出现】的属性（catalog 中已定义）：一并删除！
+    /// 只想更新部分属性时【必须改用 PATCH】，否则未提交属性的既有值将丢失。
+    ///
+    /// ★ #3：乐观锁。客户端从 GET 拿到的 UpdatedAt 通过 header 传回：
     ///   X-Expected-Updated-At: 2026-10-01T10:30:00.0000000+00:00
     ///
     /// 服务端比对 DB 中最新 UpdatedAt，不符则 409 Conflict 并返回最新值。

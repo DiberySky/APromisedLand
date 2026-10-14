@@ -32,11 +32,26 @@ public class EavEntityTypesController : ControllerBase
     // ============================================================
 
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken ct)
+    public async Task<IActionResult> List(
+        [FromQuery] string? spaceId,
+        [FromQuery] bool sharedOnly,
+        [FromQuery] bool exclusiveOnly,
+        CancellationToken ct)
     {
-        // 1. 从 EntityTypeCatalog 拿所有活动类型
-        var types = await _db.EntityTypes
-            .Where(t => !t.IsDeleted)
+        // 1. 从 EntityTypeCatalog 拿活动类型。范围过滤（三选一）：
+        //    sharedOnly=true          → 仅共享（全局选择器场景）
+        //    spaceId + exclusiveOnly  → 仅该空间独占（空间行"属性设置"对话框）
+        //    spaceId                  → 共享 ∪ 该空间独占
+        //    都不带                   → 全部（管理页全局视角）
+        var query = _db.EntityTypes.Where(t => !t.IsDeleted);
+        if (sharedOnly)
+            query = query.Where(t => t.OwnerSpaceId == null);
+        else if (!string.IsNullOrEmpty(spaceId))
+            query = exclusiveOnly
+                ? query.Where(t => t.OwnerSpaceId == spaceId)
+                : query.Where(t => t.OwnerSpaceId == null || t.OwnerSpaceId == spaceId);
+
+        var types = await query
             .OrderBy(t => t.DisplayOrder)
             .ThenBy(t => t.EntityType)
             .AsNoTracking()
@@ -97,11 +112,24 @@ public class EavEntityTypesController : ControllerBase
     [HttpGet("details")]
     public async Task<IActionResult> ListDetails(
         [FromQuery] bool includeDeleted = false,
+        [FromQuery] string? spaceId = null,
+        [FromQuery] bool sharedOnly = false,
+        [FromQuery] bool exclusiveOnly = false,
         CancellationToken ct = default)
     {
-        // 1. 全量类型（1 次 DB）
-        var types = await _db.EntityTypes
-            .Where(t => includeDeleted || !t.IsDeleted)
+        // 1. 全量类型（1 次 DB）。范围过滤同 List：
+        //    sharedOnly → 仅共享；spaceId+exclusiveOnly → 仅该空间独占；
+        //    spaceId → 共享 ∪ 该空间独占；都不带 → 全部
+        var query = _db.EntityTypes
+            .Where(t => includeDeleted || !t.IsDeleted);
+        if (sharedOnly)
+            query = query.Where(t => t.OwnerSpaceId == null);
+        else if (!string.IsNullOrEmpty(spaceId))
+            query = exclusiveOnly
+                ? query.Where(t => t.OwnerSpaceId == spaceId)
+                : query.Where(t => t.OwnerSpaceId == null || t.OwnerSpaceId == spaceId);
+
+        var types = await query
             .OrderBy(t => t.DisplayOrder)
             .ThenBy(t => t.EntityType)
             .AsNoTracking()
@@ -131,7 +159,8 @@ public class EavEntityTypesController : ControllerBase
             t.IsDeleted,
             t.CreatedAt,
             t.UpdatedAt,
-            statsMap.GetValueOrDefault(t.EntityType, 0)));
+            statsMap.GetValueOrDefault(t.EntityType, 0),
+            t.OwnerSpaceId));
 
         return Ok(result);
     }
@@ -153,7 +182,8 @@ public class EavEntityTypesController : ControllerBase
 
         return Ok(new EntityTypeDetailDto(
             t.EntityTypeId, t.EntityType, t.DisplayName, t.Description,
-            t.DisplayOrder, t.IsDeleted, t.CreatedAt, t.UpdatedAt, attrCount));
+            t.DisplayOrder, t.IsDeleted, t.CreatedAt, t.UpdatedAt, attrCount,
+            t.OwnerSpaceId));
     }
 
     // ============================================================
@@ -166,6 +196,11 @@ public class EavEntityTypesController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(req.DisplayName))
             return BadRequest(new { error = "显示名必填" });
+
+        // 独占类型：所属空间必须已存在
+        if (!string.IsNullOrWhiteSpace(req.OwnerSpaceId)
+            && !await _db.Spaces.AnyAsync(s => s.Id == req.OwnerSpaceId, ct))
+            return BadRequest(new { error = $"所属空间不存在: {req.OwnerSpaceId}" });
 
         // 生成或使用客户端指定的 EntityType
         string entityType;
@@ -204,6 +239,7 @@ public class EavEntityTypesController : ControllerBase
             EntityType = entityType,
             DisplayName = req.DisplayName.Trim(),
             Description = req.Description,
+            OwnerSpaceId = string.IsNullOrWhiteSpace(req.OwnerSpaceId) ? null : req.OwnerSpaceId,
             DisplayOrder = req.DisplayOrder
         };
         _db.EntityTypes.Add(entity);

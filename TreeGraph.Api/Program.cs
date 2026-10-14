@@ -102,6 +102,8 @@ if (!EF.IsDesignTime)
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
     await db.Database.MigrateAsync();
+    // 审计分区表：确保当月+下月分区存在（幂等；DEFAULT 分区已兜底，此处让数据按月归位）
+    await AuditPartitionMaintenance.EnsureMonthlyPartitionsAsync(db);
     await EavSeeder.SeedAsync(db);
 
     // E2E 基线（item/user/project + 固定 EntityId 示例值）仅开发/测试环境注入

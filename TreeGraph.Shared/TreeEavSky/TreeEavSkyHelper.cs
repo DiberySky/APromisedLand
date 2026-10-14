@@ -24,6 +24,7 @@ public static class TreeEavSkyHelper
             Value = nodeValue,
             Icon = icon,
             HasChildren = hasChildren,
+            CanHaveChildren = nodeValue.CanHaveChildren,
             SortOrder = nodeValue.SortOrder,
         };
     }

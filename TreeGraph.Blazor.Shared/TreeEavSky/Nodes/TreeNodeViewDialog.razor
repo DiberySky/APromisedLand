@@ -23,11 +23,11 @@
                     <MudField Label="父分类" Variant="Variant.Text">@ParentName</MudField>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudField Label="状态" Variant="Variant.Text">
+                    <MudField Label="节点角色" Variant="Variant.Text">
                         <MudChip T="string"
                                  Color="Node.CanHaveChildren ? Color.Success : Color.Default"
                                  Size="Size.Small">
-                            @(Node.CanHaveChildren ? "启用" : "禁用")
+                            @(Node.CanHaveChildren ? "可含子项" : "叶子节点")
                         </MudChip>
                     </MudField>
                 </MudItem>

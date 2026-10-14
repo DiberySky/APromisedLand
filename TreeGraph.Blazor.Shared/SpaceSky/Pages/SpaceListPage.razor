@@ -5,6 +5,7 @@
 @using TreeGraph.Blazor.Shared.SpaceSky.Components
 @using TreeGraph.Blazor.Shared.SpaceSky.Services
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
 @using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space
 @using TreeGraph.Blazor.Shared.TreeEavSky.Services
 @using TreeGraph.Shared.TreeEavSky.Entities
@@ -69,6 +70,10 @@
             </MudTabPanel>
             <MudTabPanel Text="空间维护" Icon="@Icons.Material.Filled.Settings">
                 <SpaceManagePanel OnChanged="LoadAsync" />
+            </MudTabPanel>
+            @* 动态属性：内嵌实体类型管理（IsDialogMode 隐藏页头，工具栏置于内容顶部） *@
+            <MudTabPanel Text="动态属性" Icon="@Icons.Material.Filled.Category">
+                <EntityTypes IsDialogMode="true" SharedOnly="true" />
             </MudTabPanel>
         </MudTabs>
     </PageContent>

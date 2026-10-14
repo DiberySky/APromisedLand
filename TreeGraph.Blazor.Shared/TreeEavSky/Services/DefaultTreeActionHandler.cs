@@ -77,7 +77,7 @@ public class DefaultTreeActionHandler<TItem>(
     // ============================================================
 
     /// <summary>
-    /// 从 TItem 构造 TreeNodeDto（默认设置 Id / Text / Icon / ParentId / SortOrder / Value）。
+    /// 从 TItem 构造 TreeNodeDto（默认设置 Id / Text / Icon / ParentId / SortOrder / CanHaveChildren / Value）。
     /// 宿主可覆盖以追加业务字段（如 ExtraData）。
     /// </summary>
     protected virtual TreeNodeDto<TItem> BuildDto(TItem node, string? parentId)
@@ -88,6 +88,7 @@ public class DefaultTreeActionHandler<TItem>(
             Icon = TreeHelper.TreeItemIcons,
             ParentId = parentId,
             SortOrder = node.SortOrder,
+            CanHaveChildren = node.CanHaveChildren,
             Value = node,
         };
 }

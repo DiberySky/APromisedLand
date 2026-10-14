@@ -177,12 +177,16 @@ public class UnitTreeService(TreeGraphDbContext dbContext) : ITreeService<UnitTr
             Name = nodeDto.Text ?? string.Empty,
             ParentId = nodeDto.ParentId,
             SortOrder = nodeDto.SortOrder,
+            CanHaveChildren = nodeDto.CanHaveChildren,
             HasChildren = false
         };
 
         if (!string.IsNullOrEmpty(entity.ParentId))
         {
             var parent = await dbContext.UnitTrees.FindAsync(new object[] { entity.ParentId }, cancellationToken);
+            // ★ 硬校验：父节点声明为叶子（CanHaveChildren=false）时拒绝创建子节点
+            if (parent is not null && !parent.CanHaveChildren)
+                throw new InvalidOperationException($"父节点「{parent.Name}」不允许包含子节点");
             if (parent != null && !parent.HasChildren)
             {
                 parent.HasChildren = true;
@@ -204,6 +208,7 @@ public class UnitTreeService(TreeGraphDbContext dbContext) : ITreeService<UnitTr
 
         entity.Name = nodeDto.Text ?? entity.Name;
         entity.SortOrder = nodeDto.SortOrder;
+        entity.CanHaveChildren = nodeDto.CanHaveChildren;
 
         // 不在此修改 ParentId，请使用 MoveNodeAsync
         entity.ParentId = nodeDto.ParentId;
@@ -284,6 +289,9 @@ public class UnitTreeService(TreeGraphDbContext dbContext) : ITreeService<UnitTr
         if (!string.IsNullOrEmpty(newParentId))
         {
             var newParent = await dbContext.UnitTrees.FindAsync(new object[] { newParentId }, cancellationToken);
+            // ★ 硬校验：目标父节点声明为叶子时拒绝移入
+            if (newParent is not null && !newParent.CanHaveChildren)
+                throw new InvalidOperationException($"目标父节点「{newParent.Name}」不允许包含子节点");
             if (newParent != null)
             {
                 newParent.HasChildren = true;

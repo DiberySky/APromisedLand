@@ -272,7 +272,7 @@ else
         try
         {
             _cards = await Api.ListInodeTypeCardsAsync(InodeId);
-            _allTypes = await Api.ListEntityTypesAsync();
+            _allTypes = await Api.ListEntityTypesAsync(sharedOnly: true);
         }
         finally
         {

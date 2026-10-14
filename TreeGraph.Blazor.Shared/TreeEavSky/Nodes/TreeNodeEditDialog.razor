@@ -41,7 +41,9 @@
             @* 属性区：节点保存后（编辑模式）才可关注类型与填写属性 *@
             @if (IsCreate)
             {
-                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block py-2">
+                <MudText Typo="Typo.caption"
+                         Class="d-block text-center mt-8 pb-2"
+                         Style="color: var(--mud-palette-text-secondary)">
                     节点创建保存后，可通过节点操作中的「属性」按钮关注实体类型并填写属性。
                 </MudText>
             }

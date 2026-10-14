@@ -188,15 +188,55 @@ public class UnitTreeServiceTests
         {
             Id = Guid.NewGuid().ToString(),
             Text = "分",
-            ParentId = YuanId, // 元 原本为叶子
+            ParentId = CurrencyId, // 货币为分类节点（CanHaveChildren=true）
             SortOrder = 0
         });
 
         Assert.False(string.IsNullOrEmpty(created.Id));
         Assert.Equal("分", created.Text);
 
-        var parent = await db.UnitTrees.FindAsync(YuanId);
+        var parent = await db.UnitTrees.FindAsync(CurrencyId);
         Assert.True(parent!.HasChildren);
+    }
+
+    /// <summary>硬校验：向叶子节点（CanHaveChildren=false）创建子节点应被拒绝。</summary>
+    [Fact]
+    public async Task CreateNodeAsync_LeafParent_Throws()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateNodeAsync(new TreeNodeDto<UnitTree>
+            {
+                Id = Guid.NewGuid().ToString(),
+                Text = "分",
+                ParentId = YuanId, // 元 为叶子（种子 CanHaveChildren=false）
+            }));
+
+        Assert.Contains("不允许包含子节点", ex.Message);
+        // 拒绝后不应写入任何节点
+        Assert.Null(await db.UnitTrees.FirstOrDefaultAsync(x => x.Name == "分"));
+    }
+
+    /// <summary>回归：创建时 DTO 的 CanHaveChildren 必须落库（此前该字段在服务端被丢弃）。</summary>
+    [Fact]
+    public async Task CreateNodeAsync_PersistsCanHaveChildren()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+
+        var id = Guid.NewGuid().ToString();
+        await service.CreateNodeAsync(new TreeNodeDto<UnitTree>
+        {
+            Id = id,
+            Text = "临时分类",
+            ParentId = CurrencyId,
+            CanHaveChildren = true
+        });
+
+        var entity = await db.UnitTrees.FindAsync(id);
+        Assert.True(entity!.CanHaveChildren);
     }
 
     [Fact]
@@ -227,6 +267,26 @@ public class UnitTreeServiceTests
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             service.UpdateNodeAsync(new TreeNodeDto<UnitTree> { Id = "not-exist", Text = "x" }));
+    }
+
+    /// <summary>回归：更新时 DTO 的 CanHaveChildren 必须落库（此前编辑对话框改该字段无效）。</summary>
+    [Fact]
+    public async Task UpdateNodeAsync_PersistsCanHaveChildren()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+
+        // 元 种子为叶子（false）→ 改为可含子项
+        await service.UpdateNodeAsync(new TreeNodeDto<UnitTree>
+        {
+            Id = YuanId,
+            Text = "元",
+            ParentId = CurrencyId,
+            CanHaveChildren = true
+        });
+
+        var entity = await db.UnitTrees.FindAsync(YuanId);
+        Assert.True(entity!.CanHaveChildren);
     }
 
     [Fact]

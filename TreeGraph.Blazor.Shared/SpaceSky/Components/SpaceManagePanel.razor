@@ -6,28 +6,21 @@
 @inject SpaceApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 
 @if (_loading)
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
 }
-else if (_spaces is null || _spaces.Count == 0)
-{
-    <MudAlert Severity="Severity.Info">
-        暂无空间，点击
-        <MudIconButton Icon="@Icons.Material.Filled.Add"
-                       Color="Color.Success"
-                       Size="Size.Small"
-                       OnClick="OpenCreateAsync"
-                       title="新建空间" />
-        创建第一个。
-    </MudAlert>
-}
 else
 {
-    <MudTable Items="_spaces" Hover="true" Bordered="true" Dense="true">
+    @* 表格始终渲染：空态走 NoRecordsContent（EmptyStateSky，与 EntityTypes 对齐），
+       表头操作列的新建 + 按钮在空态时同样可用 *@
+    <MudTable Items="_spaces ?? (IReadOnlyList<SpaceDto>)[]" Hover="true" Bordered="true" Dense="true">
         <HeaderContent>
             <MudTh>名称</MudTh>
+            <MudTh>属性设置</MudTh>
             <MudTh>描述</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                 <MudIconButton Icon="@Icons.Material.Filled.Add"
@@ -39,6 +32,14 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd>@context.Name</MudTd>
+            <MudTd DataLabel="属性设置">
+                @* 设置图标：打开该空间的实体类型定义对话框（共享 ∪ 本空间独占） *@
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="@(async () => await OpenEntityTypeDefsAsync(context))"
+                               title="属性设置" />
+            </MudTd>
             <MudTd>@context.Description</MudTd>
             <MudTd Style="white-space: nowrap; text-align: right;">
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
@@ -53,6 +54,14 @@ else
                                title="编辑空间" />
             </MudTd>
         </RowTemplate>
+        <NoRecordsContent>
+            <EmptyStateSky Icon="@Icons.Material.Filled.Workspaces"
+                           Title="暂无空间">
+                <Description>
+                    <text>点击右上角 + 创建第一个</text>
+                </Description>
+            </EmptyStateSky>
+        </NoRecordsContent>
     </MudTable>
 }
 
@@ -70,6 +79,25 @@ else
         MaxWidth = MaxWidth.Small,
         FullWidth = true
     };
+
+    /// <summary>打开该空间的实体类型定义对话框（属性设置入口：共享 ∪ 本空间独占，新建默认独占本空间）。</summary>
+    private async Task OpenEntityTypeDefsAsync(SpaceDto space)
+    {
+        var parameters = new DialogParameters<EntityTypeDefinitionsDialog>
+        {
+            { x => x.SpaceId, space.Id },
+            { x => x.SpaceName, space.Name }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+        await DialogService.ShowExAsync<EntityTypeDefinitionsDialog>(
+            "实体类型定义", parameters, options);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

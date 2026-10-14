@@ -69,26 +69,30 @@ public class EavQueryService
         }
         else
         {
-            // 有排序：先取全部过滤结果 + 排序键，内存排序后再分页。
+            // 有排序：LEFT JOIN 排序键行，纯 SQL 排序 + 分页。
             //
-            // 原因：Distinct + ORDER BY(相关子查询) 会被 EF Core 静默丢弃 ORDER BY
-            // （PostgreSQL 要求 SELECT DISTINCT 的 ORDER BY 表达式出现在 select list 中）。
-            // 详见回归测试 Query_OrderByDecimalDesc_SortsCorrectly 的修复背景。
+            // null 键位置（实体未设排序属性，left join 空侧）：
+            //   ASC 排最前、DESC 排最后；同键按 EntityId 升序兜底保证分页稳定。
+            //   ——与历史内存排序语义严格一致（见回归测试
+            //   Query_OrderByAsc_NullKeysFirst / Query_OrderByDesc_NullKeysLast）。
+            //
+            // 历史方案是「全量取过滤结果 ID 到内存排序再分页」，规避 EF Core 对
+            // Distinct+ORDER BY 相关子查询静默丢序的限制，但数据量大时内存/延迟
+            // 不可控；改为 LEFT JOIN 投影排序键后无此限制，排序/分页全部下推 SQL。
             if (!definitions.TryGetValue(request.OrderByAttribute, out var orderDef))
                 throw new ArgumentException($"未知排序属性: {request.OrderByAttribute}");
             if (!orderDef.IsSortable)
                 throw new ArgumentException($"属性不可排序: {request.OrderByAttribute}");
 
-            var allIds = await entityQuery.ToListAsync(ct);
-            var keyMap = await LoadSortKeysAsync(
-                request.EntityType, orderDef, allIds, ct);
+            var keyRows = _db.AttributeValues
+                .Where(v => v.EntityType == request.EntityType
+                         && v.AttributeId == orderDef.AttributeId);
 
-            ids = (request.OrderDescending
-                ? allIds.OrderByDescending(id => GetKey(keyMap, id)).ThenBy(id => id)
-                : allIds.OrderBy(id => GetKey(keyMap, id)).ThenBy(id => id))
+            var sorted = SortByKey(entityQuery, keyRows, orderDef, request.OrderDescending);
+            ids = await sorted
                 .Skip(skip)
                 .Take(take)
-                .ToList();
+                .ToListAsync(ct);
         }
 
         return new PagedResult<string>
@@ -100,75 +104,127 @@ public class EavQueryService
         };
     }
 
-    /// <summary>排序键缺失时返回 null（DESC 排最后，ASC 排最前——与 C# LINQ 默认一致）。</summary>
-    private static object? GetKey(IReadOnlyDictionary<string, object?> map, string id)
-        => map.TryGetValue(id, out var v) ? v : null;
-
     /// <summary>
-    /// 加载所有过滤结果的排序键。
-    /// 返回的 Dictionary 值与 AttributeValue 对应列 C# 类型一致
-    /// （long / decimal / string / bool / DateTimeOffset / DateOnly / TimeOnly）。
-    /// 每个实体最多一行（uq_av_entity_attr 保证）。
+    /// LEFT JOIN 排序键并按方向排序（纯 SQL，调用方再 Skip/Take）。
+    /// 每种数据类型显式展开键列投影——EF Core 无法内联委托参数，
+    /// 逐类型书写确保表达式可翻译（GroupJoin+SelectMany → LEFT JOIN）。
     /// </summary>
-    private async Task<Dictionary<string, object?>> LoadSortKeysAsync(
-        string entityType,
-        AttributeDefinition def,
-        IReadOnlyList<string> entityIds,
-        CancellationToken ct)
-    {
-        if (entityIds.Count == 0) return new Dictionary<string, object?>();
-
-        var baseQuery = _db.AttributeValues
-            .Where(v => v.EntityType == entityType
-                     && v.AttributeId == def.AttributeId
-                     && entityIds.Contains(v.EntityId));
-
-        return def.DataType switch
+    private static IQueryable<string> SortByKey(
+        IQueryable<string> ids, IQueryable<AttributeValue> keyRows,
+        AttributeDefinition def, bool descending)
+        => def.DataType switch
         {
             // ★ int + 单位：按 ValueDecimal 排序（归一化后的值）
-            EavDataTypes.Int when def.UnitId is not null => (await baseQuery
-                .Select(v => new { v.EntityId, v.ValueDecimal })
-                .ToListAsync(ct))
-                .ToDictionary(x => x.EntityId, x => (object?)x.ValueDecimal),
-
-            EavDataTypes.Int => (await baseQuery
-                .Select(v => new { v.EntityId, v.ValueInt })
-                .ToListAsync(ct))
-                .ToDictionary(x => x.EntityId, x => (object?)x.ValueInt),
-
-            EavDataTypes.Decimal => (await baseQuery
-                .Select(v => new { v.EntityId, v.ValueDecimal })
-                .ToListAsync(ct))
-                .ToDictionary(x => x.EntityId, x => (object?)x.ValueDecimal),
-
-            EavDataTypes.String or EavDataTypes.SingleChoice => (await baseQuery
-                .Select(v => new { v.EntityId, v.ValueString })
-                .ToListAsync(ct))
-                .ToDictionary(x => x.EntityId, x => (object?)x.ValueString),
-
-            EavDataTypes.Bool => (await baseQuery
-                .Select(v => new { v.EntityId, v.ValueBool })
-                .ToListAsync(ct))
-                .ToDictionary(x => x.EntityId, x => (object?)x.ValueBool),
-
-            EavDataTypes.Datetime => (await baseQuery
-                .Select(v => new { v.EntityId, v.ValueDatetime })
-                .ToListAsync(ct))
-                .ToDictionary(x => x.EntityId, x => (object?)x.ValueDatetime),
-
-            EavDataTypes.Date => (await baseQuery
-                .Select(v => new { v.EntityId, v.ValueDateOnly })
-                .ToListAsync(ct))
-                .ToDictionary(x => x.EntityId, x => (object?)x.ValueDateOnly),
-
-            EavDataTypes.Time => (await baseQuery
-                .Select(v => new { v.EntityId, v.ValueTime })
-                .ToListAsync(ct))
-                .ToDictionary(x => x.EntityId, x => (object?)x.ValueTime),
-
+            EavDataTypes.Int when def.UnitId is not null
+                => SortDecimal(ids, keyRows, descending),
+            EavDataTypes.Int => SortLong(ids, keyRows, descending),
+            EavDataTypes.Decimal => SortDecimal(ids, keyRows, descending),
+            EavDataTypes.String or EavDataTypes.SingleChoice
+                => SortString(ids, keyRows, descending),
+            EavDataTypes.Bool => SortBool(ids, keyRows, descending),
+            EavDataTypes.Datetime => SortDatetime(ids, keyRows, descending),
+            EavDataTypes.Date => SortDate(ids, keyRows, descending),
+            EavDataTypes.Time => SortTime(ids, keyRows, descending),
             _ => throw new NotSupportedException(
                 $"不支持按 {def.DataType} 类型排序")
         };
+
+    private static IQueryable<string> SortLong(
+        IQueryable<string> ids, IQueryable<AttributeValue> keys, bool desc)
+    {
+        var joined = ids
+            .GroupJoin(keys, id => id, v => v.EntityId, (id, vs) => new { id, vs })
+            .SelectMany(x => x.vs.DefaultIfEmpty(),
+                (x, v) => new { x.id, Key = (long?)v!.ValueInt });
+        return desc
+            ? joined.OrderBy(x => x.Key == null ? 1 : 0)
+                .ThenByDescending(x => x.Key).ThenBy(x => x.id).Select(x => x.id)
+            : joined.OrderBy(x => x.Key == null ? 0 : 1)
+                .ThenBy(x => x.Key).ThenBy(x => x.id).Select(x => x.id);
+    }
+
+    private static IQueryable<string> SortDecimal(
+        IQueryable<string> ids, IQueryable<AttributeValue> keys, bool desc)
+    {
+        var joined = ids
+            .GroupJoin(keys, id => id, v => v.EntityId, (id, vs) => new { id, vs })
+            .SelectMany(x => x.vs.DefaultIfEmpty(),
+                (x, v) => new { x.id, Key = (decimal?)v!.ValueDecimal });
+        return desc
+            ? joined.OrderBy(x => x.Key == null ? 1 : 0)
+                .ThenByDescending(x => x.Key).ThenBy(x => x.id).Select(x => x.id)
+            : joined.OrderBy(x => x.Key == null ? 0 : 1)
+                .ThenBy(x => x.Key).ThenBy(x => x.id).Select(x => x.id);
+    }
+
+    private static IQueryable<string> SortString(
+        IQueryable<string> ids, IQueryable<AttributeValue> keys, bool desc)
+    {
+        var joined = ids
+            .GroupJoin(keys, id => id, v => v.EntityId, (id, vs) => new { id, vs })
+            .SelectMany(x => x.vs.DefaultIfEmpty(),
+                (x, v) => new { x.id, Key = v!.ValueString });
+        return desc
+            ? joined.OrderBy(x => x.Key == null ? 1 : 0)
+                .ThenByDescending(x => x.Key).ThenBy(x => x.id).Select(x => x.id)
+            : joined.OrderBy(x => x.Key == null ? 0 : 1)
+                .ThenBy(x => x.Key).ThenBy(x => x.id).Select(x => x.id);
+    }
+
+    private static IQueryable<string> SortBool(
+        IQueryable<string> ids, IQueryable<AttributeValue> keys, bool desc)
+    {
+        var joined = ids
+            .GroupJoin(keys, id => id, v => v.EntityId, (id, vs) => new { id, vs })
+            .SelectMany(x => x.vs.DefaultIfEmpty(),
+                (x, v) => new { x.id, Key = (bool?)v!.ValueBool });
+        return desc
+            ? joined.OrderBy(x => x.Key == null ? 1 : 0)
+                .ThenByDescending(x => x.Key).ThenBy(x => x.id).Select(x => x.id)
+            : joined.OrderBy(x => x.Key == null ? 0 : 1)
+                .ThenBy(x => x.Key).ThenBy(x => x.id).Select(x => x.id);
+    }
+
+    private static IQueryable<string> SortDatetime(
+        IQueryable<string> ids, IQueryable<AttributeValue> keys, bool desc)
+    {
+        var joined = ids
+            .GroupJoin(keys, id => id, v => v.EntityId, (id, vs) => new { id, vs })
+            .SelectMany(x => x.vs.DefaultIfEmpty(),
+                (x, v) => new { x.id, Key = (DateTimeOffset?)v!.ValueDatetime });
+        return desc
+            ? joined.OrderBy(x => x.Key == null ? 1 : 0)
+                .ThenByDescending(x => x.Key).ThenBy(x => x.id).Select(x => x.id)
+            : joined.OrderBy(x => x.Key == null ? 0 : 1)
+                .ThenBy(x => x.Key).ThenBy(x => x.id).Select(x => x.id);
+    }
+
+    private static IQueryable<string> SortDate(
+        IQueryable<string> ids, IQueryable<AttributeValue> keys, bool desc)
+    {
+        var joined = ids
+            .GroupJoin(keys, id => id, v => v.EntityId, (id, vs) => new { id, vs })
+            .SelectMany(x => x.vs.DefaultIfEmpty(),
+                (x, v) => new { x.id, Key = (DateOnly?)v!.ValueDateOnly });
+        return desc
+            ? joined.OrderBy(x => x.Key == null ? 1 : 0)
+                .ThenByDescending(x => x.Key).ThenBy(x => x.id).Select(x => x.id)
+            : joined.OrderBy(x => x.Key == null ? 0 : 1)
+                .ThenBy(x => x.Key).ThenBy(x => x.id).Select(x => x.id);
+    }
+
+    private static IQueryable<string> SortTime(
+        IQueryable<string> ids, IQueryable<AttributeValue> keys, bool desc)
+    {
+        var joined = ids
+            .GroupJoin(keys, id => id, v => v.EntityId, (id, vs) => new { id, vs })
+            .SelectMany(x => x.vs.DefaultIfEmpty(),
+                (x, v) => new { x.id, Key = (TimeOnly?)v!.ValueTime });
+        return desc
+            ? joined.OrderBy(x => x.Key == null ? 1 : 0)
+                .ThenByDescending(x => x.Key).ThenBy(x => x.id).Select(x => x.id)
+            : joined.OrderBy(x => x.Key == null ? 0 : 1)
+                .ThenBy(x => x.Key).ThenBy(x => x.id).Select(x => x.id);
     }
 
     public async Task<PagedResult<DynamicEntity>> QueryAsync(

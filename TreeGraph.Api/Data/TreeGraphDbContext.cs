@@ -169,6 +169,9 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Description)
                 .HasColumnName("description")
                 .HasMaxLength(1000);
+            e.Property(x => x.OwnerSpaceId)
+                .HasColumnName("owner_space_id")
+                .HasMaxLength(36);
             e.Property(x => x.DisplayOrder).HasColumnName("display_order");
             e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
@@ -179,6 +182,10 @@ public class TreeGraphDbContext : DbContext
                 .IsUnique()
                 .HasDatabaseName("uq_entity_type")
                 .HasFilter("is_deleted = false");
+
+            // 按空间过滤可见类型（共享 ∪ 本空间独占）
+            e.HasIndex(x => x.OwnerSpaceId)
+                .HasDatabaseName("ix_entity_type_owner_space");
         });
     }
 
@@ -641,8 +648,12 @@ public class TreeGraphDbContext : DbContext
     {
         mb.Entity<AttributeAuditLog>(e =>
         {
-            e.ToTable("attribute_audit_log");
-            e.HasKey(x => x.AuditId);
+            // ★ 按月分区表（审计只增不减，分区便于按月归档/清理）：
+            //   分区表 DDL 由迁移中的手写 SQL 创建（PARTITION BY RANGE），
+            //   EF 只负责运行时映射，故排除出自动迁移。
+            e.ToTable("attribute_audit_log", t => t.ExcludeFromMigrations());
+            // ★ PG 分区表主键必须包含分区键 changed_at。
+            e.HasKey(x => new { x.AuditId, x.ChangedAt });
             e.Property(x => x.AuditId)
                 .HasColumnName("audit_id")
                 .HasMaxLength(36).IsRequired()

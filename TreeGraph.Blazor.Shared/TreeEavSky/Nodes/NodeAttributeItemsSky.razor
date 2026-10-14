@@ -137,7 +137,8 @@ else
     /// <summary>打开「关注实体类型」对话框。</summary>
     private async Task OpenAttachDialogAsync()
     {
-        var allTypes = await EavApi.ListEntityTypesAsync();
+        // 树节点属性只可选择共享类型（独占类型仅在其所属空间上下文可见）
+        var allTypes = await EavApi.ListEntityTypesAsync(sharedOnly: true);
         if (allTypes is null || allTypes.Count == 0)
         {
             Message.Warning("暂无可用实体类型，请先在「管理属性定义 → 实体类型」中创建");

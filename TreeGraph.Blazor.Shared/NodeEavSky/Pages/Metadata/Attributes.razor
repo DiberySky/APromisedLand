@@ -222,7 +222,7 @@
 
     private async Task LoadEntityTypesAsync()
     {
-        _entityTypes = await Api.ListEntityTypesAsync();
+        _entityTypes = await Api.ListEntityTypesAsync(sharedOnly: true);
 
         if (_entityTypes is null)
         {

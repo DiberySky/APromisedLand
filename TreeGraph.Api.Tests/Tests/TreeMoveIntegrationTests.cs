@@ -18,8 +18,13 @@ public class TreeMoveIntegrationTests : IntegrationTestBase
 {
     public TreeMoveIntegrationTests(EavApiFactory factory) : base(factory) { }
 
-    /// <summary>创建节点并返回 Id。parentId 为 null 时挂在根。</summary>
-    private async Task<string> CreateNodeAsync(string tree, string text, string? parentId)
+    /// <summary>
+    /// 创建节点并返回 Id。parentId 为 null 时挂在根。
+    /// canHaveChildren 默认 true：硬校验（父节点为叶子时拒绝创建/移入子节点）下，
+    /// 树结构搭建需要父节点可含子项。
+    /// </summary>
+    private async Task<string> CreateNodeAsync(
+        string tree, string text, string? parentId, bool canHaveChildren = true)
     {
         // 显式给 Id：TreeNodeDto.Id 默认 string.Empty 而非 null，
         // 服务端 `nodeDto.Id ?? Guid.NewGuid()` 对空字符串不会再生成新值，会导致 PK 冲突。
@@ -29,7 +34,8 @@ public class TreeMoveIntegrationTests : IntegrationTestBase
             id,
             text,
             parentId,
-            sortOrder = 0
+            sortOrder = 0,
+            canHaveChildren
         });
         resp.EnsureSuccessStatusCode();
         return id;
@@ -69,6 +75,45 @@ public class TreeMoveIntegrationTests : IntegrationTestBase
         // 把 parent 移到其后代 child 下：循环检测（递归 CTE）应拒绝
         var resp = await Client.PostAsync(
             $"{tree}/move?nodeId={parent}&newParentId={child}", null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    /// <summary>硬校验（HTTP 层）：向叶子节点创建子节点 → 400。</summary>
+    [Theory]
+    [InlineData("/UnitTree")]
+    [InlineData("/CategoryTree")]
+    [InlineData("/SpaceTree")]
+    public async Task Create_UnderLeafParent_Returns400(string tree)
+    {
+        var leaf = await CreateNodeAsync(
+            tree, $"L_{Guid.NewGuid():N}", null, canHaveChildren: false);
+
+        var resp = await Client.PostAsJsonAsync(tree, new
+        {
+            id = Guid.NewGuid().ToString(),
+            text = "x",
+            parentId = leaf,
+            sortOrder = 0,
+            canHaveChildren = false
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    /// <summary>硬校验（HTTP 层）：移动到叶子节点下 → 400。</summary>
+    [Theory]
+    [InlineData("/UnitTree")]
+    [InlineData("/CategoryTree")]
+    [InlineData("/SpaceTree")]
+    public async Task Move_UnderLeafParent_Returns400(string tree)
+    {
+        var leaf = await CreateNodeAsync(
+            tree, $"L_{Guid.NewGuid():N}", null, canHaveChildren: false);
+        var node = await CreateNodeAsync(tree, $"N_{Guid.NewGuid():N}", null);
+
+        var resp = await Client.PostAsync(
+            $"{tree}/move?nodeId={node}&newParentId={leaf}", null);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }

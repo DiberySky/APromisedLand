@@ -14,6 +14,9 @@ public class CreateEntityTypeRequest
     public string DisplayName { get; set; } = "";
     public string? Description { get; set; }
     public int DisplayOrder { get; set; }
+
+    /// <summary>所属空间 Id。null/不传 = 共享类型；传值 = 该空间独占（空间须已存在）。</summary>
+    public string? OwnerSpaceId { get; set; }
 }
 
 /// <summary>更新实体类型（PUT api/eav/entity-types/{id}）</summary>
@@ -34,4 +37,6 @@ public record EntityTypeDetailDto(
     bool IsDeleted,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    int AttributeCount);
+    int AttributeCount,
+    /// <summary>所属空间 Id；null = 共享类型。</summary>
+    string? OwnerSpaceId = null);

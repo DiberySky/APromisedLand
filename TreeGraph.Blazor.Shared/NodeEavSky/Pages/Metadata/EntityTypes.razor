@@ -5,6 +5,10 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
+@inject SpaceApiClient SpaceApi
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
 @using TreeGraph.Shared.NodeEavSky.Dtos
 
 @if (!IsDialogMode)
@@ -31,22 +35,8 @@
 }
 else
 {
-    @* 对话框模式：顶部工具栏 *@
-    <MudStack Row Class="mb-4" Justify="Justify.FlexEnd">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   Size="Size.Small"
-                   OnClick="LoadAsync" Disabled="@_loading"
-                   StartIcon="@Icons.Material.Filled.Refresh">
-            刷新
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Success"
-                   Size="Size.Small"
-                   OnClick="OpenCreateAsync"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   Class="ml-2">
-            新建实体类型
-        </MudButton>
-    </MudStack>
+    @* 嵌入模式（对话框/选项卡）：无独立工具栏，与 SpaceManagePanel 风格对齐——
+       新建按钮置于表头操作列，行操作为右对齐小号图标 *@
 }
 
 <MudTable Items="_types" Hover="true" Bordered="true"
@@ -56,56 +46,84 @@ else
           LoadingProgressColor="Color.Primary">
     <HeaderContent>
         <MudTh>名称</MudTh>
+        @if (ShowScopeColumn)
+        {
+            <MudTh>范围</MudTh>
+        }
+        <MudTh>设置</MudTh>
         <MudTh>说明</MudTh>
-        <MudTh>属性数</MudTh>
-        <MudTh>顺序</MudTh>
-        <MudTh>状态</MudTh>
-        <MudTh>操作</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+            @if (IsDialogMode)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="OpenCreateAsync"
+                               title="新建实体类型" />
+            }
+            else
+            {
+                <text>操作</text>
+            }
+        </MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="名称">
             @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
             <MudText Typo="Typo.body1">@context.DisplayName</MudText>
         </MudTd>
+        @if (ShowScopeColumn)
+        {
+            <MudTd DataLabel="范围">
+                @if (context.OwnerSpaceId is null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">共享</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                        独占 · @(_spaceNames.GetValueOrDefault(context.OwnerSpaceId) ?? "未知空间")
+                    </MudChip>
+                }
+            </MudTd>
+        }
+        <MudTd DataLabel="设置">
+            @* 图标入口（左）：点击打开独立属性定义对话框并锁定该类型；
+               数量胶囊靠右展示 *@
+            <div class="d-flex align-center justify-space-between">
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="@(async () => await OpenAttributesAsync(context))"
+                               title="管理属性定义" />
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                    @context.AttributeCount
+                </MudChip>
+            </div>
+        </MudTd>
         <MudTd DataLabel="说明">
             <MudText Typo="Typo.caption" Color="Color.Secondary">
                 @(string.IsNullOrEmpty(context.Description) ? "—" : context.Description)
             </MudText>
         </MudTd>
-        <MudTd DataLabel="属性数">
-            <MudChip T="string" Size="Size.Small" Color="Color.Info">
-                @context.AttributeCount
-            </MudChip>
-        </MudTd>
-        <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
-        <MudTd DataLabel="状态">
-            @if (context.IsDeleted)
-            {
-                <MudChip T="string" Size="Size.Small" Color="Color.Error">已删除</MudChip>
-            }
-            else
-            {
-                <MudChip T="string" Size="Size.Small" Color="Color.Success">活动</MudChip>
-            }
-        </MudTd>
-        <MudTd DataLabel="操作">
+        <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
             @if (!context.IsDeleted)
             {
-                <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                               Size="Size.Medium"
-                               Color="Color.Primary"
-                               OnClick="@(async () => await OpenEditAsync(context))"
-                               title="编辑" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                               Size="Size.Medium"
+                               Size="Size.Small"
                                Color="Color.Error"
                                OnClick="@(async () => await DeleteAsync(context))"
                                title="删除" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               OnClick="@(async () => await OpenEditAsync(context))"
+                               title="编辑" />
             }
             else
             {
                 <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
-                               Size="Size.Medium"
+                               Size="Size.Small"
                                Color="Color.Success"
                                OnClick="@(async () => await UndeleteAsync(context))"
                                title="恢复" />
@@ -116,17 +134,30 @@ else
         <EmptyStateSky Icon="@Icons.Material.Filled.Category"
                        Title="暂无实体类型">
             <Description>
-                <text>点击"新建实体类型"创建第一个</text>
+                <text>点击右上角 + 创建第一个</text>
             </Description>
         </EmptyStateSky>
     </NoRecordsContent>
 </MudTable>
 
 @code {
-    /// <summary>对话框模式：隐藏页头，新建按钮移至内容区顶部。</summary>
+    /// <summary>嵌入模式（对话框/选项卡）：隐藏页头与工具栏，新建按钮置于表头操作列。</summary>
     [Parameter] public bool IsDialogMode { get; set; }
 
+    /// <summary>空间过滤：仅显示 共享类型 ∪ 该空间独占类型；新建时默认独占该空间。</summary>
+    [Parameter] public string? SpaceId { get; set; }
+    /// <summary>空间显示名（范围列与新建对话框展示用）。</summary>
+    [Parameter] public string? SpaceName { get; set; }
+    /// <summary>仅显示共享类型（隐藏范围列，新建仅可创建共享类型）。</summary>
+    [Parameter] public bool SharedOnly { get; set; }
+    /// <summary>与 SpaceId 联用：仅显示该空间独占类型（隐藏范围列，新建锁定独占本空间）。</summary>
+    [Parameter] public bool ExclusiveOnly { get; set; }
+
+    /// <summary>范围列是否可见（仅共享/仅独占视图下范围无信息量）。</summary>
+    private bool ShowScopeColumn => !SharedOnly && !ExclusiveOnly;
+
     private IReadOnlyList<EntityTypeDetailDto>? _types;
+    private Dictionary<string, string> _spaceNames = [];
     private bool _loading;
     private bool _initialized;
 
@@ -151,8 +182,20 @@ else
         try
         {
             // ★ 1 次 HTTP 替代 1+N 次（原 foreach 串行 GetEntityTypeAsync）
-            _types = await Api.ListEntityTypeDetailsAsync()
+            // SharedOnly → 仅共享；SpaceId+ExclusiveOnly → 仅该空间独占；
+            // SpaceId → 共享 ∪ 该空间独占；否则全部
+            _types = await Api.ListEntityTypeDetailsAsync(
+                         spaceId: SpaceId, sharedOnly: SharedOnly, exclusiveOnly: ExclusiveOnly)
                      ?? Array.Empty<EntityTypeDetailDto>();
+
+            // 范围列的空间名映射（独占类型标注所属空间）
+            if (_types.Any(t => t.OwnerSpaceId is not null))
+            {
+                var spaces = await SpaceApi.GetAllAsync() ?? [];
+                _spaceNames = spaces.ToDictionary(s => s.Id, s => s.Name);
+                if (!string.IsNullOrEmpty(SpaceId) && !string.IsNullOrEmpty(SpaceName))
+                    _spaceNames[SpaceId] = SpaceName;
+            }
         }
         finally
         {
@@ -166,7 +209,10 @@ else
     {
         var parameters = new DialogParameters<EntityTypeEditDialog>
         {
-            { x => x.InitialDisplayOrder, (_types?.Count ?? 0) + 1 }
+            { x => x.InitialDisplayOrder, (_types?.Count ?? 0) + 1 },
+            { x => x.DefaultOwnerSpaceId, SpaceId },
+            { x => x.DefaultOwnerSpaceName, SpaceName },
+            { x => x.ForceShared, SharedOnly }
         };
 
         var dialog = await DialogService.ShowAsync<EntityTypeEditDialog>(
@@ -203,6 +249,32 @@ else
     {
         EntityTypeDisplay.Invalidate();
         await EntityTypeDisplay.EnsureLoadedAsync();
+    }
+
+    /// <summary>打开独立属性定义对话框并锁定该实体类型。</summary>
+    private async Task OpenAttributesAsync(EntityTypeDetailDto dto)
+    {
+        var parameters = new DialogParameters<AttributeDefinitionsDialog>
+        {
+            { x => x.EntityType, dto.EntityType },
+            { x => x.DisplayName, dto.DisplayName },
+            { x => x.OnAttributesChanged, EventCallback.Factory.Create(this, LoadAsync) }
+        };
+
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+
+        var dialog = await DialogService.ShowExAsync<AttributeDefinitionsDialog>(
+            string.Empty, parameters, options);
+        await dialog.Result;
+
+        // 属性可能增删，关闭后刷新属性数
+        await LoadAsync();
     }
 
     private async Task DeleteAsync(EntityTypeDetailDto dto)
