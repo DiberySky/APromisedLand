@@ -244,6 +244,7 @@ namespace TreeGraph.Api.Data.Migrations
                     from_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     to_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     weight = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
+                    enforce_single_incoming = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -868,6 +869,13 @@ namespace TreeGraph.Api.Data.Migrations
                 table: "edge_instances",
                 columns: new[] { "edge_type_id", "from_node_id", "to_node_id" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "uq_ei_single_incoming",
+                table: "edge_instances",
+                columns: new[] { "to_node_id", "edge_type_id" },
+                unique: true,
+                filter: "enforce_single_incoming = true");
 
             migrationBuilder.CreateIndex(
                 name: "uq_entity_type",

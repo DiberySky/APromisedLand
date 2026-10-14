@@ -96,6 +96,6 @@ public class InodeJsonTests : IntegrationTestBase
         using var doc = JsonDocument.Parse(json);
         var entities = doc.RootElement.GetProperty("entities");
         Assert.Equal(JsonValueKind.Object, entities.ValueKind);
-        Assert.Equal(0, entities.EnumerateObject().Count());
+        Assert.Empty(entities.EnumerateObject());
     }
 }

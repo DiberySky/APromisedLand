@@ -48,8 +48,13 @@ public class EdgeMetadataController : ControllerBase
     public async Task<IActionResult> Update(
         string edgeTypeId, [FromBody] UpdateEdgeTypeRequest req, CancellationToken ct)
     {
-        var d = await _service.UpdateAsync(edgeTypeId, req, ct);
-        return d is null ? NotFound() : Ok(d);
+        try
+        {
+            var d = await _service.UpdateAsync(edgeTypeId, req, ct);
+            return d is null ? NotFound() : Ok(d);
+        }
+        catch (InvalidOperationException ex) { return Conflict(new { error = ex.Message }); }
+        catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
     /// <summary>

@@ -827,6 +827,12 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("edge_type_id");
 
+                    b.Property<bool>("EnforceSingleIncoming")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("enforce_single_incoming");
+
                     b.Property<string>("FromNodeId")
                         .IsRequired()
                         .HasMaxLength(36)
@@ -861,6 +867,11 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("EdgeTypeId", "ToNodeId")
                         .HasDatabaseName("ix_ei_to");
+
+                    b.HasIndex("ToNodeId", "EdgeTypeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_ei_single_incoming")
+                        .HasFilter("enforce_single_incoming = true");
 
                     b.HasIndex("EdgeTypeId", "FromNodeId", "ToNodeId")
                         .IsUnique()

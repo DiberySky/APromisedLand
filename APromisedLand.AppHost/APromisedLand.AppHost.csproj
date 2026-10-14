@@ -7,6 +7,9 @@
         <Nullable>enable</Nullable>
         <UserSecretsId>023ca44c-b24a-4776-82f6-1c5c6d30ef4f</UserSecretsId>
         <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <!-- 不使用 Aspire CLI bundle 特性（ aspire publish 等），按官方诊断指引抑制 ASPIRE010；
+             AppHost.cs 中保留多套未启用的编排模板函数（按需切换调用），抑制 CS8321 -->
+        <NoWarn>$(NoWarn);ASPIRE010;CS8321</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

@@ -13,8 +13,7 @@ namespace TreeGraph.Api.Tests.Fixtures;
 /// </summary>
 public class EavApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("TreeGraphDb")
         .WithUsername("postgres")
         .WithPassword("postgres")

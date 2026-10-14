@@ -118,7 +118,9 @@ public record ChainPathResult(
     /// <summary>路径上的边（段）列表，与 NodeIds 对应。</summary>
     IReadOnlyList<EdgeInstanceDto> Edges,
     /// <summary>路径长度（边数）。</summary>
-    int Length);
+    int Length,
+    /// <summary>是否因达到递归深度上限而截断（true 表示结果可能不完整）。</summary>
+    bool Truncated = false);
 
 /// <summary>链式拓扑校验结果（入度/成环检测）。</summary>
 public record ChainValidationResult(
@@ -128,10 +130,15 @@ public record ChainValidationResult(
     IReadOnlyDictionary<string, int> InDegreeMap,
     /// <summary>出度超标的节点（仅 IsLinear=false 时收集）。</summary>
     IReadOnlyDictionary<string, int> OutDegreeMap,
-    /// <summary>成环节点（DFS 发现回边）。</summary>
+    /// <summary>成环节点（Kahn 拓扑排序未能消解的剩余节点）。</summary>
     IReadOnlyList<string> CyclicNodeIds,
     int EdgeCount,
-    int NodeCount);
+    int NodeCount,
+    /// <summary>
+    /// 非致命告警：非线性链（IsChain &amp;&amp; !IsLinear）下的入度 &gt; 1 与成环仅作提示，
+    /// 不计入 Errors（不影响 Valid）。严格线性链下这些问题会进入 Errors。
+    /// </summary>
+    IReadOnlyList<string> Warnings);
 
 /// <summary>连通分量：互不相连的节点组。</summary>
 public record ChainConnectedComponent(

@@ -72,6 +72,10 @@ public class EdgeController : ControllerBase
     public async Task<IActionResult> Delete(
         string edgeTypeId, string edgeId, CancellationToken ct)
     {
+        // 校验路径中的 edgeTypeId 与实际所属类型一致（与 Get/Update 行为对齐）
+        var d = await _service.GetByIdAsync(edgeId, ct);
+        if (d is null || d.EdgeTypeId != edgeTypeId) return NotFound();
+
         var ok = await _service.DeleteAsync(edgeId, ct);
         return ok ? NoContent() : NotFound();
     }

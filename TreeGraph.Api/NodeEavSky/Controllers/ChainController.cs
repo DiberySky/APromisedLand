@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -9,6 +10,9 @@ namespace TreeGraph.Api.NodeEavSky.Controllers;
 ///
 /// 链式结构是 Edge（关系/边）的特例：EdgeDefinition.IsChain=true。
 /// 端点覆盖：批量创建链、完整路径查询、拓扑校验、连通分量。
+///
+/// 响应体统一交由 ApiEnvelopeFilter 包装为 ApiResponse，控制器不再手工套
+/// { success, message, data }，避免与全局信封叠成双层（前端只解一层信封）。
 /// </summary>
 [ApiController]
 [Route("api/eav/chains")]
@@ -24,6 +28,7 @@ public class ChainController : ControllerBase
 
     /// <summary>
     /// 按顺序创建 A→B→C→D 的链式边。全事务，任一段失败整体回滚。
+    /// 建链前校验：节点不重复、节点存在且类型匹配、候选图不成环。
     /// </summary>
     [HttpPost("{edgeTypeId}/create")]
     public async Task<IActionResult> CreateChain(
@@ -34,55 +39,53 @@ public class ChainController : ControllerBase
         try
         {
             var edges = await _chain.CreateChainAsync(edgeTypeId, req, ct);
-            return Ok(new
-            {
-                success = true,
-                message = $"创建链成功：{edges.Count} 段边",
-                data = edges
-            });
+            return Ok(edges);
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new { success = false, error = ex.Message });
+            return Conflict(new { error = ex.Message });
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { success = false, error = ex.Message });
+            return BadRequest(new { error = ex.Message });
         }
     }
 
     // ============================================================
-    // 路径查询
+    // 路径查询（仅严格线性链）
     // ============================================================
 
-    /// <summary>
-    /// 从 nodeId 向上游走到底（找整条上游链）。
-    /// </summary>
+    /// <summary>从 nodeId 向上游走到底（找整条上游链）。</summary>
     [HttpGet("{edgeTypeId}/upstream/{nodeId}")]
     public async Task<IActionResult> Upstream(
         [FromRoute] string edgeTypeId,
         [FromRoute] string nodeId,
         CancellationToken ct)
     {
-        var path = await _chain.GetPathAsync(edgeTypeId, nodeId, "up", ct);
-        return Ok(new { success = true, data = path });
+        var (error, def) = await GuardLinearAsync(edgeTypeId, ct);
+        if (error is not null) return error;
+
+        var path = await _chain.GetPathAsync(edgeTypeId, nodeId, "up", ct, def: def);
+        return Ok(path);
     }
 
-    /// <summary>
-    /// 从 nodeId 向下游走到底（找整条下游链）。
-    /// </summary>
+    /// <summary>从 nodeId 向下游走到底（找整条下游链）。</summary>
     [HttpGet("{edgeTypeId}/downstream/{nodeId}")]
     public async Task<IActionResult> Downstream(
         [FromRoute] string edgeTypeId,
         [FromRoute] string nodeId,
         CancellationToken ct)
     {
-        var path = await _chain.GetPathAsync(edgeTypeId, nodeId, "down", ct);
-        return Ok(new { success = true, data = path });
+        var (error, def) = await GuardLinearAsync(edgeTypeId, ct);
+        if (error is not null) return error;
+
+        var path = await _chain.GetPathAsync(edgeTypeId, nodeId, "down", ct, def: def);
+        return Ok(path);
     }
 
     /// <summary>
     /// 获取 nodeId 所在的完整链（先 up 到源头，再 down 到底，拼接成一条有序链）。
+    /// 无向链（IsDirected=false）方向无意义，单次双向展开即为整条链，无需拼接。
     /// </summary>
     [HttpGet("{edgeTypeId}/path/{nodeId}")]
     public async Task<IActionResult> FullPath(
@@ -90,10 +93,20 @@ public class ChainController : ControllerBase
         [FromRoute] string nodeId,
         CancellationToken ct)
     {
+        var (error, def) = await GuardLinearAsync(edgeTypeId, ct);
+        if (error is not null) return error;
+
+        // 无向链：up/down 语义不适用，直接返回一次双向展开的完整链
+        if (def is { IsDirected: false })
+        {
+            var walk = await _chain.GetPathAsync(edgeTypeId, nodeId, "down", ct, def: def);
+            return Ok(walk);
+        }
+
         // 1. 向上游走到源头（不含当前节点）
-        var upstream = await _chain.GetPathAsync(edgeTypeId, nodeId, "up", ct);
+        var upstream = await _chain.GetPathAsync(edgeTypeId, nodeId, "up", ct, def: def);
         // 2. 向下游走到终点
-        var downstream = await _chain.GetPathAsync(edgeTypeId, nodeId, "down", ct);
+        var downstream = await _chain.GetPathAsync(edgeTypeId, nodeId, "down", ct, def: def);
 
         // 拼接：upstream 的 nodeIds 反向 + 当前 + downstream 的 nodeIds[1..]
         var orderedNodes = upstream.NodeIds.Reverse().Concat(downstream.NodeIds.Skip(1)).ToList();
@@ -101,39 +114,62 @@ public class ChainController : ControllerBase
         // 边：upstream.Edges 反向 + downstream.Edges
         var orderedEdges = upstream.Edges.Reverse().Concat(downstream.Edges).ToList();
 
-        var result = new ChainPathResult(orderedNodes, orderedEdges, orderedEdges.Count);
-        return Ok(new { success = true, data = result });
+        var result = new ChainPathResult(
+            orderedNodes, orderedEdges, orderedEdges.Count,
+            upstream.Truncated || downstream.Truncated);
+        return Ok(result);
     }
 
     // ============================================================
     // 拓扑校验
     // ============================================================
 
-    /// <summary>
-    /// 校验链式结构拓扑：入度/出度/成环。返回诊断详情。
-    /// </summary>
+    /// <summary>校验链式结构拓扑：入度/出度/成环。返回诊断详情。</summary>
     [HttpGet("{edgeTypeId}/validate")]
     public async Task<IActionResult> Validate(
         [FromRoute] string edgeTypeId,
         CancellationToken ct)
     {
-        var result = await _chain.ValidateTopologyAsync(edgeTypeId, ct);
-        return Ok(new { success = true, data = result });
+        if (await _chain.GetDefinitionAsync(edgeTypeId, ct) is null)
+            return NotFound(new { error = $"EdgeType 不存在: {edgeTypeId}" });
+
+        return Ok(await _chain.ValidateTopologyAsync(edgeTypeId, ct));
     }
 
     // ============================================================
     // 连通分量
     // ============================================================
 
-    /// <summary>
-    /// 找出该 EdgeType 下所有互不相连的链式分量（多条独立链）。
-    /// </summary>
+    /// <summary>找出该 EdgeType 下所有互不相连的链式分量（多条独立链）。</summary>
     [HttpGet("{edgeTypeId}/components")]
     public async Task<IActionResult> Components(
         [FromRoute] string edgeTypeId,
         CancellationToken ct)
     {
-        var comps = await _chain.GetConnectedComponentsAsync(edgeTypeId, ct);
-        return Ok(new { success = true, data = comps });
+        if (await _chain.GetDefinitionAsync(edgeTypeId, ct) is null)
+            return NotFound(new { error = $"EdgeType 不存在: {edgeTypeId}" });
+
+        return Ok(await _chain.GetConnectedComponentsAsync(edgeTypeId, ct));
+    }
+
+    /// <summary>
+    /// 路径类端点的前置守卫：类型不存在 → 404；非严格线性链 → 400。
+    /// 非线性链的路径查询会把分支/合流摊平成“伪单链”，故直接拒绝。
+    /// 返回 (错误结果, 定义) 供调用方复用定义（避免重复查询）。
+    /// </summary>
+    private async Task<(IActionResult? Error, EdgeDefinition? Def)> GuardLinearAsync(
+        string edgeTypeId, CancellationToken ct)
+    {
+        var def = await _chain.GetDefinitionAsync(edgeTypeId, ct);
+        if (def is null)
+            return (NotFound(new { error = $"EdgeType 不存在: {edgeTypeId}" }), null);
+
+        if (!def.IsLinear)
+            return (BadRequest(new
+            {
+                error = $"关系类型 {def.DisplayName} 非严格线性链，不支持路径查询（请改用 /components 或图遍历）"
+            }), def);
+
+        return (null, def);
     }
 }

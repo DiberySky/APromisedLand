@@ -710,6 +710,8 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.FromNodeId).HasColumnName("from_node_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.ToNodeId).HasColumnName("to_node_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.Weight).HasColumnName("weight").HasPrecision(18, 4);
+            e.Property(x => x.EnforceSingleIncoming)
+                .HasColumnName("enforce_single_incoming").HasDefaultValue(false);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
@@ -717,6 +719,18 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => new { x.EdgeTypeId, x.FromNodeId, x.ToNodeId })
                 .IsUnique()
                 .HasDatabaseName("uq_edge_instance");
+
+            // 严格线性链（IsChain && IsLinear）：同一类型下同一 to_node_id 至多一条边
+            // （入度 ≤ 1）。用部分唯一索引把并发下“查后插”的竞态收敛为数据库原子约束。
+            //
+            // 注意：列顺序刻意与下方通用索引 ix_ei_to 相反（ToNodeId, EdgeTypeId）。
+            // EF Core 按属性列表识别索引，相同列集合会被合并覆盖；反转顺序使二者成为
+            // 两个独立索引，既保留通用入边查询索引，又叠加唯一约束。唯一性语义与
+            // (EdgeTypeId, ToNodeId) 完全等价（列顺序不影响唯一性）。
+            e.HasIndex(x => new { x.ToNodeId, x.EdgeTypeId })
+                .IsUnique()
+                .HasFilter("enforce_single_incoming = true")
+                .HasDatabaseName("uq_ei_single_incoming");
 
             // 图查询索引：from 出边 / to 入边
             e.HasIndex(x => new { x.EdgeTypeId, x.FromNodeId })

@@ -52,6 +52,7 @@ builder.Services.AddScoped<CustomTableReadService>();
 builder.Services.AddScoped<CustomTableQueryService>();
 
 // Edge（关系/边）
+builder.Services.AddScoped<IEdgeNodeValidator, EdgeNodeValidator>();
 builder.Services.AddScoped<EdgeMetadataService>();
 builder.Services.AddScoped<EdgeInstanceService>();
 builder.Services.AddScoped<ChainService>();

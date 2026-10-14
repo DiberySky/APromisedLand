@@ -7,7 +7,8 @@ public static class NornicDbExtension
         AppHostResourceContext resourceContext)
     {
         // 获取 Ollama 的 HTTP 端点，Aspire 会自动解析为容器网络内地址
-        var ollamaHttp = resourceContext.Ollama.GetEndpoint("http");
+        // （前置条件：启用前须先调用 AddOllama 声明 Ollama/Embedding/ChatModel 资源）
+        var ollamaHttp = resourceContext.Ollama!.GetEndpoint("http");
         
         resourceContext.NornicDb = builder.AddContainer(
                 "nornicdb",
@@ -16,7 +17,7 @@ public static class NornicDbExtension
             .WithEndpoint(port: 7687, targetPort: 7687, name: "bolt")
             .WithVolume("nornicdb-data", "/data")
             .WithEnvironment("NORNICDB_LOG_LEVEL", "info")
-            .WithReference(resourceContext.Ollama)
+            .WithReference(resourceContext.Ollama!)
 
             // ===== Embeddings =====
             .WithEnvironment("NORNICDB_EMBEDDING_ENABLED", "true")
@@ -39,9 +40,9 @@ public static class NornicDbExtension
 
         // 显式声明完整依赖链
         resourceContext.NornicDb
-            .WaitFor(resourceContext.Ollama)
-            .WaitFor(resourceContext.Embedding)
-            .WaitFor(resourceContext.ChatModel);
+            .WaitFor(resourceContext.Ollama!)
+            .WaitFor(resourceContext.Embedding!)
+            .WaitFor(resourceContext.ChatModel!);
 
         return builder;
     }
