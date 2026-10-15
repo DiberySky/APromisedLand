@@ -40,6 +40,35 @@ builder.Services.AddScoped<EavReadService>();
 builder.Services.AddScoped<EavQueryService>();
 builder.Services.AddScoped<EavValidationService>();
 builder.Services.AddScoped<CompositeValueService>();
+
+// ★ 文件存储级联删除客户端：EavWriteService 注入 IFileStorageDeleter，
+//   在 SaveChanges 成功后通知 FileStorageApi 删除孤儿文件对象。
+//   BaseAddress 优先用 Aspire 服务发现注入的 HttpClient 命名 "FileStorageApi"；
+//   本地开发无 Aspire 时 fallback 到 Configuration["FileStorageApi:BaseAddress"]。
+var fileStorageBaseAddr = builder.Configuration["FileStorageApi:BaseAddress"]
+                         ?? "http://localhost:5060";
+
+builder.Services.AddHttpClient<IFileStorageDeleter, FileStorageDeleter>(client =>
+{
+    client.BaseAddress = new Uri(fileStorageBaseAddr);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+
+builder.Services.AddHttpClient<IFileInventoryClient, FileInventoryClient>(client =>
+{
+    client.BaseAddress = new Uri(fileStorageBaseAddr);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+
+// ★ 孤儿文件清理后台服务：对比 EAV value_file_meta ↔ FileStorageApi 文件库存，
+//   删除差集（FileStorageApi 有但 EAV 已不引用的孤儿）。
+builder.Services
+    .AddOptions<OrphanedCleanupOptions>()
+    .Bind(builder.Configuration.GetSection(OrphanedCleanupOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddHostedService<OrphanedFileCleanupService>();
 builder.Services.AddScoped<IInodeEntityService, InodeEntityService>();
 builder.Services.AddScoped<InodeEavFacade>();
 builder.Services.AddSingleton<IAttributeCache, AttributeCache>();

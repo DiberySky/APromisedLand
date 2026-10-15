@@ -1,3 +1,7 @@
+// EXTEXP0001: RemoveAllResilienceHandlers 当前标记为实验性 API。
+// 用途：移除 AddServiceDefaults 经 ConfigureHttpClientDefaults 挂上的默认弹性处理器
+// （10s 超时 + 3 次重试），避免与 NonIdempotentResilience 叠加导致大文件下载 10s 超时。
+#pragma warning disable EXTEXP0001
 using MudBlazor.Services;
 using TreeGraph.Blazor.Components;
 using TreeGraph.Blazor.Infrastructure;
@@ -36,7 +40,11 @@ builder.Services.AddTreeEavSky(
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
     },
     configureClientBuilder: httpBuilder =>
-        httpBuilder.AddStandardResilienceHandler(NonIdempotentResilience.Configure));
+        httpBuilder
+            // ★ 先移除 AddServiceDefaults 挂的默认弹性处理器（10s 超时 + 3 次重试），
+            //   否则两个处理器叠加、默认 10s 先触发，NonIdempotentResilience 形同虚设。
+            .RemoveAllResilienceHandlers()
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure));
 
 #if DEBUG
 // 弹窗源文件定位（DEBUG 专用）：装饰 IDialogService，DialogSky 等对话框标题栏 DevDialogSourceButton 据此反查 .razor 文件。
@@ -67,6 +75,7 @@ builder.Services
     {
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
     })
+    .RemoveAllResilienceHandlers()
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
 // ★ SpaceSky 空间 CRUD 客户端（/Space）：与 EavApiClient 同款服务发现与弹性策略。
@@ -75,6 +84,7 @@ builder.Services
     {
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
     })
+    .RemoveAllResilienceHandlers()
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
 // ★ FileStorageSky 客户端（UploadsController + FilesController）：独立微服务 treegraphfilestorageapi。
@@ -91,6 +101,7 @@ builder.Services
     {
         client.BaseAddress = new Uri("https+http://treegraphfilestorageapi");
     })
+    .RemoveAllResilienceHandlers()
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
 var app = builder.Build();

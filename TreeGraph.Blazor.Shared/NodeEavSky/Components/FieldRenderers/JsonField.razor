@@ -1,0 +1,195 @@
+@using System.Text.Json
+@using Microsoft.JSInterop
+@* json 类型字段渲染器：纯文本编辑 + 实时格式化 + 结构校验。
+   用户面对统一的 JSON 源文本；实时校验标记语法错误，
+   "格式化"按钮一键美化；只读模式展示美化后的 JSON。 *@
+
+<MudPaper Class="pa-3" Elevation="1" Outlined="true">
+    <div class="d-flex align-center mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.DataObject"
+                 Size="Size.Small" Color="Color.Primary" Class="mr-1" />
+        <MudText Typo="Typo.subtitle2">@Attr.DisplayName</MudText>
+        @if (Attr.IsRequired)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Error" Class="ml-1">*</MudText>
+        }
+        @if (!ReadOnly && HasValue)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.FormatAlignLeft"
+                           Size="Size.Small" Color="Color.Default"
+                           Title="格式化 JSON"
+                           OnClick="FormatJson" Class="ml-auto" />
+            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                           Size="Size.Small" Color="Color.Default"
+                           Title="复制"
+                           OnClick="CopyToClipboard" />
+        }
+    </div>
+
+    @if (ReadOnly)
+    {
+        <MudPaper Class="pa-2" Elevation="0" Outlined="true"
+                  Style="background: #f6f8fa; font-family: monospace; font-size: 13px; max-height: 300px; overflow: auto;">
+            <pre style="margin: 0; white-space: pre-wrap;">@FormattedText</pre>
+        </MudPaper>
+    }
+    else
+    {
+        <MudTextField T="string"
+                      Value="_text"
+                      ValueChanged="OnTextChanged"
+                      Required="@Attr.IsRequired"
+                      Label="@PlaceholderHint"
+                      Variant="Variant.Outlined"
+                      Lines="8"
+                      Clearable="true"
+                      ReadOnly="false"
+                      FullWidth="true"
+                      HelperText="@HelperText"
+                      Error="@HasError"
+                      ErrorText="@ErrorText" />
+    }
+</MudPaper>
+
+@code {
+    [Inject] public IJSRuntime JSRuntime { get; set; } = null!;
+
+    [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
+
+    /// <summary>传入值：JsonElement（后端返回的 JSON DOM）或 string（降级场景）。</summary>
+    [Parameter] public object? Value { get; set; }
+
+    [Parameter] public EventCallback<object?> ValueChanged { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private string _text = "";
+    private string? _formattedCache;
+    private bool _valueIsDirty;
+
+    protected override void OnParametersSet()
+    {
+        // Value 变化时刷新内部文本（仅当初次加载或值确实变了）
+        var incoming = NormalizeValueToText(Value);
+        if (_valueIsDirty && string.Equals(incoming, _text, StringComparison.Ordinal))
+        {
+            // 用户已编辑过，但新 Value 文本与当前一致（可能是同一条回调链回传）→ 不重置
+            return;
+        }
+        _text = incoming ?? "";
+        _formattedCache = null;
+        _valueIsDirty = false;
+    }
+
+    private static string? NormalizeValueToText(object? v)
+    {
+        return v switch
+        {
+            null => null,
+            JsonElement je when je.ValueKind == JsonValueKind.Null => null,
+            JsonElement je => je.GetRawText(),
+            string s => s,
+            _ => JsonSerializer.Serialize(v)
+        };
+    }
+
+    private bool HasValue => !string.IsNullOrWhiteSpace(_text);
+
+    private string? FormattedText
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_text)) return null;
+            if (_formattedCache != null) return _formattedCache;
+            try
+            {
+                using var doc = JsonDocument.Parse(_text);
+                _formattedCache = JsonSerializer.Serialize(doc,
+                    new JsonSerializerOptions { WriteIndented = true });
+            }
+            catch (JsonException)
+            {
+                _formattedCache = _text;
+            }
+            return _formattedCache;
+        }
+    }
+
+    private string PlaceholderHint =>
+        "输入 JSON 对象或数组，例如 { \"name\": \"张三\", \"age\": 30 }";
+
+    private (bool Error, string? Msg) ValidateText()
+    {
+        if (string.IsNullOrWhiteSpace(_text))
+            return (Attr.IsRequired, "必填项");
+
+        try
+        {
+            using var doc = JsonDocument.Parse(_text);
+            return (false, null);
+        }
+        catch (JsonException ex)
+        {
+            return (true, $"JSON 语法错误：{ex.Message}");
+        }
+    }
+
+    private bool HasError => ValidateText().Error;
+    private string? ErrorText => ValidateText().Msg;
+
+    private string? HelperText => !HasError && !string.IsNullOrWhiteSpace(_text)
+        ? "JSON 格式正确"
+        : null;
+
+    private async Task OnTextChanged(string v)
+    {
+        _text = v ?? "";
+        _formattedCache = null;
+        _valueIsDirty = true;
+
+        // 尝试解析为 JSON 提交；非法时降级为普通 string（与 DynamicForm.TryParseJson 策略一致）
+        object? submit;
+        if (string.IsNullOrWhiteSpace(_text))
+        {
+            submit = null;
+        }
+        else
+        {
+            try { submit = JsonDocument.Parse(_text).RootElement.Clone(); }
+            catch (JsonException) { submit = _text; }
+        }
+
+        await ValueChanged.InvokeAsync(submit);
+    }
+
+    private Task FormatJson()
+    {
+        if (string.IsNullOrWhiteSpace(_text)) return Task.CompletedTask;
+        try
+        {
+            using var doc = JsonDocument.Parse(_text);
+            var pretty = JsonSerializer.Serialize(doc,
+                new JsonSerializerOptions { WriteIndented = true });
+            _text = pretty;
+            _formattedCache = pretty;
+            _valueIsDirty = true;
+
+            object? submit = JsonDocument.Parse(_text).RootElement.Clone();
+            return ValueChanged.InvokeAsync(submit);
+        }
+        catch
+        {
+            return Task.CompletedTask; // 语法错误时跳过格式化
+        }
+    }
+
+    private async Task CopyToClipboard()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync(
+                "navigator.clipboard.writeText", HasValue ? _text : "");
+        }
+        catch { /* 忽略剪贴板失败 */ }
+    }
+}

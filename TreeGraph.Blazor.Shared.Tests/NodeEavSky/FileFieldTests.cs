@@ -1,8 +1,10 @@
 using System.Text;
 using System.Text.Json;
+using AngleSharp.Dom;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using Moq;
@@ -40,6 +42,18 @@ public class FileFieldTests : BunitTestBase
         Services.AddSingleton(_storage.Object);
     }
 
+    /// <summary>
+    /// 渲染 MudDialogProvider + FileField。
+    /// 上传测试需要 provider 才能让 UploadProgressDialog 真正初始化并关闭；
+    /// 在 mock IDialogService 的测试中，provider 会解析到 mock（因为 setup 在前）。
+    /// </summary>
+    private IRenderedComponent<FileField> RenderFileField(
+        Action<ComponentParameterCollectionBuilder<FileField>>? configure = null)
+    {
+        Render<MudDialogProvider>();
+        return configure is null ? Render<FileField>() : Render<FileField>(configure);
+    }
+
     private static AttributeSchemaDto FileAttr() =>
         new("attachment", "附件", EavDataTypes.File,
             false, false, false, 150, null, null, null);
@@ -69,7 +83,7 @@ public class FileFieldTests : BunitTestBase
             "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
             1, "active");
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -128,7 +142,7 @@ public class FileFieldTests : BunitTestBase
             });
 
         JsonElement? captured = null;
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.ValueChanged,
@@ -193,7 +207,7 @@ public class FileFieldTests : BunitTestBase
         _storage.Setup(s => s.DownloadFileAsync(fileGuid, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Stream?)new MemoryStream(Encoding.UTF8.GetBytes("payload")));
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -202,7 +216,7 @@ public class FileFieldTests : BunitTestBase
         // 删除按钮之前的是下载按钮（markup 中 download 在 delete 之前渲染）
         var buttons = cut.FindAll("button");
         Assert.True(buttons.Count >= 2, "应至少有下载+删除两个按钮");
-        await cut.InvokeAsync(() => buttons[0].Click());
+        await DownloadButton(cut).TriggerEventAsync("onclick", new MouseEventArgs());
 
         _storage.Verify(s => s.GetFileByDocIdAsync("d1", 1, It.IsAny<CancellationToken>()),
             Times.Once);
@@ -244,7 +258,7 @@ public class FileFieldTests : BunitTestBase
             .ReturnsAsync(true);
 
         JsonElement? captured = null;
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -255,7 +269,7 @@ public class FileFieldTests : BunitTestBase
         var buttons = cut.FindAll("button");
         Assert.True(buttons.Count >= 2, "应至少有下载+删除两个按钮");
         // 删除按钮是第二个（download 在前）
-        await cut.InvokeAsync(() => buttons[1].Click());
+        await cut.InvokeAsync(() => DeleteButton(cut).Click());
 
         _storage.Verify(s => s.DeleteFileAsync(fileGuid, It.IsAny<CancellationToken>()),
             Times.Once);
@@ -281,13 +295,13 @@ public class FileFieldTests : BunitTestBase
                 "missing", 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync((FileMetadataDto?)null);
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
         });
 
-        await cut.InvokeAsync(() => cut.FindAll("button")[0].Click());
+        await DownloadButton(cut).TriggerEventAsync("onclick", new MouseEventArgs());
 
         _storage.Verify(s => s.DownloadFileAsync(
                 It.IsAny<Guid>(), It.IsAny<long?>(), It.IsAny<long?>(),
@@ -314,13 +328,13 @@ public class FileFieldTests : BunitTestBase
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((Stream?)null);
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
         });
 
-        await cut.InvokeAsync(() => cut.FindAll("button")[0].Click());
+        await DownloadButton(cut).TriggerEventAsync("onclick", new MouseEventArgs());
 
         Assert.Contains("文件不存在", cut.Markup);
         Assert.DoesNotContain(JSInterop.Invocations,
@@ -341,13 +355,13 @@ public class FileFieldTests : BunitTestBase
                 "d4", 1, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("network down"));
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
         });
 
-        await cut.InvokeAsync(() => cut.FindAll("button")[0].Click());
+        await DownloadButton(cut).TriggerEventAsync("onclick", new MouseEventArgs());
 
         Assert.Contains("下载失败", cut.Markup);
         Assert.Contains("network down", cut.Markup);
@@ -388,13 +402,13 @@ public class FileFieldTests : BunitTestBase
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((Stream?)new MemoryStream(Encoding.UTF8.GetBytes("payload")));
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
         });
 
-        await cut.InvokeAsync(() => cut.FindAll("button")[0].Click());
+        await DownloadButton(cut).TriggerEventAsync("onclick", new MouseEventArgs());
 
         _storage.Verify(s => s.DownloadFileAsync(
                 fileGuid,
@@ -429,7 +443,7 @@ public class FileFieldTests : BunitTestBase
         Services.AddSingleton<IDialogService>(dialogMock.Object);
 
         var changed = false;
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -437,7 +451,7 @@ public class FileFieldTests : BunitTestBase
                 EventCallback.Factory.Create<JsonElement?>(this, _ => changed = true));
         });
 
-        await cut.InvokeAsync(() => cut.FindAll("button")[1].Click());
+        await cut.InvokeAsync(() => DeleteButton(cut).Click());
 
         _storage.Verify(s => s.GetFileByDocIdAsync(
                 It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()),
@@ -473,7 +487,7 @@ public class FileFieldTests : BunitTestBase
 
         JsonElement? captured = null;
         var changed = false;
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -485,7 +499,7 @@ public class FileFieldTests : BunitTestBase
                 }));
         });
 
-        await cut.InvokeAsync(() => cut.FindAll("button")[1].Click());
+        await cut.InvokeAsync(() => DeleteButton(cut).Click());
 
         _storage.Verify(s => s.DeleteFileAsync(
                 It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -530,7 +544,7 @@ public class FileFieldTests : BunitTestBase
                 Status = "active"
             });
 
-        var cut = Render<FileField>(p => p.Add(x => x.Attr, FileAttr()));
+        var cut = RenderFileField(p => p.Add(x => x.Attr, FileAttr()));
 
         var input = cut.FindComponent<InputFile>();
         var fakeFile = new FakeBrowserFile("small.bin", 1024, "application/octet-stream");
@@ -584,7 +598,7 @@ public class FileFieldTests : BunitTestBase
                 Status = "active"
             });
 
-        var cut = Render<FileField>(p => p.Add(x => x.Attr, FileAttr()));
+        var cut = RenderFileField(p => p.Add(x => x.Attr, FileAttr()));
 
         var input = cut.FindComponent<InputFile>();
         var fakeFile = new FakeBrowserFile("big.bin", oneMb, "application/octet-stream");
@@ -649,7 +663,7 @@ public class FileFieldTests : BunitTestBase
                 Status = "active"
             });
 
-        var cut = Render<FileField>(p => p.Add(x => x.Attr, FileAttr()));
+        var cut = RenderFileField(p => p.Add(x => x.Attr, FileAttr()));
 
         var input = cut.FindComponent<InputFile>();
         var fakeFile = new FakeBrowserFile("r.bin", 2048, "application/octet-stream");
@@ -695,7 +709,7 @@ public class FileFieldTests : BunitTestBase
             .ReturnsAsync((FileMetadataDto?)null);
 
         JsonElement? captured = null;
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.ValueChanged,
@@ -730,7 +744,7 @@ public class FileFieldTests : BunitTestBase
                 It.IsAny<InitiateUploadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("init boom"));
 
-        var cut = Render<FileField>(p => p.Add(x => x.Attr, FileAttr()));
+        var cut = RenderFileField(p => p.Add(x => x.Attr, FileAttr()));
 
         var input = cut.FindComponent<InputFile>();
         var fakeFile = new FakeBrowserFile("x.bin", 10, "application/octet-stream");
@@ -767,7 +781,7 @@ public class FileFieldTests : BunitTestBase
             : JsonSerializer.SerializeToElement(
                 new { fileName = "no-doc.pdf", size = 1L }, WebOpt);
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -791,7 +805,7 @@ public class FileFieldTests : BunitTestBase
         var value = BuildValue("size-doc", "f.bin", "application/octet-stream",
             size, null, 1, "active");
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -811,7 +825,7 @@ public class FileFieldTests : BunitTestBase
         var value = JsonSerializer.SerializeToElement(
             new { docId = "partial-doc", fileName = "partial.bin" }, WebOpt);
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -834,7 +848,7 @@ public class FileFieldTests : BunitTestBase
         var value = BuildValue("short-sha", "f.bin", "application/octet-stream",
             1L, "abc12345", 1, "active");
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -855,7 +869,7 @@ public class FileFieldTests : BunitTestBase
             "attachment", "附件", EavDataTypes.File,
             true, false, false, 150, null, null, null);
 
-        var cut = Render<FileField>(p => p.Add(x => x.Attr, requiredAttr));
+        var cut = RenderFileField(p => p.Add(x => x.Attr, requiredAttr));
 
         Assert.Contains("必填", cut.Markup);
         Assert.Contains("上传附件", cut.Markup);
@@ -898,7 +912,7 @@ public class FileFieldTests : BunitTestBase
             .ThrowsAsync(new InvalidOperationException("object lock"));
 
         var changed = false;
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
@@ -906,7 +920,7 @@ public class FileFieldTests : BunitTestBase
                 EventCallback.Factory.Create<JsonElement?>(this, _ => changed = true));
         });
 
-        await cut.InvokeAsync(() => cut.FindAll("button")[1].Click());
+        await cut.InvokeAsync(() => DeleteButton(cut).Click());
 
         Assert.Contains("删除失败", cut.Markup);
         Assert.Contains("object lock", cut.Markup);
@@ -950,7 +964,7 @@ public class FileFieldTests : BunitTestBase
                 Status = "active"
             });
 
-        var cut = Render<FileField>(p => p.Add(x => x.Attr, FileAttr()));
+        var cut = RenderFileField(p => p.Add(x => x.Attr, FileAttr()));
 
         var input = cut.FindComponent<InputFile>();
         var fakeFile = new FakeBrowserFile("noct.bin", 10, "");
@@ -1000,7 +1014,7 @@ public class FileFieldTests : BunitTestBase
                 Status = "active"
             });
 
-        var cut = Render<FileField>(p => p.Add(x => x.Attr, FileAttr()));
+        var cut = RenderFileField(p => p.Add(x => x.Attr, FileAttr()));
 
         // 初始空值态：有 InputFile，无按钮
         Assert.True(cut.HasComponent<InputFile>());
@@ -1012,11 +1026,11 @@ public class FileFieldTests : BunitTestBase
             await input.Instance.OnChange.InvokeAsync(
                 new InputFileChangeEventArgs(new IBrowserFile[] { fakeFile })));
 
-        // 完成态：上传入口消失，文件卡 + 下载/删除按钮 + 文件名
-        Assert.False(cut.HasComponent<InputFile>());
-        Assert.Equal(2, cut.FindAll("button").Count);
+        // 完成态：InputFile wrapper 仍在 DOM（ShowInputFile 永不 false，但显示用 CSS d-none），
+        //         文件卡 + 至少下载/删除两个按钮 + 文件名展示（可能多一个预览按钮）
+        Assert.True(cut.FindAll("button").Count >= 2,
+            $"应至少有下载+删除两个按钮，实际 {cut.FindAll("button").Count}");
         Assert.Contains("done.bin", cut.Markup);
-        Assert.DoesNotContain("上传附件", cut.Markup);
     }
 
     // ============================================================
@@ -1052,13 +1066,13 @@ public class FileFieldTests : BunitTestBase
         JSInterop.SetupVoid("treegraphFile.downloadFromStream", _ => true)
             .SetException(new JSException("treegraphFile.downloadFromStream is not defined"));
 
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.Value, value);
         });
 
-        await cut.InvokeAsync(() => cut.FindAll("button")[0].Click());
+        await DownloadButton(cut).TriggerEventAsync("onclick", new MouseEventArgs());
 
         Assert.Contains("下载失败", cut.Markup);
         Assert.Contains("downloadFromStream", cut.Markup);
@@ -1084,7 +1098,7 @@ public class FileFieldTests : BunitTestBase
             .ThrowsAsync(new HttpRequestException("chunk connection lost"));
 
         JsonElement? captured = null;
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.ValueChanged,
@@ -1134,7 +1148,7 @@ public class FileFieldTests : BunitTestBase
             .ThrowsAsync(new HttpRequestException("merge failed"));
 
         JsonElement? captured = null;
-        var cut = Render<FileField>(p =>
+        var cut = RenderFileField(p =>
         {
             p.Add(x => x.Attr, FileAttr());
             p.Add(x => x.ValueChanged,
@@ -1192,6 +1206,15 @@ public class FileFieldTests : BunitTestBase
     }
 
     // ============================================================
+    // 辅助：按钮查找（按文本，不按下标）—— 因为加了「预览」按钮，顺序变了
+    // ============================================================
+
+    private static IElement DownloadButton(IRenderedComponent<FileField> cut)
+        => cut.FindAll("button").First(b => b.TextContent.Contains("下载"));
+    private static IElement DeleteButton(IRenderedComponent<FileField> cut)
+        => cut.FindAll("button").First(b => b.TextContent.Contains("删除"));
+
+    // ============================================================
     // 辅助：最小可工作的 IBrowserFile 假实现
     // ============================================================
 
@@ -1244,3 +1267,4 @@ public class FileFieldTests : BunitTestBase
         return null;
     }
 }
+

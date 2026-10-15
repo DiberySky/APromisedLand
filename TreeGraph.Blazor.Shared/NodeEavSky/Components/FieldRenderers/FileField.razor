@@ -1,47 +1,37 @@
-@* FileField.razor — EAV file 属性渲染器（接入 FileStorageApi 分块上传/下载/删除） *@
-@* 存储 JSON shape 与 seeder BuildFileMeta 对齐：docId/fileName/contentType/size/sha256/version/status *@
+@* FileField.razor — EAV file 属性渲染器 *@
+@* 存储 JSON shape：docId/fileName/contentType/size/sha256/version/status *@
+@* ★ InputFile 必须始终在 DOM 中（d-none 切可见性），否则 Blazor WASM JS 侧文件注册表清空 *@
+@* ★ 上传流程委托给 UploadProgressDialog —— 对话框自己管进度/心跳/完成/取消 *@
+
 @inject IFileStorageClient FileStorage
 @inject IDialogService Dialog
-@inject IJSRuntime JS
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 @using TreeGraph.Blazor.Shared.FileStorageSky.Services
+@using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Shared.FileStorageSky.Contracts
 @using Microsoft.AspNetCore.Components.Forms
-@using Microsoft.JSInterop
-@implements System.IAsyncDisposable
 
-@if (_meta is null && !_isUploading)
+@* InputFile 专用 wrapper：始终在 DOM 中，用 d-none 切可见性 *@
+<div class="@(ShowInputFile ? "" : "d-none")">
+    <label class="mud-button-root mud-button mud-button-filled mud-button-filled-size-medium
+                 mud-button-filled-primary mud-button-filled">
+        <InputFile OnChange="OnFileSelected" accept="*/*" class="d-none" />
+        <span class="mud-button-label">@($"上传{Attr.DisplayName}")</span>
+    </label>
+    @if (Attr.IsRequired)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Error">必填</MudText>
+    }
+</div>
+
+@if (_meta is null)
 {
     @if (ReadOnly)
     {
-        @* 只读模式：无文件仅展示占位提示，不显示上传按钮 *@
         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
             @Attr.DisplayName：暂无文件
         </MudText>
     }
-    else
-    {
-        <div class="d-flex align-center gap-2 mb-2">
-            <label class="mud-button-root mud-button mud-button-filled mud-button-filled-size-medium
-                         mud-button-filled-primary mud-button-filled">
-                <InputFile OnChange="OnFileSelected" accept="*/*" class="d-none" />
-                <span class="mud-button-label">@($"上传{Attr.DisplayName}")</span>
-            </label>
-            @if (Attr.IsRequired)
-            {
-                <MudText Typo="Typo.caption" Color="Color.Error">必填</MudText>
-            }
-        </div>
-    }
-}
-else if (_isUploading)
-{
-    <MudPaper Class="pa-2 mb-2" Elevation="0" Outlined="true">
-        <MudProgressLinear Value="_progress" Max="100" Color="Color.Primary" />
-        <MudText Typo="Typo.caption">
-            已上传 @_uploadedChunks / @_totalChunks 块（@_progress%）
-        </MudText>
-    </MudPaper>
 }
 else
 {
@@ -57,6 +47,12 @@ else
             </MudText>
         }
         <div class="d-flex gap-2 mt-2">
+            @if (CanPreview)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Inherit"
+                           StartIcon="@Icons.Material.Filled.Visibility"
+                           OnClick="OnPreviewAsync">预览</MudButton>
+            }
             <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Download"
                        OnClick="OnDownloadAsync">下载</MudButton>
@@ -78,19 +74,63 @@ else
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter] public JsonElement? Value { get; set; }
     [Parameter] public EventCallback<JsonElement?> ValueChanged { get; set; }
-    /// <summary>只读模式：隐藏上传/删除，仅保留下载。</summary>
     [Parameter] public bool ReadOnly { get; set; }
 
     private FileMeta? _meta;
-    private bool _isUploading;
-    private int _progress;
-    private int _uploadedChunks;
-    private int _totalChunks;
     private string? _errorMessage;
-    private CancellationTokenSource? _cts;
 
-    private static readonly JsonSerializerOptions WebJsonOpt =
-        new(JsonSerializerDefaults.Web);
+    private bool ShowInputFile => !ReadOnly && _meta is null;
+
+    private static readonly JsonSerializerOptions WebJsonOpt = new(JsonSerializerDefaults.Web);
+
+    // ============================================================
+    // 预览分类
+    // ============================================================
+
+    private bool CanPreview => _meta is not null && IsPreviewable(_meta);
+
+    private static bool IsPreviewable(FileMeta m)
+    {
+        var ct = m.ContentType ?? "";
+        if (ct.StartsWith("image/") || ct == "application/pdf" || ct.StartsWith("text/"))
+            return true;
+        var ext = Path.GetExtension(m.FileName ?? "").ToLowerInvariant();
+        return ext switch
+        {
+            ".pdf" or ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".svg" or ".ico"
+                => true,
+            ".txt" or ".log" or ".cs" or ".csx" or ".json" or ".xml" or ".csproj" or ".sln"
+                or ".config" or ".css" or ".scss" or ".html" or ".htm" or ".js" or ".jsx"
+                or ".ts" or ".tsx" or ".md" or ".markdown" or ".yaml" or ".yml" or ".toml"
+                or ".ini" or ".env" or ".gitignore" or ".sql" or ".csv" or ".py" or ".go"
+                or ".rs" or ".java" or ".kt" or ".rb" or ".php" or ".sh" or ".bat" or ".ps1"
+                or ".proto" or ".graphql" or ".dockerfile" or ".makefile"
+                => true,
+            _ => false
+        };
+    }
+
+    private async Task OnPreviewAsync()
+    {
+        if (_meta is null) return;
+        var parameters = new DialogParameters
+        {
+            { nameof(FilePreviewDialog.FileMeta), new FilePreviewDialog.FilePreviewMeta(
+                _meta.DocId, _meta.FileName, _meta.ContentType, _meta.Version, _meta.Size) }
+        };
+        var options = new DialogOptionsEx
+        {
+            FullScreen = true, FullWidth = true, MaxWidth = MaxWidth.False,
+            CloseButton = false, BackdropClick = false, CloseOnEscapeKey = true,
+            MaximizeButton = false, Position = DialogPosition.Center,
+        };
+        await Dialog.ShowExAsync<FilePreviewDialog>(string.Empty, parameters, options);
+    }
+
+    // ============================================================
+    // 上传：开 UploadProgressDialog，等 DialogResult.Ok(FileMeta)
+    //     对话框自己管 Initiate → Heartbeat → Chunks → Complete → CloseWith
+    // ============================================================
 
     protected override void OnParametersSet()
     {
@@ -109,151 +149,75 @@ else
                 Status = obj.TryGetProperty("status", out var st) ? st.GetString() ?? "active" : "active",
             };
         }
-        else
-        {
-            _meta = null;
-        }
+        else _meta = null;
     }
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
         _errorMessage = null;
-        var file = e.File;
-        _cts = new CancellationTokenSource();
-        var ct = _cts.Token;
-        try
+        var request = new UploadProgressDialog.UploadRequest(e.File);
+        var parameters = new DialogParameters
         {
-            var fingerprint = $"{file.Name}:{file.Size}";
-            var chunkSize = file.Size >= 256L * 1024
-                ? (int)Math.Min(8L * 1024 * 1024, file.Size)
-                : (int?)null;
+            { nameof(UploadProgressDialog.Request), request }
+        };
+        var options = new DialogOptionsEx
+        {
+            FullScreen = false, FullWidth = false, MaxWidth = MaxWidth.Small,
+            CloseButton = true, BackdropClick = false, CloseOnEscapeKey = true,
+            Position = DialogPosition.Center,
+        };
+        var dialogRef = await Dialog.ShowExAsync<UploadProgressDialog>(
+            string.Empty, parameters, options);
+        var result = await dialogRef.Result;
 
-            var init = await FileStorage.InitiateUploadAsync(new InitiateUploadRequest
+        if (result?.Data is UploadProgressDialog.UploadDialogResult r)
+        {
+            if (r.Meta is not null)
             {
-                FileName = file.Name,
-                ContentType = string.IsNullOrWhiteSpace(file.ContentType)
-                    ? "application/octet-stream" : file.ContentType,
-                TotalSize = file.Size,
-                ChunkSize = chunkSize,
-                Fingerprint = fingerprint,
-            }, ct);
-
-            _totalChunks = init.TotalChunks;
-            _uploadedChunks = 0;
-            _progress = 0;
-            _isUploading = true;
-            StateHasChanged();
-
-            _ = HeartbeatLoop(init.UploadId, ct);
-
-            if (init.Resumed)
-            {
-                var status = await FileStorage.GetUploadStatusAsync(init.UploadId, ct);
-                _uploadedChunks = status.ReceivedCount;
+                _meta = new FileMeta
+                {
+                    DocId = r.Meta.DocId, FileName = r.Meta.FileName, ContentType = r.Meta.ContentType,
+                    Size = r.Meta.Size, Sha256 = r.Meta.Sha256, Version = r.Meta.Version, Status = r.Meta.Status,
+                };
+                var json = JsonSerializer.SerializeToElement(_meta, WebJsonOpt);
+                await ValueChanged.InvokeAsync(json);
             }
-
-            await UploadAsync(file, init, ct);
-            await BuildValueJsonAndCommit(init.UploadId, file, ct);
-        }
-        catch (Exception ex)
-        {
-            _errorMessage = $"上传失败: {ex.Message}";
-        }
-        finally
-        {
-            _isUploading = false;
-            _cts?.Cancel();
-            StateHasChanged();
-        }
-    }
-
-    private async Task UploadAsync(IBrowserFile file, InitiateUploadResponse init, CancellationToken ct)
-    {
-        await using var stream = file.OpenReadStream(maxAllowedSize: 2L * 1024 * 1024 * 1024, ct);
-        var chunkSize = init.ChunkSize;
-        var buf = new byte[chunkSize];
-        for (var i = _uploadedChunks; i < _totalChunks; i++)
-        {
-            var read = await stream.ReadAsync(buf.AsMemory(0, chunkSize), ct);
-            if (read == 0) break;
-            using var ms = new MemoryStream(buf, 0, read);
-            var resp = await FileStorage.UploadChunkAsync(
-                init.UploadId, i, ms, read, expectedSha256: null, ct);
-            _uploadedChunks = resp.ReceivedCount;
-            _progress = (int)(resp.Progress * 100);
-            StateHasChanged();
-        }
-    }
-
-    private async Task HeartbeatLoop(Guid uploadId, CancellationToken ct)
-    {
-        try
-        {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(300));
-            while (await timer.WaitForNextTickAsync(ct))
+            else if (r.Error is not null)
             {
-                _ = await FileStorage.HeartbeatAsync(uploadId, ct);
+                _errorMessage = r.Error;
             }
         }
-        catch { /* 心跳失败不阻断主流程 */ }
+        // DialogResult.Cancel（用户取消）→ 不处理
     }
 
-    private async Task BuildValueJsonAndCommit(Guid uploadId, IBrowserFile file, CancellationToken ct)
-    {
-        var complete = await FileStorage.CompleteUploadAsync(uploadId, request: null, ct);
-
-        FileMeta meta;
-        var full = await FileStorage.GetFileByDocIdAsync(complete.DocId, complete.Version, ct);
-        if (full is not null)
-        {
-            meta = new FileMeta
-            {
-                DocId = full.DocId,
-                FileName = full.FileName,
-                ContentType = full.ContentType,
-                Size = full.Size,
-                Sha256 = full.Sha256,
-                Version = full.Version,
-                Status = full.Status,
-            };
-        }
-        else
-        {
-            meta = new FileMeta
-            {
-                DocId = complete.DocId,
-                FileName = file.Name,
-                ContentType = string.IsNullOrWhiteSpace(file.ContentType)
-                    ? "application/octet-stream" : file.ContentType,
-                Size = complete.Size,
-                Sha256 = complete.Sha256,
-                Version = complete.Version,
-                Status = "active",
-            };
-        }
-
-        _meta = meta;
-        var json = JsonSerializer.SerializeToElement(meta, WebJsonOpt);
-        await ValueChanged.InvokeAsync(json);
-    }
+    // ============================================================
+    // 下载 / 删除
+    // ============================================================
 
     private async Task OnDownloadAsync()
     {
         if (_meta is null) return;
         _errorMessage = null;
-        try
+        var parameters = new DialogParameters
         {
-            var full = await FileStorage.GetFileByDocIdAsync(_meta.DocId, _meta.Version, CancellationToken.None);
-            if (full is null) { _errorMessage = "文件不存在"; return; }
-            var stream = await FileStorage.DownloadFileAsync(full.Id, ct: CancellationToken.None);
-            if (stream is null) { _errorMessage = "文件不存在"; return; }
-            await JS.InvokeVoidAsync("treegraphFile.downloadFromStream",
-                _meta.FileName, new DotNetStreamReference(stream));
-        }
-        catch (Exception ex)
+            { nameof(DownloadProgressDialog.Request), new DownloadProgressDialog.DownloadRequest(
+                _meta.DocId, _meta.Version, _meta.FileName, _meta.Size) }
+        };
+        var options = new DialogOptionsEx
         {
-            _errorMessage = $"下载失败: {ex.Message}";
+            FullScreen = false, FullWidth = false, MaxWidth = MaxWidth.Small,
+            CloseButton = true, BackdropClick = false, CloseOnEscapeKey = true,
+            Position = DialogPosition.Center,
+        };
+        var dialogRef = await Dialog.ShowExAsync<DownloadProgressDialog>(
+            string.Empty, parameters, options);
+        var result = await dialogRef.Result;
+
+        if (result?.Data is DownloadProgressDialog.DownloadDialogResult r && r.Error is not null)
+        {
+            _errorMessage = r.Error;
         }
+        // DialogResult.Cancel（用户取消）→ 不处理
     }
 
     private async Task OnDeleteAsync()
@@ -267,32 +231,17 @@ else
         try
         {
             var full = await FileStorage.GetFileByDocIdAsync(_meta.DocId, _meta.Version, CancellationToken.None);
-            if (full is not null)
-                await FileStorage.DeleteFileAsync(full.Id, CancellationToken.None);
+            if (full is not null) await FileStorage.DeleteFileAsync(full.Id, CancellationToken.None);
             _meta = null;
             await ValueChanged.InvokeAsync(null);
         }
-        catch (Exception ex)
-        {
-            _errorMessage = $"删除失败: {ex.Message}";
-        }
+        catch (Exception ex) { _errorMessage = $"删除失败: {ex.Message}"; }
     }
 
     private static string FormatSize(long bytes) =>
         bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:F1} MB"
         : bytes >= 1024 ? $"{bytes / 1024.0:F1} KB"
         : $"{bytes} B";
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_cts is not null)
-        {
-            _cts.Cancel();
-            _cts.Dispose();
-            _cts = null;
-        }
-        await ValueTask.CompletedTask;
-    }
 
     private sealed class FileMeta
     {

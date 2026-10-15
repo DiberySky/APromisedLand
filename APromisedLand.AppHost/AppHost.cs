@@ -31,7 +31,7 @@ void TreeGraph()
 
     // ★ TreeGraph 文件存储 API(独立微服务,固定端口 5326,
     //   复用 FileMetadataDb + SeaweedS3,与 EavApi 平级)
-    // builder.AddTreeGraphFileStorageApi(context);
+    builder.AddTreeGraphFileStorageApi(context);
 
     // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi + FileStorageApi)
     builder.AddTreeGraphBlazor(context);
@@ -40,8 +40,8 @@ void TreeGraph()
     // ★ TreeGraph.Maui(MAUI+Blazor 混合模板起步项目,引用 EavApi 供后续服务发现)
     // builder.AddTreeGraphMaui(context);
     
-    builder.AddDiberyTreeService(context);
-    builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
+    // builder.AddDiberyTreeService(context);
+    // builder.AddDiberyMauiSky(context); // Dibery Maui Blazor
 
 }
 

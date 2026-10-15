@@ -106,11 +106,10 @@
                         break;
 
                     case EavDataTypes.Json:
-                        @* json：StringField 兜底，原文本编辑 *@
-                        <StringField Attr="attr"
-                                     ReadOnly="@ReadOnly"
-                                     Value="@GetJsonText(attr.AttributeName)"
-                                     ValueChanged="v => SetValue(attr.AttributeName, v)" />
+                        <JsonField Attr="attr"
+                                   ReadOnly="@ReadOnly"
+                                   Value="@GetJsonText(attr.AttributeName)"
+                                   ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
                     default:

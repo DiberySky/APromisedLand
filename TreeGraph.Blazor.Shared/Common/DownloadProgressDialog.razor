@@ -1,0 +1,157 @@
+@* DownloadProgressDialog.razor — 下载进度对话框（DialogSky 外壳） *@
+@* 持有完整下载工作流：GetMetadata → DownloadFileAsync（流式读取+进度）→ JS 保存 → CloseWith(Error) *@
+@* DownloadFileAsync 使用 ResponseHeadersRead，流是渐进的，可实时统计进度 *@
+
+@namespace TreeGraph.Blazor.Shared.Common
+@using Microsoft.JSInterop
+
+<DialogSky Title="@Title"
+           CancelButtonVisible="true" CancelButtonText="取消"
+           SubmitButtonVisible="false"
+           IconsVisible="true"
+           OnCanceledClick="@CancelAsync">
+    <ToolBarContent>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            @StatusText
+        </MudText>
+    </ToolBarContent>
+    <DialogContent>
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.body2" Class="mb-2">
+                文件: @_fileName (@FormatSize(_totalBytes))
+            </MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                已下载 @_downloadedBytes / @_totalBytes
+            </MudText>
+
+            <MudProgressLinear Value="_progress" Max="100" Color="@_progressColor"
+                               Class="my-2" />
+
+            @if (_error is not null)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-2">
+                    @_error
+                </MudText>
+            }
+        </MudPaper>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>必填：下载目标（DocId + 版本 + 文件名 + 预期大小）。</summary>
+    [Parameter, EditorRequired] public DownloadRequest Request { get; set; } = null!;
+
+    private string Title => "下载文件";
+
+    private string _fileName = "";
+    private long _totalBytes;
+    private long _downloadedBytes;
+    private int _progress;
+    private Color _progressColor = Color.Primary;
+    private string? _error;
+    private CancellationTokenSource _cts = new();
+    private bool _cancelled;
+    private bool _completed;
+
+    [Inject] private TreeGraph.Blazor.Shared.FileStorageSky.Services.IFileStorageClient FileStorage { get; set; } = null!;
+    [Inject] private IJSRuntime JS { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        _fileName = Request.FileName;
+        _totalBytes = Request.Size;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var ct = _cts.Token;
+
+            var full = await FileStorage.GetFileByDocIdAsync(Request.DocId, Request.Version, ct);
+            if (full is null)
+            {
+                Fail("文件不存在");
+                return;
+            }
+
+            var stream = await FileStorage.DownloadFileAsync(full.Id, ct: ct);
+            if (stream is null)
+            {
+                Fail("文件不存在");
+                return;
+            }
+
+            // 流式读取并统计进度（服务端流是渐进的）
+            var ms = new MemoryStream(_totalBytes > 0 && _totalBytes <= int.MaxValue ? (int)_totalBytes : 81920);
+            await using (stream)
+            {
+                var buf = new byte[81920];
+                int n;
+                while ((n = await stream.ReadAsync(buf.AsMemory(0, buf.Length), ct)) > 0)
+                {
+                    await ms.WriteAsync(buf.AsMemory(0, n), ct);
+                    _downloadedBytes += n;
+                    _progress = _totalBytes > 0 ? (int)(_downloadedBytes * 100 / _totalBytes) : 0;
+                    StateHasChanged();
+                }
+            }
+
+            ms.Position = 0;
+            using var streamRef = new DotNetStreamReference(ms, leaveOpen: false);
+            await JS.InvokeVoidAsync("treegraphFile.downloadFromStream", ct,
+                _fileName, streamRef);
+
+            _completed = true;
+            MudDialog?.Close(DialogResult.Ok(new DownloadDialogResult(Error: null)));
+        }
+        catch (OperationCanceledException)
+        {
+            _cancelled = true;
+            MudDialog?.Close(DialogResult.Cancel());
+        }
+        catch (Exception ex)
+        {
+            Fail($"下载失败: {ex.Message}");
+        }
+    }
+
+    private void Fail(string error)
+    {
+        _error = error;
+        _progressColor = Color.Error;
+        StateHasChanged();
+        // 关闭对话框并把错误传回 FileField 显示（避免 FileField 永久 await Result）
+        MudDialog?.Close(DialogResult.Ok(new DownloadDialogResult(Error: _error)));
+    }
+
+    private Task CancelAsync()
+    {
+        if (_completed || _cancelled) return Task.CompletedTask;
+        // DialogSky 先 Close 再回调，此时组件可能已 Dispose（CTS 已释放），容错处理
+        try { _cts.Cancel(); } catch (ObjectDisposedException) { }
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        try { _cts.Cancel(); _cts.Dispose(); } catch { }
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:F1} MB"
+        : bytes >= 1024 ? $"{bytes / 1024.0:F1} KB"
+        : $"{bytes} B";
+
+    private string StatusText => _error is not null ? "失败" :
+        _completed ? "完成" :
+        _cancelled ? "已取消" : "下载中";
+
+    /// <summary>FileField → DownloadProgressDialog 的请求 DTO。</summary>
+    public sealed record DownloadRequest(string DocId, int Version, string FileName, long Size);
+
+    /// <summary>对话框返回结果：成功时 Error 为 null，失败时带错误信息，取消时对话框返回 Cancel。</summary>
+    public sealed record DownloadDialogResult(string? Error);
+}

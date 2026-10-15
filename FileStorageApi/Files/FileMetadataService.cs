@@ -113,7 +113,29 @@ public sealed class FileMetadataService : IFileMetadataService
         var m = await _db.DocumentMetadata
             .FirstOrDefaultAsync(x => x.Id == id && x.Tenant == _caller.Tenant, ct);
         if (m is null) return false;
+        return await DeleteInternalAsync(m, ct);
+    }
 
+    public async Task<bool> DeleteByDocIdAsync(string docId, int? version, CancellationToken ct)
+    {
+        var query = _db.DocumentMetadata
+            .Where(m => m.DocId == docId && m.Tenant == _caller.Tenant);
+        if (version.HasValue)
+            query = query.Where(m => m.Version == version.Value);
+        else
+            query = query.OrderByDescending(m => m.Version);
+
+        var m = await query.FirstOrDefaultAsync(ct);
+        if (m is null) return false;
+        return await DeleteInternalAsync(m, ct);
+    }
+
+    /// <summary>
+    /// 共享删除内核：标记 delete_pending → 删 S3 → 更新状态 → 写审计。
+    /// 两个公共入口（DeleteAsync / DeleteByDocIdAsync）都走这里。
+    /// </summary>
+    private async Task<bool> DeleteInternalAsync(DocumentMetadataEntity m, CancellationToken ct)
+    {
         m.Status = "delete_pending";
         m.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
@@ -142,6 +164,23 @@ public sealed class FileMetadataService : IFileMetadataService
 
         await _db.SaveChangesAsync(ct);
         return true;
+    }
+
+    public async Task<List<DocumentMetadataEntity>> ListDeletePendingAsync(
+        DateTimeOffset cutoff, CancellationToken ct)
+    {
+        return await _db.DocumentMetadata
+            .Where(m => m.Status == "delete_pending" && m.UpdatedAt < cutoff)
+            .AsNoTracking()
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<string>> GetAllDocIdsAsync(CancellationToken ct)
+    {
+        return await _db.DocumentMetadata
+            .Select(m => m.DocId)
+            .Distinct()
+            .ToListAsync(ct);
     }
 
     private static FileMetadataDto ToDto(DocumentMetadataEntity m) => new()

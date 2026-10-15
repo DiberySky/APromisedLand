@@ -18,3 +18,10 @@ window.treegraphFile.downloadFromStream = async function (fileName, contentStrea
 
     URL.revokeObjectURL(url);
 };
+
+// 用 byte[] 生成 Blob URL，返回字符串给 C# 侧用于 <img src> / <iframe src>。
+// contentType 可选（空字符串时浏览器猜类型）。
+window.treegraphFile.createBlobUrl = function (byteArray, contentType) {
+    const blob = new Blob([byteArray], { type: contentType || '' });
+    return URL.createObjectURL(blob);
+};

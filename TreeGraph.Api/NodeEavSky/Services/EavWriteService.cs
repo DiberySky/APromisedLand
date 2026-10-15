@@ -17,6 +17,8 @@ public class EavWriteService
     private readonly CompositeValueService _composite;
     private readonly IOptionSetCache _optionSetCache;
     private readonly EntityOwnerGuardRegistry _ownerGuards;
+    private readonly IFileStorageDeleter _fileDeleter;
+    private readonly ILogger<EavWriteService> _logger;
 
     public EavWriteService(
         TreeGraphDbContext db,
@@ -24,7 +26,9 @@ public class EavWriteService
         EavValidationService validator,
         CompositeValueService composite,
         IOptionSetCache optionSetCache,
-        EntityOwnerGuardRegistry ownerGuards)
+        EntityOwnerGuardRegistry ownerGuards,
+        IFileStorageDeleter fileDeleter,
+        ILogger<EavWriteService> logger)
     {
         _db = db;
         _attrCache = attrCache;
@@ -32,6 +36,8 @@ public class EavWriteService
         _composite = composite;
         _optionSetCache = optionSetCache;
         _ownerGuards = ownerGuards;
+        _fileDeleter = fileDeleter;
+        _logger = logger;
     }
 
     /// <summary>
@@ -194,6 +200,12 @@ public class EavWriteService
         var audits = new List<AttributeAuditLog>();
         var now = DateTimeOffset.UtcNow;
 
+        // ★ 待级联删除的 file 对象：收集所有即将被"删除"或"替换"的旧 file 值 docId/version
+        // 在 SaveChanges 成功后统一调 FileStorageApi DELETE（最终一致性）。
+        // 为什么 SaveChanges 之后：DB 提交失败时文件还在也没关系——防僵尸文件是单向的（删 DB 后删文件），
+        //   反向（删文件后 DB 回滚）会导致数据丢失。
+        var pendingFileDeletes = new List<(string DocId, int? Version)>();
+
         // ---- 3. 处理显式提供的值 ----
         foreach (var (name, rawValue) in values)
         {
@@ -222,6 +234,11 @@ public class EavWriteService
             {
                 if (existingValue is not null)
                 {
+                    // ★ 路径 A：显式 null 删除 file 值 → 收集级联删除目标
+                    if (def.DataType == EavDataTypes.File
+                        && TryExtractFileDocId(existingValue.ValueFileMeta, out var docIdA, out var verA))
+                        pendingFileDeletes.Add((docIdA, verA));
+
                     _db.AttributeValues.Remove(existingValue);
                     audits.Add(CreateAudit(entityId, entityType, def,
                         SerializeForAudit(existingValue, def), null, "Delete",
@@ -257,6 +274,15 @@ public class EavWriteService
                 var newSerialized = SerializeForAudit(existingValue, def);
                 if (oldSerialized != newSerialized)
                 {
+                    // ★ 路径 C：file 值被替换且内容变化 → 收集旧 file 的级联删除目标
+                    if (def.DataType == EavDataTypes.File
+                        && TryExtractFileDocId(
+                            // ClearValueColumns 已清了 ValueFileMeta，需要从 oldSerialized 反解 docId
+                            // 但 oldSerialized 是 GetRawText()（纯 JSON 原文），可直接 parse
+                            TryParseFileMetaFromAudit(oldSerialized),
+                            out var docIdC, out var verC))
+                        pendingFileDeletes.Add((docIdC, verC));
+
                     audits.Add(CreateAudit(entityId, entityType, def,
                         oldSerialized, newSerialized, "Update",
                         changedBy, correlationId, now));
@@ -284,6 +310,11 @@ public class EavWriteService
 
                 if (existingMap.TryGetValue(def.AttributeId, out var oldVal))
                 {
+                    // ★ 路径 B：fullReplace 删除 file 值 → 收集级联删除目标
+                    if (def.DataType == EavDataTypes.File
+                        && TryExtractFileDocId(oldVal.ValueFileMeta, out var docIdB, out var verB))
+                        pendingFileDeletes.Add((docIdB, verB));
+
                     _db.AttributeValues.Remove(oldVal);
                     audits.Add(CreateAudit(entityId, entityType, def,
                         SerializeForAudit(oldVal, def), null, "Delete",
@@ -294,6 +325,74 @@ public class EavWriteService
 
         _db.AttributeAuditLogs.AddRange(audits);
         await _db.SaveChangesAsync(ct);
+
+        // ★ SaveChanges 成功后：统一级联删除 FileStorageApi 中的孤儿文件对象
+        if (pendingFileDeletes.Count > 0)
+        {
+            try
+            {
+                // 去重：同一次 SaveCore 里可能多个路径命中同一 docId+version
+                var distinct = pendingFileDeletes
+                    .GroupBy(x => (x.DocId, x.Version))
+                    .Select(g => g.Key)
+                    .ToList();
+
+                _logger.LogInformation(
+                    "EAV SaveCore 级联删除 {Count} 个文件对象：entityId={EntityId}, entityType={EntityType}",
+                    distinct.Count, entityId, entityType);
+
+                await _fileDeleter.DeleteBatchAsync(distinct, ct);
+            }
+            catch (Exception ex)
+            {
+                // ★ 级联删除失败只记日志不抛——DB 已提交，回滚不了。
+                // 补偿机制：后台定期清理任务（扫描 FileStorageApi.delete_pending 或孤立文件）
+                _logger.LogError(ex,
+                    "EAV SaveCore 级联删除失败，将留后台补偿：entityId={EntityId}", entityId);
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 级联删除辅助方法
+    // ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 从 value_file_meta JSON 里提取 docId + version。
+    /// 返回 false 表示该 file 值无法解析（不应级联删除）。
+    /// </summary>
+    private static bool TryExtractFileDocId(
+        JsonDocument? doc, out string docId, out int? version)
+    {
+        docId = "";
+        version = null;
+        if (doc is null) return false;
+
+        var root = doc.RootElement;
+        if (!root.TryGetProperty("docId", out var docIdEl)
+            || docIdEl.ValueKind != JsonValueKind.String) return false;
+
+        docId = docIdEl.GetString()!;
+        if (string.IsNullOrWhiteSpace(docId)) return false;
+
+        if (root.TryGetProperty("version", out var verEl)
+            && verEl.ValueKind == JsonValueKind.Number
+            && verEl.TryGetInt32(out var v))
+            version = v;
+
+        return true;
+    }
+
+    /// <summary>
+    /// 从审计序列化原文（GetRawText）反解析出 JsonDocument。
+    /// 供 "替换路径 C" 使用——此时 ClearValueColumns 已清了 ValueFileMeta 字段，
+    /// 必须从审计用的 oldSerialized 字符串里解析 docId。
+    /// </summary>
+    private static JsonDocument? TryParseFileMetaFromAudit(string? rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson)) return null;
+        try { return JsonDocument.Parse(rawJson); }
+        catch { return null; }
     }
 
     /// <summary>
@@ -565,6 +664,8 @@ public class EavWriteService
 
         var strategy = _db.Database.CreateExecutionStrategy();
 
+        List<(string DocId, int? Version)> pendingFileDeletes = new();
+
         await strategy.ExecuteAsync(async () =>
         {
             await using var tx = await _db.Database.BeginTransactionAsync(ct);
@@ -579,6 +680,15 @@ public class EavWriteService
             {
                 var definitions = _attrCache.GetDefinitions(entityType)
                     .ToDictionary(d => d.AttributeId);
+
+                // ★ 收集待级联删除的 file 对象（RemoveRange 前从旧值提取）
+                foreach (var v in values)
+                {
+                    if (!definitions.TryGetValue(v.AttributeId, out var def)) continue;
+                    if (def.DataType != EavDataTypes.File) continue;
+                    if (TryExtractFileDocId(v.ValueFileMeta, out var docId, out var ver))
+                        pendingFileDeletes.Add((docId, ver));
+                }
 
                 var audits = new List<AttributeAuditLog>(values.Count);
                 foreach (var v in values)
@@ -644,6 +754,27 @@ public class EavWriteService
             await tx.CommitAsync(ct);
         });
 
+        // ★ 事务提交成功后：级联删除 FileStorageApi 中的孤儿文件对象
+        if (pendingFileDeletes.Count > 0)
+        {
+            try
+            {
+                var distinct = pendingFileDeletes
+                    .GroupBy(x => (x.DocId, x.Version))
+                    .Select(g => g.Key)
+                    .ToList();
+                _logger.LogInformation(
+                    "DeleteEntity 级联删除 {Count} 个文件对象：entityId={EntityId}, entityType={EntityType}",
+                    distinct.Count, entityId, entityType);
+                await _fileDeleter.DeleteBatchAsync(distinct, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "DeleteEntity 级联删除失败，将留后台补偿：entityId={EntityId}", entityId);
+            }
+        }
+
         return true;
     }
 
@@ -700,6 +831,7 @@ public class EavWriteService
 
         var strategy = _db.Database.CreateExecutionStrategy();
         int totalAttributesDeleted = 0;
+        var pendingFileDeletes = new List<(string DocId, int? Version)>();
 
         await strategy.ExecuteAsync(async () =>
         {
@@ -717,6 +849,15 @@ public class EavWriteService
             {
                 var definitions = _attrCache.GetDefinitions(entityType)
                     .ToDictionary(d => d.AttributeId);
+
+                // ★ 批量收集待级联删除的 file 对象
+                foreach (var v in values)
+                {
+                    if (!definitions.TryGetValue(v.AttributeId, out var def)) continue;
+                    if (def.DataType != EavDataTypes.File) continue;
+                    if (TryExtractFileDocId(v.ValueFileMeta, out var docId, out var ver))
+                        pendingFileDeletes.Add((docId, ver));
+                }
 
                 var audits = new List<AttributeAuditLog>(values.Count);
                 foreach (var v in values)
@@ -785,6 +926,27 @@ public class EavWriteService
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
         });
+
+        // ★ 批量删除事务提交成功后：级联删除 FileStorageApi 中的孤儿文件对象
+        if (pendingFileDeletes.Count > 0)
+        {
+            try
+            {
+                var distinct = pendingFileDeletes
+                    .GroupBy(x => (x.DocId, x.Version))
+                    .Select(g => g.Key)
+                    .ToList();
+                _logger.LogInformation(
+                    "DeleteEntities 级联删除 {Count} 个文件对象：entityType={EntityType}, entityCount={EntityCount}",
+                    distinct.Count, entityType, toDelete.Count);
+                await _fileDeleter.DeleteBatchAsync(distinct, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "DeleteEntities 级联删除失败，将留后台补偿：entityType={EntityType}", entityType);
+            }
+        }
 
         return new BatchDeleteResult(toDelete, notFound, totalAttributesDeleted);
     }

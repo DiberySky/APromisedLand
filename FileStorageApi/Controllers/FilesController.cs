@@ -141,6 +141,40 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
         => await files.DeleteAsync(id, ct) ? NoContent() : NotFound();
 
+    /// <summary>
+    /// 按 docId + 可选 version 删除。version 为空时删该 docId 最新版本。
+    /// 供 EAV file 属性级联删除调用——EAV 的 value_file_meta 里直接带 docId/version。
+    /// </summary>
+    [HttpDelete("by-doc/{docId}")]
+    public async Task<IActionResult> DeleteByDocId(
+        string docId, [FromQuery] int? version = null, CancellationToken ct = default)
+        => await files.DeleteByDocIdAsync(docId, version, ct) ? NoContent() : NotFound();
+
+    /// <summary>
+    /// 列出 status=delete_pending 且 UpdatedAt 早于 cutoff 的文档。
+    /// 供 DeletePendingRetryService 后台重试 S3 删除。
+    /// cutoff 可选（默认 5 分钟前），ISO 8601 UTC。
+    /// </summary>
+    [HttpGet("delete-pending")]
+    public async Task<IActionResult> ListDeletePending(
+        [FromQuery] DateTimeOffset? cutoff = null, CancellationToken ct = default)
+    {
+        var effectiveCutoff = cutoff ?? DateTimeOffset.UtcNow.AddMinutes(-5);
+        var list = await files.ListDeletePendingAsync(effectiveCutoff, ct);
+        return Ok(list.Select(m => new
+        {
+            m.Id, m.DocId, m.Version, m.ObjectKey, m.Status, m.UpdatedAt
+        }));
+    }
+
+    /// <summary>
+    /// 列出所有去重后的 docId。
+    /// 供 TreeGraph.Api 的 OrphanedFileCleanupService 做差集对比。
+    /// </summary>
+    [HttpGet("all-doc-ids")]
+    public async Task<IActionResult> GetAllDocIds(CancellationToken ct)
+        => Ok(await files.GetAllDocIdsAsync(ct));
+
     [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task<IActionResult> FullDownloadAsync(Guid id, CancellationToken ct)
     {

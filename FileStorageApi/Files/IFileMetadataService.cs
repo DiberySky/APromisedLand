@@ -1,3 +1,4 @@
+using FileStorageApi.Entities;
 using FileStorageApi.Models;
 
 /// <summary>
@@ -30,4 +31,24 @@ public interface IFileMetadataService
         Guid id, long? rangeStart, long? rangeEnd, CancellationToken ct);
 
     Task<bool> DeleteAsync(Guid id, CancellationToken ct);
+
+    /// <summary>
+    /// 按 docId + 可选 version 删除。EAV 级联删除时调用——
+    /// EAV 的 value_file_meta 里存了 docId + version，不需要先查 metadata Id。
+    /// version 为 null 时删该 docId 的最新版本。
+    /// </summary>
+    Task<bool> DeleteByDocIdAsync(string docId, int? version, CancellationToken ct);
+
+    /// <summary>
+    /// 列出所有 status=delete_pending 且 UpdatedAt 早于 cutoff 的文档元数据。
+    /// 供 DeletePendingRetryService 后台重试真正的 S3 删除。
+    /// </summary>
+    Task<List<DocumentMetadataEntity>> ListDeletePendingAsync(
+        DateTimeOffset cutoff, CancellationToken ct);
+
+    /// <summary>
+    /// 列出所有文档的 docId。
+    /// 供 TreeGraph.Api 的 OrphanedFileCleanupService 做差集对比（EAV ↔ FileStorageApi）。
+    /// </summary>
+    Task<List<string>> GetAllDocIdsAsync(CancellationToken ct);
 }

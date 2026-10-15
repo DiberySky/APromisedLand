@@ -78,6 +78,16 @@ builder.Services
 
 builder.Services.AddHostedService<UploadSessionCleanupService>();
 
+// ★ DeletePending 重试配置：扫描 status=delete_pending 超过阈值的对象，
+// 再次尝试真正删除 S3 对象（补偿级联删除中 S3 瞬时失败的场景）。
+builder.Services
+    .AddOptions<DeleteRetryOptions>()
+    .Bind(builder.Configuration.GetSection(DeleteRetryOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddHostedService<DeletePendingRetryService>();
+
 // ── CORS ──
 builder.Services.AddCors(options =>
 {

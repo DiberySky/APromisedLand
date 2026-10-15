@@ -249,6 +249,9 @@ public class EavQueryService
         if (def.DataType == EavDataTypes.Composite)
             return BuildCompositeFilterQuery(entityType, def, filter);
 
+        if (def.DataType == EavDataTypes.Json)
+            return BuildJsonFilterQuery(entityType, def, filter);
+
         var baseQuery = _db.AttributeValues
             .Where(v => v.EntityType == entityType && v.AttributeId == def.AttributeId);
 
@@ -279,6 +282,241 @@ public class EavQueryService
         };
 
         return filtered.Select(v => v.EntityId).Distinct();
+    }
+
+    // ============================================================
+    // json 类型查询（自由 JSON 对象，存 value_jsonb）
+    // ============================================================
+
+    /// <summary>
+    /// json 类型属性查询。
+    ///   - 无 FieldPath：按整个 JSON 原文做字符串匹配（eq / like / startswith / endswith）
+    ///   - 有 FieldPath：沿路径取值后，根据目标节点 jsonb_typeof 动态选择比较方式
+    ///     （number → 数值比较，string → 字符串比较，bool → 布尔比较）
+    ///
+    /// 路径语法：用 "." 分隔，如 "address.city"；最多支持 2 层
+    /// </summary>
+    private IQueryable<string> BuildJsonFilterQuery(
+        string entityType, AttributeDefinition def, AttributeFilter filter)
+    {
+        var baseQuery = _db.AttributeValues
+            .Where(v => v.EntityType == entityType && v.AttributeId == def.AttributeId
+                     && v.ValueJsonb != null);
+
+        // 无 FieldPath → 整体匹配
+        if (string.IsNullOrEmpty(filter.FieldPath))
+        {
+            var filtered = filter.Operator switch
+            {
+                "eq" => baseQuery.Where(v =>
+                    v.ValueJsonb!.RootElement.GetRawText() == filter.Value!.ToString()),
+                "like" => baseQuery.Where(v =>
+                    v.ValueJsonb!.RootElement.GetRawText().Contains(filter.Value!.ToString()!)),
+                "startswith" => baseQuery.Where(v =>
+                    v.ValueJsonb!.RootElement.GetRawText().StartsWith(filter.Value!.ToString()!)),
+                "endswith" => baseQuery.Where(v =>
+                    v.ValueJsonb!.RootElement.GetRawText().EndsWith(filter.Value!.ToString()!)),
+                _ => throw new NotSupportedException(
+                    $"json 整体匹配不支持运算符: {filter.Operator}（可尝试加 FieldPath 做路径查询）")
+            };
+            return filtered.Select(v => v.EntityId).Distinct();
+        }
+
+        // 有 FieldPath → 路径查询
+        var pathSegments = filter.FieldPath.Split('.');
+        if (pathSegments.Length > 3)
+            throw new NotSupportedException("json 路径查询最多支持 3 层嵌套");
+
+        var query = pathSegments.Length switch
+        {
+            1 => ApplyJsonPathFilterSingle(baseQuery, pathSegments[0], filter),
+            2 => ApplyJsonPathFilterNested(baseQuery, pathSegments[0], pathSegments[1], filter),
+            3 => ApplyJsonPathFilterTriple(baseQuery,
+                pathSegments[0], pathSegments[1], pathSegments[2], filter),
+            _ => throw new InvalidOperationException()
+        };
+
+        return query.Select(v => v.EntityId).Distinct();
+    }
+
+    /// <summary>单层 json 路径：jsonb 顶层 key</summary>
+    private static IQueryable<AttributeValue> ApplyJsonPathFilterSingle(
+        IQueryable<AttributeValue> query, string key, AttributeFilter filter)
+    {
+        // number 类型 → 数值比较
+        if (filter.Value is decimal or int or long or double or float)
+        {
+            var target = Convert.ToDecimal(filter.Value, CultureInfo.InvariantCulture);
+            return filter.Operator switch
+            {
+                "eq" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(key).GetDecimal() == target),
+                "neq" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(key).GetDecimal() != target),
+                "gt" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(key).GetDecimal() > target),
+                "gte" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(key).GetDecimal() >= target),
+                "lt" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(key).GetDecimal() < target),
+                "lte" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(key).GetDecimal() <= target),
+                _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+            };
+        }
+
+        // bool 类型
+        if (filter.Value is bool bv)
+        {
+            return filter.Operator == "eq"
+                ? query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "boolean"
+                    && v.ValueJsonb!.RootElement.GetProperty(key).GetBoolean() == bv)
+                : throw new NotSupportedException($"bool 字段仅支持 eq，不支持: {filter.Operator}");
+        }
+
+        // 默认 string 类型（也支持 like / startswith / endswith）
+        var sv = filter.Value!.ToString();
+        return filter.Operator switch
+        {
+            "eq" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(key).GetString() == sv),
+            "neq" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(key).GetString() != sv),
+            "like" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(key).GetString()!.Contains(sv!)),
+            "startswith" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(key).GetString()!.StartsWith(sv!)),
+            "endswith" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(key)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(key).GetString()!.EndsWith(sv!)),
+            _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+        };
+    }
+
+    /// <summary>两层嵌套 json 路径</summary>
+    private static IQueryable<AttributeValue> ApplyJsonPathFilterNested(
+        IQueryable<AttributeValue> query, string outer, string inner, AttributeFilter filter)
+    {
+        if (filter.Value is decimal or int or long or double or float)
+        {
+            var target = Convert.ToDecimal(filter.Value, CultureInfo.InvariantCulture);
+            return filter.Operator switch
+            {
+                "eq" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetDecimal() == target),
+                "neq" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetDecimal() != target),
+                "gt" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetDecimal() > target),
+                "gte" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetDecimal() >= target),
+                "lt" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetDecimal() < target),
+                "lte" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetDecimal() <= target),
+                _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+            };
+        }
+
+        if (filter.Value is bool bv)
+        {
+            return filter.Operator == "eq"
+                ? query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "boolean"
+                    && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetBoolean() == bv)
+                : throw new NotSupportedException($"bool 字段仅支持 eq，不支持: {filter.Operator}");
+        }
+
+        var sv = filter.Value!.ToString();
+        return filter.Operator switch
+        {
+            "eq" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetString() == sv),
+            "neq" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetString() != sv),
+            "like" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetString()!.Contains(sv!)),
+            "startswith" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetString()!.StartsWith(sv!)),
+            "endswith" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(outer).GetProperty(inner).GetString()!.EndsWith(sv!)),
+            _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+        };
+    }
+
+    /// <summary>三层嵌套 json 路径</summary>
+    private static IQueryable<AttributeValue> ApplyJsonPathFilterTriple(
+        IQueryable<AttributeValue> query, string p1, string p2, string p3, AttributeFilter filter)
+    {
+        if (filter.Value is decimal or int or long or double or float)
+        {
+            var target = Convert.ToDecimal(filter.Value, CultureInfo.InvariantCulture);
+            return filter.Operator switch
+            {
+                "eq" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3).GetDecimal() == target),
+                "gt" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3).GetDecimal() > target),
+                "gte" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3).GetDecimal() >= target),
+                "lt" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3).GetDecimal() < target),
+                "lte" => query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3)) == "number"
+                    && v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3).GetDecimal() <= target),
+                _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+            };
+        }
+
+        if (filter.Value is bool bv)
+        {
+            return filter.Operator == "eq"
+                ? query.Where(v =>
+                    EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3)) == "boolean"
+                    && v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3).GetBoolean() == bv)
+                : throw new NotSupportedException($"bool 字段仅支持 eq，不支持: {filter.Operator}");
+        }
+
+        var sv = filter.Value!.ToString();
+        return filter.Operator switch
+        {
+            "eq" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3).GetString() == sv),
+            "neq" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3).GetString() != sv),
+            "like" => query.Where(v =>
+                EF.Functions.JsonTypeof(v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3)) == "string"
+                && v.ValueJsonb!.RootElement.GetProperty(p1).GetProperty(p2).GetProperty(p3).GetString()!.Contains(sv!)),
+            _ => throw new NotSupportedException($"不支持的运算符: {filter.Operator}")
+        };
     }
 
     private IQueryable<AttributeValue> ApplyIntFilter(

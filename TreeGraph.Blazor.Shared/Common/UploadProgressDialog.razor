@@ -1,0 +1,226 @@
+@* UploadProgressDialog.razor — 上传进度对话框（拖拽可移动 + 可关闭） *@
+@* 持有完整上传工作流：Initiate → Heartbeat → Chunks → Complete → CloseWith(FileMeta) *@
+
+@namespace TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Shared.FileStorageSky.Contracts
+
+<DialogSky Title="@Title"
+           CancelButtonVisible="true" CancelButtonText="取消"
+           SubmitButtonVisible="false"
+           IconsVisible="true"
+           OnCanceledClick="@CancelAsync">
+    <ToolBarContent>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            @StatusText
+        </MudText>
+    </ToolBarContent>
+    <DialogContent>
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.body2" Class="mb-2">
+                文件: @_fileName (@FormatSize(_totalBytes))
+            </MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                已上传 @_uploadedBytes / @_totalBytes
+            </MudText>
+
+            <MudProgressLinear Value="_progress" Max="100" Color="@_progressColor"
+                               Class="my-2" />
+
+            @if (_error is not null)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-2">
+                    @_error
+                </MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                    块进度: @_uploadedChunks / @_totalChunks @(InitResumed ? "(断点续传)" : "")
+                </MudText>
+            }
+        </MudPaper>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>必填：上传源（IBrowserFile + 文件元数据）。</summary>
+    [Parameter, EditorRequired] public UploadRequest Request { get; set; } = null!;
+
+    private string Title => "上传文件";
+
+    private string _fileName = "";
+    private long _totalBytes;
+    private int _totalChunks;
+    private int _uploadedChunks;
+    private long _uploadedBytes;
+    private int _progress;
+    private Color _progressColor = Color.Primary;
+    private string? _error;
+    private CancellationTokenSource _cts = new();
+    private bool _cancelled;
+    private bool _completed;
+    private bool InitResumed;
+
+    [Inject] private TreeGraph.Blazor.Shared.FileStorageSky.Services.IFileStorageClient FileStorage { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        _fileName = Request.File.Name;
+        _totalBytes = Request.File.Size;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var fingerprint = $"{Request.File.Name}:{Request.File.Size}";
+            var chunkSize = Request.File.Size >= 256L * 1024
+                ? (int)Math.Min(8L * 1024 * 1024, Request.File.Size)
+                : (int?)null;
+
+            var ct = _cts.Token;
+            var init = await FileStorage.InitiateUploadAsync(new InitiateUploadRequest
+            {
+                FileName = Request.File.Name,
+                ContentType = string.IsNullOrWhiteSpace(Request.File.ContentType)
+                    ? "application/octet-stream" : Request.File.ContentType,
+                TotalSize = Request.File.Size,
+                ChunkSize = chunkSize,
+                Fingerprint = fingerprint,
+            }, ct);
+
+            _totalChunks = init.TotalChunks;
+            InitResumed = init.Resumed;
+            if (init.Resumed)
+            {
+                var status = await FileStorage.GetUploadStatusAsync(init.UploadId, ct);
+                _uploadedChunks = status.ReceivedCount;
+                _uploadedBytes = (long)status.ReceivedCount * init.ChunkSize;
+            }
+
+            _ = HeartbeatLoop(init.UploadId, ct);
+            await UploadChunksAsync(Request.File, init, init.ChunkSize, ct);
+            await CompleteAndCloseAsync(init.UploadId, Request.File, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            _cancelled = true;
+            MudDialog?.Close(DialogResult.Cancel());
+        }
+        catch (Exception ex)
+        {
+            _error = $"上传失败: {ex.Message}";
+            _progressColor = Color.Error;
+            StateHasChanged();
+            // 关闭对话框并把错误传回 FileField 显示（避免 FileField 永久 await Result）
+            MudDialog?.Close(DialogResult.Ok(new UploadDialogResult(Meta: null, Error: _error)));
+        }
+    }
+
+    private async Task UploadChunksAsync(IBrowserFile file, InitiateUploadResponse init, int chunkSize, CancellationToken ct)
+    {
+        await using var stream = file.OpenReadStream(maxAllowedSize: 2L * 1024 * 1024 * 1024, ct);
+
+        // 断点续传：IBrowserFile 流不可 Seek，先 drain 掉已上传字节
+        if (_uploadedBytes > 0)
+        {
+            var drain = new byte[Math.Min(81920, _uploadedBytes)];
+            long remaining = _uploadedBytes;
+            while (remaining > 0)
+            {
+                var n = await stream.ReadAsync(
+                    drain.AsMemory(0, (int)Math.Min(drain.Length, remaining)), ct);
+                if (n == 0)
+                    throw new InvalidOperationException("文件流意外结束，无法跳过已上传部分。");
+                remaining -= n;
+            }
+        }
+
+        var buf = new byte[chunkSize];
+        for (var i = _uploadedChunks; i < _totalChunks; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // 读满一个 chunk（或到 EOF）——一次 ReadAsync 不保证读满
+            var read = 0;
+            while (read < chunkSize)
+            {
+                var n = await stream.ReadAsync(buf.AsMemory(read, chunkSize - read), ct);
+                if (n == 0) break;
+                read += n;
+            }
+            if (read == 0) break;
+
+            using var ms = new MemoryStream(buf, 0, read);
+            var resp = await FileStorage.UploadChunkAsync(
+                init.UploadId, i, ms, read, expectedSha256: null, ct);
+            _uploadedChunks = resp.ReceivedCount;
+            _uploadedBytes = (long)(resp.Progress * _totalBytes);
+            _progress = (int)(resp.Progress * 100);
+            StateHasChanged();
+        }
+    }
+
+    private async Task HeartbeatLoop(Guid uploadId, CancellationToken ct)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(300));
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                _ = await FileStorage.HeartbeatAsync(uploadId, ct);
+            }
+        }
+        catch { /* 心跳失败不阻断主流程 */ }
+    }
+
+    private async Task CompleteAndCloseAsync(Guid uploadId, IBrowserFile file, CancellationToken ct)
+    {
+        if (_cancelled || _error is not null) return;
+        var complete = await FileStorage.CompleteUploadAsync(uploadId, request: null, ct);
+        var full = await FileStorage.GetFileByDocIdAsync(complete.DocId, complete.Version, ct);
+        var meta = full is not null
+            ? new FileMeta(full.DocId, full.FileName, full.ContentType, full.Size, full.Sha256, full.Version, full.Status)
+            : new FileMeta(complete.DocId, file.Name,
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                complete.Size, complete.Sha256, complete.Version, "active");
+        _completed = true;
+        MudDialog?.Close(DialogResult.Ok(new UploadDialogResult(Meta: meta, Error: null)));
+    }
+
+    private Task CancelAsync()
+    {
+        if (_completed || _cancelled) return Task.CompletedTask;
+        // DialogSky 先 Close 再回调，此时组件可能已 Dispose（CTS 已释放），容错处理
+        try { _cts.Cancel(); } catch (ObjectDisposedException) { }
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        try { _cts.Cancel(); _cts.Dispose(); } catch { }
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:F1} MB"
+        : bytes >= 1024 ? $"{bytes / 1024.0:F1} KB"
+        : $"{bytes} B";
+
+    private string StatusText => _error is not null ? "失败" :
+        _completed ? "完成" :
+        _cancelled ? "已取消" : "上传中";
+
+    /// <summary>FileField → UploadProgressDialog 的请求 DTO。</summary>
+    public sealed record UploadRequest(IBrowserFile File);
+
+    /// <summary>对话框返回结果：成功时 Meta 有值，失败时 Error 有值，取消时两者均为 null。</summary>
+    public sealed record UploadDialogResult(FileMeta? Meta, string? Error);
+
+    /// <summary>上传完成返回给 FileField 的元数据（纯 C# 对象，方便 DialogResult.Ok/Close 装箱）。</summary>
+    public sealed record FileMeta(
+        string DocId, string FileName, string ContentType, long Size,
+        string? Sha256, int Version, string Status
+    );
+}

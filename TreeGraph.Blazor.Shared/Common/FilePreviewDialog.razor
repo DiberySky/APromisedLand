@@ -1,0 +1,182 @@
+@* FilePreviewDialog.razor — 文件预览对话框（全屏，DialogPageSky 外壳） *@
+@* 通过 Dialog.ShowExAsync + DialogOptionsEx.FullScreen = true 打开 *@
+@* 支持 text / image / pdf 三种预览形态 *@
+
+@namespace TreeGraph.Blazor.Shared.Common
+@using System.Text
+@using Microsoft.JSInterop
+
+<DialogPageSky Title="@Title"
+               ArrowBackVisible="false"
+               CancelButtonVisible="true" CancelButtonText="关闭"
+               SubmitButtonVisible="false"
+               IconsVisible="true">
+    <TopBarRightContent>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mr-4">
+            类型: @FileMeta.ContentType | 大小: @FormatSize(FileMeta.Size) | 版本: v@FileMeta.Version
+        </MudText>
+        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Download"
+                   OnClick="@OnDownloadAsync">下载</MudButton>
+    </TopBarRightContent>
+    <DialogContent>
+        @if (_isLoading)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">加载中…</MudText>
+        }
+        else if (_error is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Error">@_error</MudText>
+        }
+        else if (_kind == PreviewKind.Text && _text is not null)
+        {
+            // 全屏下用 calc 100vh - toolbar - margins
+            <pre style="margin: 0; height: calc(100vh - 160px); overflow: auto;
+                        font-family: monospace; font-size: 13px;
+                        white-space: pre-wrap; word-break: break-all; line-height: 1.5;">
+@_text
+            </pre>
+        }
+        else if (_kind == PreviewKind.Image && _blobUrl is not null)
+        {
+            <img src="@_blobUrl" alt="@FileMeta!.FileName"
+                 style="max-width: 100%; max-height: calc(100vh - 160px);
+                        display: block; margin: 0 auto;" />
+        }
+        else if (_kind == PreviewKind.Pdf && _blobUrl is not null)
+        {
+            <iframe src="@_blobUrl"
+                    style="width: 100%; height: calc(100vh - 160px); border: 0;" />
+        }
+        else
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                不支持内嵌预览（@FileMeta!.ContentType），请使用下载按钮。
+            </MudText>
+        }
+    </DialogContent>
+</DialogPageSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>必填：文件元数据（docId/version/contentType/fileName）。</summary>
+    [Parameter, EditorRequired] public FilePreviewMeta FileMeta { get; set; } = null!;
+
+    private string Title => $"预览 · {FileMeta.FileName}";
+
+    [Inject] private TreeGraph.Blazor.Shared.FileStorageSky.Services.IFileStorageClient FileStorage { get; set; } = null!;
+    [Inject] private IJSRuntime JS { get; set; } = null!;
+
+    private enum PreviewKind { Text, Image, Pdf, None }
+
+    private bool _isLoading = true;
+    private string? _error;
+    private PreviewKind _kind;
+    private string? _text;
+    private string? _blobUrl;
+    private bool _blobUrlDirty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _kind = Classify(FileMeta);
+            if (_kind == PreviewKind.None)
+            {
+                _isLoading = false;
+                return;
+            }
+
+            var full = await FileStorage.GetFileByDocIdAsync(
+                FileMeta.DocId, FileMeta.Version, CancellationToken.None);
+            if (full is null) { _error = "文件不存在"; _isLoading = false; return; }
+
+            await using var stream = await FileStorage.DownloadFileAsync(
+                full.Id, ct: CancellationToken.None);
+            if (stream is null) { _error = "文件不存在"; _isLoading = false; return; }
+
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+
+            if (_kind == PreviewKind.Text)
+                _text = Encoding.UTF8.GetString(bytes);
+            else
+            {
+                _blobUrl = await JS.InvokeAsync<string>(
+                    "treegraphFile.createBlobUrl", new object[] { bytes, FileMeta.ContentType });
+                _blobUrlDirty = true;
+            }
+        }
+        catch (Exception ex) { _error = $"预览失败: {ex.Message}"; }
+        finally { _isLoading = false; await InvokeAsync(StateHasChanged); }
+    }
+
+    private static PreviewKind Classify(FilePreviewMeta m)
+    {
+        var ct = m.ContentType ?? "";
+        if (ct.StartsWith("image/")) return PreviewKind.Image;
+        if (ct == "application/pdf") return PreviewKind.Pdf;
+
+        var ext = Path.GetExtension(m.FileName ?? "").ToLowerInvariant();
+        return ext switch
+        {
+            ".pdf" => PreviewKind.Pdf,
+            ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".svg" or ".ico"
+                => PreviewKind.Image,
+            _ when ct.StartsWith("text/") || IsTextExt(ext) => PreviewKind.Text,
+            _ => PreviewKind.None
+        };
+    }
+
+    private static bool IsTextExt(string ext) => ext switch
+    {
+        ".txt" or ".log" or ".cs" or ".csx" or ".json" or ".xml" or ".csproj" or ".sln"
+            or ".config" or ".css" or ".scss" or ".html" or ".htm" or ".js" or ".jsx"
+            or ".ts" or ".tsx" or ".md" or ".markdown" or ".yaml" or ".yml" or ".toml"
+            or ".ini" or ".env" or ".gitignore" or ".sql" or ".csv" or ".py" or ".go"
+            or ".rs" or ".java" or ".kt" or ".rb" or ".php" or ".sh" or ".bat" or ".ps1"
+            or ".proto" or ".graphql" or ".dockerfile" or ".makefile"
+            => true,
+        _ => false
+    };
+
+    private async Task OnDownloadAsync()
+    {
+        try
+        {
+            var full = await FileStorage.GetFileByDocIdAsync(
+                FileMeta.DocId, FileMeta.Version, CancellationToken.None);
+            if (full is null) return;
+            var stream = await FileStorage.DownloadFileAsync(full.Id, ct: CancellationToken.None);
+            if (stream is null) return;
+            await JS.InvokeVoidAsync("treegraphFile.downloadFromStream",
+                FileMeta.FileName, new DotNetStreamReference(stream));
+        }
+        catch { /* 下载失败不影响对话框 */ }
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:F1} MB"
+        : bytes >= 1024 ? $"{bytes / 1024.0:F1} KB"
+        : $"{bytes} B";
+
+    public void Dispose()
+    {
+        if (_blobUrlDirty && !string.IsNullOrEmpty(_blobUrl))
+        {
+            try { JS.InvokeVoidAsync("URL.revokeObjectURL", _blobUrl).GetAwaiter().GetResult(); }
+            catch { }
+        }
+    }
+
+    /// <summary>FileField → FilePreviewDialog 的轻量 DTO。</summary>
+    public sealed record FilePreviewMeta(
+        string DocId,
+        string FileName,
+        string ContentType,
+        int Version,
+        long Size = 0
+    );
+}
