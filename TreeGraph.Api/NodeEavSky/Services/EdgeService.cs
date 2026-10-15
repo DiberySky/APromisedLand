@@ -9,10 +9,8 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// <summary>
 /// Edge Definition CRUD。
 ///
-/// 删除 Definition 时级联清理：
-///   1. EF Cascade 自动删 edge_instances
-///   2. 手动删 attribute_catalog / attribute_values / location_attribute_values 中
-///      entity_type = TypeName 的所有记录
+/// 删除 Definition 不采用级联删除：边实例 / 活动属性非空时抛 InvalidOperationException 拒绝，
+/// 需先清空子项与引用后才可删除。
 /// </summary>
 public class EdgeMetadataService
 {
@@ -154,33 +152,27 @@ public class EdgeMetadataService
 
         var typeName = def.TypeName;
 
-        // 1. 统计要删的实例数（EF Cascade 会自动删 edge_instances）
+        // 子项为空方可删除本项：仍有边实例时拒绝
         var instanceCount = await _db.EdgeInstances
             .CountAsync(i => i.EdgeTypeId == edgeTypeId, ct);
+        if (instanceCount > 0)
+            throw new InvalidOperationException(
+                $"该边类型仍有 {instanceCount} 条边实例，无法删除。请先删除全部边实例。");
 
-        // 2. 删 EAV 值
-        var avCount = await _db.AttributeValues
-            .Where(v => v.EntityType == typeName)
-            .ExecuteDeleteAsync(ct);
-
-        var lavCount = await _db.LocationAttributeValues
-            .Where(v => v.EntityType == typeName)
-            .ExecuteDeleteAsync(ct);
-
-        // 3. 删 EAV 属性定义
+        // 引用为空方可删除本项：仍有活动属性定义时拒绝
         var attrCount = await _db.AttributeCatalog
-            .Where(a => a.EntityType == typeName)
-            .ExecuteDeleteAsync(ct);
+            .CountAsync(a => a.EntityType == typeName && !a.IsDeleted, ct);
+        if (attrCount > 0)
+            throw new InvalidOperationException(
+                $"该边类型仍有 {attrCount} 个活动属性，无法删除。请先删除其属性。");
 
-        // 4. 删 Definition（Cascade 自动删 EdgeInstances）
         _db.EdgeDefinitions.Remove(def);
         await _db.SaveChangesAsync(ct);
 
-        // 5. 失效属性定义缓存：此处直删 attribute_catalog 绕过了 EavMetadataController
-        //    的失效逻辑，若不清理会残留该 TypeName 的旧定义导致读到脏元数据。
+        // 该类型名可能仍被属性定义缓存引用，删除类型后一并失效，避免读到悬空元数据。
         _attrCache.Invalidate(typeName);
 
-        return new EdgeDeleteResult(true, instanceCount, avCount, attrCount);
+        return new EdgeDeleteResult(true, 0, 0, 0);
     }
 
     private static EdgeTypeDto ToDto(EdgeDefinition d) => new(
@@ -481,15 +473,17 @@ public class EdgeInstanceService
         var def = await _db.EdgeDefinitions
             .FirstOrDefaultAsync(d => d.EdgeTypeId == instance.EdgeTypeId, ct);
 
-        // 删 EAV 属性值
+        // 先清空自身数据才允许删本项（不采用级联删除）：
+        // 边实例有独立行，其 EAV 属性值存于外部表，删除前必须先清空。
         if (def is not null)
         {
-            await _db.AttributeValues
-                .Where(v => v.EntityId == edgeId && v.EntityType == def.TypeName)
-                .ExecuteDeleteAsync(ct);
-            await _db.LocationAttributeValues
-                .Where(v => v.EntityId == edgeId && v.EntityType == def.TypeName)
-                .ExecuteDeleteAsync(ct);
+            var hasValues = await _db.AttributeValues
+                    .AnyAsync(v => v.EntityId == edgeId && v.EntityType == def.TypeName, ct)
+                || await _db.LocationAttributeValues
+                    .AnyAsync(v => v.EntityId == edgeId && v.EntityType == def.TypeName, ct);
+            if (hasValues)
+                throw new InvalidOperationException(
+                    "该边实例仍有属性数据，无法删除。请先清空其全部属性值。");
         }
 
         _db.EdgeInstances.Remove(instance);

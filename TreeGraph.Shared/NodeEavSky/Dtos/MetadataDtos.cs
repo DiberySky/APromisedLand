@@ -25,6 +25,7 @@ public class CreateAttributeRequest
     public string? UnitId { get; set; }
     public string? RefCompositeTypeId { get; set; }
     public string? RefTableDefinitionId { get; set; }
+
     public string? RefOptionSetId { get; set; }
     public string? DefaultValue { get; set; }
     public JsonElement? AllowedValues { get; set; }
@@ -62,6 +63,12 @@ public class CreateCustomTableRequest
     public string TableName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int DisplayOrder { get; set; }
+
+    /// <summary>时序记录表：创建时服务端预置时间维度列（第 1 列日期、可选第 2 列时间），此后锁定。</summary>
+    public bool IsRecordTable { get; set; }
+
+    /// <summary>时序记录表是否包含时间列（仅 IsRecordTable = true 时生效，默认 true）。</summary>
+    public bool HasTimeColumn { get; set; } = true;
 }
 
 public class CreateTableColumnRequest
@@ -143,7 +150,9 @@ public record CustomTableDetailDto(
     int Version,
     int DisplayOrder,
     IReadOnlyList<CustomTableColumnDto> Columns,
-    bool IsDeleted = false);
+    bool IsDeleted = false,
+    bool IsRecordTable = false,
+    bool HasTimeColumn = false);
 
 public record CustomTableColumnDto(
     string ColumnId,
@@ -212,6 +221,7 @@ public record AttributeDetailDto(
     string? RefTableDefinitionId,
     string? TableName,
     string? TableDisplayName,
+    bool IsRecordMode,
     string? RefOptionSetId,
     string? OptionSetName,
     string? OptionSetDisplayName);

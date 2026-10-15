@@ -148,7 +148,13 @@ public partial class TreeEavSky<TItem>
 
     private async Task HandleDeleteAsync(ITreeItemData<TItem> node)
     {
+        // 子项为空方可删除本项：仍有子节点时直接拒绝（后端亦会拒绝）
         var hasChildren = node.Children?.Count > 0 || node.Value?.HasChildren == true;
+        if (hasChildren)
+        {
+            Message.Warning("该节点仍有子节点，无法删除。请先删除全部子节点。");
+            return;
+        }
 
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",

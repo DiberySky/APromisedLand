@@ -8,11 +8,40 @@
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="CreateAsync">
     <DialogContent>
-        <MudTextField @bind-Value="_newTable.EntityType"
-                      Label="实体类型"
-                      Placeholder="例如：UnitTree"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
+        <div Class="d-flex align-center mb-3">
+            <MudSelect T="string"
+                       Value="_newTable.EntityType"
+                       ValueChanged="OnEntityTypeChanged"
+                       Label="实体类型"
+                       Variant="Variant.Outlined"
+                       Class="flex-grow-1 mr-3"
+                       Disabled="_isShared"
+                       HelperText="@(_isShared ? "已勾选全局共享，将归属全局共享" : "选择该自定义表归属的实体类型")"
+                       AnchorOrigin="Origin.BottomLeft"
+                       TransformOrigin="Origin.TopLeft">
+                <MudSelectItem T="string" Value="@("Shared")">全局共享</MudSelectItem>
+                @foreach (var et in _entityTypes)
+                {
+                    <MudSelectItem T="string" Value="@et.EntityType">
+                        @(string.IsNullOrWhiteSpace(et.DisplayName) ? et.EntityType : $"{et.DisplayName}（{et.EntityType}）")
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudCheckBox T="bool"
+                         Value="_isShared"
+                         ValueChanged="OnSharedChanged"
+                         Label="全局共享（Shared）"
+                         Color="Color.Primary"
+                         Dense="true" />
+        </div>
+
+        @if (!_isShared && _entityTypes.Count == 0)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true">
+                暂无实体类型，请先到「实体类型管理」创建，或直接勾选上方「全局共享」。
+            </MudAlert>
+        }
+
         <MudTextField @bind-Value="_newTable.TableName"
                       Label="表名 (snake_case)"
                       Placeholder="specs"
@@ -26,15 +55,70 @@
         <MudNumericField T="int"
                          @bind-Value="_newTable.DisplayOrder"
                          Label="显示顺序"
-                         Variant="Variant.Outlined" />
+                         Variant="Variant.Outlined"
+                         Class="mb-3" />
+
+        @* 时序记录表：创建时服务端预置时间维度列（第 1 列日期、可选第 2 列时间），此后锁定 *@
+        <MudSwitch T="bool"
+                   @bind-Value="_newTable.IsRecordTable"
+                   Color="Color.Primary"
+                   Class="mb-2">
+            时序记录
+        </MudSwitch>
+        @if (_newTable.IsRecordTable)
+        {
+            <MudSwitch T="bool"
+                       @bind-Value="_newTable.HasTimeColumn"
+                       Color="Color.Primary"
+                       Class="mb-2">
+                包含时间列
+            </MudSwitch>
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                自动预置：第 1 列「日期」@(_newTable.HasTimeColumn ? "、第 2 列「时间」" : "")。
+                时序结构创建后定死——这两列不可删除、不可调顺序，业务列可自由增删改；
+                引用该表的属性自动为时序记录（行列表不显示序号）。
+            </MudAlert>
+        }
     </DialogContent>
 </DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    private CreateCustomTableRequest _newTable = new() { EntityType = "" };
+    private CreateCustomTableRequest _newTable = new() { EntityType = "Shared" };
+    private bool _isShared = true;
     private bool _submitting;
+    private IReadOnlyList<EntityTypeSummaryDto> _entityTypes = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _entityTypes = (await Api.ListEntityTypesAsync(sharedOnly: true))
+                ?.Where(t => !string.Equals(t.EntityType, "Shared", StringComparison.OrdinalIgnoreCase))
+                .ToList() ?? [];
+        }
+        catch
+        {
+            _entityTypes = [];
+        }
+    }
+
+    private Task OnEntityTypeChanged(string? value)
+    {
+        _newTable.EntityType = value ?? "";
+        return Task.CompletedTask;
+    }
+
+    private Task OnSharedChanged(bool shared)
+    {
+        _isShared = shared;
+        // 勾选：归属固定为全局共享；取消勾选：回落到第一个实体类型，等待用户选择
+        _newTable.EntityType = shared
+            ? "Shared"
+            : (_entityTypes.FirstOrDefault()?.EntityType ?? "");
+        return Task.CompletedTask;
+    }
 
     private async Task CreateAsync()
     {

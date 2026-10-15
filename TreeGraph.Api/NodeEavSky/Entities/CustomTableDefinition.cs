@@ -12,6 +12,16 @@ public class CustomTableDefinition
     public int Version { get; set; } = 1;
     public bool IsDeleted { get; set; }
     public int DisplayOrder { get; set; }
+
+    /// <summary>
+    /// 时序记录专属表（创建 record 属性时自动建立）：
+    /// 活动列按 DisplayOrder 排序后，前 (HasTimeColumn ? 2 : 1) 列为时间维度列，
+    /// 一律锁定（不可删、不可调顺序）；业务列自由增删改。
+    /// </summary>
+    public bool IsRecordTable { get; set; }
+
+    /// <summary>时序结构是否包含时间列（创建时勾选，定死不可改；第 1 列恒为日期列）。</summary>
+    public bool HasTimeColumn { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

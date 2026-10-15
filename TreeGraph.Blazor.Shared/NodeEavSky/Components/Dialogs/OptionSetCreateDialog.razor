@@ -8,11 +8,40 @@
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="CreateAsync">
     <DialogContent>
-        <MudTextField @bind-Value="_newSet.EntityType"
-                      Label="实体类型"
-                      HelperText="填 Shared 表示全局共享"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
+        <div Class="d-flex align-center mb-3">
+            <MudSelect T="string"
+                       Value="_newSet.EntityType"
+                       ValueChanged="OnEntityTypeChanged"
+                       Label="实体类型"
+                       Variant="Variant.Outlined"
+                       Class="flex-grow-1 mr-3"
+                       Disabled="_isShared"
+                       HelperText="@(_isShared ? "已勾选全局共享，将归属全局共享" : "选择该选项集归属的实体类型")"
+                       AnchorOrigin="Origin.BottomLeft"
+                       TransformOrigin="Origin.TopLeft">
+                <MudSelectItem T="string" Value="@("Shared")">全局共享</MudSelectItem>
+                @foreach (var et in _entityTypes)
+                {
+                    <MudSelectItem T="string" Value="@et.EntityType">
+                        @(string.IsNullOrWhiteSpace(et.DisplayName) ? et.EntityType : $"{et.DisplayName}（{et.EntityType}）")
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudCheckBox T="bool"
+                         Value="_isShared"
+                         ValueChanged="OnSharedChanged"
+                         Label="全局共享（Shared）"
+                         Color="Color.Primary"
+                         Dense="true" />
+        </div>
+
+        @if (!_isShared && _entityTypes.Count == 0)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true">
+                暂无实体类型，请先到「实体类型管理」创建，或直接勾选上方「全局共享」。
+            </MudAlert>
+        }
+
         <MudTextField @bind-Value="_newSet.SetName"
                       Label="集合名 (snake_case)"
                       Placeholder="gender"
@@ -29,7 +58,39 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     private CreateOptionSetRequest _newSet = new() { EntityType = "Shared" };
+    private bool _isShared = true;
     private bool _submitting;
+    private IReadOnlyList<EntityTypeSummaryDto> _entityTypes = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _entityTypes = (await Api.ListEntityTypesAsync(sharedOnly: true))
+                ?.Where(t => !string.Equals(t.EntityType, "Shared", StringComparison.OrdinalIgnoreCase))
+                .ToList() ?? [];
+        }
+        catch
+        {
+            _entityTypes = [];
+        }
+    }
+
+    private Task OnEntityTypeChanged(string? value)
+    {
+        _newSet.EntityType = value ?? "";
+        return Task.CompletedTask;
+    }
+
+    private Task OnSharedChanged(bool shared)
+    {
+        _isShared = shared;
+        // 勾选：归属固定为全局共享；取消勾选：回落到第一个实体类型，等待用户选择
+        _newSet.EntityType = shared
+            ? "Shared"
+            : (_entityTypes.FirstOrDefault()?.EntityType ?? "");
+        return Task.CompletedTask;
+    }
 
     private async Task CreateAsync()
     {

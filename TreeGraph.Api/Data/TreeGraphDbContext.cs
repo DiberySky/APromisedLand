@@ -479,8 +479,9 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => new { x.CompositeTypeId, x.FieldName })
                 .IsUnique().HasDatabaseName("uq_composite_field");
 
+            // 不采用级联删除：组合字段非空时由应用层拒绝删除组合类型
             e.HasOne(x => x.CompositeType).WithMany(t => t.Fields)
-                .HasForeignKey(x => x.CompositeTypeId).OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(x => x.CompositeTypeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.RefCompositeType).WithMany()
                 .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
 
@@ -540,8 +541,9 @@ public class TreeGraphDbContext : DbContext
                 .IsUnique().HasDatabaseName("uq_option_item_value");
             e.HasIndex(x => x.OptionSetId).HasDatabaseName("ix_option_items_set");
 
+            // 不采用级联删除：选项非空时由应用层拒绝删除选项集
             e.HasOne(x => x.OptionSet).WithMany(s => s.Items)
-                .HasForeignKey(x => x.OptionSetId).OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(x => x.OptionSetId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -562,6 +564,8 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Version).HasColumnName("version");
             e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
             e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+            e.Property(x => x.IsRecordTable).HasColumnName("is_record_table");
+            e.Property(x => x.HasTimeColumn).HasColumnName("has_time_column");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
@@ -604,8 +608,9 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => new { x.TableDefinitionId, x.ColumnName })
                 .IsUnique().HasDatabaseName("uq_custom_table_column");
 
+            // 不采用级联删除：列非空时由应用层拒绝删除自定义表
             e.HasOne(x => x.Table).WithMany(t => t.Columns)
-                .HasForeignKey(x => x.TableDefinitionId).OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(x => x.TableDefinitionId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.RefCompositeType).WithMany()
                 .HasForeignKey(x => x.RefCompositeTypeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Unit).WithMany()
@@ -637,8 +642,9 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => new { x.ParentEntityId, x.AttributeId, x.RowOrder })
                 .HasDatabaseName("ix_ctr_order");
 
+            // 不采用级联删除：属性有实例数据（含表行）时由应用层拒绝删除该属性
             e.HasOne(x => x.Attribute).WithMany()
-                .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Table).WithMany()
                 .HasForeignKey(x => x.TableDefinitionId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -753,11 +759,11 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => x.FromNodeId).HasDatabaseName("ix_ei_from_node");
             e.HasIndex(x => x.ToNodeId).HasDatabaseName("ix_ei_to_node");
 
-            // FK：级联删 Definition → 级联删 Instance
+            // FK 不采用级联删除：边实例非空时由应用层拒绝删除边类型
             e.HasOne(x => x.EdgeType)
                 .WithMany(d => d.Instances)
                 .HasForeignKey(x => x.EdgeTypeId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

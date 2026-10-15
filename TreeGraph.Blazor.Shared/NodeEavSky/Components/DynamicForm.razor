@@ -88,13 +88,12 @@
                         break;
 
                     case EavDataTypes.Table:
-                    case EavDataTypes.Record:
                         @* 表数据由 TableField 通过行级端点独立加载/保存，不参与本表单提交 *@
                         <TableField Attr="attr"
-                                    EntityType="EntityType"
-                                    EntityId="EntityId"
+                                    EntityType="@EntityType"
+                                    EntityId="@EntityId"
                                     ReadOnly="ReadOnly"
-                                    RecordMode="@(attr.DataType == EavDataTypes.Record)"
+                                    RecordMode="@attr.IsRecordMode"
                                     Value="GetJson(attr.AttributeName)"
                                     ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
@@ -305,7 +304,7 @@
         var result = new Dictionary<string, object?>();
         foreach (var attr in Schema)
         {
-            if (attr.DataType is EavDataTypes.Table or EavDataTypes.Record)
+            if (attr.DataType == EavDataTypes.Table)
                 continue;   // 表数据由 TableField 独立保存，不随表单提交
 
             if (!_values.TryGetValue(attr.AttributeName, out var v) || v is null)

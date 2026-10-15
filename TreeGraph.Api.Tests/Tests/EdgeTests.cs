@@ -551,22 +551,43 @@ public class EdgeTests : IntegrationTestBase
     }
 
     // ============================================================
-    // 级联删除
+    // 删除不级联：子项为空方可删除
     // ============================================================
 
     [Fact]
-    public async Task EdgeType_Delete_CascadesInstances()
+    public async Task EdgeType_Delete_WhenInstancesExist_Returns409()
     {
         var et = await CreateEdgeTypeAsync();
         await CreateEdgeAsync(et.EdgeTypeId, "n1", "n2");
         await CreateEdgeAsync(et.EdgeTypeId, "n3", "n4");
 
-        // 确认有实例
-        var beforeDelete = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}");
-        Assert.Equal(2, beforeDelete!.Count);
+        // 仍有边实例 → 拒绝删除本类型，且不做级联清理
+        var delResp = await Client.DeleteAsync(
+            $"/api/eav/metadata/edge-types/{et.EdgeTypeId}");
+        Assert.Equal(HttpStatusCode.Conflict, delResp.StatusCode);
+        Assert.Contains("边实例", await delResp.Content.ReadAsStringAsync());
 
-        // 删除类型
+        // 类型与实例均保留
+        var getResp = await Client.GetAsync(
+            $"/api/eav/metadata/edge-types/{et.EdgeTypeId}");
+        Assert.Equal(HttpStatusCode.OK, getResp.StatusCode);
+
+        var instances = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges/{et.EdgeTypeId}");
+        Assert.Equal(2, instances!.Count);
+    }
+
+    [Fact]
+    public async Task EdgeType_Delete_AfterInstancesRemoved_Succeeds()
+    {
+        var et = await CreateEdgeTypeAsync();
+        var edge = await CreateEdgeAsync(et.EdgeTypeId, "n1", "n2");
+
+        // 先删实例，使子项为空
+        var delEdge = await Client.DeleteAsync(
+            $"/api/eav/edges/{et.EdgeTypeId}/{edge.EdgeId}");
+        Assert.Equal(HttpStatusCode.NoContent, delEdge.StatusCode);
+
         var delResp = await Client.DeleteAsync(
             $"/api/eav/metadata/edge-types/{et.EdgeTypeId}");
         Assert.Equal(HttpStatusCode.OK, delResp.StatusCode);
@@ -574,7 +595,6 @@ public class EdgeTests : IntegrationTestBase
         var delResult = await delResp.Content.ReadEavAsync<EdgeDeleteResult>();
         Assert.NotNull(delResult);
         Assert.True(delResult!.Deleted);
-        Assert.Equal(2, delResult.InstancesDeleted);
 
         // 确认类型已不存在
         var getResp = await Client.GetAsync(

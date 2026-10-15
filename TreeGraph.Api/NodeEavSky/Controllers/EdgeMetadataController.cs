@@ -59,14 +59,19 @@ public class EdgeMetadataController : ControllerBase
 
     /// <summary>
     /// 删除边类型（硬删）。
-    /// 级联清理：EdgeInstance（EF Cascade）+ EAV 属性定义 + EAV 属性值。
+    /// 不采用级联删除：边实例 / 活动属性非空时返回 409，需先清空子项与引用。
     /// </summary>
     [HttpDelete("{edgeTypeId}")]
     public async Task<IActionResult> Delete(string edgeTypeId, CancellationToken ct)
     {
-        var r = await _service.DeleteAsync(edgeTypeId, ct);
-        return r.Deleted
-            ? Ok(r)
-            : NotFound();
+        try
+        {
+            var r = await _service.DeleteAsync(edgeTypeId, ct);
+            return r.Deleted ? Ok(r) : NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
     }
 }

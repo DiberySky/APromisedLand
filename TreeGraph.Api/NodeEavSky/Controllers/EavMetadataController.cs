@@ -75,13 +75,12 @@ public class EavMetadataController : ControllerBase
         // ---- 类型与引用匹配 ----
         if (req.DataType == EavDataTypes.Composite && req.RefCompositeTypeId is null)
             return BadRequest(new { error = "composite 必须指定 refCompositeTypeId" });
-        if (req.DataType is EavDataTypes.Table or EavDataTypes.Record
-            && req.RefTableDefinitionId is null)
-            return BadRequest(new { error = $"{req.DataType} 必须指定 refTableDefinitionId" });
+        if (req.DataType == EavDataTypes.Table && req.RefTableDefinitionId is null)
+            return BadRequest(new { error = "table 必须指定 refTableDefinitionId" });
         if (req.DataType == EavDataTypes.SingleChoice && req.RefOptionSetId is null)
             return BadRequest(new { error = "single_choice 必须指定 refOptionSetId" });
         if (req.DataType is not (EavDataTypes.Composite or EavDataTypes.Table
-            or EavDataTypes.Record or EavDataTypes.SingleChoice) && refCount > 0)
+            or EavDataTypes.SingleChoice) && refCount > 0)
             return BadRequest(new { error = "当前 dataType 不支持引用" });
 
         // ---- 引用存在性 ----
@@ -92,20 +91,20 @@ public class EavMetadataController : ControllerBase
             && !await _db.CompositeTypes.AnyAsync(
                 t => t.CompositeTypeId == cid && !t.IsDeleted, ct))
             return BadRequest(new { error = $"组合类型不存在: {cid}" });
-        if (req.RefTableDefinitionId is { } tid
-            && !await _db.CustomTables.AnyAsync(
-                t => t.TableDefinitionId == tid && !t.IsDeleted, ct))
-            return BadRequest(new { error = $"自定义表不存在: {tid}" });
+        // 所引表的时序标记：record 属性由此推导（时序表 → 行列表屏蔽序号）
+        bool refTableIsRecord = false;
+        if (req.RefTableDefinitionId is { } tid)
+        {
+            var refTable = await _db.CustomTables
+                .Where(t => t.TableDefinitionId == tid && !t.IsDeleted)
+                .Select(t => new { t.IsRecordTable })
+                .FirstOrDefaultAsync(ct);
+            if (refTable is null) return BadRequest(new { error = $"自定义表不存在: {tid}" });
+            refTableIsRecord = refTable.IsRecordTable;
+        }
         if (req.RefOptionSetId is { } sid
             && !await _db.OptionSets.AnyAsync(s => s.OptionSetId == sid, ct))
             return BadRequest(new { error = $"选项集不存在: {sid}" });
-
-        // ---- record：所引用表的活动列第 1 列须 date、第 2 列须 time ----
-        if (req.DataType == EavDataTypes.Record && req.RefTableDefinitionId is { } recTid)
-        {
-            var colError = await ValidateRecordTableColumnsAsync(recTid, ct);
-            if (colError is not null) return BadRequest(new { error = colError });
-        }
 
         // ---- AttributeName 生成 / 校验 ----
         string attributeName;
@@ -162,6 +161,7 @@ public class EavMetadataController : ControllerBase
             UnitId = req.UnitId,
             RefCompositeTypeId = req.RefCompositeTypeId,
             RefTableDefinitionId = req.RefTableDefinitionId,
+            IsRecordMode = refTableIsRecord,
             RefOptionSetId = req.RefOptionSetId,
             DefaultValue = req.DefaultValue,
             AllowedValues = req.AllowedValues is null
@@ -185,26 +185,28 @@ public class EavMetadataController : ControllerBase
         => "attr_" + Guid.NewGuid().ToString("N")[..12];
 
     /// <summary>
-    /// record 类型表约束：活动列（!IsDeleted，按 DisplayOrder）第 1 列须 date、第 2 列须 time。
-    /// 不满足时返回中文错误信息，满足返回 null。
+    /// 取 record 专属表的锁定时间维度列：活动列按 DisplayOrder 排序后前 N 列
+    /// （N = HasTimeColumn ? 2 : 1，即第 1 列日期、可选第 2 列时间）。
+    /// 非 record 表返回 (0, 空集合)。
     /// </summary>
-    private async Task<string?> ValidateRecordTableColumnsAsync(
-        string tableDefinitionId, CancellationToken ct)
+    private async Task<(int LockedCount, HashSet<string> LockedColumnIds)>
+        GetRecordLockedColumnsAsync(string tableDefinitionId, CancellationToken ct)
     {
-        var firstTwo = await _db.CustomTableColumns
+        var flags = await _db.CustomTables
+            .Where(t => t.TableDefinitionId == tableDefinitionId)
+            .Select(t => new { t.IsRecordTable, t.HasTimeColumn })
+            .FirstOrDefaultAsync(ct);
+        if (flags is null || !flags.IsRecordTable)
+            return (0, new HashSet<string>());
+
+        var lockedCount = flags.HasTimeColumn ? 2 : 1;
+        var ids = await _db.CustomTableColumns
             .Where(c => c.TableDefinitionId == tableDefinitionId && !c.IsDeleted)
             .OrderBy(c => c.DisplayOrder)
-            .Take(2)
-            .Select(c => c.DataType)
+            .Take(lockedCount)
+            .Select(c => c.ColumnId)
             .ToListAsync(ct);
-
-        if (firstTwo.Count < 2
-            || firstTwo[0] != EavDataTypes.Date
-            || firstTwo[1] != EavDataTypes.Time)
-        {
-            return "record 类型要求所引用表的第一列为 date（仅日期）、第二列为 time（仅时间）";
-        }
-        return null;
+        return (lockedCount, ids.ToHashSet());
     }
 
     [HttpPost("composite-types")]
@@ -233,8 +235,37 @@ public class EavMetadataController : ControllerBase
             TableName = req.TableName,
             DisplayName = req.DisplayName,
             DisplayOrder = req.DisplayOrder,
-            Version = 1
+            Version = 1,
+            IsRecordTable = req.IsRecordTable,
+            HasTimeColumn = req.IsRecordTable && req.HasTimeColumn
         };
+
+        // 时序记录表：服务端预置时间维度列（第 1 列日期、勾选时第 2 列时间），创建后锁定
+        if (table.IsRecordTable)
+        {
+            table.Columns.Add(new CustomTableColumn
+            {
+                ColumnName = "date",
+                DisplayName = "日期",
+                DataType = EavDataTypes.Date,
+                IsRequired = true,
+                IsSortable = true,
+                DisplayOrder = 0
+            });
+            if (table.HasTimeColumn)
+            {
+                table.Columns.Add(new CustomTableColumn
+                {
+                    ColumnName = "time",
+                    DisplayName = "时间",
+                    DataType = EavDataTypes.Time,
+                    IsRequired = true,
+                    IsSortable = true,
+                    DisplayOrder = 1
+                });
+            }
+        }
+
         _db.CustomTables.Add(table);
         await _db.SaveChangesAsync(ct);
         // ★ 清除 name 缓存中可能存在的"不存在"哨兵，使新表按名立即可见
@@ -251,10 +282,23 @@ public class EavMetadataController : ControllerBase
     public async Task<IActionResult> AddTableColumn(
         string id, [FromBody] CreateTableColumnRequest req, CancellationToken ct)
     {
-        // 表存在性
-        var tableExists = await _db.CustomTables
-            .AnyAsync(t => t.TableDefinitionId == id && !t.IsDeleted, ct);
-        if (!tableExists) return NotFound(new { error = $"自定义表不存在: {id}" });
+        // 表存在性 + 时序记录标记
+        var tableFlags = await _db.CustomTables
+            .Where(t => t.TableDefinitionId == id && !t.IsDeleted)
+            .Select(t => new { t.IsRecordTable, t.HasTimeColumn })
+            .FirstOrDefaultAsync(ct);
+        if (tableFlags is null) return NotFound(new { error = $"自定义表不存在: {id}" });
+
+        // 时序记录表：前 N 列为锁定时间维度列，新业务列顺序须 ≥ N
+        if (tableFlags.IsRecordTable)
+        {
+            var lockedCount = tableFlags.HasTimeColumn ? 2 : 1;
+            if (req.DisplayOrder < lockedCount)
+                return BadRequest(new
+                {
+                    error = $"时序记录表前 {lockedCount} 列为时间维度列（锁定），新列显示顺序须 ≥ {lockedCount}"
+                });
+        }
 
         // ★ 类型与引用匹配
         if (req.DataType == EavDataTypes.Composite)
@@ -457,7 +501,7 @@ public class EavMetadataController : ControllerBase
             .AsQueryable();
         if (!includeDeleted) query = query.Where(t => !t.IsDeleted);
         if (!string.IsNullOrEmpty(entityType))
-            query = query.Where(t => t.EntityType == entityType);
+            query = query.Where(t => t.EntityType == entityType || t.EntityType == "Shared");
 
         var list = await query
             .OrderBy(t => t.EntityType).ThenBy(t => t.DisplayOrder)
@@ -506,9 +550,15 @@ public class EavMetadataController : ControllerBase
         if (referenced)
             return BadRequest(new { error = "该自定义表仍被属性引用，无法删除" });
 
+        // 子项为空方可删除本表（不采用级联删除）：仍有活动列时拒绝
+        if (table.Columns.Any(c => !c.IsDeleted))
+            return BadRequest(new { error = "该自定义表仍有列，无法删除。请先删除全部列。" });
+
+        if (await _db.CustomTableRows.AnyAsync(r => r.TableDefinitionId == id, ct))
+            return BadRequest(new { error = "该自定义表仍有行数据，无法删除。请先清空全部行。" });
+
         table.IsDeleted = true;
         table.UpdatedAt = DateTimeOffset.UtcNow;
-        foreach (var c in table.Columns) c.IsDeleted = true;
 
         await _db.SaveChangesAsync(ct);
         _customTableCache.Invalidate(id);
@@ -525,6 +575,22 @@ public class EavMetadataController : ControllerBase
         var col = await _db.CustomTableColumns
             .FirstOrDefaultAsync(c => c.ColumnId == columnId && c.TableDefinitionId == id, ct);
         if (col is null || col.IsDeleted) return NotFound();
+
+        // 时序记录表列保护：时间维度列不可调顺序；业务列不可移入锁定区
+        if (req.DisplayOrder is not null)
+        {
+            var (lockedCount, lockedIds) = await GetRecordLockedColumnsAsync(id, ct);
+            if (lockedCount > 0)
+            {
+                if (lockedIds.Contains(col.ColumnId))
+                    return BadRequest(new { error = "时间维度列已锁定，不可调整顺序" });
+                if (req.DisplayOrder.Value < lockedCount)
+                    return BadRequest(new
+                    {
+                        error = $"业务列显示顺序须 ≥ {lockedCount}（前 {lockedCount} 列为锁定时间维度列）"
+                    });
+            }
+        }
 
         if (req.DisplayName is not null) col.DisplayName = req.DisplayName;
         if (req.IsRequired is not null) col.IsRequired = req.IsRequired.Value;
@@ -569,6 +635,19 @@ public class EavMetadataController : ControllerBase
         var col = await _db.CustomTableColumns
             .FirstOrDefaultAsync(c => c.ColumnId == columnId && c.TableDefinitionId == id, ct);
         if (col is null) return NotFound();
+
+        // 时序记录表列保护：时间维度列不可删除（时序结构创建时定死）
+        var (_, lockedIds) = await GetRecordLockedColumnsAsync(id, ct);
+        if (lockedIds.Contains(col.ColumnId))
+            return BadRequest(new { error = "时间维度列已锁定，不可删除（时序结构在创建时定死）" });
+
+        // 子项为空方可删除本列：该列在行数据中已有值时拒绝（jsonb 键存在即视为有数据）
+        var columnName = col.ColumnName;
+        var hasData = await _db.CustomTableRows.AnyAsync(
+            r => r.TableDefinitionId == id
+              && EF.Functions.JsonTypeof(r.RowData.RootElement.GetProperty(columnName)) != null, ct);
+        if (hasData)
+            return BadRequest(new { error = $"列「{col.DisplayName}」已有行数据，无法删除。请先清空该列数据。" });
 
         col.IsDeleted = true;
         await _db.SaveChangesAsync(ct);
@@ -655,9 +734,12 @@ public class EavMetadataController : ControllerBase
         if (fieldReferenced)
             return BadRequest(new { error = "该组合类型仍被其它组合字段引用，无法删除" });
 
+        // 子项为空方可删除本类型（不采用级联删除）：仍有活动字段时拒绝
+        if (type.Fields.Any(f => !f.IsDeleted))
+            return BadRequest(new { error = "该组合类型仍有字段，无法删除。请先删除全部字段。" });
+
         type.IsDeleted = true;
         type.UpdatedAt = DateTimeOffset.UtcNow;
-        foreach (var f in type.Fields) f.IsDeleted = true;
 
         await _db.SaveChangesAsync(ct);
         _compositeCache.Invalidate(id);
@@ -841,19 +923,12 @@ public class EavMetadataController : ControllerBase
         }
         else if (req.RefTableDefinitionId is not null)
         {
-            if (def.DataType is not (EavDataTypes.Table or EavDataTypes.Record))
-                return BadRequest(new { error = "只有 table/record 类型可以引用自定义表" });
+            if (def.DataType != EavDataTypes.Table)
+                return BadRequest(new { error = "只有 table 类型可以引用自定义表" });
 
             var exists = await _db.CustomTables.AnyAsync(
                 t => t.TableDefinitionId == req.RefTableDefinitionId && !t.IsDeleted, ct);
             if (!exists) return BadRequest(new { error = $"自定义表不存在: {req.RefTableDefinitionId}" });
-
-            if (def.DataType == EavDataTypes.Record)
-            {
-                var colError = await ValidateRecordTableColumnsAsync(
-                    req.RefTableDefinitionId, ct);
-                if (colError is not null) return BadRequest(new { error = colError });
-            }
             def.RefTableDefinitionId = req.RefTableDefinitionId;
         }
 
@@ -873,6 +948,12 @@ public class EavMetadataController : ControllerBase
             def.RefOptionSetId = req.RefOptionSetId;
         }
 
+        // ---- 时序记录标记：完全由所引表推导（时序表 → 该属性的行列表屏蔽序号）----
+        def.IsRecordMode = def.DataType == EavDataTypes.Table
+            && def.RefTableDefinitionId is { } recTid
+            && await _db.CustomTables.AnyAsync(
+                t => t.TableDefinitionId == recTid && t.IsRecordTable, ct);
+
         def.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
         _attrCache.Invalidate(def.EntityType);
@@ -884,6 +965,13 @@ public class EavMetadataController : ControllerBase
     {
         var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
         if (def is null) return NotFound();
+
+        // 子项为空方可删除本项（不采用级联删除）：该属性已产生实例数据时拒绝
+        var hasValues = await _db.AttributeValues.AnyAsync(v => v.AttributeId == id, ct);
+        var hasLocations = await _db.LocationAttributeValues.AnyAsync(l => l.AttributeId == id, ct);
+        var hasRows = await _db.CustomTableRows.AnyAsync(r => r.AttributeId == id, ct);
+        if (hasValues || hasLocations || hasRows)
+            return BadRequest(new { error = "该属性已产生实例数据，无法删除。请先清空该属性的全部数据。" });
 
         def.IsDeleted = true;
         def.UpdatedAt = DateTimeOffset.UtcNow;
@@ -905,6 +993,7 @@ public class EavMetadataController : ControllerBase
         a.UnitId, a.Unit?.Name, a.Unit?.Abbreviation,
         a.RefCompositeTypeId, a.RefCompositeType?.TypeName, a.RefCompositeType?.DisplayName,
         a.RefTableDefinitionId, a.RefTableDefinition?.TableName, a.RefTableDefinition?.DisplayName,
+        a.IsRecordMode,
         a.RefOptionSetId, a.RefOptionSet?.SetName, a.RefOptionSet?.DisplayName);
 
     private static CustomTableDetailDto ToCustomTableDto(CustomTableDefinition t) => new(
@@ -922,7 +1011,8 @@ public class EavMetadataController : ControllerBase
                 c.UnitId, c.Unit?.Name, c.Unit?.Abbreviation,
                 c.IsDeleted))
             .ToList(),
-        t.IsDeleted);                            // ★ 透出表的删除状态
+        t.IsDeleted,                           // ★ 透出表的删除状态
+        t.IsRecordTable, t.HasTimeColumn);     // ★ 透出时序记录标记（前端列锁定用）
 
     private static CompositeTypeDetailDto ToCompositeTypeDto(CompositeTypeDefinition t) => new(
         t.CompositeTypeId, t.EntityType, t.TypeName, t.DisplayName, t.Version,

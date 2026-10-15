@@ -211,6 +211,12 @@ public class EavApiClient
         => await GetAsync<CustomTableValue>(
             $"api/eav/{entityType}/entities/{entityId}/tables/{tableName}", ct);
 
+    /// <summary>加载自定义表数据；失败时附带后端给出的原因（供 UI 直接展示）。</summary>
+    public async Task<(CustomTableValue? Value, string? Error)> LoadCustomTableWithErrorAsync(
+        string entityType, string entityId, string tableName, CancellationToken ct = default)
+        => await GetWithErrorAsync<CustomTableValue>(
+            $"api/eav/{entityType}/entities/{entityId}/tables/{tableName}", ct);
+
     public async Task<(bool Ok, string? Error)> ReplaceCustomTableAsync(
         string entityType, string entityId, string tableName,
         CustomTableValue value, CancellationToken ct = default)
@@ -330,6 +336,11 @@ public class EavApiClient
     public Task<CustomTableDetailDto?> GetCustomTableAsync(
         string id, CancellationToken ct = default)
         => GetAsync<CustomTableDetailDto>($"api/eav/metadata/custom-tables/{id}", ct);
+
+    /// <summary>加载自定义表结构；失败时附带后端给出的原因（供 UI 直接展示）。</summary>
+    public Task<(CustomTableDetailDto? Value, string? Error)> GetCustomTableWithErrorAsync(
+        string id, CancellationToken ct = default)
+        => GetWithErrorAsync<CustomTableDetailDto>($"api/eav/metadata/custom-tables/{id}", ct);
 
     public Task<(bool Ok, string? Error)> UpdateCustomTableAsync(
         string id, UpdateCustomTableRequest request, CancellationToken ct = default)
@@ -594,6 +605,36 @@ public class EavApiClient
         }
     }
 
+    /// <summary>
+    /// 与 <see cref="GetAsync{T}"/> 同构，但失败时返回可展示的原因而非仅 null：
+    /// 非 2xx → 解析错误体（信封 data.error/errors 或裸 error/message）；异常 → 异常消息。
+    /// </summary>
+    private async Task<(T? Value, string? Error)> GetWithErrorAsync<T>(
+        string relativeUrl, CancellationToken ct) where T : class
+    {
+        try
+        {
+            var resp = await _http.GetAsync(relativeUrl, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("GET {Url} → {Status}", relativeUrl, resp.StatusCode);
+                return (default, await ExtractErrorAsync(resp, ct));
+            }
+
+            var envelope = await resp.Content
+                .ReadFromJsonAsync<ApiResponse<T>>(JsonOptions, ct);
+            if (envelope is null || envelope.Success)
+                return (envelope?.Data, null);
+
+            return (default, string.IsNullOrWhiteSpace(envelope.Message) ? null : envelope.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GET {Url} 失败", relativeUrl);
+            return (default, ex.Message);
+        }
+    }
+
     private async Task<T?> PostAsync<T>(
         string relativeUrl, object body, CancellationToken ct) where T : class
     {
@@ -684,44 +725,56 @@ public class EavApiClient
     {
         try
         {
-            // ★ NodeEavSky 统一信封：{ success, message, data: { error?, errors? } }
-            var envelope = await resp.Content
-                .ReadFromJsonAsync<ApiResponse<JsonElement>>(JsonOptions, ct);
-            if (envelope is null) return resp.ReasonPhrase;
+            // ★ 错误体有两种形态：
+            //   1) 统一信封 { success, message, data: { error?, errors? } }
+            //   2) 部分端点直接返回的裸对象 { error } / { message }
+            var doc = await resp.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, ct);
+            if (doc.ValueKind != JsonValueKind.Object) return resp.ReasonPhrase;
 
-            var data = envelope.Data;
+            // 信封形态取 data；裸形态无 data，退回根对象本身
+            var body = doc.TryGetProperty("data", out var data)
+                       && data.ValueKind == JsonValueKind.Object
+                ? data
+                : doc;
+
             string? detail = null;
-            if (data.ValueKind == JsonValueKind.Object)
+            if (body.TryGetProperty("error", out var err)
+                && err.ValueKind == JsonValueKind.String)
             {
-                if (data.TryGetProperty("error", out var err)
-                    && err.ValueKind == JsonValueKind.String)
-                {
-                    detail = err.GetString();
-                }
-
-                if (data.TryGetProperty("errors", out var errors)
-                    && errors.ValueKind == JsonValueKind.Array)
-                {
-                    var parts = new List<string>();
-                    foreach (var item in errors.EnumerateArray())
-                    {
-                        if (item.ValueKind != JsonValueKind.Object) continue;
-                        var field = item.TryGetProperty("field", out var f)
-                            && f.ValueKind == JsonValueKind.String
-                            ? f.GetString()
-                            : null;
-                        var msg = item.TryGetProperty("message", out var m)
-                            && m.ValueKind == JsonValueKind.String
-                            ? m.GetString()
-                            : item.ToString();
-                        parts.Add(string.IsNullOrEmpty(field) ? msg! : $"{field}: {msg}");
-                    }
-                    if (parts.Count > 0) detail = string.Join("; ", parts);
-                }
+                detail = err.GetString();
             }
 
-            return detail
-                ?? (string.IsNullOrEmpty(envelope.Message) ? resp.ReasonPhrase : envelope.Message);
+            if (body.TryGetProperty("errors", out var errors)
+                && errors.ValueKind == JsonValueKind.Array)
+            {
+                var parts = new List<string>();
+                foreach (var item in errors.EnumerateArray())
+                {
+                    if (item.ValueKind != JsonValueKind.Object) continue;
+                    var field = item.TryGetProperty("field", out var f)
+                        && f.ValueKind == JsonValueKind.String
+                        ? f.GetString()
+                        : null;
+                    var msg = item.TryGetProperty("message", out var m)
+                        && m.ValueKind == JsonValueKind.String
+                        ? m.GetString()
+                        : item.ToString();
+                    parts.Add(string.IsNullOrEmpty(field) ? msg! : $"{field}: {msg}");
+                }
+                if (parts.Count > 0) detail = string.Join("; ", parts);
+            }
+
+            if (!string.IsNullOrEmpty(detail)) return detail;
+
+            // message 在根上（信封形态与裸形态都命中）
+            if (doc.TryGetProperty("message", out var rootMsg)
+                && rootMsg.ValueKind == JsonValueKind.String
+                && !string.IsNullOrEmpty(rootMsg.GetString()))
+            {
+                return rootMsg.GetString();
+            }
+
+            return resp.ReasonPhrase;
         }
         catch
         {

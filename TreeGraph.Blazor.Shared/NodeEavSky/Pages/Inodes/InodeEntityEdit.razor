@@ -85,9 +85,9 @@ else
             @foreach (var attr in _tableAttributes)
             {
                 <TableField Attr="attr"
-                            EntityType="EntityType"
+                            EntityType="@EntityType"
                             EntityId="@(_entityId ?? "")"
-                            RecordMode="@(attr.DataType == "record")" />
+                            RecordMode="@attr.IsRecordMode" />
             }
         </MudPaper>
     }
@@ -187,8 +187,8 @@ else
             var schema = await Api.GetSchemaAsync(EntityType);
             _schema = schema ?? Array.Empty<AttributeSchemaDto>();
 
-            _regularAttributes = _schema.Where(a => a.DataType is not ("table" or "record")).ToList();
-            _tableAttributes = _schema.Where(a => a.DataType is "table" or "record").ToList();
+            _regularAttributes = _schema.Where(a => a.DataType != "table").ToList();
+            _tableAttributes = _schema.Where(a => a.DataType == "table").ToList();
 
             _values.Clear();
             var entity = await Api.GetInodeEntityAsync(InodeId, EntityType);

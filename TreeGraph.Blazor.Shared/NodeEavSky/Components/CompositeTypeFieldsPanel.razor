@@ -1,0 +1,255 @@
+@* CompositeTypeFieldsPanel.razor — 组合类型字段内嵌编辑面板（供属性编辑对话框底部嵌入）。
+   仅显示活动字段；增删改后自动重载详情。 *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@if (!string.IsNullOrEmpty(CompositeTypeId))
+{
+    <MudDivider Class="my-4" />
+    <div class="d-flex align-center justify-space-between mb-2">
+        <MudText Typo="Typo.subtitle2">
+            字段 · @(_type is null ? "加载中…" : $"{_type.DisplayName} ({_type.TypeName})")
+        </MudText>
+        <MudButton Size="Size.Small"
+                   Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Disabled="@(_type is null)"
+                   OnClick="OpenAddFieldAsync">
+            添加字段
+        </MudButton>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_type is null)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true">
+            组合类型加载失败
+        </MudAlert>
+    }
+    else if (_type.Fields.Count(f => !f.IsDeleted) == 0)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true">
+            该组合类型暂无字段
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="_type.Fields.Where(f => !f.IsDeleted).OrderBy(f => f.DisplayOrder)"
+                  Dense="true" Bordered="true" Hover="true"
+                  Breakpoint="Breakpoint.Sm">
+            <HeaderContent>
+                <MudTh>字段名</MudTh>
+                <MudTh>显示名</MudTh>
+                <MudTh>类型</MudTh>
+                <MudTh>引用</MudTh>
+                <MudTh>数组</MudTh>
+                <MudTh>必填</MudTh>
+                <MudTh>顺序</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="字段名"><code>@context.FieldName</code></MudTd>
+                <MudTd DataLabel="显示名">@context.DisplayName</MudTd>
+                <MudTd DataLabel="类型">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@GetDataTypeColor(context.DataType)">
+                        @EavDataTypeLabels.GetLabel(context.DataType)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="引用">
+                    @if (context.UnitId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="Color.Warning" Class="mr-1">
+                            单位
+                        </MudChip>
+                    }
+                    @if (context.RefOptionSetId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="Color.Secondary" Class="mr-1">
+                            选项: @context.OptionSetName
+                        </MudChip>
+                    }
+                    @if (context.RefCompositeTypeId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="Color.Dark">
+                            嵌套: @GetTypeName(context.RefCompositeTypeId!)
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="数组">
+                    @if (context.IsArray)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                 Color="Color.Success" Size="Size.Small" />
+                    }
+                </MudTd>
+                <MudTd DataLabel="必填">
+                    @if (context.IsRequired)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                                 Color="Color.Success" Size="Size.Small" />
+                    }
+                </MudTd>
+                <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
+                <MudTd DataLabel="操作">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Medium"
+                                   Color="Color.Primary"
+                                   OnClick="@(async () => await OpenEditFieldAsync(context))"
+                                   title="编辑" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Medium"
+                                   Color="Color.Error"
+                                   OnClick="@(async () => await DeleteFieldAsync(context))"
+                                   title="删除" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@code {
+    /// <summary>目标组合类型 Id；空时不渲染。切换时自动重新加载。</summary>
+    [Parameter] public string? CompositeTypeId { get; set; }
+
+    private CompositeTypeDetailDto? _type;
+    private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
+    private IReadOnlyList<CompositeTypeDetailDto>? _allTypes;
+    private bool _loading;
+    private string? _loadedId;
+
+    private static readonly DialogOptions FieldDialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (CompositeTypeId == _loadedId) return;
+        _loadedId = CompositeTypeId;
+        await ReloadAsync();
+    }
+
+    /// <summary>重新加载组合类型详情与引用数据（供宿主在管理对话框关闭后强制刷新）。</summary>
+    public async Task ReloadAsync()
+    {
+        if (string.IsNullOrEmpty(CompositeTypeId))
+        {
+            _type = null;
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            _type = await Api.GetCompositeTypeAsync(CompositeTypeId);
+            _optionSets ??= await Api.ListOptionSetsAsync();
+            _allTypes = await Api.ListCompositeTypesAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>嵌套类型候选：排除当前类型自身与已删除类型。</summary>
+    private IEnumerable<CompositeTypeDetailDto> GetNestedTypeOptions()
+    {
+        if (_allTypes is null) yield break;
+        foreach (var t in _allTypes)
+        {
+            if (t.CompositeTypeId == CompositeTypeId) continue;
+            if (t.IsDeleted) continue;
+            yield return t;
+        }
+    }
+
+    private async Task OpenAddFieldAsync()
+    {
+        if (_type is null) return;
+
+        var parameters = new DialogParameters<CompositeTypeFieldDialog>
+        {
+            { x => x.Type, _type },
+            { x => x.InitialDisplayOrder, _type.Fields.Count(f => !f.IsDeleted) + 1 },
+            { x => x.OptionSets, _optionSets },
+            { x => x.NestedTypes, GetNestedTypeOptions() }
+        };
+
+        var dialog = await DialogService.ShowAsync<CompositeTypeFieldDialog>(
+            string.Empty, parameters, FieldDialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await ReloadAsync();
+    }
+
+    private async Task OpenEditFieldAsync(CompositeFieldDetailDto field)
+    {
+        if (_type is null) return;
+
+        var parameters = new DialogParameters<CompositeTypeFieldDialog>
+        {
+            { x => x.Type, _type },
+            { x => x.EditingField, field },
+            { x => x.OptionSets, _optionSets },
+            { x => x.NestedTypes, GetNestedTypeOptions() }
+        };
+
+        var dialog = await DialogService.ShowAsync<CompositeTypeFieldDialog>(
+            string.Empty, parameters, FieldDialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await ReloadAsync();
+    }
+
+    private async Task DeleteFieldAsync(CompositeFieldDetailDto field)
+    {
+        if (_type is null) return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除字段「{field.DisplayName}」？",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteCompositeFieldAsync(
+            _type.CompositeTypeId, field.FieldId);
+
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    private string GetTypeName(string compositeTypeId)
+        => _allTypes?.FirstOrDefault(t => t.CompositeTypeId == compositeTypeId)?.TypeName
+           ?? compositeTypeId;
+
+    private static Color GetDataTypeColor(string dataType) => dataType switch
+    {
+        "string" => Color.Info,
+        "int" or "decimal" => Color.Primary,
+        "bool" => Color.Success,
+        "datetime" or "date" or "time" => Color.Warning,
+        "single_choice" => Color.Tertiary,
+        "composite" => Color.Dark,
+        _ => Color.Default
+    };
+}

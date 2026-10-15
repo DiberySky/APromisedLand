@@ -159,6 +159,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsRecordMode")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsRequired")
                         .HasColumnType("boolean")
                         .HasColumnName("is_required");
@@ -642,9 +645,17 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("entity_type");
 
+                    b.Property<bool>("HasTimeColumn")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_time_column");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRecordTable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_record_table");
 
                     b.Property<string>("TableName")
                         .IsRequired()
@@ -2361,7 +2372,7 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "CompositeType")
                         .WithMany("Fields")
                         .HasForeignKey("CompositeTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", "RefCompositeType")
@@ -2398,7 +2409,7 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
                         .WithMany("Columns")
                         .HasForeignKey("TableDefinitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Unit")
@@ -2418,7 +2429,7 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
                         .WithMany()
                         .HasForeignKey("AttributeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("TreeGraph.Api.NodeEavSky.Entities.CustomTableDefinition", "Table")
@@ -2437,7 +2448,7 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasOne("TreeGraph.Api.NodeEavSky.Entities.EdgeDefinition", "EdgeType")
                         .WithMany("Instances")
                         .HasForeignKey("EdgeTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("EdgeType");
@@ -2459,7 +2470,7 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasOne("TreeGraph.Api.NodeEavSky.Entities.OptionSet", "OptionSet")
                         .WithMany("Items")
                         .HasForeignKey("OptionSetId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("OptionSet");

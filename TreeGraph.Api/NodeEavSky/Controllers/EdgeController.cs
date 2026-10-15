@@ -67,7 +67,7 @@ public class EdgeController : ControllerBase
         return d.EdgeTypeId == edgeTypeId ? Ok(d) : NotFound();
     }
 
-    /// <summary>删除边。</summary>
+    /// <summary>删除边（不级联：边实例自身仍有属性值时拒绝，返回 409）。</summary>
     [HttpDelete("{edgeId}")]
     public async Task<IActionResult> Delete(
         string edgeTypeId, string edgeId, CancellationToken ct)
@@ -76,8 +76,16 @@ public class EdgeController : ControllerBase
         var d = await _service.GetByIdAsync(edgeId, ct);
         if (d is null || d.EdgeTypeId != edgeTypeId) return NotFound();
 
-        var ok = await _service.DeleteAsync(edgeId, ct);
-        return ok ? NoContent() : NotFound();
+        try
+        {
+            var ok = await _service.DeleteAsync(edgeId, ct);
+            return ok ? NoContent() : NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // 业务规则拒绝（仍有属性数据）：409，不作为服务器错误
+            return Conflict(new { error = ex.Message });
+        }
     }
 
     // ============================================================

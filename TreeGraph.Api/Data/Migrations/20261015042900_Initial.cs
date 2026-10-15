@@ -60,6 +60,8 @@ namespace TreeGraph.Api.Data.Migrations
                     version = table.Column<int>(type: "integer", nullable: false),
                     is_deleted = table.Column<bool>(type: "boolean", nullable: false),
                     display_order = table.Column<int>(type: "integer", nullable: false),
+                    is_record_table = table.Column<bool>(type: "boolean", nullable: false),
+                    has_time_column = table.Column<bool>(type: "boolean", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -235,7 +237,7 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.edge_type_id,
                         principalTable: "edge_definitions",
                         principalColumn: "edge_type_id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -259,7 +261,7 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.option_set_id,
                         principalTable: "option_sets",
                         principalColumn: "option_set_id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -282,6 +284,7 @@ namespace TreeGraph.Api.Data.Migrations
                     default_value = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     ref_composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     ref_table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    IsRecordMode = table.Column<bool>(type: "boolean", nullable: false),
                     ref_option_set_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     unit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -348,7 +351,7 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.composite_type_id,
                         principalTable: "composite_type_definitions",
                         principalColumn: "composite_type_id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_composite_field_definitions_composite_type_definitions_ref_~",
                         column: x => x.ref_composite_type_id,
@@ -405,7 +408,7 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.table_definition_id,
                         principalTable: "custom_table_definitions",
                         principalColumn: "table_definition_id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_custom_table_columns_unit_trees_unit_id",
                         column: x => x.unit_id,
@@ -474,7 +477,7 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.attribute_id,
                         principalTable: "attribute_catalog",
                         principalColumn: "attribute_id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_custom_table_rows_custom_table_definitions_table_definition~",
                         column: x => x.table_definition_id,

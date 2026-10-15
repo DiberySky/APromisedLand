@@ -293,6 +293,19 @@ public class EavEntityTypesController : ControllerBase
                 error = $"该实体类型仍有活动属性（{e.EntityType}），请先删除其属性"
             });
 
+        // 子项为空方可删除本项（不采用级联删除）：该类型已产生实体实例时拒绝
+        var hasEntities = await _db.AttributeValues
+                .AnyAsync(v => v.EntityType == e.EntityType, ct)
+            || await _db.LocationAttributeValues
+                .AnyAsync(l => l.EntityType == e.EntityType, ct)
+            || await _db.CustomTableRows
+                .AnyAsync(r => r.ParentEntityType == e.EntityType, ct);
+        if (hasEntities)
+            return BadRequest(new
+            {
+                error = $"该实体类型已产生实体实例（{e.EntityType}），请先删除其实例数据"
+            });
+
         e.IsDeleted = true;
         e.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);

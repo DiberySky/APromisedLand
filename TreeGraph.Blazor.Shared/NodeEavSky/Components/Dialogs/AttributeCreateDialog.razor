@@ -1,6 +1,7 @@
 @* AttributeCreateDialog.razor — 新建属性（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <DialogSky Title="新建属性"
            SubmitButtonVisible="true"
@@ -65,80 +66,92 @@
                              HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
         }
 
-        @* composite *@
+        @* composite：下拉 + 右侧新建入口（无可选类型时可就地创建） *@
         @if (_createForm.DataType == "composite")
         {
-            <MudSelect T="string"
-                       Value="@(_createForm.RefCompositeTypeId ?? "")"
-                       ValueChanged="@(v => _createForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
-                       Label="组合类型"
-                       Variant="Variant.Outlined"
-                       Class="mb-3">
-                @foreach (var t in CompositeTypes ?? new List<CompositeTypeDetailDto>())
-                {
-                    <MudSelectItem T="string" Value="@t.CompositeTypeId">
-                        @t.DisplayName (@t.TypeName)
-                    </MudSelectItem>
-                }
-            </MudSelect>
-            @if (CompositeTypes is null || CompositeTypes.Count == 0)
+            <div class="d-flex align-center gap-2 mb-3">
+                <MudSelect T="string"
+                           Value="@(_createForm.RefCompositeTypeId ?? "")"
+                           ValueChanged="@(v => _createForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
+                           Label="组合类型"
+                           Variant="Variant.Outlined"
+                           Style="flex: 1;">
+                    @foreach (var t in _compositeTypes ?? new List<CompositeTypeDetailDto>())
+                    {
+                        <MudSelectItem T="string" Value="@t.CompositeTypeId">
+                            @t.DisplayName (@t.TypeName)
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="Color.Success"
+                               title="管理组合类型"
+                               OnClick="OpenCompositeTypeManageAsync" />
+            </div>
+            @if (_compositeTypes is null || _compositeTypes.Count == 0)
             {
                 <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-                    暂无组合类型，请先到「组合类型」标签页创建后再使用。
+                    暂无组合类型，可点击右侧齿轮按钮直接创建。
                 </MudAlert>
             }
         }
 
-        @* table / record *@
-        @if (_createForm.DataType is "table" or "record")
+        @* table：选择自定义表（选中时序记录表则该属性自动为时序记录，行列表屏蔽序号） *@
+        @if (_createForm.DataType == "table")
         {
-            <MudSelect T="string"
-                       Value="@(_createForm.RefTableDefinitionId ?? "")"
-                       ValueChanged="@(v => _createForm.RefTableDefinitionId = string.IsNullOrEmpty(v) ? null : v)"
-                       Label="自定义表"
-                       Variant="Variant.Outlined"
-                       Class="mb-3">
-                @foreach (var t in CustomTables ?? new List<CustomTableDetailDto>())
-                {
-                    <MudSelectItem T="string" Value="@t.TableDefinitionId">
-                        @t.DisplayName (@t.TableName)
-                    </MudSelectItem>
-                }
-            </MudSelect>
-            @if (CustomTables is null || CustomTables.Count == 0)
+            <div class="d-flex align-center gap-2 mb-3">
+                <MudSelect T="string"
+                           Value="@(_createForm.RefTableDefinitionId ?? "")"
+                           ValueChanged="@(v => _createForm.RefTableDefinitionId = string.IsNullOrEmpty(v) ? null : v)"
+                           Label="自定义表"
+                           Variant="Variant.Outlined"
+                           Style="flex: 1;">
+                    @foreach (var t in _customTables ?? new List<CustomTableDetailDto>())
+                    {
+                        <MudSelectItem T="string" Value="@t.TableDefinitionId">
+                            @t.DisplayName (@t.TableName)@(t.IsRecordTable ? "（时序）" : "")
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="Color.Success"
+                               title="管理自定义表"
+                               OnClick="OpenCustomTableManageAsync" />
+            </div>
+            @if (_customTables is null || _customTables.Count == 0)
             {
                 <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-                    暂无自定义表，请先到「自定义表」标签页创建后再使用。
-                </MudAlert>
-            }
-            @if (_createForm.DataType == "record")
-            {
-                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                    记录类型要求所选表的第一列为「日期」、第二列为「时间」，且行列表不显示序号。
+                    暂无自定义表，可点击右侧齿轮按钮直接创建。
                 </MudAlert>
             }
         }
 
-        @* single_choice *@
+        @* single_choice：下拉 + 右侧新建入口 *@
         @if (_createForm.DataType == "single_choice")
         {
-            <MudSelect T="string"
-                       Value="@(_createForm.RefOptionSetId ?? "")"
-                       ValueChanged="@(v => _createForm.RefOptionSetId = string.IsNullOrEmpty(v) ? null : v)"
-                       Label="选项集"
-                       Variant="Variant.Outlined"
-                       Class="mb-3">
-                @foreach (var s in OptionSets ?? new List<OptionSetSummaryDto>())
-                {
-                    <MudSelectItem T="string" Value="@s.OptionSetId">
-                        @s.DisplayName (@s.SetName)
-                    </MudSelectItem>
-                }
-            </MudSelect>
-            @if (OptionSets is null || OptionSets.Count == 0)
+            <div class="d-flex align-center gap-2 mb-3">
+                <MudSelect T="string"
+                           Value="@(_createForm.RefOptionSetId ?? "")"
+                           ValueChanged="@(v => _createForm.RefOptionSetId = string.IsNullOrEmpty(v) ? null : v)"
+                           Label="选项集"
+                           Variant="Variant.Outlined"
+                           Style="flex: 1;">
+                    @foreach (var s in _optionSets ?? new List<OptionSetSummaryDto>())
+                    {
+                        <MudSelectItem T="string" Value="@s.OptionSetId">
+                            @s.DisplayName (@s.SetName)
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="Color.Success"
+                               title="管理选项集"
+                               OnClick="OpenOptionSetManageAsync" />
+            </div>
+            @if (_optionSets is null || _optionSets.Count == 0)
             {
                 <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-                    暂无选项集，请先到「选项集」标签页创建后再使用。
+                    暂无选项集，可点击右侧齿轮按钮直接创建。
                 </MudAlert>
             }
         }
@@ -202,6 +215,12 @@
 
     private CreateAttributeForm _createForm = new();
     private bool _submitting;
+    /// <summary>组合类型本地副本（就地新建后刷新，不依赖父组件重传参数）。</summary>
+    private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
+    /// <summary>自定义表本地副本（同上）。</summary>
+    private IReadOnlyList<CustomTableDetailDto>? _customTables;
+    /// <summary>选项集本地副本（同上）。</summary>
+    private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
 
     private static readonly (string Value, string Label)[] DataTypeOptions =
     {
@@ -217,7 +236,6 @@
         ("file",     "文件"),
         ("composite", "组合类型"),
         ("table",    "自定义表"),
-        ("record",   "记录"),
         ("json",     "JSON")
     };
 
@@ -229,6 +247,45 @@
             DisplayOrder = InitialDisplayOrder,
             IsSearchable = true
         };
+        _compositeTypes = CompositeTypes;
+        _customTables = CustomTables;
+        _optionSets = OptionSets;
+    }
+
+    /// <summary>就地打开「组合类型管理」对话框；关闭后刷新本地列表供下拉选择。</summary>
+    private async Task OpenCompositeTypeManageAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CompositeTypeManageDialog>(
+            string.Empty,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true });
+        await dialog.Result;
+
+        // 管理对话框内可能增删组合类型，无论结果如何都刷新本地列表
+        _compositeTypes = await Api.ListCompositeTypesAsync();
+    }
+
+    /// <summary>就地打开「自定义表管理」对话框（含列 CRUD）；关闭后刷新本地列表。</summary>
+    private async Task OpenCustomTableManageAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CustomTableManageDialog>(
+            string.Empty,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true });
+        await dialog.Result;
+
+        // 管理对话框内可能增删表/列，无论结果如何都刷新本地列表
+        _customTables = await Api.ListCustomTablesAsync();
+    }
+
+    /// <summary>就地打开「选项集管理」对话框（含选项项 CRUD）；关闭后刷新本地列表。</summary>
+    private async Task OpenOptionSetManageAsync()
+    {
+        var dialog = await DialogService.ShowAsync<OptionSetManageDialog>(
+            string.Empty,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true });
+        await dialog.Result;
+
+        // 管理对话框内可能增删选项集/选项项，无论结果如何都刷新本地列表
+        _optionSets = await Api.ListOptionSetsAsync();
     }
 
     private static string GetDisplayName(EntityTypeSummaryDto et)
@@ -240,9 +297,11 @@
     {
         _createForm.DataType = dt;
         if (dt is not ("decimal" or "int")) { _createForm.UnitId = null; _createForm.UnitName = null; }
+        // decimal：精度默认 2（可改可清空）；切走则清空
         if (dt != "decimal") _createForm.Precision = null;
+        else _createForm.Precision ??= 2;
         if (dt != "composite") _createForm.RefCompositeTypeId = null;
-        if (dt is not ("table" or "record")) _createForm.RefTableDefinitionId = null;
+        if (dt != "table") { _createForm.RefTableDefinitionId = null; }
         if (dt != "single_choice") _createForm.RefOptionSetId = null;
         // 位置（经纬度坐标）不参与文本筛选/搜索
         _createForm.IsSearchable = dt != "location";
@@ -262,29 +321,10 @@
             Snackbar.Add("请先选择组合类型；如无可用类型，请先到「组合类型」标签页创建", Severity.Warning);
             return;
         }
-        if (f.DataType is "table" or "record" && f.RefTableDefinitionId is null)
+        if (f.DataType == "table" && f.RefTableDefinitionId is null)
         {
             Snackbar.Add("请先选择自定义表；如无可用表，请先到「自定义表」标签页创建", Severity.Warning);
             return;
-        }
-        // record：前端预校验所选表前两列类型（后端仍会校验）
-        if (f.DataType == "record" && f.RefTableDefinitionId is not null)
-        {
-            var tbl = CustomTables?.FirstOrDefault(
-                t => t.TableDefinitionId == f.RefTableDefinitionId);
-            var cols = tbl?.Columns
-                .Where(c => !c.IsDeleted)
-                .OrderBy(c => c.DisplayOrder)
-                .Take(2)
-                .ToList();
-            if (cols is null || cols.Count < 2
-                || cols[0].DataType != "date" || cols[1].DataType != "time")
-            {
-                Snackbar.Add(
-                    "记录类型要求所选表的第一列为「日期」、第二列为「时间」",
-                    Severity.Warning);
-                return;
-            }
         }
         if (f.DataType == "single_choice" && f.RefOptionSetId is null)
         {

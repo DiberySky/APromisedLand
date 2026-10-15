@@ -122,10 +122,11 @@ public class OptionSetsController : ControllerBase
     }
 
     /// <summary>
-    /// ★ 软删除选项集：集合 + 全部选项都标记为删除。
+    /// ★ 软删除选项集。
     ///
     /// 语义：
-    ///   - 被属性引用时仍拒绝删除（保守策略）。
+    ///   - 被属性引用时拒绝删除（保守策略）。
+    ///   - 子项为空方可删除本项：仍有活动选项时拒绝（不采用级联删除）。
     ///   - 读取端 `OptionSetCache.GetSet` 不过滤 IsDeleted，历史数据仍可拿到 Label。
     ///   - 唯一索引（entity_type, set_name）改为 partial（仅 is_deleted = false），
     ///     软删后同名集合可被重新创建。
@@ -142,13 +143,11 @@ public class OptionSetsController : ControllerBase
         if (referenced)
             return BadRequest(new { error = "该选项集仍被属性引用，无法删除。请先解除属性引用。" });
 
-        // 软删所有选项
-        var items = await _db.OptionItems.Where(i => i.OptionSetId == setId).ToListAsync(ct);
-        foreach (var item in items)
-        {
-            item.IsDeleted = true;
-            item.IsDefault = false;
-        }
+        // 子项为空方可删除本集合：仍有活动选项时拒绝
+        var hasItems = await _db.OptionItems
+            .AnyAsync(i => i.OptionSetId == setId && !i.IsDeleted, ct);
+        if (hasItems)
+            return BadRequest(new { error = "该选项集仍有选项，无法删除。请先删除全部选项。" });
 
         // ★ 软删集合本身
         set.IsDeleted = true;

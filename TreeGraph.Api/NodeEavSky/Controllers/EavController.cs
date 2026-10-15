@@ -380,7 +380,7 @@ public class EavController : ControllerBase
             d.AllowedValues?.RootElement.Clone(),
             d.ValidationRule?.RootElement.Clone(),
             composite, d.UnitId, unitName, optionSet,
-            d.RefTableDefinitionId);
+            d.RefTableDefinitionId, d.IsRecordMode);
     }
 
     /// <summary>
@@ -462,10 +462,10 @@ public class EavController : ControllerBase
         {
             var def = defs[name];
 
-            // ★ P2-3：table/record 类型属性不能通过 PUT entities 写入。
+            // ★ P2-3：table 类型属性不能通过 PUT entities 写入。
             //   行数据必须走 CustomTableDataController（PUT .../tables/{tableName}）。
             //   收集后统一抛错，避免静默忽略导致客户端误判"保存成功"。
-            if (def.DataType is EavDataTypes.Table or EavDataTypes.Record)
+            if (def.DataType == EavDataTypes.Table)
             {
                 tableAttrs.Add(name);
                 continue;
@@ -477,7 +477,7 @@ public class EavController : ControllerBase
         if (tableAttrs.Count > 0)
         {
             throw new ArgumentException(
-                $"table/record 类型属性不能通过 PUT entities 写入，请使用 " +
+                $"table 类型属性不能通过 PUT entities 写入，请使用 " +
                 $"PUT /api/eav/{{entityType}}/entities/{{entityId}}/tables/{{tableName}}。" +
                 $"涉及属性: {string.Join(", ", tableAttrs)}");
         }

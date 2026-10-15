@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Text.Json;
 using TreeGraph.Blazor.Shared.TreeEavSky.Attributes;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using TreeGraph.Shared.TreeEavSky.Models;
@@ -71,9 +72,28 @@ public class TreeApiClient<T>(HttpClient httpClient)
         if (response.IsSuccessStatusCode)
             return;
 
-        var errorResponse = await response.Content.ReadFromJsonAsync<ApiResponse<object>>();
-        if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Message))
-            throw new HttpRequestException($"请求失败: {errorResponse.Message}", null, response.StatusCode);
+        // 后端错误体有两种形态：ApiResponse{message} 与匿名对象{error}；两者都要取到真实原因
+        string? message = null;
+        try
+        {
+            var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (doc.ValueKind == JsonValueKind.Object)
+            {
+                string? Get(string name) =>
+                    doc.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
+                        ? v.GetString()
+                        : null;
+
+                message = Get("error") ?? Get("Error") ?? Get("message") ?? Get("Message");
+            }
+        }
+        catch (JsonException) { }
+
+        throw new HttpRequestException(
+            message is null
+                ? $"请求失败: {(int)response.StatusCode} {response.ReasonPhrase}"
+                : $"请求失败: {message}",
+            null, response.StatusCode);
     }
 
     // ==================== 树节点操作 ====================

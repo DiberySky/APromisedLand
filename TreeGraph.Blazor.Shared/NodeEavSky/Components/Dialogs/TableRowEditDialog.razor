@@ -38,7 +38,7 @@
                                              Margin="Margin.Dense"
                                              Error="@(errorText is not null)"
                                              ErrorText="@errorText"
-                                             FullWidth="true" />
+                                             FullWidth="@true" />
                             break;
 
                         case EavDataTypes.Decimal:
@@ -50,7 +50,7 @@
                                              Margin="Margin.Dense"
                                              Error="@(errorText is not null)"
                                              ErrorText="@errorText"
-                                             FullWidth="true" />
+                                             FullWidth="@true" />
                             break;
 
                         case EavDataTypes.Bool:
@@ -63,7 +63,7 @@
                                        AnchorOrigin="Origin.BottomRight"
                                        TransformOrigin="Origin.TopRight"
                                        Clearable="!col.IsRequired"
-                                       FullWidth="true">
+                                       FullWidth="@true">
                                 <MudSelectItem T="bool?" Value="true">是</MudSelectItem>
                                 <MudSelectItem T="bool?" Value="false">否</MudSelectItem>
                             </MudSelect>
@@ -77,7 +77,7 @@
                                            Margin="Margin.Dense"
                                            Error="@(errorText is not null)"
                                            ErrorText="@errorText"
-                                           FullWidth="true" />
+                                           FullWidth="@true" />
                             break;
 
                         case EavDataTypes.Time:
@@ -88,7 +88,7 @@
                                            Margin="Margin.Dense"
                                            Error="@(errorText is not null)"
                                            ErrorText="@errorText"
-                                           FullWidth="true" />
+                                           FullWidth="@true" />
                             break;
 
                         case EavDataTypes.Datetime:
@@ -101,7 +101,7 @@
                                           Error="@(errorText is not null)"
                                           ErrorText="@errorText"
                                           Immediate="true"
-                                          FullWidth="true" />
+                                          FullWidth="@true" />
                             break;
 
                         case EavDataTypes.SingleChoice when ExtractAllowedValues(col.AllowedValues).Count > 0:
@@ -113,7 +113,7 @@
                                        Margin="Margin.Dense"
                                        Error="@(errorText is not null)"
                                        ErrorText="@errorText"
-                                       FullWidth="true">
+                                       FullWidth="@true">
                                 @if (!col.IsRequired)
                                 {
                                     <MudSelectItem T="string" Value="@("")">（未选择）</MudSelectItem>
@@ -138,7 +138,7 @@
                                           Error="@(errorText is not null)"
                                           ErrorText="@errorText"
                                           Immediate="true"
-                                          FullWidth="true" />
+                                          FullWidth="@true" />
                             break;
 
                         default:
@@ -151,7 +151,7 @@
                                           Error="@(errorText is not null)"
                                           ErrorText="@errorText"
                                           Immediate="true"
-                                          FullWidth="true" />
+                                          FullWidth="@true" />
                             break;
                     }
                 </MudItem>
@@ -196,6 +196,31 @@
             foreach (var kv in EditRow.Fields.Where(kv => activeNames.Contains(kv.Key)))
             {
                 _fields[kv.Key] = UnwrapValue(kv.Value);
+            }
+        }
+        else
+        {
+            // 新增行：日期 / 时间列默认取当前值，省去手工输入
+            var now = DateTime.Now;
+            foreach (var col in _activeColumns)
+            {
+                switch (col.DataType)
+                {
+                    case EavDataTypes.Date:
+                        _fields[col.ColumnName] = now.ToString("yyyy-MM-dd");
+                        break;
+
+                    case EavDataTypes.Time:
+                        _fields[col.ColumnName] =
+                            new TimeOnly(now.Hour, now.Minute, now.Second).ToString("HH:mm:ss");
+                        break;
+
+                    case EavDataTypes.Datetime:
+                        // 后端按 DateTimeOffset 解析，须带时区偏移
+                        _fields[col.ColumnName] =
+                            DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz");
+                        break;
+                }
             }
         }
     }

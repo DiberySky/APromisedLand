@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.TreeEavSky.Services;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -30,9 +31,9 @@ public class CategoryTreeServiceTests
     private const string Sample331Id = "35F02829-6490-467E-9D3E-C2EBF0EAA2B4"; // Sample 3.3.1
 
     /// <summary>
-    /// 测试专用 DbContext：忽略除 CategoryTree 外的全部实体（DbSet 约定会
-    /// 自动发现基类所有 DbSet，其中 JsonDocument 属性在 InMemory 下无法映射），
-    /// 仅保留 CategoryTree 配置与种子数据。
+    /// 测试专用 DbContext：忽略除 CategoryTree / EdgeInstance / InodeEntity 外的全部实体
+    /// （DbSet 约定会自动发现基类所有 DbSet，其中 JsonDocument 属性在 InMemory 下无法映射），
+    /// 保留节点删除守卫所依赖的表配置与种子数据。
     /// </summary>
     private sealed class TestDbContext(DbContextOptions<TreeGraphDbContext> options)
         : TreeGraphDbContext(options)
@@ -40,7 +41,9 @@ public class CategoryTreeServiceTests
         protected override void OnModelCreating(ModelBuilder mb)
         {
             foreach (var entityType in mb.Model.GetEntityTypes()
-                         .Where(t => t.ClrType != typeof(CategoryTree))
+                         .Where(t => t.ClrType != typeof(CategoryTree)
+                                  && t.ClrType != typeof(EdgeInstance)
+                                  && t.ClrType != typeof(InodeEntity))
                          .ToList())
             {
                 mb.Ignore(entityType.ClrType);
@@ -51,6 +54,10 @@ public class CategoryTreeServiceTests
                 e.HasKey(x => x.Id);
                 e.HasData(CategoryTree.SeedData());
             });
+
+            // 节点删除守卫依赖：被边引用 / 仍有挂载实体数据
+            mb.Entity<EdgeInstance>(e => e.HasKey(x => x.EdgeId));
+            mb.Entity<InodeEntity>(e => e.HasKey(x => new { x.InodeId, x.EntityType }));
         }
     }
 

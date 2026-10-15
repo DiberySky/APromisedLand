@@ -1,0 +1,249 @@
+@* OptionSetItemsPanel.razor — 选项集选项内联编辑面板（供属性编辑对话框底部嵌入）。
+   仅显示活动选项；增删改/排序/设默认后自动重载。 *@
+@inject EavApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@if (Set is not null)
+{
+    <MudDivider Class="my-4" />
+    <div class="d-flex align-center justify-space-between mb-2">
+        <MudText Typo="Typo.subtitle2">
+            选项 · @Set.DisplayName (@Set.SetName)
+        </MudText>
+        <MudButton Size="Size.Small"
+                   Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddItemAsync">
+            添加选项
+        </MudButton>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true">
+            该选项集暂无选项
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="_items" Bordered="true" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Value</MudTh>
+                <MudTh>Label</MudTh>
+                <MudTh>顺序</MudTh>
+                <MudTh>默认</MudTh>
+                <MudTh>操作</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><code>@context.Value</code></MudTd>
+                <MudTd>@context.Label</MudTd>
+                <MudTd>@context.DisplayOrder</MudTd>
+                <MudTd>
+                    @if (context.IsDefault)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Star"
+                                 Color="Color.Warning" Size="Size.Small" />
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                   Size="Size.Medium"
+                                   OnClick="@(async () => await MoveUpAsync(context))"
+                                   title="上移" />
+                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                   Size="Size.Medium"
+                                   OnClick="@(async () => await MoveDownAsync(context))"
+                                   title="下移" />
+                    @if (!context.IsDefault)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.StarBorder"
+                                       Size="Size.Medium"
+                                       Color="Color.Warning"
+                                       OnClick="@(async () => await SetDefaultAsync(context))"
+                                       title="设为默认" />
+                    }
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Medium"
+                                   Color="Color.Primary"
+                                   OnClick="@(async () => await OpenEditItemAsync(context))"
+                                   title="编辑" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Medium"
+                                   Color="Color.Error"
+                                   OnClick="@(async () => await DeleteItemAsync(context))"
+                                   title="删除" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@code {
+    /// <summary>目标选项集；null 时不渲染。切换选项集时自动重新加载。</summary>
+    [Parameter] public OptionSetSummaryDto? Set { get; set; }
+
+    private List<OptionItemDetailDto> _items = new();
+    private bool _loading;
+    private string? _loadedSetId;
+
+    private static readonly DialogOptions ItemDialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Set?.OptionSetId == _loadedSetId) return;
+        _loadedSetId = Set?.OptionSetId;
+        await ReloadAsync();
+    }
+
+    /// <summary>重新加载选项（供宿主在管理对话框关闭后强制刷新）。</summary>
+    public async Task ReloadAsync()
+    {
+        if (Set is null)
+        {
+            _items = new List<OptionItemDetailDto>();
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var items = await Api.ListOptionItemsAsync(Set.OptionSetId);
+            _items = items?
+                .Where(i => !i.IsDeleted)
+                .OrderBy(i => i.DisplayOrder)
+                .ThenBy(i => i.OptionItemId)
+                .ToList()
+                ?? new List<OptionItemDetailDto>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenAddItemAsync()
+    {
+        if (Set is null) return;
+
+        var parameters = new DialogParameters<OptionSetItemDialog>
+        {
+            { x => x.Set, Set },
+            { x => x.InitialDisplayOrder, _items.Count + 1 }
+        };
+
+        var dialog = await DialogService.ShowAsync<OptionSetItemDialog>(
+            null, parameters, ItemDialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await ReloadAsync();
+    }
+
+    private async Task OpenEditItemAsync(OptionItemDetailDto item)
+    {
+        if (Set is null) return;
+
+        var parameters = new DialogParameters<OptionSetItemDialog>
+        {
+            { x => x.Set, Set },
+            { x => x.EditingItem, item }
+        };
+
+        var dialog = await DialogService.ShowAsync<OptionSetItemDialog>(
+            null, parameters, ItemDialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await ReloadAsync();
+    }
+
+    private async Task DeleteItemAsync(OptionItemDetailDto item)
+    {
+        if (Set is null) return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除选项「{item.Label}」({item.Value})？" +
+            "已有数据中引用的该值仍会保留，读取时降级显示。",
+            yesText: "删除", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteOptionItemAsync(Set.OptionSetId, item.OptionItemId);
+        if (ok)
+        {
+            Snackbar.Add("删除成功", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+        }
+    }
+
+    private async Task SetDefaultAsync(OptionItemDetailDto item)
+    {
+        if (Set is null) return;
+
+        var (ok, error) = await Api.UpdateOptionItemAsync(
+            Set.OptionSetId, item.OptionItemId,
+            new UpdateOptionItemRequest { IsDefault = true });
+
+        if (!ok)
+        {
+            Snackbar.Add($"设置默认失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"已将「{item.Label}」设为默认", Severity.Success);
+        await ReloadAsync();
+    }
+
+    private async Task MoveUpAsync(OptionItemDetailDto item)
+    {
+        var idx = _items.FindIndex(i => i.OptionItemId == item.OptionItemId);
+        if (idx <= 0) return;
+
+        (_items[idx - 1], _items[idx]) = (_items[idx], _items[idx - 1]);
+        await ApplyReorderAsync();
+    }
+
+    private async Task MoveDownAsync(OptionItemDetailDto item)
+    {
+        var idx = _items.FindIndex(i => i.OptionItemId == item.OptionItemId);
+        if (idx < 0 || idx >= _items.Count - 1) return;
+
+        (_items[idx + 1], _items[idx]) = (_items[idx], _items[idx + 1]);
+        await ApplyReorderAsync();
+    }
+
+    private async Task ApplyReorderAsync()
+    {
+        if (Set is null) return;
+
+        var orders = _items
+            .Select((it, i) => new ReorderOptionItem
+            {
+                OptionItemId = it.OptionItemId,
+                DisplayOrder = i + 1
+            })
+            .ToList();
+
+        var (ok, error) = await Api.ReorderOptionItemsAsync(Set.OptionSetId, orders);
+
+        if (!ok)
+            Snackbar.Add($"重排序失败：{error ?? "未知错误"}", Severity.Error);
+
+        await ReloadAsync();
+    }
+}

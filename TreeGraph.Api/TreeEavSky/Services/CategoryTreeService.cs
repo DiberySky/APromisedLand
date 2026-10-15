@@ -243,17 +243,25 @@ public class CategoryTreeService(TreeGraphDbContext dbContext) : ITreeService<Ca
         if (node == null)
             return false;
 
-        // 2. 检查是否为叶子节点（没有子节点）
-        // var hasChildren = await dbContext.CategoryTrees
-        //     .AnyAsync(c => c.ParentId == nodeId, cancellationToken);
-        //
-        // if (hasChildren)
-        //     throw new InvalidOperationException("只能删除叶子节点，请先删除子节点");
+        // 2. 子项为空方可删除本项：仍有子节点时拒绝（不采用级联删除）
+        var hasChildren = await dbContext.CategoryTrees
+            .AnyAsync(c => c.ParentId == nodeId, cancellationToken);
+        if (hasChildren)
+            throw new InvalidOperationException("该节点仍有子节点，无法删除。请先删除全部子节点。");
 
-        // 3. 获取父节点ID
-        // var parentId = node.ParentId;
+        // 引用为空方可删除本项：仍有边引用该节点时拒绝（不采用级联删除）
+        var hasEdges = await dbContext.EdgeInstances
+            .AnyAsync(e => e.FromNodeId == nodeId || e.ToNodeId == nodeId, cancellationToken);
+        if (hasEdges)
+            throw new InvalidOperationException("该节点仍被边引用，无法删除。请先删除引用该节点的边。");
 
-        // 4. 删除节点
+        // 先清空自身数据才允许删本项：该节点仍有挂载实体数据时拒绝（不采用级联删除）
+        var hasEntities = await dbContext.InodeEntities
+            .AnyAsync(m => m.InodeId == nodeId, cancellationToken);
+        if (hasEntities)
+            throw new InvalidOperationException("该节点仍有挂载的实体数据，无法删除。请先清空其全部实体数据。");
+
+        // 3. 删除节点
         dbContext.CategoryTrees.Remove(node);
         
         await dbContext.SaveChangesAsync(cancellationToken);

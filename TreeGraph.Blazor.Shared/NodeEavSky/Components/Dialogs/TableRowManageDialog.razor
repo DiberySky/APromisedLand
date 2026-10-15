@@ -124,10 +124,11 @@
         _loading = true;
         try
         {
-            _tableDef = await Api.GetCustomTableAsync(RefTableDefinitionId);
+            var (tableDef, defError) = await Api.GetCustomTableWithErrorAsync(RefTableDefinitionId);
+            _tableDef = tableDef;
             if (_tableDef is null)
             {
-                _loadError = "无法加载表结构。请检查后端服务或该表的元数据。";
+                _loadError = BuildLoadError("表结构", defError);
                 return;
             }
 
@@ -136,10 +137,11 @@
                 .OrderBy(c => c.DisplayOrder)
                 .ToList();
 
-            var tableValue = await Api.LoadCustomTableAsync(EntityType, EntityId, TableName);
+            var (tableValue, rowError) = await Api
+                .LoadCustomTableWithErrorAsync(EntityType, EntityId, TableName);
             if (tableValue is null)
             {
-                _loadError = $"加载表数据「{TableName}」失败";
+                _loadError = BuildLoadError("表数据", rowError);
                 return;
             }
 
@@ -160,6 +162,15 @@
         {
             _loading = false;
         }
+    }
+
+    /// <summary>加载失败文案：显示名 + 失败原因（后端未给出原因时只保留显示名）。</summary>
+    private string BuildLoadError(string what, string? reason)
+    {
+        var name = string.IsNullOrWhiteSpace(DisplayName) ? TableName : DisplayName;
+        return string.IsNullOrWhiteSpace(reason)
+            ? $"加载「{name}」的{what}失败"
+            : $"加载「{name}」的{what}失败：{reason}";
     }
 
     /// <summary>打开二级弹窗：row 为 null 时新增。保存成功后重新加载行列表。</summary>

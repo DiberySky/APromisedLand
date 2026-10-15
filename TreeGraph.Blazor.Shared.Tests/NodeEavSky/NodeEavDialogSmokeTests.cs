@@ -33,6 +33,8 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             BaseAddress = new Uri("http://localhost/")
         });
         Services.AddSingleton<EavApiClient>();
+        // EntityTypeEditDialog 注入 SpaceApiClient（渲染阶段不调用）
+        Services.AddSingleton<TreeGraph.Blazor.Shared.SpaceSky.Services.SpaceApiClient>();
         // UnitTreeField 注入 TreeNodeDialogService<UnitTree>（仅渲染，不弹窗）
         Services.AddScoped<TreeGraph.Blazor.Shared.TreeEavSky.Dialogs.BlazorService>();
         Services.AddScoped(
@@ -108,7 +110,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         UnitId: null, UnitName: null, UnitAbbreviation: null,
         RefCompositeTypeId: null, CompositeTypeName: null,
         CompositeTypeDisplayName: null, RefTableDefinitionId: null,
-        TableName: null, TableDisplayName: null, RefOptionSetId: null,
+        TableName: null, TableDisplayName: null, IsRecordMode: false, RefOptionSetId: null,
         OptionSetName: null, OptionSetDisplayName: null);
 
     // ─── OptionSets ───

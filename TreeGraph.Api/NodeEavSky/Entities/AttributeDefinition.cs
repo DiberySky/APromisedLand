@@ -34,6 +34,13 @@ public class AttributeDefinition
     public string? RefTableDefinitionId { get; set; }
     public CustomTableDefinition? RefTableDefinition { get; set; }
 
+    /// <summary>
+    /// 时序记录模式（仅 DataType = "table" 时有效）：
+    /// 所引表活动列第 1 列须 date、第 2 列须 time；行列表屏蔽序号列。
+    /// 取代原独立 DataType "record"。
+    /// </summary>
+    public bool IsRecordMode { get; set; }
+
     /// <summary>选项集关联（当 DataType = "single_choice" 时）</summary>
     public string? RefOptionSetId { get; set; }
     public OptionSet? RefOptionSet { get; set; }

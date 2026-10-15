@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Blazor.Shared.SpaceSky.Services;
@@ -73,15 +74,33 @@ public class SpaceApiClient(HttpClient httpClient)
     }
 
     /// <summary>
-    /// 检查状态码，若失败则尝试从响应中读取 ApiResponse 消息并抛出。
+    /// 检查状态码，若失败则抛出携带真实原因（ApiResponse{message} 或 {error}）的异常。
     /// </summary>
     private static async Task EnsureSuccessWithApiResponseAsync(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)
             return;
 
-        var errorResponse = await response.Content.ReadFromJsonAsync<ApiResponse<object>>();
-        if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Message))
-            throw new HttpRequestException($"请求失败: {errorResponse.Message}", null, response.StatusCode);
+        string? message = null;
+        try
+        {
+            var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (doc.ValueKind == JsonValueKind.Object)
+            {
+                string? Get(string name) =>
+                    doc.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
+                        ? v.GetString()
+                        : null;
+
+                message = Get("error") ?? Get("Error") ?? Get("message") ?? Get("Message");
+            }
+        }
+        catch (JsonException) { }
+
+        throw new HttpRequestException(
+            message is null
+                ? $"请求失败: {(int)response.StatusCode} {response.ReasonPhrase}"
+                : $"请求失败: {message}",
+            null, response.StatusCode);
     }
 }

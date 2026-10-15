@@ -25,36 +25,43 @@
     </ToolBarContent>
     <DialogContent>
         <MudContainer Class="py-8">
-            <MudForm @ref="_form" Model="@_node">
-                @if (NodeTemplate.EditTemplate is null)
-                {
-                    <MudStack Spacing="3">
-                        <MudText Color="Color.Secondary">未提供编辑模板（EditTemplate）。</MudText>
-                    </MudStack>
-                }
-                else
-                {
-                    @NodeTemplate.EditTemplate(_node)
-                }
-            </MudForm>
+            @* KeepPanelsAlive：非激活页也保持渲染，属性区组件引用（提交时保存属性）不因切页丢失 *@
+            <MudTabs Elevation="0" Rounded="true" KeepPanelsAlive="true">
+                <MudTabPanel Text="基本信息" Icon="@Icons.Material.Filled.Info">
+                    <MudForm @ref="_form" Model="@_node">
+                        @if (NodeTemplate.EditTemplate is null)
+                        {
+                            <MudStack Spacing="3">
+                                <MudText Color="Color.Secondary">未提供编辑模板（EditTemplate）。</MudText>
+                            </MudStack>
+                        }
+                        else
+                        {
+                            @NodeTemplate.EditTemplate(_node)
+                        }
+                    </MudForm>
+                </MudTabPanel>
 
-            @* 属性区：节点保存后（编辑模式）才可关注类型与填写属性 *@
-            @if (IsCreate)
-            {
-                <MudText Typo="Typo.caption"
-                         Class="d-block text-center mt-8 pb-2"
-                         Style="color: var(--mud-palette-text-secondary)">
-                    节点创建保存后，可通过节点操作中的「属性」按钮关注实体类型并填写属性。
-                </MudText>
-            }
-            else
-            {
-                <NodeAttributeItemsSky @ref="_attrItems"
-                                       TItem="@TItem"
-                                       NodeId="@_node.Id"
-                                       ReadOnly="false"
-                                       AllowManage="true" />
-            }
+                <MudTabPanel Text="属性绑定" Icon="@Icons.Material.Filled.Link">
+                    @* 属性区：节点保存后（编辑模式）才可关注类型与填写属性 *@
+                    @if (IsCreate)
+                    {
+                        <MudText Typo="Typo.caption"
+                                 Class="d-block text-center py-4"
+                                 Style="color: var(--mud-palette-text-secondary)">
+                            节点创建保存后，可通过节点操作中的「属性」按钮关注实体类型并填写属性。
+                        </MudText>
+                    }
+                    else
+                    {
+                        <NodeAttributeItemsSky @ref="_attrItems"
+                                               TItem="@TItem"
+                                               NodeId="@_node.Id"
+                                               ReadOnly="false"
+                                               AllowManage="true" />
+                    }
+                </MudTabPanel>
+            </MudTabs>
         </MudContainer>
     </DialogContent>
 </DialogTreeSky>

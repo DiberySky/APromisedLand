@@ -212,7 +212,7 @@ else if (Attribute.DataType == "composite")
         </MudPaper>
     }
 }
-else if (Attribute.DataType is "table" or "record")
+else if (Attribute.DataType == "table")
 {
     <MudAlert Severity="Severity.Info">
         @DisplayLabel 是自定义表——请使用下方的子表编辑区域

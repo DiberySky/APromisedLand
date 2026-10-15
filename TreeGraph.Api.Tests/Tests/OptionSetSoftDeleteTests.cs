@@ -15,7 +15,7 @@ namespace TreeGraph.Api.Tests.Tests;
 ///   - partial unique index：软删后同名可重建；恢复撞同名 → 409
 ///   - 恢复：集合 + 选项一并恢复
 ///   - 幂等：未删的恢复是 No-Op 204
-///   - 软删 = 集合 + 全部选项都标 IsDeleted
+///   - 子项为空方可删除：仍有活动选项时 DeleteSet 返回 400（不采用级联删除）
 ///   - GetReferences 不受 IsDeleted 影响
 ///
 /// 边界（通过 API 不可构造，不测）：
@@ -39,6 +39,9 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
         string entityType, string setName,
         params (string Value, string Label)[] items)
     {
+        // 先注入静态 HttpClient 并完成共享 schema 初始化（否则 TestData.EnsureEntityTypeAsync 会因 _client 为空抛异常）
+        await TestData.EnsureSchemaAsync(Client);
+
         // 确保实体类型存在（否则后续 CreateAttribute 400）
         await TestData.EnsureEntityTypeAsync(entityType, entityType);
 
@@ -62,11 +65,35 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
         return created!.OptionSetId;
     }
 
+    /// <summary>删除集合：先清空活动选项（子项为空方可删除本项），再删除集合本身。</summary>
     private async Task DeleteSetAsync(string setId)
     {
+        await DeleteAllItemsAsync(setId);
+
         var resp = await Client.DeleteAsync(
             $"/api/eav/metadata/option-sets/{setId}");
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
+    }
+
+    /// <summary>逐个删除集合下的全部活动选项。</summary>
+    private async Task DeleteAllItemsAsync(string setId)
+    {
+        var listResp = await Client.GetAsync(
+            $"/api/eav/metadata/option-sets/{setId}/items");
+        listResp.EnsureSuccessStatusCode();
+
+        var items = await listResp.Content
+            .ReadEavAsync<List<OptionItemDetailDto>>();
+
+        foreach (var item in items ?? [])
+        {
+            if (item.IsDeleted) continue;
+
+            var resp = await Client.DeleteAsync(
+                $"/api/eav/metadata/option-sets/{setId}/items/{item.OptionItemId}");
+            Assert.True(resp.IsSuccessStatusCode,
+                $"删除选项 '{item.Value}' 失败: {resp.StatusCode} {await resp.Content.ReadAsStringAsync()}");
+        }
     }
 
     private async Task<HttpResponseMessage> UndeleteSetRawAsync(string setId)
@@ -218,27 +245,47 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
     }
 
     // ============================================================
-    // 软删的连带效果
+    // 删除不级联：子项为空方可删除本项
     // ============================================================
 
     [Fact]
-    public async Task DeleteSet_SoftDeletesAllItems()
+    public async Task DeleteSet_WhenItemsRemain_Returns400_WithoutCascade()
     {
-        var setId = await CreateSetAsync("OptSoftCascade", "s",
+        var setId = await CreateSetAsync("OptSoftNoCascade", "s",
             ("a", "A"), ("b", "B"));
 
-        await DeleteSetAsync(setId);
+        var resp = await Client.DeleteAsync(
+            $"/api/eav/metadata/option-sets/{setId}");
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("选项", await resp.Content.ReadAsStringAsync());
+
+        // 集合仍存在，选项未被级联软删
+        var setResp = await Client.GetAsync(
+            $"/api/eav/metadata/option-sets/{setId}");
+        Assert.Equal(HttpStatusCode.OK, setResp.StatusCode);
 
         // ListOptionItems 不按 IsDeleted 过滤（管理页需要看到已删项）
-        var resp = await Client.GetAsync(
+        var listResp = await Client.GetAsync(
             $"/api/eav/metadata/option-sets/{setId}/items");
-        resp.EnsureSuccessStatusCode();
+        listResp.EnsureSuccessStatusCode();
 
-        var items = await resp.Content
+        var items = await listResp.Content
             .ReadEavAsync<List<OptionItemDetailDto>>();
         Assert.NotNull(items);
         Assert.Equal(2, items!.Count);
-        Assert.All(items, i => Assert.True(i.IsDeleted));
+        Assert.All(items, i => Assert.False(i.IsDeleted));
+    }
+
+    [Fact]
+    public async Task DeleteSet_AfterItemsRemoved_Succeeds()
+    {
+        var setId = await CreateSetAsync("OptSoftEmptyThenDel", "s", ("a", "A"));
+
+        await DeleteAllItemsAsync(setId);
+
+        var resp = await Client.DeleteAsync(
+            $"/api/eav/metadata/option-sets/{setId}");
+        Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
     }
 
     // ============================================================

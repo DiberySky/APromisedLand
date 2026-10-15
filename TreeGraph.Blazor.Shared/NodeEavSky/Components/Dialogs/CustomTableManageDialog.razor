@@ -1,0 +1,24 @@
+@* CustomTableManageDialog.razor — 自定义表管理对话框（嵌入 CustomTables 完整功能：表 + 列 CRUD） *@
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
+
+<DialogSky Title="自定义表管理"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭"
+           OnCanceledClick="@Close">
+    <DialogContent>
+        <CustomTables IsDialogMode="true" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+}

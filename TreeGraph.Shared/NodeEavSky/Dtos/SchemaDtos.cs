@@ -49,4 +49,6 @@ public sealed record AttributeSchemaDto(
     string? UnitId = null,
     string? UnitName = null,
     OptionSetSchemaDto? OptionSet = null,
-    string? RefTableDefinitionId = null);
+    string? RefTableDefinitionId = null,
+    /// <summary>时序记录模式（table 属性）：行列表屏蔽序号列。</summary>
+    bool IsRecordMode = false);

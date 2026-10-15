@@ -183,6 +183,11 @@ public abstract class TreeControllerBase<T>(
                 return NotFound(new { error = $"节点 '{id}' 不存在或删除失败" });
             return Ok(true);
         }
+        catch (InvalidOperationException ex)
+        {
+            // 业务规则拒绝（如仍有子节点）：409，不作为服务器错误
+            return Conflict(new { error = ex.Message });
+        }
         catch (Exception ex)
         {
             Logger.LogError(ex, "删除节点失败");

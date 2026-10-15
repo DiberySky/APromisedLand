@@ -99,6 +99,14 @@ else
                                  Class="ml-2">
                             @table.Columns.Count(c => !c.IsDeleted) 列
                         </MudChip>
+                        @* ★ 时序记录专属表标记 *@
+                        @if (table.IsRecordTable)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Tertiary"
+                                     Class="ml-2" Icon="@Icons.Material.Filled.Lock">
+                                时序
+                            </MudChip>
+                        }
                         @* ★ 已删除标记 *@
                         @if (table.IsDeleted)
                         {
@@ -140,7 +148,7 @@ else
                     @if (!table.IsDeleted)
                     {
                        <div class="d-flex mb-3 justify-end">
-                                添加列<MudButton Size="Size.Medium"
+                                <MudButton Size="Size.Medium"
                                        Variant="Variant.Outlined"
                                        Color="Color.Primary"
                                        StartIcon="@Icons.Material.Filled.Add"
@@ -191,6 +199,14 @@ else
                                              Color="@GetDataTypeColor(context.DataType)">
                                         @EavDataTypeLabels.GetLabel(context.DataType)
                                     </MudChip>
+                                    @* ★ 锁定时间维度列标记 *@
+                                    @if (IsLockedTimeColumn(table, context))
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Lock"
+                                                 Color="Color.Tertiary" Size="Size.Small"
+                                                 Class="ml-1"
+                                                 title="时间维度列已锁定（创建时定死）" />
+                                    }
                                 </MudTd>
                                 <MudTd DataLabel="必填">
                                     @if (context.IsRequired)
@@ -224,6 +240,7 @@ else
                                 <MudTd DataLabel="操作">
                                     @if (!context.IsDeleted)
                                     {
+                                        var locked = IsLockedTimeColumn(table, context);
                                         <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                        Size="Size.Medium"
                                                        Color="Color.Primary"
@@ -231,6 +248,8 @@ else
                                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                        Size="Size.Medium"
                                                        Color="Color.Error"
+                                                       Disabled="@locked"
+                                                       title="@(locked ? "时间维度列已锁定，不可删除" : "删除列")"
                                                        OnClick="@(async () => await DeleteColumnAsync(table, context))" />
                                     }
                                     else
@@ -481,6 +500,23 @@ else
     }
 
     // ---------- 辅助 ----------
+
+    /// <summary>record 表锁定时间维度列数（第 1 列日期 + 可选第 2 列时间）。</summary>
+    private static int LockedColumnCount(CustomTableDetailDto table)
+        => table.IsRecordTable ? (table.HasTimeColumn ? 2 : 1) : 0;
+
+    /// <summary>判定列是否为 record 表的锁定时间维度列（活动列按 DisplayOrder 前 N 列）。</summary>
+    private static bool IsLockedTimeColumn(
+        CustomTableDetailDto table, CustomTableColumnDto column)
+    {
+        var n = LockedColumnCount(table);
+        if (n == 0 || column.IsDeleted) return false;
+        return table.Columns
+            .Where(c => !c.IsDeleted)
+            .OrderBy(c => c.DisplayOrder)
+            .Take(n)
+            .Any(c => c.ColumnId == column.ColumnId);
+    }
 
     private static Color GetDataTypeColor(string dataType) => dataType switch
     {

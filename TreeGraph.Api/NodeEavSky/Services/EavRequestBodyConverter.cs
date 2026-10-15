@@ -34,7 +34,7 @@ public static class EavRequestBodyConverter
         {
             var def = defs[name];
 
-            if (def.DataType is EavDataTypes.Table or EavDataTypes.Record)
+            if (def.DataType == EavDataTypes.Table)
             {
                 tableAttrs.Add(name);
                 continue;
@@ -46,7 +46,7 @@ public static class EavRequestBodyConverter
         if (tableAttrs.Count > 0)
         {
             throw new ArgumentException(
-                $"table/record 类型属性不能通过此端点写入，请使用子表端点。" +
+                $"table 类型属性不能通过此端点写入，请使用子表端点。" +
                 $"涉及属性: {string.Join(", ", tableAttrs)}");
         }
 

@@ -18,7 +18,6 @@ public static class EavDataTypeLabels
         EavDataTypes.Json => "JSON",
         EavDataTypes.Composite => "组合类型",
         EavDataTypes.Table => "自定义表",
-        EavDataTypes.Record => "记录",
         EavDataTypes.SingleChoice => "单选",
         EavDataTypes.Location => "位置",
         _ => dataType ?? ""

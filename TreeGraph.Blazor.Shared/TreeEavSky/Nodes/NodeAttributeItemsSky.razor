@@ -1,19 +1,17 @@
 @* NodeAttributeItemsSky.razor
-   节点属性宿主适配器：节点（iNode = 树节点 Id）需先「关注」某个实体类型，
+   节点属性宿主适配器：节点（iNode = 树节点 Id）需先「关注」（绑定）某个实体类型，
    该类型的属性表单才会出现在节点上。
-     - 未关注任何类型：只读模式不渲染；管理模式显示空状态与「关注实体类型」入口
-     - 已关注 N 个类型：每个类型渲染一个 NodeEntityTypeSection
+     - 只读模式：仅渲染已关注类型的属性区块
+     - 管理模式：额外渲染「实体类型 / 绑定」表格，勾选 = 关注、取消勾选 = 取消关注
    数据读写走 iNode 端点 /api/inode/{nodeId}/entities/{type}。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
-@using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Inodes
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
 @using TreeGraph.Shared.NodeEavSky.Dtos
 
 @inject EavApiClient EavApi
 @inject MessageService Message
-@inject IDialogService DialogService
 
 @if (_loading)
 {
@@ -22,57 +20,62 @@
         <MudText Typo="Typo.caption" Class="mt-1">加载属性...</MudText>
     </MudStack>
 }
-else if (_cards.Count == 0)
-{
-    @if (AllowManage)
-    {
-        <MudPaper Outlined="true" Class="pa-4 my-2 d-flex flex-column align-center">
-            <MudIcon Icon="@Icons.Material.Outlined.Category"
-                     Color="Color.Secondary" Class="mb-2" />
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                本节点尚未关注任何实体类型，关注后才可填写属性
-            </MudText>
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenAttachDialogAsync">
-                关注实体类型
-            </MudButton>
-        </MudPaper>
-    }
-}
 else
 {
-    <div class="py-2">
-        @if (AllowManage)
+    @* 实体类型绑定表：勾选 = 关注（绑定）该实体类型，取消勾选 = 取消关注 *@
+    @if (AllowManage)
+    {
+        @if (_rows.Count == 0)
         {
-            <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
-                <MudText Typo="Typo.subtitle2">已关注的属性类型（@_cards.Count）</MudText>
-                <MudSpacer />
-                <MudButton Variant="Variant.Text"
-                           Color="Color.Primary"
-                           Size="Size.Small"
-                           StartIcon="@Icons.Material.Filled.Add"
-                           OnClick="OpenAttachDialogAsync">
-                    关注类型
-                </MudButton>
-            </MudStack>
+            <MudAlert Severity="Severity.Info" Dense="true" Class="my-2">
+                暂无可用实体类型，请先在「管理属性定义 → 实体类型」中创建
+            </MudAlert>
         }
+        else
+        {
+            <MudTable Items="_rows" Dense="true" Hover="true" Bordered="true"
+                      Elevation="0" Class="mb-3">
+                <HeaderContent>
+                    <MudTh>实体类型</MudTh>
+                    <MudTh Style="width: 96px;">绑定</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="实体类型">@context.DisplayName</MudTd>
+                    <MudTd DataLabel="绑定">
+                        @* 已产生实体实例的类型禁止取消绑定（后端亦会拒绝） *@
+                        @if (IsBound(context.EntityType) && context.HasEntity)
+                        {
+                            <MudTooltip Text="该类型下已有实体实例，无法取消绑定">
+                                <MudCheckBox T="bool" Dense="true" Value="true" Disabled="true" />
+                            </MudTooltip>
+                        }
+                        else
+                        {
+                            <MudCheckBox T="bool"
+                                         Dense="true"
+                                         Color="Color.Primary"
+                                         Value="@IsBound(context.EntityType)"
+                                         ValueChanged="@(v => ToggleBindAsync(context.EntityType, v))" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    }
 
-        @for (var i = 0; i < _cards.Count; i++)
-        {
-            var idx = i;
-            var card = _cards[idx];
-            <NodeEntityTypeSection InodeId="@NodeId"
-                                   EntityType="@card.EntityType"
-                                   DisplayName="@card.DisplayName"
-                                   ReadOnly="@ReadOnly"
-                                   AllowDetach="@AllowManage"
-                                   @ref="_sections[idx]"
-                                   OnDetachRequested="@(() => DetachAsync(card))" />
-        }
-    </div>
+    @* 已关注类型的属性区块 *@
+    @for (var i = 0; i < _cards.Count; i++)
+    {
+        var idx = i;
+        var card = _cards[idx];
+        <NodeEntityTypeSection InodeId="@NodeId"
+                               EntityType="@card.EntityType"
+                               DisplayName="@card.DisplayName"
+                               ReadOnly="@ReadOnly"
+                               AllowDetach="@AllowManage"
+                               @ref="_sections[idx]"
+                               OnDetachRequested="@(() => DetachAsync(card))" />
+    }
 }
 
 @code {
@@ -85,29 +88,64 @@ else
     /// <summary>是否允许管理关注关系（关注/取消关注）；仅属性管理对话框开启。</summary>
     [Parameter] public bool AllowManage { get; set; }
 
+    /// <summary>绑定表格行：实体类型标识 + 展示名 + 是否已产生实体实例。</summary>
+    private sealed record TypeBindRow(string EntityType, string DisplayName, bool HasEntity);
+
     private IReadOnlyList<InodeTypeCardDto> _cards = [];
+
+    /// <summary>实体类型绑定表格行（共享类型 ∪ 已关注类型），仅管理模式使用。</summary>
+    private IReadOnlyList<TypeBindRow> _rows = [];
 
     /// <summary>与 _cards 同序的区块引用槽位（Razor @ref 索引器赋值）。</summary>
     private List<NodeEntityTypeSection?> _sections = [];
     private bool _loading;
 
+    /// <summary>绑定切换进行中，避免复选框重复触发。</summary>
+    private bool _binding;
+
     protected override async Task OnInitializedAsync()
         => await ReloadAsync();
 
     /// <summary>重新加载节点已关注的类型列表及其属性区块。</summary>
-    public async Task ReloadAsync()
+    public async Task ReloadAsync(bool showLoading = true)
     {
         if (string.IsNullOrEmpty(NodeId))
             return;
 
         try
         {
-            _loading = true;
+            if (showLoading)
+                _loading = true;
 
             var cards = await EavApi.ListInodeTypeCardsAsync(NodeId);
             // ListTypes 仅返回已声明卡片；兼容未来可能混入的未声明项
             _cards = cards?.Where(c => c.Declared).ToList() ?? [];
             _sections = _cards.Select(_ => (NodeEntityTypeSection?)null).ToList();
+
+            // 绑定表格仅在管理模式渲染：共享类型 ∪ 已关注类型
+            //（已关注但不在共享列表中的类型仍需列出，否则无法取消绑定）
+            if (AllowManage)
+            {
+                var allTypes = await EavApi.ListEntityTypesAsync(sharedOnly: true);
+                var cardMap = _cards.ToDictionary(c => c.EntityType);
+                var rows = new List<TypeBindRow>();
+                var seen = new HashSet<string>();
+
+                // 已关注类型的实体数据状态来自 _cards（共享类型列表不含该信息）
+                foreach (var t in allTypes ?? [])
+                {
+                    if (seen.Add(t.EntityType))
+                        rows.Add(new TypeBindRow(t.EntityType, t.DisplayName ?? t.EntityType,
+                            cardMap.TryGetValue(t.EntityType, out var bound) && bound.HasEntity));
+                }
+                foreach (var c in _cards)
+                {
+                    if (seen.Add(c.EntityType))
+                        rows.Add(new TypeBindRow(c.EntityType, c.DisplayName, c.HasEntity));
+                }
+
+                _rows = rows;
+            }
         }
         catch (Exception ex)
         {
@@ -134,49 +172,51 @@ else
         return true;
     }
 
-    /// <summary>打开「关注实体类型」对话框。</summary>
-    private async Task OpenAttachDialogAsync()
+    /// <summary>该实体类型是否已被本节点关注（绑定）。</summary>
+    private bool IsBound(string entityType)
+        => _cards.Any(c => c.EntityType == entityType);
+
+    /// <summary>
+    /// 勾选 = 关注（绑定）实体类型；取消勾选 = 取消关注。
+    /// 已产生实体实例的类型不可取消绑定（表格中复选框禁用，此处为兜底）。
+    /// </summary>
+    private async Task ToggleBindAsync(string entityType, bool bound)
     {
-        // 树节点属性只可选择共享类型（独占类型仅在其所属空间上下文可见）
-        var allTypes = await EavApi.ListEntityTypesAsync(sharedOnly: true);
-        if (allTypes is null || allTypes.Count == 0)
+        if (_binding) return;
+
+        // 状态未变化（例如复选框值回滚）时直接忽略
+        if (bound == IsBound(entityType)) return;
+
+        if (!bound)
         {
-            Message.Warning("暂无可用实体类型，请先在「管理属性定义 → 实体类型」中创建");
-            return;
+            var card = _cards.FirstOrDefault(c => c.EntityType == entityType);
+            if (card is { HasEntity: true })
+            {
+                Message.Warning("该类型下已有属性数据，请先清空后再取消关注");
+                return;
+            }
         }
 
-        var declared = _cards.Select(c => c.EntityType).ToHashSet();
-        var available = allTypes
-            .Where(t => !declared.Contains(t.EntityType))
-            .ToList();
-
-        if (available.Count == 0)
+        _binding = true;
+        try
         {
-            Message.Info("所有实体类型均已关注");
-            return;
+            var (ok, error) = bound
+                ? await EavApi.AttachInodeTypeAsync(NodeId, entityType)
+                : await EavApi.DetachInodeTypeAsync(NodeId, entityType);
+
+            if (!ok)
+            {
+                Message.Details(bound ? "关注失败" : "取消关注失败", error ?? "未知错误");
+                return;
+            }
+
+            Message.Success(bound ? "已绑定" : "已取消绑定");
+            await ReloadAsync(showLoading: false);
         }
-
-        var parameters = new DialogParameters
+        finally
         {
-            { nameof(AttachTypeDialog.AvailableTypes), available }
-        };
-
-        var dialog = await DialogService.ShowAsync<AttachTypeDialog>(
-            "关注实体类型", parameters);
-        var result = await dialog.Result;
-
-        if (result?.Canceled != false || result.Data is not string entityType)
-            return;
-
-        var (ok, error) = await EavApi.AttachInodeTypeAsync(NodeId, entityType);
-        if (!ok)
-        {
-            Message.Details("关注失败", error ?? "未知错误");
-            return;
+            _binding = false;
         }
-
-        Message.Success("关注成功");
-        await ReloadAsync();
     }
 
     /// <summary>取消关注（后端在该类型已有实体数据时会拒绝）。</summary>
