@@ -84,6 +84,27 @@ public static class TreeGraphMafWfExtension
                     context.LiteGraph.GetEndpoint(LiteGraphResource.HttpEndpointName));
         }
 
+        // ══════════════════════════════════════════════════════════
+        // ★ TreeGraphEavApi（语义搜索）端点注入（服务发现）
+        //   GraphAgent 的 SemanticSearchNodes 工具远程调用该服务的
+        //   /api/search/semantic。Program.cs 优先级：
+        //   TreeGraphApi:BaseAddress > localhost:5773
+        // ══════════════════════════════════════════════════════════
+        if (context.TreeGraphEavApi is not null)
+        {
+            var eavEndpoint = context.TreeGraphEavApi.GetEndpoint("http");
+
+            context.TreeGraphMafWfApi
+                .WaitFor(context.TreeGraphEavApi)
+                .WithEnvironment("TreeGraphApi__BaseAddress", eavEndpoint);
+
+            Console.WriteLine($"[TreeGraphMafWfApi] TreeGraphEavApi 端点 → {eavEndpoint}");
+        }
+        else
+        {
+            Console.WriteLine("[TreeGraphMafWfApi] ⚠️ context.TreeGraphEavApi 为 null，语义搜索工具将连接 localhost:5773");
+        }
+
         // ─── 健康检查 ─────────────────────────────────────────────
         // 轻量端点 /api/health，永远 200，供 liveness probe 使用。
         // 深度端点 /api/health/deep 会探活 vLLM，供 readiness 使用。

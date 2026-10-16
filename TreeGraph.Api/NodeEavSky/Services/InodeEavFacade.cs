@@ -1,4 +1,6 @@
+using MassTransit;
 using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Shared.Messaging;
 
 namespace TreeGraph.Api.NodeEavSky.Services;
 
@@ -17,15 +19,18 @@ public class InodeEavFacade
     private readonly IInodeEntityService _inodeEntities;
     private readonly EavWriteService _write;
     private readonly EavReadService _read;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     public InodeEavFacade(
         IInodeEntityService inodeEntities,
         EavWriteService write,
-        EavReadService read)
+        EavReadService read,
+        IPublishEndpoint publishEndpoint)
     {
         _inodeEntities = inodeEntities;
         _write = write;
         _read = read;
+        _publishEndpoint = publishEndpoint;
     }
 
     // ============================================================
@@ -76,6 +81,13 @@ public class InodeEavFacade
 
         await _write.SaveAsync(entityId, entityType, values,
             changedBy, correlationId, ct, expectedUpdatedAt);
+
+        // ★ 语义搜索：发布宿主变更事件（at-least-once，消费端幂等）
+        await _publishEndpoint.Publish(new InodeChangedEvent
+        {
+            InodeId = inodeId,
+            Kind = InodeChangeKind.Saved
+        }, ct);
     }
 
     public async Task PatchAsync(
@@ -90,6 +102,13 @@ public class InodeEavFacade
 
         await _write.PatchAsync(entityId, entityType, values,
             changedBy, correlationId, ct, expectedUpdatedAt);
+
+        // ★ 语义搜索：发布宿主变更事件
+        await _publishEndpoint.Publish(new InodeChangedEvent
+        {
+            InodeId = inodeId,
+            Kind = InodeChangeKind.Patched
+        }, ct);
     }
 
     /// <summary>
@@ -110,6 +129,13 @@ public class InodeEavFacade
 
         // 2. 删归属映射
         await _inodeEntities.DeleteMappingAsync(inodeId, entityType, ct);
+
+        // ★ 语义搜索：发布宿主变更事件（消费端据此刷新/删除向量）
+        await _publishEndpoint.Publish(new InodeChangedEvent
+        {
+            InodeId = inodeId,
+            Kind = InodeChangeKind.Deleted
+        }, ct);
 
         return true;
     }

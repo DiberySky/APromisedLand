@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Shared.MafWfSky.Contracts;
 
@@ -62,7 +63,7 @@ public sealed class RenameSessionRequest
 // 流式（/api/graph-agent/chat/stream，SSE）
 // ══════════════════════════════════════════════════════
 
-public enum StreamChunkType { Start, Delta, Done }
+public enum StreamChunkType { Start, Delta, SearchResults, Done }
 
 /// <summary>Graph Agent 流式块（SSE data 载荷）。</summary>
 public sealed class StreamChunkDto
@@ -73,4 +74,7 @@ public sealed class StreamChunkDto
     public IReadOnlyList<string>? ToolsInvoked { get; set; }
     public IReadOnlyList<ToolCallDetailDto>? ToolCallDetails { get; set; }
     public string? AgentName { get; set; }
+
+    /// <summary>仅 Type = SearchResults 时填充：语义搜索命中卡片列表。</summary>
+    public List<SemanticSearchItemDto>? Items { get; set; }
 }

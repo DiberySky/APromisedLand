@@ -61,6 +61,16 @@ internal static class ServiceCollectionExtensions
         // Graph Function Calling Agent（Scoped）
         services.AddScoped<ToolCallContext>();
         services.AddScoped<GraphTools>();
+
+        // ★ 语义搜索客户端（GraphAgent 的 SemanticSearchNodes 工具依赖，
+        //   远程调用 TreeGraphEavApi 的 /api/search/semantic）
+        services.AddHttpClient<SearchApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(
+                config["TreeGraphApi:BaseAddress"] ?? "http://localhost:5773");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
         services.AddScoped<GraphAgentService>();
         services.AddScoped<AssistantAgentService>();
         services.AddScoped<LlmAgentRouter>();

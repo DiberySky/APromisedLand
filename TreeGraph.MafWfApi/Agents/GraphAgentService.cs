@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using TreeGraph.MafWfApi.Models;
+using TreeGraph.MafWfApi.Services;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -22,6 +24,7 @@ public sealed class GraphAgentService
     public GraphAgentService(
         IChatClient chatClient,
         GraphTools graphTools,
+        SearchApiClient searchClient,
         AgentSessionStore sessionStore,
         IConversationCatalog catalog,
         ToolCallContext toolCtx,
@@ -36,7 +39,7 @@ public sealed class GraphAgentService
         _router = router;
         _logger = loggerFactory.CreateLogger<GraphAgentService>();
 
-        var tools = BuildTools(graphTools);
+        var tools = BuildTools(graphTools, searchClient, _toolCtx);
         _graphAgent = chatClient.AsAIAgent(
             instructions: BuildInstructions(),
             name: "GraphAssistant",
@@ -161,10 +164,22 @@ public sealed class GraphAgentService
         };
 
         var accumulated = new StringBuilder();
+        var searchResultsSent = false;
 
         await foreach (var update in _graphAgent
             .RunStreamingAsync(userMessage, session, cancellationToken: ct))
         {
+            // ★ 语义搜索工具命中后，立即补发 SearchResults chunk（仅一次）
+            if (!searchResultsSent && _toolCtx.SearchResults is { } hits)
+            {
+                searchResultsSent = true;
+                yield return new StreamChunk
+                {
+                    Type = StreamChunkType.SearchResults,
+                    Items = hits.ToList()
+                };
+            }
+
             // 提取增量文本（只取最终回答的文本，跳过 functionCall / functionResult）
             var delta = update.Text;
 
@@ -191,6 +206,16 @@ public sealed class GraphAgentService
         // ★ 使用 AgentSessionStoreKey
         await _sessionStore.SaveSessionAsync(
             _graphAgent, new AgentSessionStoreKey(currentConversationId), session, ct);
+
+        // ★ 流结束但工具结果尚未补发（模型未再产出文本的边界情况），兜底补发
+        if (!searchResultsSent && _toolCtx.SearchResults is { } finalHits)
+        {
+            yield return new StreamChunk
+            {
+                Type = StreamChunkType.SearchResults,
+                Items = finalHits.ToList()
+            };
+        }
 
         // 最终事件：包含完整文本 + 工具调用详情
         var toolsInvoked = _toolCtx.Records.Select(r => r.ToolName).ToList();
@@ -268,7 +293,8 @@ public sealed class GraphAgentService
 
     // ══════════════════════════════════════════════════════
 
-    private static IList<AITool> BuildTools(GraphTools t)
+    private static IList<AITool> BuildTools(
+        GraphTools t, SearchApiClient s, ToolCallContext ctx)
     {
         return new List<AITool>
         {
@@ -324,7 +350,45 @@ public sealed class GraphAgentService
                 name: "GetEdgesOfNode",
                 description: "查询指定节点的所有出边和入边，明确区分边的方向。" +
                              "当用户问'X 指向谁'、'谁指向 X'、'X 的出边/入边有哪些'时使用。"),
+
+            AIFunctionFactory.Create(
+                (Func<string, int, CancellationToken, Task<string>>)
+                ((query, topK, ct) => SemanticSearchNodesAsync(s, ctx, query, topK, ct)),
+                name: "SemanticSearchNodes",
+                description: "语义搜索：按自然语言描述查找树节点（设备/房间/资产等）。" +
+                             "适用于模糊描述：'有没有消防相关的设备'、'一楼的会议室'、" +
+                             "'所有温度传感器'。返回相似度排序的节点名称列表。"),
         };
+    }
+
+    /// <summary>
+    /// 语义搜索工具实现（服务不可用时降级提示）。
+    /// 命中结果写入 <see cref="ToolCallContext.SearchResults"/>，
+    /// 由流式管道补发 SearchResults chunk 供前端渲染卡片列表。
+    /// </summary>
+    private static async Task<string> SemanticSearchNodesAsync(
+        SearchApiClient client, ToolCallContext ctx,
+        string query, int topK, CancellationToken ct)
+    {
+        topK = Math.Clamp(topK, 1, 20);
+        var result = await client.SearchAsync(query, topK, null, ct);
+
+        if (result is null)
+            return "语义搜索服务暂不可用，请改用 SearchNodes 关键词搜索";
+
+        ctx.SearchResults = result.Items;
+
+        if (result.Items.Count == 0)
+            return $"未找到与'{query}'相关的节点";
+
+        var lines = result.Items.Select((item, i) =>
+        {
+            var name = item.NodeName ?? item.InodeId;
+            var path = string.IsNullOrEmpty(item.Path) ? "" : $"（{item.Path}）";
+            return $"{i + 1}. {name}{path}（相似度 {item.Score:F2}）";
+        });
+
+        return string.Join('\n', lines);
     }
 
     private static string BuildInstructions() => """
@@ -337,6 +401,7 @@ public sealed class GraphAgentService
                                                  - SearchNodes：按关键词搜索节点名（部分匹配）
                                                  - GetSubgraph：从起始节点出发 N 跳内的子图（1-3 跳）
                                                  - GetEdgesOfNode：查询节点的出边和入边（区分方向）
+                                                 - SemanticSearchNodes：语义搜索（自然语言模糊查找树节点）
 
                                                  【绝对规则】
                                                  1. 你必须先调用工具函数获取真实数据，才能回答任何与图数据相关的问题。
@@ -357,6 +422,7 @@ public enum StreamChunkType
 {
     Start,
     Delta,
+    SearchResults,
     Done
 }
 
@@ -383,4 +449,8 @@ public sealed class StreamChunk
 
     [System.Text.Json.Serialization.JsonPropertyName("agentName")]
     public string? AgentName { get; set; }
+
+    /// <summary>仅 Type = SearchResults 时填充：语义搜索命中卡片列表。</summary>
+    [System.Text.Json.Serialization.JsonPropertyName("items")]
+    public List<SemanticSearchItemDto>? Items { get; set; }
 }

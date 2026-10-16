@@ -23,6 +23,10 @@ void TreeGraph()
     //   (SeaweedMaster/Volume/Filer/S3 容器组，由 SeaweedFsExtension 声明)
     builder.AddSeaweedFs(context);
 
+    // ★ 语义搜索基础设施（TreeGraphEavApi 的依赖，需先声明）
+    builder.AddRabbitMq(context);
+    builder.AddQdrant(context);
+
     // ★ EAV 动态类型 API(复用 TreeGraphDb,固定端口 5773)
     builder.AddTreeGraphEavApi(context);
 

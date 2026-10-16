@@ -1,0 +1,360 @@
+@page "/search"
+@namespace TreeGraph.Blazor.Shared.MafWfSky.Pages
+@inject MafWfSseReader SseReader
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+@inject BlazorService BlazorService
+@inject ILogger<SemanticSearch> Logger
+
+<PageSky Title="语义搜索"
+         ArrowBackVisible="false"
+         MaxWidth="MaxWidth.Medium">
+
+    <TopBarRightContent>
+        @if (_results.Count > 0 && !_streaming)
+        {
+            <MudIconButton Icon="@Icons.Material.Outlined.ClearAll"
+                           Color="Color.Inherit"
+                           OnClick="ClearResults"
+                           Title="清空结果"/>
+        }
+    </TopBarRightContent>
+
+    <PageContent>
+
+        @* ═══ AI 回复条（流式） ═══ *@
+        @if (_streaming || !string.IsNullOrEmpty(_lastReply))
+        {
+            <MudAlert Severity="Severity.Info"
+                      Variant="Variant.Outlined"
+                      Dense="true"
+                      Class="ma-3">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.SmartToy"
+                             Size="Size.Small"
+                             Color="Color.Primary"/>
+                    <MudText Typo="Typo.body2" Style="flex:1;">
+                        @(string.IsNullOrEmpty(_streamingText) ? _lastReply : _streamingText)
+                    </MudText>
+                </MudStack>
+
+                @if (_streaming)
+                {
+                    <MudProgressLinear Indeterminate
+                                       Color="Color.Primary"
+                                       Class="mt-2"/>
+                }
+            </MudAlert>
+        }
+
+        @* ═══ 空状态 ═══ *@
+        @if (_results.Count == 0 && !_streaming && string.IsNullOrEmpty(_lastReply))
+        {
+            <MudStack AlignItems="AlignItems.Center"
+                      Spacing="3"
+                      Class="mt-10 pa-4">
+                <MudIcon Icon="@Icons.Material.Filled.ManageSearch"
+                         Size="Size.Large"
+                         Color="Color.Default"/>
+                <MudText Typo="Typo.body1"
+                         Color="Color.Secondary"
+                         Align="Align.Center">
+                    问一个问题，比如
+                </MudText>
+                <MudChip T="string"
+                         Color="Color.Primary"
+                         Variant="Variant.Outlined"
+                         Size="Size.Small"
+                         OnClick="@(() => QuickFill("找海天的注塑机"))">
+                    找海天的注塑机
+                </MudChip>
+                <MudChip T="string"
+                         Color="Color.Primary"
+                         Variant="Variant.Outlined"
+                         Size="Size.Small"
+                         OnClick="@(() => QuickFill("保修期超过 2 年的设备"))">
+                    保修期超过 2 年的设备
+                </MudChip>
+                <MudChip T="string"
+                         Color="Color.Primary"
+                         Variant="Variant.Outlined"
+                         Size="Size.Small"
+                         OnClick="@(() => QuickFill("有没有关于安全生产的节点"))">
+                    有没有关于安全生产的节点
+                </MudChip>
+            </MudStack>
+        }
+
+        @* ═══ 结果列表 ═══ *@
+        @if (_results.Count > 0)
+        {
+            <MudList T="string" Dense="true" Class="pa-2">
+                @for (int i = 0; i < _results.Count; i++)
+                {
+                    var idx = i;
+                    var item = _results[i];
+
+                    <MudListItem Class="pa-0 mb-2">
+                        <MudCard Elevation="1"
+                                 Style="cursor:pointer; border-radius:12px;"
+                                 @onclick="() => OnItemClick(item)">
+                            <MudCardContent Class="pa-3">
+                                <MudStack Row="true"
+                                          AlignItems="AlignItems.Center"
+                                          Spacing="2">
+                                    <MudIcon Icon="@HostIcon(item.HostType)"
+                                             Size="Size.Small"
+                                             Color="Color.Primary"/>
+                                    <MudText Typo="Typo.subtitle2"
+                                             Style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                                             title="@item.NodeName">
+                                        @(idx + 1). @(item.NodeName ?? item.InodeId)
+                                    </MudText>
+                                    <MudChip T="string"
+                                             Size="Size.Small"
+                                             Color="@ScoreColor(item.Score)">
+                                        @((item.Score * 100).ToString("F0"))%
+                                    </MudChip>
+                                    <span @onclick:stopPropagation="true">
+                                        <MudIconButton Icon="@Icons.Material.Filled.AccountTree"
+                                                       Size="Size.Small"
+                                                       Color="Color.Primary"
+                                                       Title="打开树视图"
+                                                       OnClick="@(() => OpenTreeDialogAsync(item))"/>
+                                    </span>
+                                </MudStack>
+
+                                @if (!string.IsNullOrEmpty(item.Path))
+                                {
+                                    <MudText Typo="Typo.caption"
+                                             Color="Color.Secondary"
+                                             Class="mt-1"
+                                             title="@item.Path"
+                                             Style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                        @item.Path
+                                    </MudText>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+
+        @* 底部占位：给固定输入框留空间 *@
+        <div style="height: calc(96px + env(safe-area-inset-bottom, 0px));"></div>
+    </PageContent>
+</PageSky>
+
+@* ═══ 固定底部输入框（PageSky 之外） ═══ *@
+<div class="search-input-bar">
+    <MudStack Row="true"
+              AlignItems="AlignItems.End"
+              Spacing="2"
+              Class="pa-2">
+        <MudTextField @bind-Value="_input"
+                      Placeholder="问我找什么..."
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Lines="1"
+                      MaxLines="4"
+                      Disabled="_streaming"
+                      OnKeyDown="OnKeyDown"
+                      Style="flex:1;"
+                      InputStyle="padding:8px 12px;"/>
+        <MudIconButton Icon="@Icons.Material.Filled.Send"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       Disabled="@(_streaming || string.IsNullOrWhiteSpace(_input))"
+                       OnClick="SendAsync"/>
+    </MudStack>
+</div>
+
+<style>
+    .search-input-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 200;
+        background: var(--mud-palette-surface);
+        border-top: 1px solid var(--mud-palette-lines-default);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    /* iOS 上防止输入框聚焦时自动放大页面（字号小于 16px 会触发） */
+    .search-input-bar .mud-input-slot {
+        font-size: 16px;
+    }
+</style>
+
+@code {
+    private string _input = "";
+    private bool _streaming;
+    private string _streamingText = "";
+    private string _lastReply = "";
+    private List<SemanticSearchItemDto> _results = new();
+
+    // ═══════════════════════════════════════════════════════
+    // 事件处理
+    // ═══════════════════════════════════════════════════════
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendAsync();
+        }
+    }
+
+    private void QuickFill(string text)
+    {
+        _input = text;
+        StateHasChanged();
+    }
+
+    private void ClearResults()
+    {
+        _results.Clear();
+        _lastReply = "";
+        _streamingText = "";
+        StateHasChanged();
+    }
+
+    private void OnItemClick(SemanticSearchItemDto item)
+    {
+        // 现有 iNode 详情页路由（/inodes/{InodeId}），无 HostType 段
+        Nav.NavigateTo($"/inodes/{item.InodeId}");
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // SSE 消费（复用 MafWfSseReader）
+    // ═══════════════════════════════════════════════════════
+
+    private async Task SendAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_input) || _streaming)
+            return;
+
+        var query = _input.Trim();
+        _input = "";
+        _streaming = true;
+        _streamingText = "";
+        _lastReply = "";
+        _results.Clear();
+        StateHasChanged();
+
+        try
+        {
+            await foreach (var chunk in SseReader.GraphAgentStreamAsync(
+                               conversationId: null,
+                               message: query))
+            {
+                HandleChunk(chunk);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "语义搜索 SSE 异常");
+            _lastReply = $"请求失败：{ex.Message}";
+            StateHasChanged();
+        }
+        finally
+        {
+            _streaming = false;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleChunk(StreamChunkDto chunk)
+    {
+        switch (chunk.Type)
+        {
+            case StreamChunkType.Delta:
+                _streamingText += chunk.Text ?? "";
+                StateHasChanged();
+                break;
+
+            case StreamChunkType.SearchResults:
+                _results = chunk.Items ?? new List<SemanticSearchItemDto>();
+                StateHasChanged();
+                break;
+
+            case StreamChunkType.Done:
+                _lastReply = chunk.Text ?? _streamingText;
+                _streamingText = "";
+                StateHasChanged();
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 树对话框
+    // ═══════════════════════════════════════════════════════
+
+    private async Task OpenTreeDialogAsync(SemanticSearchItemDto item)
+    {
+        if (string.IsNullOrEmpty(item.RootId))
+        {
+            _lastReply = "该节点没有根节点信息，无法打开树视图";
+            StateHasChanged();
+            return;
+        }
+
+        switch (item.HostType)
+        {
+            case "SpaceTree":
+                await ShowTreeDialogAsync<SpaceTree>(item.RootId);
+                break;
+            case "UnitTree":
+                await ShowTreeDialogAsync<UnitTree>(item.RootId);
+                break;
+            case "CategoryTree":
+                await ShowTreeDialogAsync<CategoryTree>(item.RootId);
+                break;
+            default:
+                _lastReply = $"未知的节点类型：{item.HostType}";
+                StateHasChanged();
+                break;
+        }
+    }
+
+    private async Task ShowTreeDialogAsync<TItem>(string rootId)
+        where TItem : class, ITreeNodeBase<TItem>, new()
+    {
+        var parameters = new DialogParameters<TreeDialogPageSky<TItem>>
+        {
+            { x => x.Title, "树节点" },
+            { x => x.TitleToolBar, "" },
+            { x => x.RootId, rootId },
+        };
+
+        var options = BlazorService.DialogOptions;
+
+        var dialog = await DialogService.ShowExAsync<TreeDialogPageSky<TItem>>(
+            "树节点", parameters, options);
+
+        await dialog.Result;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 图标 & 颜色
+    // ═══════════════════════════════════════════════════════
+
+    private static string HostIcon(string hostType) => hostType switch
+    {
+        "SpaceTree"    => Icons.Material.Filled.AccountTree,
+        "UnitTree"     => Icons.Material.Filled.Straighten,
+        "CategoryTree" => Icons.Material.Filled.Category,
+        _              => Icons.Material.Filled.DeviceHub
+    };
+
+    private static Color ScoreColor(float score) => score switch
+    {
+        >= 0.85f => Color.Success,
+        >= 0.70f => Color.Info,
+        >= 0.50f => Color.Warning,
+        _        => Color.Default
+    };
+}

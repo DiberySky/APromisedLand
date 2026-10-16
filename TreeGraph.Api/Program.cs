@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
+using TreeGraph.Api.NodeEavSky.SemanticSearch;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Api.TreeEavSky.Services;
 
@@ -79,6 +80,13 @@ builder.Services.AddScoped<CustomTableValidationService>();
 builder.Services.AddScoped<CustomTableWriteService>();
 builder.Services.AddScoped<CustomTableReadService>();
 builder.Services.AddScoped<CustomTableQueryService>();
+
+// ★ 语义搜索 + 向量同步管道（Qdrant + vLLM bge-m3 + RabbitMQ 事件驱动）
+builder.Services.AddSemanticSearch(builder.Configuration);
+// Testing 环境（EavApiFactory 集成测试）无 RabbitMQ，
+// MassTransit 总线启动会无限重连并阻塞 WebApplication 启动，故跳过消费者注册。
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddVectorSyncConsumers(builder.Configuration);
 
 // Edge（关系/边）
 builder.Services.AddScoped<IEdgeNodeValidator, EdgeNodeValidator>();

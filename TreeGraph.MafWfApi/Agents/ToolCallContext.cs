@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.MafWfApi.Agents;
 
@@ -11,7 +12,17 @@ public sealed class ToolCallContext
 
     public IReadOnlyList<ToolCallRecord> Records => _records;
 
-    public void Reset() => _records.Clear();
+    /// <summary>
+    /// SemanticSearchNodes 工具最近一次命中的结果集。
+    /// 非 null 时 GraphAgentService 流式管道会补发一个 SearchResults chunk。
+    /// </summary>
+    public IReadOnlyList<SemanticSearchItemDto>? SearchResults { get; set; }
+
+    public void Reset()
+    {
+        _records.Clear();
+        SearchResults = null;
+    }
 
     public ToolCallRecord BeginCall(string toolName, string arguments)
     {
