@@ -1,0 +1,84 @@
+@* NamingTextField.razor — 英文名输入框 + AI 命名建议按钮。
+   点击尾部魔棒图标：用 SourceText（通常是中文显示名）调用
+   POST /api/naming/generate，按 NameCase 取 snake_case / PascalCase 回填。
+   宿主未注册 MafWfSky 服务（如 BlazorMaui）时自动隐藏建议按钮，退化为普通输入框。 *@
+@using TreeGraph.Blazor.Shared.MafWfSky.Services
+@using TreeGraph.Shared.MafWfSky.Contracts
+@inject IServiceProvider Services
+@inject ISnackbar Snackbar
+
+<MudTextField T="string"
+              Value="Value"
+              ValueChanged="ValueChanged"
+              Label="@Label"
+              Placeholder="@Placeholder"
+              HelperText="@HelperText"
+              Variant="Variant.Outlined"
+              Disabled="@Disabled"
+              Class="@Class"
+              Adornment="@(_client is null ? Adornment.None : Adornment.End)"
+              AdornmentIcon="@Icons.Material.Filled.AutoAwesome"
+              AdornmentAriaLabel="AI 命名建议"
+              OnAdornmentClick="SuggestAsync" />
+
+@code {
+    /// <summary>当前值（双向绑定）。</summary>
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    /// <summary>命名来源文本（一般是中文显示名）。为空时点击按钮仅提示。</summary>
+    [Parameter] public string? SourceText { get; set; }
+
+    /// <summary>取值形态："snake"（默认）或 "pascal"。</summary>
+    [Parameter] public string NameCase { get; set; } = "snake";
+
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? HelperText { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private MafWfApiClient? _client;
+    private bool _suggesting;
+
+    protected override void OnInitialized()
+    {
+        // 可选解析：BlazorMaui 等未注册 MafWfSky 的宿主中退化为普通输入框
+        _client = Services.GetService(typeof(MafWfApiClient)) as MafWfApiClient;
+    }
+
+    private async Task SuggestAsync()
+    {
+        if (_client is null || _suggesting) return;
+
+        if (string.IsNullOrWhiteSpace(SourceText))
+        {
+            Snackbar.Add("请先填写显示名，再生成英文命名建议", Severity.Info);
+            return;
+        }
+
+        _suggesting = true;
+        try
+        {
+            NamingResultDto result = await _client.GenerateNamingAsync(SourceText.Trim());
+
+            var suggestion = NameCase.Equals("pascal", StringComparison.OrdinalIgnoreCase)
+                ? result.PascalCase
+                : result.SnakeCase;
+
+            if (!string.IsNullOrWhiteSpace(suggestion))
+            {
+                Value = suggestion;
+                await ValueChanged.InvokeAsync(suggestion);
+            }
+
+            foreach (var w in result.Warnings)
+                Snackbar.Add(w, Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"命名建议生成失败：{ex.Message}", Severity.Warning);
+        }
+        finally { _suggesting = false; }
+    }
+}

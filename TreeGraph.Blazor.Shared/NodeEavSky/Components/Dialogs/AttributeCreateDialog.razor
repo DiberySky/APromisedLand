@@ -1,4 +1,5 @@
 @* AttributeCreateDialog.razor — 新建属性（DialogSky 外壳，与树节点对话框风格一致） *@
+@using TreeGraph.Blazor.Shared.MafWfSky.Components
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -188,12 +189,12 @@
                         如需与外部系统对接，建议手动指定可读的英文标识。
                     </MudText>
                 </MudAlert>
-                <MudTextField @bind-Value="_createForm.AttributeName"
-                              Label="内部标识（可选）"
-                              Placeholder="如：name、length"
-                              Variant="Variant.Outlined"
-                              HelperText="留空自动生成；填了则：字母开头，只含字母/数字/下划线"
-                              Immediate="true" />
+                <NamingTextField @bind-Value="_createForm.AttributeName"
+                                 SourceText="@_createForm.DisplayName"
+                                 NameCase="snake"
+                                 Label="内部标识（可选）"
+                                 Placeholder="如：name、length"
+                                 HelperText="留空自动生成；填了则：字母开头，只含字母/数字/下划线" />
             </MudExpansionPanel>
         </MudExpansionPanels>
     </DialogContent>

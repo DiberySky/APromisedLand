@@ -14,4 +14,7 @@ public class MafWfSkyOptions
 
     /// <summary>工作流路由前缀，默认 "api/Workflows"。</summary>
     public string WorkflowsPath { get; set; } = "api/Workflows";
+
+    /// <summary>命名生成路由前缀，默认 "api/naming"。</summary>
+    public string NamingPath { get; set; } = "api/naming";
 }

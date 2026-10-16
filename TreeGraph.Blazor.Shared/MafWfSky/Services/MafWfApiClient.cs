@@ -36,6 +36,7 @@ public class MafWfApiClient
     private string GraphAgentBase => _options.GraphAgentPath.TrimEnd('/');
     private string AgentsBase => _options.AgentsPath.TrimEnd('/');
     private string WorkflowsBase => _options.WorkflowsPath.TrimEnd('/');
+    private string NamingBase => _options.NamingPath.TrimEnd('/');
 
     // ══════════════════════════════════════════════════════
     // 无工具对话（/api/chat）
@@ -155,6 +156,18 @@ public class MafWfApiClient
         var resp = await _http.PostAsJsonAsync($"{WorkflowsBase}/writer-critic",
             new WorkflowRunRequest { Topic = topic }, JsonOptions, ct);
         return (await UnwrapAsync<WorkflowReplyDto>(resp, ct))!;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // 命名生成（/api/naming）
+    // ══════════════════════════════════════════════════════
+
+    /// <summary>中文描述 → snake_case / PascalCase 英文命名（LLM 翻译 + 代码侧规则）。</summary>
+    public async Task<NamingResultDto> GenerateNamingAsync(string text, CancellationToken ct = default)
+    {
+        var resp = await _http.PostAsJsonAsync($"{NamingBase}/generate",
+            new NamingRequestDto { Text = text }, JsonOptions, ct);
+        return (await UnwrapAsync<NamingResultDto>(resp, ct))!;
     }
 
     // ══════════════════════════════════════════════════════

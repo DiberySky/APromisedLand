@@ -1,5 +1,6 @@
 @* CompositeTypeCreateDialog.razor — 新建组合类型（DialogSky 外壳，与树节点对话框风格一致） *@
 @using TreeGraph.Shared.NodeEavSky.Dtos
+@using TreeGraph.Blazor.Shared.MafWfSky.Components
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
@@ -49,10 +50,11 @@
                       Placeholder="中文名称"
                       Variant="Variant.Outlined"
                       Class="mb-3" />
-        <MudTextField @bind-Value="_newType.TypeName"
-                      Label="类型名（英文，首字母大写）"
-                      Placeholder="意义接近的英文名称，如 Address"
-                      Variant="Variant.Outlined" />
+        <NamingTextField @bind-Value="_newType.TypeName"
+                         SourceText="@_newType.DisplayName"
+                         NameCase="pascal"
+                         Label="类型名（英文，首字母大写）"
+                         Placeholder="意义接近的英文名称，如 Address" />
     </DialogContent>
 </DialogSky>
 

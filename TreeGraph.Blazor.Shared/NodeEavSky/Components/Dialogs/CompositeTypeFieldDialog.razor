@@ -1,4 +1,5 @@
 @* CompositeTypeFieldDialog.razor — 添加 / 编辑组合类型字段（DialogSky 外壳，与树节点对话框风格一致） *@
+@using TreeGraph.Blazor.Shared.MafWfSky.Components
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
@@ -20,12 +21,13 @@
                       Placeholder="界面上展示的中文名称"
                       Variant="Variant.Outlined"
                       Class="mb-3" />
-        <MudTextField @bind-Value="_fieldForm.FieldName"
-                      Label="字段名（小写英文+下划线）"
-                      Placeholder="小写英文+下划线，如 street_name"
-                      Variant="Variant.Outlined"
-                      Disabled="@(EditingField is not null)"
-                      Class="mb-3" />
+        <NamingTextField @bind-Value="_fieldForm.FieldName"
+                         SourceText="@_fieldForm.DisplayName"
+                         NameCase="snake"
+                         Label="字段名（小写英文+下划线）"
+                         Placeholder="小写英文+下划线，如 street_name"
+                         Disabled="@(EditingField is not null)"
+                         Class="mb-3" />
 
         <MudSelect T="string"
                    Value="_fieldForm.DataType"

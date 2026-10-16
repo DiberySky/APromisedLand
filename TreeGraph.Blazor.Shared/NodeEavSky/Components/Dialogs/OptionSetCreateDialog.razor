@@ -1,4 +1,5 @@
 @* OptionSetCreateDialog.razor — 新建选项集（DialogSky 外壳，与树节点对话框风格一致） *@
+@using TreeGraph.Blazor.Shared.MafWfSky.Components
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
@@ -42,11 +43,12 @@
             </MudAlert>
         }
 
-        <MudTextField @bind-Value="_newSet.SetName"
-                      Label="集合名 (snake_case)"
-                      Placeholder="gender"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
+        <NamingTextField @bind-Value="_newSet.SetName"
+                         SourceText="@_newSet.DisplayName"
+                         NameCase="snake"
+                         Label="集合名 (snake_case)"
+                         Placeholder="gender"
+                         Class="mb-3" />
         <MudTextField @bind-Value="_newSet.DisplayName"
                       Label="显示名"
                       Placeholder="性别"
