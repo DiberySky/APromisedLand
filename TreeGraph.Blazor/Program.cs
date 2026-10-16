@@ -13,6 +13,7 @@ using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.FileStorageSky;
 using TreeGraph.Blazor.Shared.FileStorageSky.Services;
+using TreeGraph.Blazor.Shared.MafWfSky.Extensions;
 using TreeGraph.Blazor.Shared.Responsive.Extensions;
 #if DEBUG
 using TreeGraph.Blazor.Shared.Common.Dev;
@@ -103,6 +104,11 @@ builder.Services
     })
     .RemoveAllResilienceHandlers()
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+// ★ MafWfSky 客户端（MafWfApi: /api/chat + /api/graph-agent + /api/Agents + /api/Workflows）：
+//   Aspire 服务发现名 treegraphmafwfapi（资源名 TreeGraphMafWfApi），
+//   TreeGraphBlazorExtension 已 WithReference 注入服务发现。
+builder.Services.AddMafWfSky();
 
 var app = builder.Build();
 

@@ -45,6 +45,9 @@ public class AppHostResourceContext
     public IResourceBuilder<ProjectResource>? MafWorkFlowApi { get; set; }
     public IResourceBuilder<ProjectResource>? MafSampleApi { get; set; }
 
+    /// <summary>TreeGraph.MafWfApi（MAF + Workflow 服务 API，vLLM 版，端口 5323，替代旧 MAFWorkFlowApi）。</summary>
+    public IResourceBuilder<ProjectResource>? TreeGraphMafWfApi { get; set; }
+
     /// <summary>TreeGraph.FileStorageApi(独立微服务,端口 5326,复用 FileMetadataDb + SeaweedS3)。</summary>
     public IResourceBuilder<ProjectResource>? TreeGraphFileStorageApi { get; set; }
 

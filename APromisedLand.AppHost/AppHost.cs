@@ -7,9 +7,6 @@ var context = new AppHostResourceContext();
 
 TreeGraph();
 
-
-
-
 // MafRagApi();
 //MafWorkFlowService();
 
@@ -37,6 +34,14 @@ void TreeGraph()
     builder.AddTreeGraphBlazor(context);
     builder.AddTreeGraphBlazorMaui(context);
 
+    // ★ vLLM Chat/Embedding 容器 + LiteGraph(MAF + Workflow API 的依赖)
+    builder.AddVllm(context);
+    // builder.AddLiteGraph(context);
+
+    // ★ TreeGraph.MafWfApi:MAF + Workflow 服务 API(vLLM 版,固定端口 5323,
+    //   替代已停用的旧 MAFWorkFlowApi)
+    builder.AddTreeGraphMafWfApi(context);
+
     // ★ TreeGraph.Maui(MAUI+Blazor 混合模板起步项目,引用 EavApi 供后续服务发现)
     // builder.AddTreeGraphMaui(context);
     
@@ -62,6 +67,8 @@ void MafRagApi()
 
     // ★ 新增:泛型树形数据 API(复用 TreeDb,固定端口 5753)
     builder.AddTreeGraphApi(context);
+    
+    builder.AddVllm(context);
 
     // ★ 新增:TreeGraph 前端 Blazor Server(固定端口 5763,调用 TreeGraphApi)
     builder.AddMafRagTreeGraph(context);

@@ -19,6 +19,14 @@
         <PackageReference Include="Moq" Version="4.21.0" />
         <!-- P2：bUnit 组件测试（版本与 TreeGraph.Blazor.Tests 对齐） -->
         <PackageReference Include="bunit" Version="2.11.3" />
+        <!-- MafWfSky SSE 弹性配置测试 -->
+        <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
+        <!-- MafWfSky SSE 集成测试：内存 SSE 服务器 -->
+        <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 
     <ItemGroup>

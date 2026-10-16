@@ -1,0 +1,184 @@
+@page "/maf-wf/graph-agent"
+@rendermode @(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode(prerender: false))
+@inject MafWfApiClient Api
+@inject MafWfSseReader Sse
+@inject ISnackbar Snackbar
+
+<PageTitle>Graph Agent</PageTitle>
+
+<MudGrid Spacing="3" Class="pa-4" Style="height: calc(100vh - 64px);">
+    @* ─── 左侧：会话列表 ─── *@
+    <MudItem xs="12" md="3" Style="height:100%; display:flex; flex-direction:column;">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+            <MudText Typo="Typo.h6">会话</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                           OnClick="NewSession" Title="新会话" />
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                           OnClick="LoadSessionsAsync" Title="刷新" />
+        </MudStack>
+
+        <MudList T="SessionSummaryDto" Dense="true" Style="overflow-y:auto; flex:1;"
+                 SelectedValue="_selectedSession" SelectedValueChanged="OnSessionSelected">
+            @foreach (var s in _sessions)
+            {
+                <MudListItem T="SessionSummaryDto" Value="s" Text="@DisplayName(s)" />
+            }
+        </MudList>
+    </MudItem>
+
+    @* ─── 右侧：消息区 + 输入区 ─── *@
+    <MudItem xs="12" md="9" Style="height:100%; display:flex; flex-direction:column;">
+        <MudPaper Elevation="1" Class="pa-3 mb-3" Style="flex:1; overflow-y:auto;">
+            @if (_messages.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    向 Graph Agent 提问，例如「列出所有图」。
+                </MudText>
+            }
+            @foreach (var m in _messages)
+            {
+                <MudStack Spacing="1" Class="mb-3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @(m.IsUser ? "我" : m.AgentName ?? "Assistant")
+                        @if (m.ToolCallDetails is { Count: > 0 } tools)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-1">
+                                工具 ×@tools.Count
+                            </MudChip>
+                        }
+                    </MudText>
+                    <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@m.Text</MudText>
+                </MudStack>
+            }
+            @if (_streaming)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Assistant</MudText>
+                </MudStack>
+                <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@_streamBuffer</MudText>
+            }
+        </MudPaper>
+
+        <MudStack Row="true" Spacing="2">
+            <MudTextField @bind-Value="_input" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Placeholder="输入消息，Enter 发送" Disabled="_streaming"
+                          OnKeyDown="OnInputKeyDown" Immediate="true" Class="flex-grow-1" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="_streaming || string.IsNullOrWhiteSpace(_input)"
+                       OnClick="SendAsync">发送</MudButton>
+        </MudStack>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private sealed record UiMessage(bool IsUser, string Text, string? AgentName,
+        IReadOnlyList<ToolCallDetailDto>? ToolCallDetails);
+
+    private List<SessionSummaryDto> _sessions = [];
+    private SessionSummaryDto? _selectedSession;
+    private List<UiMessage> _messages = [];
+    private string? _conversationId;
+    private string _input = string.Empty;
+    private string _streamBuffer = string.Empty;
+    private bool _streaming;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSessionsAsync();
+    }
+
+    private static string DisplayName(SessionSummaryDto s)
+        => s.DisplayName is { Length: > 0 } n ? n : s.Id[..8];
+
+    private async Task LoadSessionsAsync()
+    {
+        try { _sessions = (await Api.GraphAgentListSessionsAsync()).ToList(); }
+        catch (Exception ex) { Snackbar.Add($"加载会话失败：{ex.Message}", Severity.Error); }
+    }
+
+    private async Task OnSessionSelected(object? value)
+    {
+        if (value is not SessionSummaryDto s) return;
+        _selectedSession = s;
+        _conversationId = s.Id;
+        _messages.Clear();
+        try
+        {
+            var history = await Api.GraphAgentGetSessionMessagesAsync(s.Id);
+            if (history is not null)
+            {
+                _messages = history.Messages
+                    .Select(m => new UiMessage(
+                        m.Role.Equals("user", StringComparison.OrdinalIgnoreCase),
+                        m.Text, m.AuthorName, null))
+                    .ToList();
+            }
+        }
+        catch (Exception ex) { Snackbar.Add($"加载消息失败：{ex.Message}", Severity.Error); }
+    }
+
+    private void NewSession()
+    {
+        _selectedSession = null;
+        _conversationId = null;
+        _messages.Clear();
+    }
+
+    private async Task OnInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !_streaming && !string.IsNullOrWhiteSpace(_input))
+            await SendAsync();
+    }
+
+    private async Task SendAsync()
+    {
+        var text = _input.Trim();
+        if (text.Length == 0) return;
+
+        _messages.Add(new UiMessage(true, text, null, null));
+        _input = string.Empty;
+        _streamBuffer = string.Empty;
+        _streaming = true;
+        StateHasChanged();
+
+        try
+        {
+            string? convId = null, agentName = null;
+            IReadOnlyList<ToolCallDetailDto>? tools = null;
+
+            await foreach (var chunk in Sse.GraphAgentStreamAsync(_conversationId, text))
+            {
+                switch (chunk.Type)
+                {
+                    case StreamChunkType.Start:
+                        convId ??= chunk.ConversationId;
+                        agentName ??= chunk.AgentName;
+                        break;
+                    case StreamChunkType.Delta:
+                        _streamBuffer += chunk.Text;
+                        StateHasChanged();
+                        break;
+                    case StreamChunkType.Done:
+                        convId = chunk.ConversationId ?? convId;
+                        tools = chunk.ToolCallDetails;
+                        break;
+                }
+            }
+
+            _messages.Add(new UiMessage(false, _streamBuffer, agentName, tools));
+            _conversationId = convId ?? _conversationId;
+            await LoadSessionsAsync();   // 新会话入列
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"发送失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _streaming = false;
+            _streamBuffer = string.Empty;
+            StateHasChanged();
+        }
+    }
+}

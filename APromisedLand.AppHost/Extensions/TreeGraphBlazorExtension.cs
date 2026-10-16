@@ -35,6 +35,14 @@ public static class TreeGraphBlazorExtension
                 .WaitFor(context.TreeGraphFileStorageApi);
         }
 
+        // ★ MafWfApi 可选:Blazor 通过服务发现 treegraphmafwfapi 调用 MafWfSky。
+        if (context.TreeGraphMafWfApi is not null)
+        {
+            blazor
+                .WithReference(context.TreeGraphMafWfApi)
+                .WaitFor(context.TreeGraphMafWfApi);
+        }
+
         context.TreeGraphBlazor = blazor;
         blazor.WithOtlpExporter();
 

@@ -43,8 +43,9 @@ public static class MafRagApiExtension
         // ══════════════════════════════════════════════════════════
         // ★ vLLM Chat 容器：WaitFor + 显式端点注入
         //   ContainerResource 不实现 IResourceWithConnectionString，
-        //   不能用 WireIfPresent / WithReference，只能 WaitFor 等健康检查通过，
-        //   然后手动把 Endpoint 写进环境变量。
+        //   不能用 WireIfPresent / WithReference，只能 WaitFor 等容器进入
+        //   Running（vLLM 未注册 Aspire 健康检查），然后手动把 Endpoint
+        //   写进环境变量；模型实际就绪由 MafRagApi 的 VllmWarmupService 预热保证。
         //   Program.cs 优先级：VLLM_HTTP > Agent:Endpoint > localhost:8000
         // ══════════════════════════════════════════════════════════
         if (context.Vllm is not null)
@@ -52,7 +53,7 @@ public static class MafRagApiExtension
             var chatEndpoint = context.Vllm.GetEndpoint(VllmExtension.HttpEndpointName);
 
             context.MafSampleApi
-                .WaitFor(context.Vllm)                  // ← 等 /health 探活通过
+                .WaitFor(context.Vllm)                  // ← 等容器 Running（模型就绪由 VllmWarmupService 保证）
                 .WithEnvironment("VLLM_HTTP",       chatEndpoint)
                 .WithEnvironment("Agent__Endpoint", chatEndpoint);
 

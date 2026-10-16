@@ -1,0 +1,81 @@
+# TreeGraph.MafWfApi 冒烟测试
+# 前置：Aspire AppHost 已启动，vllm 容器 Running（模型预热约 30s~2min）
+@host = http://localhost:5323
+
+### 1. 轻量健康检查（恒 200）
+GET {{host}}/api/health
+
+### 2. 深度健康检查（探 vLLM，模型就绪后 200，否则 503）
+GET {{host}}/api/health/deep
+
+### 3. 无工具单轮对话
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{
+  "message": "用一句话介绍什么是知识图谱"
+}
+
+### 4. Graph Agent 对话（新会话，触发 list_graphs 工具）
+POST {{host}}/api/graph-agent/chat
+Content-Type: application/json
+
+{
+  "conversationId": null,
+  "message": "列出所有图"
+}
+
+### 5. Graph Agent 对话（继续上面会话，填实际 conversationId）
+POST {{host}}/api/graph-agent/chat
+Content-Type: application/json
+
+{
+  "conversationId": "00000000-0000-0000-0000-000000000000",
+  "message": "第一个图里有哪些节点？"
+}
+
+### 6. Graph Agent 会话列表
+GET {{host}}/api/graph-agent/sessions
+
+### 7. Graph Agent 会话消息记录（填实际 id）
+GET {{host}}/api/graph-agent/sessions/00000000-0000-0000-0000-000000000000/messages
+
+### 8. Graph Agent 重命名会话
+POST {{host}}/api/graph-agent/sessions/rename
+Content-Type: application/json
+
+{
+  "conversationId": "00000000-0000-0000-0000-000000000000",
+  "displayName": "冒烟测试会话"
+}
+
+### 9. Graph Agent 重置会话
+POST {{host}}/api/graph-agent/reset/00000000-0000-0000-0000-000000000000
+
+### 10. MafAgent 通用助手对话
+POST {{host}}/api/Agents/chat
+Content-Type: application/json
+
+{
+  "conversationId": null,
+  "message": "你好，请自我介绍"
+}
+
+### 11. Writer-Critic 工作流（同步）
+POST {{host}}/api/Workflows/writer-critic
+Content-Type: application/json
+
+{
+  "topic": "vLLM 在消费级显卡上的部署要点"
+}
+
+### 12. MCP 端点（Mcp:ApiKey 为空时应可直接访问）
+POST {{host}}/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/list"
+}
