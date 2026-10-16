@@ -19,6 +19,7 @@ public sealed class GraphAgentService
     private readonly ToolCallContext _toolCtx;
     private readonly AssistantAgentService _assistant;
     private readonly LlmAgentRouter _router;
+    private readonly NodeExpandService _nodeExpand;
     private readonly ILogger<GraphAgentService> _logger;
 
     public GraphAgentService(
@@ -30,6 +31,7 @@ public sealed class GraphAgentService
         ToolCallContext toolCtx,
         AssistantAgentService assistant,
         LlmAgentRouter router,
+        NodeExpandService nodeExpand,
         ILoggerFactory loggerFactory)
     {
         _sessionStore = sessionStore;
@@ -37,6 +39,7 @@ public sealed class GraphAgentService
         _toolCtx = toolCtx;
         _assistant = assistant;
         _router = router;
+        _nodeExpand = nodeExpand;
         _logger = loggerFactory.CreateLogger<GraphAgentService>();
 
         var tools = BuildTools(graphTools, searchClient, _toolCtx);
@@ -110,6 +113,27 @@ public sealed class GraphAgentService
         string userMessage,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        // ★ 特殊前缀拦截：展开节点（用户点击搜索结果卡片上的 ✨ 按钮触发）
+        const string ExpandPrefix = "__expand_node__:";
+        if (userMessage.StartsWith(ExpandPrefix, StringComparison.Ordinal))
+        {
+            var payload = userMessage[ExpandPrefix.Length..];
+            var parts = payload.Split(':', 2);
+            if (parts.Length == 2)
+            {
+                var inodeId = parts[0];
+                var hostType = parts[1];
+                _logger.LogInformation("[ExpandNode] 展开节点 {InodeId} ({HostType})", inodeId, hostType);
+
+                await foreach (var chunk in _nodeExpand.ExpandAsConversationAsync(
+                                   conversationId, inodeId, hostType, ct))
+                {
+                    yield return chunk;
+                }
+                yield break;
+            }
+        }
+
         // LLM 路由：元问题走 AssistantAgent（非流式，包装成流式返回）
         var route = await _router.RouteAsync(userMessage, ct);
         if (route == "assistant")

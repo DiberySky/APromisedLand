@@ -76,6 +76,10 @@ builder.Services.AddSingleton<IAttributeCache, AttributeCache>();
 builder.Services.AddSingleton<ICompositeTypeCache, CompositeTypeCache>();
 builder.Services.AddSingleton<ICustomTableCache, CustomTableCache>();
 builder.Services.AddSingleton<IOptionSetCache, OptionSetCache>();
+
+// ★ 子树加载服务（供 MafWfApi NodeExpandService 调用）
+builder.Services.AddScoped<SubtreeService>();
+
 builder.Services.AddScoped<CustomTableValidationService>();
 builder.Services.AddScoped<CustomTableWriteService>();
 builder.Services.AddScoped<CustomTableReadService>();

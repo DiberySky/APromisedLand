@@ -29,6 +29,17 @@ public class MafWfSseReader(HttpClient http, MafWfSkyOptions options)
             yield return chunk;
     }
 
+    /// <summary>
+    /// 展开节点合成回答：复用 /chat/stream，通过 __expand_node__:{inodeId}:{hostType} 前缀触发。
+    /// </summary>
+    public IAsyncEnumerable<StreamChunkDto> ExpandNodeStreamAsync(
+        string? conversationId, string inodeId, string hostType,
+        CancellationToken ct = default)
+        => GraphAgentStreamAsync(
+            conversationId,
+            $"__expand_node__:{inodeId}:{hostType}",
+            ct);
+
     /// <summary>Writer-Critic 流式：逐事件返回 WorkflowStreamEventDto，遇 event:done 结束。</summary>
     public async IAsyncEnumerable<WorkflowStreamEventDto> WriterCriticStreamAsync(
         string topic,

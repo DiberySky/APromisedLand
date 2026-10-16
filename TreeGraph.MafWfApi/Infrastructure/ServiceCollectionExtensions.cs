@@ -71,6 +71,17 @@ internal static class ServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(30);
         });
 
+        // ★ 子树加载客户端（复用 TreeGraphEavApi BaseAddress，走 /api/inode/.../subtree）
+        services.AddHttpClient<SubtreeLoader>(client =>
+        {
+            client.BaseAddress = new Uri(
+                config["TreeGraphApi:BaseAddress"] ?? "http://localhost:5773");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+        // ★ 节点展开合成服务（子树 → LLM 合成回答）
+        services.AddScoped<NodeExpandService>();
+
         services.AddScoped<GraphAgentService>();
         services.AddScoped<AssistantAgentService>();
         services.AddScoped<LlmAgentRouter>();

@@ -116,6 +116,14 @@
                                         @((item.Score * 100).ToString("F0"))%
                                     </MudChip>
                                     <span @onclick:stopPropagation="true">
+                                        <MudIconButton Icon="@Icons.Material.Filled.AutoAwesome"
+                                                       Size="Size.Small"
+                                                       Color="Color.Warning"
+                                                       Title="AI 综合展开"
+                                                       Disabled="@(_expandingInodeId is not null && _expandingInodeId != item.InodeId)"
+                                                       OnClick="@(() => ToggleExpandAsync(item))"/>
+                                    </span>
+                                    <span @onclick:stopPropagation="true">
                                         <MudIconButton Icon="@Icons.Material.Filled.AccountTree"
                                                        Size="Size.Small"
                                                        Color="Color.Primary"
@@ -195,6 +203,11 @@
     private string _streamingText = "";
     private string _lastReply = "";
     private List<SemanticSearchItemDto> _results = new();
+
+    // 展开节点合成回答状态
+    private string? _expandingInodeId;
+    private string? _expandConversationId;
+    private CancellationTokenSource? _expandCts;
 
     // ═══════════════════════════════════════════════════════
     // 事件处理
@@ -286,6 +299,67 @@
                 _streamingText = "";
                 StateHasChanged();
                 break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 展开节点合成回答
+    // ═══════════════════════════════════════════════════════
+
+    private async Task ToggleExpandAsync(SemanticSearchItemDto item)
+    {
+        // 再次点击同一节点 → 停止
+        if (_expandingInodeId == item.InodeId)
+        {
+            _expandCts?.Cancel();
+            return;
+        }
+
+        // 已有展开在进行 → 先停止
+        if (_expandingInodeId is not null)
+        {
+            _expandCts?.Cancel();
+            _expandCts?.Dispose();
+        }
+
+        _expandingInodeId = item.InodeId;
+        _streaming = true;
+        _streamingText = "";
+        _lastReply = "";
+        _expandCts = new CancellationTokenSource();
+        StateHasChanged();
+
+        try
+        {
+            await foreach (var chunk in SseReader.ExpandNodeStreamAsync(
+                               _expandConversationId, item.InodeId, item.HostType,
+                               _expandCts.Token))
+            {
+                if (chunk.Type == StreamChunkType.Start
+                    && !string.IsNullOrEmpty(chunk.ConversationId))
+                {
+                    _expandConversationId = chunk.ConversationId;
+                }
+                HandleChunk(chunk);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户停止，静默
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "展开失败");
+            _lastReply = $"展开失败：{ex.Message}";
+            StateHasChanged();
+        }
+        finally
+        {
+            _expandingInodeId = null;
+            _streaming = false;
+            _expandCts?.Dispose();
+            _expandCts = null;
+            StateHasChanged();
         }
     }
 
