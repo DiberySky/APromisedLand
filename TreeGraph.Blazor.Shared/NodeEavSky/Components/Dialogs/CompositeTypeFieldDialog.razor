@@ -52,13 +52,12 @@
         @* decimal：小数精度（ValidationRule.precision） *@
         @if (_fieldForm.DataType == "decimal")
         {
-            <MudNumericField T="int?"
-                             @bind-Value="_fieldForm.Precision"
-                             Label="小数精度（可选）"
-                             Min="0" Max="10" Step="1"
-                             Variant="Variant.Outlined"
-                             Class="mb-3"
-                             HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
+            <NumberInputField T="int?"
+                              @bind-Value="_fieldForm.Precision"
+                              Label="小数精度（可选）"
+                              Min="0" Max="10" Step="1"
+                              Class="mb-3"
+                              HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
         }
 
         @* single_choice 的选项集 *@
@@ -105,10 +104,9 @@
 
         <MudGrid Class="mb-3">
             <MudItem xs="6">
-                <MudNumericField T="int"
-                                 @bind-Value="_fieldForm.DisplayOrder"
-                                 Label="显示顺序"
-                                 Variant="Variant.Outlined" />
+                <NumberInputField T="int"
+                                  @bind-Value="_fieldForm.DisplayOrder"
+                                  Label="显示顺序" />
             </MudItem>
             <MudItem xs="6" Class="d-flex align-center">
                 <MudCheckBox T="bool"

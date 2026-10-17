@@ -98,39 +98,39 @@
     @* </MudNavGroup> *@
 
     @* 元数据管理 *@
-    @* <MudNavGroup Title="元数据管理" *@
-    @*              Icon="@Icons.Material.Filled.Settings"> *@
-    @*     $1$ 实体类型（最优先入口） #1# *@
-    @*     <MudNavLink Href="/metadata/entity-types" *@
-    @*                 Icon="@Icons.Material.Filled.Category" *@
-    @*                 Match="NavLinkMatch.Prefix"> *@
-    @*         实体类型 *@
-    @*     </MudNavLink> *@
-    @*     <MudNavLink Icon="@Icons.Material.Filled.EditAttributes" *@
-    @*                 OnClick="OpenAttributesManage"> *@
-    @*         属性定义 *@
-    @*     </MudNavLink> *@
-    @*     <MudNavLink Href="/metadata/composite-types" *@
-    @*                 Icon="@Icons.Material.Filled.AccountTree" *@
-    @*                 Match="NavLinkMatch.Prefix"> *@
-    @*         组合类型 *@
-    @*     </MudNavLink> *@
-    @*     <MudNavLink Href="/metadata/custom-tables" *@
-    @*                 Icon="@Icons.Material.Filled.TableChart" *@
-    @*                 Match="NavLinkMatch.Prefix"> *@
-    @*         自定义表 *@
-    @*     </MudNavLink> *@
-    @*     <MudNavLink Href="/metadata/option-sets" *@
-    @*                 Icon="@Icons.Material.Filled.Checklist" *@
-    @*                 Match="NavLinkMatch.Prefix"> *@
-    @*         选项集 *@
-    @*     </MudNavLink> *@
-    @*     <MudNavLink Href="/metadata/edge-types" *@
-    @*                 Icon="@Icons.Material.Filled.Hub" *@
-    @*                 Match="NavLinkMatch.Prefix"> *@
-    @*         边类型 *@
-    @*     </MudNavLink> *@
-    @* </MudNavGroup> *@
+    <MudNavGroup Title="元数据管理"
+                 Icon="@Icons.Material.Filled.Settings">
+        @* 实体类型（最优先入口） *@
+        <MudNavLink Href="/metadata/entity-types"
+                    Icon="@Icons.Material.Filled.Category"
+                    Match="NavLinkMatch.Prefix">
+            实体类型
+        </MudNavLink>
+        <MudNavLink Icon="@Icons.Material.Filled.EditAttributes"
+                    OnClick="OpenAttributesManage">
+            属性定义
+        </MudNavLink>
+        <MudNavLink Href="/metadata/composite-types"
+                    Icon="@Icons.Material.Filled.AccountTree"
+                    Match="NavLinkMatch.Prefix">
+            组合类型
+        </MudNavLink>
+        <MudNavLink Href="/metadata/custom-tables"
+                    Icon="@Icons.Material.Filled.TableChart"
+                    Match="NavLinkMatch.Prefix">
+            自定义表
+        </MudNavLink>
+        <MudNavLink Href="/metadata/option-sets"
+                    Icon="@Icons.Material.Filled.Checklist"
+                    Match="NavLinkMatch.Prefix">
+            选项集
+        </MudNavLink>
+        <MudNavLink Href="/metadata/edge-types"
+                    Icon="@Icons.Material.Filled.Hub"
+                    Match="NavLinkMatch.Prefix">
+            边类型
+        </MudNavLink>
+    </MudNavGroup>
 
     @* ★ 智能体工作流（MafWfSky） *@
     <MudNavGroup Title="智能体工作流"

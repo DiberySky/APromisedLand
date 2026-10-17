@@ -69,27 +69,25 @@
         @* decimal：小数精度（ValidationRule.precision） *@
         @if (_columnForm.DataType == "decimal")
         {
-            <MudNumericField T="int?"
-                             @bind-Value="_columnForm.Precision"
-                             Label="小数精度（可选）"
-                             Min="0" Max="10" Step="1"
-                             Variant="Variant.Outlined"
-                             Class="mb-3"
-                             HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
+            <NumberInputField T="int?"
+                              @bind-Value="_columnForm.Precision"
+                              Label="小数精度（可选）"
+                              Min="0" Max="10" Step="1"
+                              Class="mb-3"
+                              HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
         }
 
-        <MudNumericField T="int"
-                         @bind-Value="_columnForm.DisplayOrder"
-                         Label="显示顺序"
-                         Variant="Variant.Outlined"
-                         Class="mb-3"
-                         Min="@(IsRecordTable && !_isEditingLockedColumn ? LockedColumnCount : int.MinValue)"
-                         Disabled="@_isEditingLockedColumn"
-                         HelperText="@(IsRecordTable
-                             ? (_isEditingLockedColumn
-                                 ? "时间维度列已锁定，不可调整顺序"
-                                 : $"时序表前 {LockedColumnCount} 列为时间维度列（锁定），业务列顺序须 ≥ {LockedColumnCount}")
-                             : null)" />
+        <NumberInputField T="int"
+                          @bind-Value="_columnForm.DisplayOrder"
+                          Label="显示顺序"
+                          Class="mb-3"
+                          Min="@(IsRecordTable && !_isEditingLockedColumn ? LockedColumnCount : int.MinValue)"
+                          Disabled="@_isEditingLockedColumn"
+                          HelperText="@(IsRecordTable
+                              ? (_isEditingLockedColumn
+                                  ? "时间维度列已锁定，不可调整顺序"
+                                  : $"时序表前 {LockedColumnCount} 列为时间维度列（锁定），业务列顺序须 ≥ {LockedColumnCount}")
+                              : null)" />
 
         <MudGrid>
             <MudItem xs="12" md="3">

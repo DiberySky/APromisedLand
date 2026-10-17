@@ -54,11 +54,10 @@
                       Placeholder="规格参数"
                       Variant="Variant.Outlined"
                       Class="mb-3" />
-        <MudNumericField T="int"
-                         @bind-Value="_newTable.DisplayOrder"
-                         Label="显示顺序"
-                         Variant="Variant.Outlined"
-                         Class="mb-3" />
+        <NumberInputField T="int"
+                          @bind-Value="_newTable.DisplayOrder"
+                          Label="显示顺序"
+                          Class="mb-3" />
 
         @* 时序记录表：创建时服务端预置时间维度列（第 1 列日期、可选第 2 列时间），此后锁定 *@
         <MudSwitch T="bool"

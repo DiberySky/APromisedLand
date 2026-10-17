@@ -1,7 +1,9 @@
-/* 容器：相对定位，承载输入框与右侧聚拢的 −/+ 按钮 */
+/* 容器：相对定位，承载输入框与右侧聚拢的 −/+ 按钮。
+   display:flex 使对话框内整行占满（与其他字段一致）；
+   语义搜索页等场景由 Style 传入固定宽度。 */
 .numinput {
     position: relative;
-    display: inline-flex;
+    display: flex;
     align-items: center;
 }
 

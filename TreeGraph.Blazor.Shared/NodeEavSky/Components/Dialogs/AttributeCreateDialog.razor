@@ -58,13 +58,12 @@
         @* decimal：小数精度（ValidationRule.precision） *@
         @if (_createForm.DataType == "decimal")
         {
-            <MudNumericField T="int?"
-                             @bind-Value="_createForm.Precision"
-                             Label="小数精度（可选）"
-                             Min="0" Max="10" Step="1"
-                             Variant="Variant.Outlined"
-                             Class="mb-3"
-                             HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
+            <NumberInputField T="int?"
+                              @bind-Value="_createForm.Precision"
+                              Label="小数精度（可选）"
+                              Min="0" Max="10" Step="1"
+                              Class="mb-3"
+                              HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
         }
 
         @* composite：下拉 + 右侧新建入口（无可选类型时可就地创建） *@
@@ -157,11 +156,10 @@
             }
         }
 
-        <MudNumericField T="int"
-                         @bind-Value="_createForm.DisplayOrder"
-                         Label="显示顺序"
-                         Variant="Variant.Outlined"
-                         Class="mb-3" />
+        <NumberInputField T="int"
+                          @bind-Value="_createForm.DisplayOrder"
+                          Label="显示顺序"
+                          Class="mb-3" />
 
         <MudGrid>
             <MudItem xs="6" md="3">

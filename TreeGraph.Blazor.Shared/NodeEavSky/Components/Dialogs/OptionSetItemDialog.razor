@@ -32,11 +32,10 @@
                       Variant="Variant.Outlined"
                       Class="mb-3" />
 
-        <MudNumericField T="int"
-                         @bind-Value="_form.DisplayOrder"
-                         Label="显示顺序"
-                         Variant="Variant.Outlined"
-                         Class="mb-3" />
+        <NumberInputField T="int"
+                          @bind-Value="_form.DisplayOrder"
+                          Label="显示顺序"
+                          Class="mb-3" />
 
         <MudSwitch T="bool"
                    @bind-Value="_form.IsDefault"
