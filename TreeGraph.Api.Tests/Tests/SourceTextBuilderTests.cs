@@ -10,6 +10,7 @@ namespace TreeGraph.Api.Tests.Tests;
 /// <summary>
 /// SourceTextBuilder 单元测试（EF Core InMemory，无需 Docker）。
 /// 守护语义搜索幂等的基础契约：确定性 + 内容指纹敏感性。
+/// 契约：BuildAsync 返回 NodeSourceText（节点文本 NodeText/NodeHash + 实体列表 EntityTexts）。
 /// </summary>
 public class SourceTextBuilderTests
 {
@@ -77,7 +78,7 @@ public class SourceTextBuilderTests
     {
         var dbName = Guid.NewGuid().ToString();
 
-        SourceText first, second;
+        NodeSourceText first, second;
         await using (var db = CreateDb(dbName))
         {
             first = (await new SourceTextBuilder(db).BuildAsync(InodeId))!;
@@ -87,15 +88,22 @@ public class SourceTextBuilderTests
             second = (await new SourceTextBuilder(db).BuildAsync(InodeId))!;
         }
 
-        Assert.Equal(first.Text, second.Text);
-        Assert.Equal(first.SourceHash, second.SourceHash);
+        // 节点级
+        Assert.Equal(first.NodeText, second.NodeText);
+        Assert.Equal(first.NodeHash, second.NodeHash);
         Assert.Equal("space_tree", first.HostType);
-        Assert.Contains("节点：一楼配电室", first.Text);
-        Assert.Contains("名称：消防水泵", first.Text);
+        Assert.Contains("节点：一楼配电室", first.NodeText);
+
+        // 实体级
+        var firstEntity = Assert.Single(first.EntityTexts);
+        var secondEntity = Assert.Single(second.EntityTexts);
+        Assert.Equal(firstEntity.Text, secondEntity.Text);
+        Assert.Equal(firstEntity.Hash, secondEntity.Hash);
+        Assert.Contains("名称：消防水泵", firstEntity.Text);
     }
 
     [Fact]
-    public async Task Build_属性值变化_指纹变化()
+    public async Task Build_属性值变化_实体指纹变化()
     {
         var dbName = Guid.NewGuid().ToString();
 
@@ -103,7 +111,7 @@ public class SourceTextBuilderTests
         await using (var db = CreateDb(dbName))
         {
             hashBefore = (await new SourceTextBuilder(db).BuildAsync(InodeId))!
-                .SourceHash;
+                .EntityTexts.Single().Hash;
 
             db.AttributeValues.Single().ValueString = "消防水泵（备用）";
             await db.SaveChangesAsync();
@@ -113,18 +121,35 @@ public class SourceTextBuilderTests
         await using (var db = CreateDb(dbName, seed: false))
         {
             hashAfter = (await new SourceTextBuilder(db).BuildAsync(InodeId))!
-                .SourceHash;
+                .EntityTexts.Single().Hash;
         }
 
         Assert.NotEqual(hashBefore, hashAfter);
     }
 
     [Fact]
-    public async Task Build_无实体节点_返回null()
+    public async Task Build_无实体节点_仍返回节点文本()
     {
         var dbName = Guid.NewGuid().ToString();
         await using var db = CreateDb(dbName);
         db.InodeEntities.RemoveRange(db.InodeEntities);
+        await db.SaveChangesAsync();
+
+        var result = await new SourceTextBuilder(db).BuildAsync(InodeId);
+
+        // 节点仍在树中（仅无实体）→ 返回节点文本，实体列表为空
+        Assert.NotNull(result);
+        Assert.Contains("节点：一楼配电室", result!.NodeText);
+        Assert.Empty(result.EntityTexts);
+    }
+
+    [Fact]
+    public async Task Build_节点不在树中且无实体_返回null()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        await using var db = CreateDb(dbName);
+        db.InodeEntities.RemoveRange(db.InodeEntities);
+        db.SpaceTrees.RemoveRange(db.SpaceTrees);
         await db.SaveChangesAsync();
 
         var result = await new SourceTextBuilder(db).BuildAsync(InodeId);
