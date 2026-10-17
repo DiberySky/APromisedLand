@@ -532,11 +532,6 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.InsertData(
-                table: "space_trees",
-                columns: new[] { "id", "can_have_children", "description", "has_children", "name", "parent_id", "sort_order" },
-                values: new object[] { "EBBAD64B-2119-47EB-95C3-01D3DD796774", true, "", false, "空间树", null, 0 });
-
-            migrationBuilder.InsertData(
                 table: "unit_trees",
                 columns: new[] { "id", "abbreviation", "can_have_children", "description", "has_children", "name", "parent_id", "sort_order" },
                 values: new object[,]
@@ -968,7 +963,6 @@ namespace TreeGraph.Api.Data.Migrations
         {
             // 手写分区表（与 Up 尾部的手写 DDL 对应）
             migrationBuilder.Sql("DROP TABLE IF EXISTS attribute_audit_log CASCADE;");
-
             migrationBuilder.DropTable(
                 name: "attribute_values");
 

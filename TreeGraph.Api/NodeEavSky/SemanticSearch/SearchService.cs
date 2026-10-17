@@ -38,12 +38,30 @@ public sealed class SearchService
         var vector = await _embedding.EmbedAsync(query, ct);
         var hits = await _store.SearchAsync(vector, topK, spaceId, ct);
 
+        // 节点优先过滤：节点已命中，则其自身及全部后代节点上的实体原始命中不再列出
+        var nodeHitInodeIds = hits
+            .Where(h => h.PointKind != "entity")
+            .Select(h => h.InodeId)
+            .ToHashSet(StringComparer.Ordinal);
+        if (nodeHitInodeIds.Count > 0)
+        {
+            foreach (var descendantId in await LoadDescendantIdsAsync(nodeHitInodeIds, ct))
+                nodeHitInodeIds.Add(descendantId);
+        }
+        var filtered = hits
+            .Where(h => h.PointKind != "entity" || !nodeHitInodeIds.Contains(h.InodeId))
+            .ToList();
+
         // 批量反查空间树节点（含全部祖先，BFS 逐层加载）
-        var inodeIds = hits.Select(h => h.InodeId).ToList();
+        var inodeIds = filtered.Select(h => h.InodeId).Distinct().ToList();
         var nodes = await LoadSpaceNodesWithAncestorsAsync(inodeIds, ct);
 
-        return hits.Select(h =>
+        return filtered.Select(h =>
         {
+            var isEntity = h.PointKind == "entity";
+            var entityType = isEntity && !string.IsNullOrWhiteSpace(h.EntityType)
+                ? h.EntityType : null;
+
             if (nodes.TryGetValue(h.InodeId, out var node))
             {
                 var (path, parentName, rootId) = BuildPath(node, nodes);
@@ -54,7 +72,9 @@ public sealed class SearchService
                     ParentName: parentName,
                     Path: path,
                     RootId: rootId,
-                    Score: (float)Math.Round(h.Score, 4));
+                    Score: (float)Math.Round(h.Score, 4),
+                    MatchKind: isEntity ? "Entity" : "Node",
+                    EntityType: entityType);
             }
 
             // 未挂载空间树的命中（tree_node 裸实体 / 待对账清理的孤儿向量）
@@ -65,7 +85,9 @@ public sealed class SearchService
                 ParentName: null,
                 Path: "",
                 RootId: null,
-                Score: (float)Math.Round(h.Score, 4));
+                Score: (float)Math.Round(h.Score, 4),
+                MatchKind: isEntity ? "Entity" : "Node",
+                EntityType: entityType);
         }).ToList();
     }
 
@@ -108,6 +130,32 @@ public sealed class SearchService
     }
 
     /// <summary>
+    /// 加载若干节点的全部后代节点 Id（BFS 逐层向下，用于节点命中后的子树实体过滤）。
+    /// 不含传入的根 Id 本身。
+    /// </summary>
+    private async Task<List<string>> LoadDescendantIdsAsync(
+        IReadOnlyCollection<string> rootIds, CancellationToken ct)
+    {
+        var result = new List<string>();
+        var known = new HashSet<string>(rootIds, StringComparer.Ordinal);
+        var frontier = rootIds.ToList();
+
+        while (frontier.Count > 0)
+        {
+            var children = await _db.SpaceTrees
+                .AsNoTracking()
+                .Where(n => n.ParentId != null && frontier.Contains(n.ParentId))
+                .Select(n => n.Id)
+                .ToListAsync(ct);
+
+            frontier = children.Where(id => known.Add(id)).ToList();
+            result.AddRange(frontier);
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// 由祖先链构造 (Path, ParentName, RootId)。
     /// Path 含本节点（"根 / … / 父 / 本节点"）；RootId 取最顶端已知祖先
     /// （父链断裂时退化为最顶端已知节点，尽力而为）。
@@ -135,6 +183,7 @@ public sealed class SearchService
     {
         "space_tree" => "SpaceTree",
         "tree_node" => "TreeNode",
+        "entity" => "Entity",
         var other => other
     };
 }

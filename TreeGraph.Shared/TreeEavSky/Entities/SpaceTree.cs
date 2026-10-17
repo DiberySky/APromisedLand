@@ -25,22 +25,4 @@ public class SpaceTree : ITreeNodeBase<SpaceTree>
     {
         return Name;
     }
-
-    public static List<SpaceTree> SeedData()
-    {
-        return
-        [
-            // 唯一根节点（固定 GUID），其余节点全部由界面创建
-            new SpaceTree
-            {
-                Id = "EBBAD64B-2119-47EB-95C3-01D3DD796774",
-                Name = "空间树",
-                Description = "",
-                ParentId = null,
-                CanHaveChildren = true,
-                SortOrder = 0,
-                HasChildren = false
-            }
-        ];
-    }
 }

@@ -1,6 +1,4 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using TreeGraph.Api.Data;
 
 namespace TreeGraph.Api.NodeEavSky.SemanticSearch;
 
@@ -57,55 +55,8 @@ public sealed class VectorReconciliationService : BackgroundService
     private async Task ReconcileAsync(CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
-        var builder = scope.ServiceProvider
-            .GetRequiredService<SourceTextBuilder>();
-        var embedding = scope.ServiceProvider
-            .GetRequiredService<EmbeddingClient>();
-        var store = scope.ServiceProvider
-            .GetRequiredService<QdrantVectorStore>();
-
-        // PG 侧活跃 inode 集合（有实体的节点）
-        var activeIds = await db.InodeEntities
-            .AsNoTracking()
-            .Select(m => m.InodeId)
-            .Distinct()
-            .ToListAsync(ct);
-        var activeSet = activeIds.ToHashSet(StringComparer.Ordinal);
-
-        // Qdrant 侧已存向量集合
-        var existingIds = await store.ScrollAllIdsAsync(ct);
-
-        var missing = activeSet.Except(existingIds, StringComparer.Ordinal)
-            .ToList();
-        var orphaned = existingIds.Except(activeSet, StringComparer.Ordinal)
-            .ToList();
-
-        _logger.LogInformation(
-            "向量对账：活跃={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned}",
-            activeSet.Count, existingIds.Count, missing.Count, orphaned.Count);
-
-        // 补算缺失（小数据集逐条，避免长时间占用嵌入模型）
-        foreach (var inodeId in missing)
-        {
-            var source = await builder.BuildAsync(inodeId, ct);
-            if (source is null) continue;
-
-            var vector = await embedding.EmbedAsync(source.Text, ct);
-            await store.UpsertAsync(inodeId, vector,
-                source.HostType, source.SpaceId,
-                source.SourceHash, source.Text, ct);
-        }
-
-        // 删除孤儿
-        foreach (var inodeId in orphaned)
-            await store.DeleteAsync(inodeId, ct);
-
-        if (missing.Count > 0 || orphaned.Count > 0)
-        {
-            _logger.LogInformation(
-                "向量对账修复：补算 {Missing} 条，删除孤儿 {Orphaned} 条",
-                missing.Count, orphaned.Count);
-        }
+        var synchronizer = scope.ServiceProvider
+            .GetRequiredService<VectorSynchronizer>();
+        await synchronizer.ReconcileAllAsync(ct);
     }
 }

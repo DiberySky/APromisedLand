@@ -19,15 +19,18 @@ public sealed class SearchController : ControllerBase
     private readonly SearchService _searchService;
     private readonly SemanticSearchOptions _options;
     private readonly ILogger<SearchController> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public SearchController(
         SearchService searchService,
         IOptions<SemanticSearchOptions> options,
-        ILogger<SearchController> logger)
+        ILogger<SearchController> logger,
+        IServiceScopeFactory scopeFactory)
     {
         _searchService = searchService;
         _options = options.Value;
         _logger = logger;
+        _scopeFactory = scopeFactory;
     }
 
     [HttpPost("semantic")]
@@ -52,6 +55,35 @@ public sealed class SearchController : ControllerBase
             Query: request.Query.Trim(),
             Total: results.Count,
             Items: results));
+    }
+
+    /// <summary>
+    /// 手动触发向量对账（立即执行，无需等待后台周期）。
+    /// 用于修复：PG 有、Qdrant 无（补算向量）或 Qdrant 有、PG 无（删除孤儿）。
+    /// </summary>
+    [HttpPost("reconcile")]
+    public async Task<IActionResult> ReconcileVectors(CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var synchronizer = scope.ServiceProvider
+            .GetRequiredService<VectorSynchronizer>();
+
+        var result = await synchronizer.ReconcileAllAsync(ct);
+
+        _logger.LogInformation(
+            "手动向量对账：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
+            result.Active, result.Existing, result.Missing,
+            result.Orphaned, result.FixedCount, result.DeletedCount);
+
+        return Ok(new
+        {
+            active = result.Active,
+            existing = result.Existing,
+            missing = result.Missing,
+            orphaned = result.Orphaned,
+            fixedCount = result.FixedCount,
+            deletedCount = result.DeletedCount
+        });
     }
 }
 

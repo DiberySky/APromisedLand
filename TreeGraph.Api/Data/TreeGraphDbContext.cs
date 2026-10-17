@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.SpaceSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -127,9 +128,6 @@ public class TreeGraphDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(x => x.ParentId).HasDatabaseName("ix_space_trees_parent");
-
-            // 仅播种唯一根节点「空间树」，其余节点全部由界面创建
-            e.HasData(SpaceTree.SeedData());
         });
     }
 

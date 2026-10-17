@@ -26,86 +26,107 @@ public sealed class SourceTextBuilder
     public SourceTextBuilder(TreeGraphDbContext db) => _db = db;
 
     /// <summary>
-    /// 为指定 iNode 构造宿主文本。
-    /// iNode 下无任何实体时返回 null（调用方删除向量）。
+    /// 为指定 iNode 构造宿主文本（节点 + 实体分离）。
+    /// 返回：NodeText（纯节点名）+ EntityTexts（各实体独立文本）。
     /// </summary>
-    public async Task<SourceText?> BuildAsync(string inodeId, CancellationToken ct = default)
+    public async Task<NodeSourceText?> BuildAsync(string inodeId, CancellationToken ct = default)
     {
         // 1. 查 inode 归属的全部实体
-        var entityTypes = await _db.InodeEntities
+        var entityMounts = await _db.InodeEntities
             .AsNoTracking()
             .Where(m => m.InodeId == inodeId)
             .Select(m => new { m.EntityType, m.EntityId })
             .ToListAsync(ct);
 
-        if (entityTypes.Count == 0)
-            return null;
-
-        // 2. 解析宿主类型与 spaceId
+        // 2. 解析宿主节点
         var space = await _db.SpaceTrees
             .AsNoTracking()
             .FirstOrDefaultAsync(n => n.Id == inodeId, ct);
 
+        if (space is null && entityMounts.Count == 0)
+            return null; // 既无实体又不在树中 → 删除向量
+
         var hostType = space is not null ? "space_tree" : "tree_node";
         var spaceId = "default";
 
-        // 3. 逐类型构造文本段（按实体类型名排序，保证确定性）
-        var lines = new List<string>();
+        // 3. 构造节点文本（纯节点名）。
+        // space 节点（Id 存在于 spaces 空间实体列表内，代表空间本身）不创建向量。
+        var isSpaceNode = space is not null &&
+            await _db.Spaces.AsNoTracking().AnyAsync(s => s.Id == inodeId, ct);
+        var nodeText = space is not null && !isSpaceNode
+            ? $"节点：{space.Name}" : "";
+        var nodeHash = ComputeHash(nodeText);
 
-        if (space is not null)
-            lines.Add($"节点：{space.Name}");
-
-        foreach (var et in entityTypes
-                     .OrderBy(e => e.EntityType, StringComparer.Ordinal))
+        // 4. 构造各实体独立文本
+        var entityTexts = new List<EntitySourceText>();
+        foreach (var mount in entityMounts)
         {
-            lines.Add($"类型：{et.EntityType}");
-
-            var attrs = _db.AttributeCatalog
-                .Where(a => a.EntityType == et.EntityType && !a.IsDeleted)
-                .ToList();
-            var defs = attrs
-                .OrderBy(a => a.DisplayOrder)
-                .ThenBy(a => a.AttributeId, StringComparer.Ordinal)
-                .ToList();
-
-            var values = await _db.AttributeValues
-                .AsNoTracking()
-                .Where(v => v.EntityType == et.EntityType && v.EntityId == et.EntityId)
-                .ToListAsync(ct);
-
-            var byAttrId = values.ToDictionary(v => v.AttributeId, v => v);
-
-            foreach (var def in defs)
-            {
-                if (!byAttrId.TryGetValue(def.AttributeId, out var val))
-                    continue;
-
-                var display = FormatValue(val);
-                if (display is null) continue;
-                lines.Add($"{def.DisplayName}：{display}");
-            }
-
-            // 自定义表子数据（按 RowOrder 排序，限制行数防爆 token）
-            var tableRows = await _db.CustomTableRows
-                .AsNoTracking()
-                .Where(r => r.ParentEntityType == et.EntityType &&
-                            r.ParentEntityId == et.EntityId)
-                .OrderBy(r => r.RowOrder)
-                .Take(50)
-                .ToListAsync(ct);
-
-            foreach (var row in tableRows)
-            {
-                var rowText = FormatTableRow(row.RowData);
-                if (!string.IsNullOrWhiteSpace(rowText))
-                    lines.Add($"行：{rowText}");
-            }
+            var entityText = await BuildEntityTextAsync(
+                mount.EntityType, mount.EntityId, ct);
+            if (entityText is not null)
+                entityTexts.Add(entityText);
         }
+
+        return new NodeSourceText(
+            inodeId, hostType, spaceId,
+            nodeText, nodeHash, entityTexts);
+    }
+
+    /// <summary>
+    /// 构造单个实体的独立文本。
+    /// </summary>
+    private async Task<EntitySourceText?> BuildEntityTextAsync(
+        string entityType, string entityId, CancellationToken ct)
+    {
+        var lines = new List<string> { $"类型：{entityType}" };
+
+        var attrs = _db.AttributeCatalog
+            .Where(a => a.EntityType == entityType && !a.IsDeleted)
+            .ToList();
+        var defs = attrs
+            .OrderBy(a => a.DisplayOrder)
+            .ThenBy(a => a.AttributeId, StringComparer.Ordinal)
+            .ToList();
+
+        var values = await _db.AttributeValues
+            .AsNoTracking()
+            .Where(v => v.EntityType == entityType && v.EntityId == entityId)
+            .ToListAsync(ct);
+
+        var byAttrId = values.ToDictionary(v => v.AttributeId, v => v);
+
+        foreach (var def in defs)
+        {
+            if (!byAttrId.TryGetValue(def.AttributeId, out var val))
+                continue;
+
+            var display = FormatValue(val);
+            if (display is null) continue;
+            lines.Add($"{def.DisplayName}：{display}");
+        }
+
+        // 自定义表子数据
+        var tableRows = await _db.CustomTableRows
+            .AsNoTracking()
+            .Where(r => r.ParentEntityType == entityType &&
+                        r.ParentEntityId == entityId)
+            .OrderBy(r => r.RowOrder)
+            .Take(50)
+            .ToListAsync(ct);
+
+        foreach (var row in tableRows)
+        {
+            var rowText = FormatTableRow(row.RowData);
+            if (!string.IsNullOrWhiteSpace(rowText))
+                lines.Add($"行：{rowText}");
+        }
+
+        if (lines.Count <= 1) return null; // 只有类型行，无实际内容
 
         var text = string.Join("；", lines);
         var hash = ComputeHash(text);
 
-        return new SourceText(text, hostType, spaceId, hash);
+        return new EntitySourceText(entityId, entityType, text, hash);
     }
 
     private static string? FormatValue(NodeEavSky.Entities.AttributeValue v)
@@ -146,5 +167,18 @@ public sealed class SourceTextBuilder
     }
 }
 
-public sealed record SourceText(
-    string Text, string HostType, string SpaceId, string SourceHash);
+/// <summary>节点级源文本：纯节点文本 + 挂载的全部实体独立文本。</summary>
+public sealed record NodeSourceText(
+    string InodeId,
+    string HostType,
+    string SpaceId,
+    string NodeText,
+    string NodeHash,
+    IReadOnlyList<EntitySourceText> EntityTexts);
+
+/// <summary>实体级源文本：独立于节点存在，仅通过 InodeId 建立路径关系。</summary>
+public sealed record EntitySourceText(
+    string EntityId,
+    string EntityType,
+    string Text,
+    string Hash);
