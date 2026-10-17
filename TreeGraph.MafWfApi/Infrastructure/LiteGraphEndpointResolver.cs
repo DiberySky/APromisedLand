@@ -1,4 +1,4 @@
-﻿using System.Data.Common;
+using System.Data.Common;
 using System.Text;
 
 namespace TreeGraph.MafWfApi.Infrastructure;
@@ -18,6 +18,9 @@ internal static class LiteGraphEndpointResolver
         "services__litegraph__http__0",
         "services__litegraph__https__0",
         "LITEGRAPH_ENDPOINT",
+        // ★ Aspire 通过 WithEnvironment("LiteGraph__Endpoint", ...) 注入，
+        //   在 .NET 配置系统中映射为 LiteGraph:Endpoint，但环境变量名是 LiteGraph__Endpoint
+        "LiteGraph__Endpoint",
     ];
 
     private const string ConnectionStringVar = "ConnectionStrings__litegraph";

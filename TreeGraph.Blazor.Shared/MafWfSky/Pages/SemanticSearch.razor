@@ -191,6 +191,14 @@
         box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
     }
 
+    /* 桌面端（≥960px，MudDrawer Responsive 的 md 断点）drawer 展开时避让其宽度；
+       移动端 drawer 为 overlay 不推挤内容，保持 left: 0。 */
+    @@media (min-width: 960px) {
+        .mud-layout.mud-drawer-open-responsive-md-left .search-input-bar {
+            left: var(--mud-drawer-width-left, 240px);
+        }
+    }
+
     /* iOS 上防止输入框聚焦时自动放大页面（字号小于 16px 会触发） */
     .search-input-bar .mud-input-slot {
         font-size: 16px;
@@ -409,7 +417,18 @@
         var dialog = await DialogService.ShowExAsync<TreeDialogPageSky<TItem>>(
             "树节点", parameters, options);
 
-        await dialog.Result;
+        var result = await dialog.Result;
+
+        // 用户在树对话框中选择了节点（点击节点文本触发 ShowDialogFunc）
+        if (result is { Canceled: false, Data: TItem selectedNode })
+        {
+            // 显示选中节点的信息
+            _lastReply = $"已选择节点：{selectedNode.Text()} (ID: {selectedNode.Id})";
+            StateHasChanged();
+
+            // 跳转到节点详情页
+            Nav.NavigateTo($"/inodes/{selectedNode.Id}");
+        }
     }
 
     // ═══════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using TreeGraph.MafWfApi.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
@@ -576,12 +576,46 @@ public sealed class GraphTools
         if (!root.TryGetProperty("Objects", out var objs) || objs.ValueKind != JsonValueKind.Array)
             return null;
 
+        // 先精确匹配（忽略大小写）
         foreach (var g in objs.EnumerateArray())
         {
             var name = g.TryGetProperty("Name", out var n) ? n.GetString() : null;
             if (string.Equals(name, graphName, StringComparison.OrdinalIgnoreCase))
                 return g.TryGetProperty("GUID", out var gg) ? gg.GetGuid() : null;
         }
+
+        // 再模糊匹配（处理 LLM 幻觉：default_graph → Default graph）
+        var normalizedInput = graphName.Replace("_", " ").Trim();
+        foreach (var g in objs.EnumerateArray())
+        {
+            var name = g.TryGetProperty("Name", out var n) ? n.GetString() : null;
+            if (name is null) continue;
+            var normalizedName = name.Replace("_", " ").Trim();
+            if (string.Equals(normalizedName, normalizedInput, StringComparison.OrdinalIgnoreCase))
+                return g.TryGetProperty("GUID", out var gg) ? gg.GetGuid() : null;
+        }
+
+        // 最后包含匹配（处理 LLM 幻觉截断：default → Default graph；取最长名避免歧义）
+        string? containsGuid = null;
+        var bestLen = -1;
+        foreach (var g in objs.EnumerateArray())
+        {
+            var name = g.TryGetProperty("Name", out var n) ? n.GetString() : null;
+            if (name is null) continue;
+            var normalizedName = name.Replace("_", " ").Trim();
+            if (normalizedName.Contains(normalizedInput, StringComparison.OrdinalIgnoreCase)
+                && name.Length > bestLen)
+            {
+                bestLen = name.Length;
+                containsGuid = g.TryGetProperty("GUID", out var gg) ? gg.GetString() : null;
+            }
+        }
+        if (containsGuid is not null && Guid.TryParse(containsGuid, out var fuzzyGuid))
+        {
+            // 记录幻觉纠正，便于排查
+            return fuzzyGuid;
+        }
+
         return null;
     }
 

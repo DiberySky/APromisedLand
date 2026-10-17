@@ -15,10 +15,10 @@
                       Disabled="_running" Immediate="true" Class="flex-grow-1" />
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    Disabled="_running || string.IsNullOrWhiteSpace(_topic)"
-                   OnClick="() => RunAsync(stream: false)">同步运行</MudButton>
+                   OnClick="@(() => RunAsync(stream: false))">同步运行</MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                    Disabled="_running || string.IsNullOrWhiteSpace(_topic)"
-                   OnClick="() => RunAsync(stream: true)">流式运行</MudButton>
+                   OnClick="@(() => RunAsync(stream: true))">流式运行</MudButton>
     </MudStack>
 
     @if (_steps.Count > 0)

@@ -21,11 +21,15 @@ public static class QdrantExtension
     {
         resourceContext.Qdrant = builder.AddQdrant("Qdrant")
             .WithDataVolume("qdrant-data")
+            // isProxied: false → 由 docker 直接发布宿主端口，绕过 DCP 代理
+            //（代理模式下固定端口偶发不绑定，健康检查探针打不通导致 WaitFor 挂起）。
             .WithEndpoint(port: GrpcHostPort, targetPort: 6334,
-                scheme: "http", name: GrpcEndpointName)
+                scheme: "http", name: GrpcEndpointName, isProxied: false)
             .WithEndpoint(port: RestHostPort, targetPort: 6333,
-                scheme: "http", name: RestEndpointName)
+                scheme: "http", name: RestEndpointName, isProxied: false)
             .WithLifetime(ContainerLifetime.Persistent)
+            // 离线环境访问不了 telemetry.qdrant.io，关闭遥测消除 ERROR 噪音
+            .WithEnvironment("QDRANT__TELEMETRY_DISABLED", "true")
             .WithHttpHealthCheck(path: "/healthz", statusCode: 200,
                 endpointName: RestEndpointName);
 

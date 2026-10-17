@@ -122,7 +122,7 @@ public static class VllmExtension
         // ══════════════════════════════════════════════════════
         var vllm = builder.AddContainer("vllm", "vllm/vllm-openai")
             .WithImageTag(imageTag)
-            .WithEndpoint(port: ChatHostPort, targetPort: ContainerPort, scheme: "http", name: HttpEndpointName)
+            .WithEndpoint(port: ChatHostPort, targetPort: ContainerPort, scheme: "http", name: HttpEndpointName, isProxied: false)
             .WithVolume(HuggingFaceCacheVolumeName, "/root/.cache/huggingface")
             .WithLifetime(ContainerLifetime.Persistent)
             .WithEntrypoint("python3")
@@ -170,7 +170,7 @@ public static class VllmExtension
         // ══════════════════════════════════════════════════════
         var vllmEmbed = builder.AddContainer("vllm-embed", "vllm/vllm-openai")
             .WithImageTag(imageTag)
-            .WithEndpoint(port: EmbeddingHostPort, targetPort: ContainerPort, scheme: "http", name: EmbeddingHttpEndpointName)
+            .WithEndpoint(port: EmbeddingHostPort, targetPort: ContainerPort, scheme: "http", name: EmbeddingHttpEndpointName, isProxied: false)
             .WithVolume(HuggingFaceCacheVolumeName, "/root/.cache/huggingface")
             .WithLifetime(ContainerLifetime.Persistent)
             .WithEntrypoint("python3")

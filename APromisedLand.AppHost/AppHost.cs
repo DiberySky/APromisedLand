@@ -34,17 +34,22 @@ void TreeGraph()
     //   复用 FileMetadataDb + SeaweedS3,与 EavApi 平级)
     builder.AddTreeGraphFileStorageApi(context);
 
-    // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi + FileStorageApi)
-    builder.AddTreeGraphBlazor(context);
-    builder.AddTreeGraphBlazorMaui(context);
-
-    // ★ vLLM Chat/Embedding 容器 + LiteGraph(MAF + Workflow API 的依赖)
+    // ★ vLLM Chat/Embedding 容器（LiteGraph/MAF 依赖）
     builder.AddVllm(context);
-    // builder.AddLiteGraph(context);
+
+    // ★ LiteGraph 图数据库容器组（REST:8701/MCP:8702/UI:3001，
+    //   复用 Postgres + vLLM Embed；TreeGraph.MafWfApi 的图查询工具依赖）
+    builder.AddLiteGraph(context);
 
     // ★ TreeGraph.MafWfApi:MAF + Workflow 服务 API(vLLM 版,固定端口 5323,
     //   替代已停用的旧 MAFWorkFlowApi)
     builder.AddTreeGraphMafWfApi(context);
+
+    // ★ TreeGraph 管理台 Blazor Server(固定端口 5783,引用 EavApi + FileStorageApi + MafWfApi)
+    //   必须在 AddTreeGraphMafWfApi 之后调用：否则扩展内 WithReference(TreeGraphMafWfApi)
+    //   因资源尚未声明被条件跳过，Blazor 服务发现无法解析 treegraphmafwfapi。
+    builder.AddTreeGraphBlazor(context);
+    builder.AddTreeGraphBlazorMaui(context);
 
     // ★ TreeGraph.Maui(MAUI+Blazor 混合模板起步项目,引用 EavApi 供后续服务发现)
     // builder.AddTreeGraphMaui(context);

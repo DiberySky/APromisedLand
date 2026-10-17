@@ -1,4 +1,5 @@
 using MudBlazor;
+using MudBlazor.Extensions;
 using MudBlazor.Extensions.Options;
 
 namespace TreeGraph.Blazor.Shared.TreeEavSky.Dialogs;
@@ -33,16 +34,27 @@ public class DialogConfig
     public bool MaximizeButton { get; set; } = true;
 
     /// <summary>
+    /// 拖拽模式（MudBlazor.Extensions）。null = 扩展默认；None = 不可移动。
+    /// </summary>
+    public MudDialogDragMode? DragMode { get; set; }
+
+    /// <summary>
     /// 转换为 DialogOptionsEx（MudBlazor.Extensions）。
     /// </summary>
-    public DialogOptionsEx ToDialogOptions() => new()
+    public DialogOptionsEx ToDialogOptions()
     {
-        MaxWidth = MaxWidth,
-        CloseButton = CloseButton,
-        BackdropClick = BackdropClick,
-        FullScreen = FullScreen,
-        FullWidth = FullWidth,
-        Position = Position,
-        MaximizeButton = MaximizeButton
-    };
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth,
+            CloseButton = CloseButton,
+            BackdropClick = BackdropClick,
+            FullScreen = FullScreen,
+            FullWidth = FullWidth,
+            Position = Position,
+            MaximizeButton = MaximizeButton
+        };
+        if (DragMode.HasValue)
+            options.DragMode = DragMode.Value;
+        return options;
+    }
 }

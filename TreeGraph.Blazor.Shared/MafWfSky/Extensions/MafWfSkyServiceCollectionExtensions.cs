@@ -40,14 +40,14 @@ public static class MafWfSkyServiceCollectionExtensions
         //   否则与本客户端策略叠加，默认 10s 先触发，对话/工作流一律超时。
         .RemoveAllResilienceHandlers()
         // 非流式调用：禁重试（对话/工作流均不幂等），超时走 AttemptTimeout，
-        // 放宽到对话可接受的 60s（Writer-Critic 全程可能较长，由 TotalRequestTimeout 兜底）。
+        // 放宽到 5 分钟（本地 vLLM 节点展开/Writer-Critic 全程可能数分钟，由 TotalRequestTimeout 兜底）。
         .AddStandardResilienceHandler(o =>
         {
             o.Retry.MaxRetryAttempts = 1;
             o.Retry.ShouldHandle = _ => ValueTask.FromResult(false);
-            o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(60);
+            o.AttemptTimeout.Timeout = TimeSpan.FromMinutes(5);
             o.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(10);
-            o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(120);
+            o.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(11); // 校验要求 ≥ 2× AttemptTimeout
         });
 
         // SSE 长连接：专用策略（禁重试/禁超时，仅宽熔断），见 SseResilience。

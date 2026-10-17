@@ -1,0 +1,123 @@
+@using Microsoft.Extensions.Logging
+@using Microsoft.JSInterop
+@using TreeGraph.Blazor.Shared.MafWfSky.Services
+@using MudBlazor
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Pages
+@inject MafWfApiClient MafWfApi
+@inject ILogger<NodeExpandDialog> Logger
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@($"AI 综合：{NodeName}")"
+           CancelButtonText="关闭"
+           ActionsMaxWidth="MaxWidth.Medium">
+    <ToolBarContent>
+        <MudCheckBox @bind-Value="_includeChildren"
+                     Label="包含子项"
+                     Color="Color.Primary"
+                     Size="Size.Small"/>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                       Size="Size.Small"
+                       Color="Color.Primary"
+                       Title="重新综合"
+                       OnClick="RunAsync"/>
+        <MudSpacer/>
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                       Size="Size.Small"
+                       Color="Color.Success"
+                       Title="复制 Markdown"
+                       OnClick="CopyAsync"/>
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer MaxWidth="MaxWidth.Medium" Class="pa-4">
+            @if (_loading)
+            {
+                <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Secondary"/>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        正在加载子树并综合，本地模型可能需要几分钟…
+                    </MudText>
+                </MudStack>
+            }
+            else if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
+                    @_error
+                </MudAlert>
+            }
+            else
+            {
+                <div class="markdown-preview">
+                    @((MarkupString)MarkdownRenderer.ToHtml(_reply))
+                </div>
+            }
+        </MudContainer>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [Parameter, EditorRequired] public string InodeId { get; set; } = "";
+    [Parameter, EditorRequired] public string HostType { get; set; } = "";
+    [Parameter] public string? NodeName { get; set; }
+
+    private bool _includeChildren = false;
+    private bool _loading = true;
+    private bool _running;          // 重入守卫：字段值始终准确，不依赖 DOM 渲染状态
+    private string? _error;
+    private string? _reply;
+
+    protected override Task OnInitializedAsync() => RunAsync();
+
+    private async Task RunAsync()
+    {
+        if (_running)
+        {
+            Snackbar.Add("正在进行 AI 综合，请稍候…", Severity.Info);
+            return;
+        }
+
+        _running = true;
+        _loading = true;
+        _error = null;
+        _reply = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await MafWfApi.ExpandNodeAsync(
+                conversationId: null, InodeId, HostType, _includeChildren);
+            _reply = result.Reply;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "AI 综合失败：{InodeId}", InodeId);
+            _error = $"AI 综合失败：{ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            _running = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CopyAsync()
+    {
+        if (_reply is null)
+        {
+            Snackbar.Add("结果尚未就绪，请稍候再试", Severity.Info);
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _reply);
+            Snackbar.Add("已复制 Markdown 到剪贴板", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "复制失败");
+            Snackbar.Add($"复制失败：{ex.Message}", Severity.Error);
+        }
+    }
+}

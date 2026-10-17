@@ -15,13 +15,16 @@ namespace TreeGraph.MafWfApi.Controllers;
 public sealed class GraphAgentController : ControllerBase
 {
     private readonly GraphAgentService _agents;
+    private readonly NodeExpandService _nodeExpand;
     private readonly ILogger<GraphAgentController> _logger;
 
     public GraphAgentController(
         GraphAgentService agents,
+        NodeExpandService nodeExpand,
         ILogger<GraphAgentController> logger)
     {
         _agents = agents;
+        _nodeExpand = nodeExpand;
         _logger = logger;
     }
 
@@ -44,6 +47,23 @@ public sealed class GraphAgentController : ControllerBase
             MessageCount: reply.MessageCount,
             ToolsInvoked: reply.ToolsInvoked ?? new List<string>(),
             ToolCallDetails: reply.ToolCallDetails ?? new List<ToolCallDetailDto>()));
+    }
+
+    /// <summary>展开节点合成回答（非流式一次性返回）。</summary>
+    [HttpPost("expand-node")]
+    public async Task<ActionResult<NodeExpandResult>> ExpandNode(
+        [FromBody] ExpandNodeRequest request,
+        CancellationToken ct)
+    {
+        _logger.LogInformation(
+            "ExpandNode, ConvId={ConvId}, {Host}/{Inode}",
+            request.ConversationId ?? "(new)", request.HostType, request.InodeId);
+
+        var result = await _nodeExpand.ExpandAsync(
+            request.ConversationId, request.InodeId, request.HostType,
+            request.IncludeChildren, ct);
+
+        return Ok(result);
     }
 
     [HttpPost("chat/stream")]

@@ -127,6 +127,59 @@ public sealed class NodeExpandService
 
     // ═══════════════════════════════════════════════════════
 
+    /// <summary>
+    /// 非流式版本：加载子树 → LLM 一次性合成 → 返回全文。
+    /// 供独立端点 POST /api/graph-agent/expand-node 使用。
+    /// </summary>
+    public async Task<NodeExpandResult> ExpandAsync(
+        string? conversationId,
+        string inodeId,
+        string hostType,
+        bool includeChildren,
+        CancellationToken ct)
+    {
+        var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
+
+        var subtree = await _subtreeLoader.LoadAsync(
+            hostType, inodeId,
+            includeChildren ? DefaultMaxDepth : 1,
+            DefaultMaxNodes, ct);
+
+        if (subtree is null)
+        {
+            return new NodeExpandResult(
+                ConversationId: currentConversationId,
+                AgentName: "NodeExpander",
+                Reply: $"未找到节点 {inodeId}",
+                Found: false);
+        }
+
+        var session = await _sessionStore.GetSessionAsync(
+                          _expandAgent,
+                          new AgentSessionStoreKey(currentConversationId), ct)
+                      ?? await _expandAgent.CreateSessionAsync(cancellationToken: ct);
+
+        var userPrompt = $"""
+            请综合描述以下节点及其子树的内容：
+            {FormatSubtreeAsText(subtree)}
+            """;
+
+        var response = await _expandAgent.RunAsync(
+            userPrompt, session, cancellationToken: ct);
+
+        await _sessionStore.SaveSessionAsync(
+            _expandAgent,
+            new AgentSessionStoreKey(currentConversationId),
+            session, ct);
+
+        var text = response.Text;
+        return new NodeExpandResult(
+            ConversationId: currentConversationId,
+            AgentName: "NodeExpander",
+            Reply: string.IsNullOrWhiteSpace(text) ? "（模型未返回内容）" : text,
+            Found: true);
+    }
+
     private static string FormatSubtreeAsText(SubtreeNodeDto node)
     {
         var sb = new StringBuilder();
@@ -159,12 +212,14 @@ public sealed class NodeExpandService
 
         【规则】
         1. 用自然语言回答，不要输出 JSON、代码块或原始数据结构。
-        2. 具体数字优先（"3 条记录"，不是"多条记录"）。
+        2. 只陈述子树数据中的事实，具体数字优先（"3 条记录"，不是"多条记录"）。
         3. 涉及时间时给出具体日期。
         4. 子树有多个分支时，按时间或重要程度顺序描述。
         5. 严禁编造子树里没有的内容。
-        6. 若子树是空的，如实说明"该节点暂无子节点"。
-        7. 长度 200-500 字，简洁清晰。
+        6. 严禁任何假设、可能、推测、估计、设想、猜测类虚拟内容；"可能""或许""假设""推测"等措辞一律不得出现。
+        7. 某方面没有数据就不呈现该部分，必要时直接说明"没有相关内容"。
+        8. 若子树是空的，如实说明"该节点暂无子节点"。
+        9. 长度 200-500 字，简洁清晰。
 
         【回答风格】
         - 直接开始描述，不要寒暄。

@@ -1,7 +1,6 @@
 @page "/maf-wf/graph-agent"
 @rendermode @(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode(prerender: false))
 @inject MafWfApiClient Api
-@inject MafWfSseReader Sse
 @inject ISnackbar Snackbar
 
 <PageTitle>Graph Agent</PageTitle>
@@ -144,30 +143,11 @@
 
         try
         {
-            string? convId = null, agentName = null;
-            IReadOnlyList<ToolCallDetailDto>? tools = null;
-
-            await foreach (var chunk in Sse.GraphAgentStreamAsync(_conversationId, text))
-            {
-                switch (chunk.Type)
-                {
-                    case StreamChunkType.Start:
-                        convId ??= chunk.ConversationId;
-                        agentName ??= chunk.AgentName;
-                        break;
-                    case StreamChunkType.Delta:
-                        _streamBuffer += chunk.Text;
-                        StateHasChanged();
-                        break;
-                    case StreamChunkType.Done:
-                        convId = chunk.ConversationId ?? convId;
-                        tools = chunk.ToolCallDetails;
-                        break;
-                }
-            }
-
-            _messages.Add(new UiMessage(false, _streamBuffer, agentName, tools));
-            _conversationId = convId ?? _conversationId;
+            // 改用非流式调用，避免 SSE 连接问题
+            var reply = await Api.GraphAgentChatAsync(_conversationId, text);
+            
+            _messages.Add(new UiMessage(false, reply.Reply, reply.AgentName, reply.ToolCallDetails));
+            _conversationId = reply.ConversationId ?? _conversationId;
             await LoadSessionsAsync();   // 新会话入列
         }
         catch (Exception ex)

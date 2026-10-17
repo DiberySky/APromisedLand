@@ -62,6 +62,17 @@ public class MafWfApiClient
         return (await UnwrapAsync<AgentReplyDto>(resp, ct))!;
     }
 
+    /// <summary>展开节点合成回答（非流式一次性返回）。</summary>
+    public async Task<NodeExpandResultDto> ExpandNodeAsync(
+        string? conversationId, string inodeId, string hostType,
+        bool includeChildren = true,
+        CancellationToken ct = default)
+    {
+        var resp = await _http.PostAsJsonAsync($"{GraphAgentBase}/expand-node",
+            new { conversationId, inodeId, hostType, includeChildren }, JsonOptions, ct);
+        return (await UnwrapAsync<NodeExpandResultDto>(resp, ct))!;
+    }
+
     public async Task<IReadOnlyList<SessionSummaryDto>> GraphAgentListSessionsAsync(
         CancellationToken ct = default)
     {
@@ -213,3 +224,10 @@ public class MafWfApiClient
             $"请求失败 ({(int)resp.StatusCode}): {body[..Math.Min(300, body.Length)]}");
     }
 }
+
+/// <summary>POST /api/graph-agent/expand-node 响应（非流式一次性返回）。</summary>
+public sealed record NodeExpandResultDto(
+    string ConversationId,
+    string AgentName,
+    string Reply,
+    bool Found);
