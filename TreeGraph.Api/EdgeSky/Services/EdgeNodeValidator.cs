@@ -1,14 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
-namespace TreeGraph.Api.NodeEavSky.Services;
+namespace TreeGraph.Api.EdgeSky.Services;
 
 /// <summary>
 /// 边/链节点校验器：当 EdgeDefinition 声明了 FromNodeType/ToNodeType 时，
 /// 校验对应节点在其宿主主表中真实存在，防止边指向不存在的节点（孤儿边）。
 ///
-/// 遵循既有“无守卫则放行”的约定：
+/// 遵循既有"无守卫则放行"的约定：
 ///   - nodeType 为空 → 不校验（该关系不限定节点类型）；
 ///   - nodeType 为未知类型（无对应宿主表）→ 放行（无法校验）；
 ///   - 当前覆盖的宿主类型：UnitTree / CategoryTree / SpaceTree。

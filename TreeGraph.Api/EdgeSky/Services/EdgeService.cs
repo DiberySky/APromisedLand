@@ -1,10 +1,11 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
-using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Shared.NodeEavSky.Dtos;
+using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Shared.EdgeSky.Dtos;
 
-namespace TreeGraph.Api.NodeEavSky.Services;
+namespace TreeGraph.Api.EdgeSky.Services;
 
 /// <summary>
 /// Edge Definition CRUD。
@@ -15,13 +16,14 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 public class EdgeMetadataService
 {
     private readonly TreeGraphDbContext _db;
-    private readonly ChainService _chain;
+    private readonly EdgeInstanceService _edgeInst;
     private readonly IAttributeCache _attrCache;
 
-    public EdgeMetadataService(TreeGraphDbContext db, ChainService chain, IAttributeCache attrCache)
+    public EdgeMetadataService(
+        TreeGraphDbContext db, EdgeInstanceService edgeInst, IAttributeCache attrCache)
     {
         _db = db;
-        _chain = chain;
+        _edgeInst = edgeInst;
         _attrCache = attrCache;
     }
 
@@ -112,7 +114,7 @@ public class EdgeMetadataService
 
             // ValidateTopologyAsync 与当前 ApiResponse 请求共享同一 Scoped DbContext，
             // 会读取上面已修改（尚未保存）的跟踪实体值。
-            var validation = await _chain.ValidateTopologyAsync(def.EdgeTypeId, ct);
+            var validation = await _edgeInst.ValidateTopologyAsync(def.EdgeTypeId, ct);
             if (!validation.Valid)
             {
                 def.IsChain = oldIsChain;
@@ -121,7 +123,7 @@ public class EdgeMetadataService
                     $"变更链式/线性约束会破坏现有拓扑：{string.Join("；", validation.Errors)}");
             }
 
-            // 同步存量实例的“严格线性”镜像标记
+            // 同步存量实例的"严格线性"镜像标记
             var enforce = newIsChain && newIsLinear;
             await _db.EdgeInstances
                 .Where(i => i.EdgeTypeId == def.EdgeTypeId)
@@ -492,6 +494,60 @@ public class EdgeInstanceService
     }
 
     // ============================================================
+    // 拓扑校验（入度/出度/成环）—— 迭代 Kahn，无递归
+    // ============================================================
+
+    /// <summary>
+    /// 校验链式结构拓扑：入度/出度/成环。
+    /// 返回轻量结果（Valid + Errors），供 EdgeMetadataService 在变更 IsChain/IsLinear 时使用。
+    /// 严格线性链（IsChain &amp;&amp; IsLinear）下，入度 &gt; 1 与成环计入 Errors。
+    /// </summary>
+    public async Task<(bool Valid, List<string> Errors)> ValidateTopologyAsync(
+        string edgeTypeId, CancellationToken ct)
+    {
+        var def = await _db.EdgeDefinitions
+            .FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
+
+        var pairs = await _db.EdgeInstances
+            .Where(e => e.EdgeTypeId == edgeTypeId)
+            .Select(e => new { e.FromNodeId, e.ToNodeId })
+            .ToListAsync(ct);
+
+        var analysis = AnalyzeTopology(pairs.Select(e => (e.FromNodeId, e.ToNodeId)).ToList());
+        var treatAsStrict = def is { IsChain: true, IsLinear: true };
+
+        var errors = new List<string>();
+
+        foreach (var (nodeId, deg) in analysis.Indeg.Where(kv => kv.Value > 1))
+        {
+            var msg = $"节点 {nodeId} 入度 = {deg}（链式结构入度应 ≤ 1）";
+            if (treatAsStrict) errors.Add(msg);
+        }
+
+        foreach (var nodeId in analysis.Cyclic)
+        {
+            var msg = $"节点 {nodeId} 参与成环（链式结构应无环）";
+            if (treatAsStrict) errors.Add(msg);
+        }
+
+        return (errors.Count == 0, errors);
+    }
+
+    /// <summary>
+    /// 完整拓扑分析（供 ChainService 包装为 ChainValidationResult）。
+    /// </summary>
+    public async Task<TopologyAnalysis> AnalyzeTopologyAsync(
+        string edgeTypeId, CancellationToken ct)
+    {
+        var pairs = await _db.EdgeInstances
+            .Where(e => e.EdgeTypeId == edgeTypeId)
+            .Select(e => new { e.FromNodeId, e.ToNodeId })
+            .ToListAsync(ct);
+
+        return AnalyzeTopology(pairs.Select(e => (e.FromNodeId, e.ToNodeId)).ToList());
+    }
+
+    // ============================================================
     // Helpers
     // ============================================================
 
@@ -616,4 +672,54 @@ public class EdgeInstanceService
         }
         return dict;
     }
+
+    /// <summary>
+    /// 迭代 Kahn 拓扑排序：返回入度表、出度表、未能消解的节点（= 成环节点）。
+    /// 无递归，避免长链导致的栈溢出；O(V+E)。
+    /// 注：环下游的节点也可能留在 Cyclic 中（Kahn 的已知特性），仅用于诊断提示。
+    /// </summary>
+    public static TopologyAnalysis AnalyzeTopology(List<(string From, string To)> edges)
+    {
+        var indeg = new Dictionary<string, int>();
+        var outdeg = new Dictionary<string, int>();
+        var adj = new Dictionary<string, List<string>>();
+
+        foreach (var (from, to) in edges)
+        {
+            if (!indeg.ContainsKey(from)) indeg[from] = 0;
+            indeg[to] = indeg.GetValueOrDefault(to) + 1;
+            outdeg[from] = outdeg.GetValueOrDefault(from) + 1;
+            if (!outdeg.ContainsKey(to)) outdeg[to] = 0;
+
+            if (!adj.TryGetValue(from, out var list)) adj[from] = list = new();
+            list.Add(to);
+        }
+
+        var remaining = new Dictionary<string, int>(indeg);
+        var queue = new Queue<string>(remaining.Where(kv => kv.Value == 0).Select(kv => kv.Key));
+        var processed = new HashSet<string>();
+
+        while (queue.Count > 0)
+        {
+            var node = queue.Dequeue();
+            processed.Add(node);
+
+            foreach (var next in adj.GetValueOrDefault(node, new()))
+            {
+                if (!remaining.ContainsKey(next)) continue;
+                remaining[next]--;
+                if (remaining[next] == 0) queue.Enqueue(next);
+            }
+        }
+
+        var cyclic = indeg.Keys.Where(n => !processed.Contains(n)).ToList();
+        return new TopologyAnalysis(indeg, outdeg, cyclic, indeg.Count);
+    }
 }
+
+/// <summary>拓扑分析结果（入度/出度/成环节点）。</summary>
+public sealed record TopologyAnalysis(
+    Dictionary<string, int> Indeg,
+    Dictionary<string, int> Outdeg,
+    List<string> Cyclic,
+    int NodeCount);

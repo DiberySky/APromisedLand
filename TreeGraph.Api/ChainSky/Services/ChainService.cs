@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
-using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Shared.NodeEavSky.Dtos;
+using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Api.EdgeSky.Services;
+using TreeGraph.Shared.ChainSky.Dtos;
+using TreeGraph.Shared.EdgeSky.Dtos;
 
-namespace TreeGraph.Api.NodeEavSky.Services;
+namespace TreeGraph.Api.ChainSky.Services;
 
 /// <summary>
 /// 链式结构（Chain）专用服务。
@@ -12,6 +14,7 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// 语义上表达"点线相连的链式结构"（如输电线路、物流线路、工序链）。
 ///
 /// 核心查询使用 PostgreSQL WITH RECURSIVE CTE（单次 SQL 拿完整路径）。
+/// 拓扑分析内核（Kahn）复用 EdgeSky 的 <see cref="EdgeInstanceService.AnalyzeTopology"/>。
 /// </summary>
 public class ChainService
 {
@@ -83,7 +86,7 @@ public class ChainService
             for (int i = 0; i < req.OrderedNodeIds.Count - 1; i++)
                 pairs.Add((req.OrderedNodeIds[i], req.OrderedNodeIds[i + 1]));
 
-            if (AnalyzeTopology(pairs).Cyclic.Count > 0)
+            if (EdgeInstanceService.AnalyzeTopology(pairs).Cyclic.Count > 0)
                 throw new InvalidOperationException(
                     "新增链会形成环，链式结构应无环（请检查 OrderedNodeIds 是否与既有边构成回路）");
         }
@@ -279,7 +282,7 @@ public class ChainService
         int Depth);
 
     // ============================================================
-    // ③ 拓扑校验（入度/出度/成环）—— 迭代 Kahn，无递归
+    // ③ 拓扑校验（入度/出度/成环）—— 内核复用 EdgeSky 的迭代 Kahn
     // ============================================================
 
     /// <summary>
@@ -297,7 +300,8 @@ public class ChainService
             .Select(e => new { e.FromNodeId, e.ToNodeId })
             .ToListAsync(ct);
 
-        var analysis = AnalyzeTopology(pairs.Select(e => (e.FromNodeId, e.ToNodeId)).ToList());
+        var analysis = EdgeInstanceService.AnalyzeTopology(
+            pairs.Select(e => (e.FromNodeId, e.ToNodeId)).ToList());
         var treatAsStrict = def is { IsChain: true, IsLinear: true };
 
         var errors = new List<string>();
@@ -410,58 +414,5 @@ public class ChainService
         }
 
         return components;
-    }
-
-    // ============================================================
-    // 拓扑分析内核（迭代 Kahn）
-    // ============================================================
-
-    private sealed record TopologyAnalysis(
-        Dictionary<string, int> Indeg,
-        Dictionary<string, int> Outdeg,
-        List<string> Cyclic,
-        int NodeCount);
-
-    /// <summary>
-    /// 迭代 Kahn 拓扑排序：返回入度表、出度表、未能消解的节点（= 成环节点）。
-    /// 无递归，避免长链导致的栈溢出；O(V+E)。
-    /// 注：环下游的节点也可能留在 Cyclic 中（Kahn 的已知特性），仅用于诊断提示。
-    /// </summary>
-    private static TopologyAnalysis AnalyzeTopology(List<(string From, string To)> edges)
-    {
-        var indeg = new Dictionary<string, int>();
-        var outdeg = new Dictionary<string, int>();
-        var adj = new Dictionary<string, List<string>>();
-
-        foreach (var (from, to) in edges)
-        {
-            if (!indeg.ContainsKey(from)) indeg[from] = 0;
-            indeg[to] = indeg.GetValueOrDefault(to) + 1;
-            outdeg[from] = outdeg.GetValueOrDefault(from) + 1;
-            if (!outdeg.ContainsKey(to)) outdeg[to] = 0;
-
-            if (!adj.TryGetValue(from, out var list)) adj[from] = list = new();
-            list.Add(to);
-        }
-
-        var remaining = new Dictionary<string, int>(indeg);
-        var queue = new Queue<string>(remaining.Where(kv => kv.Value == 0).Select(kv => kv.Key));
-        var processed = new HashSet<string>();
-
-        while (queue.Count > 0)
-        {
-            var node = queue.Dequeue();
-            processed.Add(node);
-
-            foreach (var next in adj.GetValueOrDefault(node, new()))
-            {
-                if (!remaining.ContainsKey(next)) continue;
-                remaining[next]--;
-                if (remaining[next] == 0) queue.Enqueue(next);
-            }
-        }
-
-        var cyclic = indeg.Keys.Where(n => !processed.Contains(n)).ToList();
-        return new TopologyAnalysis(indeg, outdeg, cyclic, indeg.Count);
     }
 }

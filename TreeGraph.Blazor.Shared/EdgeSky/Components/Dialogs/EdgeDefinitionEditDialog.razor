@@ -1,6 +1,6 @@
 @* EdgeDefinitionEditDialog.razor — 编辑边类型 *@
-@using TreeGraph.Shared.NodeEavSky.Dtos
-@inject EavApiClient Api
+@inject EavApiClient EavApi
+@inject EdgeApiClient EdgeApi
 @inject ISnackbar Snackbar
 
 <DialogSky Title="编辑边类型"
@@ -83,7 +83,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try { _entityTypes = await Api.ListEntityTypesAsync(sharedOnly: true) ?? []; }
+        try { _entityTypes = await EavApi.ListEntityTypesAsync(sharedOnly: true) ?? []; }
         catch { _entityTypes = []; }
     }
 
@@ -111,7 +111,7 @@
                     ? null : _form.Description
             };
 
-            var (ok, error) = await Api.UpdateEdgeTypeAsync(Type.EdgeTypeId, req);
+            var (ok, error) = await EdgeApi.UpdateEdgeTypeAsync(Type.EdgeTypeId, req);
             if (ok)
             {
                 Snackbar.Add("保存成功", Severity.Success);

@@ -7,9 +7,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using MudBlazor;
 using MudBlazor.Services;
-using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs;
+using TreeGraph.Blazor.Shared.EdgeSky.Components.Dialogs;
+using TreeGraph.Blazor.Shared.EdgeSky.Services;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
+using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
 
@@ -35,6 +37,7 @@ public class EdgeDialogSmokeTests : BunitTestBase
             BaseAddress = new Uri("http://localhost/")
         });
         Services.AddSingleton<EavApiClient>();
+        Services.AddSingleton<EdgeApiClient>();
     }
 
     private async Task<IRenderedComponent<MudDialogProvider>> OpenAsync<TDialog>(

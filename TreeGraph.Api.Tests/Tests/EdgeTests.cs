@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using TreeGraph.Api.Tests.Fixtures;
+using TreeGraph.Shared.EdgeSky.Dtos;
+using TreeGraph.Shared.ChainSky.Dtos;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
 

@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Components.WebView.Maui;
 using TreeGraph.Blazor.Maui;
 using TreeGraph.Blazor.Maui.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
+using TreeGraph.Blazor.Shared.EdgeSky.Services;
+using TreeGraph.Blazor.Shared.ChainSky.Services;
 using TreeGraph.Blazor.Shared.SpaceSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
@@ -71,6 +73,21 @@ public static class MauiProgram
         builder.Services.AddScoped<EntityTypeDisplayService>();
         builder.Services
             .AddHttpClient<EavApiClient>(client =>
+            {
+                client.BaseAddress = new Uri("https+http://treegrapheavapi");
+            })
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+        // ★ EdgeSky / ChainSky 客户端：与 EavApiClient 同一后端、同款弹性策略。
+        builder.Services
+            .AddHttpClient<EdgeApiClient>(client =>
+            {
+                client.BaseAddress = new Uri("https+http://treegrapheavapi");
+            })
+            .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+        builder.Services
+            .AddHttpClient<ChainApiClient>(client =>
             {
                 client.BaseAddress = new Uri("https+http://treegrapheavapi");
             })

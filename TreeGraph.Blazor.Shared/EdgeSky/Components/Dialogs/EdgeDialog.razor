@@ -1,7 +1,7 @@
 @* EdgeDialog.razor — 创建 / 编辑边实例 *@
 @using System.Text.Json
-@using TreeGraph.Shared.NodeEavSky.Dtos
-@inject EavApiClient Api
+@inject EavApiClient EavApi
+@inject EdgeApiClient EdgeApi
 @inject ISnackbar Snackbar
 
 <DialogSky Title="@(IsEdit ? "编辑边" : "创建边")"
@@ -127,7 +127,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _edgeTypes = await Api.ListEdgeTypesAsync() ?? [];
+        _edgeTypes = await EdgeApi.ListEdgeTypesAsync() ?? [];
 
         if (IsEdit && Editing is not null)
         {
@@ -146,7 +146,7 @@
 
             if (type is not null)
             {
-                _schema = await Api.GetSchemaAsync(type.TypeName);
+                _schema = await EavApi.GetSchemaAsync(type.TypeName);
                 if (_schema is { Count: > 0 } && Editing.Properties is not null)
                 {
                     // DynamicForm.LoadFrom 接受 Dictionary<string, JsonElement>
@@ -176,7 +176,7 @@
 
         if (_currentEdgeType is not null)
         {
-            _schema = await Api.GetSchemaAsync(_currentEdgeType.TypeName);
+            _schema = await EavApi.GetSchemaAsync(_currentEdgeType.TypeName);
         }
         else
         {
@@ -235,7 +235,7 @@
                 : null
         };
 
-        var edgeId = await Api.CreateEdgeAsync(_form.EdgeTypeId, request);
+        var edgeId = await EdgeApi.CreateEdgeAsync(_form.EdgeTypeId, request);
         if (edgeId is null)
         {
             Snackbar.Add("创建失败（节点可能不存在，或该边已存在）", Severity.Error);
@@ -252,7 +252,7 @@
 
         // 2a. 更新边实例本身（Weight）
         var req = new UpdateEdgeRequest { Weight = _form.Weight };
-        var (ok, error) = await Api.UpdateEdgeAsync(
+        var (ok, error) = await EdgeApi.UpdateEdgeAsync(
             Editing.EdgeTypeId, Editing.EdgeId, req);
 
         if (!ok)
@@ -264,7 +264,7 @@
         // 2b. 更新 EAV 属性（如果有）
         if (_eavValues.Count > 0)
         {
-            var (eavOk, eavError, _) = await Api.SaveEntityAsync(
+            var (eavOk, eavError, _) = await EavApi.SaveEntityAsync(
                 _currentEdgeType.TypeName, Editing.EdgeId, _eavValues);
 
             if (!eavOk)

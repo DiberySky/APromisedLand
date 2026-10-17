@@ -6,6 +6,8 @@ using MudBlazor.Services;
 using TreeGraph.Blazor.Components;
 using TreeGraph.Blazor.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
+using TreeGraph.Blazor.Shared.EdgeSky.Services;
+using TreeGraph.Blazor.Shared.ChainSky.Services;
 using TreeGraph.Blazor.Shared.SpaceSky.Services;
 using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
 using TreeGraph.Blazor.Shared.TreeEavSky.Services;
@@ -73,6 +75,23 @@ builder.Services.AddScoped<EntityTypeDisplayService>();
 //   与 TreeEavSky 客户端保持一致，避免同一后端操作在不同客户端上行为不同。
 builder.Services
     .AddHttpClient<EavApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .RemoveAllResilienceHandlers()
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+// ★ EdgeSky / ChainSky 客户端：与 EavApiClient 同一后端、同款弹性策略。
+builder.Services
+    .AddHttpClient<EdgeApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .RemoveAllResilienceHandlers()
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+builder.Services
+    .AddHttpClient<ChainApiClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://treegrapheavapi");
     })

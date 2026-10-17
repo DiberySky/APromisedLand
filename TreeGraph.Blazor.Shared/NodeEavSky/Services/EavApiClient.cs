@@ -578,6 +578,22 @@ public class EavApiClient
             $"api/eav/metadata/option-sets/{optionSetId}/items/{itemId}/undelete", ct);
 
     // ============================================================
+    // 语义搜索（直接调用 TreeGraphEavApi）
+    // ============================================================
+
+    /// <summary>
+    /// 语义搜索（向量相似度匹配）。
+    /// 直接调用 TreeGraphEavApi 的 /api/search/semantic，不经过 MafWfApi Agent。
+    /// </summary>
+    public async Task<SemanticSearchResponse?> SemanticSearchAsync(
+        SemanticSearchRequest request, CancellationToken ct = default)
+    {
+        var resp = await PostAsync<SemanticSearchResponse>(
+            "api/search/semantic", request, ct);
+        return resp;
+    }
+
+    // ============================================================
     // 通用助手
     // ============================================================
 
@@ -1008,124 +1024,6 @@ public class EavApiClient
             return null;
         }
     }
-
-    // ============================================================
-    // ★ Edge（关系/边）
-    // ============================================================
-
-    public async Task<IReadOnlyList<EdgeTypeDto>?> ListEdgeTypesAsync(
-        CancellationToken ct = default)
-        => await GetAsync<IReadOnlyList<EdgeTypeDto>>(
-            "api/eav/metadata/edge-types", ct);
-
-    public Task<EdgeTypeDto?> GetEdgeTypeAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => GetAsync<EdgeTypeDto>(
-            $"api/eav/metadata/edge-types/{edgeTypeId}", ct);
-
-    public Task<string?> CreateEdgeTypeAsync(
-        CreateEdgeTypeRequest request, CancellationToken ct = default)
-        => PostForIdAsync("api/eav/metadata/edge-types", request, "edgeTypeId", ct);
-
-    public Task<(bool Ok, string? Error)> UpdateEdgeTypeAsync(
-        string edgeTypeId, UpdateEdgeTypeRequest request, CancellationToken ct = default)
-        => PutAsync($"api/eav/metadata/edge-types/{edgeTypeId}", request, ct);
-
-    public Task<(bool Ok, string? Error)> DeleteEdgeTypeAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => DeleteWithErrorAsync($"api/eav/metadata/edge-types/{edgeTypeId}", ct);
-
-    // --- Edge Instance ---
-
-    public async Task<IReadOnlyList<EdgeInstanceDto>?> ListEdgesAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => await GetAsync<IReadOnlyList<EdgeInstanceDto>>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}", ct);
-
-    public Task<EdgeInstanceDto?> GetEdgeAsync(
-        string edgeTypeId, string edgeId, CancellationToken ct = default)
-        => GetAsync<EdgeInstanceDto>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}/{Uri.EscapeDataString(edgeId)}",
-            ct);
-
-    public Task<string?> CreateEdgeAsync(
-        string edgeTypeId, CreateEdgeRequest request, CancellationToken ct = default)
-        => PostForIdAsync(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}",
-            request, "edgeId", ct);
-
-    public Task<(bool Ok, string? Error)> UpdateEdgeAsync(
-        string edgeTypeId, string edgeId,
-        UpdateEdgeRequest request, CancellationToken ct = default)
-        => PutAsync(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}/{Uri.EscapeDataString(edgeId)}",
-            request, ct);
-
-    public Task<(bool Ok, string? Error)> DeleteEdgeAsync(
-        string edgeTypeId, string edgeId, CancellationToken ct = default)
-        => DeleteWithErrorAsync(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}/{Uri.EscapeDataString(edgeId)}",
-            ct);
-
-    // --- 图查询 ---
-
-    public async Task<IReadOnlyList<EdgeInstanceDto>?> FindOutgoingEdgesAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => await GetAsync<IReadOnlyList<EdgeInstanceDto>>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}" +
-            $"/from/{Uri.EscapeDataString(nodeId)}", ct);
-
-    public async Task<IReadOnlyList<EdgeInstanceDto>?> FindIncomingEdgesAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => await GetAsync<IReadOnlyList<EdgeInstanceDto>>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}" +
-            $"/to/{Uri.EscapeDataString(nodeId)}", ct);
-
-    public async Task<EdgeTraverseResult?> TraverseEdgesAsync(
-        string edgeTypeId, EdgeTraverseRequest request, CancellationToken ct = default)
-        => await PostAsync<EdgeTraverseResult>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}/traverse",
-            request, ct);
-
-    // ============================================================
-    // ★ 链式结构（Chain）
-    // ============================================================
-
-    public Task<List<EdgeInstanceDto>?> CreateChainAsync(
-        string edgeTypeId, CreateChainRequest request, CancellationToken ct = default)
-        => PostAsync<List<EdgeInstanceDto>>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/create",
-            request, ct);
-
-    public Task<ChainPathResult?> GetChainUpstreamAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => GetAsync<ChainPathResult>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/upstream/{Uri.EscapeDataString(nodeId)}",
-            ct);
-
-    public Task<ChainPathResult?> GetChainDownstreamAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => GetAsync<ChainPathResult>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/downstream/{Uri.EscapeDataString(nodeId)}",
-            ct);
-
-    public Task<ChainPathResult?> GetChainFullPathAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => GetAsync<ChainPathResult>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/path/{Uri.EscapeDataString(nodeId)}",
-            ct);
-
-    public Task<ChainValidationResult?> ValidateChainTopologyAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => GetAsync<ChainValidationResult>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/validate",
-            ct);
-
-    public Task<IReadOnlyList<ChainConnectedComponent>?> GetChainComponentsAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => GetAsync<IReadOnlyList<ChainConnectedComponent>>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/components",
-            ct);
 
     // ============================================================
     // ★ 内部辅助：带乐观锁的 PUT / PATCH

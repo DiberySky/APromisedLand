@@ -1,7 +1,7 @@
 @* EdgeDefinitionCreateDialog.razor — 新建边类型（DialogSky 外壳） *@
-@using TreeGraph.Shared.NodeEavSky.Dtos
 @using TreeGraph.Blazor.Shared.MafWfSky.Components
-@inject EavApiClient Api
+@inject EavApiClient EavApi
+@inject EdgeApiClient EdgeApi
 @inject ISnackbar Snackbar
 
 <DialogSky Title="新建边类型"
@@ -89,7 +89,7 @@
     {
         try
         {
-            _entityTypes = await Api.ListEntityTypesAsync(sharedOnly: true) ?? [];
+            _entityTypes = await EavApi.ListEntityTypesAsync(sharedOnly: true) ?? [];
         }
         catch { _entityTypes = []; }
     }
@@ -113,7 +113,7 @@
         _submitting = true;
         try
         {
-            var id = await Api.CreateEdgeTypeAsync(_newType);
+            var id = await EdgeApi.CreateEdgeTypeAsync(_newType);
             if (id is null)
             {
                 Snackbar.Add("创建失败（类型名可能已被占用）", Severity.Error);

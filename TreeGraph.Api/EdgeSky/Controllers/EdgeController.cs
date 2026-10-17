@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.NodeEavSky.Dtos;
+using TreeGraph.Api.EdgeSky.Services;
+using TreeGraph.Shared.EdgeSky.Dtos;
 
-namespace TreeGraph.Api.NodeEavSky.Controllers;
+namespace TreeGraph.Api.EdgeSky.Controllers;
 
 /// <summary>
 /// Edge Instance CRUD + 图查询。

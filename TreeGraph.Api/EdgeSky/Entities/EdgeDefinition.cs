@@ -1,4 +1,4 @@
-namespace TreeGraph.Api.NodeEavSky.Entities;
+namespace TreeGraph.Api.EdgeSky.Entities;
 
 /// <summary>
 /// 边类型定义（Edge Definition）。
@@ -93,9 +93,9 @@ public class EdgeInstance
     public decimal? Weight { get; set; }
 
     /// <summary>
-    /// 镜像自 EdgeDefinition（IsChain &amp;&amp; IsLinear）的“严格线性”标记。
+    /// 镜像自 EdgeDefinition（IsChain &amp;&amp; IsLinear）的"严格线性"标记。
     /// 供数据库层部分唯一索引 uq_ei_single_incoming 使用：同一 edge_type_id 下
-    /// 同一 to_node_id 至多一条边（入度 ≤ 1），把“查后插”的并发竞态收敛为数据库原子约束。
+    /// 同一 to_node_id 至多一条边（入度 ≤ 1），把"查后插"的并发竞态收敛为数据库原子约束。
     /// </summary>
     public bool EnforceSingleIncoming { get; set; }
 

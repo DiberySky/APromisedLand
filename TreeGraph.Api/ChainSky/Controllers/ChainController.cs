@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
-using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.NodeEavSky.Dtos;
+using TreeGraph.Api.ChainSky.Services;
+using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Shared.ChainSky.Dtos;
 
-namespace TreeGraph.Api.NodeEavSky.Controllers;
+namespace TreeGraph.Api.ChainSky.Controllers;
 
 /// <summary>
 /// 链式结构（Chain）专用端点。
