@@ -1,0 +1,55 @@
+.numstep {
+    display: inline-flex;
+    align-items: center;
+    font-size: .875rem;
+    line-height: 1;
+    user-select: none;
+    margin-right: .5rem;
+}
+
+.numstep-label {
+    margin-right: .25rem;
+}
+
+.numstep-frame {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 6px;
+    padding: 2px 4px;
+}
+
+.numstep-frame.embedded {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+}
+
+.numstep-seg {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 22px;
+    padding: 0 2px;
+}
+
+.numstep-btn {
+    color: var(--mud-palette-primary);
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.numstep-btn:hover {
+    color: var(--mud-palette-primary-lighten);
+}
+
+.numstep-btn.disabled {
+    color: var(--mud-palette-text-disabled);
+    cursor: default;
+}
+
+.numstep-value {
+    font-weight: 600;
+    color: var(--mud-palette-text-primary);
+}

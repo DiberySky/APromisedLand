@@ -1,0 +1,47 @@
+/* 容器：相对定位，承载输入框与右侧聚拢的 −/+ 按钮 */
+.numinput {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* 输入框占满容器 */
+.numinput ::deep .mud-input-control {
+    width: 100%;
+}
+
+/* 数字居中于 − 与 + 的间隙中点（距右缘 44px = 8 + 20(+) + 6 + 10）。
+   padding-left 用 calc(100% - 74px) 随宽度联动（74 = 88 − padding-right 14），
+   任意控件宽度下 − 与 + 到数字的距离都相等 */
+.numinput ::deep input {
+    text-align: center;
+    padding-left: calc(100% - 74px);
+    padding-right: 14px;
+}
+
+/* 按钮组：锚定输入框右侧内部，垂直居中 */
+.numinput-stepper {
+    position: absolute;
+    right: 8px;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    z-index: 2;
+    pointer-events: none; /* 不挡输入框点击，按钮单独恢复 */
+}
+
+/* 抵消 NumberStepper 自带右边距，保证贴齐 */
+.numinput-stepper ::deep .numstep {
+    margin-right: 0;
+}
+
+/* − 与 + 之间留出数字区，三者聚拢为 "− 数字 +" */
+.numinput-stepper ::deep .numstep-btn + .numstep-btn {
+    margin-left: 32px; /* 6(间距) + 20(数字区) + 6(间距) */
+}
+
+/* 仅按钮恢复可点击 */
+.numinput-stepper ::deep .numstep-btn {
+    pointer-events: auto;
+}

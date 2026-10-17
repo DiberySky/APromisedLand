@@ -1,0 +1,56 @@
+@* 紧凑数字微调器：【− 值 +】括号整体包裹，替代 MudNumericField 的上下 stepper *@
+<span class="numstep">
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <span class="numstep-label">@Label</span>
+    }
+    <span class="numstep-frame @(Embedded ? "embedded" : "")">
+        <span class="numstep-seg numstep-btn @(Disabled || Value <= Min ? "disabled" : "")"
+              title="减少"
+              @onclick="@(() => ChangeAsync(-Step))">−</span>
+        @if (!Embedded)
+        {
+            @* 内嵌模式：宿主输入框已显示数值，这里只保留 −/+ *@
+            <span class="numstep-seg numstep-value">@Value</span>
+        }
+        <span class="numstep-seg numstep-btn @(Disabled || Value >= Max ? "disabled" : "")"
+              title="增加"
+              @onclick="@(() => ChangeAsync(Step))">+</span>
+    </span>
+    @if (!string.IsNullOrEmpty(Suffix))
+    {
+        <span class="numstep-label">@Suffix</span>
+    }
+</span>
+
+@code {
+    /// <summary>当前值（配合 @bind-Value 使用）。</summary>
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+
+    /// <summary>左侧标签文字，空则不显示。</summary>
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>右侧单位后缀（如"层"），空则不显示。</summary>
+    [Parameter] public string? Suffix { get; set; }
+
+    [Parameter] public int Min { get; set; }
+    [Parameter] public int Max { get; set; } = 10;
+    [Parameter] public int Step { get; set; } = 1;
+    [Parameter] public Color Color { get; set; } = Color.Primary;
+
+    /// <summary>内嵌模式：去掉自身描边框，供宿主控件（如 NumberInputField）承载边框。</summary>
+    [Parameter] public bool Embedded { get; set; }
+
+    /// <summary>禁用步进按钮。</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    private async Task ChangeAsync(int delta)
+    {
+        if (Disabled) return;
+        var next = Math.Clamp(Value + delta, Min, Max);
+        if (next == Value) return;
+        Value = next;
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

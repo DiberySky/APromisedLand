@@ -1,0 +1,56 @@
+@* 数字输入框：Outlined 可键入 + 右侧内嵌 NumberStepper（−/+）。
+   MudBlazor 9 的 MudTextField 无自定义 adornment 通道，
+   故用容器相对定位 + 步进器绝对定位叠进输入框内。 *@
+<div class="numinput" style="@Style">
+    <MudTextField T="int"
+                  Value="_boundValue"
+                  ValueChanged="SetValueAsync"
+                  Label="@Label"
+                  Variant="Variant.Outlined"
+                  Immediate="true"
+                  HideSpinButtons="true"
+                  Disabled="@Disabled"
+                  Class="numinput-field"/>
+    <div class="numinput-stepper">
+        <NumberStepper Embedded="true" Label="" Suffix="@Suffix" Disabled="@Disabled"
+                       Value="Value" ValueChanged="SetValueAsync"
+                       Min="@Min" Max="@Max" Step="@Step"/>
+    </div>
+</div>
+
+@code {
+    /// <summary>当前值（配合 @bind-Value 使用）。</summary>
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+
+    /// <summary>浮动标签文字。</summary>
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>步进器右侧单位后缀（如"层"），空则不显示。</summary>
+    [Parameter] public string? Suffix { get; set; }
+
+    [Parameter] public int Min { get; set; }
+    [Parameter] public int Max { get; set; } = 100;
+    [Parameter] public int Step { get; set; } = 1;
+
+    /// <summary>作用于外层容器的样式（如宽度）。</summary>
+    [Parameter] public string? Style { get; set; }
+
+    /// <summary>禁用输入与步进。</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    private int _boundValue;
+
+    protected override void OnParametersSet() => _boundValue = Value;
+
+    private async Task SetValueAsync(int v)
+    {
+        v = Math.Clamp(v, Min, Max);
+        _boundValue = v;
+        if (v != Value)
+        {
+            Value = v;
+            await ValueChanged.InvokeAsync(v);
+        }
+    }
+}
