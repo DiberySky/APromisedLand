@@ -61,7 +61,7 @@ public sealed class GraphAgentController : ControllerBase
 
         var result = await _nodeExpand.ExpandAsync(
             request.ConversationId, request.InodeId, request.HostType,
-            request.IncludeChildren, ct);
+            request.Depth, ct);
 
         return Ok(result);
     }

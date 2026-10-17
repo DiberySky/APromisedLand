@@ -65,11 +65,11 @@ public class MafWfApiClient
     /// <summary>展开节点合成回答（非流式一次性返回）。</summary>
     public async Task<NodeExpandResultDto> ExpandNodeAsync(
         string? conversationId, string inodeId, string hostType,
-        bool includeChildren = true,
+        int depth = 3,
         CancellationToken ct = default)
     {
         var resp = await _http.PostAsJsonAsync($"{GraphAgentBase}/expand-node",
-            new { conversationId, inodeId, hostType, includeChildren }, JsonOptions, ct);
+            new { conversationId, inodeId, hostType, depth }, JsonOptions, ct);
         return (await UnwrapAsync<NodeExpandResultDto>(resp, ct))!;
     }
 

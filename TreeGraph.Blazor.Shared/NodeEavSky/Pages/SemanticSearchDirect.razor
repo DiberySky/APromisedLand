@@ -30,12 +30,11 @@
                               Disabled="_searching"/>
 
                 <MudStack Row="true" Spacing="2">
-                    <MudNumericField @bind-Value="_topK"
-                                     Label="返回数量"
-                                     Variant="Variant.Outlined"
-                                     Min="1" Max="20"
-                                     Style="width: 120px;"
-                                     Disabled="_searching"/>
+                    <NumberInputField @bind-Value="_topK"
+                                      Label="返回数量"
+                                      Min="1" Max="20"
+                                      Style="width: 120px;"
+                                      Disabled="_searching"/>
 
                     <MudSpacer/>
 

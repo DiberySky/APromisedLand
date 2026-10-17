@@ -135,15 +135,15 @@ public sealed class NodeExpandService
         string? conversationId,
         string inodeId,
         string hostType,
-        bool includeChildren,
+        int depth,
         CancellationToken ct)
     {
         var currentConversationId = conversationId ?? Guid.NewGuid().ToString("N");
 
+        // 子树层数由调用方（UI 参数）控制：0 = 仅节点本身，默认 3 层
+        var maxDepth = Math.Clamp(depth, 0, 10);
         var subtree = await _subtreeLoader.LoadAsync(
-            hostType, inodeId,
-            includeChildren ? DefaultMaxDepth : 1,
-            DefaultMaxNodes, ct);
+            hostType, inodeId, maxDepth, DefaultMaxNodes, ct);
 
         if (subtree is null)
         {
@@ -159,8 +159,9 @@ public sealed class NodeExpandService
                           new AgentSessionStoreKey(currentConversationId), ct)
                       ?? await _expandAgent.CreateSessionAsync(cancellationToken: ct);
 
+        var scopeText = maxDepth > 0 ? $"节点及其 {maxDepth} 层子树" : "节点本身（不含子项）";
         var userPrompt = $"""
-            请综合描述以下节点及其子树的内容：
+            请综合描述以下{scopeText}的内容：
             {FormatSubtreeAsText(subtree)}
             """;
 
@@ -208,20 +209,24 @@ public sealed class NodeExpandService
     }
 
     private static string BuildInstructions() => """
-        你是数据摘要助手。用户点击了一个节点，希望看到该节点及其子树的综合描述。
+        你是数据分析助手。用户点击了一个节点，已收集该节点（可能含若干层子树）的全部信息，需要你综合分析后以小结的形式回答。
+
+        【核心要求】
+        - 不要描述节点的结构：路径、层级、目录树、位置关系等一律不写。
+        - 把收集到的节点信息（实体属性、记录内容等）综合起来分析，提炼出这些信息共同说明了什么。
+        - 输出是一段连贯的小结（结论性文字），不是逐条罗列原始数据，也不是复述结构。
 
         【规则】
         1. 用自然语言回答，不要输出 JSON、代码块或原始数据结构。
-        2. 只陈述子树数据中的事实，具体数字优先（"3 条记录"，不是"多条记录"）。
+        2. 只陈述数据中的事实，具体数字优先（"3 条记录"，不是"多条记录"）。
         3. 涉及时间时给出具体日期。
-        4. 子树有多个分支时，按时间或重要程度顺序描述。
-        5. 严禁编造子树里没有的内容。
-        6. 严禁任何假设、可能、推测、估计、设想、猜测类虚拟内容；"可能""或许""假设""推测"等措辞一律不得出现。
-        7. 某方面没有数据就不呈现该部分，必要时直接说明"没有相关内容"。
-        8. 若子树是空的，如实说明"该节点暂无子节点"。
-        9. 长度 200-500 字，简洁清晰。
+        4. 严禁编造数据里没有的内容。
+        5. 严禁任何假设、可能、推测、估计、设想、猜测类虚拟内容；"可能""或许""假设""推测"等措辞一律不得出现。
+        6. 某方面没有数据就不呈现该部分，必要时直接说明"没有相关内容"。
+        7. 若没有任何实质数据，直接说明"该节点暂无内容"。
+        8. 长度 200-500 字，简洁清晰。
 
         【回答风格】
-        - 直接开始描述，不要寒暄。
+        - 直接给出小结，不要寒暄。
         """;
 }

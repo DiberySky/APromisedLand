@@ -12,10 +12,7 @@
            CancelButtonText="关闭"
            ActionsMaxWidth="MaxWidth.Medium">
     <ToolBarContent>
-        <MudCheckBox @bind-Value="_includeChildren"
-                     Label="包含子项"
-                     Color="Color.Primary"
-                     Size="Size.Small"/>
+        <NumberStepper @bind-Value="_depth" Label="包含子项" Suffix="层" Min="0" Max="10"/>
         <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                        Size="Size.Small"
                        Color="Color.Primary"
@@ -60,7 +57,7 @@
     [Parameter, EditorRequired] public string HostType { get; set; } = "";
     [Parameter] public string? NodeName { get; set; }
 
-    private bool _includeChildren = false;
+    private int _depth = 3;         // 子树层数：0 = 仅节点本身，默认 3 层
     private bool _loading = true;
     private bool _running;          // 重入守卫：字段值始终准确，不依赖 DOM 渲染状态
     private string? _error;
@@ -85,7 +82,7 @@
         try
         {
             var result = await MafWfApi.ExpandNodeAsync(
-                conversationId: null, InodeId, HostType, _includeChildren);
+                conversationId: null, InodeId, HostType, _depth);
             _reply = result.Reply;
         }
         catch (Exception ex)

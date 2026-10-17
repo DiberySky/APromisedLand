@@ -44,8 +44,9 @@ public sealed class ExpandNodeRequest
     [Required(AllowEmptyStrings = false)]
     public string HostType { get; set; } = string.Empty;
 
-    /// <summary>是否包含子项（false = 仅节点自身，maxDepth=1）。</summary>
-    public bool IncludeChildren { get; set; } = true;
+    /// <summary>子树展开层数（0 = 仅节点自身，默认 3 层）。</summary>
+    [Range(0, 10)]
+    public int Depth { get; set; } = 3;
 }
 
 /// <summary>POST /api/graph-agent/expand-node 响应体（非流式一次性返回）。</summary>
