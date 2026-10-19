@@ -1,9 +1,11 @@
 using System.Text.Json;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.EdgeSky.Dtos;
+using TreeGraph.Shared.Messaging;
 
 namespace TreeGraph.Api.EdgeSky.Services;
 
@@ -20,16 +22,19 @@ public class EdgeInstanceService
     private readonly EavReadService _eavRead;
     private readonly IEdgeNodeValidator _nodeValidator;
     private readonly InodeOwnerGuardRegistry _inodeGuards;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     public EdgeInstanceService(
         TreeGraphDbContext db, EavWriteService eavWrite, EavReadService eavRead,
-        IEdgeNodeValidator nodeValidator, InodeOwnerGuardRegistry inodeGuards)
+        IEdgeNodeValidator nodeValidator, InodeOwnerGuardRegistry inodeGuards,
+        IPublishEndpoint publishEndpoint)
     {
         _db = db;
         _eavWrite = eavWrite;
         _eavRead = eavRead;
         _nodeValidator = nodeValidator;
         _inodeGuards = inodeGuards;
+        _publishEndpoint = publishEndpoint;
     }
 
     public async Task<EdgeInstanceDto?> CreateAsync(
@@ -104,6 +109,9 @@ public class EdgeInstanceService
                 instance.EdgeId, def.TypeName,
                 values, changedBy: "edge", ct: ct);
         }
+
+        // 图同步：边创建 → 通知图数据库即时写入（消费端幂等）
+        await PublishAsync(instance, def, EdgeChangeKind.Created, ct);
 
         return await BuildDtoAsync(instance, def, ct);
     }
@@ -281,6 +289,10 @@ public class EdgeInstanceService
 
         var def = await _db.EdgeDefinitions
             .FirstOrDefaultAsync(d => d.EdgeTypeId == instance.EdgeTypeId, ct);
+
+        // 图同步：边更新 → 通知图数据库即时刷新（消费端幂等）
+        await PublishAsync(instance, def, EdgeChangeKind.Updated, ct);
+
         return def is null ? null : await BuildDtoAsync(instance, def, ct);
     }
 
@@ -308,6 +320,10 @@ public class EdgeInstanceService
 
         _db.EdgeInstances.Remove(instance);
         await _db.SaveChangesAsync(ct);
+
+        // 图同步：边删除 → 通知图数据库即时移除（消费端幂等）
+        await PublishAsync(instance, def, EdgeChangeKind.Deleted, ct);
+
         return true;
     }
 
@@ -368,6 +384,20 @@ public class EdgeInstanceService
     // ============================================================
     // Helpers
     // ============================================================
+
+    /// <summary>发布边变更事件（NebulaGraph 图同步；at-least-once，消费端幂等）。</summary>
+    private async Task PublishAsync(
+        EdgeInstance instance, EdgeDefinition? def, EdgeChangeKind kind, CancellationToken ct)
+    {
+        await _publishEndpoint.Publish(new EdgeChangedEvent
+        {
+            EdgeId = instance.EdgeId,
+            Kind = kind,
+            EdgeTypeName = def?.TypeName,
+            FromNodeId = instance.FromNodeId,
+            ToNodeId = instance.ToNodeId
+        }, ct);
+    }
 
     // 与 API 层（Program.cs）保持一致：Web 默认命名策略 + 数值/组合值转换器，
     // 保证边属性读回的 JSON 形状与实体端点一致。

@@ -1,7 +1,9 @@
+using MassTransit;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Shared.LineSky.Entities;
+using TreeGraph.Shared.Messaging;
 
 namespace TreeGraph.Api.LineSky.Controllers;
 
@@ -10,14 +12,22 @@ namespace TreeGraph.Api.LineSky.Controllers;
 ///
 /// LineNode 是独立一等公民实体，实现 Inode，不隶属于任何树。
 /// 典型场景：输电线路杆塔、交叉跨越点、物流站点等。
+///
+/// 写操作（创建/更新/删除）成功后发布 InodeChangedEvent，
+/// 由向量同步与图同步管道的消费者即时刷新该节点（消费端幂等）。
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class LineNodeController : ControllerBase
 {
     private readonly TreeGraphDbContext _db;
+    private readonly IPublishEndpoint _publishEndpoint;
 
-    public LineNodeController(TreeGraphDbContext db) => _db = db;
+    public LineNodeController(TreeGraphDbContext db, IPublishEndpoint publishEndpoint)
+    {
+        _db = db;
+        _publishEndpoint = publishEndpoint;
+    }
 
     /// <summary>查询全部 LineNode（支持按名称搜索）。</summary>
     [HttpGet]
@@ -51,6 +61,10 @@ public class LineNodeController : ControllerBase
 
         _db.LineNodes.Add(node);
         await _db.SaveChangesAsync(ct);
+
+        // ★ 节点新增 → 即时同步向量/图（消费端幂等）
+        await PublishAsync(node.Id, InodeChangeKind.Saved, ct);
+
         return CreatedAtAction(nameof(GetById), new { id = node.Id }, node);
     }
 
@@ -68,6 +82,10 @@ public class LineNodeController : ControllerBase
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
+
+        // ★ 节点更新 → 即时重建向量/图顶点
+        await PublishAsync(id, InodeChangeKind.Saved, ct);
+
         return Ok(existing);
     }
 
@@ -85,6 +103,20 @@ public class LineNodeController : ControllerBase
 
         _db.LineNodes.Remove(existing);
         await _db.SaveChangesAsync(ct);
+
+        // ★ 节点已删除 → 消费端据 InodeId 清除残留向量/图顶点
+        await PublishAsync(id, InodeChangeKind.Deleted, ct);
+
         return NoContent();
+    }
+
+    /// <summary>发布 iNode 变更事件（向量/图同步；at-least-once，消费端幂等）。</summary>
+    private async Task PublishAsync(string inodeId, InodeChangeKind kind, CancellationToken ct)
+    {
+        await _publishEndpoint.Publish(new InodeChangedEvent
+        {
+            InodeId = inodeId,
+            Kind = kind
+        }, ct);
     }
 }

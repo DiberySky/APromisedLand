@@ -3,6 +3,7 @@ using TreeGraph.Api.Data;
 using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.LineSky.Services;
 using TreeGraph.Api.EdgeSky.Services;
+using TreeGraph.Api.GraphSyncSky;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.SemanticSearch;
 using TreeGraph.Api.NodeEavSky.Services;
@@ -95,6 +96,13 @@ builder.Services.AddSemanticSearch(builder.Configuration);
 // MassTransit 总线启动会无限重连并阻塞 WebApplication 启动，故跳过消费者注册。
 if (!builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddVectorSyncConsumers(builder.Configuration);
+
+// ★ 图同步管道（PostgreSQL → NebulaGraph，经 TreeGraph.NebulaApi REST 网关）
+//   Testing 环境无 NebulaGraph/NebulaApi，跳过 schema 初始化后台服务与消费者注册。
+var isTesting = builder.Environment.IsEnvironment("Testing");
+builder.Services.AddGraphSync(builder.Configuration, enableSchemaInitializer: !isTesting);
+if (!isTesting)
+    builder.Services.AddGraphSyncConsumers(builder.Configuration);
 
 // Edge（关系/边）
 builder.Services.AddScoped<IEdgeNodeValidator, EdgeNodeValidator>();
