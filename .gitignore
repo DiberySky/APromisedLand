@@ -24,3 +24,6 @@ Notes/GitHub.md
 __pycache__/
 *.pyc
 .venv/
+
+# 旧项目存档备份，不入库
+_archive/
