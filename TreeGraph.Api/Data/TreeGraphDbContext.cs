@@ -30,9 +30,10 @@ public class TreeGraphDbContext : DbContext
     public DbSet<EdgeDefinition> EdgeDefinitions => Set<EdgeDefinition>();
     public DbSet<EdgeInstance> EdgeInstances => Set<EdgeInstance>();
 
-    // TreeEavSky：计量单位树 / 分类树 / 空间树
+    // TreeEavSky：计量单位树 / 分类树 / 知识树 / 空间树
     public DbSet<UnitTree> UnitTrees => Set<UnitTree>();
     public DbSet<CategoryTree> CategoryTrees => Set<CategoryTree>();
+    public DbSet<KnowledgeTree> KnowledgeTrees => Set<KnowledgeTree>();
     public DbSet<SpaceTree> SpaceTrees => Set<SpaceTree>();
 
     // 空间（独立简单实体）
@@ -55,6 +56,7 @@ public class TreeGraphDbContext : DbContext
         ConfigureEdges(mb);
         ConfigureUnitTrees(mb);
         ConfigureCategoryTrees(mb);
+        ConfigureKnowledgeTrees(mb);
         ConfigureSpaceTrees(mb);
         ConfigureSpaces(mb);
     }
@@ -105,6 +107,26 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => x.ParentId).HasDatabaseName("ix_category_trees_parent");
 
             e.HasData(CategoryTree.SeedData());
+        });
+    }
+
+    private static void ConfigureKnowledgeTrees(ModelBuilder mb)
+    {
+        mb.Entity<KnowledgeTree>(e =>
+        {
+            e.ToTable("knowledge_trees");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(300).IsRequired();
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
+            e.Property(x => x.IsArchived).HasColumnName("is_archived");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order");
+            e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
+
+            e.HasIndex(x => x.ParentId).HasDatabaseName("ix_knowledge_trees_parent");
+
+            e.HasData(KnowledgeTree.SeedData());
         });
     }
 

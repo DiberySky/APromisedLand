@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 
-namespace TreeGraph.Api.Data.Migrations
+namespace TreeGraph.Api.Migrations
 {
     /// <inheritdoc />
     public partial class Initial : Migration
@@ -137,6 +137,23 @@ namespace TreeGraph.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_inode_entitytype", x => new { x.inode_id, x.entity_type });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "knowledge_trees",
+                columns: table => new
+                {
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    name = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    can_have_children = table.Column<bool>(type: "boolean", nullable: false),
+                    is_archived = table.Column<bool>(type: "boolean", nullable: false),
+                    sort_order = table.Column<int>(type: "integer", nullable: false),
+                    parent_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_knowledge_trees", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -556,20 +573,7 @@ namespace TreeGraph.Api.Data.Migrations
             migrationBuilder.InsertData(
                 table: "category_trees",
                 columns: new[] { "id", "can_have_children", "description", "is_archived", "name", "parent_id", "sort_order" },
-                values: new object[,]
-                {
-                    { "1B16336D-FB7F-42AA-AFD2-F78388883336", true, "子分类 3.3", false, "Sample 3.3", "27EE32B0-0F30-4331-AA85-61457B7A0912", 2 },
-                    { "27EE32B0-0F30-4331-AA85-61457B7A0912", true, "子分类 3", false, "Sample 3", "55705350-7071-43A4-AFAF-2F30B3CE2718", 3 },
-                    { "35F02829-6490-467E-9D3E-C2EBF0EAA2B4", false, "子分类 3.3.1", false, "Sample 3.3.1", "1B16336D-FB7F-42AA-AFD2-F78388883336", 0 },
-                    { "39EA6315-0A74-40F6-A096-8E15CCC98579", true, "子分类 1", false, "Sample 1", "55705350-7071-43A4-AFAF-2F30B3CE2718", 1 },
-                    { "55705350-7071-43A4-AFAF-2F30B3CE2718", true, "根分类示例", false, "Sample Root", null, 0 },
-                    { "5C30BACA-3C11-4677-8123-8EC2BE729667", false, "子分类 3.2", false, "Sample 3.2", "27EE32B0-0F30-4331-AA85-61457B7A0912", 1 },
-                    { "8E971C0E-B99A-4931-AFD6-46E44D6ECE5A", false, "子分类 3.1", false, "Sample 3.1", "27EE32B0-0F30-4331-AA85-61457B7A0912", 0 },
-                    { "975599CC-B967-4AD2-B4B8-9E00D889FB4D", false, "子分类 2.2 [Archived]", true, "Sample 2.2", "C8969ED0-C018-4FDC-AE55-C363BD95C853", 1 },
-                    { "C1EBEE10-97F6-44C8-9852-2F574515BF51", false, "子分类 1.1", false, "Sample 1.1", "39EA6315-0A74-40F6-A096-8E15CCC98579", 0 },
-                    { "C8969ED0-C018-4FDC-AE55-C363BD95C853", true, "子分类 2", false, "Sample 2", "55705350-7071-43A4-AFAF-2F30B3CE2718", 2 },
-                    { "ED0990CF-5BB7-4C36-A3BB-3AF606AD1974", false, "子分类 2.1", false, "Sample 2.1", "C8969ED0-C018-4FDC-AE55-C363BD95C853", 0 }
-                });
+                values: new object[] { "d0000000-0000-4000-8000-000000000001", true, "根分类", false, "项目类型", null, 0 });
 
             migrationBuilder.InsertData(
                 table: "edge_definitions",
@@ -595,13 +599,19 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.InsertData(
+                table: "knowledge_trees",
+                columns: new[] { "id", "can_have_children", "description", "is_archived", "name", "parent_id", "sort_order" },
+                values: new object[] { "beef0000-0000-4000-8000-000000000001", true, "根知识库", false, "知识库", null, 0 });
+
+            migrationBuilder.InsertData(
                 table: "spaces",
                 columns: new[] { "id", "description", "name", "type" },
                 values: new object[,]
                 {
                     { "7a1e3f5d-9b2c-4a8e-1f0d-3c5b7e9a1c2d", "武汉供电段", "武汉供电段", "Dynamic" },
                     { "8b2f4a6e-0c3d-5b9f-2a1e-4d6c8f0b2d3e", "类型", "类型", "Type" },
-                    { "9c3a5b7f-1d4e-6c0a-3b2f-5e7d9a1c3e4f", "单位", "单位", "Unit" }
+                    { "9c3a5b7f-1d4e-6c0a-3b2f-5e7d9a1c3e4f", "单位", "单位", "Unit" },
+                    { "ad5e6c8f-2b3d-4a7e-9c0f-1d2b3e4f5a6b", "知识库", "知识库", "Knowledge" }
                 });
 
             migrationBuilder.InsertData(
@@ -955,6 +965,11 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "entity_type");
 
             migrationBuilder.CreateIndex(
+                name: "ix_knowledge_trees_parent",
+                table: "knowledge_trees",
+                column: "parent_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_lav_entity",
                 table: "location_attribute_values",
                 columns: new[] { "entity_type", "entity_id" });
@@ -1004,29 +1019,36 @@ namespace TreeGraph.Api.Data.Migrations
                 table: "unit_trees",
                 column: "parent_id");
 
-            // ★ 手写 DDL：attribute_audit_log 按月分区表（EF ExcludeFromMigrations，不参与自动生成）。
-            //   PG 分区表主键必须包含分区键 changed_at；DEFAULT 分区兜底未建月度分区的写入。
-            //   月度分区由 AuditPartitionMaintenance 启动时幂等补建（当月 + 下月）。
+            // attribute_audit_log 为 ExcludeFromMigrations 分区表，EF 不自动生成，此处手写补回
             migrationBuilder.Sql("""
                 CREATE TABLE attribute_audit_log (
-                    audit_id varchar(36) NOT NULL DEFAULT gen_random_uuid()::text,
-                    entity_id varchar(36) NOT NULL,
-                    entity_type varchar(100) NOT NULL,
-                    attribute_id varchar(36) NOT NULL,
-                    attribute_name varchar(200) NOT NULL,
-                    old_value text NULL,
-                    new_value text NULL,
-                    change_type varchar(20) NOT NULL,
-                    changed_by varchar(200) NOT NULL,
-                    changed_at timestamptz NOT NULL,
-                    correlation_id varchar(100) NULL,
-                    client_ip varchar(50) NULL,
+                    audit_id text NOT NULL DEFAULT gen_random_uuid()::text,
+                    changed_at timestamp with time zone NOT NULL,
+                    entity_id text NOT NULL,
+                    entity_type text NOT NULL,
+                    attribute_id text NOT NULL,
+                    attribute_name text NOT NULL,
+                    old_value text,
+                    new_value text,
+                    change_type text NOT NULL,
+                    changed_by text NOT NULL,
+                    correlation_id text,
+                    client_ip text,
                     CONSTRAINT pk_attribute_audit_log PRIMARY KEY (audit_id, changed_at)
                 ) PARTITION BY RANGE (changed_at);
+                """);
 
-                CREATE TABLE attribute_audit_log_default PARTITION OF attribute_audit_log DEFAULT;
+            migrationBuilder.Sql("""
+                CREATE TABLE attribute_audit_log_default
+                    PARTITION OF attribute_audit_log DEFAULT;
+                """);
 
-                CREATE INDEX ix_audit_entity ON attribute_audit_log (entity_type, entity_id, changed_at DESC);
+            migrationBuilder.Sql("""
+                CREATE INDEX ix_audit_entity ON attribute_audit_log
+                    (entity_type, entity_id, changed_at DESC);
+                """);
+
+            migrationBuilder.Sql("""
                 CREATE INDEX ix_audit_time ON attribute_audit_log (changed_at);
                 """);
         }
@@ -1034,7 +1056,6 @@ namespace TreeGraph.Api.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // 手写分区表（与 Up 尾部的手写 DDL 对应）
             migrationBuilder.Sql("DROP TABLE IF EXISTS attribute_audit_log CASCADE;");
 
             migrationBuilder.DropTable(
@@ -1063,6 +1084,9 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "inode_entitytype");
+
+            migrationBuilder.DropTable(
+                name: "knowledge_trees");
 
             migrationBuilder.DropTable(
                 name: "location_attribute_values");

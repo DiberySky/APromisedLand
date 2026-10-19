@@ -10,10 +10,10 @@ using TreeGraph.Api.Data;
 
 #nullable disable
 
-namespace TreeGraph.Api.Data.Migrations
+namespace TreeGraph.Api.Migrations
 {
     [DbContext(typeof(TreeGraphDbContext))]
-    [Migration("20261019101310_Initial")]
+    [Migration("20261019192532_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -2045,6 +2045,13 @@ namespace TreeGraph.Api.Data.Migrations
                             Description = "单位",
                             Name = "单位",
                             Type = "Unit"
+                        },
+                        new
+                        {
+                            Id = "ad5e6c8f-2b3d-4a7e-9c0f-1d2b3e4f5a6b",
+                            Description = "知识库",
+                            Name = "知识库",
+                            Type = "Knowledge"
                         });
                 });
 
@@ -2093,111 +2100,65 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "55705350-7071-43A4-AFAF-2F30B3CE2718",
+                            Id = "d0000000-0000-4000-8000-000000000001",
                             CanHaveChildren = true,
-                            Description = "根分类示例",
+                            Description = "根分类",
                             IsArchived = false,
-                            Name = "Sample Root",
+                            Name = "项目类型",
                             SortOrder = 0
-                        },
+                        });
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.KnowledgeTree", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CanHaveChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_have_children");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_archived");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParentId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("parent_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("ix_knowledge_trees_parent");
+
+                    b.ToTable("knowledge_trees", (string)null);
+
+                    b.HasData(
                         new
                         {
-                            Id = "39EA6315-0A74-40F6-A096-8E15CCC98579",
+                            Id = "beef0000-0000-4000-8000-000000000001",
                             CanHaveChildren = true,
-                            Description = "子分类 1",
+                            Description = "根知识库",
                             IsArchived = false,
-                            Name = "Sample 1",
-                            ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718",
-                            SortOrder = 1
-                        },
-                        new
-                        {
-                            Id = "C1EBEE10-97F6-44C8-9852-2F574515BF51",
-                            CanHaveChildren = false,
-                            Description = "子分类 1.1",
-                            IsArchived = false,
-                            Name = "Sample 1.1",
-                            ParentId = "39EA6315-0A74-40F6-A096-8E15CCC98579",
-                            SortOrder = 0
-                        },
-                        new
-                        {
-                            Id = "C8969ED0-C018-4FDC-AE55-C363BD95C853",
-                            CanHaveChildren = true,
-                            Description = "子分类 2",
-                            IsArchived = false,
-                            Name = "Sample 2",
-                            ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718",
-                            SortOrder = 2
-                        },
-                        new
-                        {
-                            Id = "ED0990CF-5BB7-4C36-A3BB-3AF606AD1974",
-                            CanHaveChildren = false,
-                            Description = "子分类 2.1",
-                            IsArchived = false,
-                            Name = "Sample 2.1",
-                            ParentId = "C8969ED0-C018-4FDC-AE55-C363BD95C853",
-                            SortOrder = 0
-                        },
-                        new
-                        {
-                            Id = "975599CC-B967-4AD2-B4B8-9E00D889FB4D",
-                            CanHaveChildren = false,
-                            Description = "子分类 2.2 [Archived]",
-                            IsArchived = true,
-                            Name = "Sample 2.2",
-                            ParentId = "C8969ED0-C018-4FDC-AE55-C363BD95C853",
-                            SortOrder = 1
-                        },
-                        new
-                        {
-                            Id = "27EE32B0-0F30-4331-AA85-61457B7A0912",
-                            CanHaveChildren = true,
-                            Description = "子分类 3",
-                            IsArchived = false,
-                            Name = "Sample 3",
-                            ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718",
-                            SortOrder = 3
-                        },
-                        new
-                        {
-                            Id = "8E971C0E-B99A-4931-AFD6-46E44D6ECE5A",
-                            CanHaveChildren = false,
-                            Description = "子分类 3.1",
-                            IsArchived = false,
-                            Name = "Sample 3.1",
-                            ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912",
-                            SortOrder = 0
-                        },
-                        new
-                        {
-                            Id = "5C30BACA-3C11-4677-8123-8EC2BE729667",
-                            CanHaveChildren = false,
-                            Description = "子分类 3.2",
-                            IsArchived = false,
-                            Name = "Sample 3.2",
-                            ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912",
-                            SortOrder = 1
-                        },
-                        new
-                        {
-                            Id = "1B16336D-FB7F-42AA-AFD2-F78388883336",
-                            CanHaveChildren = true,
-                            Description = "子分类 3.3",
-                            IsArchived = false,
-                            Name = "Sample 3.3",
-                            ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912",
-                            SortOrder = 2
-                        },
-                        new
-                        {
-                            Id = "35F02829-6490-467E-9D3E-C2EBF0EAA2B4",
-                            CanHaveChildren = false,
-                            Description = "子分类 3.3.1",
-                            IsArchived = false,
-                            Name = "Sample 3.3.1",
-                            ParentId = "1B16336D-FB7F-42AA-AFD2-F78388883336",
+                            Name = "知识库",
                             SortOrder = 0
                         });
                 });

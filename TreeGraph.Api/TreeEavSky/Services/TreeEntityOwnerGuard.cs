@@ -52,6 +52,26 @@ public sealed class CategoryTreeInodeGuard(TreeGraphDbContext db) : IInodeOwnerG
 }
 
 /// <summary>
+/// 知识树节点 iNode 宿主守卫：inodeId 是真实知识树节点时认领。
+/// </summary>
+public sealed class KnowledgeTreeInodeGuard(TreeGraphDbContext db) : IInodeOwnerGuard
+{
+    public string NodeType => "KnowledgeTree";
+
+    public async Task<bool> NodeExistsAsync(
+        string inodeId, CancellationToken ct = default)
+        => await db.KnowledgeTrees.AnyAsync(c => c.Id == inodeId, ct);
+
+    // 展示文本与 KnowledgeTree.Text() 一致：Name
+    public async Task<Dictionary<string, string>> GetNodeNamesAsync(
+        IReadOnlyCollection<string> inodeIds, CancellationToken ct = default)
+        => await db.KnowledgeTrees
+            .AsNoTracking()
+            .Where(c => inodeIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.Name, StringComparer.Ordinal, ct);
+}
+
+/// <summary>
 /// 空间树节点 iNode 宿主守卫：inodeId 是真实空间树节点时认领。
 /// </summary>
 public sealed class SpaceTreeInodeGuard(TreeGraphDbContext db) : IInodeOwnerGuard

@@ -3,6 +3,7 @@ using MudBlazor.Extensions;
 using MudBlazor.Extensions.Components;
 using MudBlazor.Extensions.Options;
 using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Category;
+using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Knowledge;
 using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space;
 using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Unit;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -73,6 +74,23 @@ public class BlazorService(IDialogService dialogService)
         };
 
         var dialog = await dialogService.ShowExAsync<CategoryTreeDialogPage>("分类注册",
+            parameters, DialogOptions);
+
+        var result = await dialog.Result;
+    }
+
+    /// <summary>
+    /// 弹出知识树对话框页（点击节点文本时递归弹窗，克隆自 ShowCategoryTreeDialogPageAsync）。
+    /// </summary>
+    public async Task ShowKnowledgeTreeDialogPageAsync(
+        ITreeItemData<KnowledgeTree>? node = null)
+    {
+        var parameters = new DialogParameters<KnowledgeTreeDialogPage>
+        {
+            { x => x.ClickNode, node },
+        };
+
+        var dialog = await dialogService.ShowExAsync<KnowledgeTreeDialogPage>("知识注册",
             parameters, DialogOptions);
 
         var result = await dialog.Result;

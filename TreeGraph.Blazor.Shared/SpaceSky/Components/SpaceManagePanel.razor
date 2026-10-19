@@ -83,6 +83,7 @@ else
         ("Dynamic", "空间树"),
         ("Type", "类型树"),
         ("Unit", "单位树"),
+        ("Knowledge", "知识树"),
     };
 
     private static string SpaceTypeLabel(string? type)
@@ -152,7 +153,7 @@ else
 
     /// <summary>
     /// 手动向量刷新（按本空间范围）：补缺（PG 有、向量库无）+ 删孤（向量库有、PG 无）。
-    /// 范围与打开该空间的树一致：动态空间 = 空间树子树；单位空间 = 单位树；类型空间 = 分类树。
+    /// 范围与打开该空间的树一致：动态空间 = 空间树子树；单位空间 = 单位树；类型空间 = 分类树；知识库空间 = 知识树。
     /// </summary>
     private async Task ReconcileAsync(SpaceDto space)
     {

@@ -216,7 +216,7 @@ public sealed class VectorSynchronizer
     /// <summary>
     /// 解析某空间对应的 inode 范围（与空间维护页打开树的规则一致）：
     /// 动态空间 → 空间树中以空间 Id 为根的子树（含根，根作为 space 节点后续被排除）；
-    /// 单位空间 → 单位树全体节点；类型空间 → 分类树全体节点。
+    /// 单位空间 → 单位树全体节点；类型空间 → 分类树全体节点；知识库空间 → 知识树全体节点。
     /// 空间不存在时返回空集合。
     /// </summary>
     private async Task<HashSet<string>> ResolveScopeAsync(string spaceId, CancellationToken ct)
@@ -239,6 +239,11 @@ public sealed class VectorSynchronizer
 
             case SpaceType.Type:
                 return (await _db.CategoryTrees.AsNoTracking()
+                        .Select(n => n.Id).ToListAsync(ct))
+                    .ToHashSet(StringComparer.Ordinal);
+
+            case SpaceType.Knowledge:
+                return (await _db.KnowledgeTrees.AsNoTracking()
                         .Select(n => n.Id).ToListAsync(ct))
                     .ToHashSet(StringComparer.Ordinal);
 

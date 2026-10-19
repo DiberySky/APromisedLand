@@ -395,6 +395,9 @@
             case "CategoryTree":
                 await ShowTreeDialogAsync<CategoryTree>(item.RootId);
                 break;
+            case "KnowledgeTree":
+                await ShowTreeDialogAsync<KnowledgeTree>(item.RootId);
+                break;
             default:
                 _lastReply = $"未知的节点类型：{item.HostType}";
                 StateHasChanged();
@@ -440,6 +443,7 @@
         "SpaceTree"    => Icons.Material.Filled.AccountTree,
         "UnitTree"     => Icons.Material.Filled.Straighten,
         "CategoryTree" => Icons.Material.Filled.Category,
+        "KnowledgeTree" => Icons.Material.Filled.MenuBook,
         _              => Icons.Material.Filled.DeviceHub
     };
 

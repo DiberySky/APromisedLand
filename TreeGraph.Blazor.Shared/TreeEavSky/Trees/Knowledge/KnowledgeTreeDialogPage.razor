@@ -1,0 +1,56 @@
+@* KnowledgeTreeDialogPage.razor
+   知识树对话框页（克隆自 CategoryTreeDialogPage.razor，适配 KnowledgeTree 字段）：
+   基于 TreeDialogPageSky 包装 TreeEavSky<KnowledgeTree>，点击节点文本经 ShowDialogFunc 递归弹窗。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Trees.Knowledge
+@using TreeGraph.Shared.TreeEavSky.Entities
+
+@inject BlazorService BlazorService
+
+@{
+    RenderFragment<KnowledgeTree> editTemplate = (context) =>
+        @<MudStack Spacing="0">
+            <MudTextField T="string"
+                          @bind-Value="context.Name"
+                          Label="名称"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredError="名称不能为空"
+                          MaxLength="100"
+                          Counter="100"
+                          Immediate="true" />
+
+            <MudTextField T="string"
+                          @bind-Value="context.Description"
+                          Label="描述"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          MaxLength="500"
+                          Counter="500"
+                          Immediate="true" />
+
+            <BoolFieldSky Label="允许包含子节点"
+                          @bind-Value="context.CanHaveChildren" />
+
+            <BoolFieldSky Label="已归档"
+                          @bind-Value="context.IsArchived" />
+        </MudStack>;
+}
+
+<TreeDialogPageSky TItem="KnowledgeTree"
+                   Title="@(Title ?? "知识注册")"
+                   TitleToolBar="@(ClickNode?.Value?.Parent?.Text() ?? "知识树")"
+                   RootId="@ClickNode?.Value?.Id"
+                   EditTemplate="@editTemplate"
+                   ShowDialogFunc="@ShowDialogAsync" />
+
+@code {
+    [Parameter] public ITreeItemData<KnowledgeTree>? ClickNode { get; set; }
+
+    /// <summary>自定义标题（可选，默认「知识注册」）。</summary>
+    [Parameter] public string? Title { get; set; }
+
+    private async Task ShowDialogAsync(ITreeItemData<KnowledgeTree> node)
+    {
+        await BlazorService.ShowKnowledgeTreeDialogPageAsync(node);
+    }
+}

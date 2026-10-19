@@ -124,6 +124,7 @@
     /// 根据空间类型打开对应树：
     /// - Type = Unit → 打开单位树（整棵树，不使用空间 Id）
     /// - Type = Type → 打开分类树（整棵树，不使用空间 Id）
+    /// - Type = Knowledge → 打开知识树（整棵树，不使用空间 Id）
     /// - 其他（Dynamic）→ 打开空间树（RootId = Space.Id）
     /// </summary>
     private async Task OpenTreeAsync(SpaceDto space)
@@ -136,6 +137,10 @@
 
             case "Type":
                 await BlazorService.ShowCategoryTreeDialogPageAsync();
+                break;
+
+            case "Knowledge":
+                await BlazorService.ShowKnowledgeTreeDialogPageAsync();
                 break;
 
             default:

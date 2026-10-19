@@ -277,6 +277,9 @@
             case "CategoryTree":
                 await ShowTreeDialogAsync<CategoryTree>(item.InodeId);
                 break;
+            case "KnowledgeTree":
+                await ShowTreeDialogAsync<KnowledgeTree>(item.InodeId);
+                break;
             default:
                 _error = $"未知的节点类型：{item.HostType}";
                 StateHasChanged();
@@ -315,6 +318,7 @@
         "SpaceTree" => Icons.Material.Filled.Forest,
         "UnitTree" => Icons.Material.Filled.CorporateFare,
         "CategoryTree" => Icons.Material.Filled.Category,
+        "KnowledgeTree" => Icons.Material.Filled.MenuBook,
         "TreeNode" => Icons.Material.Filled.AccountTree,
         _ => Icons.Material.Filled.HelpOutline
     };

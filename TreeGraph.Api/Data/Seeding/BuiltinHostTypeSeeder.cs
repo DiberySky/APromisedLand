@@ -6,7 +6,7 @@ namespace TreeGraph.Api.Data.Seeding;
 /// <summary>
 /// 内置 Inode 宿主类型播种（启动时幂等 upsert）。
 ///
-/// 三棵树（SpaceTree/UnitTree/CategoryTree）是边类型端点选择与 EAV 属性挂载的
+/// 四棵树（SpaceTree/UnitTree/CategoryTree/KnowledgeTree）是边类型端点选择与 EAV 属性挂载的
 /// 合法宿主（由 InodeOwnerGuardRegistry 认领），必须在实体类型目录中可见，
 /// 否则边类型对话框的「起点/终点节点类型」下拉无候选。
 ///
@@ -50,6 +50,16 @@ public static class BuiltinHostTypeSeeder
             DisplayName = "分类树",
             Description = "内置 Inode 宿主：分类树节点（边端点/属性挂载用）",
             DisplayOrder = 2,
+            CreatedAt = SeedTime,
+            UpdatedAt = SeedTime
+        },
+        new()
+        {
+            EntityTypeId = "b0000004-0000-4000-8000-000000000004",
+            EntityType = "KnowledgeTree",
+            DisplayName = "知识树",
+            Description = "内置 Inode 宿主：知识树节点（边端点/属性挂载用）",
+            DisplayOrder = 3,
             CreatedAt = SeedTime,
             UpdatedAt = SeedTime
         }

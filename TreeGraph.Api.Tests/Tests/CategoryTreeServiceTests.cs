@@ -12,8 +12,7 @@ namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
 /// CategoryTreeService 单元测试：EF Core InMemory 提供器，无需 Docker。
-/// 每个用例使用独立数据库名（Guid），互不干扰；种子数据来自
-/// CategoryTree.SeedData()（Sample Root + Sample 1/2/3 及其子级，共 11 节点）。
+/// 每个用例使用独立数据库名（Guid），互不干扰；种子数据来自本文件 Fixture()。
 ///
 /// 与 UnitTree 的差异：
 /// - HasChildren / Parent 均为 [NotMapped]，不落库；
@@ -23,13 +22,29 @@ namespace TreeGraph.Api.Tests.Tests;
 /// </summary>
 public class CategoryTreeServiceTests
 {
-    // 种子数据中的已知节点（GUID 固定，见 CategoryTree.SeedData）
+    // 夹具中的已知节点（GUID 固定，见本文件 Fixture()）
     private const string RootId = "55705350-7071-43A4-AFAF-2F30B3CE2718";   // Sample Root
     private const string Sample1Id = "39EA6315-0A74-40F6-A096-8E15CCC98579"; // Sample 1
     private const string Sample2Id = "C8969ED0-C018-4FDC-AE55-C363BD95C853"; // Sample 2
     private const string Sample3Id = "27EE32B0-0F30-4331-AA85-61457B7A0912"; // Sample 3
     private const string Sample33Id = "1B16336D-FB7F-42AA-AFD2-F78388883336"; // Sample 3.3
     private const string Sample331Id = "35F02829-6490-467E-9D3E-C2EBF0EAA2B4"; // Sample 3.3.1
+
+    /// <summary>测试夹具：Sample Root + Sample 1/2/3 及其子级，共 11 节点（含 1 归档节点 2.2）。</summary>
+    private static List<CategoryTree> Fixture() => new()
+    {
+        new() { Id = "55705350-7071-43A4-AFAF-2F30B3CE2718", Name = "Sample Root", Description = "根分类示例", CanHaveChildren = true, IsArchived = false, SortOrder = 0, ParentId = null, HasChildren = true },
+        new() { Id = "39EA6315-0A74-40F6-A096-8E15CCC98579", Name = "Sample 1", Description = "子分类 1", CanHaveChildren = true, IsArchived = false, SortOrder = 1, ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718", HasChildren = true },
+        new() { Id = "C1EBEE10-97F6-44C8-9852-2F574515BF51", Name = "Sample 1.1", Description = "子分类 1.1", CanHaveChildren = false, IsArchived = false, SortOrder = 0, ParentId = "39EA6315-0A74-40F6-A096-8E15CCC98579", HasChildren = false },
+        new() { Id = "C8969ED0-C018-4FDC-AE55-C363BD95C853", Name = "Sample 2", Description = "子分类 2", CanHaveChildren = true, IsArchived = false, SortOrder = 2, ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718", HasChildren = true },
+        new() { Id = "ED0990CF-5BB7-4C36-A3BB-3AF606AD1974", Name = "Sample 2.1", Description = "子分类 2.1", CanHaveChildren = false, IsArchived = false, SortOrder = 0, ParentId = "C8969ED0-C018-4FDC-AE55-C363BD95C853", HasChildren = false },
+        new() { Id = "975599CC-B967-4AD2-B4B8-9E00D889FB4D", Name = "Sample 2.2 [Archived]", Description = "子分类 2.2", CanHaveChildren = false, IsArchived = true, SortOrder = 1, ParentId = "C8969ED0-C018-4FDC-AE55-C363BD95C853", HasChildren = false },
+        new() { Id = "27EE32B0-0F30-4331-AA85-61457B7A0912", Name = "Sample 3", Description = "子分类 3", CanHaveChildren = true, IsArchived = false, SortOrder = 3, ParentId = "55705350-7071-43A4-AFAF-2F30B3CE2718", HasChildren = true },
+        new() { Id = "8E971C0E-B99A-4931-AFD6-46E44D6ECE5A", Name = "Sample 3.1", Description = "子分类 3.1", CanHaveChildren = false, IsArchived = false, SortOrder = 0, ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912", HasChildren = false },
+        new() { Id = "5C30BACA-3C11-4677-8123-8EC2BE729667", Name = "Sample 3.2", Description = "子分类 3.2", CanHaveChildren = false, IsArchived = false, SortOrder = 1, ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912", HasChildren = false },
+        new() { Id = "1B16336D-FB7F-42AA-AFD2-F78388883336", Name = "Sample 3.3", Description = "子分类 3.3", CanHaveChildren = true, IsArchived = false, SortOrder = 2, ParentId = "27EE32B0-0F30-4331-AA85-61457B7A0912", HasChildren = true },
+        new() { Id = "35F02829-6490-467E-9D3E-C2EBF0EAA2B4", Name = "Sample 3.3.1", Description = "子分类 3.3.1", CanHaveChildren = false, IsArchived = false, SortOrder = 0, ParentId = "1B16336D-FB7F-42AA-AFD2-F78388883336", HasChildren = false },
+    };
 
     /// <summary>
     /// 测试专用 DbContext：忽略除 CategoryTree / EdgeInstance / InodeEntity 外的全部实体
@@ -53,7 +68,7 @@ public class CategoryTreeServiceTests
             mb.Entity<CategoryTree>(e =>
             {
                 e.HasKey(x => x.Id);
-                e.HasData(CategoryTree.SeedData());
+                e.HasData(Fixture());
             });
 
             // 节点删除守卫依赖：被边引用 / 仍有挂载实体数据
@@ -97,14 +112,14 @@ public class CategoryTreeServiceTests
     }
 
     [Fact]
-    public void SeedData_ContainsRootAndThreeTopCategories()
+    public void SeedData_ContainsRootOnly()
     {
         var seed = CategoryTree.SeedData();
-        var root = seed.Single(n => n.ParentId == null);
-        Assert.Equal("Sample Root", root.Name);
-        Assert.Equal(3, seed.Count(n => n.ParentId == root.Id));
-        Assert.Equal(11, seed.Count);
-        Assert.Single(seed, n => n.IsArchived); // Sample 2.2 [Archived]
+        var root = Assert.Single(seed);
+        Assert.Equal("项目类型", root.Name);
+        Assert.Null(root.ParentId);
+        Assert.True(root.CanHaveChildren);
+        Assert.False(root.HasChildren);
     }
 
     // ========== 查询 ==========

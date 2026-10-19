@@ -48,6 +48,7 @@ public sealed class SubtreeService
             "SpaceTree" => await LoadRawSpaceTreeAsync(rootId, maxDepth, maxNodes, ct),
             "UnitTree" => await LoadRawUnitTreeAsync(rootId, maxDepth, maxNodes, ct),
             "CategoryTree" => await LoadRawCategoryTreeAsync(rootId, maxDepth, maxNodes, ct),
+            "KnowledgeTree" => await LoadRawKnowledgeTreeAsync(rootId, maxDepth, maxNodes, ct),
             _ => new List<RawNode>()
         };
 
@@ -137,6 +138,23 @@ public sealed class SubtreeService
                 UNION ALL
                 SELECT c.id, c.name, c.parent_id, t.depth + 1
                 FROM category_trees c
+                JOIN subtree t ON c.parent_id = t.id
+                WHERE t.depth < {1}
+            )
+            SELECT id AS "Id", name AS "Name", parent_id AS "ParentId", depth AS "Depth"
+            FROM subtree ORDER BY depth, name LIMIT {2}
+            """, rootId, maxDepth, maxNodes)
+            .ToListAsync(ct);
+
+    private Task<List<RawNode>> LoadRawKnowledgeTreeAsync(
+        string rootId, int maxDepth, int maxNodes, CancellationToken ct)
+        => _db.Database.SqlQueryRaw<RawNode>("""
+            WITH RECURSIVE subtree AS (
+                SELECT id, name, parent_id, 0 AS depth
+                FROM knowledge_trees WHERE id = {0}
+                UNION ALL
+                SELECT c.id, c.name, c.parent_id, t.depth + 1
+                FROM knowledge_trees c
                 JOIN subtree t ON c.parent_id = t.id
                 WHERE t.depth < {1}
             )
@@ -446,6 +464,10 @@ public sealed class SubtreeService
                     var ct2 = await _db.CategoryTrees.AsNoTracking()
                         .FirstOrDefaultAsync(x => x.Id == current, ct);
                     name = ct2?.Name; parentId = ct2?.ParentId; break;
+                case "KnowledgeTree":
+                    var kt = await _db.KnowledgeTrees.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.Id == current, ct);
+                    name = kt?.Name; parentId = kt?.ParentId; break;
             }
 
             if (name is null) break;
