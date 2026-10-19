@@ -68,13 +68,11 @@
         </div>
 
         @* 权重 *@
-        <MudNumericField T="decimal?"
-                         @bind-Value="_form.Weight"
-                         Label="权重（可选）"
-                         Variant="Variant.Outlined"
-                         Class="mb-3"
-                         Step="0.0001M"
-                         Precision="@(4)" />
+        <NumberInputField T="decimal?"
+                          @bind-Value="_form.Weight"
+                          Label="权重（可选）"
+                          Class="mb-3"
+                          Step="0.0001M" />
 
         @* EAV 属性（DynamicForm） *@
         @if (_schema is { Count: > 0 })

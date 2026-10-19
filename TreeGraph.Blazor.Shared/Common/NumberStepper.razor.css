@@ -37,7 +37,10 @@
 .numstep-btn {
     color: var(--mud-palette-primary);
     cursor: pointer;
-    font-weight: 500;
+}
+
+.numstep-btn .mud-icon-root {
+    font-size: 1.125rem;
 }
 
 .numstep-btn:hover {

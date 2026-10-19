@@ -4,13 +4,11 @@
    输入值在提交时按精度实际舍入（AwayFromZero），保证真实值与显示一致、可通过服务端校验。 *@
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
-<MudNumericField T="decimal?" Label="@Attr.DisplayName"
-                 Value="_value" ValueChanged="OnValueChanged"
-                 Required="@Attr.IsRequired"
-                 ReadOnly="@ReadOnly"
-                 Format="@NumberFormat"
-                 Variant="Variant.Outlined"
-                 InputMode="@(Platform.IsMobile ? InputMode.numeric : InputMode.none)" />
+<NumberInputField T="decimal?" Label="@Attr.DisplayName"
+                  Value="_value" ValueChanged="OnValueChanged"
+                  Required="@Attr.IsRequired"
+                  ReadOnly="@ReadOnly"
+                  InputMode="@(Platform.IsMobile ? InputMode.numeric : InputMode.none)" />
 
 @code {
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
@@ -29,9 +27,6 @@
             && p.TryGetInt32(out var n)
             && n is >= 0 and <= 10
             ? n : null;
-
-    /// <summary>显示格式：int 固定 F0；decimal 有精度时 F{n}；否则不设。</summary>
-    private string? NumberFormat => Precision is int d ? $"F{d}" : null;
 
     protected override void OnParametersSet()
     {

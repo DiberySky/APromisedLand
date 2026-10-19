@@ -30,27 +30,23 @@
                     @switch (col.DataType)
                     {
                         case EavDataTypes.Int:
-                            <MudNumericField T="long?"
-                                             Value="@GetLong(col.ColumnName)"
-                                             ValueChanged="@(v => SetField(col, v))"
-                                             Label="@ColLabel(col)"
-                                             Variant="Variant.Outlined"
-                                             Margin="Margin.Dense"
-                                             Error="@(errorText is not null)"
-                                             ErrorText="@errorText"
-                                             FullWidth="@true" />
+                            <NumberInputField T="long?"
+                                              Value="@GetLong(col.ColumnName)"
+                                              ValueChanged="@(v => SetField(col, v))"
+                                              Label="@ColLabel(col)"
+                                              Margin="Margin.Dense"
+                                              Error="@(errorText is not null)"
+                                              ErrorText="@errorText" />
                             break;
 
                         case EavDataTypes.Decimal:
-                            <MudNumericField T="decimal?"
-                                             Value="@GetDecimal(col.ColumnName)"
-                                             ValueChanged="@(v => SetField(col, v))"
-                                             Label="@ColLabel(col)"
-                                             Variant="Variant.Outlined"
-                                             Margin="Margin.Dense"
-                                             Error="@(errorText is not null)"
-                                             ErrorText="@errorText"
-                                             FullWidth="@true" />
+                            <NumberInputField T="decimal?"
+                                              Value="@GetDecimal(col.ColumnName)"
+                                              ValueChanged="@(v => SetField(col, v))"
+                                              Label="@ColLabel(col)"
+                                              Margin="Margin.Dense"
+                                              Error="@(errorText is not null)"
+                                              ErrorText="@errorText" />
                             break;
 
                         case EavDataTypes.Bool:

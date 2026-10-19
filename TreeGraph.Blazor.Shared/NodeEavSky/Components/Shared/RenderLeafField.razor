@@ -27,57 +27,50 @@
 }
 else if (Field.DataType == "int")
 {
-    <MudNumericField T="long?"
-                     Label="@Field.DisplayName"
-                     Value="@(Value switch { long l => l, int i => i, _ => null })"
-                     ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                     Variant="Variant.Outlined"
-                     Required="@Field.IsRequired"
-                     Error="@hasError"
-                     ErrorText="@errorText"
-                     FullWidth="true" />
+    <NumberInputField T="long?"
+                      Label="@Field.DisplayName"
+                      Value="@(Value switch { long l => l, int i => i, _ => null })"
+                      ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                      Required="@Field.IsRequired"
+                      Error="@hasError"
+                      ErrorText="@errorText" />
 }
 else if (Field.DataType == "decimal")
 {
     @if (!string.IsNullOrEmpty(Field.UnitId))
     {
         var numeric = Value as NumericInput ?? new NumericInput { UnitId = Field.UnitId };
-        <MudNumericField T="decimal?"
-                         Label="@Field.DisplayName"
-                         Value="@numeric.Value"
-                         ValueChanged="@(v =>
-                         {
-                             var n = Value as NumericInput ?? new NumericInput { UnitId = Field.UnitId };
-                             n.Value = v ?? 0;
-                             n.UnitId = Field.UnitId;
-                             ValueChanged.InvokeAsync(n);
-                         })"
-                         Variant="Variant.Outlined"
-                         Required="@Field.IsRequired"
-                         Error="@hasError"
-                         ErrorText="@errorText"
-                         Adornment="Adornment.End"
-                         AdornmentText="@Field.UnitName"
-                         FullWidth="true" />
+        <NumberInputField T="decimal?"
+                          Label="@Field.DisplayName"
+                          Value="@numeric.Value"
+                          ValueChanged="@(v =>
+                          {
+                              var n = Value as NumericInput ?? new NumericInput { UnitId = Field.UnitId };
+                              n.Value = v ?? 0;
+                              n.UnitId = Field.UnitId;
+                              ValueChanged.InvokeAsync(n);
+                          })"
+                          Required="@Field.IsRequired"
+                          Error="@hasError"
+                          ErrorText="@errorText"
+                          Suffix="@Field.UnitName" />
     }
     else
     {
-        <MudNumericField T="decimal?"
-                         Label="@Field.DisplayName"
-                         Value="@(Value switch
-                         {
-                             decimal d => d,
-                             double db => (decimal)db,
-                             int i => i,
-                             long l => l,
-                             _ => null
-                         })"
-                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                         Variant="Variant.Outlined"
-                         Required="@Field.IsRequired"
-                         Error="@hasError"
-                         ErrorText="@errorText"
-                         FullWidth="true" />
+        <NumberInputField T="decimal?"
+                          Label="@Field.DisplayName"
+                          Value="@(Value switch
+                          {
+                              decimal d => d,
+                              double db => (decimal)db,
+                              int i => i,
+                              long l => l,
+                              _ => null
+                          })"
+                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                          Required="@Field.IsRequired"
+                          Error="@hasError"
+                          ErrorText="@errorText" />
     }
 }
 else if (Field.DataType == "bool")

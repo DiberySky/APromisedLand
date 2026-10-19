@@ -49,13 +49,12 @@
 
                         case EavDataTypes.Int:
                         case EavDataTypes.Decimal:
-                            <MudNumericField T="decimal?"
-                                             Label="@field.DisplayName"
-                                             Value="GetDecimal(field.FieldName)"
-                                             ValueChanged="v => SetDecimal(field.FieldName, v)"
-                                             Required="field.IsRequired"
-                                             ReadOnly="@ReadOnly"
-                                             Variant="Variant.Outlined" />
+                            <NumberInputField T="decimal?"
+                                              Label="@field.DisplayName"
+                                              Value="GetDecimal(field.FieldName)"
+                                              ValueChanged="v => SetDecimal(field.FieldName, v)"
+                                              Required="field.IsRequired"
+                                              ReadOnly="@ReadOnly" />
                             break;
 
                         case EavDataTypes.Bool:

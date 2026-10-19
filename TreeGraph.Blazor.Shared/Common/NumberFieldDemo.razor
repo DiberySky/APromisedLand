@@ -1,0 +1,46 @@
+@page "/number-field-demo"
+@namespace TreeGraph.Blazor.Shared.Common
+
+<PageSky Title="数字控件 Demo" ArrowBackVisible="false">
+    <PageContent>
+        <MudStack Spacing="4" Class="pa-4" Style="max-width:420px">
+            <MudText Typo="Typo.h6">NumberInputField（输入框 + 内嵌 −/+）</MudText>
+
+            <NumberInputField @bind-Value="_int" Label="int（0–100，步长 1）" Min="0" Max="100"/>
+            <NumberInputField @bind-Value="_intNullable" Label="int?（可空，清空即 null）" Min="0" Max="100"/>
+            <NumberInputField @bind-Value="_decimal" Label="decimal（0–10，步长 0.5）" Min="0" Max="10" Step="0.5m"/>
+            <NumberInputField @bind-Value="_decimalNullable" Label="decimal?（步长 0.01，可空）" Step="0.01m"/>
+            <NumberInputField @bind-Value="_double" Label="double（步长 0.1）" Step="0.1m"/>
+            <NumberInputField @bind-Value="_long" Label="long（步长 1000）" Step="1000"/>
+            <NumberInputField @bind-Value="_int" Label="禁用状态" Min="0" Max="100" Disabled="true"/>
+
+            <MudDivider/>
+            <MudText Typo="Typo.h6">NumberStepper（独立步进器）</MudText>
+            <div>
+                <NumberStepper @bind-Value="_depth" Label="包含子项" Suffix="层" Min="0" Max="10"/>
+            </div>
+
+            <MudDivider/>
+            <MudText Typo="Typo.h6">当前值</MudText>
+            <MudText Typo="Typo.body2">
+                int：@_int<br/>
+                int?：@(_intNullable?.ToString() ?? "null")<br/>
+                decimal：@_decimal<br/>
+                decimal?：@(_decimalNullable?.ToString() ?? "null")<br/>
+                double：@_double<br/>
+                long：@_long<br/>
+                步进器层数：@_depth
+            </MudText>
+        </MudStack>
+    </PageContent>
+</PageSky>
+
+@code {
+    private int _int = 5;
+    private int? _intNullable;
+    private decimal _decimal = 2.5m;
+    private decimal? _decimalNullable;
+    private double _double = 1.5;
+    private long _long = 5000;
+    private int _depth = 3;
+}

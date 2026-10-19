@@ -12,13 +12,11 @@
     width: 100%;
 }
 
-/* 数字居中于 − 与 + 的间隙中点（距右缘 44px = 8 + 20(+) + 6 + 10）。
-   padding-left 用 calc(100% - 74px) 随宽度联动（74 = 88 − padding-right 14），
-   任意控件宽度下 − 与 + 到数字的距离都相等 */
+/* 数字靠左、−/+ 图标贴右缘，两端 between 分隔；
+   右侧留白给图标（56 = 8(右边距) + 24×2(两个图标位)） */
 .numinput ::deep input {
-    text-align: center;
-    padding-left: calc(100% - 74px);
-    padding-right: 14px;
+    text-align: left;
+    padding-right: 56px;
 }
 
 /* 按钮组：锚定输入框右侧内部，垂直居中 */
@@ -38,9 +36,9 @@
     margin-right: 0;
 }
 
-/* − 与 + 之间留出数字区，三者聚拢为 "− 数字 +" */
+/* −/+ 图标相邻聚拢（同 MudNumericField 箭头区），不再夹住数字 */
 .numinput-stepper ::deep .numstep-btn + .numstep-btn {
-    margin-left: 32px; /* 6(间距) + 20(数字区) + 6(间距) */
+    margin-left: 2px;
 }
 
 /* 仅按钮恢复可点击 */

@@ -29,35 +29,30 @@ else if (Attribute.DataType == "int")
     @if (!string.IsNullOrEmpty(Attribute.UnitId))
     {
         var numeric = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-        <MudNumericField T="decimal?"
-                         Label="@DisplayLabel"
-                         Value="@numeric.Value"
-                         ValueChanged="@(v =>
-                         {
-                             var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-                             n.Value = v ?? 0;
-                             n.UnitId = Attribute.UnitId;
-                             ValueChanged.InvokeAsync(n);
-                         })"
-                         Variant="Variant.Outlined"
-                         Required="@Attribute.IsRequired"
-                         Error="@HasSelfErrors"
-                         ErrorText="@SelfErrorText"
-                         Adornment="Adornment.End"
-                         AdornmentText="@Attribute.UnitName"
-                         FullWidth="true" />
+        <NumberInputField T="decimal?"
+                          Label="@DisplayLabel"
+                          Value="@numeric.Value"
+                          ValueChanged="@(v =>
+                          {
+                              var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
+                              n.Value = v ?? 0;
+                              n.UnitId = Attribute.UnitId;
+                              ValueChanged.InvokeAsync(n);
+                          })"
+                          Required="@Attribute.IsRequired"
+                          Error="@HasSelfErrors"
+                          ErrorText="@SelfErrorText"
+                          Suffix="@Attribute.UnitName" />
     }
     else
     {
-        <MudNumericField T="long?"
-                         Label="@DisplayLabel"
-                         Value="@LongValue"
-                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                         Variant="Variant.Outlined"
-                         Required="@Attribute.IsRequired"
-                         Error="@HasSelfErrors"
-                         ErrorText="@SelfErrorText"
-                         FullWidth="true" />
+        <NumberInputField T="long?"
+                          Label="@DisplayLabel"
+                          Value="@LongValue"
+                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                          Required="@Attribute.IsRequired"
+                          Error="@HasSelfErrors"
+                          ErrorText="@SelfErrorText" />
     }
 }
 else if (Attribute.DataType == "decimal")
@@ -65,35 +60,30 @@ else if (Attribute.DataType == "decimal")
     @if (!string.IsNullOrEmpty(Attribute.UnitId))
     {
         var numeric = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-        <MudNumericField T="decimal?"
-                         Label="@DisplayLabel"
-                         Value="@numeric.Value"
-                         ValueChanged="@(v =>
-                         {
-                             var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-                             n.Value = v ?? 0;
-                             n.UnitId = Attribute.UnitId;
-                             ValueChanged.InvokeAsync(n);
-                         })"
-                         Variant="Variant.Outlined"
-                         Required="@Attribute.IsRequired"
-                         Error="@HasSelfErrors"
-                         ErrorText="@SelfErrorText"
-                         Adornment="Adornment.End"
-                         AdornmentText="@Attribute.UnitName"
-                         FullWidth="true" />
+        <NumberInputField T="decimal?"
+                          Label="@DisplayLabel"
+                          Value="@numeric.Value"
+                          ValueChanged="@(v =>
+                          {
+                              var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
+                              n.Value = v ?? 0;
+                              n.UnitId = Attribute.UnitId;
+                              ValueChanged.InvokeAsync(n);
+                          })"
+                          Required="@Attribute.IsRequired"
+                          Error="@HasSelfErrors"
+                          ErrorText="@SelfErrorText"
+                          Suffix="@Attribute.UnitName" />
     }
     else
     {
-        <MudNumericField T="decimal?"
-                         Label="@DisplayLabel"
-                         Value="@DecimalValue"
-                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                         Variant="Variant.Outlined"
-                         Required="@Attribute.IsRequired"
-                         Error="@HasSelfErrors"
-                         ErrorText="@SelfErrorText"
-                         FullWidth="true" />
+        <NumberInputField T="decimal?"
+                          Label="@DisplayLabel"
+                          Value="@DecimalValue"
+                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                          Required="@Attribute.IsRequired"
+                          Error="@HasSelfErrors"
+                          ErrorText="@SelfErrorText" />
     }
 }
 else if (Attribute.DataType == "bool")

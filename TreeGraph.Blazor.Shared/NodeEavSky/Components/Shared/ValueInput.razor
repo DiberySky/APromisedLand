@@ -23,31 +23,26 @@ else if (Attribute.DataType == "int")
     @if (!string.IsNullOrEmpty(Attribute.UnitId))
     {
         var numeric = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-        <MudNumericField T="decimal?"
-                         Value="@numeric.Value"
-                         ValueChanged="@(v =>
-                         {
-                             var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-                             n.Value = v ?? 0;
-                             n.UnitId = Attribute.UnitId;
-                             ValueChanged.InvokeAsync(n);
-                         })"
-                         Variant="Variant.Outlined"
-                         Margin="Margin.Dense"
-                         Placeholder="值"
-                         Adornment="Adornment.End"
-                         AdornmentText="@Attribute.UnitName"
-                         FullWidth="true" />
+        <NumberInputField T="decimal?"
+                          Value="@numeric.Value"
+                          ValueChanged="@(v =>
+                          {
+                              var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
+                              n.Value = v ?? 0;
+                              n.UnitId = Attribute.UnitId;
+                              ValueChanged.InvokeAsync(n);
+                          })"
+                          Margin="Margin.Dense"
+                          Placeholder="值"
+                          Suffix="@Attribute.UnitName" />
     }
     else
     {
-        <MudNumericField T="long?"
-                         Value="@(Value switch { long l => l, int i => i, _ => null })"
-                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                         Variant="Variant.Outlined"
-                         Margin="Margin.Dense"
-                         Placeholder="值"
-                         FullWidth="true" />
+        <NumberInputField T="long?"
+                          Value="@(Value switch { long l => l, int i => i, _ => null })"
+                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                          Margin="Margin.Dense"
+                          Placeholder="值" />
     }
 }
 else if (Attribute.DataType == "decimal")
@@ -55,38 +50,33 @@ else if (Attribute.DataType == "decimal")
     @if (!string.IsNullOrEmpty(Attribute.UnitId))
     {
         var numeric = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-        <MudNumericField T="decimal?"
-                         Value="@numeric.Value"
-                         ValueChanged="@(v =>
-                         {
-                             var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
-                             n.Value = v ?? 0;
-                             n.UnitId = Attribute.UnitId;
-                             ValueChanged.InvokeAsync(n);
-                         })"
-                         Variant="Variant.Outlined"
-                         Margin="Margin.Dense"
-                         Placeholder="值"
-                         Adornment="Adornment.End"
-                         AdornmentText="@Attribute.UnitName"
-                         FullWidth="true" />
+        <NumberInputField T="decimal?"
+                          Value="@numeric.Value"
+                          ValueChanged="@(v =>
+                          {
+                              var n = Value as NumericInput ?? new NumericInput { UnitId = Attribute.UnitId };
+                              n.Value = v ?? 0;
+                              n.UnitId = Attribute.UnitId;
+                              ValueChanged.InvokeAsync(n);
+                          })"
+                          Margin="Margin.Dense"
+                          Placeholder="值"
+                          Suffix="@Attribute.UnitName" />
     }
     else
     {
-        <MudNumericField T="decimal?"
-                         Value="@(Value switch
-                         {
-                             decimal d => d,
-                             double db => (decimal)db,
-                             int i => i,
-                             long l => l,
-                             _ => null
-                         })"
-                         ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
-                         Variant="Variant.Outlined"
-                         Margin="Margin.Dense"
-                         Placeholder="值"
-                         FullWidth="true" />
+        <NumberInputField T="decimal?"
+                          Value="@(Value switch
+                          {
+                              decimal d => d,
+                              double db => (decimal)db,
+                              int i => i,
+                              long l => l,
+                              _ => null
+                          })"
+                          ValueChanged="@(v => ValueChanged.InvokeAsync(v))"
+                          Margin="Margin.Dense"
+                          Placeholder="值" />
     }
 }
 else if (Attribute.DataType == "bool")
