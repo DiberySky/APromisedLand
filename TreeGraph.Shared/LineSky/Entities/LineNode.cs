@@ -1,0 +1,30 @@
+using TreeGraph.Shared.NodeEavSky.Abstractions;
+
+namespace TreeGraph.Shared.LineSky.Entities;
+
+/// <summary>
+/// 线路节点 —— 独立的一等公民实体，实现 <see cref="Inode"/>。
+///
+/// 用于承载线路上的点，与四棵宿主树节点无关。
+/// 典型场景：输电线路杆塔、物流站点、工序工位、交叉跨越点等。
+/// </summary>
+public class LineNode : Inode
+{
+    /// <summary>节点 ID（GUID 字符串），EAV 内作为 inode_id 使用。</summary>
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    /// <summary>节点名称。</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>节点描述。</summary>
+    public string? Description { get; set; }
+
+    /// <summary>经纬度（WGS84），格式 "lng,lat"。</summary>
+    public string? LocationGeo { get; set; }
+
+    /// <summary>是否已归档。</summary>
+    public bool IsArchived { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? UpdatedAt { get; set; }
+}

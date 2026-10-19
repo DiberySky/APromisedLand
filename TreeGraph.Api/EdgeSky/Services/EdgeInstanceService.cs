@@ -57,9 +57,9 @@ public class EdgeInstanceService
         if (duplicate)
             throw new InvalidOperationException("该边已存在（同类型同方向不重复）");
 
-        var enforceSingleIncoming = def.IsChain && def.IsLinear;
+        var enforceSingleIncoming = def.IsLine && def.IsLinear;
 
-        // 严格线性链：入度 ≤ 1 友好前置校验（数据库部分唯一索引 uq_ei_single_incoming 兜底）
+        // 严格线性线路：入度 ≤ 1 友好前置校验（数据库部分唯一索引 uq_ei_single_incoming 兜底）
         if (enforceSingleIncoming)
         {
             var indegree = await _db.EdgeInstances
@@ -67,18 +67,18 @@ public class EdgeInstanceService
                     && i.ToNodeId == req.ToNodeId, ct);
             if (indegree > 0)
                 throw new InvalidOperationException(
-                    $"链式结构 {def.DisplayName} 是严格线性，节点 {req.ToNodeId} 入度已 = 1，不能再接");
+                    $"线路结构 {def.DisplayName} 是严格线性，节点 {req.ToNodeId} 入度已 = 1，不能再接");
         }
 
-        // 链式结构：自环 / 成环拦截
-        if (def.IsChain)
+        // 线路结构：自环 / 成环拦截
+        if (def.IsLine)
         {
             if (req.FromNodeId == req.ToNodeId)
-                throw new InvalidOperationException("链式结构不允许自环（from 与 to 相同）");
+                throw new InvalidOperationException("线路结构不允许自环（from 与 to 相同）");
 
             if (await WouldCreateCycleAsync(edgeTypeId, req.FromNodeId, req.ToNodeId, ct))
                 throw new InvalidOperationException(
-                    $"新增边 {req.FromNodeId} → {req.ToNodeId} 会形成环，链式结构应无环");
+                    $"新增边 {req.FromNodeId} → {req.ToNodeId} 会形成环，线路结构应无环");
         }
 
         var instance = new EdgeInstance
@@ -316,9 +316,9 @@ public class EdgeInstanceService
     // ============================================================
 
     /// <summary>
-    /// 校验链式结构拓扑：入度/出度/成环。
-    /// 返回轻量结果（Valid + Errors），供 EdgeMetadataService 在变更 IsChain/IsLinear 时使用。
-    /// 严格线性链（IsChain &amp;&amp; IsLinear）下，入度 &gt; 1 与成环计入 Errors。
+    /// 校验线路结构拓扑：入度/出度/成环。
+    /// 返回轻量结果（Valid + Errors），供 EdgeMetadataService 在变更 IsLine/IsLinear 时使用。
+    /// 严格线性线路（IsLine &amp;&amp; IsLinear）下，入度 &gt; 1 与成环计入 Errors。
     /// </summary>
     public async Task<(bool Valid, List<string> Errors)> ValidateTopologyAsync(
         string edgeTypeId, CancellationToken ct)
@@ -332,19 +332,19 @@ public class EdgeInstanceService
             .ToListAsync(ct);
 
         var analysis = AnalyzeTopology(pairs.Select(e => (e.FromNodeId, e.ToNodeId)).ToList());
-        var treatAsStrict = def is { IsChain: true, IsLinear: true };
+        var treatAsStrict = def is { IsLine: true, IsLinear: true };
 
         var errors = new List<string>();
 
         foreach (var (nodeId, deg) in analysis.Indeg.Where(kv => kv.Value > 1))
         {
-            var msg = $"节点 {nodeId} 入度 = {deg}（链式结构入度应 ≤ 1）";
+            var msg = $"节点 {nodeId} 入度 = {deg}（线路结构入度应 ≤ 1）";
             if (treatAsStrict) errors.Add(msg);
         }
 
         foreach (var nodeId in analysis.Cyclic)
         {
-            var msg = $"节点 {nodeId} 参与成环（链式结构应无环）";
+            var msg = $"节点 {nodeId} 参与成环（线路结构应无环）";
             if (treatAsStrict) errors.Add(msg);
         }
 
@@ -352,7 +352,7 @@ public class EdgeInstanceService
     }
 
     /// <summary>
-    /// 完整拓扑分析（供 ChainService 包装为 ChainValidationResult）。
+    /// 完整拓扑分析（供 LineService 包装为 LineValidationResult）。
     /// </summary>
     public async Task<TopologyAnalysis> AnalyzeTopologyAsync(
         string edgeTypeId, CancellationToken ct)

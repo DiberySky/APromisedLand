@@ -180,7 +180,7 @@ public static class BuilderConfig
 #if DEBUG
         // 仅开发环境使用，切勿在生产环境启用！
         handler.ServerCertificateCustomValidationCallback =
-            (message, cert, chain, errors) => true;
+            (message, cert, line, errors) => true;
 #endif
         return handler;
     }

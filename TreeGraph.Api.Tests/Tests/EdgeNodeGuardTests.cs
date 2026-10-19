@@ -63,7 +63,7 @@ public class EdgeNodeGuardTests
                 ToNodeId = SeededUnitNodeId
             });
 
-        // 自环由链式规则拒绝，但本类型非链式（IsChain=false），存在性校验通过 → 201
+        // 自环由线路规则拒绝，但本类型非线路（IsLine=false），存在性校验通过 → 201
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var dto = await resp.Content.ReadEavAsync<EdgeInstanceDto>();
         Assert.NotNull(dto);

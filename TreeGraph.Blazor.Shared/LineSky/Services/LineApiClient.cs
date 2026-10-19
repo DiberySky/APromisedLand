@@ -1,62 +1,62 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using TreeGraph.Shared.ChainSky.Dtos;
+using TreeGraph.Shared.LineSky.Dtos;
 using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
-namespace TreeGraph.Blazor.Shared.ChainSky.Services;
+namespace TreeGraph.Blazor.Shared.LineSky.Services;
 
 /// <summary>
-/// 链式结构（Chain）API 客户端：建链、上下游/全路径查询、拓扑校验、连通分量。
+/// 线路结构（Line）API 客户端：建线、上下游/全路径查询、拓扑校验、连通分量。
 /// </summary>
-public class ChainApiClient
+public class LineApiClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _http;
-    private readonly ILogger<ChainApiClient> _logger;
+    private readonly ILogger<LineApiClient> _logger;
 
-    public ChainApiClient(HttpClient http, ILogger<ChainApiClient> logger)
+    public LineApiClient(HttpClient http, ILogger<LineApiClient> logger)
     {
         _http = http;
         _logger = logger;
     }
 
-    public Task<List<EdgeInstanceDto>?> CreateChainAsync(
-        string edgeTypeId, CreateChainRequest request, CancellationToken ct = default)
+    public Task<List<EdgeInstanceDto>?> CreateLineAsync(
+        string edgeTypeId, CreateLineRequest request, CancellationToken ct = default)
         => PostAsync<List<EdgeInstanceDto>>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/create",
+            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/create",
             request, ct);
 
-    public Task<ChainPathResult?> GetChainUpstreamAsync(
+    public Task<LinePathResult?> GetLineUpstreamAsync(
         string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => GetAsync<ChainPathResult>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/upstream/{Uri.EscapeDataString(nodeId)}",
+        => GetAsync<LinePathResult>(
+            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/upstream/{Uri.EscapeDataString(nodeId)}",
             ct);
 
-    public Task<ChainPathResult?> GetChainDownstreamAsync(
+    public Task<LinePathResult?> GetLineDownstreamAsync(
         string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => GetAsync<ChainPathResult>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/downstream/{Uri.EscapeDataString(nodeId)}",
+        => GetAsync<LinePathResult>(
+            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/downstream/{Uri.EscapeDataString(nodeId)}",
             ct);
 
-    public Task<ChainPathResult?> GetChainFullPathAsync(
+    public Task<LinePathResult?> GetLineFullPathAsync(
         string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => GetAsync<ChainPathResult>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/path/{Uri.EscapeDataString(nodeId)}",
+        => GetAsync<LinePathResult>(
+            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/path/{Uri.EscapeDataString(nodeId)}",
             ct);
 
-    public Task<ChainValidationResult?> ValidateChainTopologyAsync(
+    public Task<LineValidationResult?> ValidateLineTopologyAsync(
         string edgeTypeId, CancellationToken ct = default)
-        => GetAsync<ChainValidationResult>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/validate",
+        => GetAsync<LineValidationResult>(
+            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/validate",
             ct);
 
-    public Task<IReadOnlyList<ChainConnectedComponent>?> GetChainComponentsAsync(
+    public Task<IReadOnlyList<LineConnectedComponent>?> GetLineComponentsAsync(
         string edgeTypeId, CancellationToken ct = default)
-        => GetAsync<IReadOnlyList<ChainConnectedComponent>>(
-            $"api/eav/chains/{Uri.EscapeDataString(edgeTypeId)}/components",
+        => GetAsync<IReadOnlyList<LineConnectedComponent>>(
+            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/components",
             ct);
 
     // ============================================================

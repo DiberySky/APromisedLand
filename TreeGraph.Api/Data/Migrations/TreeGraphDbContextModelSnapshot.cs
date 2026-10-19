@@ -56,9 +56,6 @@ namespace TreeGraph.Api.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
-                    b.Property<bool>("IsChain")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("IsDirected")
                         .HasColumnType("boolean")
                         .HasColumnName("is_directed");
@@ -66,6 +63,9 @@ namespace TreeGraph.Api.Migrations
                     b.Property<bool>("IsGlobal")
                         .HasColumnType("boolean")
                         .HasColumnName("is_global");
+
+                    b.Property<bool>("IsLine")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsLinear")
                         .HasColumnType("boolean");
@@ -102,9 +102,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "电气连接",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = false,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "ConnectedTo",
@@ -114,13 +114,13 @@ namespace TreeGraph.Api.Migrations
                         {
                             EdgeTypeId = "e0000002-0000-4000-8000-000000000002",
                             CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "下游设备指向供电上游，沿供电方向逐级上溯；链式支持完整供电路径查询与成环校验。",
+                            Description = "下游设备指向供电上游，沿供电方向逐级上溯；线路结构支持完整供电路径查询与成环校验。",
                             DisplayName = "供电来源",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = true,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = true,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "SuppliedBy",
@@ -134,9 +134,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "低压接入",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "LowVoltageAccess",
@@ -146,13 +146,13 @@ namespace TreeGraph.Api.Migrations
                         {
                             EdgeTypeId = "e0000004-0000-4000-8000-000000000004",
                             CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "线路段序列，链式；允许 T 接分支（不限制入度）。",
+                            Description = "线路段序列，属线路结构；允许 T 接分支（不限制入度）。",
                             DisplayName = "输电线路",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = true,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = true,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "TransmissionLine",
@@ -162,13 +162,13 @@ namespace TreeGraph.Api.Migrations
                         {
                             EdgeTypeId = "e0000005-0000-4000-8000-000000000005",
                             CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "单电源馈线，链式且严格线性（入度≤1、无环）。",
+                            Description = "单电源馈线，线路结构且严格线性（入度≤1、无环）。",
                             DisplayName = "馈线",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = true,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = true,
                             IsLinear = true,
                             ToNodeType = "SpaceTree",
                             TypeName = "Feeder",
@@ -182,9 +182,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "逻辑归属",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "BelongsTo",
@@ -198,9 +198,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "归属单位",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "UnitTree",
                             TypeName = "AssignedTo",
@@ -214,9 +214,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "安装承载",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "InstalledIn",
@@ -230,9 +230,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "空间邻接",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = false,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "AdjacentTo",
@@ -246,9 +246,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "位置所在",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "LocatedAt",
@@ -262,9 +262,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "保护范围",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "Protects",
@@ -278,9 +278,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "保护配合",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "BacksUp",
@@ -294,9 +294,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "操作前置",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "PrerequisiteFor",
@@ -310,9 +310,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "二次依赖",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "DependsOn",
@@ -326,9 +326,9 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "影响范围",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "Affects",
@@ -342,12 +342,27 @@ namespace TreeGraph.Api.Migrations
                             DisplayName = "事件起因",
                             FromNodeType = "SpaceTree",
                             IsActive = true,
-                            IsChain = false,
                             IsDirected = true,
                             IsGlobal = false,
+                            IsLine = false,
                             IsLinear = false,
                             ToNodeType = "SpaceTree",
                             TypeName = "TrippedBy",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000017-0000-4000-8000-000000000017",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "线路区段 → 交叉跨越点；空间相交但电气隔离，不参与供电拓扑遍历。",
+                            DisplayName = "跨越通过",
+                            IsActive = true,
+                            IsDirected = true,
+                            IsGlobal = true,
+                            IsLine = false,
+                            IsLinear = false,
+                            ToNodeType = "LineNode",
+                            TypeName = "PassesThrough",
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
                 });
@@ -1157,6 +1172,108 @@ namespace TreeGraph.Api.Migrations
                             IsRequired = false,
                             IsSearchable = true,
                             IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000032-0000-4000-8000-000000000032",
+                            AttributeName = "clearance_m",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "decimal",
+                            DisplayName = "垂直净距（米）",
+                            DisplayOrder = 1,
+                            EntityType = "LineNode",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = true,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000033-0000-4000-8000-000000000033",
+                            AttributeName = "crossing_angle",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "decimal",
+                            DisplayName = "交叉角（度）",
+                            DisplayOrder = 2,
+                            EntityType = "LineNode",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000034-0000-4000-8000-000000000034",
+                            AttributeName = "crossing_type",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "single_choice",
+                            DisplayName = "跨越物类型",
+                            DisplayOrder = 3,
+                            EntityType = "LineNode",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = true,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000035-0000-4000-8000-000000000035",
+                            AttributeName = "voltage_below",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "被跨线路电压等级",
+                            DisplayOrder = 4,
+                            EntityType = "LineNode",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000036-0000-4000-8000-000000000036",
+                            AttributeName = "location_geo",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "location",
+                            DisplayName = "经纬度",
+                            DisplayOrder = 5,
+                            EntityType = "LineNode",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = false,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000037-0000-4000-8000-000000000037",
+                            AttributeName = "measured_at",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "datetime",
+                            DisplayName = "最近测量时间",
+                            DisplayOrder = 6,
+                            EntityType = "LineNode",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Version = 1
                         });
@@ -2050,6 +2167,48 @@ namespace TreeGraph.Api.Migrations
                             Name = "知识库",
                             Type = "Knowledge"
                         });
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.LineNode", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_archived");
+
+                    b.Property<string>("LocationGeo")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("location_geo");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("line_nodes", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", b =>

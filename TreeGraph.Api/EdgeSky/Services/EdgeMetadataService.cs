@@ -58,7 +58,7 @@ public class EdgeMetadataService
             IsDirected = req.IsDirected,
             Description = req.Description,
             IsActive = true,
-            IsChain = req.IsChain,
+            IsLine = req.IsLine,
             IsLinear = req.IsLinear,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
@@ -100,15 +100,15 @@ public class EdgeMetadataService
             throw new ArgumentException(
                 "IsGlobal=false 时必须同时声明 FromNodeType 与 ToNodeType（否则该关系类型无约束，等同于全局）");
 
-        var newIsChain = req.IsChain ?? def.IsChain;
+        var newIsLine = req.IsLine ?? def.IsLine;
         var newIsLinear = req.IsLinear ?? def.IsLinear;
 
         // ★ 拓扑约束变更：先按新值做一次校验，若破坏现有拓扑则整体回滚拒绝。
-        if (newIsChain != def.IsChain || newIsLinear != def.IsLinear)
+        if (newIsLine != def.IsLine || newIsLinear != def.IsLinear)
         {
-            var oldIsChain = def.IsChain;
+            var oldIsLine = def.IsLine;
             var oldIsLinear = def.IsLinear;
-            def.IsChain = newIsChain;
+            def.IsLine = newIsLine;
             def.IsLinear = newIsLinear;
 
             // ValidateTopologyAsync 与当前 ApiResponse 请求共享同一 Scoped DbContext，
@@ -116,14 +116,14 @@ public class EdgeMetadataService
             var validation = await _edgeInst.ValidateTopologyAsync(def.EdgeTypeId, ct);
             if (!validation.Valid)
             {
-                def.IsChain = oldIsChain;
+                def.IsLine = oldIsLine;
                 def.IsLinear = oldIsLinear;
                 throw new InvalidOperationException(
-                    $"变更链式/线性约束会破坏现有拓扑：{string.Join("；", validation.Errors)}");
+                    $"变更线路/线性约束会破坏现有拓扑：{string.Join("；", validation.Errors)}");
             }
 
             // 同步存量实例的"严格线性"镜像标记
-            var enforce = newIsChain && newIsLinear;
+            var enforce = newIsLine && newIsLinear;
             await _db.EdgeInstances
                 .Where(i => i.EdgeTypeId == def.EdgeTypeId)
                 .ExecuteUpdateAsync(s => s.SetProperty(i => i.EnforceSingleIncoming, enforce), ct);
@@ -181,7 +181,7 @@ public class EdgeMetadataService
         d.FromNodeType, d.ToNodeType,
         d.IsGlobal, d.IsDirected,
         d.Description, d.IsActive,
-        d.IsChain, d.IsLinear);
+        d.IsLine, d.IsLinear);
 
     private static bool IsPascalCase(string s)
         => char.IsUpper(s[0])

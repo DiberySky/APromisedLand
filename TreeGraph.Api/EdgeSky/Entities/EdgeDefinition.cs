@@ -40,8 +40,8 @@ public class EdgeDefinition
     /// <summary>
     /// 有向，默认 true。false 表示无方向（边等同双向）。
     /// 当前实现：创建时反向亦视为重复；出边/入边查询与 BFS 遍历均做对称化展开
-    /// （无向时忽略 Direction，按双向处理）。路径/链查询（ChainService）仍按存储的
-    /// from→to 处理，无向链场景未对称化（语义预留）。
+    /// （无向时忽略 Direction，按双向处理）。路径/线路查询（LineService）仍按存储的
+    /// from→to 处理，无向线路场景未对称化（语义预留）。
     /// </summary>
     public bool IsDirected { get; set; } = true;
 
@@ -50,16 +50,16 @@ public class EdgeDefinition
     public bool IsActive { get; set; } = true;
 
     /// <summary>
-    /// 是否为链式结构类型（如输电线路、物流线路）。
-    /// 链式结构支持：批量创建链、完整路径查询（WITH RECURSIVE）、
+    /// 是否为线路结构类型（如输电线路、物流线路）。
+    /// 线路结构支持：批量创建线路、完整路径查询（WITH RECURSIVE）、
     /// 入度/成环校验、连通分量。
     /// </summary>
-    public bool IsChain { get; set; } = false;
+    public bool IsLine { get; set; } = false;
 
     /// <summary>
-    /// 严格线性链式（入度 ≤ 1，无环）。true 时创建边会自动校验入度约束。
+    /// 严格线性线路（入度 ≤ 1，无环）。true 时创建边会自动校验入度约束。
     /// false 时允许 T 接分支（入度 ≤ 1 但出度可多）。
-    /// 仅 IsChain=true 时生效。
+    /// 仅 IsLine=true 时生效。
     /// </summary>
     public bool IsLinear { get; set; } = true;
 
@@ -80,7 +80,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = false,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "设备之间的电气连通（母线↔断路器、隔离开关↔线路）；物理连接对称，按无向处理。",
             IsActive = true,
@@ -96,9 +96,9 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = true,
+            IsLine = true,
             IsLinear = false,
-            Description = "下游设备指向供电上游，沿供电方向逐级上溯；链式支持完整供电路径查询与成环校验。",
+            Description = "下游设备指向供电上游，沿供电方向逐级上溯；线路结构支持完整供电路径查询与成环校验。",
             IsActive = true,
             CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
             UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
@@ -112,7 +112,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "低压电缆组接入变压器，与电气连接配合还原「建筑—低压柜—变压器」链路。",
             IsActive = true,
@@ -128,9 +128,9 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = true,
+            IsLine = true,
             IsLinear = false,
-            Description = "线路段序列，链式；允许 T 接分支（不限制入度）。",
+            Description = "线路段序列，属线路结构；允许 T 接分支（不限制入度）。",
             IsActive = true,
             CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
             UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
@@ -144,9 +144,9 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = true,
+            IsLine = true,
             IsLinear = true,
-            Description = "单电源馈线，链式且严格线性（入度≤1、无环）。",
+            Description = "单电源馈线，线路结构且严格线性（入度≤1、无环）。",
             IsActive = true,
             CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
             UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
@@ -160,7 +160,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "设备在管理上归属台区/馈线等逻辑单元；与电气连接、物理位置分开建模。",
             IsActive = true,
@@ -176,7 +176,7 @@ public class EdgeDefinition
             ToNodeType = "UnitTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "设备归属运维单位，与逻辑归属分型，避免同一对点混用一条边。",
             IsActive = true,
@@ -192,7 +192,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "分布式光伏、储能等设备安装在建筑/站点上。",
             IsActive = true,
@@ -208,7 +208,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = false,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "空间实体相邻（共享边界/距离），用于台区划分与抢修路径分析；对称按无向处理。",
             IsActive = true,
@@ -224,7 +224,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "设备物理位置（站房/楼层/房间），与逻辑归属分离。",
             IsActive = true,
@@ -240,7 +240,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "保护装置指向被保护设备，用于故障时定位应动作的保护。",
             IsActive = true,
@@ -256,7 +256,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "上下级保护配合（配合级差与时间定值），支持定值校核与越级跳闸分析。",
             IsActive = true,
@@ -272,7 +272,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "操作票与五防规则的前置约束，例如线路带电时禁止合接地刀闸。",
             IsActive = true,
@@ -288,7 +288,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "二次设备（保护、测控、通信）依赖一次设备或电源，用于故障溯源。",
             IsActive = true,
@@ -304,7 +304,7 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "故障事件节点指向受影响的设备/用户，表达失电或降级范围。",
             IsActive = true,
@@ -320,9 +320,25 @@ public class EdgeDefinition
             ToNodeType = "SpaceTree",
             IsGlobal = false,
             IsDirected = true,
-            IsChain = false,
+            IsLine = false,
             IsLinear = false,
             Description = "跳闸事件指向触发它的保护动作或根因故障，用于事后复盘。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000017-0000-4000-8000-000000000017",
+            TypeName = "PassesThrough",
+            DisplayName = "跨越通过",
+            FromNodeType = null,
+            ToNodeType = "LineNode",
+            IsGlobal = true,
+            IsDirected = true,
+            IsLine = false,
+            IsLinear = false,
+            Description = "线路区段 → 交叉跨越点；空间相交但电气隔离，不参与供电拓扑遍历。",
             IsActive = true,
             CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
             UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
@@ -356,7 +372,7 @@ public class EdgeInstance : Inode
     public decimal? Weight { get; set; }
 
     /// <summary>
-    /// 镜像自 EdgeDefinition（IsChain &amp;&amp; IsLinear）的"严格线性"标记。
+    /// 镜像自 EdgeDefinition（IsLine &amp;&amp; IsLinear）的"严格线性"标记。
     /// 供数据库层部分唯一索引 uq_ei_single_incoming 使用：同一 edge_type_id 下
     /// 同一 to_node_id 至多一条边（入度 ≤ 1），把"查后插"的并发竞态收敛为数据库原子约束。
     /// </summary>

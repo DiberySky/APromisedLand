@@ -551,6 +551,103 @@ public class AttributeDefinition
             Version = 1,
             CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
             UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        // ============ LineNode（跨越点）属性 ============
+        new AttributeDefinition
+        {
+            AttributeId = "a0000032-0000-4000-8000-000000000032",
+            EntityType = "LineNode",
+            AttributeName = "clearance_m",
+            DisplayName = "垂直净距（米）",
+            DataType = EavDataTypes.Decimal,
+            DisplayOrder = 1,
+            IsRequired = true,
+            IsSearchable = true,
+            IsSortable = true,
+            IsDeleted = false,
+            Version = 1,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new AttributeDefinition
+        {
+            AttributeId = "a0000033-0000-4000-8000-000000000033",
+            EntityType = "LineNode",
+            AttributeName = "crossing_angle",
+            DisplayName = "交叉角（度）",
+            DataType = EavDataTypes.Decimal,
+            DisplayOrder = 2,
+            IsRequired = false,
+            IsSearchable = true,
+            IsSortable = true,
+            IsDeleted = false,
+            Version = 1,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new AttributeDefinition
+        {
+            AttributeId = "a0000034-0000-4000-8000-000000000034",
+            EntityType = "LineNode",
+            AttributeName = "crossing_type",
+            DisplayName = "跨越物类型",
+            DataType = EavDataTypes.SingleChoice,
+            DisplayOrder = 3,
+            IsRequired = true,
+            IsSearchable = true,
+            IsSortable = false,
+            IsDeleted = false,
+            Version = 1,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new AttributeDefinition
+        {
+            AttributeId = "a0000035-0000-4000-8000-000000000035",
+            EntityType = "LineNode",
+            AttributeName = "voltage_below",
+            DisplayName = "被跨线路电压等级",
+            DataType = EavDataTypes.String,
+            DisplayOrder = 4,
+            IsRequired = false,
+            IsSearchable = true,
+            IsSortable = false,
+            IsDeleted = false,
+            Version = 1,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new AttributeDefinition
+        {
+            AttributeId = "a0000036-0000-4000-8000-000000000036",
+            EntityType = "LineNode",
+            AttributeName = "location_geo",
+            DisplayName = "经纬度",
+            DataType = EavDataTypes.Location,
+            DisplayOrder = 5,
+            IsRequired = false,
+            IsSearchable = false,
+            IsSortable = false,
+            IsDeleted = false,
+            Version = 1,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new AttributeDefinition
+        {
+            AttributeId = "a0000037-0000-4000-8000-000000000037",
+            EntityType = "LineNode",
+            AttributeName = "measured_at",
+            DisplayName = "最近测量时间",
+            DataType = EavDataTypes.Datetime,
+            DisplayOrder = 6,
+            IsRequired = false,
+            IsSearchable = true,
+            IsSortable = true,
+            IsDeleted = false,
+            Version = 1,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
         }
     ];
 }

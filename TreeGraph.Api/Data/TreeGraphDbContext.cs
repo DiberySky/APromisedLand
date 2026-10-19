@@ -39,6 +39,9 @@ public class TreeGraphDbContext : DbContext
     // 空间（独立简单实体）
     public DbSet<Space> Spaces => Set<Space>();
 
+    // LineSky：线路节点（独立一等公民，实现 Inode）
+    public DbSet<TreeGraph.Shared.LineSky.Entities.LineNode> LineNodes => Set<TreeGraph.Shared.LineSky.Entities.LineNode>();
+
     public TreeGraphDbContext(DbContextOptions<TreeGraphDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -59,6 +62,7 @@ public class TreeGraphDbContext : DbContext
         ConfigureKnowledgeTrees(mb);
         ConfigureSpaceTrees(mb);
         ConfigureSpaces(mb);
+        ConfigureLineNodes(mb);
     }
 
     // ============================================================
@@ -765,7 +769,7 @@ public class TreeGraphDbContext : DbContext
                 .IsUnique()
                 .HasDatabaseName("uq_edge_instance");
 
-            // 严格线性链（IsChain && IsLinear）：同一类型下同一 to_node_id 至多一条边
+            // 严格线性线路（IsLine && IsLinear）：同一类型下同一 to_node_id 至多一条边
             // （入度 ≤ 1）。用部分唯一索引把并发下“查后插”的竞态收敛为数据库原子约束。
             //
             // 注意：列顺序刻意与下方通用索引 ix_ei_to 相反（ToNodeId, EdgeTypeId）。
@@ -792,6 +796,29 @@ public class TreeGraphDbContext : DbContext
                 .WithMany(d => d.Instances)
                 .HasForeignKey(x => x.EdgeTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    // ============================================================
+    // LineSky：线路节点（独立一等公民，实现 Inode）
+    // ============================================================
+    private static void ConfigureLineNodes(ModelBuilder mb)
+    {
+        mb.Entity<TreeGraph.Shared.LineSky.Entities.LineNode>(e =>
+        {
+            e.ToTable("line_nodes");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id)
+                .HasColumnName("id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.LocationGeo).HasColumnName("location_geo").HasMaxLength(100);
+            e.Property(x => x.IsArchived).HasColumnName("is_archived");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });
     }
 }

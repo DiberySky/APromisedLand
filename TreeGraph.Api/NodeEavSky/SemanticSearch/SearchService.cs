@@ -200,7 +200,7 @@ public sealed class SearchService
     public static (string Path, string? ParentName, string RootId) BuildPath(
         SpaceTree node, IReadOnlyDictionary<string, SpaceTree> nodes)
     {
-        var chain = new List<string> { node.Name };
+        var line = new List<string> { node.Name };
         string? parentName = null;
         var current = node;
 
@@ -208,11 +208,11 @@ public sealed class SearchService
                nodes.TryGetValue(current.ParentId, out var parent))
         {
             parentName ??= parent.Name;
-            chain.Insert(0, parent.Name);
+            line.Insert(0, parent.Name);
             current = parent;
         }
 
-        return (string.Join(" / ", chain), parentName, current.Id);
+        return (string.Join(" / ", line), parentName, current.Id);
     }
 
     /// <summary>Qdrant payload 的 snake_case 宿主类型 → 前端契约 HostType。</summary>

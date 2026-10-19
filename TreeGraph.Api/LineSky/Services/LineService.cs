@@ -2,21 +2,21 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.EdgeSky.Services;
-using TreeGraph.Shared.ChainSky.Dtos;
+using TreeGraph.Shared.LineSky.Dtos;
 using TreeGraph.Shared.EdgeSky.Dtos;
 
-namespace TreeGraph.Api.ChainSky.Services;
+namespace TreeGraph.Api.LineSky.Services;
 
 /// <summary>
-/// 链式结构（Chain）专用服务。
+/// 线路结构（Line）专用服务。
 ///
-/// 链式结构 = EdgeDefinition.IsChain = true 的一组边实例，
-/// 语义上表达"点线相连的链式结构"（如输电线路、物流线路、工序链）。
+/// 线路结构 = EdgeDefinition.IsLine = true 的一组边实例，
+/// 语义上表达"点线相连的线路结构"（如输电线路、物流线路、工序链）。
 ///
 /// 核心查询使用 PostgreSQL WITH RECURSIVE CTE（单次 SQL 拿完整路径）。
 /// 拓扑分析内核（Kahn）复用 EdgeSky 的 <see cref="EdgeInstanceService.AnalyzeTopology"/>。
 /// </summary>
-public class ChainService
+public class LineService
 {
     /// <summary>路径递归的最大展开层数；触顶即视为截断（返回 Truncated=true）。</summary>
     public const int MaxPathDepth = 500;
@@ -26,7 +26,7 @@ public class ChainService
     private readonly IEdgeNodeValidator _nodeValidator;
     private readonly NodeEavSky.Services.InodeOwnerGuardRegistry _inodeGuards;
 
-    public ChainService(
+    public LineService(
         TreeGraphDbContext db, EdgeInstanceService edgeInst,
         IEdgeNodeValidator nodeValidator,
         NodeEavSky.Services.InodeOwnerGuardRegistry inodeGuards)
@@ -42,23 +42,23 @@ public class ChainService
         => _db.EdgeDefinitions.FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
 
     // ============================================================
-    // ① 批量创建链（A→B→C→D）
+    // ① 批量创建线路（A→B→C→D）
     // ============================================================
 
     /// <summary>
     /// 全事务创建：按 OrderedNodeIds 顺序创建 from→to 边。
     /// 任何一段失败 → 整体回滚。
-    /// 建链前先做整链体检：节点不重复、节点存在/类型匹配、候选图不成环。
+    /// 建线前先做整线体检：节点不重复、节点存在/类型匹配、候选图不成环。
     /// </summary>
-    public async Task<List<EdgeInstanceDto>> CreateChainAsync(
-        string edgeTypeId, CreateChainRequest req, CancellationToken ct)
+    public async Task<List<EdgeInstanceDto>> CreateLineAsync(
+        string edgeTypeId, CreateLineRequest req, CancellationToken ct)
     {
         if (req.OrderedNodeIds.Count < 2)
-            throw new ArgumentException("OrderedNodeIds 至少需要 2 个节点才能形成链");
+            throw new ArgumentException("OrderedNodeIds 至少需要 2 个节点才能形成线路");
 
         if (req.OrderedNodeIds.Count != req.OrderedNodeIds.Distinct().Count())
             throw new ArgumentException(
-                "OrderedNodeIds 存在重复节点，无法形成链（链式结构应无环且不可自环）");
+                "OrderedNodeIds 存在重复节点，无法形成线路（线路结构应无环且不可自环）");
 
         if (req.Weights is not null && req.Weights.Count != req.OrderedNodeIds.Count - 1)
             throw new ArgumentException("Weights 长度应 = OrderedNodeIds.Count - 1");
@@ -75,10 +75,10 @@ public class ChainService
                 await _nodeValidator.EnsureNodeAsync(def.ToNodeType, nodeId, ct);
         }
 
-        // 候选图成环检测：现有边 + 待新增链边。
-        // 注：IsChain=true 的类型在启用时已通过 ValidateTopology 拒绝既有环，
+        // 候选图成环检测：现有边 + 待新增线边。
+        // 注：IsLine=true 的类型在启用时已通过 ValidateTopology 拒绝既有环，
         // 故此处出现的环必为本次新增引入。
-        if (def.IsChain)
+        if (def.IsLine)
         {
             var existing = await _db.EdgeInstances
                 .Where(e => e.EdgeTypeId == edgeTypeId)
@@ -92,7 +92,7 @@ public class ChainService
 
             if (EdgeInstanceService.AnalyzeTopology(pairs).Cyclic.Count > 0)
                 throw new InvalidOperationException(
-                    "新增链会形成环，链式结构应无环（请检查 OrderedNodeIds 是否与既有边构成回路）");
+                    "新增线路会形成环，线路结构应无环（请检查 OrderedNodeIds 是否与既有边构成回路）");
         }
 
         // NpgsqlRetryingExecutionStrategy 不支持用户自发起事务，须经执行策略包裹后整体执行
@@ -140,28 +140,28 @@ public class ChainService
     // ============================================================
 
     /// <summary>
-    /// 从 startNodeId 沿指定方向走到底，返回完整链。
+    /// 从 startNodeId 沿指定方向走到底，返回完整线路。
     /// direction=down → 沿 FromNodeId→ToNodeId 往下游走
     /// direction=up   → 沿 ToNodeId→FromNodeId 往上游走
-    /// 无向链（IsDirected=false）忽略 direction，统一按双向展开（up/down 结果一致）。
+    /// 无向线路（IsDirected=false）忽略 direction，统一按双向展开（up/down 结果一致）。
     /// 单次 SQL（WITH RECURSIVE），线性 O(N)；带 visited 去重防环，深度上限 MaxPathDepth。
     /// </summary>
-    public async Task<ChainPathResult> GetPathAsync(
+    public async Task<LinePathResult> GetPathAsync(
         string edgeTypeId, string startNodeId, string direction,
         CancellationToken ct, int maxDepth = MaxPathDepth, EdgeDefinition? def = null)
     {
-        // 调用方（如 ChainController 的守卫）已加载定义时直接复用，避免重复查询。
+        // 调用方（如 LineController 的守卫）已加载定义时直接复用，避免重复查询。
         def ??= await _db.EdgeDefinitions
             .AsNoTracking()
             .FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
 
-        // 无向链（IsDirected=false）：up/down 语义不适用，统一按双向展开。
+        // 无向线路（IsDirected=false）：up/down 语义不适用，统一按双向展开。
         var sql = def is { IsDirected: false }
             ? UndirectedCteSql
             : direction == "up" ? UpstreamCteSql : DownstreamCteSql;
 
         var edges = await _db.Database
-            .SqlQueryRaw<ChainEdgeRow>(sql,
+            .SqlQueryRaw<LineEdgeRow>(sql,
                 new Npgsql.NpgsqlParameter("edgeTypeId", edgeTypeId),
                 new Npgsql.NpgsqlParameter("startNodeId", startNodeId),
                 new Npgsql.NpgsqlParameter("maxDepth", maxDepth))
@@ -199,12 +199,12 @@ public class ChainService
                 Properties: null));
         }
 
-        return new ChainPathResult(nodeIds, dtos, dtos.Count, truncated);
+        return new LinePathResult(nodeIds, dtos, dtos.Count, truncated);
     }
 
     /// <summary>向上游走：从当前节点沿 ToNode→FromNode 反向走（visited 去重防环）。</summary>
     private const string UpstreamCteSql = """
-        WITH RECURSIVE chain AS (
+        WITH RECURSIVE line AS (
             SELECT edge_id, from_node_id, to_node_id, weight, created_at, updated_at,
                    from_node_id AS next_node, 0 AS depth, ARRAY[from_node_id::text] AS visited
             FROM edge_instances
@@ -215,19 +215,19 @@ public class ChainService
             SELECT e.edge_id, e.from_node_id, e.to_node_id, e.weight, e.created_at, e.updated_at,
                    e.from_node_id, c.depth + 1, c.visited || e.from_node_id::text
             FROM edge_instances e
-            JOIN chain c ON e.to_node_id = c.next_node
+            JOIN line c ON e.to_node_id = c.next_node
             WHERE e.edge_type_id = @edgeTypeId AND c.depth < @maxDepth
               AND NOT (e.from_node_id = ANY(c.visited))
         )
         SELECT edge_id AS EdgeId, from_node_id AS FromNode, to_node_id AS ToNode,
                next_node AS NextNode,
                weight AS Weight, created_at AS CreatedAt, updated_at AS UpdatedAt, depth AS Depth
-        FROM chain ORDER BY depth
+        FROM line ORDER BY depth
         """;
 
     /// <summary>向下游走：从当前节点沿 FromNode→ToNode 正向走（visited 去重防环）。</summary>
     private const string DownstreamCteSql = """
-        WITH RECURSIVE chain AS (
+        WITH RECURSIVE line AS (
             SELECT edge_id, from_node_id, to_node_id, weight, created_at, updated_at,
                    to_node_id AS next_node, 0 AS depth, ARRAY[to_node_id::text] AS visited
             FROM edge_instances
@@ -238,23 +238,23 @@ public class ChainService
             SELECT e.edge_id, e.from_node_id, e.to_node_id, e.weight, e.created_at, e.updated_at,
                    e.to_node_id, c.depth + 1, c.visited || e.to_node_id::text
             FROM edge_instances e
-            JOIN chain c ON e.from_node_id = c.next_node
+            JOIN line c ON e.from_node_id = c.next_node
             WHERE e.edge_type_id = @edgeTypeId AND c.depth < @maxDepth
               AND NOT (e.to_node_id = ANY(c.visited))
         )
         SELECT edge_id AS EdgeId, from_node_id AS FromNode, to_node_id AS ToNode,
                next_node AS NextNode,
                weight AS Weight, created_at AS CreatedAt, updated_at AS UpdatedAt, depth AS Depth
-        FROM chain ORDER BY depth
+        FROM line ORDER BY depth
         """;
 
     /// <summary>
-    /// 无向链双向展开：忽略 up/down，从当前节点出发沿边两端任意方向游走，
-    /// 覆盖起点所在的整个连通链。visited 记录已到达节点，visited_edges 记录
+    /// 无向线路双向展开：忽略 up/down，从当前节点出发沿边两端任意方向游走，
+    /// 覆盖起点所在的整个连通线路。visited 记录已到达节点，visited_edges 记录
     /// 已用过的边，二者共同防止往返重复与成环回绕。
     /// </summary>
     private const string UndirectedCteSql = """
-        WITH RECURSIVE chain AS (
+        WITH RECURSIVE line AS (
             SELECT edge_id, from_node_id, to_node_id, weight, created_at, updated_at,
                    CASE WHEN from_node_id = @startNodeId THEN to_node_id ELSE from_node_id END AS next_node,
                    0 AS depth,
@@ -273,7 +273,7 @@ public class ChainService
                                       THEN e.to_node_id::text ELSE e.from_node_id::text END),
                    c.visited_edges || e.edge_id::text
             FROM edge_instances e
-            JOIN chain c ON (e.from_node_id = c.next_node OR e.to_node_id = c.next_node)
+            JOIN line c ON (e.from_node_id = c.next_node OR e.to_node_id = c.next_node)
             WHERE e.edge_type_id = @edgeTypeId AND c.depth < @maxDepth
               AND NOT (e.edge_id = ANY(c.visited_edges))
               AND NOT (CASE WHEN e.from_node_id = c.next_node
@@ -282,10 +282,10 @@ public class ChainService
         SELECT edge_id AS EdgeId, from_node_id AS FromNode, to_node_id AS ToNode,
                next_node AS NextNode,
                weight AS Weight, created_at AS CreatedAt, updated_at AS UpdatedAt, depth AS Depth
-        FROM chain ORDER BY depth
+        FROM line ORDER BY depth
         """;
 
-    private sealed record ChainEdgeRow(
+    private sealed record LineEdgeRow(
         string EdgeId, string FromNode, string ToNode, string NextNode,
         decimal? Weight, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt,
         int Depth);
@@ -295,11 +295,11 @@ public class ChainService
     // ============================================================
 
     /// <summary>
-    /// 校验链式结构拓扑：入度/出度/成环。
-    /// 严格线性链（IsChain &amp;&amp; IsLinear）下，入度 &gt; 1 与成环计入 Errors；
-    /// 非线性链（或非链式类型）下同样的问题仅作为 Warnings 提示，不影响 Valid。
+    /// 校验线路结构拓扑：入度/出度/成环。
+    /// 严格线性线路（IsLine &amp;&amp; IsLinear）下，入度 &gt; 1 与成环计入 Errors；
+    /// 非线性线路（或非线路类型）下同样的问题仅作为 Warnings 提示，不影响 Valid。
     /// </summary>
-    public async Task<ChainValidationResult> ValidateTopologyAsync(
+    public async Task<LineValidationResult> ValidateTopologyAsync(
         string edgeTypeId, CancellationToken ct)
     {
         var def = await GetDefinitionAsync(edgeTypeId, ct);
@@ -311,24 +311,24 @@ public class ChainService
 
         var analysis = EdgeInstanceService.AnalyzeTopology(
             pairs.Select(e => (e.FromNodeId, e.ToNodeId)).ToList());
-        var treatAsStrict = def is { IsChain: true, IsLinear: true };
+        var treatAsStrict = def is { IsLine: true, IsLinear: true };
 
         var errors = new List<string>();
         var warnings = new List<string>();
 
         foreach (var (nodeId, deg) in analysis.Indeg.Where(kv => kv.Value > 1))
         {
-            var msg = $"节点 {nodeId} 入度 = {deg}（链式结构入度应 ≤ 1）";
+            var msg = $"节点 {nodeId} 入度 = {deg}（线路结构入度应 ≤ 1）";
             (treatAsStrict ? errors : warnings).Add(msg);
         }
 
         foreach (var nodeId in analysis.Cyclic)
         {
-            var msg = $"节点 {nodeId} 参与成环（链式结构应无环）";
+            var msg = $"节点 {nodeId} 参与成环（线路结构应无环）";
             (treatAsStrict ? errors : warnings).Add(msg);
         }
 
-        return new ChainValidationResult(
+        return new LineValidationResult(
             Valid: errors.Count == 0,
             Errors: errors,
             InDegreeMap: analysis.Indeg,
@@ -340,10 +340,10 @@ public class ChainService
     }
 
     // ============================================================
-    // ④ 连通分量（多条互不相连的链）—— O(V+E)
+    // ④ 连通分量（多条互不相连的线路）—— O(V+E)
     // ============================================================
 
-    public async Task<List<ChainConnectedComponent>> GetConnectedComponentsAsync(
+    public async Task<List<LineConnectedComponent>> GetConnectedComponentsAsync(
         string edgeTypeId, CancellationToken ct)
     {
         var def = await _db.EdgeDefinitions
@@ -381,7 +381,7 @@ public class ChainService
             edges.SelectMany(e => new[] { e.FromNodeId, e.ToNodeId }), ct);
 
         var visited = new HashSet<string>();
-        var components = new List<ChainConnectedComponent>();
+        var components = new List<LineConnectedComponent>();
 
         foreach (var start in neighbors.Keys)
         {
@@ -424,7 +424,7 @@ public class ChainService
                 })
                 .ToList();
 
-            components.Add(new ChainConnectedComponent(compNodes, compEdges, compNodes.Count));
+            components.Add(new LineConnectedComponent(compNodes, compEdges, compNodes.Count));
         }
 
         return components;

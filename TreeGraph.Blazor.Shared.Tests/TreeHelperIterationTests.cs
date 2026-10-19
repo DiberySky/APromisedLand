@@ -13,7 +13,7 @@ public class TreeHelperIterationTests
     private const int Depth = 10_000;
 
     /// <summary>构造 1→2→…→Depth 的单链，子集合在构造期就全部挂好。</summary>
-    private static List<TreeItemData<UnitTree>> BuildChain(int depth)
+    private static List<TreeItemData<UnitTree>> BuildLine(int depth)
     {
         TreeItemData<UnitTree>? leaf = null;
 
@@ -31,9 +31,9 @@ public class TreeHelperIterationTests
     }
 
     [Fact]
-    public void FindTreeItem_DeepChain_DoesNotStackOverflow()
+    public void FindTreeItem_DeepLine_DoesNotStackOverflow()
     {
-        var roots = BuildChain(Depth);
+        var roots = BuildLine(Depth);
 
         var found = roots.FindTreeItem(Depth.ToString());
 
@@ -41,9 +41,9 @@ public class TreeHelperIterationTests
     }
 
     [Fact]
-    public void GetPathToNode_DeepChain_ReturnsFullPath()
+    public void GetPathToNode_DeepLine_ReturnsFullPath()
     {
-        var roots = BuildChain(Depth);
+        var roots = BuildLine(Depth);
 
         var path = roots.GetPathToNode(Depth.ToString());
 

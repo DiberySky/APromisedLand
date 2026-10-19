@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Shared.EdgeSky.Dtos;
-using TreeGraph.Shared.ChainSky.Dtos;
+using TreeGraph.Shared.LineSky.Dtos;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
 
@@ -647,54 +647,54 @@ public class EdgeTests : IntegrationTestBase
     }
 
     // ============================================================
-    // 无向链（IsDirected=false）双向查询
+    // 无向线路（IsDirected=false）双向查询
     // ============================================================
 
     [Fact]
-    public async Task Chain_Undirected_DownstreamAndUpstream_BothCoverWholeChain()
+    public async Task Line_Undirected_DownstreamAndUpstream_BothCoverWholeLine()
     {
-        // 无向链 A—B—C：从中间 B 出发，up/down 都应覆盖整条链（方向被忽略）
+        // 无向线路 A—B—C：从中间 B 出发，up/down 都应覆盖整条线路（方向被忽略）
         var et = await CreateEdgeTypeAsync(
-            "UndirChain", isDirected: false, isChain: true, isLinear: true);
-        await CreateChainAsync(et.EdgeTypeId, "UC_A", "UC_B", "UC_C");
+            "UndirLine", isDirected: false, isLine: true, isLinear: true);
+        await CreateLineAsync(et.EdgeTypeId, "UC_A", "UC_B", "UC_C");
 
-        var down = await Client.GetEavAsync<ChainPathResult>(
-            $"/api/eav/chains/{et.EdgeTypeId}/downstream/UC_B");
+        var down = await Client.GetEavAsync<LinePathResult>(
+            $"/api/eav/lines/{et.EdgeTypeId}/downstream/UC_B");
         Assert.NotNull(down);
         Assert.Equal(2, down!.Edges.Count);
         Assert.Contains("UC_A", down.NodeIds);
         Assert.Contains("UC_C", down.NodeIds);
 
-        var up = await Client.GetEavAsync<ChainPathResult>(
-            $"/api/eav/chains/{et.EdgeTypeId}/upstream/UC_B");
+        var up = await Client.GetEavAsync<LinePathResult>(
+            $"/api/eav/lines/{et.EdgeTypeId}/upstream/UC_B");
         Assert.NotNull(up);
         Assert.Equal(2, up!.Edges.Count);
     }
 
     [Fact]
-    public async Task Chain_Undirected_FullPath_ReturnsWholeChain()
+    public async Task Line_Undirected_FullPath_ReturnsWholeLine()
     {
         var et = await CreateEdgeTypeAsync(
-            "UndirChainFull", isDirected: false, isChain: true, isLinear: true);
-        await CreateChainAsync(et.EdgeTypeId, "UCF_A", "UCF_B", "UCF_C");
+            "UndirLineFull", isDirected: false, isLine: true, isLinear: true);
+        await CreateLineAsync(et.EdgeTypeId, "UCF_A", "UCF_B", "UCF_C");
 
-        var path = await Client.GetEavAsync<ChainPathResult>(
-            $"/api/eav/chains/{et.EdgeTypeId}/path/UCF_B");
+        var path = await Client.GetEavAsync<LinePathResult>(
+            $"/api/eav/lines/{et.EdgeTypeId}/path/UCF_B");
         Assert.NotNull(path);
         Assert.Equal(2, path!.Edges.Count);
         Assert.Equal(3, path.NodeIds.Distinct().Count());
     }
 
     [Fact]
-    public async Task Chain_Directed_Downstream_StillRespectsDirection()
+    public async Task Line_Directed_Downstream_StillRespectsDirection()
     {
-        // 回归：有向链从中间出发，down 只覆盖下游（B→C），不含上游 A
+        // 回归：有向线路从中间出发，down 只覆盖下游（B→C），不含上游 A
         var et = await CreateEdgeTypeAsync(
-            "DirChain", isDirected: true, isChain: true, isLinear: true);
-        await CreateChainAsync(et.EdgeTypeId, "DC_A", "DC_B", "DC_C");
+            "DirLine", isDirected: true, isLine: true, isLinear: true);
+        await CreateLineAsync(et.EdgeTypeId, "DC_A", "DC_B", "DC_C");
 
-        var down = await Client.GetEavAsync<ChainPathResult>(
-            $"/api/eav/chains/{et.EdgeTypeId}/downstream/DC_B");
+        var down = await Client.GetEavAsync<LinePathResult>(
+            $"/api/eav/lines/{et.EdgeTypeId}/downstream/DC_B");
         Assert.NotNull(down);
         Assert.Single(down!.Edges);
         Assert.DoesNotContain("DC_A", down.NodeIds);
@@ -702,17 +702,17 @@ public class EdgeTests : IntegrationTestBase
     }
 
     // ============================================================
-    // 缺陷回归：链创建事务 与 递归 CTE
+    // 缺陷回归：线路创建事务 与 递归 CTE
     // ============================================================
 
     [Fact]
-    public async Task Chain_Create_MultiSegment_PersistsAllEdges()
+    public async Task Line_Create_MultiSegment_PersistsAllEdges()
     {
-        // 回归：CreateChainAsync 曾用裸事务与 NpgsqlRetryingExecutionStrategy 冲突，
-        // 多段建链直接抛"does not support user-initiated transactions"。
+        // 回归：CreateLineAsync 曾用裸事务与 NpgsqlRetryingExecutionStrategy 冲突，
+        // 多段创建线路直接抛"does not support user-initiated transactions"。
         // 现事务经 CreateExecutionStrategy 包裹，5 节点 4 段应全部落库。
-        var et = await CreateEdgeTypeAsync("ChainTx", isChain: true);
-        await CreateChainAsync(et.EdgeTypeId, "TX_A", "TX_B", "TX_C", "TX_D", "TX_E");
+        var et = await CreateEdgeTypeAsync("LineTx", isLine: true);
+        await CreateLineAsync(et.EdgeTypeId, "TX_A", "TX_B", "TX_C", "TX_D", "TX_E");
 
         var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
             $"/api/eav/edges/{et.EdgeTypeId}");
@@ -727,16 +727,16 @@ public class EdgeTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Chain_Create_MidTransactionFailure_RollsBackEarlierSegments()
+    public async Task Line_Create_MidTransactionFailure_RollsBackEarlierSegments()
     {
         // 回归：第 1 段在事务内插入成功、第 2 段命中重复边校验失败，
         // 整体应回滚（A→B 不残留）；失败原因为业务校验而非策略异常。
-        var et = await CreateEdgeTypeAsync("ChainRb", isChain: true);
+        var et = await CreateEdgeTypeAsync("LineRb", isLine: true);
         await CreateEdgeAsync(et.EdgeTypeId, "RB_B", "RB_C");
 
         var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/chains/{et.EdgeTypeId}/create",
-            new CreateChainRequest { OrderedNodeIds = new List<string> { "RB_A", "RB_B", "RB_C" } });
+            $"/api/eav/lines/{et.EdgeTypeId}/create",
+            new CreateLineRequest { OrderedNodeIds = new List<string> { "RB_A", "RB_B", "RB_C" } });
         var body = await resp.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
         Assert.Contains("已存在", body);
@@ -752,15 +752,15 @@ public class EdgeTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Chain_Directed_Upstream_WalksToHead()
+    public async Task Line_Directed_Upstream_WalksToHead()
     {
         // 回归：UpstreamCteSql 的 visited 数组曾因 varchar(36)[] 与 varchar[] 不一致
         // 触发 Postgres 42804；同时验证反向装配（NodeIds 从起点逆序至源头）。
-        var et = await CreateEdgeTypeAsync("ChainUp", isChain: true);
-        await CreateChainAsync(et.EdgeTypeId, "CU_A", "CU_B", "CU_C", "CU_D");
+        var et = await CreateEdgeTypeAsync("LineUp", isLine: true);
+        await CreateLineAsync(et.EdgeTypeId, "CU_A", "CU_B", "CU_C", "CU_D");
 
-        var up = await Client.GetEavAsync<ChainPathResult>(
-            $"/api/eav/chains/{et.EdgeTypeId}/upstream/CU_C");
+        var up = await Client.GetEavAsync<LinePathResult>(
+            $"/api/eav/lines/{et.EdgeTypeId}/upstream/CU_C");
         Assert.NotNull(up);
         Assert.False(up!.Truncated);
         Assert.Equal(2, up.Edges.Count);
@@ -774,15 +774,15 @@ public class EdgeTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Chain_Directed_Downstream_MultiLevel_TraversesAllDepth()
+    public async Task Line_Directed_Downstream_MultiLevel_TraversesAllDepth()
     {
         // 回归：递归 CTE 数组元素须为 text（::text），多轮递归拼接 visited
-        // 时类型不一致会触发 42804；5 节点链验证多轮递归全深度覆盖。
-        var et = await CreateEdgeTypeAsync("ChainDeep", isChain: true);
-        await CreateChainAsync(et.EdgeTypeId, "CD_A", "CD_B", "CD_C", "CD_D", "CD_E");
+        // 时类型不一致会触发 42804；5 节点线路验证多轮递归全深度覆盖。
+        var et = await CreateEdgeTypeAsync("LineDeep", isLine: true);
+        await CreateLineAsync(et.EdgeTypeId, "CD_A", "CD_B", "CD_C", "CD_D", "CD_E");
 
-        var down = await Client.GetEavAsync<ChainPathResult>(
-            $"/api/eav/chains/{et.EdgeTypeId}/downstream/CD_A");
+        var down = await Client.GetEavAsync<LinePathResult>(
+            $"/api/eav/lines/{et.EdgeTypeId}/downstream/CD_A");
         Assert.NotNull(down);
         Assert.False(down!.Truncated);
         Assert.Equal(4, down.Edges.Count);
@@ -790,15 +790,15 @@ public class EdgeTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Chain_Undirected_MultiLevel_CoversWholeChain()
+    public async Task Line_Undirected_MultiLevel_CoversWholeLine()
     {
         // 回归：无向 CTE 同时拼接 visited（节点）与 visited_edges（边）两个数组，
-        // 多轮递归下任一类型不一致即 42804；从端点出发应按深度覆盖整条链。
-        var et = await CreateEdgeTypeAsync("UndirDeep", isDirected: false, isChain: true);
-        await CreateChainAsync(et.EdgeTypeId, "UD_A", "UD_B", "UD_C", "UD_D", "UD_E");
+        // 多轮递归下任一类型不一致即 42804；从端点出发应按深度覆盖整条线路。
+        var et = await CreateEdgeTypeAsync("UndirDeep", isDirected: false, isLine: true);
+        await CreateLineAsync(et.EdgeTypeId, "UD_A", "UD_B", "UD_C", "UD_D", "UD_E");
 
-        var down = await Client.GetEavAsync<ChainPathResult>(
-            $"/api/eav/chains/{et.EdgeTypeId}/downstream/UD_A");
+        var down = await Client.GetEavAsync<LinePathResult>(
+            $"/api/eav/lines/{et.EdgeTypeId}/downstream/UD_A");
         Assert.NotNull(down);
         Assert.False(down!.Truncated);
         Assert.Equal(4, down.Edges.Count);
@@ -810,7 +810,7 @@ public class EdgeTests : IntegrationTestBase
     // ============================================================
 
     private async Task<EdgeTypeDto> CreateEdgeTypeAsync(
-        string? prefix = null, bool isDirected = true, bool isChain = false, bool isLinear = true)
+        string? prefix = null, bool isDirected = true, bool isLine = false, bool isLinear = true)
     {
         var typeName = NewTypeName(prefix ?? "EdgeTest");
         var displayName = $"EdgeType_{typeName}";
@@ -823,7 +823,7 @@ public class EdgeTests : IntegrationTestBase
                 DisplayName = displayName,
                 IsGlobal = true,
                 IsDirected = isDirected,
-                IsChain = isChain,
+                IsLine = isLine,
                 IsLinear = isLinear
             });
 
@@ -833,15 +833,15 @@ public class EdgeTests : IntegrationTestBase
         return dto!;
     }
 
-    private async Task CreateChainAsync(string edgeTypeId, params string[] orderedNodeIds)
+    private async Task CreateLineAsync(string edgeTypeId, params string[] orderedNodeIds)
     {
         var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/chains/{edgeTypeId}/create",
-            new CreateChainRequest { OrderedNodeIds = orderedNodeIds.ToList() });
+            $"/api/eav/lines/{edgeTypeId}/create",
+            new CreateLineRequest { OrderedNodeIds = orderedNodeIds.ToList() });
 
         var body = await resp.Content.ReadAsStringAsync();
         Assert.True(resp.StatusCode == HttpStatusCode.OK,
-            $"创建链失败: {(int)resp.StatusCode} {body}");
+            $"创建线路失败: {(int)resp.StatusCode} {body}");
     }
 
     private async Task<EdgeInstanceDto> CreateEdgeAsync(

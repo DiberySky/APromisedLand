@@ -19,9 +19,9 @@ public class CreateEdgeTypeRequest
     /// <summary>有向（true：from→to 有方向）/无向（false：边等同双向），默认 true。</summary>
     public bool IsDirected { get; set; } = true;
     public string? Description { get; set; }
-    /// <summary>链式结构类型（如输电线路），默认 false。</summary>
-    public bool IsChain { get; set; } = false;
-    /// <summary>严格线性（入度≤1，创建边时自动校验），仅 IsChain=true 时生效。</summary>
+    /// <summary>线路结构类型（如输电线路），默认 false。</summary>
+    public bool IsLine { get; set; } = false;
+    /// <summary>严格线性（入度≤1，创建边时自动校验），仅 IsLine=true 时生效。</summary>
     public bool IsLinear { get; set; } = true;
 }
 
@@ -33,7 +33,7 @@ public class UpdateEdgeTypeRequest
     public bool? IsGlobal { get; set; }
     public bool? IsDirected { get; set; }
     public string? Description { get; set; }
-    public bool? IsChain { get; set; }
+    public bool? IsLine { get; set; }
     public bool? IsLinear { get; set; }
 }
 
@@ -47,7 +47,7 @@ public record EdgeTypeDto(
     bool IsDirected,
     string? Description,
     bool IsActive,
-    bool IsChain,
+    bool IsLine,
     bool IsLinear);
 
 // ============ Edge Instance（关系实例） ============

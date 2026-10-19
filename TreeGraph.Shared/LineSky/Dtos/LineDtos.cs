@@ -1,11 +1,11 @@
 using TreeGraph.Shared.EdgeSky.Dtos;
 
-namespace TreeGraph.Shared.ChainSky.Dtos;
+namespace TreeGraph.Shared.LineSky.Dtos;
 
-// ============ 链式结构（Chain）专用 ============
+// ============ 线路结构（Line）专用 ============
 
-/// <summary>批量创建链：按 orderedNodeIds 顺序创建 from→to 边。</summary>
-public class CreateChainRequest
+/// <summary>批量创建线路：按 orderedNodeIds 顺序创建 from→to 边。</summary>
+public class CreateLineRequest
 {
     /// <summary>有序节点列表，如 ["A", "B", "C", "D"] → 创建 A→B, B→C, C→D。</summary>
     public List<string> OrderedNodeIds { get; set; } = new();
@@ -13,8 +13,8 @@ public class CreateChainRequest
     public List<decimal?>? Weights { get; set; }
 }
 
-/// <summary>链式完整路径查询结果（WITH RECURSIVE CTE 返回）。</summary>
-public record ChainPathResult(
+/// <summary>线路完整路径查询结果（WITH RECURSIVE CTE 返回）。</summary>
+public record LinePathResult(
     /// <summary>路径上的节点 ID 列表（按方向排列，起点在索引 0）。</summary>
     IReadOnlyList<string> NodeIds,
     /// <summary>路径上的边（段）列表，与 NodeIds 对应。</summary>
@@ -24,8 +24,8 @@ public record ChainPathResult(
     /// <summary>是否因达到递归深度上限而截断（true 表示结果可能不完整）。</summary>
     bool Truncated = false);
 
-/// <summary>链式拓扑校验结果（入度/成环检测）。</summary>
-public record ChainValidationResult(
+/// <summary>线路拓扑校验结果（入度/成环检测）。</summary>
+public record LineValidationResult(
     bool Valid,
     IReadOnlyList<string> Errors,
     /// <summary>入度超标的节点（入度值）。</summary>
@@ -37,13 +37,13 @@ public record ChainValidationResult(
     int EdgeCount,
     int NodeCount,
     /// <summary>
-    /// 非致命告警：非线性链（IsChain &amp;&amp; !IsLinear）下的入度 &gt; 1 与成环仅作提示，
-    /// 不计入 Errors（不影响 Valid）。严格线性链下这些问题会进入 Errors。
+    /// 非致命告警：非线性线路（IsLine &amp;&amp; !IsLinear）下的入度 &gt; 1 与成环仅作提示，
+    /// 不计入 Errors（不影响 Valid）。严格线性线路下这些问题会进入 Errors。
     /// </summary>
     IReadOnlyList<string> Warnings);
 
 /// <summary>连通分量：互不相连的节点组。</summary>
-public record ChainConnectedComponent(
+public record LineConnectedComponent(
     IReadOnlyList<string> NodeIds,
     IReadOnlyList<EdgeInstanceDto> Edges,
     int Size);

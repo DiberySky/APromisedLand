@@ -1,4 +1,4 @@
-﻿using APromisedLand.Maui.Authentication;
+using APromisedLand.Maui.Authentication;
 using APromisedLand.MauiBlazor.Weather;
 using APromisedLand.Shared.Services;
 using SolutionService = APromisedLand.Shared.Services.Solution.SolutionService;
@@ -66,7 +66,7 @@ public static class WeatherHttpClient
 // #if DEBUG
 //         // 仅开发环境使用，切勿在生产环境启用！
 //         handler.ServerCertificateCustomValidationCallback =
-//             (message, cert, chain, errors) => true;
+//             (message, cert, line, errors) => true;
 // #endif
 //         return handler;
 //     }

@@ -4,7 +4,7 @@ using TreeGraph.Shared.NodeEavSky.Dtos;
 namespace TreeGraph.Api.EdgeSky.Services;
 
 /// <summary>
-/// 边/链节点校验器：当 EdgeDefinition 声明了 FromNodeType/ToNodeType 时，
+/// 边/线路节点校验器：当 EdgeDefinition 声明了 FromNodeType/ToNodeType 时，
 /// 校验对应节点在其宿主主表中真实存在，防止边指向不存在的节点（孤儿边）。
 ///
 /// 节点必须是 Inode 宿主：通过 <see cref="InodeOwnerGuardRegistry"/> 按

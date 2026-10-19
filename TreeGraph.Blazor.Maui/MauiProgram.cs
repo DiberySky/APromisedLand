@@ -8,7 +8,7 @@ using TreeGraph.Blazor.Maui;
 using TreeGraph.Blazor.Maui.Infrastructure;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.EdgeSky.Services;
-using TreeGraph.Blazor.Shared.ChainSky.Services;
+using TreeGraph.Blazor.Shared.LineSky.Services;
 using TreeGraph.Blazor.Shared.SpaceSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.TreeEavSky.Extensions;
@@ -79,7 +79,7 @@ public static class MauiProgram
             })
             .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
-        // ★ EdgeSky / ChainSky 客户端：与 EavApiClient 同一后端、同款弹性策略。
+        // ★ EdgeSky / LineSky 客户端：与 EavApiClient 同一后端、同款弹性策略。
         builder.Services
             .AddHttpClient<EdgeApiClient>(client =>
             {
@@ -88,7 +88,7 @@ public static class MauiProgram
             .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
         builder.Services
-            .AddHttpClient<ChainApiClient>(client =>
+            .AddHttpClient<LineApiClient>(client =>
             {
                 client.BaseAddress = new Uri("https+http://treegrapheavapi");
             })
