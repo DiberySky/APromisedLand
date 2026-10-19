@@ -19,3 +19,8 @@ node_modules/
 
 # 凭证/个人笔记，不入库
 Notes/GitHub.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
