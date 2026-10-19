@@ -92,6 +92,8 @@ public partial class TreeEavSky<TItem>
         };
         node.Value!.ParentId = parent.Value!.Id;
         node.Value.Parent = parent.Value;
+        // 创建子项时「允许包含子节点」默认为「允许」
+        node.Value.CanHaveChildren = true;
 
         var nodeTemplate = new NodeTemplate<TItem>
         {

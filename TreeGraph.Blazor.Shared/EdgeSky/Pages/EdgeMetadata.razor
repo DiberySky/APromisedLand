@@ -1,28 +1,32 @@
-@* EdgeMetadata.razor — 边类型管理 *@
+@* EdgeMetadata.razor — 边类型管理（支持对话框/选项卡内嵌：IsDialogMode=true 时隐藏
+   PageHeaderSky，新建按钮移至表头操作列，与 EntityTypes/SpaceManagePanel 风格对齐） *@
 @page "/metadata/edge-types"
 @inject EdgeApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageTitle>边类型管理</PageTitle>
+@if (!IsDialogMode)
+{
+    <PageTitle>边类型管理</PageTitle>
 
-<PageHeaderSky Title="边类型管理">
-    <Actions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   Size="Size.Small"
-                   OnClick="LoadAsync" Disabled="@_loading"
-                   StartIcon="@Icons.Material.Filled.Refresh">
-            刷新
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Success"
-                   Size="Size.Small"
-                   OnClick="OpenCreateAsync"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   Class="ml-2">
-            新建边类型
-        </MudButton>
-    </Actions>
-</PageHeaderSky>
+    <PageHeaderSky Title="边类型管理">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Size="Size.Small"
+                       OnClick="LoadAsync" Disabled="@_loading"
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                刷新
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       Size="Size.Small"
+                       OnClick="OpenCreateAsync"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Class="ml-2">
+                新建边类型
+            </MudButton>
+        </Actions>
+    </PageHeaderSky>
+}
 
 <MudTable Items="_types" Hover="true" Bordered="true"
           Dense="true"
@@ -37,7 +41,20 @@
         <MudTh>全局</MudTh>
         <MudTh>有向</MudTh>
         <MudTh>描述</MudTh>
-        <MudTh>操作</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+            @if (IsDialogMode)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="OpenCreateAsync"
+                               title="新建边类型" />
+            }
+            else
+            {
+                <text>操作</text>
+            }
+        </MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="类型名">
@@ -104,6 +121,9 @@
 </MudTable>
 
 @code {
+    /// <summary>对话框/选项卡内嵌模式：隐藏页头，新建按钮移至表头操作列。</summary>
+    [Parameter] public bool IsDialogMode { get; set; }
+
     private IReadOnlyList<EdgeTypeDto>? _types;
     private bool _loading;
     private bool _initialized;

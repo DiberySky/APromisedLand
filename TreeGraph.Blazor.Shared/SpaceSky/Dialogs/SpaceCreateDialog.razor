@@ -1,5 +1,6 @@
 @* SpaceCreateDialog.razor — 新建空间（DialogSky 外壳，与选项集对话框风格一致） *@
 @using TreeGraph.Blazor.Shared.SpaceSky
+@using TreeGraph.Blazor.Shared.SpaceSky.Components
 @using TreeGraph.Blazor.Shared.SpaceSky.Services
 @inject SpaceApiClient Api
 @inject ISnackbar Snackbar
@@ -14,6 +15,16 @@
                       Label="名称"
                       Variant="Variant.Outlined"
                       Class="mb-3" />
+        <MudSelect T="string"
+                   @bind-Value="_form.Type"
+                   Label="类型"
+                   Variant="Variant.Outlined"
+                   Class="mb-3">
+            @foreach (var opt in SpaceManagePanel.SpaceTypeOptions)
+            {
+                <MudSelectItem T="string" Value="@opt.Value">@opt.Label</MudSelectItem>
+            }
+        </MudSelect>
         <MudTextField @bind-Value="_form.Description"
                       Label="描述"
                       Variant="Variant.Outlined"

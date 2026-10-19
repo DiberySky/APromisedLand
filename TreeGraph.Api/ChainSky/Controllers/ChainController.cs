@@ -29,6 +29,8 @@ public class ChainController : ControllerBase
     /// <summary>
     /// 按顺序创建 A→B→C→D 的链式边。全事务，任一段失败整体回滚。
     /// 建链前校验：节点不重复、节点存在且类型匹配、候选图不成环。
+    /// 异常统一交由 ApiEnvelopeFilter 映射：
+    ///   ArgumentException → 400；InvalidOperationException（业务规则冲突）→ 409。
     /// </summary>
     [HttpPost("{edgeTypeId}/create")]
     public async Task<IActionResult> CreateChain(
@@ -36,19 +38,8 @@ public class ChainController : ControllerBase
         [FromBody] CreateChainRequest req,
         CancellationToken ct)
     {
-        try
-        {
-            var edges = await _chain.CreateChainAsync(edgeTypeId, req, ct);
-            return Ok(edges);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { error = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var edges = await _chain.CreateChainAsync(edgeTypeId, req, ct);
+        return Ok(edges);
     }
 
     // ============================================================

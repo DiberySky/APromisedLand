@@ -43,16 +43,16 @@
             </MudAlert>
         }
 
+        <MudTextField @bind-Value="_newSet.DisplayName"
+                      Label="显示名"
+                      Placeholder="性别"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
         <NamingTextField @bind-Value="_newSet.SetName"
                          SourceText="@_newSet.DisplayName"
                          NameCase="snake"
                          Label="集合名 (snake_case)"
-                         Placeholder="gender"
-                         Class="mb-3" />
-        <MudTextField @bind-Value="_newSet.DisplayName"
-                      Label="显示名"
-                      Placeholder="性别"
-                      Variant="Variant.Outlined" />
+                         Placeholder="gender" />
     </DialogContent>
 </DialogSky>
 

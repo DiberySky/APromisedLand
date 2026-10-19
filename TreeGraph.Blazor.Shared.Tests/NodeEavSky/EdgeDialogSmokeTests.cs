@@ -9,6 +9,7 @@ using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.EdgeSky.Components.Dialogs;
 using TreeGraph.Blazor.Shared.EdgeSky.Services;
+using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Shared.EdgeSky.Dtos;
@@ -73,7 +74,8 @@ public class EdgeDialogSmokeTests : BunitTestBase
         EdgeTypeName: "Collaboration", EdgeTypeDisplayName: "协作关系",
         FromNodeId: "node-a", FromNodeText: "",
         ToNodeId: "node-b", ToNodeText: "",
-        Weight: 3.14m, CreatedAt: DateTimeOffset.UtcNow,
+        Weight: 3.14m, DisplayName: null,
+        CreatedAt: DateTimeOffset.UtcNow,
         UpdatedAt: DateTimeOffset.UtcNow, Properties: null);
 
     private static List<EntityTypeSummaryDto> EntityTypeSummaries() => new()
@@ -101,6 +103,10 @@ public class EdgeDialogSmokeTests : BunitTestBase
         // EdgeDialog 创建模式下可能还会调 GetSchemaAsync
         if (path.StartsWith("/api/eav/Collaboration/schema") && method == HttpMethod.Get)
             return Envelope(new { attributes = Array.Empty<object>() });
+
+        // 宿主 inode 选择器：语义搜索
+        if (path.StartsWith("/api/search/semantic") && method == HttpMethod.Post)
+            return Envelope(new { query = "q", total = 0, items = Array.Empty<object>() });
 
         return null;
     }
@@ -148,8 +154,8 @@ public class EdgeDialogSmokeTests : BunitTestBase
         AssertDialog(provider, "创建边");
         var html = provider.Find(".mud-dialog").InnerHtml;
         Assert.Contains("边类型", html);
-        Assert.Contains("起点节点 ID", html);
-        Assert.Contains("终点节点 ID", html);
+        Assert.Contains("起点节点", html);
+        Assert.Contains("终点节点", html);
         Assert.Contains("权重", html);
     }
 
@@ -166,6 +172,53 @@ public class EdgeDialogSmokeTests : BunitTestBase
         // 编辑模式：TypeName 只读展示
         Assert.Contains("协作关系", html);
         Assert.Contains("权重", html);
+    }
+
+    [Fact]
+    public async Task EdgeDialog_CreateMode_FromNodeIsReadOnly()
+    {
+        // 约束：创建流程来源于宿主 inode —— 起点由宿主节点固定，不可修改
+        var provider = await OpenAsync<EdgeDialog>(new DialogParameters
+        {
+            { "PreFillFromNodeId", "host-node-1" }
+        });
+
+        var html = provider.Find(".mud-dialog").InnerHtml;
+        Assert.Contains("来自宿主节点，不可修改", html);
+
+        var fromControl = provider.FindAll(".mud-input-control").FirstOrDefault(c =>
+            c.TextContent.Contains("起点节点", StringComparison.Ordinal));
+        Assert.NotNull(fromControl);
+        var input = fromControl!.QuerySelector("input");
+        Assert.NotNull(input);
+        Assert.True(input!.HasAttribute("readonly"));
+    }
+
+    [Fact]
+    public async Task InodeSelectorDialog_Renders()
+    {
+        // 宿主 inode 选择器（语义搜索包装，DialogSky 外壳）
+        var provider = await OpenAsync<InodeSelectorDialog>();
+
+        AssertDialog(provider, "选择宿主节点");
+
+        var html = provider.Find(".mud-dialog").InnerHtml;
+        Assert.Contains("搜索内容", html);
+        Assert.Contains("确定", html);
+    }
+
+    [Fact]
+    public async Task EdgeDialog_CreateMode_ToNodeUsesSelector()
+    {
+        // 终点 = 宿主 inode 选择器（语义搜索），不再自由输入
+        var provider = await OpenAsync<EdgeDialog>(new DialogParameters
+        {
+            { "PreFillFromNodeId", "host-node-1" }
+        });
+
+        var html = provider.Find(".mud-dialog").InnerHtml;
+        Assert.Contains("点击右侧按钮选择宿主节点", html);
+        Assert.Contains("语义搜索选择宿主节点", html);
     }
 
     [Fact]

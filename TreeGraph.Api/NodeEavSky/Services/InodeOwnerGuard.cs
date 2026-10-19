@@ -17,8 +17,22 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// </summary>
 public interface IInodeOwnerGuard
 {
+    /// <summary>
+    /// 本守卫认领的宿主节点类型名（与宿主类名 / EAV entity_type 一致，如 "UnitTree"）。
+    /// 供需要按类型精确分流校验的场景使用（如 EdgeSky 起点终点节点校验）。
+    /// </summary>
+    string NodeType { get; }
+
     /// <summary>判断 inodeId 是否为本守卫所维护宿主表中的真实节点。</summary>
     Task<bool> NodeExistsAsync(string inodeId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 批量解析宿主节点显示名（Id → 节点展示文本，如树节点的 Text()）。
+    /// 未命中的 id 不出现在结果中；默认空实现（不参与名字解析的守卫无需覆盖）。
+    /// </summary>
+    Task<Dictionary<string, string>> GetNodeNamesAsync(
+        IReadOnlyCollection<string> inodeIds, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, string>());
 }
 
 /// <summary>
@@ -31,6 +45,30 @@ public sealed class InodeOwnerGuardRegistry
 
     public InodeOwnerGuardRegistry(IEnumerable<IInodeOwnerGuard> guards)
         => _guards = guards as IReadOnlyList<IInodeOwnerGuard> ?? guards.ToList();
+
+    /// <summary>
+    /// 按节点类型解析守卫；无守卫认领该类型时返回 null。
+    /// </summary>
+    public IInodeOwnerGuard? Resolve(string nodeType)
+        => _guards.FirstOrDefault(g =>
+            string.Equals(g.NodeType, nodeType, StringComparison.Ordinal));
+
+    /// <summary>
+    /// 跨全部守卫批量解析 inode 显示名（Id → 展示文本）。
+    /// 未被任何守卫认领的 id 不出现在结果中（调用方决定回退显示）。
+    /// </summary>
+    public async Task<Dictionary<string, string>> ResolveNodeNamesAsync(
+        IEnumerable<string> inodeIds, CancellationToken ct = default)
+    {
+        var ids = inodeIds.Distinct(StringComparer.Ordinal).ToArray();
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var guard in _guards)
+        {
+            foreach (var (id, name) in await guard.GetNodeNamesAsync(ids, ct))
+                map.TryAdd(id, name);
+        }
+        return map;
+    }
 
     public async Task EnsureNodeExistsAsync(
         string inodeId, CancellationToken ct = default)

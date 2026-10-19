@@ -71,6 +71,7 @@ public class SpaceController(TreeGraphDbContext db) : ControllerBase
 
         space.Name = input.Name;
         space.Description = input.Description;
+        space.Type = input.Type;
 
         // 同步空间树根节点：root id = space id；不存在则自愈补建（与创建路径一致，同一次 SaveChanges 原子提交）
         var root = await db.SpaceTrees.FindAsync([id], cancellationToken);

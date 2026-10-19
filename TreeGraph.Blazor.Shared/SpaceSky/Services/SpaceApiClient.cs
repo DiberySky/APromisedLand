@@ -22,9 +22,14 @@ public class SpaceApiClient(HttpClient httpClient)
         var response = await httpClient.GetAsync(BasePath, cancellationToken);
         await EnsureSuccessWithApiResponseAsync(response);
         var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<List<SpaceDto>>>(cancellationToken);
-        return apiResponse?.Success == true && apiResponse.Data != null
-            ? apiResponse.Data
-            : [];
+        if (apiResponse?.Success != true || apiResponse.Data == null)
+            return [];
+
+        // 排序：类型（Type）和单位（Unit）排最后，其余（如动态 Dynamic）排前；同组按名称升序。
+        return apiResponse.Data
+            .OrderBy(s => s.Type is "Type" or "Unit" ? 1 : 0)
+            .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     // GET /Space/{id}；不存在返回 null

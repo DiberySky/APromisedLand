@@ -7,11 +7,16 @@
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
 @using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
 @using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space
+@using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Unit
+@using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Category
 @using TreeGraph.Blazor.Shared.TreeEavSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs
+@using TreeGraph.Blazor.Shared.EdgeSky.Pages
 @using TreeGraph.Shared.TreeEavSky.Entities
 @using TreeGraph.Shared.TreeEavSky.Models
 @inject SpaceApiClient Api
 @inject TreeApiClient<SpaceTree> TreeApi
+@inject BlazorService BlazorService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
@@ -71,6 +76,10 @@
             <MudTabPanel Text="空间维护" Icon="@Icons.Material.Filled.Settings">
                 <SpaceManagePanel OnChanged="LoadAsync" />
             </MudTabPanel>
+            @* 关系设置：内嵌边类型管理（IsDialogMode 隐藏页头，新建按钮在表头操作列） *@
+            <MudTabPanel Text="关系设置" Icon="@Icons.Material.Filled.Hub">
+                <EdgeMetadata IsDialogMode="true" />
+            </MudTabPanel>
             @* 动态属性：内嵌实体类型管理（IsDialogMode 隐藏页头，工具栏置于内容顶部） *@
             <MudTabPanel Text="动态属性" Icon="@Icons.Material.Filled.Category">
                 <EntityTypes IsDialogMode="true" SharedOnly="true" />
@@ -111,8 +120,32 @@
         }
     }
 
-    /// <summary>打开该空间对应的空间树对话框（RootId = Space.Id）。打开前自检：根节点不存在则补建。</summary>
+    /// <summary>
+    /// 根据空间类型打开对应树：
+    /// - Type = Unit → 打开单位树（整棵树，不使用空间 Id）
+    /// - Type = Type → 打开分类树（整棵树，不使用空间 Id）
+    /// - 其他（Dynamic）→ 打开空间树（RootId = Space.Id）
+    /// </summary>
     private async Task OpenTreeAsync(SpaceDto space)
+    {
+        switch (space.Type)
+        {
+            case "Unit":
+                await BlazorService.ShowUnitTreeDialogPageAsync();
+                break;
+
+            case "Type":
+                await BlazorService.ShowCategoryTreeDialogPageAsync();
+                break;
+
+            default:
+                await OpenSpaceTreeAsync(space);
+                break;
+        }
+    }
+
+    /// <summary>打开该空间对应的空间树对话框（RootId = Space.Id）。打开前自检：根节点不存在则补建。</summary>
+    private async Task OpenSpaceTreeAsync(SpaceDto space)
     {
         try
         {

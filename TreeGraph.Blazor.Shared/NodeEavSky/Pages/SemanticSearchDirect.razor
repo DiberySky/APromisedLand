@@ -36,6 +36,20 @@
                                       Style="width: 120px;"
                                       Disabled="_searching"/>
 
+                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">最低相似度</MudText>
+                        <div style="width: 160px;">
+                            <MudSlider @bind-Value="_minScore"
+                                       Min="0" Max="1" Step="0.05"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       Disabled="_searching"/>
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @_minScore.ToString("0.00")
+                        </MudText>
+                    </MudStack>
+
                     <MudSpacer/>
 
                     <MudButton Variant="Variant.Filled"
@@ -158,6 +172,8 @@
 @code {
     private string _query = "";
     private int _topK = 5;
+    /// <summary>最低相似度：低于该值的命中不返回（与服务端 SemanticSearch:MinScore 默认值一致）。</summary>
+    private double _minScore = 0.5;
     private bool _searching;
     private bool _searched;
     private string? _error;
@@ -176,7 +192,12 @@
 
         try
         {
-            var request = new SemanticSearchRequest { Query = _query, TopK = _topK };
+            var request = new SemanticSearchRequest
+            {
+                Query = _query,
+                TopK = _topK,
+                MinScore = (float)_minScore,
+            };
             var response = await EavApi.SemanticSearchAsync(request);
 
             if (response is null)

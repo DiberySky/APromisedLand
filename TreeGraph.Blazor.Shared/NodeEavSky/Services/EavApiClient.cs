@@ -593,6 +593,20 @@ public class EavApiClient
         return resp;
     }
 
+    /// <summary>
+    /// 手动触发向量对账（补缺 + 删孤）。
+    /// spaceId 非空时仅对该空间对应树范围对账（动态=空间树子树；单位=单位树；类型=分类树）；
+    /// 为空则全量对账。失败返回 null。
+    /// </summary>
+    public Task<VectorReconcileResultDto?> ReconcileVectorsAsync(
+        string? spaceId = null, CancellationToken ct = default)
+    {
+        var url = string.IsNullOrWhiteSpace(spaceId)
+            ? "api/search/reconcile"
+            : $"api/search/reconcile?spaceId={Uri.EscapeDataString(spaceId)}";
+        return PostNoBodyAsync<VectorReconcileResultDto>(url, ct);
+    }
+
     // ============================================================
     // 通用助手
     // ============================================================
@@ -733,6 +747,31 @@ public class EavApiClient
         {
             _logger.LogError(ex, "POST {Url} 失败", relativeUrl);
             return (false, ex.Message);
+        }
+    }
+
+    /// <summary>带响应体的无 Body POST（解包统一信封的 data；失败返回 default）。</summary>
+    private async Task<T?> PostNoBodyAsync<T>(
+        string relativeUrl, CancellationToken ct) where T : class
+    {
+        try
+        {
+            var resp = await _http.PostAsync(relativeUrl, content: null, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("POST {Url} → {Status}", relativeUrl, resp.StatusCode);
+                return default;
+            }
+            var envelope = await resp.Content
+                .ReadFromJsonAsync<ApiResponse<T>>(JsonOptions, ct);
+            return envelope is not null && !envelope.Success
+                ? default
+                : envelope?.Data;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "POST {Url} 失败", relativeUrl);
+            return default;
         }
     }
 

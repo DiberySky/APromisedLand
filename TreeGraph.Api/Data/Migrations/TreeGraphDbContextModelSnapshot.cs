@@ -92,6 +92,264 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("uq_edge_definition_type_name");
 
                     b.ToTable("edge_definitions", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            EdgeTypeId = "e0000001-0000-4000-8000-000000000001",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "设备之间的电气连通（母线↔断路器、隔离开关↔线路）；物理连接对称，按无向处理。",
+                            DisplayName = "电气连接",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = false,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "ConnectedTo",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000002-0000-4000-8000-000000000002",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "下游设备指向供电上游，沿供电方向逐级上溯；链式支持完整供电路径查询与成环校验。",
+                            DisplayName = "供电来源",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = true,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "SuppliedBy",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000003-0000-4000-8000-000000000003",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "低压电缆组接入变压器，与电气连接配合还原「建筑—低压柜—变压器」链路。",
+                            DisplayName = "低压接入",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "LowVoltageAccess",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000004-0000-4000-8000-000000000004",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "线路段序列，链式；允许 T 接分支（不限制入度）。",
+                            DisplayName = "输电线路",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = true,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "TransmissionLine",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000005-0000-4000-8000-000000000005",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "单电源馈线，链式且严格线性（入度≤1、无环）。",
+                            DisplayName = "馈线",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = true,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = true,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "Feeder",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000006-0000-4000-8000-000000000006",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "设备在管理上归属台区/馈线等逻辑单元；与电气连接、物理位置分开建模。",
+                            DisplayName = "逻辑归属",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "BelongsTo",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000007-0000-4000-8000-000000000007",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "设备归属运维单位，与逻辑归属分型，避免同一对点混用一条边。",
+                            DisplayName = "归属单位",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "UnitTree",
+                            TypeName = "AssignedTo",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000008-0000-4000-8000-000000000008",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "分布式光伏、储能等设备安装在建筑/站点上。",
+                            DisplayName = "安装承载",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "InstalledIn",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000009-0000-4000-8000-000000000009",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "空间实体相邻（共享边界/距离），用于台区划分与抢修路径分析；对称按无向处理。",
+                            DisplayName = "空间邻接",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = false,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "AdjacentTo",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000010-0000-4000-8000-000000000010",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "设备物理位置（站房/楼层/房间），与逻辑归属分离。",
+                            DisplayName = "位置所在",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "LocatedAt",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000011-0000-4000-8000-000000000011",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "保护装置指向被保护设备，用于故障时定位应动作的保护。",
+                            DisplayName = "保护范围",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "Protects",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000012-0000-4000-8000-000000000012",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "上下级保护配合（配合级差与时间定值），支持定值校核与越级跳闸分析。",
+                            DisplayName = "保护配合",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "BacksUp",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000013-0000-4000-8000-000000000013",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "操作票与五防规则的前置约束，例如线路带电时禁止合接地刀闸。",
+                            DisplayName = "操作前置",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "PrerequisiteFor",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000014-0000-4000-8000-000000000014",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "二次设备（保护、测控、通信）依赖一次设备或电源，用于故障溯源。",
+                            DisplayName = "二次依赖",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "DependsOn",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000015-0000-4000-8000-000000000015",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "故障事件节点指向受影响的设备/用户，表达失电或降级范围。",
+                            DisplayName = "影响范围",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "Affects",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000016-0000-4000-8000-000000000016",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "跳闸事件指向触发它的保护动作或根因故障，用于事后复盘。",
+                            DisplayName = "事件起因",
+                            FromNodeType = "SpaceTree",
+                            IsActive = true,
+                            IsChain = false,
+                            IsDirected = true,
+                            IsGlobal = false,
+                            IsLinear = false,
+                            ToNodeType = "SpaceTree",
+                            TypeName = "TrippedBy",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeInstance", b =>
@@ -106,6 +364,11 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("display_name");
 
                     b.Property<string>("EdgeTypeId")
                         .IsRequired()
@@ -368,6 +631,535 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("uq_attr_catalog");
 
                     b.ToTable("attribute_catalog", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            AttributeId = "a0000001-0000-4000-8000-000000000001",
+                            AttributeName = "voltageLevel",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "电压等级",
+                            DisplayOrder = 0,
+                            EntityType = "ConnectedTo",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000002-0000-4000-8000-000000000002",
+                            AttributeName = "connectionMode",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "连接方式",
+                            DisplayOrder = 1,
+                            EntityType = "ConnectedTo",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000003-0000-4000-8000-000000000003",
+                            AttributeName = "supplyDirection",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "供电方向",
+                            DisplayOrder = 0,
+                            EntityType = "SuppliedBy",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000004-0000-4000-8000-000000000004",
+                            AttributeName = "isPrimarySupply",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "bool",
+                            DisplayName = "是否主供",
+                            DisplayOrder = 1,
+                            EntityType = "SuppliedBy",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000005-0000-4000-8000-000000000005",
+                            AttributeName = "cableSegmentCount",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "int",
+                            DisplayName = "电缆段数",
+                            DisplayOrder = 0,
+                            EntityType = "LowVoltageAccess",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000006-0000-4000-8000-000000000006",
+                            AttributeName = "cableLength",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "decimal",
+                            DisplayName = "电缆长度",
+                            DisplayOrder = 1,
+                            EntityType = "LowVoltageAccess",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000007-0000-4000-8000-000000000007",
+                            AttributeName = "voltageLevel",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "电压等级",
+                            DisplayOrder = 0,
+                            EntityType = "TransmissionLine",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000008-0000-4000-8000-000000000008",
+                            AttributeName = "commissionDate",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "date",
+                            DisplayName = "投运日期",
+                            DisplayOrder = 1,
+                            EntityType = "TransmissionLine",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000009-0000-4000-8000-000000000009",
+                            AttributeName = "ratedCurrent",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "decimal",
+                            DisplayName = "额定载流量",
+                            DisplayOrder = 0,
+                            EntityType = "Feeder",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000010-0000-4000-8000-000000000010",
+                            AttributeName = "isSingleSource",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "bool",
+                            DisplayName = "单电源",
+                            DisplayOrder = 1,
+                            EntityType = "Feeder",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000011-0000-4000-8000-000000000011",
+                            AttributeName = "belongType",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "归属类型",
+                            DisplayOrder = 0,
+                            EntityType = "BelongsTo",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000012-0000-4000-8000-000000000012",
+                            AttributeName = "effectiveDate",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "date",
+                            DisplayName = "生效日期",
+                            DisplayOrder = 1,
+                            EntityType = "BelongsTo",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000013-0000-4000-8000-000000000013",
+                            AttributeName = "assignType",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "归属类型",
+                            DisplayOrder = 0,
+                            EntityType = "AssignedTo",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000014-0000-4000-8000-000000000014",
+                            AttributeName = "installYear",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "int",
+                            DisplayName = "安装年份",
+                            DisplayOrder = 0,
+                            EntityType = "InstalledIn",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000015-0000-4000-8000-000000000015",
+                            AttributeName = "installedCapacity",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "decimal",
+                            DisplayName = "装机容量",
+                            DisplayOrder = 1,
+                            EntityType = "InstalledIn",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000016-0000-4000-8000-000000000016",
+                            AttributeName = "distance",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "decimal",
+                            DisplayName = "距离",
+                            DisplayOrder = 0,
+                            EntityType = "AdjacentTo",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000017-0000-4000-8000-000000000017",
+                            AttributeName = "shareBoundary",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "bool",
+                            DisplayName = "共享边界",
+                            DisplayOrder = 1,
+                            EntityType = "AdjacentTo",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000018-0000-4000-8000-000000000018",
+                            AttributeName = "position",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "location",
+                            DisplayName = "位置",
+                            DisplayOrder = 0,
+                            EntityType = "LocatedAt",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000019-0000-4000-8000-000000000019",
+                            AttributeName = "protectionType",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "保护类型",
+                            DisplayOrder = 0,
+                            EntityType = "Protects",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000020-0000-4000-8000-000000000020",
+                            AttributeName = "settingValue",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "保护定值",
+                            DisplayOrder = 1,
+                            EntityType = "Protects",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000021-0000-4000-8000-000000000021",
+                            AttributeName = "coordinationGap",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "decimal",
+                            DisplayName = "配合级差",
+                            DisplayOrder = 0,
+                            EntityType = "BacksUp",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000022-0000-4000-8000-000000000022",
+                            AttributeName = "timeSetting",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "decimal",
+                            DisplayName = "时间定值",
+                            DisplayOrder = 1,
+                            EntityType = "BacksUp",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000023-0000-4000-8000-000000000023",
+                            AttributeName = "ruleCode",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "规则编号",
+                            DisplayOrder = 0,
+                            EntityType = "PrerequisiteFor",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000024-0000-4000-8000-000000000024",
+                            AttributeName = "precondition",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "前置条件",
+                            DisplayOrder = 1,
+                            EntityType = "PrerequisiteFor",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000025-0000-4000-8000-000000000025",
+                            AttributeName = "dependencyType",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "依赖类型",
+                            DisplayOrder = 0,
+                            EntityType = "DependsOn",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000026-0000-4000-8000-000000000026",
+                            AttributeName = "impactLevel",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "影响等级",
+                            DisplayOrder = 0,
+                            EntityType = "Affects",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000027-0000-4000-8000-000000000027",
+                            AttributeName = "estimatedRecoveryMinutes",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "int",
+                            DisplayName = "预计恢复时长",
+                            DisplayOrder = 1,
+                            EntityType = "Affects",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000028-0000-4000-8000-000000000028",
+                            AttributeName = "eventTime",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "datetime",
+                            DisplayName = "事件时刻",
+                            DisplayOrder = 0,
+                            EntityType = "TrippedBy",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000029-0000-4000-8000-000000000029",
+                            AttributeName = "faultType",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "故障类型",
+                            DisplayOrder = 1,
+                            EntityType = "TrippedBy",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000030-0000-4000-8000-000000000030",
+                            AttributeName = "room",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "房间",
+                            DisplayOrder = 1,
+                            EntityType = "LocatedAt",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000031-0000-4000-8000-000000000031",
+                            AttributeName = "settingUnit",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "string",
+                            DisplayName = "定值单位",
+                            DisplayOrder = 2,
+                            EntityType = "Protects",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = true,
+                            IsSortable = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
+                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeValue", b =>
@@ -1219,9 +2011,38 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
                     b.HasKey("Id");
 
                     b.ToTable("spaces", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "7a1e3f5d-9b2c-4a8e-1f0d-3c5b7e9a1c2d",
+                            Description = "武汉供电段",
+                            Name = "武汉供电段",
+                            Type = "Dynamic"
+                        },
+                        new
+                        {
+                            Id = "8b2f4a6e-0c3d-5b9f-2a1e-4d6c8f0b2d3e",
+                            Description = "类型",
+                            Name = "类型",
+                            Type = "Type"
+                        },
+                        new
+                        {
+                            Id = "9c3a5b7f-1d4e-6c0a-3b2f-5e7d9a1c3e4f",
+                            Description = "单位",
+                            Name = "单位",
+                            Type = "Unit"
+                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", b =>

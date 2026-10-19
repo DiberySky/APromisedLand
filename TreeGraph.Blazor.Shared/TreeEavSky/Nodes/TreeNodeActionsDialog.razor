@@ -63,8 +63,12 @@
                                       ReadOnly="true"
                                       Lines="3"/>
 
-                        <BoolFieldSky Label="是否允许添加子节点" ReadOnly="true"
-                                      @bind-Value="NodeTemplate.Node.Value!.CanHaveChildren" />
+                        @* 根节点不可修改：不展示「是否允许添加子节点」（根节点恒为允许） *@
+                        @if (!IsBoot)
+                        {
+                            <BoolFieldSky Label="是否允许添加子节点" ReadOnly="true"
+                                          @bind-Value="NodeTemplate.Node.Value!.CanHaveChildren" />
+                        }
 
                         @* 属性区：仅展示本节点已关注实体类型的属性（只读） *@
                         <NodeAttributeItemsSky TItem="@TItem"
@@ -201,7 +205,8 @@
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
-        @if (!NodeTemplate.Node.HasChildren)
+        @* 根节点不可删除：根节点仅能创建子项、子项排序（与「设置修改/属性/移动」一致按 IsBoot 判定） *@
+        @if (!IsBoot && !NodeTemplate.Node.HasChildren)
         {
             <MudButton OnClick="OnDelete"
                        Variant="Variant.Text"
@@ -341,11 +346,14 @@
         var parameters = new DialogParameters
         {
             { "PreFillFromNodeId", NodeId },
+            { "PreFillFromNodeName", NodeTemplate.Node.Text },
             { "PreFillEdgeTypeId", string.IsNullOrEmpty(_filterEdgeTypeId) ? null : _filterEdgeTypeId }
         };
 
-        var dialog = await DialogService.ShowAsync<EdgeDialog>(
-            string.Empty, parameters);
+        // 与其余对话框一致：顶部居中（DialogConfig.Position 默认 TopCenter）
+        var options = new DialogConfig { MaxWidth = MaxWidth.Medium }.ToDialogOptions();
+        var dialog = await DialogService.ShowExAsync<EdgeDialog>(
+            string.Empty, parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })

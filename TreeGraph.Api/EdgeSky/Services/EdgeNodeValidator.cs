@@ -1,5 +1,3 @@
-using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.Data;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -9,25 +7,29 @@ namespace TreeGraph.Api.EdgeSky.Services;
 /// 边/链节点校验器：当 EdgeDefinition 声明了 FromNodeType/ToNodeType 时，
 /// 校验对应节点在其宿主主表中真实存在，防止边指向不存在的节点（孤儿边）。
 ///
-/// 遵循既有"无守卫则放行"的约定：
-///   - nodeType 为空 → 不校验（该关系不限定节点类型）；
-///   - nodeType 为未知类型（无对应宿主表）→ 放行（无法校验）；
-///   - 当前覆盖的宿主类型：UnitTree / CategoryTree / SpaceTree。
+/// 节点必须是 Inode 宿主：通过 <see cref="InodeOwnerGuardRegistry"/> 按
+/// <see cref="IInodeOwnerGuard.NodeType"/> 解析宿主守卫（各树模块注册），
+/// 不再在本模块硬编码宿主表。
+///
+///   - nodeType 为空 → 不校验（该关系不限定节点类型，IsGlobal）；
+///   - nodeType 无守卫认领（未实现 Inode）→ 拒绝（EavValidationException → 400）；
+///   - nodeType 有守卫但节点不存在 → 拒绝（EavValidationException → 400）。
 /// </summary>
 public interface IEdgeNodeValidator
 {
     /// <summary>
     /// 校验 (nodeType, nodeId) 的宿主存在性。
-    /// 宿主不存在时抛出 <see cref="EavValidationException"/>（由统一异常管道映射为 400）。
+    /// 失败时抛出 <see cref="EavValidationException"/>（由统一异常管道映射为 400）。
     /// </summary>
     Task EnsureNodeAsync(string? nodeType, string nodeId, CancellationToken ct = default);
 }
 
 public sealed class EdgeNodeValidator : IEdgeNodeValidator
 {
-    private readonly TreeGraphDbContext _db;
+    private readonly InodeOwnerGuardRegistry _inodeGuards;
 
-    public EdgeNodeValidator(TreeGraphDbContext db) => _db = db;
+    public EdgeNodeValidator(InodeOwnerGuardRegistry inodeGuards)
+        => _inodeGuards = inodeGuards;
 
     public async Task EnsureNodeAsync(
         string? nodeType, string nodeId, CancellationToken ct = default)
@@ -35,15 +37,16 @@ public sealed class EdgeNodeValidator : IEdgeNodeValidator
         if (string.IsNullOrWhiteSpace(nodeType) || string.IsNullOrWhiteSpace(nodeId))
             return;
 
-        var exists = nodeType switch
-        {
-            "UnitTree" => await _db.UnitTrees.AnyAsync(n => n.Id == nodeId, ct),
-            "CategoryTree" => await _db.CategoryTrees.AnyAsync(n => n.Id == nodeId, ct),
-            "SpaceTree" => await _db.SpaceTrees.AnyAsync(n => n.Id == nodeId, ct),
-            _ => true // 未知节点类型：无对应宿主表，跳过校验
-        };
+        // 节点类型必须已实现 Inode（有宿主守卫认领），否则拒绝
+        var guard = _inodeGuards.Resolve(nodeType);
+        if (guard is null)
+            throw new EavValidationException(
+            [
+                new ValidationError(nodeType,
+                    $"节点类型 '{nodeType}' 未实现 Inode 宿主，不能作为边的起点/终点。")
+            ]);
 
-        if (!exists)
+        if (!await guard.NodeExistsAsync(nodeId, ct))
             throw new EavValidationException(
             [
                 new ValidationError(nodeType,

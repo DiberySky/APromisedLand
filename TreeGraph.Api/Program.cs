@@ -23,6 +23,8 @@ builder.Services.AddControllers(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new NumericValueJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new DynamicCompositeValueJsonConverter());
+        // 枚举序列化为字符串（与 EF Core HasConversion<string>() 对齐，前端 DTO 用 string 接收）
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 builder.Services.AddOpenApi();
 
@@ -148,6 +150,8 @@ if (!EF.IsDesignTime)
     // 审计分区表：确保当月+下月分区存在（幂等；DEFAULT 分区已兜底，此处让数据按月归位）
     await AuditPartitionMaintenance.EnsureMonthlyPartitionsAsync(db);
     await EavSeeder.SeedAsync(db);
+    // 内置 Inode 宿主类型（三树）：边端点下拉与属性挂载依赖目录可见（幂等 upsert）
+    await BuiltinHostTypeSeeder.SeedAsync(db);
 
     // E2E 基线（item/user/project + 固定 EntityId 示例值）仅开发/测试环境注入
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))

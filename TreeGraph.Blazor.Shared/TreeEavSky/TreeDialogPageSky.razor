@@ -4,7 +4,10 @@
 
 @inject ITreeClientService<TItem> ClientService
 
-<DialogPageSky Title="@Title" ActionsMaxWidth="@MaxWidth" TopBarRightContent="@TopBarRightContent">
+<DialogSky Title="@Title"
+           ActionsMaxWidth="@MaxWidth"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭">
     <ToolBarContent>
         @if (!string.IsNullOrEmpty(TitleToolBar))
         {
@@ -17,6 +20,11 @@
         }
 
         <MudSpacer/>
+
+        @if (TopBarRightContent != null)
+        {
+            @TopBarRightContent
+        }
 
         @if (ToolBarRightContent != null)
         {
@@ -42,7 +50,7 @@
                      ShowDialogFunc="@ShowDialogFunc"/>
         </MudContainer>
     </DialogContent>
-</DialogPageSky>
+</DialogSky>
 
 @code {
     [Parameter] public string Title { get; set; } = typeof(TItem).Name;

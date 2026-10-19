@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using TreeGraph.Shared.NodeEavSky.Abstractions;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 
 namespace TreeGraph.Shared.TreeEavSky.Entities;
@@ -9,7 +10,7 @@ namespace TreeGraph.Shared.TreeEavSky.Entities;
 /// 分类树节点 - 实现完整的树节点接口
 /// </summary>
 public sealed class CategoryTree : ITreeNodeBase<CategoryTree>,
-    IEquatable<CategoryTree>
+    IEquatable<CategoryTree>, Inode
 {
     [Key]
     [MaxLength(36)]

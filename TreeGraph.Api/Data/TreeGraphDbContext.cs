@@ -140,6 +140,9 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
             e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.Type).HasColumnName("type").HasConversion<string>().HasMaxLength(50).IsRequired();
+
+            e.HasData(Space.SeedData());
         });
     }
 
@@ -293,6 +296,8 @@ public class TreeGraphDbContext : DbContext
 
             e.HasOne(x => x.RefOptionSet).WithMany()
                 .HasForeignKey(x => x.RefOptionSetId).OnDelete(DeleteBehavior.Restrict);
+
+            e.HasData(AttributeDefinition.SeedData());
         });
     }
 
@@ -710,6 +715,8 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => x.TypeName)
                 .IsUnique()
                 .HasDatabaseName("uq_edge_definition_type_name");
+
+            e.HasData(EdgeDefinition.SeedData());
         });
 
         mb.Entity<EdgeInstance>(e =>
@@ -727,6 +734,7 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Weight).HasColumnName("weight").HasPrecision(18, 4);
             e.Property(x => x.EnforceSingleIncoming)
                 .HasColumnName("enforce_single_incoming").HasDefaultValue(false);
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(500);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 

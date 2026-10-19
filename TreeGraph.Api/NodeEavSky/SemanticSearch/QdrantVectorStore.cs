@@ -128,8 +128,13 @@ public sealed class QdrantVectorStore
         _logger.LogDebug("Qdrant delete point：{Uuid}", uuid);
     }
 
+    /// <summary>
+    /// 向量检索。<paramref name="scoreThreshold"/> 非空时由 Qdrant 原生过滤低分点
+    /// （低于该相似度的点不返回），调用方可据此少传候选、由上层再做相对过滤。
+    /// </summary>
     public async Task<IReadOnlyList<SemanticHit>> SearchAsync(
         float[] queryVector, int topK, string? spaceId,
+        float? scoreThreshold = null,
         CancellationToken ct = default)
     {
         Filter? filter = null;
@@ -152,6 +157,7 @@ public sealed class QdrantVectorStore
             filter: filter,
             limit: (ulong)topK,
             payloadSelector: true,
+            scoreThreshold: scoreThreshold,
             cancellationToken: ct);
 
         return results.Select(r => new SemanticHit(

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using TreeGraph.Shared.NodeEavSky.Abstractions;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 
 namespace TreeGraph.Shared.TreeEavSky.Entities;
@@ -6,7 +7,7 @@ namespace TreeGraph.Shared.TreeEavSky.Entities;
 /// <summary>
 /// 空间树节点（克隆自 UnitTree，不播种，表 space_trees 初始为空）。
 /// </summary>
-public class SpaceTree : ITreeNodeBase<SpaceTree>
+public class SpaceTree : ITreeNodeBase<SpaceTree>, Inode
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Name { get; set; } = string.Empty;

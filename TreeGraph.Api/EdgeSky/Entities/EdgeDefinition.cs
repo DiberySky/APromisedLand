@@ -1,3 +1,5 @@
+using TreeGraph.Shared.NodeEavSky.Abstractions;
+
 namespace TreeGraph.Api.EdgeSky.Entities;
 
 /// <summary>
@@ -65,6 +67,267 @@ public class EdgeDefinition
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<EdgeInstance> Instances { get; set; } = new();
+
+    /// <summary>供配电场景内置边类型种子（16 条）。</summary>
+    public static List<EdgeDefinition> SeedData() =>
+    [
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000001-0000-4000-8000-000000000001",
+            TypeName = "ConnectedTo",
+            DisplayName = "电气连接",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = false,
+            IsChain = false,
+            IsLinear = false,
+            Description = "设备之间的电气连通（母线↔断路器、隔离开关↔线路）；物理连接对称，按无向处理。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000002-0000-4000-8000-000000000002",
+            TypeName = "SuppliedBy",
+            DisplayName = "供电来源",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = true,
+            IsLinear = false,
+            Description = "下游设备指向供电上游，沿供电方向逐级上溯；链式支持完整供电路径查询与成环校验。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000003-0000-4000-8000-000000000003",
+            TypeName = "LowVoltageAccess",
+            DisplayName = "低压接入",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "低压电缆组接入变压器，与电气连接配合还原「建筑—低压柜—变压器」链路。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000004-0000-4000-8000-000000000004",
+            TypeName = "TransmissionLine",
+            DisplayName = "输电线路",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = true,
+            IsLinear = false,
+            Description = "线路段序列，链式；允许 T 接分支（不限制入度）。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000005-0000-4000-8000-000000000005",
+            TypeName = "Feeder",
+            DisplayName = "馈线",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = true,
+            IsLinear = true,
+            Description = "单电源馈线，链式且严格线性（入度≤1、无环）。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000006-0000-4000-8000-000000000006",
+            TypeName = "BelongsTo",
+            DisplayName = "逻辑归属",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "设备在管理上归属台区/馈线等逻辑单元；与电气连接、物理位置分开建模。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000007-0000-4000-8000-000000000007",
+            TypeName = "AssignedTo",
+            DisplayName = "归属单位",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "UnitTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "设备归属运维单位，与逻辑归属分型，避免同一对点混用一条边。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000008-0000-4000-8000-000000000008",
+            TypeName = "InstalledIn",
+            DisplayName = "安装承载",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "分布式光伏、储能等设备安装在建筑/站点上。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000009-0000-4000-8000-000000000009",
+            TypeName = "AdjacentTo",
+            DisplayName = "空间邻接",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = false,
+            IsChain = false,
+            IsLinear = false,
+            Description = "空间实体相邻（共享边界/距离），用于台区划分与抢修路径分析；对称按无向处理。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000010-0000-4000-8000-000000000010",
+            TypeName = "LocatedAt",
+            DisplayName = "位置所在",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "设备物理位置（站房/楼层/房间），与逻辑归属分离。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000011-0000-4000-8000-000000000011",
+            TypeName = "Protects",
+            DisplayName = "保护范围",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "保护装置指向被保护设备，用于故障时定位应动作的保护。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000012-0000-4000-8000-000000000012",
+            TypeName = "BacksUp",
+            DisplayName = "保护配合",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "上下级保护配合（配合级差与时间定值），支持定值校核与越级跳闸分析。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000013-0000-4000-8000-000000000013",
+            TypeName = "PrerequisiteFor",
+            DisplayName = "操作前置",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "操作票与五防规则的前置约束，例如线路带电时禁止合接地刀闸。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000014-0000-4000-8000-000000000014",
+            TypeName = "DependsOn",
+            DisplayName = "二次依赖",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "二次设备（保护、测控、通信）依赖一次设备或电源，用于故障溯源。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000015-0000-4000-8000-000000000015",
+            TypeName = "Affects",
+            DisplayName = "影响范围",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "故障事件节点指向受影响的设备/用户，表达失电或降级范围。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000016-0000-4000-8000-000000000016",
+            TypeName = "TrippedBy",
+            DisplayName = "事件起因",
+            FromNodeType = "SpaceTree",
+            ToNodeType = "SpaceTree",
+            IsGlobal = false,
+            IsDirected = true,
+            IsChain = false,
+            IsLinear = false,
+            Description = "跳闸事件指向触发它的保护动作或根因故障，用于事后复盘。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        }
+    ];
 }
 
 /// <summary>
@@ -76,7 +339,7 @@ public class EdgeDefinition
 ///
 /// 属性值复用 EAV：entity_type = EdgeDefinition.TypeName，entity_id = EdgeId。
 /// </summary>
-public class EdgeInstance
+public class EdgeInstance : Inode
 {
     public string EdgeId { get; set; } = "";
 
@@ -99,6 +362,13 @@ public class EdgeInstance
     /// </summary>
     public bool EnforceSingleIncoming { get; set; }
 
+    /// <summary>边的显示名称（可选，为空时由调用方拼装 from→to）。</summary>
+    public string? DisplayName { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    // ── Inode 显式实现 ──────────────────────────────────────────────
+    string Inode.Id => EdgeId;
+    string Inode.Name => DisplayName ?? $"{FromNodeId}→{ToNodeId}";
 }

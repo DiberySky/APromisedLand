@@ -30,8 +30,8 @@ public class TreeNodeDto<T>
     /// <summary>是否有子节点</summary>
     public bool HasChildren { get; set; }
 
-    /// <summary>是否允许包含子节点（false = 叶子节点，创建/移动到其下将被后端拒绝）</summary>
-    public bool CanHaveChildren { get; set; }
+    /// <summary>是否允许包含子节点（false = 叶子节点，创建/移动到其下将被后端拒绝；未显式赋值时默认为 true）</summary>
+    public bool CanHaveChildren { get; set; } = true;
 
     /// <summary>是否展开</summary>
     public bool Expanded { get; set; }

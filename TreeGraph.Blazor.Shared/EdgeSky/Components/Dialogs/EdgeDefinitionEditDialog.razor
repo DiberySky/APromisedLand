@@ -10,11 +10,11 @@
            ActionsMaxWidth="MaxWidth.False"
            OnSubmitClick="UpdateAsync">
     <DialogContent>
-        <MudTextField T="string" Value="@Type.TypeName" Label="类型名"
-                      Variant="Variant.Outlined" ReadOnly="true" Class="mb-3" />
-
         <MudTextField @bind-Value="_form.DisplayName"
                       Label="显示名" Variant="Variant.Outlined" Class="mb-3" />
+
+        <MudTextField T="string" Value="@Type.TypeName" Label="类型名"
+                      Variant="Variant.Outlined" ReadOnly="true" Class="mb-3" />
 
         <div Class="d-flex mb-3">
             <MudSelect T="string"

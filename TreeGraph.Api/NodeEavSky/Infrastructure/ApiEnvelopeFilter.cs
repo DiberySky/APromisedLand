@@ -22,7 +22,10 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
     public int Order => 0;
 
     private static readonly System.Text.Json.JsonSerializerOptions JsonOptions =
-        new(System.Text.Json.JsonSerializerDefaults.Web);
+        new(System.Text.Json.JsonSerializerDefaults.Web)
+        {
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        };
 
     private static bool AppliesTo(FilterContext context)
         => context.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor cad
@@ -31,7 +34,11 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
                || cad.ControllerTypeInfo.Namespace?.Contains(
                    "TreeEavSky.Controllers", StringComparison.Ordinal) == true
                || cad.ControllerTypeInfo.Namespace?.Contains(
-                   "SpaceSky.Controllers", StringComparison.Ordinal) == true);
+                   "SpaceSky.Controllers", StringComparison.Ordinal) == true
+               || cad.ControllerTypeInfo.Namespace?.Contains(
+                   "EdgeSky.Controllers", StringComparison.Ordinal) == true
+               || cad.ControllerTypeInfo.Namespace?.Contains(
+                   "ChainSky.Controllers", StringComparison.Ordinal) == true);
 
     // ------------------------------------------------------------
     // 结果包装
@@ -188,7 +195,8 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
     }
 
     // ------------------------------------------------------------
-    // 异常映射（控制器未就地捕获时的兜底）
+    // 异常映射（控制器未就地捕获时的兜底；
+    // Edge/Chain 控制器已移除就地 try/catch，本映射为其唯一异常出口）
     // ------------------------------------------------------------
 
     public void OnException(ExceptionContext context)
@@ -230,6 +238,18 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
                 context.ExceptionHandled = true;
                 break;
 
+            // Edge/Chain 家族：InvalidOperationException 的语义是"业务规则冲突"
+            //（重复边、子项非空拒绝、拓扑破坏等），映射为 409，
+            // 与控制器就地 try/catch 时代的 Conflict 行为保持一致。
+            case InvalidOperationException when IsEdgeFamily(context):
+                context.Result = new ObjectResult(
+                    ApiResponse.Fail(context.Exception.Message))
+                {
+                    StatusCode = StatusCodes.Status409Conflict
+                };
+                context.ExceptionHandled = true;
+                break;
+
             case ArgumentException or InvalidOperationException:
                 context.Result = new ObjectResult(
                     ApiResponse.Fail(context.Exception.Message))
@@ -240,4 +260,15 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
                 break;
         }
     }
+
+    /// <summary>
+    /// Edge/Chain 家族控制器判定（EdgeSky.Controllers / ChainSky.Controllers 命名空间）。
+    /// 仅用于异常映射的家族级差异；结果包装仍由 <see cref="AppliesTo"/> 统一判定。
+    /// </summary>
+    private static bool IsEdgeFamily(FilterContext context)
+        => context.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor cad
+           && (cad.ControllerTypeInfo.Namespace?.Contains(
+                   "EdgeSky.Controllers", StringComparison.Ordinal) == true
+               || cad.ControllerTypeInfo.Namespace?.Contains(
+                   "ChainSky.Controllers", StringComparison.Ordinal) == true);
 }

@@ -1,4 +1,6 @@
+using MassTransit;
 using TreeGraph.Api.Data;
+using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Models;
@@ -9,8 +11,13 @@ namespace TreeGraph.Api.TreeEavSky.Services;
 
 /// <summary>
 /// 空间树服务（克隆自 UnitTreeService，表 space_trees）。
+///
+/// 写操作（创建/更新/删除/移动）成功后发布 InodeChangedEvent，
+/// 由语义搜索管道的消费者即时刷新该节点的向量（消费端幂等）。
 /// </summary>
-public class SpaceTreeService(TreeGraphDbContext dbContext) : ITreeService<SpaceTree>
+public class SpaceTreeService(
+    TreeGraphDbContext dbContext,
+    IPublishEndpoint publishEndpoint) : ITreeService<SpaceTree>
 {
     public async Task<IReadOnlyList<TreeNodeDto<SpaceTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
@@ -186,6 +193,10 @@ public class SpaceTreeService(TreeGraphDbContext dbContext) : ITreeService<Space
 
         await dbContext.SpaceTrees.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // ★ 语义搜索：节点新增 → 即时补建向量（消费端幂等）
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+
         return entity.ToNodeDto();
     }
 
@@ -205,6 +216,10 @@ public class SpaceTreeService(TreeGraphDbContext dbContext) : ITreeService<Space
 
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // ★ 语义搜索：节点改名等更新 → 即时重建向量
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+
         return entity.ToNodeDto();
     }
 
@@ -257,6 +272,9 @@ public class SpaceTreeService(TreeGraphDbContext dbContext) : ITreeService<Space
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        // ★ 语义搜索：节点已删除 → 消费端据 InodeId 清除其残留向量
+        await PublishAsync(nodeId, InodeChangeKind.Deleted, cancellationToken);
+
         return true;
     }
 
@@ -308,7 +326,21 @@ public class SpaceTreeService(TreeGraphDbContext dbContext) : ITreeService<Space
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // ★ 语义搜索：节点移动 → 即时重建向量（路径由检索时反查，此处保持索引与宿主一致）
+        await PublishAsync(nodeId, InodeChangeKind.Saved, cancellationToken);
+
         return true;
+    }
+
+    /// <summary>发布 iNode 变更事件（语义搜索向量同步；at-least-once，消费端幂等）。</summary>
+    private async Task PublishAsync(string inodeId, InodeChangeKind kind, CancellationToken ct)
+    {
+        await publishEndpoint.Publish(new InodeChangedEvent
+        {
+            InodeId = inodeId,
+            Kind = kind
+        }, ct);
     }
 
     private async Task<bool> IsDescendantAsync(string ancestorId, string? nodeId, CancellationToken cancellationToken)

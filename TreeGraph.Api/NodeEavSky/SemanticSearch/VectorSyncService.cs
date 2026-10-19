@@ -2,7 +2,9 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.SpaceSky.Entities;
 using TreeGraph.Shared.Messaging;
 
 namespace TreeGraph.Api.NodeEavSky.SemanticSearch;
@@ -76,13 +78,33 @@ public sealed class VectorSynchronizer
         return true;
     }
 
+    /// <summary>全量对账（不限定空间）。</summary>
+    public Task<ReconcileResult> ReconcileAllAsync(CancellationToken ct)
+        => ReconcileAsync(null, ct);
+
     /// <summary>
-    /// 全量对账：比较 PG 期望向量集合与 Qdrant 已存集合，补缺删孤。
+    /// 按空间对账：仅在该空间对应树范围内比对。
+    /// 动态空间 = 空间树中以该空间为根的子树；单位空间 = 单位树全体；类型空间 = 分类树全体。
+    /// </summary>
+    public Task<ReconcileResult> ReconcileSpaceAsync(string spaceId, CancellationToken ct)
+        => ReconcileAsync(spaceId, ct);
+
+    /// <summary>
+    /// 对账：比较 PG 期望向量集合与 Qdrant 已存集合，补缺删孤。
     /// PG 活跃集合 = InodeEntities 挂载的 inode ∪ SpaceTree 节点
     /// （Id 在 spaces 空间实体列表内的 space 节点除外，不创建向量）。
+    /// spaceId 非空时，期望集合与 Qdrant 侧均先按该空间的 inode 范围过滤。
     /// </summary>
-    public async Task<ReconcileResult> ReconcileAllAsync(CancellationToken ct)
+    private async Task<ReconcileResult> ReconcileAsync(string? spaceId, CancellationToken ct)
     {
+        // 空间范围（null = 全量，不做范围限制）
+        var scope = spaceId is null ? null : await ResolveScopeAsync(spaceId, ct);
+        if (scope is not null && scope.Count == 0)
+        {
+            _logger.LogInformation("按空间对账：空间 {SpaceId} 无对应节点，跳过", spaceId);
+            return new ReconcileResult(0, 0, 0, 0, 0, 0);
+        }
+
         // PG 侧期望：节点键 + 实体键
         var mounts = await _db.InodeEntities
             .AsNoTracking()
@@ -100,6 +122,12 @@ public sealed class VectorSynchronizer
             .Select(n => n.Id)
             .ToListAsync(ct);
 
+        if (scope is not null)
+        {
+            mounts = mounts.Where(m => scope.Contains(m.InodeId)).ToList();
+            spaceNodeIds = spaceNodeIds.Where(scope.Contains).ToList();
+        }
+
         var activeInodes = mounts.Select(m => m.InodeId)
             .Union(spaceNodeIds)
             .ToHashSet(StringComparer.Ordinal);
@@ -111,8 +139,10 @@ public sealed class VectorSynchronizer
         foreach (var id in activeInodes) expectedKeys.Add("node:" + id);
         foreach (var m in mounts) expectedKeys.Add("entity:" + m.EntityId);
 
-        // Qdrant 侧已存
-        var existing = await _store.ScrollAllPointsAsync(ct);
+        // Qdrant 侧已存（按空间范围过滤，范围外的点本轮不处理）
+        var existing = (await _store.ScrollAllPointsAsync(ct))
+            .Where(p => scope is null || scope.Contains(p.InodeId))
+            .ToList();
         var existingKeys = existing
             .Select(p => p.PointKind == "entity"
                 ? "entity:" + p.EntityId
@@ -155,7 +185,9 @@ public sealed class VectorSynchronizer
         var deletedCount = 0;
         if (orphaned.Count > 0)
         {
-            var fresh = await _store.ScrollAllPointsAsync(ct);
+            var fresh = (await _store.ScrollAllPointsAsync(ct))
+                .Where(p => scope is null || scope.Contains(p.InodeId))
+                .ToList();
             var freshOrphaned = fresh
                 .Where(p => !expectedKeys.Contains(
                     p.PointKind == "entity" ? "entity:" + p.EntityId : "node:" + p.InodeId))
@@ -179,6 +211,53 @@ public sealed class VectorSynchronizer
             expectedKeys.Count, existing.Count,
             missing.Count, orphaned.Count,
             fixedCount, deletedCount);
+    }
+
+    /// <summary>
+    /// 解析某空间对应的 inode 范围（与空间维护页打开树的规则一致）：
+    /// 动态空间 → 空间树中以空间 Id 为根的子树（含根，根作为 space 节点后续被排除）；
+    /// 单位空间 → 单位树全体节点；类型空间 → 分类树全体节点。
+    /// 空间不存在时返回空集合。
+    /// </summary>
+    private async Task<HashSet<string>> ResolveScopeAsync(string spaceId, CancellationToken ct)
+    {
+        var spaceType = await _db.Spaces
+            .AsNoTracking()
+            .Where(s => s.Id == spaceId)
+            .Select(s => (SpaceType?)s.Type)
+            .FirstOrDefaultAsync(ct);
+
+        if (spaceType is null)
+            return new HashSet<string>(StringComparer.Ordinal);
+
+        switch (spaceType.Value)
+        {
+            case SpaceType.Unit:
+                return (await _db.UnitTrees.AsNoTracking()
+                        .Select(n => n.Id).ToListAsync(ct))
+                    .ToHashSet(StringComparer.Ordinal);
+
+            case SpaceType.Type:
+                return (await _db.CategoryTrees.AsNoTracking()
+                        .Select(n => n.Id).ToListAsync(ct))
+                    .ToHashSet(StringComparer.Ordinal);
+
+            default:
+                const string subtreeSql = """
+                    WITH RECURSIVE subtree AS (
+                        SELECT id FROM "space_trees" WHERE id = @spaceId
+                        UNION ALL
+                        SELECT c.id FROM "space_trees" c
+                        INNER JOIN subtree s ON c."parent_id" = s.id
+                    )
+                    SELECT id AS "Value" FROM subtree
+                    """;
+                var param = new NpgsqlParameter("@spaceId", spaceId);
+                var ids = await _db.Database
+                    .SqlQueryRaw<string>(subtreeSql, param)
+                    .ToListAsync(ct);
+                return ids.ToHashSet(StringComparer.Ordinal);
+        }
     }
 }
 

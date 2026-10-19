@@ -11,6 +11,12 @@
            ActionsMaxWidth="MaxWidth.False"
            OnSubmitClick="CreateAsync">
     <DialogContent>
+        <MudTextField @bind-Value="_newType.DisplayName"
+                      Label="显示名"
+                      Placeholder="中文名称，如 协作关系"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
         <NamingTextField @bind-Value="_newType.TypeName"
                          SourceText="@_newType.DisplayName"
                          NameCase="pascal"
@@ -18,12 +24,6 @@
                          Placeholder="如 Collaboration、Follow"
                          Class="mb-3"
                          HelperText="作为 EAV entityType 使用；首字母大写，只含字母和数字" />
-
-        <MudTextField @bind-Value="_newType.DisplayName"
-                      Label="显示名"
-                      Placeholder="中文名称，如 协作关系"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
 
         <div Class="d-flex mb-3">
             <MudSelect T="string"
@@ -81,7 +81,9 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    private CreateEdgeTypeRequest _newType = new() { IsGlobal = true, IsDirected = true };
+    // 起点/终点默认「不限」（空串匹配下拉「不限」项），提交前归一化为 null
+    private CreateEdgeTypeRequest _newType = new()
+        { IsGlobal = true, IsDirected = true, FromNodeType = "", ToNodeType = "" };
     private bool _submitting;
     private IReadOnlyList<EntityTypeSummaryDto> _entityTypes = [];
 
@@ -113,6 +115,12 @@
         _submitting = true;
         try
         {
+            // 「不限」选中态为空串，归一化为 null（与编辑对话框一致，DB 存 null）
+            _newType.FromNodeType = string.IsNullOrWhiteSpace(_newType.FromNodeType)
+                ? null : _newType.FromNodeType;
+            _newType.ToNodeType = string.IsNullOrWhiteSpace(_newType.ToNodeType)
+                ? null : _newType.ToNodeType;
+
             var id = await EdgeApi.CreateEdgeTypeAsync(_newType);
             if (id is null)
             {

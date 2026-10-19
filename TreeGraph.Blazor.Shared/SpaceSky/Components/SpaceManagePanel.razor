@@ -8,6 +8,8 @@
 @inject IDialogService DialogService
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@inject EavApiClient EavApi
 
 @if (_loading)
 {
@@ -20,6 +22,7 @@ else
     <MudTable Items="_spaces ?? (IReadOnlyList<SpaceDto>)[]" Hover="true" Bordered="true" Dense="true">
         <HeaderContent>
             <MudTh>名称</MudTh>
+            <MudTh>类型</MudTh>
             <MudTh>属性设置</MudTh>
             <MudTh>描述</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
@@ -32,6 +35,7 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd>@context.Name</MudTd>
+            <MudTd>@SpaceTypeLabel(context.Type)</MudTd>
             <MudTd DataLabel="属性设置">
                 @* 设置图标：打开该空间的实体类型定义对话框（共享 ∪ 本空间独占） *@
                 <MudIconButton Icon="@Icons.Material.Filled.Settings"
@@ -42,6 +46,13 @@ else
             </MudTd>
             <MudTd>@context.Description</MudTd>
             <MudTd Style="white-space: nowrap; text-align: right;">
+                @* 向量刷新：按本空间范围手动补缺 + 删孤（语义搜索索引刷新） *@
+                <MudIconButton Icon="@Icons.Material.Filled.Sync"
+                               Color="Color.Info"
+                               Size="Size.Small"
+                               Disabled="_reconciling"
+                               OnClick="@(async () => await ReconcileAsync(context))"
+                               title="向量刷新" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                Color="Color.Error"
                                Size="Size.Small"
@@ -66,12 +77,25 @@ else
 }
 
 @code {
+    /// <summary>空间类型选项（值 = 后端 SpaceType 枚举名；标签随其承载的树命名）。</summary>
+    internal static readonly (string Value, string Label)[] SpaceTypeOptions =
+    {
+        ("Dynamic", "空间树"),
+        ("Type", "类型树"),
+        ("Unit", "单位树"),
+    };
+
+    private static string SpaceTypeLabel(string? type)
+        => SpaceTypeOptions.FirstOrDefault(o => o.Value == type).Label
+           ?? type ?? "空间树";
+
     /// <summary>CRUD 变更后触发（供宿主刷新自身列表）。</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
 
     private IReadOnlyList<SpaceDto>? _spaces;
     private bool _loading;
     private bool _initialized;
+    private bool _reconciling;
 
     /// <summary>CRUD 子对话框选项（与 OptionSets 页面一致：小宽度全宽）。</summary>
     private static readonly DialogOptions DialogOptions = new()
@@ -123,6 +147,40 @@ else
         finally
         {
             _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// 手动向量刷新（按本空间范围）：补缺（PG 有、向量库无）+ 删孤（向量库有、PG 无）。
+    /// 范围与打开该空间的树一致：动态空间 = 空间树子树；单位空间 = 单位树；类型空间 = 分类树。
+    /// </summary>
+    private async Task ReconcileAsync(SpaceDto space)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "向量刷新",
+            $"将刷新「{space.Name}」的搜索索引：整理该空间范围内的节点与实体数据，" +
+            "使语义搜索能立即检索到它们。是否继续？",
+            yesText: "刷新", cancelText: "取消");
+        if (confirmed != true) return;
+
+        _reconciling = true;
+        try
+        {
+            var result = await EavApi.ReconcileVectorsAsync(space.Id);
+            if (result is null)
+                Snackbar.Add("刷新失败：接口未返回结果", Severity.Error);
+            else
+                Snackbar.Add(
+                    $"刷新完成：新增 {result.FixedCount} 条，清理 {result.DeletedCount} 条",
+                    Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"刷新失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _reconciling = false;
         }
     }
 

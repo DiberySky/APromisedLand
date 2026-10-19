@@ -45,11 +45,11 @@ public sealed class SearchController : ControllerBase
             request.TopK ?? _options.DefaultTopK, 1, _options.MaxTopK);
 
         var results = await _searchService.SearchAsync(
-            request.Query.Trim(), topK, request.SpaceId, ct);
+            request.Query.Trim(), topK, request.SpaceId, request.MinScore, ct);
 
         _logger.LogDebug(
-            "语义搜索：query={Query} topK={TopK} hits={Count}",
-            request.Query, topK, results.Count);
+            "语义搜索：query={Query} topK={TopK} minScore={MinScore} hits={Count}",
+            request.Query, topK, request.MinScore, results.Count);
 
         return Ok(new SemanticSearchResponse(
             Query: request.Query.Trim(),
@@ -60,19 +60,23 @@ public sealed class SearchController : ControllerBase
     /// <summary>
     /// 手动触发向量对账（立即执行，无需等待后台周期）。
     /// 用于修复：PG 有、Qdrant 无（补算向量）或 Qdrant 有、PG 无（删除孤儿）。
+    /// spaceId 为空 = 全量对账；非空 = 仅该空间对应树范围（动态=空间树子树；单位=单位树；类型=分类树）。
     /// </summary>
     [HttpPost("reconcile")]
-    public async Task<IActionResult> ReconcileVectors(CancellationToken ct)
+    public async Task<IActionResult> ReconcileVectors(
+        [FromQuery] string? spaceId, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var synchronizer = scope.ServiceProvider
             .GetRequiredService<VectorSynchronizer>();
 
-        var result = await synchronizer.ReconcileAllAsync(ct);
+        var result = string.IsNullOrWhiteSpace(spaceId)
+            ? await synchronizer.ReconcileAllAsync(ct)
+            : await synchronizer.ReconcileSpaceAsync(spaceId, ct);
 
         _logger.LogInformation(
-            "手动向量对账：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
-            result.Active, result.Existing, result.Missing,
+            "手动向量对账（空间={SpaceId}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
+            spaceId ?? "*", result.Active, result.Existing, result.Missing,
             result.Orphaned, result.FixedCount, result.DeletedCount);
 
         return Ok(new
@@ -93,6 +97,9 @@ public sealed class SemanticSearchRequest
     public string Query { get; set; } = "";
     public int? TopK { get; set; }
     public string? SpaceId { get; set; }
+
+    /// <summary>相似度绝对下限（0~1）；为空则用 SemanticSearch:MinScore 配置默认值。</summary>
+    public float? MinScore { get; set; }
 }
 
 public sealed record SemanticSearchResponse(

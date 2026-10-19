@@ -2,6 +2,7 @@ using MudBlazor;
 using MudBlazor.Extensions;
 using MudBlazor.Extensions.Components;
 using MudBlazor.Extensions.Options;
+using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Category;
 using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Space;
 using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Unit;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -55,6 +56,23 @@ public class BlazorService(IDialogService dialogService)
         };
 
         var dialog = await dialogService.ShowExAsync<SpaceTreeDialogPage>("空间注册",
+            parameters, DialogOptions);
+
+        var result = await dialog.Result;
+    }
+
+    /// <summary>
+    /// 弹出分类树对话框页（点击节点文本时递归弹窗）。
+    /// </summary>
+    public async Task ShowCategoryTreeDialogPageAsync(
+        ITreeItemData<CategoryTree>? node = null)
+    {
+        var parameters = new DialogParameters<CategoryTreeDialogPage>
+        {
+            { x => x.ClickNode, node },
+        };
+
+        var dialog = await dialogService.ShowExAsync<CategoryTreeDialogPage>("分类注册",
             parameters, DialogOptions);
 
         var result = await dialog.Result;

@@ -11,6 +11,9 @@ namespace TreeGraph.Api.EdgeSky.Controllers;
 ///   CRUD：  POST/GET/PUT/DELETE /api/eav/edges/{edgeTypeId}[/edgeId]
 ///   图查询：GET /api/eav/edges/{edgeTypeId}/from|to/{nodeId}
 ///           POST /api/eav/edges/{edgeTypeId}/traverse
+///
+/// 异常统一交由 ApiEnvelopeFilter 映射：
+///   ArgumentException → 400；InvalidOperationException（业务规则冲突）→ 409。
 /// </summary>
 [ApiController]
 [Route("api/eav/edges/{edgeTypeId}")]
@@ -33,16 +36,11 @@ public class EdgeController : ControllerBase
     public async Task<IActionResult> Create(
         string edgeTypeId, [FromBody] CreateEdgeRequest req, CancellationToken ct)
     {
-        try
-        {
-            var d = await _service.CreateAsync(edgeTypeId, req, ct);
-            return d is null
-                ? NotFound(new { error = $"EdgeType 不存在: {edgeTypeId}" })
-                : CreatedAtAction(nameof(Get),
-                    new { edgeTypeId, edgeId = d.EdgeId }, d);
-        }
-        catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { error = ex.Message }); }
+        var d = await _service.CreateAsync(edgeTypeId, req, ct);
+        return d is null
+            ? NotFound(new { error = $"EdgeType 不存在: {edgeTypeId}" })
+            : CreatedAtAction(nameof(Get),
+                new { edgeTypeId, edgeId = d.EdgeId }, d);
     }
 
     /// <summary>按 ID 获取边。</summary>
@@ -67,7 +65,7 @@ public class EdgeController : ControllerBase
         return d.EdgeTypeId == edgeTypeId ? Ok(d) : NotFound();
     }
 
-    /// <summary>删除边（不级联：边实例自身仍有属性值时拒绝，返回 409）。</summary>
+    /// <summary>删除边（不级联：边实例自身仍有属性值时服务抛 InvalidOperationException → 409）。</summary>
     [HttpDelete("{edgeId}")]
     public async Task<IActionResult> Delete(
         string edgeTypeId, string edgeId, CancellationToken ct)
@@ -76,16 +74,8 @@ public class EdgeController : ControllerBase
         var d = await _service.GetByIdAsync(edgeId, ct);
         if (d is null || d.EdgeTypeId != edgeTypeId) return NotFound();
 
-        try
-        {
-            var ok = await _service.DeleteAsync(edgeId, ct);
-            return ok ? NoContent() : NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            // 业务规则拒绝（仍有属性数据）：409，不作为服务器错误
-            return Conflict(new { error = ex.Message });
-        }
+        var ok = await _service.DeleteAsync(edgeId, ct);
+        return ok ? NoContent() : NotFound();
     }
 
     // ============================================================

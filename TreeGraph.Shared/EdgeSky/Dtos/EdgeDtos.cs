@@ -58,6 +58,8 @@ public class CreateEdgeRequest
     public string ToNodeId { get; set; } = "";
     /// <summary>可选权重。</summary>
     public decimal? Weight { get; set; }
+    /// <summary>可选显示名称。</summary>
+    public string? DisplayName { get; set; }
     /// <summary>EAV 属性值（与 PUT entities/{id} 格式一致）。</summary>
     public Dictionary<string, JsonElement>? Properties { get; set; }
 }
@@ -65,6 +67,8 @@ public class CreateEdgeRequest
 public class UpdateEdgeRequest
 {
     public decimal? Weight { get; set; }
+    /// <summary>可选显示名称。</summary>
+    public string? DisplayName { get; set; }
     /// <summary>如需更新属性，走 EAV PUT /api/eav/{edgeTypeId}/entities/{edgeId}。</summary>
 }
 
@@ -78,6 +82,7 @@ public record EdgeInstanceDto(
     string ToNodeId,
     string ToNodeText,
     decimal? Weight,
+    string? DisplayName,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
     Dictionary<string, JsonElement>? Properties);

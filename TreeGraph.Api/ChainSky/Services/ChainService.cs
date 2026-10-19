@@ -24,13 +24,17 @@ public class ChainService
     private readonly TreeGraphDbContext _db;
     private readonly EdgeInstanceService _edgeInst;
     private readonly IEdgeNodeValidator _nodeValidator;
+    private readonly NodeEavSky.Services.InodeOwnerGuardRegistry _inodeGuards;
 
     public ChainService(
-        TreeGraphDbContext db, EdgeInstanceService edgeInst, IEdgeNodeValidator nodeValidator)
+        TreeGraphDbContext db, EdgeInstanceService edgeInst,
+        IEdgeNodeValidator nodeValidator,
+        NodeEavSky.Services.InodeOwnerGuardRegistry inodeGuards)
     {
         _db = db;
         _edgeInst = edgeInst;
         _nodeValidator = nodeValidator;
+        _inodeGuards = inodeGuards;
     }
 
     /// <summary>读取边类型定义（跟踪查询，便于变更链路复用同一实例）。</summary>
@@ -171,6 +175,10 @@ public class ChainService
         var nodeIds = new List<string> { startNodeId };
         var dtos = new List<EdgeInstanceDto>(orderedEdges.Count);
 
+        // 两端 Inode 显示名：整批一次解析
+        var names = await _inodeGuards.ResolveNodeNamesAsync(
+            orderedEdges.SelectMany(r => new[] { r.FromNode, r.ToNode }), ct);
+
         foreach (var row in orderedEdges)
         {
             nodeIds.Add(row.NextNode);
@@ -181,10 +189,11 @@ public class ChainService
                 EdgeTypeName: def?.TypeName ?? "",
                 EdgeTypeDisplayName: def?.DisplayName ?? "",
                 FromNodeId: row.FromNode,
-                FromNodeText: "",
+                FromNodeText: names.GetValueOrDefault(row.FromNode, ""),
                 ToNodeId: row.ToNode,
-                ToNodeText: "",
+                ToNodeText: names.GetValueOrDefault(row.ToNode, ""),
                 Weight: row.Weight,
+                DisplayName: null,
                 CreatedAt: row.CreatedAt,
                 UpdatedAt: row.UpdatedAt,
                 Properties: null));
@@ -344,7 +353,7 @@ public class ChainService
         // 投影仅取组装 DTO 所需列（匿名类型不进变更跟踪），避免整行实体加载
         var edges = await _db.EdgeInstances
             .Where(e => e.EdgeTypeId == edgeTypeId)
-            .Select(e => new { e.EdgeId, e.FromNodeId, e.ToNodeId, e.Weight, e.CreatedAt, e.UpdatedAt })
+            .Select(e => new { e.EdgeId, e.FromNodeId, e.ToNodeId, e.Weight, e.DisplayName, e.CreatedAt, e.UpdatedAt })
             .ToListAsync(ct);
 
         // 无向邻接 + 节点→关联边 索引，均 O(V+E) 构建
@@ -366,6 +375,10 @@ public class ChainService
         var edgeById = edges.ToDictionary(e => e.EdgeId);
         foreach (var e in edges)
             Add(e.FromNodeId, e.ToNodeId, e.EdgeId);
+
+        // 两端 Inode 显示名：整批一次解析
+        var names = await _inodeGuards.ResolveNodeNamesAsync(
+            edges.SelectMany(e => new[] { e.FromNodeId, e.ToNodeId }), ct);
 
         var visited = new HashSet<string>();
         var components = new List<ChainConnectedComponent>();
@@ -402,9 +415,10 @@ public class ChainService
                         EdgeTypeId: edgeTypeId,
                         EdgeTypeName: def?.TypeName ?? "",
                         EdgeTypeDisplayName: def?.DisplayName ?? "",
-                        FromNodeId: e.FromNodeId, FromNodeText: "",
-                        ToNodeId: e.ToNodeId, ToNodeText: "",
+                        FromNodeId: e.FromNodeId, FromNodeText: names.GetValueOrDefault(e.FromNodeId, ""),
+                        ToNodeId: e.ToNodeId, ToNodeText: names.GetValueOrDefault(e.ToNodeId, ""),
                         Weight: e.Weight,
+                        DisplayName: e.DisplayName,
                         CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt,
                         Properties: null);
                 })

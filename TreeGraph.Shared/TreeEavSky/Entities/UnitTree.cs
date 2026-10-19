@@ -1,9 +1,10 @@
 using System.Text.Json.Serialization;
+using TreeGraph.Shared.NodeEavSky.Abstractions;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 
 namespace TreeGraph.Shared.TreeEavSky.Entities;
 
-public class UnitTree : ITreeNodeBase<UnitTree>
+public class UnitTree : ITreeNodeBase<UnitTree>, Inode
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Name { get; set; } = string.Empty;
