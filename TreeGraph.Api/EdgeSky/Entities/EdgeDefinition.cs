@@ -68,7 +68,7 @@ public class EdgeDefinition
 
     public List<EdgeInstance> Instances { get; set; } = new();
 
-    /// <summary>供配电场景内置边类型种子（16 条）。</summary>
+    /// <summary>供配电场景内置边类型种子（18 条）。</summary>
     public static List<EdgeDefinition> SeedData() =>
     [
         new EdgeDefinition
@@ -339,6 +339,22 @@ public class EdgeDefinition
             IsLine = false,
             IsLinear = false,
             Description = "线路区段 → 交叉跨越点；空间相交但电气隔离，不参与供电拓扑遍历。",
+            IsActive = true,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        new EdgeDefinition
+        {
+            EdgeTypeId = "e0000018-0000-4000-8000-000000000018",
+            TypeName = "LineSegment",
+            DisplayName = "线路段",
+            FromNodeType = "LineNode",
+            ToNodeType = "LineNode",
+            IsGlobal = false,
+            IsDirected = false,
+            IsLine = true,
+            IsLinear = false,
+            Description = "两个跨越点（LineNode）之间的线路区段；无向对称，属线路结构，可串联成完整路径，允许 T 接分支。",
             IsActive = true,
             CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
             UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)

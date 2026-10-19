@@ -364,6 +364,22 @@ namespace TreeGraph.Api.Migrations
                             ToNodeType = "LineNode",
                             TypeName = "PassesThrough",
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            EdgeTypeId = "e0000018-0000-4000-8000-000000000018",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "两个跨越点（LineNode）之间的线路区段；无向对称，属线路结构，可串联成完整路径，允许 T 接分支。",
+                            DisplayName = "线路段",
+                            FromNodeType = "LineNode",
+                            IsActive = true,
+                            IsDirected = false,
+                            IsGlobal = false,
+                            IsLine = true,
+                            IsLinear = false,
+                            ToNodeType = "LineNode",
+                            TypeName = "LineSegment",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
                 });
 
