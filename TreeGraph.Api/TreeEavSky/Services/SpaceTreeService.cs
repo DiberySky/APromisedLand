@@ -170,7 +170,7 @@ public class SpaceTreeService(
     {
         var entity = new SpaceTree
         {
-            Id = nodeDto.Id ?? Guid.NewGuid().ToString(),
+            Id = string.IsNullOrEmpty(nodeDto.Id) ? Guid.NewGuid().ToString() : nodeDto.Id,
             Name = nodeDto.Text ?? string.Empty,
             ParentId = nodeDto.ParentId,
             SortOrder = nodeDto.SortOrder,

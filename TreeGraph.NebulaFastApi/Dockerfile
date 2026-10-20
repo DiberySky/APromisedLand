@@ -15,8 +15,8 @@ COPY app/ ./app/
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
+# Health check（启动期 lifespan 会循环重连 graphd 最长 ~3 分钟，期间端口未绑定，start-period 需覆盖该窗口）
+HEALTHCHECK --interval=30s --timeout=10s --start-period=200s --retries=3     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
 
-# Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Run application（单 worker：连接池是进程级全局，多 worker 会各自建池）
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

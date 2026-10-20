@@ -82,11 +82,11 @@ public static class TreeGraphEavApiExtension
             Console.WriteLine("[TreeGraphEavApi] ⚠️ context.VllmEmbed 为 null，向量化将连接 localhost:5719");
         }
 
-        // TreeGraph.NebulaFastApi（图同步 REST 网关；注入 NebulaApi:Endpoint）
+        // TreeGraph.NebulaFastApi（图同步 REST 网关；注入 NebulaFastApi:Endpoint）
         if (context.TreeGraphNebulaFastApiEndpoint is not null)
         {
             context.TreeGraphEavApi
-                .WithEnvironment("NebulaApi__Endpoint",
+                .WithEnvironment("NebulaFastApi__Endpoint",
                     ReferenceExpression.Create($"{context.TreeGraphNebulaFastApiEndpoint}/"));
 
             if (context.TreeGraphNebulaFastApi is not null)

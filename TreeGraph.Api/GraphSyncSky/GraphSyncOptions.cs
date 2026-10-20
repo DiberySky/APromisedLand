@@ -7,7 +7,7 @@ public sealed class GraphSyncOptions
 
     public bool Enabled { get; set; } = true;
 
-    /// <summary>TreeGraph.NebulaFastApi REST 端点（Aspire 注入 NebulaApi:Endpoint 优先）。</summary>
+    /// <summary>TreeGraph.NebulaFastApi REST 端点（Aspire 注入 NebulaFastApi:Endpoint 优先）。</summary>
     public string NebulaApiEndpoint { get; set; } = "http://localhost:9393/";
 
     /// <summary>NebulaGraph 图空间名。</summary>

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Api.TreeEavSky.Services;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -88,7 +89,8 @@ public class KnowledgeTreeServiceTests
         return context;
     }
 
-    private static KnowledgeTreeService CreateService(TreeGraphDbContext context) => new(context);
+    private static KnowledgeTreeService CreateService(TreeGraphDbContext context) =>
+        new(context, new NoopPublishEndpoint());
 
     // ========== 实体 ==========
 

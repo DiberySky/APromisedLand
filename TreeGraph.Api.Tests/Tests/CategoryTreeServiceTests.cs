@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Api.TreeEavSky.Services;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -87,7 +88,8 @@ public class CategoryTreeServiceTests
         return context;
     }
 
-    private static CategoryTreeService CreateService(TreeGraphDbContext context) => new(context);
+    private static CategoryTreeService CreateService(TreeGraphDbContext context) =>
+        new(context, new NoopPublishEndpoint());
 
     // ========== 实体 ==========
 
@@ -218,7 +220,7 @@ public class CategoryTreeServiceTests
         await using var db = CreateContext();
         var service = CreateService(db);
 
-        // 注：TreeNodeDto.Id 默认为 string.Empty，服务用 ?? 判空，须显式传 Id
+        // 注：TreeNodeDto.Id 默认为 string.Empty，服务按 IsNullOrEmpty 判空并生成新 GUID，故此处显式传 Id
         var newId = Guid.NewGuid().ToString();
         var created = await service.CreateNodeAsync(new TreeNodeDto<CategoryTree>
         {

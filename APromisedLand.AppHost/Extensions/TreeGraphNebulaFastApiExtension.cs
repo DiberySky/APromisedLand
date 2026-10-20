@@ -20,16 +20,18 @@ public static class TreeGraphNebulaFastApiExtension
                 "AddTreeGraphNebulaFastApi 前需先调用 builder.AddNebulaGraph(context)");
         }
 
-        var nebulaApi = builder.AddUvicornApp(
+        // ★ 容器化运行：uvicorn 作为宿主机进程无法解析 nebula 集群的 docker 内部名
+        //   （nebula-graphd/nebula-storaged0，见 NebulaGraphExtension 的 --local_ip 与 ADD HOSTS），
+        //   必须与集群同网络运行；NEBULA_HOSTS 用容器资源名。
+        var nebulaApi = builder.AddDockerfile(
                 name: "treegraph-nebulafastapi",
-                appDirectory: "../TreeGraph.NebulaFastApi",
-                app: "app.main:app")
-            .WithHttpEndpoint(port: NebulaApiHttpPort, targetPort: NebulaApiHttpPort,
-                name: "http", isProxied: false)
+                contextPath: "../TreeGraph.NebulaFastApi")
+            .WithHttpEndpoint(port: NebulaApiHttpPort, targetPort: 8000, name: "http")
             .WithEnvironment("NEBULA_HOSTS", "nebula-graphd:9669")
+            .WithEnvironment("NEBULA_USER", "root")
+            .WithEnvironment("NEBULA_PASSWORD", "nebula")
             .WithEnvironment("NEBULA_SPACE", "treegraph")
-            .WithEnvironment("HOST", "0.0.0.0")
-            .WithEnvironment("PORT", NebulaApiHttpPort.ToString())
+            .WithHttpHealthCheck("/api/v1/health")
             .WaitFor(context.NebulaGraph);
 
         context.TreeGraphNebulaFastApi = nebulaApi;

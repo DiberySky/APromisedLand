@@ -1,4 +1,6 @@
+using MassTransit;
 using TreeGraph.Api.Data;
+using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Models;
@@ -7,7 +9,7 @@ using Npgsql;
 
 namespace TreeGraph.Api.TreeEavSky.Services;
 
-public class KnowledgeTreeService(TreeGraphDbContext dbContext) : ITreeService<KnowledgeTree>
+public class KnowledgeTreeService(TreeGraphDbContext dbContext, IPublishEndpoint publishEndpoint) : ITreeService<KnowledgeTree>
 {
     public async Task<IReadOnlyList<TreeNodeDto<KnowledgeTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
@@ -173,7 +175,7 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext) : ITreeService<K
     {
         var entity = new KnowledgeTree
         {
-            Id = nodeDto.Id ?? Guid.NewGuid().ToString(),
+            Id = string.IsNullOrEmpty(nodeDto.Id) ? Guid.NewGuid().ToString() : nodeDto.Id,
             Name = nodeDto.Text ?? string.Empty,
             ParentId = nodeDto.ParentId,
             SortOrder = nodeDto.SortOrder,
@@ -196,6 +198,9 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext) : ITreeService<K
 
         await dbContext.KnowledgeTrees.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+
         return entity.ToNodeDto();
     }
 
@@ -215,6 +220,9 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext) : ITreeService<K
 
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+
         return entity.ToNodeDto();
     }
 
@@ -265,6 +273,8 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext) : ITreeService<K
         dbContext.KnowledgeTrees.Remove(node);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await PublishAsync(nodeId, InodeChangeKind.Deleted, cancellationToken);
 
         // 5. 更新父节点的 HasChildren
         // if (!string.IsNullOrEmpty(parentId))
@@ -335,7 +345,20 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext) : ITreeService<K
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await PublishAsync(nodeId, InodeChangeKind.Saved, cancellationToken);
+
         return true;
+    }
+
+    /// <summary>发布 iNode 变更事件（向量同步 + 图同步；at-least-once，消费端幂等）。</summary>
+    private async Task PublishAsync(string inodeId, InodeChangeKind kind, CancellationToken ct)
+    {
+        await publishEndpoint.Publish(new InodeChangedEvent
+        {
+            InodeId = inodeId,
+            Kind = kind
+        }, ct);
     }
 
     private async Task<bool> IsDescendantAsync(string ancestorId, string? nodeId, CancellationToken cancellationToken)

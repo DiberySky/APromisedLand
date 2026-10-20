@@ -43,7 +43,9 @@ public static class NebulaGraphExtension
                 e.IsExternal = false;
             })
             .WithContainerRuntimeArgs("--hostname", "nebula-metad0")
-            .WithContainerRuntimeArgs("--memory", "1g");
+            .WithContainerRuntimeArgs("--memory", "1g")
+            // ★ 持久化卷：AppHost 重启会重建容器，挂卷使元数据（space/tag/edge schema）跨重启保留
+            .WithVolume("nebula-meta-data", "/data/meta");
 
         // ========== Storage ==========
         var nebulaStoraged0 = builder.AddContainer("nebula-storaged0", "docker.io/vesoft/nebula-storaged", "v3.8.0")
@@ -77,6 +79,8 @@ public static class NebulaGraphExtension
             })
             .WithContainerRuntimeArgs("--hostname", "nebula-storaged0")
             .WithContainerRuntimeArgs("--memory", "1g")
+            // ★ 持久化卷：顶点/边数据的实际落盘位置，跨重启保留
+            .WithVolume("nebula-storage-data", "/data/storage")
             .WaitFor(nebulaMetad0);
 
         // ========== Graphd ==========

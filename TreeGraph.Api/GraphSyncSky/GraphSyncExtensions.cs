@@ -21,8 +21,8 @@ public static class GraphSyncExtensions
             .GetSection(GraphSyncOptions.SectionName)
             .Get<GraphSyncOptions>() ?? new GraphSyncOptions();
 
-        // 配置优先级：NebulaApi:Endpoint（Aspire 注入）> GraphSync:NebulaApiEndpoint
-        var endpoint = config["NebulaApi:Endpoint"] ?? options.NebulaApiEndpoint;
+        // 配置优先级：NebulaFastApi:Endpoint（Aspire 注入）> GraphSync:NebulaApiEndpoint
+        var endpoint = config["NebulaFastApi:Endpoint"] ?? options.NebulaApiEndpoint;
 
         services.AddOptions<GraphSyncOptions>()
             .Bind(config.GetSection(GraphSyncOptions.SectionName));

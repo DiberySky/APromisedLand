@@ -16,7 +16,7 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <!-- ★ 新增：bUnit 组件测试框架 -->
-        <PackageReference Include="bunit" Version="2.11.3" />
+        <PackageReference Include="bunit" Version="2.12.5" />
         <!-- ★ 新增：启动级 smoke 测试（WebApplicationFactory<Program>） -->
         <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.13" />
     </ItemGroup>

@@ -68,6 +68,13 @@ class NebulaService:
                 row[col_name] = self._convert_value(value)
             data_rows.append(row)
 
+        # nebula3-python 的 ResultSet.space_name 是方法而非属性，
+        # 直接 getattr 会拿到 bound method 导致 QueryResult pydantic 校验失败
+        space_name_attr = getattr(result, 'space_name', None)
+        space_name = space_name_attr() if callable(space_name_attr) else space_name_attr
+        if isinstance(space_name, bytes):
+            space_name = space_name.decode()
+
         return QueryResult(
             success=True,
             error_code=0,
@@ -75,7 +82,7 @@ class NebulaService:
             data=data_rows,
             columns=columns,
             row_count=len(data_rows),
-            space_name=getattr(result, 'space_name', None)
+            space_name=space_name or None
         )
 
     def _convert_value(self, value) -> Any:

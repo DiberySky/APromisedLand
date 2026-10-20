@@ -266,7 +266,9 @@ public sealed class GraphSynchronizer
         }
 
         // ── 批量写入 ──
-        var result = await _client.BulkAsync(vertices, edges, _options.RebuildBatchSize, ct);
+        // DROP SPACE 后重建 schema，storaged 侧生效滞后于 metad（官方建议等两个心跳周期），
+        // 立即写入会报 No schema found/EdgeNotFound；bulk 为幂等覆盖写，整体重试等待传播。
+        var result = await BulkWithSchemaRetryAsync(vertices, edges, ct);
 
         var errors = new List<string>();
         foreach (var err in result.VerticesErrors ?? [])
@@ -283,6 +285,37 @@ public sealed class GraphSynchronizer
             vertices.Count, parentEdgeCount, semanticEdges.Count,
             result.VerticesSuccess, result.EdgesSuccess, errors);
     }
+
+    private async Task<BulkResult> BulkWithSchemaRetryAsync(
+        List<VertexItem> vertices, List<EdgeItem> edges, CancellationToken ct)
+    {
+        const int maxAttempts = 12; // 首次 + 11 次 × 5s ≈ 覆盖 55s 传播窗口
+        for (var attempt = 1; ; attempt++)
+        {
+            var result = await _client.BulkAsync(vertices, edges, _options.RebuildBatchSize, ct);
+            var allErrors = (result.VerticesErrors ?? []).Concat(result.EdgesErrors ?? [])
+                .Select(e => e.TryGetValue("error", out var v) ? v.GetString() ?? "" : "")
+                .ToList();
+
+            if (allErrors.Count == 0 || !allErrors.Any(IsSchemaPropagationError) || attempt >= maxAttempts)
+                return result;
+
+            _logger.LogWarning(
+                "全量重建遇到 schema 传播延迟（第 {Attempt}/{Max} 次），5s 后整体重试",
+                attempt, maxAttempts);
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+    }
+
+    /// <summary>
+    /// 判断是否为 schema 传播延迟类错误（重试可恢复）。
+    /// DROP SPACE 重建后 storaged 侧 space 信息（含 vid 类型）刷新滞后，
+    /// 写入会报 vid 长度不符——同属传播延迟，须纳入重试。
+    /// </summary>
+    private static bool IsSchemaPropagationError(string msg) =>
+        msg.Contains("No schema found") || msg.Contains("EdgeNotFound")
+        || msg.Contains("TagNotFound") || msg.Contains("SpaceNotFound")
+        || msg.Contains("Invalid space vid len");
 
     private static VertexItem MakeVertex(
         string id, string name, string tag, string nodeType, bool isArchived) =>
