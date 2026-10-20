@@ -82,14 +82,14 @@ public sealed class VectorSynchronizer
 
     /// <summary>全量对账（不限定空间）。</summary>
     public Task<ReconcileResult> ReconcileAllAsync(CancellationToken ct)
-        => ReconcileAsync(null, null, onProgress: null, ct);
+        => ReconcileAsync(null, null, null, onProgress: null, ct);
 
     /// <summary>
     /// 按空间对账：仅在该空间对应树范围内比对。
     /// 动态空间 = 空间树中以该空间为根的子树；单位空间 = 单位树全体；类型空间 = 分类树全体。
     /// </summary>
     public Task<ReconcileResult> ReconcileSpaceAsync(string spaceId, CancellationToken ct)
-        => ReconcileAsync(spaceId, null, onProgress: null, ct);
+        => ReconcileAsync(spaceId, null, null, onProgress: null, ct);
 
     /// <summary>
     /// 按数据类别对账（同步刷新对话框用）：仅在该类别数据源范围内比对。
@@ -97,27 +97,37 @@ public sealed class VectorSynchronizer
     /// edge 在向量库无对应数据，不应传入。
     /// </summary>
     public Task<ReconcileResult> ReconcileCategoryAsync(SyncCategory category, CancellationToken ct)
-        => ReconcileAsync(null, category, onProgress: null, ct);
+        => ReconcileAsync(null, category, null, onProgress: null, ct);
+
+    /// <summary>
+    /// 按单条线路对账（线路管理页行级刷新用）：仅比对该线路自身 + 其下全部线路节点。
+    /// </summary>
+    public Task<ReconcileResult> ReconcileLineAsync(string lineId, CancellationToken ct)
+        => ReconcileAsync(null, null, lineId, onProgress: null, ct);
 
     /// <summary>
     /// 对账：比较 PG 期望向量集合与 Qdrant 已存集合，补缺删孤。
-    /// PG 活跃集合 = InodeEntities 挂载的 inode ∪ 4 棵宿主树节点 ∪ LineNodes
+    /// PG 活跃集合 = InodeEntities 挂载的 inode ∪ 4 棵宿主树节点 ∪ Lines ∪ LineNodes
     /// （Id 在 spaces 空间实体列表内的 space 节点除外，不创建向量）。
-    /// 比对范围三选一：category（按数据类别）> spaceId（按空间子树）> 全量。
+    /// 比对范围四选一：category（按数据类别）> spaceId（按空间子树）> lineId（按单线路）> 全量。
     /// onProgress：逐项异步进度回调（fix=同步节点 / purge=清理孤儿），流式端点逐行 await 推送；null 时零开销。
     /// </summary>
     public async Task<ReconcileResult> ReconcileAsync(
-        string? spaceId, SyncCategory? category,
+        string? spaceId, SyncCategory? category, string? lineId,
         Func<ReconcileProgress, Task>? onProgress, CancellationToken ct)
     {
         // 范围（null = 全量，不做范围限制）
         var scope = category is not null
             ? await ResolveCategoryScopeAsync(category.Value, ct)
-            : spaceId is null ? null : await ResolveScopeAsync(spaceId, ct);
+            : spaceId is not null
+                ? await ResolveScopeAsync(spaceId, ct)
+                : lineId is not null
+                    ? await ResolveLineScopeAsync(lineId, ct)
+                    : null;
         if (scope is not null && scope.Count == 0)
         {
             _logger.LogInformation(
-                "对账范围为空（空间={SpaceId} 类别={Category}），跳过", spaceId, category);
+                "对账范围为空（空间={SpaceId} 类别={Category} 线路={LineId}），跳过", spaceId, category, lineId);
             return new ReconcileResult(0, 0, 0, 0, 0, 0);
         }
 
@@ -145,6 +155,8 @@ public sealed class VectorSynchronizer
         hostNodeIds.AddRange(await _db.KnowledgeTrees.AsNoTracking()
             .Select(n => n.Id).ToListAsync(ct));
         hostNodeIds.AddRange(await _db.LineNodes.AsNoTracking()
+            .Select(n => n.Id).ToListAsync(ct));
+        hostNodeIds.AddRange(await _db.Lines.AsNoTracking()
             .Select(n => n.Id).ToListAsync(ct));
 
         if (scope is not null)
@@ -280,7 +292,8 @@ public sealed class VectorSynchronizer
             : NodeVectorKey(p.InodeId, p.TemplateVersion ?? "");
 
     /// <summary>
-    /// BFS 收集 4 棵宿主树中 inode 的全部后代 Id（不含自身；线路节点无父子结构）。
+    /// BFS 收集 4 棵宿主树中 inode 的全部后代 Id（不含自身）；
+    /// 若 inode 是线路，另按 LineId 收集其下全部线路节点。
     /// 改名/移动后由消费端调用，逐个级联刷新路径型向量文本。
     /// </summary>
     public async Task<List<string>> CollectDescendantIdsAsync(string inodeId, CancellationToken ct)
@@ -290,6 +303,11 @@ public sealed class VectorSynchronizer
         result.AddRange(await ExpandDescendantsAsync([inodeId], _db.UnitTrees, ct));
         result.AddRange(await ExpandDescendantsAsync([inodeId], _db.CategoryTrees, ct));
         result.AddRange(await ExpandDescendantsAsync([inodeId], _db.KnowledgeTrees, ct));
+        // 线路改名 → 其下全部线路节点的「所属线路」行失效，按 LineId 级联
+        result.AddRange(await _db.LineNodes.AsNoTracking()
+            .Where(n => n.LineId == inodeId)
+            .Select(n => n.Id)
+            .ToListAsync(ct));
         return result;
     }
 
@@ -349,6 +367,11 @@ public sealed class VectorSynchronizer
             .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
             result[n.Id] = n.Name;
 
+        foreach (var n in await _db.Lines.AsNoTracking()
+            .Where(n => inodeIds.Contains(n.Id))
+            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
+            result[n.Id] = n.Name;
+
         return result;
     }
 
@@ -381,9 +404,12 @@ public sealed class VectorSynchronizer
                 return ids.ToHashSet(StringComparer.Ordinal);
 
             case SyncCategory.Line:
-                return (await _db.LineNodes.AsNoTracking()
+                var lineScope = (await _db.Lines.AsNoTracking()
                         .Select(n => n.Id).ToListAsync(ct))
                     .ToHashSet(StringComparer.Ordinal);
+                lineScope.UnionWith(await _db.LineNodes.AsNoTracking()
+                    .Select(n => n.Id).ToListAsync(ct));
+                return lineScope;
 
             default:
                 return new HashSet<string>(StringComparer.Ordinal);
@@ -440,6 +466,26 @@ public sealed class VectorSynchronizer
                     .ToListAsync(ct);
                 return ids.ToHashSet(StringComparer.Ordinal);
         }
+    }
+
+    /// <summary>
+    /// 解析单条线路的 inode 范围：线路自身 + 其下全部线路节点（LineId = lineId）。
+    /// 线路不存在时返回空集合。
+    /// （internal：单元测试直接验证范围解析契约）
+    /// </summary>
+    internal async Task<HashSet<string>> ResolveLineScopeAsync(string lineId, CancellationToken ct)
+    {
+        var exists = await _db.Lines.AsNoTracking()
+            .AnyAsync(l => l.Id == lineId, ct);
+        if (!exists)
+            return new HashSet<string>(StringComparer.Ordinal);
+
+        var scope = new HashSet<string>(StringComparer.Ordinal) { lineId };
+        scope.UnionWith(await _db.LineNodes.AsNoTracking()
+            .Where(n => n.LineId == lineId)
+            .Select(n => n.Id)
+            .ToListAsync(ct));
+        return scope;
     }
 }
 

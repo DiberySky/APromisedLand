@@ -19,7 +19,9 @@ else
     <MudTable Items="_lines ?? (IReadOnlyList<LineDto>)[]" Hover="true" Bordered="true" Dense="true">
         <HeaderContent>
             <MudTh>名称</MudTh>
+            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">设置</MudTh>
             <MudTh>描述</MudTh>
+            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">同步刷新</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                 <MudIconButton Icon="@Icons.Material.Filled.Add"
                                Color="Color.Success"
@@ -30,7 +32,23 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd>@context.Name</MudTd>
+            <MudTd Style="white-space: nowrap; text-align: center;">
+                @* 线路节点设置：打开该线路的 LineNode 维护对话框 *@
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="@(async () => await OpenLineNodesAsync(context))"
+                               title="线路节点设置" />
+            </MudTd>
             <MudTd>@context.Description</MudTd>
+            <MudTd Style="white-space: nowrap; text-align: center;">
+                @* 向量刷新：按该线路自身 + 其下线路节点范围对账（补缺 + 删孤） *@
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                               Color="Color.Info"
+                               Size="Size.Small"
+                               OnClick="@(async () => await OpenVectorRefreshAsync(context))"
+                               title="向量刷新" />
+            </MudTd>
             <MudTd Style="white-space: nowrap; text-align: right;">
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                Color="Color.Error"
@@ -42,12 +60,6 @@ else
                                Size="Size.Small"
                                OnClick="@(async () => await OpenEditAsync(context))"
                                title="编辑线路" />
-                @* 线路节点设置：打开该线路的 LineNode 维护对话框 *@
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
-                               Color="Color.Success"
-                               Size="Size.Small"
-                               OnClick="@(async () => await OpenLineNodesAsync(context))"
-                               title="线路节点设置" />
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
@@ -161,5 +173,25 @@ else
 
         await DialogService.ShowExAsync<LineNodeManageDialog>(
             "线路节点", parameters, options);
+    }
+
+    /// <summary>
+    /// 打开向量刷新对话框（无确认步骤）：可视化该线路范围（线路自身 + 其下线路节点）的向量对账进度。
+    /// </summary>
+    private async Task OpenVectorRefreshAsync(LineDto line)
+    {
+        var parameters = new DialogParameters<LineVectorRefreshDialog>
+        {
+            { x => x.Line, line }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+        await DialogService.ShowExAsync<LineVectorRefreshDialog>(
+            "向量刷新", parameters, options);
     }
 }

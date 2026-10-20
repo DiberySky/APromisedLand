@@ -596,17 +596,20 @@ public class EavApiClient
     /// <summary>
     /// 手动触发向量对账（补缺 + 删孤）。
     /// spaceId 非空时仅对该空间对应树范围对账（动态=空间树子树；单位=单位树；类型=分类树）；
-    /// category 非空时按数据类别对账（space=空间树；tree=单位/分类/知识树；line=线路），与 spaceId 互斥；
-    /// 两者皆空则全量对账。失败返回 null。
+    /// category 非空时按数据类别对账（space=空间树；tree=单位/分类/知识树；line=线路）；
+    /// lineId 非空时仅对该线路自身+其线路节点对账；三者互斥，皆空则全量对账。失败返回 null。
     /// </summary>
     public Task<VectorReconcileResultDto?> ReconcileVectorsAsync(
-        string? spaceId = null, string? category = null, CancellationToken ct = default)
+        string? spaceId = null, string? category = null, string? lineId = null,
+        CancellationToken ct = default)
     {
-        var query = new List<string>(2);
+        var query = new List<string>(3);
         if (!string.IsNullOrWhiteSpace(spaceId))
             query.Add($"spaceId={Uri.EscapeDataString(spaceId)}");
         if (!string.IsNullOrWhiteSpace(category))
             query.Add($"category={Uri.EscapeDataString(category)}");
+        if (!string.IsNullOrWhiteSpace(lineId))
+            query.Add($"lineId={Uri.EscapeDataString(lineId)}");
 
         var url = query.Count == 0
             ? "api/search/reconcile"
@@ -617,17 +620,20 @@ public class EavApiClient
     /// <summary>
     /// 流式向量对账（NDJSON 逐行进度）：每个同步/清理项实时回调 onEvent（UI 滚动展示），
     /// 流结束返回最终统计（stage=summary 行）。失败（非 2xx/断流）返回 null。
+    /// spaceId / category / lineId 三选一限定范围，皆空为全量。
     /// </summary>
     public async Task<VectorReconcileResultDto?> StreamReconcileAsync(
-        string? spaceId = null, string? category = null,
+        string? spaceId = null, string? category = null, string? lineId = null,
         Action<ReconcileStreamEventDto>? onEvent = null,
         CancellationToken ct = default)
     {
-        var query = new List<string>(2);
+        var query = new List<string>(3);
         if (!string.IsNullOrWhiteSpace(spaceId))
             query.Add($"spaceId={Uri.EscapeDataString(spaceId)}");
         if (!string.IsNullOrWhiteSpace(category))
             query.Add($"category={Uri.EscapeDataString(category)}");
+        if (!string.IsNullOrWhiteSpace(lineId))
+            query.Add($"lineId={Uri.EscapeDataString(lineId)}");
 
         var url = query.Count == 0
             ? "api/search/reconcile/stream"

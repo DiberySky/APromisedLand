@@ -23,8 +23,9 @@ else
         <HeaderContent>
             <MudTh>名称</MudTh>
             <MudTh>类型</MudTh>
-            <MudTh>属性设置</MudTh>
+            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">属性设置</MudTh>
             <MudTh>描述</MudTh>
+            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">同步刷新</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                 @* 同步刷新：分步列出 space/tree/line/edge 同步到 向量/图 的过程进度 *@
                 <MudIconButton Icon="@Icons.Material.Filled.Refresh"
@@ -42,7 +43,7 @@ else
         <RowTemplate>
             <MudTd>@context.Name</MudTd>
             <MudTd>@SpaceTypeLabel(context.Type)</MudTd>
-            <MudTd DataLabel="属性设置">
+            <MudTd DataLabel="属性设置" Style="white-space: nowrap; text-align: center;">
                 @* 设置图标：打开该空间的实体类型定义对话框（共享 ∪ 本空间独占） *@
                 <MudIconButton Icon="@Icons.Material.Filled.Settings"
                                Color="Color.Success"
@@ -51,13 +52,15 @@ else
                                title="属性设置" />
             </MudTd>
             <MudTd>@context.Description</MudTd>
-            <MudTd Style="white-space: nowrap; text-align: right;">
+            <MudTd Style="white-space: nowrap; text-align: center;">
                 @* 向量刷新：打开对话框可视化该空间范围的向量对账进度（补缺 + 删孤） *@
                 <MudIconButton Icon="@Icons.Material.Filled.Sync"
                                Color="Color.Info"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenVectorRefreshAsync(context))"
                                title="向量刷新" />
+            </MudTd>
+            <MudTd Style="white-space: nowrap; text-align: right;">
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                Color="Color.Error"
                                Size="Size.Small"

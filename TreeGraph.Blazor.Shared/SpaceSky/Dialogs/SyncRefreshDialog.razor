@@ -38,35 +38,39 @@
             </tbody>
         </MudSimpleTable>
 
-        @* 同步项收纳：流式对账逐项追加为列表（最新在顶部），用 MudExpansion 可折叠收纳；执行后始终保留 *@
+        @* 同步项收纳：按数据类别分面板（空间树 / 单位·分类·知识树 / 线路），流式对账逐项追加，
+           最新在顶部；运行中的类别自动展开，执行后面板始终保留 *@
         @if (_hasRun)
         {
             <MudExpansionPanels Class="mt-2" Elevation="0">
-                <MudExpansionPanel Text="@FeedTitle"
-                                   Expanded="_feedExpanded"
-                                   ExpandedChanged="OnFeedExpandedChanged"
-                                   Dense="true">
-                    <MudList T="FeedItem" Dense="true" Class="pa-1"
-                             Style="height:150px; overflow-y:auto;">
-                        @if (_feed.Count == 0)
-                        {
-                            <MudListItem T="FeedItem" Class="py-0">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    @(_running ? "准备中…" : "本轮无同步项")
-                                </MudText>
-                            </MudListItem>
-                        }
-                        @foreach (var item in _feed)
-                        {
-                            <MudListItem T="FeedItem" Class="py-0">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudIcon Icon="@item.Icon" Size="Size.Small" Color="@item.Color"/>
-                                    <MudText Typo="Typo.caption">@item.Text</MudText>
-                                </MudStack>
-                            </MudListItem>
-                        }
-                    </MudList>
-                </MudExpansionPanel>
+                @foreach (var row in _rows.Where(r => r.Key != "edge"))
+                {
+                    <MudExpansionPanel Text="@FeedTitle(row)"
+                                       Expanded="row.FeedExpanded"
+                                       ExpandedChanged="@(expanded => OnFeedExpandedChanged(row, expanded))"
+                                       Dense="true">
+                        <MudList T="FeedItem" Dense="true" Class="pa-1"
+                                 Style="height:150px; overflow-y:auto;">
+                            @if (row.Feed.Count == 0)
+                            {
+                                <MudListItem T="FeedItem" Class="py-0">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @(_running && _currentVectorKey == row.Key ? "准备中…" : "本轮无同步项")
+                                    </MudText>
+                                </MudListItem>
+                            }
+                            @foreach (var item in row.Feed)
+                            {
+                                <MudListItem T="FeedItem" Class="py-0">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@item.Icon" Size="Size.Small" Color="@item.Color"/>
+                                        <MudText Typo="Typo.caption">@item.Text</MudText>
+                                    </MudStack>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudExpansionPanel>
+                }
             </MudExpansionPanels>
         }
     </DialogContent>
@@ -85,23 +89,21 @@
     private string _submitText = "开始同步";
     private CancellationTokenSource _cts = new();
 
-    /// <summary>向量对账同步项列表（最新在顶部，上限 200 条防渲染膨胀）。</summary>
-    private readonly List<FeedItem> _feed = new();
+    /// <summary>各类别同步项列表上限（防渲染膨胀）。</summary>
     private const int FeedLimit = 200;
-
-    /// <summary>同步项收纳面板展开状态（运行中自动展开，用户可手动折叠收纳）。</summary>
-    private bool _feedExpanded = true;
 
     /// <summary>是否已执行过同步（执行后面板始终保留展示，即使本轮无同步项）。</summary>
     private bool _hasRun;
 
-    private string FeedTitle => _running
-        ? $"同步项（{_feed.Count}）· 同步中…"
-        : $"同步项（{_feed.Count}）";
+    /// <summary>当前正在执行的向量类别键（space/tree/line），用于自动展开对应面板与「准备中」提示。</summary>
+    private string? _currentVectorKey;
 
-    private Task OnFeedExpandedChanged(bool expanded)
+    private static string FeedTitle(CategoryRow row) =>
+        $"{row.Label} · 同步项（{row.Feed.Count}）";
+
+    private Task OnFeedExpandedChanged(CategoryRow row, bool expanded)
     {
-        _feedExpanded = expanded;
+        row.FeedExpanded = expanded;
         return Task.CompletedTask;
     }
 
@@ -128,6 +130,10 @@
         public string Label { get; }
         public StepState Vector { get; } = new();
         public StepState Graph { get; } = new();
+        /// <summary>该类别的同步项列表（最新在顶部）。</summary>
+        public List<FeedItem> Feed { get; } = new();
+        /// <summary>该类别同步项面板的展开状态。</summary>
+        public bool FeedExpanded { get; set; }
     }
 
     private readonly List<CategoryRow> _rows =
@@ -161,6 +167,7 @@
                 if (StopRequested()) return;
                 await RunVectorStepAsync(key);
             }
+            _currentVectorKey = null;
             foreach (var key in new[] { "space", "tree", "line", "edge" })
             {
                 if (StopRequested()) return;
@@ -185,12 +192,13 @@
             row.Graph.Status = StepStatus.Pending;
             row.Graph.Detail = null;
             row.Graph.Warn = false;
+            row.Feed.Clear();
+            row.FeedExpanded = false;
         }
         MarkVectorNA();
-        _feed.Clear();
-        _feedExpanded = true;
         _hasRun = true;
         _currentItem = null;
+        _currentVectorKey = null;
     }
 
     private void MarkVectorNA()
@@ -203,12 +211,16 @@
 
     private async Task RunVectorStepAsync(string key)
     {
-        var step = Row(key).Vector;
+        var row = Row(key);
+        var step = row.Vector;
         step.Status = StepStatus.Running;
+        // 运行中的类别自动展开，其余折叠收纳
+        _currentVectorKey = key;
+        foreach (var r in _rows) r.FeedExpanded = r.Key == key;
         SafeRefresh();
         try
         {
-            // 流式对账：逐项实时追加同步节点名 / 清理项到窗口列表
+            // 流式对账：逐项实时追加同步节点名 / 清理项到对应类别面板
             var result = await EavApi.StreamReconcileAsync(
                 category: key,
                 onEvent: evt => InvokeAsync(() =>
@@ -217,18 +229,18 @@
                     var label = string.IsNullOrEmpty(evt.Name) ? evt.InodeId : evt.Name;
                     var detail = evt.Detail.Replace("\n", " · ");
                     var text = evt.Stage == "purge"
-                        ? $"[{Row(key).Label}] 清理 · {detail}"
-                        : $"[{Row(key).Label}] {(evt.Stage == "fix" ? "同步" : "已同步")} · {label}"
+                        ? $"清理 · {detail}"
+                        : $"{(evt.Stage == "fix" ? "同步" : "已同步")} · {label}"
                           + (string.IsNullOrEmpty(evt.Detail) ? "" : $"（{detail}）");
-                    _currentItem = text;
-                    _feed.Insert(0, evt.Stage switch
+                    _currentItem = $"[{row.Label}] {text}";
+                    row.Feed.Insert(0, evt.Stage switch
                     {
                         "fix" => new FeedItem(text, Icons.Material.Filled.Check, Color.Success),
                         "ok" => new FeedItem(text, Icons.Material.Filled.CheckCircle, Color.Secondary),
                         _ => new FeedItem(text, Icons.Material.Filled.DeleteOutline, Color.Warning)
                     });
-                    if (_feed.Count > FeedLimit)
-                        _feed.RemoveAt(_feed.Count - 1);
+                    if (row.Feed.Count > FeedLimit)
+                        row.Feed.RemoveAt(row.Feed.Count - 1);
                     SafeRefresh();
                 }),
                 ct: _cts.Token);

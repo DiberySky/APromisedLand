@@ -23,13 +23,15 @@ namespace TreeGraph.Api.NodeEavSky.SemanticSearch;
 /// </summary>
 public sealed class SourceTextBuilder
 {
-    /// <summary>当前节点视图模板版本。模板文案/标签词/截断/规范化规则变化必须升版并全量重算。</summary>
-    public const string TemplateVersion = "v1";
+    /// <summary>当前节点视图模板版本。模板文案/标签词/截断/规范化规则变化必须升版并全量重算。
+    /// v2：LineNode 增加「所属线路」行；Line 成为宿主。</summary>
+    public const string TemplateVersion = "v2";
 
     /// <summary>节点向量视图类型。</summary>
     public const string ViewType = "path_view";
 
     private const string PathLabel = "层级路径：";
+    private const string LineLabel = "所属线路：";
     private const string SelfLabel = "当前节点：";
     private const string UnnamedNode = "未命名节点";
     private const string Ellipsis = "…";
@@ -46,7 +48,7 @@ public sealed class SourceTextBuilder
     /// <summary>
     /// 为指定 iNode 构造宿主文本（节点 + 实体分离）。
     /// 返回：NodeText（纯节点名）+ EntityTexts（各实体独立文本）。
-    /// 宿主范围：4 棵宿主树（空间/单位/分类/知识）+ 线路节点，均创建节点向量。
+    /// 宿主范围：4 棵宿主树（空间/单位/分类/知识）+ 线路 + 线路节点，均创建节点向量。
     /// </summary>
     public async Task<NodeSourceText?> BuildAsync(string inodeId, CancellationToken ct = default)
     {
@@ -73,20 +75,23 @@ public sealed class SourceTextBuilder
         var lineNode = space is null && unit is null && category is null && knowledge is null
             ? await _db.LineNodes.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
+        var line = space is null && unit is null && category is null && knowledge is null && lineNode is null
+            ? await _db.Lines.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
+            : null;
 
         if (space is null && unit is null && category is null &&
-            knowledge is null && lineNode is null && entityMounts.Count == 0)
+            knowledge is null && lineNode is null && line is null && entityMounts.Count == 0)
             return null; // 既无实体也不在任何宿主 → 删除向量
 
-        // 3. 构造节点文本（path_view 两段式：层级路径 + 当前节点）。
+        // 3. 构造节点文本（path_view 两段式：层级路径/所属线路 + 当前节点）。
         // space 节点（Id 存在于 spaces 空间实体列表内，代表空间本身）不创建向量。
         var isSpaceNode = space is not null &&
             await _db.Spaces.AsNoTracking().AnyAsync(s => s.Id == inodeId, ct);
         var nodeName = isSpaceNode
             ? null
-            : space?.Name ?? unit?.Name ?? category?.Name ?? knowledge?.Name ?? lineNode?.Name;
+            : space?.Name ?? unit?.Name ?? category?.Name ?? knowledge?.Name ?? lineNode?.Name ?? line?.Name;
 
-        // 祖先链：4 棵宿主树内沿 ParentId 上溯（线路节点无父子结构，祖先为空）
+        // 祖先链：4 棵宿主树内沿 ParentId 上溯；线路节点以所属线路为唯一"祖先"
         var ancestorNames = new List<string>();
         var ancestorIds = new List<string>();
         if (nodeName is not null)
@@ -103,10 +108,23 @@ public sealed class SourceTextBuilder
             else if (knowledge is not null)
                 (ancestorNames, ancestorIds) =
                     await BuildAncestorChainAsync(_db.KnowledgeTrees, knowledge.ParentId, ct);
+            else if (lineNode is not null)
+            {
+                var parentLine = await _db.Lines.AsNoTracking()
+                    .FirstOrDefaultAsync(l => l.Id == lineNode.LineId, ct);
+                if (parentLine is not null)
+                {
+                    ancestorNames.Add(NormalizeName(parentLine.Name));
+                    ancestorIds.Add(parentLine.Id);
+                }
+            }
         }
 
         var selfName = NormalizeName(nodeName);
-        var nodeText = nodeName is null ? "" : BuildNodeText(ancestorNames, selfName);
+        // 线路节点路径行用「所属线路：」标签，树节点用「层级路径：」
+        var nodeText = nodeName is null
+            ? ""
+            : BuildNodeText(ancestorNames, selfName, lineNode is not null ? LineLabel : PathLabel);
         var nodeHash = ComputeHash(TemplateVersion + "\n" + nodeText);
 
         // 4. 宿主类型与归属空间（检索按 space_id 过滤）
@@ -114,6 +132,7 @@ public sealed class SourceTextBuilder
             : unit is not null ? "unit_tree"
             : category is not null ? "category_tree"
             : knowledge is not null ? "knowledge_tree"
+            : line is not null ? "line"
             : "line_node";
         var spaceId = await ResolveSpaceIdAsync(space, unit, category, knowledge, inodeId, ct);
 
@@ -228,7 +247,7 @@ public sealed class SourceTextBuilder
     /// 祖先 ≤8 层全保留，超过保留 根 + … + 最近 4 层；
     /// 整条超 400 字符时逐步收短祖先路径（保根 + 最近层），当前节点行永不裁剪。
     /// </summary>
-    private static string BuildNodeText(List<string> ancestorNames, string selfName)
+    private static string BuildNodeText(List<string> ancestorNames, string selfName, string pathLabel)
     {
         var selfLine = SelfLabel + Clip(selfName, MaxNameChars);
         if (ancestorNames.Count == 0) return selfLine;
@@ -236,18 +255,18 @@ public sealed class SourceTextBuilder
         var keep = ancestorNames.Count <= MaxPathSegments
             ? ancestorNames.Count
             : MaxTailSegments;
-        var text = BuildPathLine(ancestorNames, keep) + "\n" + selfLine;
+        var text = BuildPathLine(ancestorNames, keep, pathLabel) + "\n" + selfLine;
         while (text.Length > MaxTextChars && keep > 1)
         {
             keep--;
-            text = BuildPathLine(ancestorNames, keep) + "\n" + selfLine;
+            text = BuildPathLine(ancestorNames, keep, pathLabel) + "\n" + selfLine;
         }
 
         return text.Length <= MaxTextChars ? text : selfLine;
     }
 
     /// <summary>构造层级路径行；keep 小于段数时保留 根 + … + 最近 keep 层。</summary>
-    private static string BuildPathLine(List<string> ancestorNames, int keep)
+    private static string BuildPathLine(List<string> ancestorNames, int keep, string pathLabel)
     {
         var segs = keep >= ancestorNames.Count
             ? ancestorNames
@@ -255,7 +274,7 @@ public sealed class SourceTextBuilder
                 .Append(Ellipsis)
                 .Concat(ancestorNames.Skip(ancestorNames.Count - keep))
                 .ToList();
-        return PathLabel + string.Join(PathSeparator, segs.Select(s => Clip(s, MaxNameChars)));
+        return pathLabel + string.Join(PathSeparator, segs.Select(s => Clip(s, MaxNameChars)));
     }
 
     /// <summary>

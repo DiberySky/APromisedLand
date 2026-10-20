@@ -387,6 +387,7 @@ public sealed class SearchService
         "category_tree" => "CategoryTree",
         "knowledge_tree" => "KnowledgeTree",
         "line_node" => "LineNode",
+        "line" => "Line",
         "tree_node" => "TreeNode",
         "entity" => "Entity",
         var other => other

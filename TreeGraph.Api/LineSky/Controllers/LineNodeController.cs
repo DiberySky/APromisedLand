@@ -89,8 +89,8 @@ public class LineNodeController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
 
-        // ★ 节点更新 → 即时重建向量/图顶点
-        await PublishAsync(id, InodeChangeKind.Saved, pathAffected: true, ct);
+        // ★ 节点更新 → 即时重建向量/图顶点（线路节点无后代，无需级联）
+        await PublishAsync(id, InodeChangeKind.Saved, pathAffected: false, ct);
 
         return Ok(existing);
     }
@@ -117,7 +117,7 @@ public class LineNodeController : ControllerBase
     }
 
     /// <summary>发布 iNode 变更事件（向量/图同步；at-least-once，消费端幂等）。
-    /// pathAffected：名称变更（改名）→ 消费端级联刷新后代（线路节点无后代，保持规则统一）。</summary>
+    /// 线路节点无后代，pathAffected 恒为 false（线路改名的级联由 LinesController 发起）。</summary>
     private async Task PublishAsync(string inodeId, InodeChangeKind kind, bool pathAffected, CancellationToken ct)
     {
         await _publishEndpoint.Publish(new InodeChangedEvent

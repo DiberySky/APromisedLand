@@ -61,15 +61,19 @@ public sealed class SearchController : ControllerBase
     /// <summary>
     /// 手动触发向量对账（立即执行，无需等待后台周期）。
     /// 用于修复：PG 有、Qdrant 无（补算向量）或 Qdrant 有、PG 无（删除孤儿）。
-    /// 范围三选一：category（space=空间树；tree=单位/分类/知识树；line=线路；边无向量不支持）
-    /// > spaceId（该空间对应树范围）> 全量（两者皆空）。
+    /// 范围四选一：category（space=空间树；tree=单位/分类/知识树；line=线路；边无向量不支持）
+    /// > spaceId（该空间对应树范围）> lineId（该线路自身+其线路节点）> 全量（三者皆空）。
     /// </summary>
     [HttpPost("reconcile")]
     public async Task<IActionResult> ReconcileVectors(
-        [FromQuery] string? spaceId, [FromQuery] string? category, CancellationToken ct)
+        [FromQuery] string? spaceId, [FromQuery] string? category,
+        [FromQuery] string? lineId, CancellationToken ct)
     {
-        if (!string.IsNullOrWhiteSpace(category) && !string.IsNullOrWhiteSpace(spaceId))
-            return BadRequest(new { error = "category 与 spaceId 只能二选一" });
+        var scopeCount = (string.IsNullOrWhiteSpace(category) ? 0 : 1)
+            + (string.IsNullOrWhiteSpace(spaceId) ? 0 : 1)
+            + (string.IsNullOrWhiteSpace(lineId) ? 0 : 1);
+        if (scopeCount > 1)
+            return BadRequest(new { error = "category / spaceId / lineId 只能三选一" });
 
         SyncCategory? syncCategory = null;
         if (!string.IsNullOrWhiteSpace(category))
@@ -85,13 +89,15 @@ public sealed class SearchController : ControllerBase
 
         var result = syncCategory is not null
             ? await synchronizer.ReconcileCategoryAsync(syncCategory.Value, ct)
-            : string.IsNullOrWhiteSpace(spaceId)
-                ? await synchronizer.ReconcileAllAsync(ct)
-                : await synchronizer.ReconcileSpaceAsync(spaceId, ct);
+            : !string.IsNullOrWhiteSpace(spaceId)
+                ? await synchronizer.ReconcileSpaceAsync(spaceId, ct)
+                : !string.IsNullOrWhiteSpace(lineId)
+                    ? await synchronizer.ReconcileLineAsync(lineId, ct)
+                    : await synchronizer.ReconcileAllAsync(ct);
 
         _logger.LogInformation(
-            "手动向量对账（空间={SpaceId} 类别={Category}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
-            spaceId ?? "*", syncCategory?.ToString() ?? "*",
+            "手动向量对账（空间={SpaceId} 类别={Category} 线路={LineId}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
+            spaceId ?? "*", syncCategory?.ToString() ?? "*", lineId ?? "*",
             result.Active, result.Existing, result.Missing,
             result.Orphaned, result.FixedCount, result.DeletedCount);
 
@@ -111,15 +117,19 @@ public sealed class SearchController : ControllerBase
     /// 行格式：{"stage":"fix","inodeId":...,"name":...} 同步节点；
     ///        {"stage":"purge",...,"detail":...} 清理孤儿；
     ///        {"stage":"summary",...六个计数字段} 结束统计。
-    /// 范围三选一：category（space=空间树；tree=单位/分类/知识树；line=线路）> spaceId > 全量。
+    /// 范围四选一：category（space=空间树；tree=单位/分类/知识树；line=线路）> spaceId > lineId > 全量。
     /// 校验失败仍走普通 400 信封；成功时直接写响应体并返回 EmptyResult，不经信封包装。
     /// </summary>
     [HttpPost("reconcile/stream")]
     public async Task<IActionResult> ReconcileVectorsStream(
-        [FromQuery] string? spaceId, [FromQuery] string? category, CancellationToken ct)
+        [FromQuery] string? spaceId, [FromQuery] string? category,
+        [FromQuery] string? lineId, CancellationToken ct)
     {
-        if (!string.IsNullOrWhiteSpace(category) && !string.IsNullOrWhiteSpace(spaceId))
-            return BadRequest(new { error = "category 与 spaceId 只能二选一" });
+        var scopeCount = (string.IsNullOrWhiteSpace(category) ? 0 : 1)
+            + (string.IsNullOrWhiteSpace(spaceId) ? 0 : 1)
+            + (string.IsNullOrWhiteSpace(lineId) ? 0 : 1);
+        if (scopeCount > 1)
+            return BadRequest(new { error = "category / spaceId / lineId 只能三选一" });
 
         SyncCategory? syncCategory = null;
         if (!string.IsNullOrWhiteSpace(category))
@@ -145,6 +155,7 @@ public sealed class SearchController : ControllerBase
 
         var result = await synchronizer.ReconcileAsync(
             string.IsNullOrWhiteSpace(spaceId) ? null : spaceId, syncCategory,
+            string.IsNullOrWhiteSpace(lineId) ? null : lineId,
             onProgress: async p => await WriteEventAsync(new ReconcileStreamEventDto(
                 p.Stage, p.InodeId, p.Name, p.Detail)),
             ct);
@@ -155,8 +166,8 @@ public sealed class SearchController : ControllerBase
             result.FixedCount, result.DeletedCount));
 
         _logger.LogInformation(
-            "手动向量对账-流式（空间={SpaceId} 类别={Category}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
-            spaceId ?? "*", syncCategory?.ToString() ?? "*",
+            "手动向量对账-流式（空间={SpaceId} 类别={Category} 线路={LineId}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
+            spaceId ?? "*", syncCategory?.ToString() ?? "*", lineId ?? "*",
             result.Active, result.Existing, result.Missing,
             result.Orphaned, result.FixedCount, result.DeletedCount);
 

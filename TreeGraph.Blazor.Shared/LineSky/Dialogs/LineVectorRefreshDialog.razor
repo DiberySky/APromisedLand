@@ -1,0 +1,195 @@
+@* LineVectorRefreshDialog.razor — 向量刷新对话框（单线路）：可视化该线路范围的向量对账进度 *@
+@* 打开即自动执行（无确认步骤）：按该线路自身 + 其下全部线路节点范围对账（补缺 + 删孤），完成后展示统计明细；
+   底部「重新刷新」可重复执行；关闭即取消 *@
+
+@namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@implements IDisposable
+@inject EavApiClient EavApi
+
+<DialogSky Title="@Title"
+           CancelButtonVisible="true" CancelButtonText="关闭"
+           SubmitButtonVisible="true" SubmitButtonText="@_submitText"
+           SubmitButtonDisabled="_running"
+           OnSubmitClick="@RefreshAsync">
+    <ToolBarContent>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">@StatusText</MudText>
+    </ToolBarContent>
+    <DialogContent>
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            @if (_running)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    正在整理「@Line.Name」线路及其线路节点的数据，使语义搜索能立即检索到它们…
+                </MudText>
+            }
+            else if (_error is not null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Error">@_error</MudText>
+            }
+            else if (_result is not null)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    刷新完成：<span class="mud-success-text">新增 @_result.FixedCount 条 · 清理 @_result.DeletedCount 条</span>
+                </MudText>
+                <MudSimpleTable Hover="false" Dense="true" Bordered="true">
+                    <tbody>
+                        <tr><td>期望集合（PG 活跃节点 + 实体）</td><td align="right">@_result.Active</td></tr>
+                        <tr><td>已存向量（Qdrant）</td><td align="right">@_result.Existing</td></tr>
+                        <tr><td>缺失（本轮补算）</td><td align="right">@_result.Missing</td></tr>
+                        <tr><td>孤儿（本轮清理）</td><td align="right">@_result.Orphaned</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+            }
+
+            @* 同步项收纳：流式对账逐项追加为列表（最新在顶部），用 MudExpansion 可折叠收纳；执行后始终保留 *@
+            @if (_hasRun)
+            {
+                <MudExpansionPanels Class="mt-3" Elevation="0">
+                    <MudExpansionPanel Text="@FeedTitle"
+                                       Expanded="_feedExpanded"
+                                       ExpandedChanged="OnFeedExpandedChanged"
+                                       Dense="true">
+                        <MudList T="FeedItem" Dense="true" Class="pa-1"
+                                 Style="height:170px; overflow-y:auto;">
+                            @if (_feed.Count == 0)
+                            {
+                                <MudListItem T="FeedItem" Class="py-0">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @(_running ? "准备中…" : "本轮无同步项")
+                                    </MudText>
+                                </MudListItem>
+                            }
+                            @foreach (var item in _feed)
+                            {
+                                <MudListItem T="FeedItem" Class="py-0">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@item.Icon" Size="Size.Small" Color="@item.Color"/>
+                                        <MudText Typo="Typo.caption">@item.Text</MudText>
+                                    </MudStack>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+        </MudPaper>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>目标线路（按该线路自身 + 其下全部线路节点范围对账）。</summary>
+    [Parameter, EditorRequired] public LineDto Line { get; set; } = null!;
+
+    private bool _running;
+    private bool _disposed;
+    private string _submitText = "开始刷新";
+    private VectorReconcileResultDto? _result;
+    private string? _error;
+    private CancellationTokenSource _cts = new();
+
+    /// <summary>同步项列表（最新在顶部，上限 200 条防渲染膨胀）。</summary>
+    private readonly List<FeedItem> _feed = new();
+    private const int FeedLimit = 200;
+
+    /// <summary>同步项收纳面板展开状态（运行中自动展开，用户可手动折叠收纳）。</summary>
+    private bool _feedExpanded = true;
+
+    /// <summary>是否已执行过同步（执行后面板始终保留展示，即使本轮无同步项）。</summary>
+    private bool _hasRun;
+
+    private string FeedTitle => _running
+        ? $"同步项（{_feed.Count}）· 同步中…"
+        : $"同步项（{_feed.Count}）";
+
+    private Task OnFeedExpandedChanged(bool expanded)
+    {
+        _feedExpanded = expanded;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>同步项（图标区分同步 / 清理）。</summary>
+    private sealed record FeedItem(string Text, string Icon, Color Color);
+
+    private string Title => $"向量刷新 · {Line.Name}";
+
+    private string StatusText => _running ? "刷新中" : _error is not null ? "失败" : "完成";
+
+    /// <summary>每次打开都按当前 Line 重新执行（对话框组件实例可能被宿主复用，不能只挂 OnInitializedAsync）。</summary>
+    protected override async Task OnParametersSetAsync() => await RefreshAsync();
+
+    /// <summary>按该线路自身 + 其下全部线路节点范围执行向量对账。
+    /// 流式端点逐项回调，执行期间滚动展示正在同步的节点名。</summary>
+    private async Task RefreshAsync()
+    {
+        if (_running) return;
+        _running = true;
+        _submitText = "刷新中…";
+        _result = null;
+        _error = null;
+        _feed.Clear();
+        _feedExpanded = true;
+        _hasRun = true;
+        // 复用实例时上一轮 CTS 已在关闭时取消/释放，每次执行前重建
+        _cts.Dispose();
+        _cts = new();
+        SafeRefresh();
+        try
+        {
+            _result = await EavApi.StreamReconcileAsync(
+                lineId: Line.Id,
+                onEvent: evt => InvokeAsync(() =>
+                {
+                    // fix=本轮补算；ok=已存在仅校验；purge=清理孤儿。Detail 为实际向量化文本
+                    var label = string.IsNullOrEmpty(evt.Name) ? evt.InodeId : evt.Name;
+                    var detail = evt.Detail.Replace("\n", " · ");
+                    var text = evt.Stage == "purge"
+                        ? $"清理 · {detail}"
+                        : string.IsNullOrEmpty(evt.Detail)
+                            ? $"{(evt.Stage == "fix" ? "同步" : "已同步")} · {label}"
+                            : $"{(evt.Stage == "fix" ? "同步" : "已同步")} · {label}（{detail}）";
+                    _feed.Insert(0, evt.Stage switch
+                    {
+                        "fix" => new FeedItem(text, Icons.Material.Filled.Check, Color.Success),
+                        "ok" => new FeedItem(text, Icons.Material.Filled.CheckCircle, Color.Secondary),
+                        _ => new FeedItem(text, Icons.Material.Filled.DeleteOutline, Color.Warning)
+                    });
+                    if (_feed.Count > FeedLimit)
+                        _feed.RemoveAt(_feed.Count - 1);
+                    SafeRefresh();
+                }),
+                ct: _cts.Token);
+            if (_result is null)
+                _error = "刷新失败：接口未返回结果";
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _error = $"刷新失败：{ex.Message}";
+        }
+        finally
+        {
+            _running = false;
+            _submitText = "重新刷新";
+            SafeRefresh();
+        }
+    }
+
+    private void SafeRefresh()
+    {
+        if (!_disposed) StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        try { _cts.Cancel(); _cts.Dispose(); } catch { /* 关闭竞态容错 */ }
+    }
+}

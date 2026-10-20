@@ -24,4 +24,8 @@
       <ProjectReference Include="..\TreeGraph.Shared\TreeGraph.Shared.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <InternalsVisibleTo Include="TreeGraph.Api.Tests" />
+    </ItemGroup>
+
 </Project>
