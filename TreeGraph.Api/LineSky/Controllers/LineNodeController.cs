@@ -78,7 +78,6 @@ public class LineNodeController : ControllerBase
         existing.Name = node.Name;
         existing.Description = node.Description;
         existing.LocationGeo = node.LocationGeo;
-        existing.IsArchived = node.IsArchived;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);

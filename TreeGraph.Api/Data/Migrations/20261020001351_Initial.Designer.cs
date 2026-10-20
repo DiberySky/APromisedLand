@@ -10,10 +10,10 @@ using TreeGraph.Api.Data;
 
 #nullable disable
 
-namespace TreeGraph.Api.Migrations
+namespace TreeGraph.Api.Data.Migrations
 {
     [DbContext(typeof(TreeGraphDbContext))]
-    [Migration("20261019215717_Initial")]
+    [Migration("20261020001351_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -2188,7 +2188,7 @@ namespace TreeGraph.Api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.LineNode", b =>
+            modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.Line", b =>
                 {
                     b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
@@ -2206,9 +2206,38 @@ namespace TreeGraph.Api.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("description");
 
-                    b.Property<bool>("IsArchived")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_archived");
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("lines", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.LineNode", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
 
                     b.Property<string>("LocationGeo")
                         .HasMaxLength(100)

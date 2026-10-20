@@ -92,17 +92,16 @@ builder.Services.AddScoped<CustomTableQueryService>();
 
 // ★ 语义搜索 + 向量同步管道（Qdrant + vLLM bge-m3 + RabbitMQ 事件驱动）
 builder.Services.AddSemanticSearch(builder.Configuration);
-// Testing 环境（EavApiFactory 集成测试）无 RabbitMQ，
-// MassTransit 总线启动会无限重连并阻塞 WebApplication 启动，故跳过消费者注册。
-if (!builder.Environment.IsEnvironment("Testing"))
-    builder.Services.AddVectorSyncConsumers(builder.Configuration);
 
-// ★ 图同步管道（PostgreSQL → NebulaGraph，经 TreeGraph.NebulaApi REST 网关）
-//   Testing 环境无 NebulaGraph/NebulaApi，跳过 schema 初始化后台服务与消费者注册。
+// ★ 图同步管道（PostgreSQL → NebulaGraph，经 TreeGraph.NebulaFastApi REST 网关）
+//   Testing 环境（EavApiFactory 集成测试）无 RabbitMQ/NebulaGraph：
+//   跳过消费者注册（MassTransit 总线启动会无限重连并阻塞 WebApplication 启动）
+//   与 schema 初始化后台服务。
+//   AddMassTransit 每容器只允许调用一次，图同步消费者经回调并入向量同步的总线注册。
 var isTesting = builder.Environment.IsEnvironment("Testing");
-builder.Services.AddGraphSync(builder.Configuration, enableSchemaInitializer: !isTesting);
 if (!isTesting)
-    builder.Services.AddGraphSyncConsumers(builder.Configuration);
+    builder.Services.AddVectorSyncConsumers(builder.Configuration, x => x.AddGraphSyncConsumers());
+builder.Services.AddGraphSync(builder.Configuration, enableSchemaInitializer: !isTesting);
 
 // Edge（关系/边）
 builder.Services.AddScoped<IEdgeNodeValidator, EdgeNodeValidator>();

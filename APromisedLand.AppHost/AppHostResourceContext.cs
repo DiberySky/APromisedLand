@@ -97,9 +97,9 @@ public class AppHostResourceContext
     public IResourceBuilder<PythonAppResource>? NebulaGraphFastApi { get; set; }
     public EndpointReference? NebulaGraphFastApiEndpoint { get; set; }
 
-    /// <summary>TreeGraph.NebulaApi（Python FastAPI → NebulaGraph REST 网关，端口 9393）。</summary>
-    public IResourceBuilder<PythonAppResource>? TreeGraphNebulaApi { get; set; }
-    public EndpointReference? TreeGraphNebulaApiEndpoint { get; set; }
+    /// <summary>TreeGraph.NebulaFastApi（Python FastAPI → NebulaGraph REST 网关，端口 9393）。</summary>
+    public IResourceBuilder<PythonAppResource>? TreeGraphNebulaFastApi { get; set; }
+    public EndpointReference? TreeGraphNebulaFastApiEndpoint { get; set; }
 
     // ── AI (Ollama) ──
     public IResourceBuilder<OllamaResource>? Ollama { get; set; }

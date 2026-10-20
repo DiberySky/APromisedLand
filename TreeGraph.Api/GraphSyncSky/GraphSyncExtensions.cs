@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace TreeGraph.Api.GraphSyncSky;
 
-/// <summary>图同步管道（PostgreSQL → NebulaGraph，经 TreeGraph.NebulaApi REST 网关）的 DI 注册。</summary>
+/// <summary>图同步管道（PostgreSQL → NebulaGraph，经 TreeGraph.NebulaFastApi REST 网关）的 DI 注册。</summary>
 public static class GraphSyncExtensions
 {
     /// <summary>
@@ -43,18 +43,13 @@ public static class GraphSyncExtensions
     }
 
     /// <summary>
-    /// 注册图同步消费者（仅追加消费者）。
-    /// 须在 AddVectorSyncConsumers（声明 RabbitMQ 总线）之后调用。
+    /// 追加图同步消费者到既有 MassTransit 注册。
+    /// AddMassTransit 每容器只允许调用一次，故须作为
+    /// AddVectorSyncConsumers 的 configureConsumers 回调传入。
     /// </summary>
-    public static IServiceCollection AddGraphSyncConsumers(
-        this IServiceCollection services, IConfiguration config)
+    public static void AddGraphSyncConsumers(this IBusRegistrationConfigurator x)
     {
-        services.AddMassTransit(x =>
-        {
-            x.AddConsumer<InodeGraphSyncConsumer>();
-            x.AddConsumer<EdgeGraphSyncConsumer>();
-        });
-
-        return services;
+        x.AddConsumer<InodeGraphSyncConsumer>();
+        x.AddConsumer<EdgeGraphSyncConsumer>();
     }
 }

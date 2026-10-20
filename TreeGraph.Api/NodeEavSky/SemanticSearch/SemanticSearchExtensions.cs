@@ -68,13 +68,19 @@ public static class SemanticSearchExtensions
         return services;
     }
 
-    /// <summary>RabbitMQ 消费者注册（MassTransit）。</summary>
+    /// <summary>
+    /// RabbitMQ 消费者注册（MassTransit）。
+    /// AddMassTransit 每容器只允许调用一次；其他管道的消费者经
+    /// <paramref name="configureConsumers"/> 并入同一次注册。
+    /// </summary>
     public static IServiceCollection AddVectorSyncConsumers(
-        this IServiceCollection services, IConfiguration config)
+        this IServiceCollection services, IConfiguration config,
+        Action<MassTransit.IBusRegistrationConfigurator>? configureConsumers = null)
     {
         services.AddMassTransit(x =>
         {
             x.AddConsumer<InodeChangedConsumer>();
+            configureConsumers?.Invoke(x);
 
             x.UsingRabbitMq((ctx, cfg) =>
             {

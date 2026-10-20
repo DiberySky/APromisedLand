@@ -21,9 +21,9 @@ void TreeGraph()
     // ★ NebulaGraph 图数据库容器组（graphd/metad/storaged/console/studio:17001）
     builder.AddNebulaGraph(context);
 
-    // ★ TreeGraph.NebulaApi（Python FastAPI → NebulaGraph REST 网关，端口 9393，
+    // ★ TreeGraph.NebulaFastApi（Python FastAPI → NebulaGraph REST 网关，端口 9393，
     //   需先于 AddTreeGraphEavApi 声明以便注入 endpoint）
-    builder.AddTreeGraphNebulaApi(context);
+    builder.AddTreeGraphNebulaFastApi(context);
 
     // ★ SeaweedFS：TreeGraph.FileStorageApi 的对象存储依赖
     //   (SeaweedMaster/Volume/Filer/S3 容器组，由 SeaweedFsExtension 声明)

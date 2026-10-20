@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 
-namespace TreeGraph.Api.Migrations
+namespace TreeGraph.Api.Data.Migrations
 {
     /// <inheritdoc />
     public partial class Initial : Migration
@@ -164,13 +164,27 @@ namespace TreeGraph.Api.Migrations
                     name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     location_geo = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    is_archived = table.Column<bool>(type: "boolean", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_line_nodes", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "lines",
+                columns: table => new
+                {
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_lines", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -1115,6 +1129,9 @@ namespace TreeGraph.Api.Migrations
 
             migrationBuilder.DropTable(
                 name: "line_nodes");
+
+            migrationBuilder.DropTable(
+                name: "lines");
 
             migrationBuilder.DropTable(
                 name: "location_attribute_values");

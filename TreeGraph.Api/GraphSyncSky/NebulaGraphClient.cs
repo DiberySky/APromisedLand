@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace TreeGraph.Api.GraphSyncSky;
 
-/// <summary>TreeGraph.NebulaApi REST 调用结果（nGQL 原生返回）。</summary>
+/// <summary>TreeGraph.NebulaFastApi REST 调用结果（nGQL 原生返回）。</summary>
 public sealed class NebulaQueryResult
 {
     [JsonPropertyName("success")] public bool Success { get; set; }
@@ -15,7 +15,7 @@ public sealed class NebulaQueryResult
     [JsonPropertyName("row_count")] public int RowCount { get; set; }
 }
 
-/// <summary>TreeGraph.NebulaApi /bulk 调用结果。</summary>
+/// <summary>TreeGraph.NebulaFastApi /bulk 调用结果。</summary>
 public sealed class BulkResult
 {
     [JsonPropertyName("vertices_total")] public int VerticesTotal { get; set; }
@@ -40,7 +40,7 @@ public sealed record EdgeItem(
     [property: JsonPropertyName("properties")] Dictionary<string, object?>? Properties
 );
 
-/// <summary>TreeGraph.NebulaApi REST 客户端（幂等写入 NebulaGraph）。</summary>
+/// <summary>TreeGraph.NebulaFastApi REST 客户端（幂等写入 NebulaGraph）。</summary>
 public sealed class NebulaGraphClient
 {
     private readonly HttpClient _http;

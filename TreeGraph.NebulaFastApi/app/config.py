@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
     # FastAPI Settings
-    APP_NAME: str = "TreeGraph.NebulaApi"
+    APP_NAME: str = "TreeGraph.NebulaFastApi"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     HOST: str = "0.0.0.0"

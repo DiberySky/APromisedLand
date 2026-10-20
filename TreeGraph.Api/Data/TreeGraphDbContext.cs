@@ -42,6 +42,9 @@ public class TreeGraphDbContext : DbContext
     // LineSky：线路节点（独立一等公民，实现 Inode）
     public DbSet<TreeGraph.Shared.LineSky.Entities.LineNode> LineNodes => Set<TreeGraph.Shared.LineSky.Entities.LineNode>();
 
+    // LineSky：线路（独立一等公民，实现 Inode）
+    public DbSet<TreeGraph.Shared.LineSky.Entities.Line> Lines => Set<TreeGraph.Shared.LineSky.Entities.Line>();
+
     public TreeGraphDbContext(DbContextOptions<TreeGraphDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -63,6 +66,7 @@ public class TreeGraphDbContext : DbContext
         ConfigureSpaceTrees(mb);
         ConfigureSpaces(mb);
         ConfigureLineNodes(mb);
+        ConfigureLines(mb);
     }
 
     // ============================================================
@@ -816,7 +820,27 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(x => x.LocationGeo).HasColumnName("location_geo").HasMaxLength(100);
-            e.Property(x => x.IsArchived).HasColumnName("is_archived");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+    }
+
+    // ============================================================
+    // LineSky：线路（独立一等公民，实现 Inode）
+    // ============================================================
+    private static void ConfigureLines(ModelBuilder mb)
+    {
+        mb.Entity<TreeGraph.Shared.LineSky.Entities.Line>(e =>
+        {
+            e.ToTable("lines");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id)
+                .HasColumnName("id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });

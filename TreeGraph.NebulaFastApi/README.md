@@ -1,4 +1,4 @@
-# TreeGraph.NebulaApi
+# TreeGraph.NebulaFastApi
 
 Production-ready Web API service that wraps [nebula3-python](https://github.com/vesoft-inc/nebula-python) client with FastAPI, providing RESTful endpoints for all NebulaGraph operations.
 

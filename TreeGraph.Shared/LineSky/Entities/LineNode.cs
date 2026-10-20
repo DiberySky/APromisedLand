@@ -22,9 +22,6 @@ public class LineNode : Inode
     /// <summary>经纬度（WGS84），格式 "lng,lat"。</summary>
     public string? LocationGeo { get; set; }
 
-    /// <summary>是否已归档。</summary>
-    public bool IsArchived { get; set; }
-
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }
 }

@@ -125,11 +125,11 @@ public sealed class GraphSynchronizer
 
         var line = await _db.LineNodes.AsNoTracking()
             .Where(n => n.Id == inodeId)
-            .Select(n => new { n.Name, n.IsArchived })
+            .Select(n => new { n.Name })
             .FirstOrDefaultAsync(ct);
         if (line is not null)
             return new GraphNodeInfo(inodeId, line.Name, GraphNaming.LineNodeTag,
-                "LineNode", line.IsArchived, null);
+                "LineNode", false, null);
 
         return null;
     }
@@ -240,9 +240,9 @@ public sealed class GraphSynchronizer
         }
 
         foreach (var n in await _db.LineNodes.AsNoTracking()
-                     .Select(n => new { n.Id, n.Name, n.IsArchived }).ToListAsync(ct))
+                     .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
         {
-            vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.LineNodeTag, "LineNode", n.IsArchived));
+            vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.LineNodeTag, "LineNode", false));
         }
 
         var parentEdgeCount = edges.Count;

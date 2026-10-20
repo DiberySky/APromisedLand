@@ -28,12 +28,23 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
-    success = nebula_client.initialize()
-    if not success:
-        logger.error("Failed to initialize NebulaGraph connection pool!")
-        logger.error("Service will start but graph endpoints may fail")
+    # Aspire WaitFor(graphd) 只等容器进程启动，不等 graphd 可接受会话；
+    # 一次性 initialize 失败会让 _connected 永久为 False（全部请求 503）。
+    # 故启动期循环重试，直到 graphd/metad 就绪（上限 ~3 分钟）。
+    import time
+    max_attempts = 36
+    for attempt in range(1, max_attempts + 1):
+        if nebula_client.initialize():
+            logger.info("NebulaGraph connection pool initialized successfully")
+            break
+        logger.warning(
+            f"NebulaGraph connection pool init failed ({attempt}/{max_attempts}), retry in 5s"
+        )
+        if attempt < max_attempts:
+            time.sleep(5)
     else:
-        logger.info("NebulaGraph connection pool initialized successfully")
+        logger.error("Failed to initialize NebulaGraph connection pool after all retries!")
+        logger.error("Service will start but graph endpoints may fail")
 
     yield
 
