@@ -157,22 +157,6 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "line_nodes",
-                columns: table => new
-                {
-                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    location_geo = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_line_nodes", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "lines",
                 columns: table => new
                 {
@@ -287,6 +271,28 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.edge_type_id,
                         principalTable: "edge_definitions",
                         principalColumn: "edge_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "line_nodes",
+                columns: table => new
+                {
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_line_nodes", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_line_nodes_lines_line_id",
+                        column: x => x.line_id,
+                        principalTable: "lines",
+                        principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -1009,6 +1015,11 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "parent_id");
 
             migrationBuilder.CreateIndex(
+                name: "IX_line_nodes_line_id",
+                table: "line_nodes",
+                column: "line_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_lav_entity",
                 table: "location_attribute_values",
                 columns: new[] { "entity_type", "entity_id" });
@@ -1058,44 +1069,15 @@ namespace TreeGraph.Api.Data.Migrations
                 table: "unit_trees",
                 column: "parent_id");
 
-            // attribute_audit_log 为 ExcludeFromMigrations 分区表，EF 不自动生成，此处手写补回
-            migrationBuilder.Sql("""
-                CREATE TABLE attribute_audit_log (
-                    audit_id text NOT NULL DEFAULT gen_random_uuid()::text,
-                    changed_at timestamp with time zone NOT NULL,
-                    entity_id text NOT NULL,
-                    entity_type text NOT NULL,
-                    attribute_id text NOT NULL,
-                    attribute_name text NOT NULL,
-                    old_value text,
-                    new_value text,
-                    change_type text NOT NULL,
-                    changed_by text NOT NULL,
-                    correlation_id text,
-                    client_ip text,
-                    CONSTRAINT pk_attribute_audit_log PRIMARY KEY (audit_id, changed_at)
-                ) PARTITION BY RANGE (changed_at);
-                """);
-
-            migrationBuilder.Sql("""
-                CREATE TABLE attribute_audit_log_default
-                    PARTITION OF attribute_audit_log DEFAULT;
-                """);
-
-            migrationBuilder.Sql("""
-                CREATE INDEX ix_audit_entity ON attribute_audit_log
-                    (entity_type, entity_id, changed_at DESC);
-                """);
-
-            migrationBuilder.Sql("""
-                CREATE INDEX ix_audit_time ON attribute_audit_log (changed_at);
-                """);
+            // attribute_audit_log 是 ExcludeFromMigrations 的分区表，EF 不生成其 DDL。
+            // SQL 本体集中在 MigrationSqlExtensions.CreateAuditPartitionTable（重建迁移时勿删本调用）。
+            migrationBuilder.CreateAuditPartitionTable();
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("DROP TABLE IF EXISTS attribute_audit_log CASCADE;");
+            migrationBuilder.DropAuditPartitionTable();
 
             migrationBuilder.DropTable(
                 name: "attribute_values");
@@ -1131,9 +1113,6 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "line_nodes");
 
             migrationBuilder.DropTable(
-                name: "lines");
-
-            migrationBuilder.DropTable(
                 name: "location_attribute_values");
 
             migrationBuilder.DropTable(
@@ -1147,6 +1126,9 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "edge_definitions");
+
+            migrationBuilder.DropTable(
+                name: "lines");
 
             migrationBuilder.DropTable(
                 name: "attribute_catalog");

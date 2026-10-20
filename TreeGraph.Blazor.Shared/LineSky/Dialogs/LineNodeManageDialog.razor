@@ -1,0 +1,151 @@
+@* LineNodeManageDialog.razor — 线路节点管理（一级弹窗）：列表 + 新建/编辑/删除（二级弹窗）
+   入口：「空间管理」页 →「线路」选项卡 → 行内「设置」图标。 *@
+@namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@inject LineNodeManageApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<DialogSky Title="@($"线路节点：{LineName}")"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭">
+    <DialogContent>
+        <div class="d-flex align-center mb-3">
+            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">线路节点</MudText>
+            <MudSpacer />
+            <MudButton Size="Size.Small"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateAsync">
+                新建节点
+            </MudButton>
+        </div>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <MudTable Items="_nodes ?? (IReadOnlyList<LineNodeDto>)[]" Hover="true" Bordered="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>名称</MudTh>
+                    <MudTh>描述</MudTh>
+                    <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">操作</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.Description</MudTd>
+                    <MudTd Style="white-space: nowrap; text-align: right;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(async () => await OpenDeleteAsync(context))"
+                                       title="删除节点" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="@(async () => await OpenEditAsync(context))"
+                                       title="编辑节点" />
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <EmptyStateSky Icon="@Icons.Material.Filled.AccountTree"
+                                   Title="暂无线路节点">
+                        <Description>
+                            <text>点击左上角"新建节点"添加第一个</text>
+                        </Description>
+                    </EmptyStateSky>
+                </NoRecordsContent>
+            </MudTable>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    /// <summary>所属线路 ID。</summary>
+    [Parameter, EditorRequired] public string LineId { get; set; } = string.Empty;
+
+    /// <summary>所属线路名称（仅用于标题展示）。</summary>
+    [Parameter] public string LineName { get; set; } = string.Empty;
+
+    private IReadOnlyList<LineNodeDto>? _nodes;
+    private bool _loading;
+
+    /// <summary>二级弹窗选项（与 TableRowManageDialog 一致）。</summary>
+    private static readonly DialogOptionsEx NestedOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        MaximizeButton = true
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _nodes = await Api.GetByLineAsync(LineId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+            _nodes = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var parameters = new DialogParameters<LineNodeCreateDialog>
+        {
+            { x => x.LineId, LineId }
+        };
+
+        var dialog = await DialogService.ShowExAsync<LineNodeCreateDialog>(
+            "新建线路节点", parameters, NestedOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    private async Task OpenEditAsync(LineNodeDto node)
+    {
+        var parameters = new DialogParameters<LineNodeEditDialog>
+        {
+            { x => x.Node, node }
+        };
+
+        var dialog = await DialogService.ShowExAsync<LineNodeEditDialog>(
+            "编辑线路节点", parameters, NestedOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    private async Task OpenDeleteAsync(LineNodeDto node)
+    {
+        var parameters = new DialogParameters<LineNodeDeleteDialog>
+        {
+            { x => x.Node, node }
+        };
+
+        var dialog = await DialogService.ShowExAsync<LineNodeDeleteDialog>(
+            "删除线路节点", parameters, NestedOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await LoadAsync();
+    }
+}

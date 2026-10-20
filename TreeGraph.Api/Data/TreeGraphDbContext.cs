@@ -690,6 +690,10 @@ public class TreeGraphDbContext : DbContext
             // ★ 按月分区表（审计只增不减，分区便于按月归档/清理）：
             //   分区表 DDL 由迁移中的手写 SQL 创建（PARTITION BY RANGE），
             //   EF 只负责运行时映射，故排除出自动迁移。
+            //   ★★ 建表 SQL 位于 migrations/MigrationSqlExtensions.CreateAuditPartitionTable：
+            //     重建 Initial 迁移（drop 库 + 重建）时必须确认该扩展方法仍被迁移调用，
+            //     否则启动时 42P01 relation "attribute_audit_log" does not exist。
+            //   月度分区由 AuditPartitionMaintenance 运行时按需创建。
             e.ToTable("attribute_audit_log", t => t.ExcludeFromMigrations());
             // ★ PG 分区表主键必须包含分区键 changed_at。
             e.HasKey(x => new { x.AuditId, x.ChangedAt });
@@ -817,9 +821,17 @@ public class TreeGraphDbContext : DbContext
                 .HasMaxLength(36).IsRequired()
                 .HasDefaultValueSql("gen_random_uuid()::text")
                 .HasSentinel("");
+            // 所属线路：必填外键 → lines(id)。Restrict：线路下仍有节点时禁止删除线路，
+            // 避免级联删除节点留下悬空边（edge_instances 对节点无外键约束）。
+            e.Property(x => x.LineId).HasColumnName("line_id").HasMaxLength(36).IsRequired();
+            e.HasOne<TreeGraph.Shared.LineSky.Entities.Line>()
+                .WithMany()
+                .HasForeignKey(x => x.LineId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.LineId);
+
             e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
-            e.Property(x => x.LocationGeo).HasColumnName("location_geo").HasMaxLength(100);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });

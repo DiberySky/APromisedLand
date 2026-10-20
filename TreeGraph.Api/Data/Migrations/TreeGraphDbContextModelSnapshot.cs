@@ -2236,10 +2236,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("description");
 
-                    b.Property<string>("LocationGeo")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("location_geo");
+                    b.Property<string>("LineId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("line_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2252,6 +2253,8 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LineId");
 
                     b.ToTable("line_nodes", (string)null);
                 });
@@ -3449,6 +3452,15 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.LineNode", b =>
+                {
+                    b.HasOne("TreeGraph.Shared.LineSky.Entities.Line", null)
+                        .WithMany()
+                        .HasForeignKey("LineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.SpaceTree", b =>

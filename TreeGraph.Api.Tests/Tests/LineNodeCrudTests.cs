@@ -39,14 +39,14 @@ public class LineNodeCrudTests
     public async Task Create_PersistsLineNode()
     {
         await using var db = CreateContext();
-        var node = new LineNode { Name = "跨越点 #001", Description = "10kV 线路跨越公路", LocationGeo = "116.404,39.915" };
+        var node = new LineNode { Name = "跨越点 #001", Description = "10kV 线路跨越公路" };
         db.LineNodes.Add(node);
         await db.SaveChangesAsync();
 
         var loaded = await db.LineNodes.FindAsync(node.Id);
         Assert.NotNull(loaded);
         Assert.Equal("跨越点 #001", loaded.Name);
-        Assert.Equal("116.404,39.915", loaded.LocationGeo);
+        Assert.Equal("10kV 线路跨越公路", loaded.Description);
     }
 
     [Fact]

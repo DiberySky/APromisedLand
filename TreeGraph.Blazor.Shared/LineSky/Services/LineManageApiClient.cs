@@ -1,0 +1,104 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using TreeGraph.Blazor.Shared.LineSky;
+using TreeGraph.Shared.NodeEavSky.Dtos;
+
+namespace TreeGraph.Blazor.Shared.LineSky.Services;
+
+/// <summary>
+/// 线路（Line）实体 CRUD HTTP 客户端，对齐后端 LinesController（路由 api/Lines）。
+/// 响应为 { success, message, data } 信封，本类负责解包。
+///
+/// 与 <see cref="LineApiClient"/>（api/eav/lines，线路结构查询）职责区分：本类只管 Line 实体增删改查。
+/// </summary>
+public class LineManageApiClient(HttpClient httpClient)
+{
+    private const string BasePath = "api/Lines";
+
+    // GET api/Lines
+    public async Task<IReadOnlyList<LineDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(BasePath, cancellationToken);
+        await EnsureSuccessWithApiResponseAsync(response);
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<List<LineDto>>>(cancellationToken);
+        return apiResponse?.Success != true || apiResponse.Data == null ? [] : apiResponse.Data;
+    }
+
+    // GET api/Lines/{id}；不存在返回 null
+    public async Task<LineDto?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"{BasePath}/{Uri.EscapeDataString(id)}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+        await EnsureSuccessWithApiResponseAsync(response);
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<LineDto>>(cancellationToken);
+        return apiResponse?.Success == true ? apiResponse.Data : null;
+    }
+
+    // POST api/Lines
+    public async Task<LineDto> CreateAsync(LineDto line, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(BasePath, line, cancellationToken);
+        await EnsureSuccessWithApiResponseAsync(response);
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<LineDto>>(cancellationToken);
+        if (apiResponse?.Success != true || apiResponse.Data is null)
+            throw new Exception(apiResponse?.Message ?? "创建失败，未返回具体错误信息");
+        return apiResponse.Data;
+    }
+
+    // PUT api/Lines/{id}；不存在返回 null
+    public async Task<LineDto?> UpdateAsync(string id, LineDto line, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"{BasePath}/{Uri.EscapeDataString(id)}", line, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+        await EnsureSuccessWithApiResponseAsync(response);
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<LineDto>>(cancellationToken);
+        if (apiResponse?.Success != true)
+            throw new Exception(apiResponse?.Message ?? "更新失败，未返回具体错误信息");
+        return apiResponse.Data;
+    }
+
+    // DELETE api/Lines/{id}；不存在返回 false
+    // 后端返回 204 NoContent（无响应体），故仅以状态码判定成功。
+    public async Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.DeleteAsync($"{BasePath}/{Uri.EscapeDataString(id)}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+        await EnsureSuccessWithApiResponseAsync(response);
+        return true;
+    }
+
+    /// <summary>
+    /// 检查状态码，若失败则抛出携带真实原因（ApiResponse{message} 或 {error}）的异常。
+    /// </summary>
+    private static async Task EnsureSuccessWithApiResponseAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        string? message = null;
+        try
+        {
+            var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (doc.ValueKind == JsonValueKind.Object)
+            {
+                string? Get(string name) =>
+                    doc.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
+                        ? v.GetString()
+                        : null;
+
+                message = Get("error") ?? Get("Error") ?? Get("message") ?? Get("Message");
+            }
+        }
+        catch (JsonException) { }
+
+        throw new HttpRequestException(
+            message is null
+                ? $"请求失败: {(int)response.StatusCode} {response.ReasonPhrase}"
+                : $"请求失败: {message}",
+            null, response.StatusCode);
+    }
+}

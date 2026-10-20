@@ -108,6 +108,24 @@ builder.Services
     .RemoveAllResilienceHandlers()
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
+// ★ LineSky 线路实体 CRUD 客户端（/api/Lines）：与 SpaceApiClient 同款服务发现与弹性策略。
+builder.Services
+    .AddHttpClient<LineManageApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .RemoveAllResilienceHandlers()
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
+// ★ LineSky 线路节点 CRUD 客户端（/api/LineNode）：同上。
+builder.Services
+    .AddHttpClient<LineNodeManageApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .RemoveAllResilienceHandlers()
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
 // ★ FileStorageSky 客户端（UploadsController + FilesController）：独立微服务 treegraphfilestorageapi。
 //   Aspire 服务发现名 "treegraphfilestorageapi"（见 AppHost/Extensions/TreeGraphFileStorageApiExtension.cs），
 //   全小写,与 treegrapheavapi 风格一致;TreeGraph.BlazorExtension 已通过
@@ -141,8 +159,11 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+// ★ AddAdditionalAssemblies：RCL（Blazor.Shared）中的 @page（如 /spaces）需注册进端点路由表，
+//   否则服务端路由不命中直接 404（Routes.razor 的 AdditionalAssemblies 只管客户端 Router）。
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddAdditionalAssemblies(typeof(TreeGraph.Blazor.Shared.SpaceSky.Pages.SpaceListPage).Assembly);
 
 app.MapDefaultEndpoints();
 

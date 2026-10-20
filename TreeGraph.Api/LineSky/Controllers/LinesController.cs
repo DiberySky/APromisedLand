@@ -69,12 +69,17 @@ public class LinesController : ControllerBase
         return Ok(existing);
     }
 
-    /// <summary>删除 Line。</summary>
+    /// <summary>删除 Line（其下仍有线路节点时拒绝，需先删除节点）。</summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct = default)
     {
         var existing = await _db.Lines.FindAsync([id], ct);
         if (existing is null) return NotFound();
+
+        // 线路节点以 line_id 外键（Restrict）挂在线上：仍有节点时拒绝，避免 23503 直抛 500
+        var hasNodes = await _db.LineNodes.AnyAsync(n => n.LineId == id, ct);
+        if (hasNodes)
+            return Conflict(new { error = "该线路下仍有线路节点，请先删除节点后再删除线路" });
 
         _db.Lines.Remove(existing);
         await _db.SaveChangesAsync(ct);

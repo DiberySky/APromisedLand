@@ -1,0 +1,54 @@
+@* LineCreateDialog.razor — 新建线路（DialogSky 外壳，与 SpaceCreateDialog 风格一致） *@
+@using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Services
+@inject LineManageApiClient Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="新建线路"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="CreateAsync">
+    <DialogContent>
+        <MudTextField @bind-Value="_form.Name"
+                      Label="名称"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+        <MudTextField @bind-Value="_form.Description"
+                      Label="描述"
+                      Variant="Variant.Outlined"
+                      Lines="3" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private readonly LineDto _form = new();
+    private bool _submitting;
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_form.Name))
+        {
+            Snackbar.Add("请填写名称", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var created = await Api.CreateAsync(_form);
+            Snackbar.Add($"创建成功：{created.Name}", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(created));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"创建失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

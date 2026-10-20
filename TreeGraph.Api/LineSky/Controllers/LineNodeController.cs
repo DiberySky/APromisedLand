@@ -29,11 +29,16 @@ public class LineNodeController : ControllerBase
         _publishEndpoint = publishEndpoint;
     }
 
-    /// <summary>查询全部 LineNode（支持按名称搜索）。</summary>
+    /// <summary>查询 LineNode；可按所属线路（lineId）与名称（search）过滤。</summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? search = null, CancellationToken ct = default)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? lineId = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
     {
         var query = _db.LineNodes.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(lineId))
+            query = query.Where(n => n.LineId == lineId);
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(n => n.Name.Contains(search));
         var items = await query.OrderBy(n => n.Name).ToListAsync(ct);
@@ -54,6 +59,9 @@ public class LineNodeController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(node.Name))
             return BadRequest("名称不能为空");
+
+        if (string.IsNullOrWhiteSpace(node.LineId))
+            return BadRequest("所属线路不能为空");
 
         node.Id = string.IsNullOrWhiteSpace(node.Id) ? Guid.NewGuid().ToString() : node.Id;
         node.CreatedAt = DateTimeOffset.UtcNow;
@@ -77,7 +85,6 @@ public class LineNodeController : ControllerBase
 
         existing.Name = node.Name;
         existing.Description = node.Description;
-        existing.LocationGeo = node.LocationGeo;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
@@ -98,7 +105,7 @@ public class LineNodeController : ControllerBase
         var hasEdges = await _db.EdgeInstances
             .AnyAsync(e => e.FromNodeId == id || e.ToNodeId == id, ct);
         if (hasEdges)
-            return Conflict("该节点仍有边引用，无法删除");
+            return Conflict(new { error = "该节点仍有边引用，无法删除" });
 
         _db.LineNodes.Remove(existing);
         await _db.SaveChangesAsync(ct);
