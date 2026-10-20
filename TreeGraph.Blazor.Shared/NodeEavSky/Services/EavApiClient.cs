@@ -596,16 +596,89 @@ public class EavApiClient
     /// <summary>
     /// 手动触发向量对账（补缺 + 删孤）。
     /// spaceId 非空时仅对该空间对应树范围对账（动态=空间树子树；单位=单位树；类型=分类树）；
-    /// 为空则全量对账。失败返回 null。
+    /// category 非空时按数据类别对账（space=空间树；tree=单位/分类/知识树；line=线路），与 spaceId 互斥；
+    /// 两者皆空则全量对账。失败返回 null。
     /// </summary>
     public Task<VectorReconcileResultDto?> ReconcileVectorsAsync(
-        string? spaceId = null, CancellationToken ct = default)
+        string? spaceId = null, string? category = null, CancellationToken ct = default)
     {
-        var url = string.IsNullOrWhiteSpace(spaceId)
+        var query = new List<string>(2);
+        if (!string.IsNullOrWhiteSpace(spaceId))
+            query.Add($"spaceId={Uri.EscapeDataString(spaceId)}");
+        if (!string.IsNullOrWhiteSpace(category))
+            query.Add($"category={Uri.EscapeDataString(category)}");
+
+        var url = query.Count == 0
             ? "api/search/reconcile"
-            : $"api/search/reconcile?spaceId={Uri.EscapeDataString(spaceId)}";
+            : $"api/search/reconcile?{string.Join("&", query)}";
         return PostNoBodyAsync<VectorReconcileResultDto>(url, ct);
     }
+
+    /// <summary>
+    /// 流式向量对账（NDJSON 逐行进度）：每个同步/清理项实时回调 onEvent（UI 滚动展示），
+    /// 流结束返回最终统计（stage=summary 行）。失败（非 2xx/断流）返回 null。
+    /// </summary>
+    public async Task<VectorReconcileResultDto?> StreamReconcileAsync(
+        string? spaceId = null, string? category = null,
+        Action<ReconcileStreamEventDto>? onEvent = null,
+        CancellationToken ct = default)
+    {
+        var query = new List<string>(2);
+        if (!string.IsNullOrWhiteSpace(spaceId))
+            query.Add($"spaceId={Uri.EscapeDataString(spaceId)}");
+        if (!string.IsNullOrWhiteSpace(category))
+            query.Add($"category={Uri.EscapeDataString(category)}");
+
+        var url = query.Count == 0
+            ? "api/search/reconcile/stream"
+            : $"api/search/reconcile/stream?{string.Join("&", query)}";
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, url);
+            using var resp = await _http.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("POST {Url} → {Status}", url, resp.StatusCode);
+                return default;
+            }
+
+            await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var reader = new StreamReader(stream);
+            VectorReconcileResultDto? summary = null;
+            while (await reader.ReadLineAsync(ct) is { Length: > 0 } line)
+            {
+                var evt = JsonSerializer.Deserialize<ReconcileStreamEventDto>(line, JsonOptions);
+                if (evt is null) continue;
+                if (evt.Stage == "summary")
+                {
+                    summary = new VectorReconcileResultDto(
+                        evt.Active ?? 0, evt.Existing ?? 0, evt.Missing ?? 0,
+                        evt.Orphaned ?? 0, evt.FixedCount ?? 0, evt.DeletedCount ?? 0);
+                }
+                else
+                {
+                    onEvent?.Invoke(evt);
+                }
+            }
+            return summary;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "POST {Url} 流式对账失败", url);
+            return default;
+        }
+    }
+
+    /// <summary>
+    /// 图按类别幂等推送（不 DROP）：把 PostgreSQL 该类别现状批量覆盖写入 NebulaGraph。
+    /// category：space=空间树；tree=单位/分类/知识树；line=线路；edge=语义边。
+    /// </summary>
+    public Task<GraphCategorySyncResultDto?> SyncGraphCategoryAsync(
+        string category, CancellationToken ct = default)
+        => PostNoBodyAsync<GraphCategorySyncResultDto>(
+            $"api/graph-sync/category/{Uri.EscapeDataString(category)}", ct);
 
     // ============================================================
     // 通用助手

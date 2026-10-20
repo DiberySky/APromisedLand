@@ -4,10 +4,12 @@ using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.LineSky.Services;
 using TreeGraph.Api.EdgeSky.Services;
 using TreeGraph.Api.GraphSyncSky;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.SemanticSearch;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Api.TreeEavSky.Services;
+using Wolverine;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,12 +97,12 @@ builder.Services.AddSemanticSearch(builder.Configuration);
 
 // ★ 图同步管道（PostgreSQL → NebulaGraph，经 TreeGraph.NebulaFastApi REST 网关）
 //   Testing 环境（EavApiFactory 集成测试）无 RabbitMQ/NebulaGraph：
-//   跳过消费者注册（MassTransit 总线启动会无限重连并阻塞 WebApplication 启动）
-//   与 schema 初始化后台服务。
-//   AddMassTransit 每容器只允许调用一次，图同步消费者经回调并入向量同步的总线注册。
+//   跳过 Wolverine 总线（消费者 handler 随 UseWolverine 一并跳过，IEventPublisher
+//   由测试工厂注册 Noop 空桩）与 schema 初始化后台服务。
+//   Wolverine 按约定自动发现本程序集中的 *Consumer handler（向量同步 + 图同步）。
 var isTesting = builder.Environment.IsEnvironment("Testing");
 if (!isTesting)
-    builder.Services.AddVectorSyncConsumers(builder.Configuration, x => x.AddGraphSyncConsumers());
+    builder.Host.UseWolverine(opts => opts.UseTreeGraphMessaging(builder.Configuration));
 builder.Services.AddGraphSync(builder.Configuration, enableSchemaInitializer: !isTesting);
 
 // Edge（关系/边）

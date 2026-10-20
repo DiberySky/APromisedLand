@@ -1,4 +1,3 @@
-using MassTransit;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using TreeGraph.Shared.Messaging;
@@ -9,7 +8,7 @@ namespace TreeGraph.Api.GraphSyncSky;
 /// RabbitMQ 消费者：iNode 变更 → 同步图顶点 + parent_of 边（幂等）。
 /// 去重键带 kind 组（upsert/delete），避免同 Id 创建后紧跟删除被窗口吞掉。
 /// </summary>
-public sealed class InodeGraphSyncConsumer : IConsumer<InodeChangedEvent>
+public sealed class InodeGraphSyncConsumer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IMemoryCache _dedupCache;
@@ -28,9 +27,8 @@ public sealed class InodeGraphSyncConsumer : IConsumer<InodeChangedEvent>
         _logger = logger;
     }
 
-    public async Task Consume(ConsumeContext<InodeChangedEvent> context)
+    public async Task Consume(InodeChangedEvent msg, CancellationToken ct)
     {
-        var msg = context.Message;
         var dedupKey = $"graph-sync:{msg.InodeId}:{(msg.Kind == InodeChangeKind.Deleted ? "del" : "upsert")}";
         if (_dedupCache.TryGetValue(dedupKey, out _))
         {
@@ -43,8 +41,8 @@ public sealed class InodeGraphSyncConsumer : IConsumer<InodeChangedEvent>
         var initializer = scope.ServiceProvider.GetRequiredService<GraphSchemaInitializer>();
         var synchronizer = scope.ServiceProvider.GetRequiredService<GraphSynchronizer>();
 
-        await initializer.EnsureReadyAsync(context.CancellationToken);
-        await synchronizer.SyncInodeAsync(msg.InodeId, context.CancellationToken);
+        await initializer.EnsureReadyAsync(ct);
+        await synchronizer.SyncInodeAsync(msg.InodeId, ct);
     }
 }
 
@@ -52,7 +50,7 @@ public sealed class InodeGraphSyncConsumer : IConsumer<InodeChangedEvent>
 /// RabbitMQ 消费者：边变更 → 同步语义边（幂等）。
 /// Deleted 依赖事件载荷定位图边（PG 行已删）。
 /// </summary>
-public sealed class EdgeGraphSyncConsumer : IConsumer<EdgeChangedEvent>
+public sealed class EdgeGraphSyncConsumer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IMemoryCache _dedupCache;
@@ -71,9 +69,8 @@ public sealed class EdgeGraphSyncConsumer : IConsumer<EdgeChangedEvent>
         _logger = logger;
     }
 
-    public async Task Consume(ConsumeContext<EdgeChangedEvent> context)
+    public async Task Consume(EdgeChangedEvent msg, CancellationToken ct)
     {
-        var msg = context.Message;
         var dedupKey = $"graph-sync-edge:{msg.EdgeId}:{(msg.Kind == EdgeChangeKind.Deleted ? "del" : "upsert")}";
         if (_dedupCache.TryGetValue(dedupKey, out _))
         {
@@ -86,7 +83,7 @@ public sealed class EdgeGraphSyncConsumer : IConsumer<EdgeChangedEvent>
         var initializer = scope.ServiceProvider.GetRequiredService<GraphSchemaInitializer>();
         var synchronizer = scope.ServiceProvider.GetRequiredService<GraphSynchronizer>();
 
-        await initializer.EnsureReadyAsync(context.CancellationToken);
-        await synchronizer.SyncEdgeAsync(msg, context.CancellationToken);
+        await initializer.EnsureReadyAsync(ct);
+        await synchronizer.SyncEdgeAsync(msg, ct);
     }
 }

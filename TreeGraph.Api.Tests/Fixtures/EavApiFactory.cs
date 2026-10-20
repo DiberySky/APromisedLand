@@ -1,9 +1,9 @@
-using MassTransit;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Services;
 using Xunit;
 
@@ -43,10 +43,10 @@ public class EavApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             services.RemoveAll<IInodeOwnerGuard>();
 
-            // ★ Testing 环境 Program.cs 跳过 RabbitMQ 消费者注册，
-            //   但 InodeEavFacade 写链路依赖 IPublishEndpoint；
-            //   注册无消费者的内存总线：总线秒启动，发布即丢弃。
-            services.AddMassTransit(x => x.UsingInMemory((_, _) => { }));
+            // ★ Testing 环境 Program.cs 跳过 UseWolverine（无 RabbitMQ），
+            //   但 InodeEavFacade 等写链路依赖 IEventPublisher；
+            //   注册 Noop 空桩：发布即丢弃，无外部依赖。
+            services.AddSingleton<IEventPublisher, NoopEventPublisher>();
         });
     }
 }

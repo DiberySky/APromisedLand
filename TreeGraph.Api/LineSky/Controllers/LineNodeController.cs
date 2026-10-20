@@ -1,7 +1,7 @@
-using MassTransit;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.LineSky.Entities;
 using TreeGraph.Shared.Messaging;
 
@@ -21,9 +21,9 @@ namespace TreeGraph.Api.LineSky.Controllers;
 public class LineNodeController : ControllerBase
 {
     private readonly TreeGraphDbContext _db;
-    private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IEventPublisher _publishEndpoint;
 
-    public LineNodeController(TreeGraphDbContext db, IPublishEndpoint publishEndpoint)
+    public LineNodeController(TreeGraphDbContext db, IEventPublisher publishEndpoint)
     {
         _db = db;
         _publishEndpoint = publishEndpoint;
@@ -71,7 +71,7 @@ public class LineNodeController : ControllerBase
         await _db.SaveChangesAsync(ct);
 
         // ★ 节点新增 → 即时同步向量/图（消费端幂等）
-        await PublishAsync(node.Id, InodeChangeKind.Saved, ct);
+        await PublishAsync(node.Id, InodeChangeKind.Saved, pathAffected: false, ct);
 
         return CreatedAtAction(nameof(GetById), new { id = node.Id }, node);
     }
@@ -90,7 +90,7 @@ public class LineNodeController : ControllerBase
         await _db.SaveChangesAsync(ct);
 
         // ★ 节点更新 → 即时重建向量/图顶点
-        await PublishAsync(id, InodeChangeKind.Saved, ct);
+        await PublishAsync(id, InodeChangeKind.Saved, pathAffected: true, ct);
 
         return Ok(existing);
     }
@@ -111,18 +111,20 @@ public class LineNodeController : ControllerBase
         await _db.SaveChangesAsync(ct);
 
         // ★ 节点已删除 → 消费端据 InodeId 清除残留向量/图顶点
-        await PublishAsync(id, InodeChangeKind.Deleted, ct);
+        await PublishAsync(id, InodeChangeKind.Deleted, pathAffected: false, ct);
 
         return NoContent();
     }
 
-    /// <summary>发布 iNode 变更事件（向量/图同步；at-least-once，消费端幂等）。</summary>
-    private async Task PublishAsync(string inodeId, InodeChangeKind kind, CancellationToken ct)
+    /// <summary>发布 iNode 变更事件（向量/图同步；at-least-once，消费端幂等）。
+    /// pathAffected：名称变更（改名）→ 消费端级联刷新后代（线路节点无后代，保持规则统一）。</summary>
+    private async Task PublishAsync(string inodeId, InodeChangeKind kind, bool pathAffected, CancellationToken ct)
     {
         await _publishEndpoint.Publish(new InodeChangedEvent
         {
             InodeId = inodeId,
-            Kind = kind
+            Kind = kind,
+            PathAffected = pathAffected
         }, ct);
     }
 }

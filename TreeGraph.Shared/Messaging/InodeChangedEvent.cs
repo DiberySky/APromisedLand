@@ -11,6 +11,12 @@ public record InodeChangedEvent
     public required string InodeId { get; init; }
     public required InodeChangeKind Kind { get; init; }
     public DateTimeOffset OccurredAt { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// 名称/层级位置是否变更（改名/移动）。true 时消费端除刷新自身外，
+    /// 还需级联刷新该 inode 在 4 棵宿主树中的全部后代（后代的路径型向量文本失效）。
+    /// </summary>
+    public bool PathAffected { get; init; }
 }
 
 public enum InodeChangeKind

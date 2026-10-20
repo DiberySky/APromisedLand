@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using TreeGraph.Api.GraphSyncSky;
 using TreeGraph.Api.NodeEavSky.SemanticSearch;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -60,23 +61,38 @@ public sealed class SearchController : ControllerBase
     /// <summary>
     /// 手动触发向量对账（立即执行，无需等待后台周期）。
     /// 用于修复：PG 有、Qdrant 无（补算向量）或 Qdrant 有、PG 无（删除孤儿）。
-    /// spaceId 为空 = 全量对账；非空 = 仅该空间对应树范围（动态=空间树子树；单位=单位树；类型=分类树）。
+    /// 范围三选一：category（space=空间树；tree=单位/分类/知识树；line=线路；边无向量不支持）
+    /// > spaceId（该空间对应树范围）> 全量（两者皆空）。
     /// </summary>
     [HttpPost("reconcile")]
     public async Task<IActionResult> ReconcileVectors(
-        [FromQuery] string? spaceId, CancellationToken ct)
+        [FromQuery] string? spaceId, [FromQuery] string? category, CancellationToken ct)
     {
+        if (!string.IsNullOrWhiteSpace(category) && !string.IsNullOrWhiteSpace(spaceId))
+            return BadRequest(new { error = "category 与 spaceId 只能二选一" });
+
+        SyncCategory? syncCategory = null;
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            if (!SyncCategoryParser.TryParse(category, out var parsed) || parsed == SyncCategory.Edge)
+                return BadRequest(new { error = "category 仅支持 space|tree|line（边无向量）" });
+            syncCategory = parsed;
+        }
+
         await using var scope = _scopeFactory.CreateAsyncScope();
         var synchronizer = scope.ServiceProvider
             .GetRequiredService<VectorSynchronizer>();
 
-        var result = string.IsNullOrWhiteSpace(spaceId)
-            ? await synchronizer.ReconcileAllAsync(ct)
-            : await synchronizer.ReconcileSpaceAsync(spaceId, ct);
+        var result = syncCategory is not null
+            ? await synchronizer.ReconcileCategoryAsync(syncCategory.Value, ct)
+            : string.IsNullOrWhiteSpace(spaceId)
+                ? await synchronizer.ReconcileAllAsync(ct)
+                : await synchronizer.ReconcileSpaceAsync(spaceId, ct);
 
         _logger.LogInformation(
-            "手动向量对账（空间={SpaceId}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
-            spaceId ?? "*", result.Active, result.Existing, result.Missing,
+            "手动向量对账（空间={SpaceId} 类别={Category}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
+            spaceId ?? "*", syncCategory?.ToString() ?? "*",
+            result.Active, result.Existing, result.Missing,
             result.Orphaned, result.FixedCount, result.DeletedCount);
 
         return Ok(new
@@ -89,6 +105,66 @@ public sealed class SearchController : ControllerBase
             deletedCount = result.DeletedCount
         });
     }
+
+    /// <summary>
+    /// 流式向量对账（NDJSON 逐行推送进度，同步刷新对话框滚动展示用）。
+    /// 行格式：{"stage":"fix","inodeId":...,"name":...} 同步节点；
+    ///        {"stage":"purge",...,"detail":...} 清理孤儿；
+    ///        {"stage":"summary",...六个计数字段} 结束统计。
+    /// 范围三选一：category（space=空间树；tree=单位/分类/知识树；line=线路）> spaceId > 全量。
+    /// 校验失败仍走普通 400 信封；成功时直接写响应体并返回 EmptyResult，不经信封包装。
+    /// </summary>
+    [HttpPost("reconcile/stream")]
+    public async Task<IActionResult> ReconcileVectorsStream(
+        [FromQuery] string? spaceId, [FromQuery] string? category, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(category) && !string.IsNullOrWhiteSpace(spaceId))
+            return BadRequest(new { error = "category 与 spaceId 只能二选一" });
+
+        SyncCategory? syncCategory = null;
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            if (!SyncCategoryParser.TryParse(category, out var parsed) || parsed == SyncCategory.Edge)
+                return BadRequest(new { error = "category 仅支持 space|tree|line（边无向量）" });
+            syncCategory = parsed;
+        }
+
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var synchronizer = scope.ServiceProvider
+            .GetRequiredService<VectorSynchronizer>();
+
+        Response.ContentType = "application/x-ndjson; charset=utf-8";
+
+        // 必须逐行 await 写入再 flush：fire-and-forget 的并发写响应体会导致流卡死
+        async Task WriteEventAsync(ReconcileStreamEventDto evt)
+        {
+            await Response.WriteAsync(
+                System.Text.Json.JsonSerializer.Serialize(evt, JsonOpts) + "\n", ct);
+            await Response.Body.FlushAsync(ct);
+        }
+
+        var result = await synchronizer.ReconcileAsync(
+            string.IsNullOrWhiteSpace(spaceId) ? null : spaceId, syncCategory,
+            onProgress: async p => await WriteEventAsync(new ReconcileStreamEventDto(
+                p.Stage, p.InodeId, p.Name, p.Detail)),
+            ct);
+
+        await WriteEventAsync(new ReconcileStreamEventDto(
+            "summary", "", "", "",
+            result.Active, result.Existing, result.Missing, result.Orphaned,
+            result.FixedCount, result.DeletedCount));
+
+        _logger.LogInformation(
+            "手动向量对账-流式（空间={SpaceId} 类别={Category}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
+            spaceId ?? "*", syncCategory?.ToString() ?? "*",
+            result.Active, result.Existing, result.Missing,
+            result.Orphaned, result.FixedCount, result.DeletedCount);
+
+        return new EmptyResult(); // 自写响应体，不经信封包装
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOpts =
+        new(System.Text.Json.JsonSerializerDefaults.Web);
 }
 
 public sealed class SemanticSearchRequest

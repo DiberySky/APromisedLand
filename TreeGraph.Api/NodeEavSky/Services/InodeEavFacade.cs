@@ -1,4 +1,4 @@
-using MassTransit;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Shared.Messaging;
 
@@ -19,13 +19,13 @@ public class InodeEavFacade
     private readonly IInodeEntityService _inodeEntities;
     private readonly EavWriteService _write;
     private readonly EavReadService _read;
-    private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IEventPublisher _publishEndpoint;
 
     public InodeEavFacade(
         IInodeEntityService inodeEntities,
         EavWriteService write,
         EavReadService read,
-        IPublishEndpoint publishEndpoint)
+        IEventPublisher publishEndpoint)
     {
         _inodeEntities = inodeEntities;
         _write = write;

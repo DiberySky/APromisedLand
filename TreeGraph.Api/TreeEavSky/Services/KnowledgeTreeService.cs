@@ -1,5 +1,5 @@
-using MassTransit;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -9,7 +9,7 @@ using Npgsql;
 
 namespace TreeGraph.Api.TreeEavSky.Services;
 
-public class KnowledgeTreeService(TreeGraphDbContext dbContext, IPublishEndpoint publishEndpoint) : ITreeService<KnowledgeTree>
+public class KnowledgeTreeService(TreeGraphDbContext dbContext, IEventPublisher publishEndpoint) : ITreeService<KnowledgeTree>
 {
     public async Task<IReadOnlyList<TreeNodeDto<KnowledgeTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
@@ -199,7 +199,7 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext, IPublishEndpoint
         await dbContext.KnowledgeTrees.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: false, cancellationToken);
 
         return entity.ToNodeDto();
     }
@@ -221,7 +221,7 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext, IPublishEndpoint
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
         return entity.ToNodeDto();
     }
@@ -274,7 +274,7 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext, IPublishEndpoint
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await PublishAsync(nodeId, InodeChangeKind.Deleted, cancellationToken);
+        await PublishAsync(nodeId, InodeChangeKind.Deleted, pathAffected: false, cancellationToken);
 
         // 5. 更新父节点的 HasChildren
         // if (!string.IsNullOrEmpty(parentId))
@@ -346,18 +346,20 @@ public class KnowledgeTreeService(TreeGraphDbContext dbContext, IPublishEndpoint
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await PublishAsync(nodeId, InodeChangeKind.Saved, cancellationToken);
+        await PublishAsync(nodeId, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
         return true;
     }
 
-    /// <summary>发布 iNode 变更事件（向量同步 + 图同步；at-least-once，消费端幂等）。</summary>
-    private async Task PublishAsync(string inodeId, InodeChangeKind kind, CancellationToken ct)
+    /// <summary>发布 iNode 变更事件（向量同步 + 图同步；at-least-once，消费端幂等）。
+    /// pathAffected：名称/层级位置变更（改名/移动）→ 消费端级联刷新全部后代的路径型文本。</summary>
+    private async Task PublishAsync(string inodeId, InodeChangeKind kind, bool pathAffected, CancellationToken ct)
     {
         await publishEndpoint.Publish(new InodeChangedEvent
         {
             InodeId = inodeId,
-            Kind = kind
+            Kind = kind,
+            PathAffected = pathAffected
         }, ct);
     }
 

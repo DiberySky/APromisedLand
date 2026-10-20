@@ -1,4 +1,3 @@
-using MassTransit;
 using Qdrant.Client;
 
 namespace TreeGraph.Api.NodeEavSky.SemanticSearch;
@@ -64,38 +63,6 @@ public static class SemanticSearchExtensions
         services.AddScoped<VectorSynchronizer>();
         services.AddScoped<SearchService>();
         services.AddHostedService<VectorReconciliationService>();
-
-        return services;
-    }
-
-    /// <summary>
-    /// RabbitMQ 消费者注册（MassTransit）。
-    /// AddMassTransit 每容器只允许调用一次；其他管道的消费者经
-    /// <paramref name="configureConsumers"/> 并入同一次注册。
-    /// </summary>
-    public static IServiceCollection AddVectorSyncConsumers(
-        this IServiceCollection services, IConfiguration config,
-        Action<MassTransit.IBusRegistrationConfigurator>? configureConsumers = null)
-    {
-        services.AddMassTransit(x =>
-        {
-            x.AddConsumer<InodeChangedConsumer>();
-            configureConsumers?.Invoke(x);
-
-            x.UsingRabbitMq((ctx, cfg) =>
-            {
-                var rabbitUri = config.GetConnectionString("RabbitMQ")
-                                ?? "amqp://localhost:5672";
-                cfg.Host(new Uri(rabbitUri));
-                cfg.ConfigureEndpoints(ctx);
-
-                cfg.UseMessageRetry(r => r.Exponential(
-                    retryLimit: 5,
-                    minInterval: TimeSpan.FromSeconds(1),
-                    maxInterval: TimeSpan.FromMinutes(1),
-                    intervalDelta: TimeSpan.FromSeconds(5)));
-            });
-        });
 
         return services;
     }

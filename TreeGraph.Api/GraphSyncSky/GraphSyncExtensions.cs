@@ -1,4 +1,3 @@
-using MassTransit;
 using Microsoft.Extensions.Options;
 
 namespace TreeGraph.Api.GraphSyncSky;
@@ -40,16 +39,5 @@ public static class GraphSyncExtensions
         services.AddScoped<GraphSynchronizer>();
 
         return services;
-    }
-
-    /// <summary>
-    /// 追加图同步消费者到既有 MassTransit 注册。
-    /// AddMassTransit 每容器只允许调用一次，故须作为
-    /// AddVectorSyncConsumers 的 configureConsumers 回调传入。
-    /// </summary>
-    public static void AddGraphSyncConsumers(this IBusRegistrationConfigurator x)
-    {
-        x.AddConsumer<InodeGraphSyncConsumer>();
-        x.AddConsumer<EdgeGraphSyncConsumer>();
     }
 }

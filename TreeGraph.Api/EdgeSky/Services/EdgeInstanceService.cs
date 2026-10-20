@@ -1,8 +1,8 @@
 using System.Text.Json;
-using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.Messaging;
@@ -22,12 +22,12 @@ public class EdgeInstanceService
     private readonly EavReadService _eavRead;
     private readonly IEdgeNodeValidator _nodeValidator;
     private readonly InodeOwnerGuardRegistry _inodeGuards;
-    private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IEventPublisher _publishEndpoint;
 
     public EdgeInstanceService(
         TreeGraphDbContext db, EavWriteService eavWrite, EavReadService eavRead,
         IEdgeNodeValidator nodeValidator, InodeOwnerGuardRegistry inodeGuards,
-        IPublishEndpoint publishEndpoint)
+        IEventPublisher publishEndpoint)
     {
         _db = db;
         _eavWrite = eavWrite;

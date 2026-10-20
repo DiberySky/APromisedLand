@@ -1,5 +1,5 @@
-using MassTransit;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -13,7 +13,7 @@ namespace TreeGraph.Api.TreeEavSky.Services;
 /// 写操作（创建/更新/删除/移动）成功后发布 InodeChangedEvent，
 /// 供语义搜索向量同步与图同步消费（at-least-once，消费端幂等）。
 /// </summary>
-public class UnitTreeService(TreeGraphDbContext dbContext, IPublishEndpoint publishEndpoint) : ITreeService<UnitTree>
+public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publishEndpoint) : ITreeService<UnitTree>
 {
     public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
@@ -203,7 +203,7 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IPublishEndpoint publ
         await dbContext.UnitTrees.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: false, cancellationToken);
 
         return entity.ToNodeDto();
     }
@@ -225,7 +225,7 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IPublishEndpoint publ
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
         return entity.ToNodeDto();
     }
@@ -279,7 +279,7 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IPublishEndpoint publ
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await PublishAsync(nodeId, InodeChangeKind.Deleted, cancellationToken);
+        await PublishAsync(nodeId, InodeChangeKind.Deleted, pathAffected: false, cancellationToken);
 
         return true;
     }
@@ -333,18 +333,20 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IPublishEndpoint publ
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await PublishAsync(nodeId, InodeChangeKind.Saved, cancellationToken);
+        await PublishAsync(nodeId, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
         return true;
     }
 
-    /// <summary>发布 iNode 变更事件（向量同步 + 图同步；at-least-once，消费端幂等）。</summary>
-    private async Task PublishAsync(string inodeId, InodeChangeKind kind, CancellationToken ct)
+    /// <summary>发布 iNode 变更事件（向量同步 + 图同步；at-least-once，消费端幂等）。
+    /// pathAffected：名称/层级位置变更（改名/移动）→ 消费端级联刷新全部后代的路径型文本。</summary>
+    private async Task PublishAsync(string inodeId, InodeChangeKind kind, bool pathAffected, CancellationToken ct)
     {
         await publishEndpoint.Publish(new InodeChangedEvent
         {
             InodeId = inodeId,
-            Kind = kind
+            Kind = kind,
+            PathAffected = pathAffected
         }, ct);
     }
 

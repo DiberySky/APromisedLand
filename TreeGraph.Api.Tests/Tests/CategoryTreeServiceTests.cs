@@ -89,7 +89,7 @@ public class CategoryTreeServiceTests
     }
 
     private static CategoryTreeService CreateService(TreeGraphDbContext context) =>
-        new(context, new NoopPublishEndpoint());
+        new(context, new NoopEventPublisher());
 
     // ========== 实体 ==========
 

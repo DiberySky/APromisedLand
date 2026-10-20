@@ -26,6 +26,12 @@ else
             <MudTh>属性设置</MudTh>
             <MudTh>描述</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+                @* 同步刷新：分步列出 space/tree/line/edge 同步到 向量/图 的过程进度 *@
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                               Color="Color.Info"
+                               Size="Size.Small"
+                               OnClick="OpenSyncRefreshAsync"
+                               title="同步刷新" />
                 <MudIconButton Icon="@Icons.Material.Filled.Add"
                                Color="Color.Success"
                                Size="Size.Small"
@@ -46,12 +52,11 @@ else
             </MudTd>
             <MudTd>@context.Description</MudTd>
             <MudTd Style="white-space: nowrap; text-align: right;">
-                @* 向量刷新：按本空间范围手动补缺 + 删孤（语义搜索索引刷新） *@
+                @* 向量刷新：打开对话框可视化该空间范围的向量对账进度（补缺 + 删孤） *@
                 <MudIconButton Icon="@Icons.Material.Filled.Sync"
                                Color="Color.Info"
                                Size="Size.Small"
-                               Disabled="_reconciling"
-                               OnClick="@(async () => await ReconcileAsync(context))"
+                               OnClick="@(async () => await OpenVectorRefreshAsync(context))"
                                title="向量刷新" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                Color="Color.Error"
@@ -96,7 +101,6 @@ else
     private IReadOnlyList<SpaceDto>? _spaces;
     private bool _loading;
     private bool _initialized;
-    private bool _reconciling;
 
     /// <summary>CRUD 子对话框选项（与 OptionSets 页面一致：小宽度全宽）。</summary>
     private static readonly DialogOptions DialogOptions = new()
@@ -152,37 +156,38 @@ else
     }
 
     /// <summary>
-    /// 手动向量刷新（按本空间范围）：补缺（PG 有、向量库无）+ 删孤（向量库有、PG 无）。
+    /// 打开向量刷新对话框（无确认步骤）：可视化该空间范围的向量对账进度。
     /// 范围与打开该空间的树一致：动态空间 = 空间树子树；单位空间 = 单位树；类型空间 = 分类树；知识库空间 = 知识树。
     /// </summary>
-    private async Task ReconcileAsync(SpaceDto space)
+    private async Task OpenVectorRefreshAsync(SpaceDto space)
     {
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "向量刷新",
-            $"将刷新「{space.Name}」的搜索索引：整理该空间范围内的节点与实体数据，" +
-            "使语义搜索能立即检索到它们。是否继续？",
-            yesText: "刷新", cancelText: "取消");
-        if (confirmed != true) return;
+        var parameters = new DialogParameters<SpaceVectorRefreshDialog>
+        {
+            { x => x.Space, space }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+        await DialogService.ShowExAsync<SpaceVectorRefreshDialog>(
+            "向量刷新", parameters, options);
+    }
 
-        _reconciling = true;
-        try
+    /// <summary>打开同步刷新对话框：分步列出 space/tree/line/edge 同步到 向量/图 的过程进度。</summary>
+    private async Task OpenSyncRefreshAsync()
+    {
+        var options = new DialogOptionsEx
         {
-            var result = await EavApi.ReconcileVectorsAsync(space.Id);
-            if (result is null)
-                Snackbar.Add("刷新失败：接口未返回结果", Severity.Error);
-            else
-                Snackbar.Add(
-                    $"刷新完成：新增 {result.FixedCount} 条，清理 {result.DeletedCount} 条",
-                    Severity.Success);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"刷新失败：{ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _reconciling = false;
-        }
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+        await DialogService.ShowExAsync<SyncRefreshDialog>(
+            "同步刷新", new DialogParameters<SyncRefreshDialog>(), options);
     }
 
     private async Task OpenCreateAsync()

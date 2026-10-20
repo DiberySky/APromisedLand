@@ -1,9 +1,9 @@
-using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.GraphSyncSky;
 using TreeGraph.Api.SpaceSky.Entities;
 using TreeGraph.Shared.Messaging;
 
@@ -52,14 +52,16 @@ public sealed class VectorSynchronizer
             return false;
         }
 
-        // 节点向量（纯节点文本；tree_node 裸实体节点无节点文本则跳过）
+        // 节点向量（纯节点文本；无节点文本则跳过）
         if (!string.IsNullOrWhiteSpace(source.NodeText))
         {
             var nodeVector = await _embedding.EmbedAsync(source.NodeText, ct);
             await _store.UpsertNodeAsync(
                 inodeId, nodeVector,
                 source.HostType, source.SpaceId,
-                source.NodeHash, source.NodeText, ct);
+                source.NodeHash, source.NodeText,
+                SourceTextBuilder.ViewType, SourceTextBuilder.TemplateVersion,
+                source.Path, source.PathIds, source.Depth, ct);
         }
 
         // 各实体独立向量
@@ -80,63 +82,87 @@ public sealed class VectorSynchronizer
 
     /// <summary>全量对账（不限定空间）。</summary>
     public Task<ReconcileResult> ReconcileAllAsync(CancellationToken ct)
-        => ReconcileAsync(null, ct);
+        => ReconcileAsync(null, null, onProgress: null, ct);
 
     /// <summary>
     /// 按空间对账：仅在该空间对应树范围内比对。
     /// 动态空间 = 空间树中以该空间为根的子树；单位空间 = 单位树全体；类型空间 = 分类树全体。
     /// </summary>
     public Task<ReconcileResult> ReconcileSpaceAsync(string spaceId, CancellationToken ct)
-        => ReconcileAsync(spaceId, ct);
+        => ReconcileAsync(spaceId, null, onProgress: null, ct);
+
+    /// <summary>
+    /// 按数据类别对账（同步刷新对话框用）：仅在该类别数据源范围内比对。
+    /// space = 空间树节点；tree = 单位/分类/知识树节点；line = 线路节点。
+    /// edge 在向量库无对应数据，不应传入。
+    /// </summary>
+    public Task<ReconcileResult> ReconcileCategoryAsync(SyncCategory category, CancellationToken ct)
+        => ReconcileAsync(null, category, onProgress: null, ct);
 
     /// <summary>
     /// 对账：比较 PG 期望向量集合与 Qdrant 已存集合，补缺删孤。
-    /// PG 活跃集合 = InodeEntities 挂载的 inode ∪ SpaceTree 节点
+    /// PG 活跃集合 = InodeEntities 挂载的 inode ∪ 4 棵宿主树节点 ∪ LineNodes
     /// （Id 在 spaces 空间实体列表内的 space 节点除外，不创建向量）。
-    /// spaceId 非空时，期望集合与 Qdrant 侧均先按该空间的 inode 范围过滤。
+    /// 比对范围三选一：category（按数据类别）> spaceId（按空间子树）> 全量。
+    /// onProgress：逐项异步进度回调（fix=同步节点 / purge=清理孤儿），流式端点逐行 await 推送；null 时零开销。
     /// </summary>
-    private async Task<ReconcileResult> ReconcileAsync(string? spaceId, CancellationToken ct)
+    public async Task<ReconcileResult> ReconcileAsync(
+        string? spaceId, SyncCategory? category,
+        Func<ReconcileProgress, Task>? onProgress, CancellationToken ct)
     {
-        // 空间范围（null = 全量，不做范围限制）
-        var scope = spaceId is null ? null : await ResolveScopeAsync(spaceId, ct);
+        // 范围（null = 全量，不做范围限制）
+        var scope = category is not null
+            ? await ResolveCategoryScopeAsync(category.Value, ct)
+            : spaceId is null ? null : await ResolveScopeAsync(spaceId, ct);
         if (scope is not null && scope.Count == 0)
         {
-            _logger.LogInformation("按空间对账：空间 {SpaceId} 无对应节点，跳过", spaceId);
+            _logger.LogInformation(
+                "对账范围为空（空间={SpaceId} 类别={Category}），跳过", spaceId, category);
             return new ReconcileResult(0, 0, 0, 0, 0, 0);
         }
 
-        // PG 侧期望：节点键 + 实体键
+        // PG 侧期望：节点键 + 实体键。
+        // 节点 = 4 棵宿主树（空间/单位/分类/知识）+ 线路节点；
+        // space 节点（Id 存在于 spaces 空间实体列表内）不创建向量，不计入期望集合。
         var mounts = await _db.InodeEntities
             .AsNoTracking()
             .Select(m => new { m.InodeId, m.EntityId })
             .ToListAsync(ct);
-        // space 节点（Id 存在于 spaces 空间实体列表内）不创建向量，不计入期望集合
         var spaceEntityIds = (await _db.Spaces
                 .AsNoTracking()
                 .Select(s => s.Id)
                 .ToListAsync(ct))
             .ToHashSet(StringComparer.Ordinal);
-        var spaceNodeIds = await _db.SpaceTrees
+        var hostNodeIds = await _db.SpaceTrees
             .AsNoTracking()
             .Where(n => !spaceEntityIds.Contains(n.Id))
             .Select(n => n.Id)
             .ToListAsync(ct);
+        hostNodeIds.AddRange(await _db.UnitTrees.AsNoTracking()
+            .Select(n => n.Id).ToListAsync(ct));
+        hostNodeIds.AddRange(await _db.CategoryTrees.AsNoTracking()
+            .Select(n => n.Id).ToListAsync(ct));
+        hostNodeIds.AddRange(await _db.KnowledgeTrees.AsNoTracking()
+            .Select(n => n.Id).ToListAsync(ct));
+        hostNodeIds.AddRange(await _db.LineNodes.AsNoTracking()
+            .Select(n => n.Id).ToListAsync(ct));
 
         if (scope is not null)
         {
             mounts = mounts.Where(m => scope.Contains(m.InodeId)).ToList();
-            spaceNodeIds = spaceNodeIds.Where(scope.Contains).ToList();
+            hostNodeIds = hostNodeIds.Where(scope.Contains).ToList();
         }
 
         var activeInodes = mounts.Select(m => m.InodeId)
-            .Union(spaceNodeIds)
+            .Union(hostNodeIds)
             .ToHashSet(StringComparer.Ordinal);
         var entityToInode = mounts
             .GroupBy(m => m.EntityId)
             .ToDictionary(g => g.Key, g => g.First().InodeId, StringComparer.Ordinal);
 
         var expectedKeys = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var id in activeInodes) expectedKeys.Add("node:" + id);
+        foreach (var id in activeInodes)
+            expectedKeys.Add(NodeVectorKey(id, SourceTextBuilder.TemplateVersion));
         foreach (var m in mounts) expectedKeys.Add("entity:" + m.EntityId);
 
         // Qdrant 侧已存（按空间范围过滤，范围外的点本轮不处理）
@@ -144,15 +170,12 @@ public sealed class VectorSynchronizer
             .Where(p => scope is null || scope.Contains(p.InodeId))
             .ToList();
         var existingKeys = existing
-            .Select(p => p.PointKind == "entity"
-                ? "entity:" + p.EntityId
-                : "node:" + p.InodeId)
+            .Select(PointKey)
             .ToHashSet(StringComparer.Ordinal);
 
         var missing = expectedKeys.Except(existingKeys, StringComparer.Ordinal).ToList();
         var orphaned = existing
-            .Where(p => !expectedKeys.Contains(
-                p.PointKind == "entity" ? "entity:" + p.EntityId : "node:" + p.InodeId))
+            .Where(p => !expectedKeys.Contains(PointKey(p)))
             .ToList();
 
         _logger.LogInformation(
@@ -165,18 +188,46 @@ public sealed class VectorSynchronizer
         {
             var sep = key.IndexOf(':');
             var kind = key[..sep];
-            var id = key[(sep + 1)..];
+            var rest = key[(sep + 1)..];
             if (kind == "node")
-                affectedInodes.Add(id);
-            else if (entityToInode.TryGetValue(id, out var inodeId))
+            {
+                // node:{inodeId}:{viewType}:{templateVersion}
+                affectedInodes.Add(rest[..rest.IndexOf(':')]);
+            }
+            else if (entityToInode.TryGetValue(rest, out var inodeId))
                 affectedInodes.Add(inodeId);
         }
 
+        // 逐项处理范围内全部节点：缺失的补算（fix），已存在的仅校验（ok）。
+        // 两者都推送进度，让对话框能展示每个节点的同步过程，而不只是缺失项。
+        var names = onProgress is not null
+            ? await LoadHostNamesAsync(activeInodes, ct)
+            : null;
+        var orderedInodes = activeInodes
+            .OrderBy(id => names is not null && names.TryGetValue(id, out var n) ? n : id,
+                StringComparer.Ordinal)
+            .ToList();
+
         var fixedCount = 0;
-        foreach (var inodeId in affectedInodes)
+        for (var i = 0; i < orderedInodes.Count; i++)
         {
-            await SyncInodeAsync(inodeId, ct);
-            fixedCount++;
+            var inodeId = orderedInodes[i];
+            var isMissing = affectedInodes.Contains(inodeId);
+            if (isMissing)
+            {
+                await SyncInodeAsync(inodeId, ct);
+                fixedCount++;
+            }
+
+            if (onProgress is not null)
+            {
+                // Detail = 该节点实际送去向量化的文本（SourceTextBuilder 构建结果）
+                var source = await _builder.BuildAsync(inodeId, ct);
+                await onProgress(new ReconcileProgress(
+                    isMissing ? "fix" : "ok", inodeId,
+                    names!.TryGetValue(inodeId, out var name) ? name : "",
+                    source?.NodeText ?? ""));
+            }
         }
 
         // 删孤儿（按 PointId）。
@@ -189,14 +240,19 @@ public sealed class VectorSynchronizer
                 .Where(p => scope is null || scope.Contains(p.InodeId))
                 .ToList();
             var freshOrphaned = fresh
-                .Where(p => !expectedKeys.Contains(
-                    p.PointKind == "entity" ? "entity:" + p.EntityId : "node:" + p.InodeId))
+                .Where(p => !expectedKeys.Contains(PointKey(p)))
                 .ToList();
 
             foreach (var point in freshOrphaned)
             {
                 await _store.DeletePointAsync(point.Uuid, ct);
                 deletedCount++;
+                if (onProgress is not null)
+                    await onProgress(new ReconcileProgress(
+                        "purge", point.InodeId, "",
+                        point.PointKind == "entity"
+                            ? $"实体 {point.EntityId}"
+                            : $"节点 {point.InodeId}"));
             }
         }
 
@@ -211,6 +267,127 @@ public sealed class VectorSynchronizer
             expectedKeys.Count, existing.Count,
             missing.Count, orphaned.Count,
             fixedCount, deletedCount);
+    }
+
+    /// <summary>节点点对账键：node:{inodeId}:{viewType}:{templateVersion}（升版即换键，旧点自动成为孤儿被清理）。</summary>
+    private static string NodeVectorKey(string inodeId, string templateVersion) =>
+        $"node:{inodeId}:{SourceTextBuilder.ViewType}:{templateVersion}";
+
+    /// <summary>向量点对账键：实体点按 entityId，节点点按 inode+视图+模板版本。</summary>
+    private static string PointKey(StoredVectorPoint p) =>
+        p.PointKind == "entity"
+            ? "entity:" + p.EntityId
+            : NodeVectorKey(p.InodeId, p.TemplateVersion ?? "");
+
+    /// <summary>
+    /// BFS 收集 4 棵宿主树中 inode 的全部后代 Id（不含自身；线路节点无父子结构）。
+    /// 改名/移动后由消费端调用，逐个级联刷新路径型向量文本。
+    /// </summary>
+    public async Task<List<string>> CollectDescendantIdsAsync(string inodeId, CancellationToken ct)
+    {
+        var result = new List<string>();
+        result.AddRange(await ExpandDescendantsAsync([inodeId], _db.SpaceTrees, ct));
+        result.AddRange(await ExpandDescendantsAsync([inodeId], _db.UnitTrees, ct));
+        result.AddRange(await ExpandDescendantsAsync([inodeId], _db.CategoryTrees, ct));
+        result.AddRange(await ExpandDescendantsAsync([inodeId], _db.KnowledgeTrees, ct));
+        return result;
+    }
+
+    /// <summary>在单棵树表内 BFS 展开后代（不含传入根自身）。</summary>
+    private static async Task<List<string>> ExpandDescendantsAsync<T>(
+        IReadOnlyCollection<string> rootIds, DbSet<T> set, CancellationToken ct) where T : class
+    {
+        var result = new List<string>();
+        var known = new HashSet<string>(rootIds, StringComparer.Ordinal);
+        var frontier = rootIds.ToList();
+
+        while (frontier.Count > 0)
+        {
+            var children = await set.AsNoTracking()
+                .Where(n => EF.Property<string>(n, "ParentId") != null &&
+                            frontier.Contains(EF.Property<string>(n, "ParentId")))
+                .Select(n => EF.Property<string>(n, "Id"))
+                .ToListAsync(ct);
+
+            frontier = children.Where(id => known.Add(id)).ToList();
+            result.AddRange(frontier);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 批量解析宿主节点名称（4 棵宿主树 + 线路节点；进度流展示用，查不到的 Id 不在结果内）。
+    /// </summary>
+    private async Task<Dictionary<string, string>> LoadHostNamesAsync(
+        IReadOnlyCollection<string> inodeIds, CancellationToken ct)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var n in await _db.SpaceTrees.AsNoTracking()
+            .Where(n => inodeIds.Contains(n.Id))
+            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
+            result[n.Id] = n.Name;
+
+        foreach (var n in await _db.UnitTrees.AsNoTracking()
+            .Where(n => inodeIds.Contains(n.Id))
+            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
+            result[n.Id] = n.Name;
+
+        foreach (var n in await _db.CategoryTrees.AsNoTracking()
+            .Where(n => inodeIds.Contains(n.Id))
+            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
+            result[n.Id] = n.Name;
+
+        foreach (var n in await _db.KnowledgeTrees.AsNoTracking()
+            .Where(n => inodeIds.Contains(n.Id))
+            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
+            result[n.Id] = n.Name;
+
+        foreach (var n in await _db.LineNodes.AsNoTracking()
+            .Where(n => inodeIds.Contains(n.Id))
+            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
+            result[n.Id] = n.Name;
+
+        return result;
+    }
+
+    /// <summary>
+    /// 解析同步类别的 inode 范围（与图装载分组一致）：
+    /// space = 空间树节点（排除 Id 存在于 spaces 空间实体列表内的 space 节点）；
+    /// tree = 单位/分类/知识树节点；line = 线路节点；edge 无向量，返回空集合。
+    /// </summary>
+    private async Task<HashSet<string>> ResolveCategoryScopeAsync(
+        SyncCategory category, CancellationToken ct)
+    {
+        switch (category)
+        {
+            case SyncCategory.Space:
+                var spaceEntityIds = (await _db.Spaces.AsNoTracking()
+                        .Select(s => s.Id).ToListAsync(ct))
+                    .ToHashSet(StringComparer.Ordinal);
+                return (await _db.SpaceTrees.AsNoTracking()
+                        .Select(n => n.Id).ToListAsync(ct))
+                    .Where(id => !spaceEntityIds.Contains(id))
+                    .ToHashSet(StringComparer.Ordinal);
+
+            case SyncCategory.Tree:
+                var ids = await _db.UnitTrees.AsNoTracking()
+                    .Select(n => n.Id).ToListAsync(ct);
+                ids.AddRange(await _db.CategoryTrees.AsNoTracking()
+                    .Select(n => n.Id).ToListAsync(ct));
+                ids.AddRange(await _db.KnowledgeTrees.AsNoTracking()
+                    .Select(n => n.Id).ToListAsync(ct));
+                return ids.ToHashSet(StringComparer.Ordinal);
+
+            case SyncCategory.Line:
+                return (await _db.LineNodes.AsNoTracking()
+                        .Select(n => n.Id).ToListAsync(ct))
+                    .ToHashSet(StringComparer.Ordinal);
+
+            default:
+                return new HashSet<string>(StringComparer.Ordinal);
+        }
     }
 
     /// <summary>
@@ -270,6 +447,10 @@ public sealed record ReconcileResult(
     int Active, int Existing, int Missing, int Orphaned,
     int FixedCount, int DeletedCount);
 
+/// <summary>对账逐项进度事件：fix=同步节点（Name 为宿主节点名）；purge=清理孤儿（Detail 描述被删点）。</summary>
+public sealed record ReconcileProgress(
+    string Stage, string InodeId, string Name, string Detail);
+
 /// <summary>
 /// RabbitMQ 消费者：iNode 变更 → 重建向量（幂等）。
 ///
@@ -282,7 +463,7 @@ public sealed record ReconcileResult(
 /// 单实例部署假设：IMemoryCache 进程内去重，多实例时仅窗口失效，
 /// 同步幂等保证结果仍正确。
 /// </summary>
-public sealed class InodeChangedConsumer : IConsumer<InodeChangedEvent>
+public sealed class InodeChangedConsumer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IMemoryCache _dedupCache;
@@ -301,9 +482,9 @@ public sealed class InodeChangedConsumer : IConsumer<InodeChangedEvent>
         _logger = logger;
     }
 
-    public async Task Consume(ConsumeContext<InodeChangedEvent> context)
+    public async Task Consume(InodeChangedEvent msg, CancellationToken ct)
     {
-        var inodeId = context.Message.InodeId;
+        var inodeId = msg.InodeId;
 
         // 滑动窗口去重：窗口内已有待处理的同 inodeId 事件则跳过
         var dedupKey = $"vec-sync:{inodeId}";
@@ -321,7 +502,15 @@ public sealed class InodeChangedConsumer : IConsumer<InodeChangedEvent>
         var synchronizer = scope.ServiceProvider
             .GetRequiredService<VectorSynchronizer>();
 
-        await initializer.EnsureReadyAsync(context.CancellationToken);
-        await synchronizer.SyncInodeAsync(inodeId, context.CancellationToken);
+        await initializer.EnsureReadyAsync(ct);
+        await synchronizer.SyncInodeAsync(inodeId, ct);
+
+        // 改名/移动（PathAffected）：自身文本已随上面刷新；全部后代的路径型文本
+        // 同步失效，级联重建（后代的幂等由先删后写保证）
+        if (!msg.PathAffected) return;
+        var descendants = await synchronizer.CollectDescendantIdsAsync(inodeId, ct);
+        _logger.LogInformation("路径级联刷新：{InodeId} 后代 {Count} 个", inodeId, descendants.Count);
+        foreach (var descendantId in descendants)
+            await synchronizer.SyncInodeAsync(descendantId, ct);
     }
 }

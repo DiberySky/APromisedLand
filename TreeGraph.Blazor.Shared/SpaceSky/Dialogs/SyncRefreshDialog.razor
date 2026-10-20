@@ -1,0 +1,375 @@
+@* SyncRefreshDialog.razor — 同步刷新对话框：分步列出 space/tree/line/edge 同步到 向量/图 的过程进度 *@
+@* 打开即自动执行：向量 space→tree→line，图 space→tree→line→edge，顺序调用逐步更新格子；
+   边在向量库无对应数据，该格显示不适用；单步失败不中断后续步骤；关闭即取消剩余步骤 *@
+
+@namespace TreeGraph.Blazor.Shared.SpaceSky.Dialogs
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@implements IDisposable
+@inject EavApiClient EavApi
+
+<DialogSky Title="同步刷新"
+           CancelButtonVisible="true" CancelButtonText="关闭"
+           SubmitButtonVisible="true" SubmitButtonText="@_submitText"
+           SubmitButtonDisabled="_running"
+           OnSubmitClick="@RunAllAsync">
+    <ToolBarContent>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">@SummaryText</MudText>
+    </ToolBarContent>
+    <DialogContent>
+        <MudSimpleTable Hover="false" Dense="true" Bordered="true">
+            <thead>
+                <tr>
+                    <th>数据类别</th>
+                    <th>向量</th>
+                    <th>图</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _rows)
+                {
+                    <tr>
+                        <td>@row.Label</td>
+                        <td>@CellContent(row.Vector, row.Key == "edge",
+                                row.Vector.Status == StepStatus.Running ? _currentItem : null)</td>
+                        <td>@CellContent(row.Graph)</td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+
+        @* 同步项收纳：流式对账逐项追加为列表（最新在顶部），用 MudExpansion 可折叠收纳；执行后始终保留 *@
+        @if (_hasRun)
+        {
+            <MudExpansionPanels Class="mt-2" Elevation="0">
+                <MudExpansionPanel Text="@FeedTitle"
+                                   Expanded="_feedExpanded"
+                                   ExpandedChanged="OnFeedExpandedChanged"
+                                   Dense="true">
+                    <MudList T="FeedItem" Dense="true" Class="pa-1"
+                             Style="height:150px; overflow-y:auto;">
+                        @if (_feed.Count == 0)
+                        {
+                            <MudListItem T="FeedItem" Class="py-0">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @(_running ? "准备中…" : "本轮无同步项")
+                                </MudText>
+                            </MudListItem>
+                        }
+                        @foreach (var item in _feed)
+                        {
+                            <MudListItem T="FeedItem" Class="py-0">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@item.Icon" Size="Size.Small" Color="@item.Color"/>
+                                    <MudText Typo="Typo.caption">@item.Text</MudText>
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    private const string VectorNAText = "—（无边向量）";
+
+    /// <summary>总步数 = 向量 3 步 + 图 4 步（边→向量不适用不计）。</summary>
+    private const int TotalSteps = 7;
+
+    private bool _running;
+    private bool _disposed;
+    private string _submitText = "开始同步";
+    private CancellationTokenSource _cts = new();
+
+    /// <summary>向量对账同步项列表（最新在顶部，上限 200 条防渲染膨胀）。</summary>
+    private readonly List<FeedItem> _feed = new();
+    private const int FeedLimit = 200;
+
+    /// <summary>同步项收纳面板展开状态（运行中自动展开，用户可手动折叠收纳）。</summary>
+    private bool _feedExpanded = true;
+
+    /// <summary>是否已执行过同步（执行后面板始终保留展示，即使本轮无同步项）。</summary>
+    private bool _hasRun;
+
+    private string FeedTitle => _running
+        ? $"同步项（{_feed.Count}）· 同步中…"
+        : $"同步项（{_feed.Count}）";
+
+    private Task OnFeedExpandedChanged(bool expanded)
+    {
+        _feedExpanded = expanded;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>同步项（图标区分同步 / 清理）。</summary>
+    private sealed record FeedItem(string Text, string Icon, Color Color);
+
+    /// <summary>当前正在同步的项（滚动流最新一条的名称，向量格子 Running 时显示）。</summary>
+    private string? _currentItem;
+
+    private enum StepStatus { Pending, Running, Done, Failed }
+
+    private sealed class StepState
+    {
+        public StepStatus Status { get; set; } = StepStatus.Pending;
+        public string? Detail { get; set; }
+        /// <summary>完成但带警告（如图写入存在错误批次），用 Warning 色展示。</summary>
+        public bool Warn { get; set; }
+    }
+
+    private sealed class CategoryRow
+    {
+        public CategoryRow(string key, string label) { Key = key; Label = label; }
+        public string Key { get; }
+        public string Label { get; }
+        public StepState Vector { get; } = new();
+        public StepState Graph { get; } = new();
+    }
+
+    private readonly List<CategoryRow> _rows =
+    [
+        new("space", "空间树"),
+        new("tree", "单位/分类/知识树"),
+        new("line", "线路"),
+        new("edge", "语义边"),
+    ];
+
+    private CategoryRow Row(string key) => _rows.First(r => r.Key == key);
+
+    /// <summary>每次打开都重新执行全部步骤（对话框组件实例可能被宿主复用，不能只挂 OnInitializedAsync）。</summary>
+    protected override async Task OnParametersSetAsync() => await RunAllAsync();
+
+    /// <summary>顺序执行：向量 space→tree→line，图 space→tree→line→edge。</summary>
+    private async Task RunAllAsync()
+    {
+        if (_running) return;
+        _running = true;
+        _submitText = "同步中…";
+        ResetSteps();
+        // 复用实例时上一轮 CTS 已在关闭时取消/释放，每轮执行前重建
+        _cts.Dispose();
+        _cts = new();
+        SafeRefresh();
+        try
+        {
+            foreach (var key in new[] { "space", "tree", "line" })
+            {
+                if (StopRequested()) return;
+                await RunVectorStepAsync(key);
+            }
+            foreach (var key in new[] { "space", "tree", "line", "edge" })
+            {
+                if (StopRequested()) return;
+                await RunGraphStepAsync(key);
+            }
+        }
+        finally
+        {
+            _running = false;
+            _submitText = "重新同步";
+            SafeRefresh();
+        }
+    }
+
+    private void ResetSteps()
+    {
+        foreach (var row in _rows)
+        {
+            row.Vector.Status = StepStatus.Pending;
+            row.Vector.Detail = null;
+            row.Vector.Warn = false;
+            row.Graph.Status = StepStatus.Pending;
+            row.Graph.Detail = null;
+            row.Graph.Warn = false;
+        }
+        MarkVectorNA();
+        _feed.Clear();
+        _feedExpanded = true;
+        _hasRun = true;
+        _currentItem = null;
+    }
+
+    private void MarkVectorNA()
+    {
+        Row("edge").Vector.Status = StepStatus.Done;
+        Row("edge").Vector.Detail = VectorNAText;
+    }
+
+    private bool StopRequested() => _disposed || _cts.IsCancellationRequested;
+
+    private async Task RunVectorStepAsync(string key)
+    {
+        var step = Row(key).Vector;
+        step.Status = StepStatus.Running;
+        SafeRefresh();
+        try
+        {
+            // 流式对账：逐项实时追加同步节点名 / 清理项到窗口列表
+            var result = await EavApi.StreamReconcileAsync(
+                category: key,
+                onEvent: evt => InvokeAsync(() =>
+                {
+                    // fix=本轮补算；ok=已存在仅校验；purge=清理孤儿。Detail 为实际向量化文本
+                    var label = string.IsNullOrEmpty(evt.Name) ? evt.InodeId : evt.Name;
+                    var detail = evt.Detail.Replace("\n", " · ");
+                    var text = evt.Stage == "purge"
+                        ? $"[{Row(key).Label}] 清理 · {detail}"
+                        : $"[{Row(key).Label}] {(evt.Stage == "fix" ? "同步" : "已同步")} · {label}"
+                          + (string.IsNullOrEmpty(evt.Detail) ? "" : $"（{detail}）");
+                    _currentItem = text;
+                    _feed.Insert(0, evt.Stage switch
+                    {
+                        "fix" => new FeedItem(text, Icons.Material.Filled.Check, Color.Success),
+                        "ok" => new FeedItem(text, Icons.Material.Filled.CheckCircle, Color.Secondary),
+                        _ => new FeedItem(text, Icons.Material.Filled.DeleteOutline, Color.Warning)
+                    });
+                    if (_feed.Count > FeedLimit)
+                        _feed.RemoveAt(_feed.Count - 1);
+                    SafeRefresh();
+                }),
+                ct: _cts.Token);
+            if (result is null)
+            {
+                step.Status = StepStatus.Failed;
+                step.Detail = "接口未返回结果";
+            }
+            else
+            {
+                step.Status = StepStatus.Done;
+                step.Detail = $"新增 {result.FixedCount} · 清理 {result.DeletedCount}";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            step.Status = StepStatus.Pending;
+            step.Detail = null;
+            return;
+        }
+        catch (Exception ex)
+        {
+            step.Status = StepStatus.Failed;
+            step.Detail = ex.Message;
+        }
+        SafeRefresh();
+    }
+
+    private async Task RunGraphStepAsync(string key)
+    {
+        var step = Row(key).Graph;
+        step.Status = StepStatus.Running;
+        SafeRefresh();
+        try
+        {
+            var result = await EavApi.SyncGraphCategoryAsync(key, _cts.Token);
+            if (result is null)
+            {
+                step.Status = StepStatus.Failed;
+                step.Detail = "接口未返回结果";
+            }
+            else
+            {
+                step.Status = StepStatus.Done;
+                step.Warn = result.Errors.Count > 0;
+                step.Detail = result.Errors.Count > 0
+                    ? $"顶点 {result.VerticesWritten}/{result.Vertices} · 边 {result.EdgesWritten}/{result.Edges} · 错误批次 {result.Errors.Count}"
+                    : $"顶点 {result.VerticesWritten} · 边 {result.EdgesWritten}";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            step.Status = StepStatus.Pending;
+            step.Detail = null;
+            return;
+        }
+        catch (Exception ex)
+        {
+            step.Status = StepStatus.Failed;
+            step.Detail = ex.Message;
+        }
+        SafeRefresh();
+    }
+
+    private string SummaryText
+    {
+        get
+        {
+            var done = _rows.Count(r => r.Key != "edge" && r.Vector.Status == StepStatus.Done)
+                       + _rows.Count(r => r.Graph.Status == StepStatus.Done);
+            var failed = _rows.Count(r => r.Vector.Status == StepStatus.Failed)
+                         + _rows.Count(r => r.Graph.Status == StepStatus.Failed);
+            return _running
+                ? $"进行中：完成 {done}/{TotalSteps} 步"
+                : failed > 0
+                    ? $"已结束：完成 {done}/{TotalSteps} 步，失败 {failed} 步"
+                    : $"已结束：{TotalSteps}/{TotalSteps} 步全部完成";
+        }
+    }
+
+    /// <summary>单元格渲染：按步骤状态展示 等待/同步中(当前同步项或进度条)/完成统计/失败原因。</summary>
+    private RenderFragment CellContent(StepState step, bool notApplicable = false, string? current = null) => __builder =>
+    {
+        if (notApplicable)
+        {
+            __builder.AddContent(0, VectorNAText);
+            return;
+        }
+
+        switch (step.Status)
+        {
+            case StepStatus.Pending:
+                __builder.OpenElement(1, "span");
+                __builder.AddAttribute(2, "style", "color: var(--mud-palette-text-disabled);");
+                __builder.AddContent(3, "等待");
+                __builder.CloseElement();
+                break;
+
+            case StepStatus.Running when current is not null:
+                // 向量对账：显示当前正在同步的项（inode.name）
+                __builder.OpenElement(4, "span");
+                __builder.AddAttribute(5, "style",
+                    "color: var(--mud-palette-info); white-space: nowrap; display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;");
+                __builder.AddContent(6, current);
+                __builder.CloseElement();
+                break;
+
+            case StepStatus.Running:
+                __builder.OpenComponent<MudProgressLinear>(7);
+                __builder.AddAttribute(8, nameof(MudProgressLinear.Indeterminate), true);
+                __builder.AddAttribute(9, nameof(MudProgressLinear.Color), Color.Info);
+                __builder.AddAttribute(10, nameof(MudProgressLinear.Class), "my-1");
+                __builder.CloseComponent();
+                __builder.AddContent(11, "同步中…");
+                break;
+
+            case StepStatus.Done:
+                __builder.OpenElement(12, "span");
+                __builder.AddAttribute(13, "class",
+                    step.Warn ? "mud-warning-text" : "mud-success-text");
+                __builder.AddContent(14, step.Detail);
+                __builder.CloseElement();
+                break;
+
+            case StepStatus.Failed:
+                __builder.OpenElement(15, "span");
+                __builder.AddAttribute(16, "class", "mud-error-text");
+                __builder.AddContent(17, step.Detail);
+                __builder.CloseElement();
+                break;
+        }
+    };
+
+    private void SafeRefresh()
+    {
+        if (!_disposed) StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        try { _cts.Cancel(); _cts.Dispose(); } catch { /* 关闭竞态容错 */ }
+    }
+}

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.SpaceSky.Entities;
+using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.TreeEavSky.Entities;
 
 namespace TreeGraph.Api.SpaceSky.Controllers;
@@ -11,7 +13,7 @@ namespace TreeGraph.Api.SpaceSky.Controllers;
 /// </summary>
 [ApiController]
 [Route("[controller]")]
-public class SpaceController(TreeGraphDbContext db) : ControllerBase
+public class SpaceController(TreeGraphDbContext db, IEventPublisher publisher) : ControllerBase
 {
     // GET /Space
     [HttpGet]
@@ -55,6 +57,15 @@ public class SpaceController(TreeGraphDbContext db) : ControllerBase
         });
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // ★ 语义搜索：空间根节点新增 → 即时同步向量（消费端幂等；根节点 isSpaceNode 无节点向量，仅占位）
+        await publisher.Publish(new InodeChangedEvent
+        {
+            InodeId = space.Id,
+            Kind = InodeChangeKind.Saved,
+            PathAffected = false
+        }, cancellationToken);
+
         return CreatedAtAction(nameof(GetById), new { id = space.Id }, space);
     }
 
@@ -94,6 +105,15 @@ public class SpaceController(TreeGraphDbContext db) : ControllerBase
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // ★ 语义搜索：空间改名 → 根节点名即后代 path 第一段，全部后代路径型向量失效，需级联刷新
+        await publisher.Publish(new InodeChangedEvent
+        {
+            InodeId = id,
+            Kind = InodeChangeKind.Saved,
+            PathAffected = true
+        }, cancellationToken);
+
         return Ok(space);
     }
 
@@ -130,6 +150,15 @@ public class SpaceController(TreeGraphDbContext db) : ControllerBase
 
         db.Spaces.Remove(space);
         await db.SaveChangesAsync(cancellationToken);
+
+        // ★ 语义搜索：空间根节点已删除 → 消费端据 InodeId 清除残留向量
+        await publisher.Publish(new InodeChangedEvent
+        {
+            InodeId = id,
+            Kind = InodeChangeKind.Deleted,
+            PathAffected = false
+        }, cancellationToken);
+
         return Ok(true);
     }
 }

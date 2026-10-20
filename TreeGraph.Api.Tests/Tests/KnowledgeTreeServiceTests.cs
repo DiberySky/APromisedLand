@@ -90,7 +90,7 @@ public class KnowledgeTreeServiceTests
     }
 
     private static KnowledgeTreeService CreateService(TreeGraphDbContext context) =>
-        new(context, new NoopPublishEndpoint());
+        new(context, new NoopEventPublisher());
 
     // ========== 实体 ==========
 

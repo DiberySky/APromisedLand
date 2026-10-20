@@ -34,3 +34,31 @@ public sealed record VectorReconcileResultDto(
     int Orphaned,
     int FixedCount,
     int DeletedCount);
+
+/// <summary>
+/// 向量对账流式进度事件（POST /api/search/reconcile/stream，NDJSON 逐行）。
+/// stage=fix：同步节点（InodeId/Name）；stage=purge：清理孤儿（Detail 描述）；
+/// stage=summary：结束统计（六个计数字段，与 VectorReconcileResultDto 对应）。
+/// </summary>
+public sealed record ReconcileStreamEventDto(
+    string Stage,
+    string InodeId,
+    string Name,
+    string Detail,
+    int? Active = null,
+    int? Existing = null,
+    int? Missing = null,
+    int? Orphaned = null,
+    int? FixedCount = null,
+    int? DeletedCount = null);
+
+/// <summary>
+/// 图按类别同步结果（POST /api/graph-sync/category/{category}，同步刷新对话框展示用）。
+/// Vertices/Edges 为该类别参与写入的总量，VerticesWritten/EdgesWritten 为实际成功写入数。
+/// </summary>
+public sealed record GraphCategorySyncResultDto(
+    int Vertices,
+    int Edges,
+    int VerticesWritten,
+    int EdgesWritten,
+    IReadOnlyList<string> Errors);

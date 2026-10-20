@@ -286,6 +286,105 @@ public sealed class GraphSynchronizer
             result.VerticesSuccess, result.EdgesSuccess, errors);
     }
 
+    /// <summary>
+    /// 按类别同步（同步刷新对话框用）：把 PG 中该类别现状批量覆盖写入 NebulaGraph。
+    /// 幂等覆盖写，不 DROP SPACE；图内残留清理仍靠事件同步 / 全量重建。
+    /// </summary>
+    public async Task<GraphRebuildResult> SyncCategoryAsync(SyncCategory category, CancellationToken ct)
+    {
+        var vertices = new List<VertexItem>();
+        var edges = new List<EdgeItem>();
+        var parentEdgeCount = 0;
+        var semanticEdgeCount = 0;
+
+        switch (category)
+        {
+            case SyncCategory.Space:
+                foreach (var n in await _db.SpaceTrees.AsNoTracking()
+                             .Select(n => new { n.Id, n.Name, n.ParentId }).ToListAsync(ct))
+                {
+                    vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.SpaceTreeTag, "SpaceTree", false));
+                    if (n.ParentId is not null)
+                        edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
+                }
+                parentEdgeCount = edges.Count;
+                break;
+
+            case SyncCategory.Tree:
+                foreach (var n in await _db.UnitTrees.AsNoTracking()
+                             .Select(n => new { n.Id, n.Name, n.ParentId }).ToListAsync(ct))
+                {
+                    vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.UnitTreeTag, "UnitTree", false));
+                    if (n.ParentId is not null)
+                        edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
+                }
+
+                foreach (var n in await _db.CategoryTrees.AsNoTracking()
+                             .Select(n => new { n.Id, n.Name, n.ParentId, n.IsArchived }).ToListAsync(ct))
+                {
+                    vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.CategoryTreeTag, "CategoryTree", n.IsArchived));
+                    if (n.ParentId is not null)
+                        edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
+                }
+
+                foreach (var n in await _db.KnowledgeTrees.AsNoTracking()
+                             .Select(n => new { n.Id, n.Name, n.ParentId, n.IsArchived }).ToListAsync(ct))
+                {
+                    vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.KnowledgeTreeTag, "KnowledgeTree", n.IsArchived));
+                    if (n.ParentId is not null)
+                        edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
+                }
+                parentEdgeCount = edges.Count;
+                break;
+
+            case SyncCategory.Line:
+                foreach (var n in await _db.LineNodes.AsNoTracking()
+                             .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
+                {
+                    vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.LineNodeTag, "LineNode", false));
+                }
+                break;
+
+            case SyncCategory.Edge:
+                var semanticEdges = await (
+                    from i in _db.EdgeInstances.AsNoTracking()
+                    join d in _db.EdgeDefinitions.AsNoTracking() on i.EdgeTypeId equals d.EdgeTypeId
+                    select new { i.FromNodeId, i.ToNodeId, d.TypeName, i.EdgeId, i.Weight, i.DisplayName }
+                ).ToListAsync(ct);
+
+                semanticEdgeCount = semanticEdges.Count;
+                foreach (var e in semanticEdges)
+                {
+                    edges.Add(new EdgeItem(e.FromNodeId, e.ToNodeId, e.TypeName, 0,
+                        new Dictionary<string, object?>
+                        {
+                            ["edge_id"] = e.EdgeId,
+                            ["weight"] = e.Weight.HasValue ? (double)e.Weight.Value : null,
+                            ["display_name"] = e.DisplayName
+                        }));
+                }
+                break;
+        }
+
+        // 不 DROP，schema 恒在；BulkWithSchemaRetryAsync 仅在出现传播类瞬时错误时整体重试
+        var result = await BulkWithSchemaRetryAsync(vertices, edges, ct);
+
+        var errors = new List<string>();
+        foreach (var err in result.VerticesErrors ?? [])
+            errors.Add($"vertices: {err.GetValueOrDefault("error")}");
+        foreach (var err in result.EdgesErrors ?? [])
+            errors.Add($"edges: {err.GetValueOrDefault("error")}");
+
+        _logger.LogInformation(
+            "图按类别同步（{Category}）：顶点 {V}/{VT}，边 {E}/{ET}，错误批次 {Err}",
+            category, result.VerticesSuccess, result.VerticesTotal,
+            result.EdgesSuccess, result.EdgesTotal, errors.Count);
+
+        return new GraphRebuildResult(
+            vertices.Count, parentEdgeCount, semanticEdgeCount,
+            result.VerticesSuccess, result.EdgesSuccess, errors);
+    }
+
     private async Task<BulkResult> BulkWithSchemaRetryAsync(
         List<VertexItem> vertices, List<EdgeItem> edges, CancellationToken ct)
     {

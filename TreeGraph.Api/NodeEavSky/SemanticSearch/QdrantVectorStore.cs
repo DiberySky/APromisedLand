@@ -10,7 +10,8 @@ namespace TreeGraph.Api.NodeEavSky.SemanticSearch;
 /// Qdrant 向量存储薄封装（双向量：节点向量 + 实体向量）。
 ///
 /// PointId 规则（Qdrant 仅支持 UUID / uint）：
-///   - 节点点：UUID = inodeId 本身
+///   - 节点点：UUID = MD5("node:{inodeId}:{viewType}") 派生的确定性 UUID
+///     （按视图类型派生，模板升版即换 UUID，旧点由对账清理）
 ///   - 实体点：UUID = MD5("entity:" + entityId) 派生的确定性 UUID
 ///
 /// payload 规则：
@@ -43,15 +44,27 @@ public sealed class QdrantVectorStore
         return new Guid(bytes);
     }
 
-    /// <summary>写入节点向量（纯节点文本）。</summary>
+    /// <summary>节点点的确定性 UUID（同 inode+viewType 恒同 UUID，模板升版即换 UUID）。</summary>
+    public static Guid NodePointUuid(string inodeId, string viewType)
+    {
+        var bytes = MD5.HashData(Encoding.UTF8.GetBytes($"node:{inodeId}:{viewType}"));
+        return new Guid(bytes);
+    }
+
+    /// <summary>写入节点向量（path_view 两段式文本 + 路径快照 payload）。</summary>
     public async Task UpsertNodeAsync(
         string inodeId, float[] vector,
         string hostType, string spaceId, string sourceHash, string sourceText,
+        string viewType, string templateVersion,
+        string path, IReadOnlyList<string> pathIds, int depth,
         CancellationToken ct = default)
     {
+        var pathIdsValue = new Value { ListValue = new ListValue() };
+        pathIdsValue.ListValue.Values.AddRange(pathIds.Select(id => (Value)id));
+
         var point = new PointStruct
         {
-            Id = new PointId { Uuid = inodeId },
+            Id = new PointId { Uuid = NodePointUuid(inodeId, viewType).ToString() },
             Vectors = vector,
             Payload =
             {
@@ -60,15 +73,20 @@ public sealed class QdrantVectorStore
                 ["host_type"] = hostType,
                 ["space_id"] = spaceId,
                 ["source_hash"] = sourceHash,
-                ["source_text"] = Truncate(sourceText)
+                ["source_text"] = Truncate(sourceText),
+                ["view_type"] = viewType,
+                ["template_version"] = templateVersion,
+                ["path"] = Truncate(path),
+                ["path_ids"] = pathIdsValue,
+                ["depth"] = (long)depth
             }
         };
 
         await _client.UpsertAsync(_options.CollectionName, [point],
             cancellationToken: ct);
 
-        _logger.LogDebug("Qdrant upsert 节点：inode={InodeId} hash={Hash}",
-            inodeId, sourceHash[..8]);
+        _logger.LogDebug("Qdrant upsert 节点：inode={InodeId} view={ViewType} hash={Hash}",
+            inodeId, viewType, sourceHash[..8]);
     }
 
     /// <summary>写入实体向量（实体独立文本，通过 inode_id 建立路径关系）。</summary>
@@ -169,7 +187,9 @@ public sealed class QdrantVectorStore
             HostType: GetString(r, "host_type"),
             SpaceId: GetString(r, "space_id"),
             SourceHash: GetString(r, "source_hash"),
-            SourceText: GetString(r, "source_text")
+            SourceText: GetString(r, "source_text"),
+            Path: GetString(r, "path"),
+            PathIds: PayloadStrings(r.Payload, "path_ids")
         )).ToList();
     }
 
@@ -194,7 +214,12 @@ public sealed class QdrantVectorStore
                 Uuid: p.Id.Uuid,
                 PointKind: PayloadString(p.Payload, "point_kind"),
                 InodeId: PayloadString(p.Payload, "inode_id"),
-                EntityId: PayloadString(p.Payload, "entity_id"))));
+                EntityId: PayloadString(p.Payload, "entity_id"),
+                ViewType: PayloadString(p.Payload, "view_type"),
+                TemplateVersion: PayloadString(p.Payload, "template_version"),
+                Path: PayloadString(p.Payload, "path"),
+                PathIds: PayloadStrings(p.Payload, "path_ids"),
+                Depth: PayloadLong(p.Payload, "depth"))));
 
             offset = batch.NextPageOffset;
             if (offset is null || batch.Result.Count < 256) break;
@@ -212,6 +237,22 @@ public sealed class QdrantVectorStore
     private static string PayloadString(
         Google.Protobuf.Collections.MapField<string, Value> payload, string key) =>
         payload.TryGetValue(key, out var v) ? v.StringValue : "";
+
+    private static IReadOnlyList<string>? PayloadStrings(
+        Google.Protobuf.Collections.MapField<string, Value> payload, string key) =>
+        payload.TryGetValue(key, out var v) && v.ListValue is not null
+            ? v.ListValue.Values
+                .Where(x => x.KindCase == Value.KindOneofCase.StringValue)
+                .Select(x => x.StringValue)
+                .ToList()
+            : null;
+
+    private static long? PayloadLong(
+        Google.Protobuf.Collections.MapField<string, Value> payload, string key) =>
+        payload.TryGetValue(key, out var v) &&
+        v.KindCase == Value.KindOneofCase.IntegerValue
+            ? v.IntegerValue
+            : null;
 }
 
 public sealed record SemanticHit(
@@ -219,8 +260,12 @@ public sealed record SemanticHit(
     string? EntityId, string? EntityType,
     float Score,
     string HostType, string SpaceId,
-    string SourceHash, string SourceText);
+    string SourceHash, string SourceText,
+    string Path = "",
+    IReadOnlyList<string>? PathIds = null);
 
-/// <summary>对账视角的已存向量点。</summary>
+/// <summary>对账视角的已存向量点（节点点含视图/模板版本/路径快照）。</summary>
 public sealed record StoredVectorPoint(
-    string Uuid, string PointKind, string InodeId, string? EntityId);
+    string Uuid, string PointKind, string InodeId, string? EntityId,
+    string? ViewType = null, string? TemplateVersion = null, string? Path = null,
+    IReadOnlyList<string>? PathIds = null, long? Depth = null);

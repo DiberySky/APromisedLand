@@ -1,5 +1,5 @@
-using MassTransit;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -17,7 +17,7 @@ namespace TreeGraph.Api.TreeEavSky.Services;
 /// </summary>
 public class SpaceTreeService(
     TreeGraphDbContext dbContext,
-    IPublishEndpoint publishEndpoint) : ITreeService<SpaceTree>
+    IEventPublisher publishEndpoint) : ITreeService<SpaceTree>
 {
     public async Task<IReadOnlyList<TreeNodeDto<SpaceTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
@@ -195,7 +195,7 @@ public class SpaceTreeService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // ★ 语义搜索：节点新增 → 即时补建向量（消费端幂等）
-        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: false, cancellationToken);
 
         return entity.ToNodeDto();
     }
@@ -218,7 +218,7 @@ public class SpaceTreeService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // ★ 语义搜索：节点改名等更新 → 即时重建向量
-        await PublishAsync(entity.Id, InodeChangeKind.Saved, cancellationToken);
+        await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
         return entity.ToNodeDto();
     }
@@ -273,7 +273,7 @@ public class SpaceTreeService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // ★ 语义搜索：节点已删除 → 消费端据 InodeId 清除其残留向量
-        await PublishAsync(nodeId, InodeChangeKind.Deleted, cancellationToken);
+        await PublishAsync(nodeId, InodeChangeKind.Deleted, pathAffected: false, cancellationToken);
 
         return true;
     }
@@ -328,18 +328,20 @@ public class SpaceTreeService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // ★ 语义搜索：节点移动 → 即时重建向量（路径由检索时反查，此处保持索引与宿主一致）
-        await PublishAsync(nodeId, InodeChangeKind.Saved, cancellationToken);
+        await PublishAsync(nodeId, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
         return true;
     }
 
-    /// <summary>发布 iNode 变更事件（语义搜索向量同步；at-least-once，消费端幂等）。</summary>
-    private async Task PublishAsync(string inodeId, InodeChangeKind kind, CancellationToken ct)
+    /// <summary>发布 iNode 变更事件（语义搜索向量同步；at-least-once，消费端幂等）。
+    /// pathAffected：名称/层级位置变更（改名/移动）→ 消费端级联刷新全部后代的路径型文本。</summary>
+    private async Task PublishAsync(string inodeId, InodeChangeKind kind, bool pathAffected, CancellationToken ct)
     {
         await publishEndpoint.Publish(new InodeChangedEvent
         {
             InodeId = inodeId,
-            Kind = kind
+            Kind = kind,
+            PathAffected = pathAffected
         }, ct);
     }
 

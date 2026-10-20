@@ -58,7 +58,7 @@ public sealed class NebulaGraphClient
 
     public string Space => _options.Space;
 
-    /// <summary>执行 nGQL；失败抛 InvalidOperationException（交由 MassTransit 重试）。</summary>
+    /// <summary>执行 nGQL；失败抛 InvalidOperationException（交由 Wolverine 重试）。</summary>
     public async Task<NebulaQueryResult> QueryAsync(string ngql, CancellationToken ct)
     {
         using var resp = await _http.PostAsJsonAsync(
