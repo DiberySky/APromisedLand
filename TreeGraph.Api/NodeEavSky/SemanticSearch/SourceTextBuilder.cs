@@ -24,8 +24,9 @@ namespace TreeGraph.Api.NodeEavSky.SemanticSearch;
 public sealed class SourceTextBuilder
 {
     /// <summary>当前节点视图模板版本。模板文案/标签词/截断/规范化规则变化必须升版并全量重算。
-    /// v2：LineNode 增加「所属线路」行；Line 成为宿主。</summary>
-    public const string TemplateVersion = "v2";
+    /// v2：LineNode 增加「所属线路」行；Line 成为宿主。
+    /// v3：实体文本前置宿主 path_view（层级路径/所属线路 + 当前节点）。</summary>
+    public const string TemplateVersion = "v3";
 
     /// <summary>节点向量视图类型。</summary>
     public const string ViewType = "path_view";
@@ -136,12 +137,12 @@ public sealed class SourceTextBuilder
             : "line_node";
         var spaceId = await ResolveSpaceIdAsync(space, unit, category, knowledge, inodeId, ct);
 
-        // 5. 构造各实体独立文本
+        // 5. 构造各实体独立文本（v3：前置宿主 path_view，实体可被路径语义命中）
         var entityTexts = new List<EntitySourceText>();
         foreach (var mount in entityMounts)
         {
             var entityText = await BuildEntityTextAsync(
-                mount.EntityType, mount.EntityId, ct);
+                mount.EntityType, mount.EntityId, nodeText, ct);
             if (entityText is not null)
                 entityTexts.Add(entityText);
         }
@@ -312,12 +313,21 @@ public sealed class SourceTextBuilder
         text.Length <= maxChars ? text : text[..maxChars] + Ellipsis;
 
     /// <summary>
-    /// 构造单个实体的独立文本。
+    /// 构造单个实体的独立文本（v3：path_view 结构）。
+    /// hostNodeText 非空时前置宿主全路径（层级路径/所属线路 + 当前节点两行），
+    /// 独立实体（未挂载 inode）传 null → 仅类型行 + 属性行。
+    /// 仅当存在实际内容（属性值或自定义表行）时返回文本，否则返回 null。
+    /// （internal：独立实体同步与单元测试直接调用）
     /// </summary>
-    private async Task<EntitySourceText?> BuildEntityTextAsync(
-        string entityType, string entityId, CancellationToken ct)
+    internal async Task<EntitySourceText?> BuildEntityTextAsync(
+        string entityType, string entityId,
+        string? hostNodeText = null, CancellationToken ct = default)
     {
-        var lines = new List<string> { $"类型：{entityType}" };
+        var lines = new List<string>();
+        if (!string.IsNullOrWhiteSpace(hostNodeText))
+            lines.Add(hostNodeText);
+        lines.Add($"类型：{entityType}");
+        var contentCount = 0;
 
         var attrs = _db.AttributeCatalog
             .Where(a => a.EntityType == entityType && !a.IsDeleted)
@@ -342,6 +352,7 @@ public sealed class SourceTextBuilder
             var display = FormatValue(val);
             if (display is null) continue;
             lines.Add($"{def.DisplayName}：{display}");
+            contentCount++;
         }
 
         // 自定义表子数据
@@ -357,10 +368,13 @@ public sealed class SourceTextBuilder
         {
             var rowText = FormatTableRow(row.RowData);
             if (!string.IsNullOrWhiteSpace(rowText))
+            {
                 lines.Add($"行：{rowText}");
+                contentCount++;
+            }
         }
 
-        if (lines.Count <= 1) return null; // 只有类型行，无实际内容
+        if (contentCount == 0) return null; // 无实际内容（仅剩宿主路径/类型行）
 
         var text = string.Join("；", lines);
         var hash = ComputeHash(text);

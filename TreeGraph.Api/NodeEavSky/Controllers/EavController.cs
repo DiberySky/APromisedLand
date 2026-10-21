@@ -3,9 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -23,6 +25,7 @@ public class EavController : ControllerBase
     private readonly ICompositeTypeCache _compositeCache;
     private readonly IOptionSetCache _optionSetCache;
     private readonly TreeGraphDbContext _db;
+    private readonly IEventPublisher _publisher;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public EavController(
@@ -30,6 +33,7 @@ public class EavController : ControllerBase
         CustomTableQueryService tableQuery,
         IAttributeCache attrCache, ICompositeTypeCache compositeCache,
         IOptionSetCache optionSetCache, TreeGraphDbContext db,
+        IEventPublisher publisher,
         IOptions<JsonOptions> jsonOptions)
     {
         _write = write;
@@ -40,6 +44,7 @@ public class EavController : ControllerBase
         _compositeCache = compositeCache;
         _optionSetCache = optionSetCache;
         _db = db;
+        _publisher = publisher;
         _jsonOptions = jsonOptions.Value.JsonSerializerOptions;
     }
 
@@ -137,6 +142,12 @@ public class EavController : ControllerBase
                 HttpContext.TraceIdentifier,
                 ct,
                 expectedUpdatedAt);
+
+            // ★ 语义搜索：独立实体向量刷新（at-least-once，消费端幂等）
+            await _publisher.Publish(new EntityChangedEvent
+            {
+                EntityType = entityType, EntityId = id, Kind = InodeChangeKind.Saved
+            }, ct);
             return NoContent();
         }
         catch (EavConcurrencyException ex)
@@ -244,6 +255,12 @@ public class EavController : ControllerBase
             ct);
 
         if (!deleted) return NotFound();
+
+        // ★ 语义搜索：实体点删除（消费端发现无内容 → 删点）
+        await _publisher.Publish(new EntityChangedEvent
+        {
+            EntityType = entityType, EntityId = id, Kind = InodeChangeKind.Deleted
+        }, ct);
         return NoContent();
     }
 
@@ -283,6 +300,12 @@ public class EavController : ControllerBase
                 HttpContext.TraceIdentifier,
                 ct,
                 expectedUpdatedAt);
+
+            // ★ 语义搜索：独立实体向量刷新
+            await _publisher.Publish(new EntityChangedEvent
+            {
+                EntityType = entityType, EntityId = id, Kind = InodeChangeKind.Patched
+            }, ct);
             return NoContent();
         }
         catch (EavConcurrencyException ex)
@@ -329,6 +352,15 @@ public class EavController : ControllerBase
             User.Identity?.Name ?? "system",
             HttpContext.TraceIdentifier,
             ct);
+
+        // ★ 语义搜索：批量删除后逐实体发布删除事件
+        foreach (var deletedId in result.Deleted)
+        {
+            await _publisher.Publish(new EntityChangedEvent
+            {
+                EntityType = entityType, EntityId = deletedId, Kind = InodeChangeKind.Deleted
+            }, ct);
+        }
 
         return Ok(new BatchDeleteResultDto(
             result.Deleted, result.NotFound, result.TotalAttributesDeleted));

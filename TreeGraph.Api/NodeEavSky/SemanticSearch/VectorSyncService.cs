@@ -80,6 +80,52 @@ public sealed class VectorSynchronizer
         return true;
     }
 
+    /// <summary>
+    /// 同步单个实体的独立向量（独立实体事件的消费入口，幂等）。
+    /// 挂载关系现查：已挂载 → 文本前置宿主 path_view、payload inode_id=挂载 inode、space_id 同宿主；
+    /// 未挂载 → 独立点（inode_id=""、space_id="default"，仅全局检索可见）。
+    /// 无实际内容（含实体已删除）→ 删除实体点。返回是否写入。
+    /// </summary>
+    public async Task<bool> SyncEntityAsync(
+        string entityType, string entityId, CancellationToken ct = default)
+    {
+        var mountInodeId = await _db.InodeEntities
+            .AsNoTracking()
+            .Where(m => m.EntityType == entityType && m.EntityId == entityId)
+            .Select(m => m.InodeId)
+            .FirstOrDefaultAsync(ct);
+
+        string? hostNodeText = null;
+        var spaceId = "default";
+        if (mountInodeId is not null)
+        {
+            var host = await _builder.BuildAsync(mountInodeId, ct);
+            hostNodeText = host?.NodeText;
+            spaceId = host?.SpaceId ?? "default";
+        }
+
+        var source = await _builder.BuildEntityTextAsync(
+            entityType, entityId, hostNodeText, ct);
+        if (source is null)
+        {
+            await _store.DeletePointAsync(
+                QdrantVectorStore.EntityPointUuid(entityId).ToString(), ct);
+            _logger.LogInformation(
+                "实体向量已删除（无内容或已删除）：{EntityType}/{EntityId}", entityType, entityId);
+            return false;
+        }
+
+        var vector = await _embedding.EmbedAsync(source.Text, ct);
+        await _store.UpsertEntityAsync(
+            mountInodeId ?? "", entityId, entityType, vector,
+            spaceId, source.Hash, source.Text, ct);
+
+        _logger.LogInformation(
+            "实体向量已同步：{EntityType}/{EntityId} 挂载={Mount} hash={Hash}",
+            entityType, entityId, mountInodeId ?? "(独立)", source.Hash[..8]);
+        return true;
+    }
+
     /// <summary>全量对账（不限定空间）。</summary>
     public Task<ReconcileResult> ReconcileAllAsync(CancellationToken ct)
         => ReconcileAsync(null, null, null, onProgress: null, ct);
@@ -177,6 +223,22 @@ public sealed class VectorSynchronizer
             expectedKeys.Add(NodeVectorKey(id, SourceTextBuilder.TemplateVersion));
         foreach (var m in mounts) expectedKeys.Add("entity:" + m.EntityId);
 
+        // 独立实体（含未挂载）：仅全量对账纳入期望集合
+        // （无归属空间/线路，范围对账的 existing 过滤不含 inode_id="" 的点，纳入会误报缺失）
+        Dictionary<string, string>? standaloneEntityTypes = null;
+        if (scope is null)
+        {
+            standaloneEntityTypes = (await _db.AttributeValues
+                    .AsNoTracking()
+                    .Select(v => new { v.EntityId, v.EntityType })
+                    .Distinct()
+                    .ToListAsync(ct))
+                .GroupBy(v => v.EntityId)
+                .ToDictionary(g => g.Key, g => g.First().EntityType, StringComparer.Ordinal);
+            foreach (var id in standaloneEntityTypes.Keys)
+                expectedKeys.Add("entity:" + id);
+        }
+
         // Qdrant 侧已存（按空间范围过滤，范围外的点本轮不处理）
         var existing = (await _store.ScrollAllPointsAsync(ct))
             .Where(p => scope is null || scope.Contains(p.InodeId))
@@ -196,6 +258,7 @@ public sealed class VectorSynchronizer
 
         // 补缺：按 inode 归集后整体同步（节点+实体一次完成）
         var affectedInodes = new HashSet<string>(StringComparer.Ordinal);
+        var missingStandaloneEntities = new List<string>();
         foreach (var key in missing)
         {
             var sep = key.IndexOf(':');
@@ -208,6 +271,8 @@ public sealed class VectorSynchronizer
             }
             else if (entityToInode.TryGetValue(rest, out var inodeId))
                 affectedInodes.Add(inodeId);
+            else if (standaloneEntityTypes is not null && standaloneEntityTypes.ContainsKey(rest))
+                missingStandaloneEntities.Add(rest);
         }
 
         // 逐项处理范围内全部节点：缺失的补算（fix），已存在的仅校验（ok）。
@@ -239,6 +304,19 @@ public sealed class VectorSynchronizer
                     isMissing ? "fix" : "ok", inodeId,
                     names!.TryGetValue(inodeId, out var name) ? name : "",
                     source?.NodeText ?? ""));
+            }
+        }
+
+        // 补缺：独立实体（无挂载 inode，不在节点循环内）
+        foreach (var entityId in missingStandaloneEntities)
+        {
+            var entityType = standaloneEntityTypes![entityId];
+            await SyncEntityAsync(entityType, entityId, ct);
+            fixedCount++;
+            if (onProgress is not null)
+            {
+                var src = await _builder.BuildEntityTextAsync(entityType, entityId, null, ct);
+                await onProgress(new ReconcileProgress("fix", entityId, "", src?.Text ?? ""));
             }
         }
 
@@ -558,5 +636,53 @@ public sealed class InodeChangedConsumer
         _logger.LogInformation("路径级联刷新：{InodeId} 后代 {Count} 个", inodeId, descendants.Count);
         foreach (var descendantId in descendants)
             await synchronizer.SyncInodeAsync(descendantId, ct);
+    }
+}
+
+/// <summary>
+/// RabbitMQ 消费者：EAV 实体变更 → 重建实体独立向量（幂等）。
+/// 覆盖独立实体（未挂载 inode）的写操作路径（EavController）；
+/// 已挂载实体由 InodeChangedConsumer 的 SyncInodeAsync 一并重建，不经过本消费者。
+/// 去重窗口与 InodeChangedConsumer 同策略（vec-sync-entity:{entityId}）。
+/// </summary>
+public sealed class EntityChangedConsumer
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IMemoryCache _dedupCache;
+    private readonly VectorSyncOptions _syncOptions;
+    private readonly ILogger<EntityChangedConsumer> _logger;
+
+    public EntityChangedConsumer(
+        IServiceScopeFactory scopeFactory,
+        IMemoryCache dedupCache,
+        IOptions<VectorSyncOptions> syncOptions,
+        ILogger<EntityChangedConsumer> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _dedupCache = dedupCache;
+        _syncOptions = syncOptions.Value;
+        _logger = logger;
+    }
+
+    public async Task Consume(EntityChangedEvent msg, CancellationToken ct)
+    {
+        // 滑动窗口去重：窗口内已有待处理的同实体事件则跳过
+        var dedupKey = $"vec-sync-entity:{msg.EntityId}";
+        if (_dedupCache.TryGetValue(dedupKey, out _))
+        {
+            _logger.LogDebug("去重窗口内跳过实体：{EntityId}", msg.EntityId);
+            return;
+        }
+        _dedupCache.Set(dedupKey, true,
+            TimeSpan.FromSeconds(_syncOptions.DedupWindowSeconds));
+
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var initializer = scope.ServiceProvider
+            .GetRequiredService<QdrantInitializer>();
+        var synchronizer = scope.ServiceProvider
+            .GetRequiredService<VectorSynchronizer>();
+
+        await initializer.EnsureReadyAsync(ct);
+        await synchronizer.SyncEntityAsync(msg.EntityType, msg.EntityId, ct);
     }
 }
