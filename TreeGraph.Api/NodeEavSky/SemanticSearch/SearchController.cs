@@ -46,7 +46,12 @@ public sealed class SearchController : ControllerBase
             request.TopK ?? _options.DefaultTopK, 1, _options.MaxTopK);
 
         var results = await _searchService.SearchAsync(
-            request.Query.Trim(), topK, request.SpaceId, request.MinScore, ct);
+            request.Query.Trim(), topK, request.SpaceId, request.MinScore,
+            request.AttributeFilters?.ToDictionary(
+                kv => kv.Key, kv => (IReadOnlyList<string>)kv.Value),
+            request.AttributeRanges?.ToDictionary(
+                kv => kv.Key, kv => kv.Value),
+            ct);
 
         _logger.LogDebug(
             "语义搜索：query={Query} topK={TopK} minScore={MinScore} hits={Count}",
@@ -187,6 +192,12 @@ public sealed class SemanticSearchRequest
 
     /// <summary>相似度绝对下限（0~1）；为空则用 SemanticSearch:MinScore 配置默认值。</summary>
     public float? MinScore { get; set; }
+
+    /// <summary>hybrid 属性等值过滤（AttributeId → 候选显示值，同属性多值为 OR），逐项 AND。</summary>
+    public Dictionary<string, string[]>? AttributeFilters { get; set; }
+
+    /// <summary>hybrid 数值范围过滤（AttributeId → 范围），命中 attrn_{id} 数值槽。</summary>
+    public Dictionary<string, AttrRangeFilter>? AttributeRanges { get; set; }
 }
 
 public sealed record SemanticSearchResponse(

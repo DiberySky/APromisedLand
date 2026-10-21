@@ -51,6 +51,8 @@ public sealed class SearchService
 
     public async Task<IReadOnlyList<SemanticSearchItemDto>> SearchAsync(
         string query, int topK, string? spaceId, float? minScore,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? attributeFilters = null,
+        IReadOnlyDictionary<string, AttrRangeFilter>? attributeRanges = null,
         CancellationToken ct = default)
     {
         var vector = await _embedding.EmbedAsync(query, ct);
@@ -60,7 +62,8 @@ public sealed class SearchService
         var candidateLimit = Math.Clamp(
             topK * CandidateMultiplier, MinCandidates, MaxCandidates);
         var hits = await _store.SearchAsync(
-            vector, candidateLimit, spaceId, absoluteFloor, ct);
+            vector, candidateLimit, spaceId, absoluteFloor,
+            attributeFilters, attributeRanges, ct);
 
         // 相对门槛：只保留与本轮最高分相近的命中（剔除同批低相关噪声）
         if (_options.RelativeMargin > 0 && hits.Count > 0)
@@ -103,7 +106,8 @@ public sealed class SearchService
         return filtered
             .Select(h =>
             {
-                var isEntity = h.PointKind == "entity";
+                // 行命中与实体命中同构展示（MatchKind=Entity，EntityType=行所属实体类型）
+                var isEntity = h.PointKind is "entity" or "row";
                 var entityType = isEntity && !string.IsNullOrWhiteSpace(h.EntityType)
                     ? h.EntityType : null;
 
@@ -390,6 +394,7 @@ public sealed class SearchService
         "line" => "Line",
         "tree_node" => "TreeNode",
         "entity" => "Entity",
+        "row" => "Row",
         var other => other
     };
 }

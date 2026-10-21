@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.Controllers;
@@ -12,14 +14,16 @@ public class CustomTableDataController : ControllerBase
     private readonly CustomTableReadService _read;
     private readonly CustomTableWriteService _write;
     private readonly IAttributeCache _attrCache;
+    private readonly IEventPublisher _publisher;
 
     public CustomTableDataController(
         CustomTableReadService read, CustomTableWriteService write,
-        IAttributeCache attrCache)
+        IAttributeCache attrCache, IEventPublisher publisher)
     {
         _read = read;
         _write = write;
         _attrCache = attrCache;
+        _publisher = publisher;
     }
 
     [HttpGet("{tableName}")]
@@ -50,6 +54,12 @@ public class CustomTableDataController : ControllerBase
             await _write.ReplaceAsync(
                 entityId, entityType,
                 def.AttributeId, def.RefTableDefinitionId, value, ct);
+
+            // ★ 语义搜索：行变更随实体向量刷新（整表替换）
+            await _publisher.Publish(new EntityChangedEvent
+            {
+                EntityType = entityType, EntityId = entityId, Kind = InodeChangeKind.Saved
+            }, ct);
             return NoContent();
         }
         catch (EavValidationException ex)
@@ -73,6 +83,12 @@ public class CustomTableDataController : ControllerBase
                 entityId, entityType,
                 def.AttributeId, def.RefTableDefinitionId,
                 rowValue, ct);
+
+            // ★ 语义搜索：行变更随实体向量刷新（单行新增/更新）
+            await _publisher.Publish(new EntityChangedEvent
+            {
+                EntityType = entityType, EntityId = entityId, Kind = InodeChangeKind.Patched
+            }, ct);
             return NoContent();
         }
         catch (EavValidationException ex)
@@ -97,6 +113,12 @@ public class CustomTableDataController : ControllerBase
 
         await _write.DeleteRowAsync(
             rowId, entityId, entityType, def.AttributeId, ct);
+
+        // ★ 语义搜索：行变更随实体向量刷新（单行删除）
+        await _publisher.Publish(new EntityChangedEvent
+        {
+            EntityType = entityType, EntityId = entityId, Kind = InodeChangeKind.Deleted
+        }, ct);
         return NoContent();
     }
 }

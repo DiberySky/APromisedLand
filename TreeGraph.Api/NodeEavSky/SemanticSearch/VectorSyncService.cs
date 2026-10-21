@@ -64,13 +64,16 @@ public sealed class VectorSynchronizer
                 source.Path, source.PathIds, source.Depth, ct);
         }
 
-        // 各实体独立向量
+        // 各实体独立向量（v4：行独立成点，随实体一并重建）
         foreach (var entity in source.EntityTexts)
         {
             var entityVector = await _embedding.EmbedAsync(entity.Text, ct);
             await _store.UpsertEntityAsync(
                 inodeId, entity.EntityId, entity.EntityType, entityVector,
-                source.SpaceId, entity.Hash, entity.Text, ct);
+                source.SpaceId, entity.Hash, entity.Text, entity.Attrs, entity.AttrNums, ct);
+            await SyncRowsForEntityAsync(
+                entity.EntityType, entity.EntityId,
+                source.EntityPrefix, inodeId, source.SpaceId, ct);
         }
 
         _logger.LogInformation(
@@ -84,7 +87,7 @@ public sealed class VectorSynchronizer
     /// 同步单个实体的独立向量（独立实体事件的消费入口，幂等）。
     /// 挂载关系现查：已挂载 → 文本前置宿主 path_view、payload inode_id=挂载 inode、space_id 同宿主；
     /// 未挂载 → 独立点（inode_id=""、space_id="default"，仅全局检索可见）。
-    /// 无实际内容（含实体已删除）→ 删除实体点。返回是否写入。
+    /// v4：同时重建该实体全部自定义表行点（先删后写；实体无内容/已删除时行点仍按 PG 维护）。
     /// </summary>
     public async Task<bool> SyncEntityAsync(
         string entityType, string entityId, CancellationToken ct = default)
@@ -100,7 +103,8 @@ public sealed class VectorSynchronizer
         if (mountInodeId is not null)
         {
             var host = await _builder.BuildAsync(mountInodeId, ct);
-            hostNodeText = host?.NodeText;
+            // EAV 文本统一 name = value：使用宿主前缀的等号格式
+            hostNodeText = host?.EntityPrefix;
             spaceId = host?.SpaceId ?? "default";
         }
 
@@ -112,18 +116,60 @@ public sealed class VectorSynchronizer
                 QdrantVectorStore.EntityPointUuid(entityId).ToString(), ct);
             _logger.LogInformation(
                 "实体向量已删除（无内容或已删除）：{EntityType}/{EntityId}", entityType, entityId);
-            return false;
+        }
+        else
+        {
+            var vector = await _embedding.EmbedAsync(source.Text, ct);
+            await _store.UpsertEntityAsync(
+                mountInodeId ?? "", entityId, entityType, vector,
+                spaceId, source.Hash, source.Text, source.Attrs, source.AttrNums, ct);
+
+            _logger.LogInformation(
+                "实体向量已同步：{EntityType}/{EntityId} 挂载={Mount} hash={Hash}",
+                entityType, entityId, mountInodeId ?? "(独立)", source.Hash[..8]);
         }
 
-        var vector = await _embedding.EmbedAsync(source.Text, ct);
-        await _store.UpsertEntityAsync(
-            mountInodeId ?? "", entityId, entityType, vector,
-            spaceId, source.Hash, source.Text, ct);
+        // 行独立向量：实体已删除时 PG 行已被级联清空，此处仅清残留点
+        await SyncRowsForEntityAsync(
+            entityType, entityId, hostNodeText, mountInodeId ?? "", spaceId, ct);
 
-        _logger.LogInformation(
-            "实体向量已同步：{EntityType}/{EntityId} 挂载={Mount} hash={Hash}",
-            entityType, entityId, mountInodeId ?? "(独立)", source.Hash[..8]);
-        return true;
+        return source is not null;
+    }
+
+    /// <summary>
+    /// 同步某实体的全部自定义表行向量（先删后写，幂等）。
+    /// 行文本前置宿主 path_view（与实体文本共用 hostNodeText），inode/space 归属沿用宿主；
+    /// 已删行的残留点由 DeleteRowsByEntityAsync 统一清理。
+    /// </summary>
+    private async Task SyncRowsForEntityAsync(
+        string entityType, string entityId,
+        string? hostNodeText, string inodeId, string spaceId,
+        CancellationToken ct)
+    {
+        await _store.DeleteRowsByEntityAsync(entityId, ct);
+
+        var rows = await _db.CustomTableRows
+            .AsNoTracking()
+            .Where(r => r.ParentEntityType == entityType && r.ParentEntityId == entityId)
+            .OrderBy(r => r.AttributeId)
+            .ThenBy(r => r.RowOrder)
+            .ToListAsync(ct);
+
+        foreach (var row in rows)
+        {
+            var rowSource = await _builder.BuildRowTextAsync(row, hostNodeText, ct);
+            if (rowSource is null) continue;
+
+            var rowVector = await _embedding.EmbedAsync(rowSource.Text, ct);
+            await _store.UpsertRowAsync(
+                row.RowId, entityId, entityType, row.AttributeId,
+                rowVector, inodeId, spaceId,
+                rowSource.Hash, rowSource.Text, ct);
+        }
+
+        if (rows.Count > 0)
+            _logger.LogInformation("实体行向量已同步：{EntityType}/{EntityId} 行数={Count}",
+                entityType, entityId, rows.Count);
     }
 
     /// <summary>全量对账（不限定空间）。</summary>
@@ -182,7 +228,7 @@ public sealed class VectorSynchronizer
         // space 节点（Id 存在于 spaces 空间实体列表内）不创建向量，不计入期望集合。
         var mounts = await _db.InodeEntities
             .AsNoTracking()
-            .Select(m => new { m.InodeId, m.EntityId })
+            .Select(m => new { m.InodeId, m.EntityType, m.EntityId })
             .ToListAsync(ct);
         var spaceEntityIds = (await _db.Spaces
                 .AsNoTracking()
@@ -239,6 +285,34 @@ public sealed class VectorSynchronizer
                 expectedKeys.Add("entity:" + id);
         }
 
+        // 行期望键 row:{rowId}：全量 = 全部自定义表行；范围 = 范围内挂载实体的行
+        // （独立实体的行与独立实体同规则：仅全量纳入；行点 payload 带 inode_id，existing 过滤口径一致）
+        var rowOwners = new Dictionary<string, (string EntityType, string EntityId)>(StringComparer.Ordinal);
+        if (scope is null)
+        {
+            foreach (var r in await _db.CustomTableRows.AsNoTracking()
+                         .Select(r => new { r.RowId, r.ParentEntityType, r.ParentEntityId })
+                         .ToListAsync(ct))
+            {
+                expectedKeys.Add("row:" + r.RowId);
+                rowOwners[r.RowId] = (r.ParentEntityType, r.ParentEntityId);
+            }
+        }
+        else
+        {
+            var mountedPairs = mounts
+                .Select(m => m.EntityType + "\n" + m.EntityId)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var r in await _db.CustomTableRows.AsNoTracking()
+                         .Select(r => new { r.RowId, r.ParentEntityType, r.ParentEntityId })
+                         .ToListAsync(ct))
+            {
+                if (!mountedPairs.Contains(r.ParentEntityType + "\n" + r.ParentEntityId)) continue;
+                expectedKeys.Add("row:" + r.RowId);
+                rowOwners[r.RowId] = (r.ParentEntityType, r.ParentEntityId);
+            }
+        }
+
         // Qdrant 侧已存（按空间范围过滤，范围外的点本轮不处理）
         var existing = (await _store.ScrollAllPointsAsync(ct))
             .Where(p => scope is null || scope.Contains(p.InodeId))
@@ -259,6 +333,7 @@ public sealed class VectorSynchronizer
         // 补缺：按 inode 归集后整体同步（节点+实体一次完成）
         var affectedInodes = new HashSet<string>(StringComparer.Ordinal);
         var missingStandaloneEntities = new List<string>();
+        var missingRowOwners = new HashSet<(string EntityType, string EntityId)>();
         foreach (var key in missing)
         {
             var sep = key.IndexOf(':');
@@ -268,6 +343,12 @@ public sealed class VectorSynchronizer
             {
                 // node:{inodeId}:{viewType}:{templateVersion}
                 affectedInodes.Add(rest[..rest.IndexOf(':')]);
+            }
+            else if (kind == "row")
+            {
+                // row:{rowId} → 路由到父实体整体重建
+                if (rowOwners.TryGetValue(rest, out var owner))
+                    missingRowOwners.Add(owner);
             }
             else if (entityToInode.TryGetValue(rest, out var inodeId))
                 affectedInodes.Add(inodeId);
@@ -320,6 +401,17 @@ public sealed class VectorSynchronizer
             }
         }
 
+        // 补缺：行缺失 → 父实体整体重建（实体点 + 全部行点，先删后写幂等）。
+        // v4 文本变化的行承载实体经此自愈（实体点键不含模板版本，靠此路由重算）。
+        foreach (var owner in missingRowOwners)
+        {
+            await SyncEntityAsync(owner.EntityType, owner.EntityId, ct);
+            fixedCount++;
+            if (onProgress is not null)
+                await onProgress(new ReconcileProgress(
+                    "fix", owner.EntityId, "", $"行向量重建（实体 {owner.EntityType}）"));
+        }
+
         // 删孤儿（按 PointId）。
         // 注意：补缺可能用同 UUID 覆盖旧点（旧单向量点 UUID=inodeId，与新节点点相同），
         // 基于对账开始时的快照删孤儿会误删刚写好的新点，因此重新快照再判定。
@@ -339,9 +431,11 @@ public sealed class VectorSynchronizer
                 deletedCount++;
                 if (onProgress is not null)
                     await onProgress(new ReconcileProgress(
-                        "purge", point.InodeId, "",
-                        point.PointKind == "entity"
-                            ? $"实体 {point.EntityId}"
+                    "purge", point.InodeId, "",
+                    point.PointKind == "entity"
+                        ? $"实体 {point.EntityId}"
+                        : point.PointKind == "row"
+                            ? $"行 {point.RowId}"
                             : $"节点 {point.InodeId}"));
             }
         }
@@ -363,11 +457,14 @@ public sealed class VectorSynchronizer
     private static string NodeVectorKey(string inodeId, string templateVersion) =>
         $"node:{inodeId}:{SourceTextBuilder.ViewType}:{templateVersion}";
 
-    /// <summary>向量点对账键：实体点按 entityId，节点点按 inode+视图+模板版本。</summary>
+    /// <summary>向量点对账键：实体点按 entityId，行点按 rowId，节点点按 inode+视图+模板版本。</summary>
     private static string PointKey(StoredVectorPoint p) =>
-        p.PointKind == "entity"
-            ? "entity:" + p.EntityId
-            : NodeVectorKey(p.InodeId, p.TemplateVersion ?? "");
+        p.PointKind switch
+        {
+            "entity" => "entity:" + p.EntityId,
+            "row" => "row:" + p.RowId,
+            _ => NodeVectorKey(p.InodeId, p.TemplateVersion ?? "")
+        };
 
     /// <summary>
     /// BFS 收集 4 棵宿主树中 inode 的全部后代 Id（不含自身）；

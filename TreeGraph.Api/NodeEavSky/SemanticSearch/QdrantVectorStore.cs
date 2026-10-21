@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Api.NodeEavSky.SemanticSearch;
 
@@ -51,6 +52,13 @@ public sealed class QdrantVectorStore
         return new Guid(bytes);
     }
 
+    /// <summary>行点的确定性 UUID（同 rowId 恒同 UUID，保证 upsert 幂等）。</summary>
+    public static Guid RowPointUuid(string rowId)
+    {
+        var bytes = MD5.HashData(Encoding.UTF8.GetBytes("row:" + rowId));
+        return new Guid(bytes);
+    }
+
     /// <summary>写入节点向量（path_view 两段式文本 + 路径快照 payload）。</summary>
     public async Task UpsertNodeAsync(
         string inodeId, float[] vector,
@@ -89,10 +97,17 @@ public sealed class QdrantVectorStore
             inodeId, viewType, sourceHash[..8]);
     }
 
-    /// <summary>写入实体向量（实体独立文本，通过 inode_id 建立路径关系）。</summary>
+    /// <summary>
+    /// 写入实体向量（实体独立文本，通过 inode_id 建立路径关系）。
+    /// attrs 非空时把每个属性写入 payload 键 attr_{attributeId}（显示值），
+    /// 供 hybrid 检索做属性精确过滤（Qdrant keyword match）。
+    /// attrNums 非空时写入数值槽 attrn_{attributeId}（double），供 Range 范围过滤。
+    /// </summary>
     public async Task UpsertEntityAsync(
         string inodeId, string entityId, string entityType, float[] vector,
         string spaceId, string sourceHash, string sourceText,
+        IReadOnlyDictionary<string, string>? attrs = null,
+        IReadOnlyDictionary<string, double>? attrNums = null,
         CancellationToken ct = default)
     {
         var point = new PointStruct
@@ -112,11 +127,52 @@ public sealed class QdrantVectorStore
             }
         };
 
+        if (attrs is not null)
+            foreach (var (attrId, display) in attrs)
+                point.Payload[$"attr_{attrId}"] = display;
+
+        if (attrNums is not null)
+            foreach (var (attrId, num) in attrNums)
+                point.Payload[$"attrn_{attrId}"] = num;
+
         await _client.UpsertAsync(_options.CollectionName, [point],
             cancellationToken: ct);
 
         _logger.LogDebug("Qdrant upsert 实体：inode={InodeId} entity={EntityId} type={EntityType}",
             inodeId, entityId, entityType);
+    }
+
+    /// <summary>写入行向量（自定义表行独立文本，entity_id/inode_id 建立归属链）。</summary>
+    public async Task UpsertRowAsync(
+        string rowId, string entityId, string entityType, string attributeId,
+        float[] vector, string inodeId, string spaceId,
+        string sourceHash, string sourceText,
+        CancellationToken ct = default)
+    {
+        var point = new PointStruct
+        {
+            Id = new PointId { Uuid = RowPointUuid(rowId).ToString() },
+            Vectors = vector,
+            Payload =
+            {
+                ["point_kind"] = "row",
+                ["row_id"] = rowId,
+                ["entity_id"] = entityId,
+                ["entity_type"] = entityType,
+                ["attribute_id"] = attributeId,
+                ["inode_id"] = inodeId,
+                ["host_type"] = "row",
+                ["space_id"] = spaceId,
+                ["source_hash"] = sourceHash,
+                ["source_text"] = Truncate(sourceText)
+            }
+        };
+
+        await _client.UpsertAsync(_options.CollectionName, [point],
+            cancellationToken: ct);
+
+        _logger.LogDebug("Qdrant upsert 行：row={RowId} entity={EntityId} type={EntityType}",
+            rowId, entityId, entityType);
     }
 
     /// <summary>删除某 inode 的全部向量（节点点 + 其全部实体点）。</summary>
@@ -137,6 +193,35 @@ public sealed class QdrantVectorStore
         _logger.LogDebug("Qdrant delete by inode：{InodeId}", inodeId);
     }
 
+    /// <summary>
+    /// 删除某实体的全部行点（point_kind=row 且 entity_id 匹配；实体点不受影响）。
+    /// 行同步先删后写用，清理已删行的残留点。
+    /// </summary>
+    public async Task DeleteRowsByEntityAsync(string entityId, CancellationToken ct = default)
+    {
+        var filter = new Filter();
+        filter.Must.Add(new Condition
+        {
+            Field = new FieldCondition
+            {
+                Key = "point_kind",
+                Match = new Match { Keyword = "row" }
+            }
+        });
+        filter.Must.Add(new Condition
+        {
+            Field = new FieldCondition
+            {
+                Key = "entity_id",
+                Match = new Match { Keyword = entityId }
+            }
+        });
+
+        await _client.DeleteAsync(_options.CollectionName, filter,
+            cancellationToken: ct);
+        _logger.LogDebug("Qdrant delete rows by entity：{EntityId}", entityId);
+    }
+
     /// <summary>按 PointId（UUID）删除单个向量点（对账清理孤儿用）。</summary>
     public async Task DeletePointAsync(string uuid, CancellationToken ct = default)
     {
@@ -149,16 +234,22 @@ public sealed class QdrantVectorStore
     /// <summary>
     /// 向量检索。<paramref name="scoreThreshold"/> 非空时由 Qdrant 原生过滤低分点
     /// （低于该相似度的点不返回），调用方可据此少传候选、由上层再做相对过滤。
+    /// attributeFilters：hybrid 属性等值过滤（AttributeId → 候选显示值数组，
+    /// 单值=精确匹配，多值=MatchAny 即同属性内 OR），命中 attr_{id} 键；
+    /// attributeRanges：数值范围过滤（attrn_{id} 键上的 Range）。
+    /// 两类条件与空间过滤在 Filter.Must 顶层 AND。
     /// </summary>
     public async Task<IReadOnlyList<SemanticHit>> SearchAsync(
         float[] queryVector, int topK, string? spaceId,
         float? scoreThreshold = null,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? attributeFilters = null,
+        IReadOnlyDictionary<string, AttrRangeFilter>? attributeRanges = null,
         CancellationToken ct = default)
     {
         Filter? filter = null;
         if (!string.IsNullOrWhiteSpace(spaceId))
         {
-            filter = new Filter();
+            filter ??= new Filter();
             filter.Must.Add(new Condition
             {
                 Field = new FieldCondition
@@ -167,6 +258,47 @@ public sealed class QdrantVectorStore
                     Match = new Match { Keyword = spaceId }
                 }
             });
+        }
+
+        if (attributeFilters is not null)
+        {
+            filter ??= new Filter();
+            foreach (var (attrId, expected) in attributeFilters)
+            {
+                if (expected.Count == 0) continue;
+                var match = expected.Count == 1
+                    ? new Match { Keyword = expected[0] }
+                    : new Match { Keywords = new RepeatedStrings { Strings = { expected } } };
+                filter.Must.Add(new Condition
+                {
+                    Field = new FieldCondition
+                    {
+                        Key = $"attr_{attrId}",
+                        Match = match
+                    }
+                });
+            }
+        }
+
+        if (attributeRanges is not null)
+        {
+            filter ??= new Filter();
+            foreach (var (attrId, range) in attributeRanges)
+            {
+                var r = new Qdrant.Client.Grpc.Range();
+                if (range.Gte.HasValue) r.Gte = range.Gte.Value;
+                if (range.Lte.HasValue) r.Lte = range.Lte.Value;
+                if (range.Gt.HasValue) r.Gt = range.Gt.Value;
+                if (range.Lt.HasValue) r.Lt = range.Lt.Value;
+                filter.Must.Add(new Condition
+                {
+                    Field = new FieldCondition
+                    {
+                        Key = $"attrn_{attrId}",
+                        Range = r
+                    }
+                });
+            }
         }
 
         var results = await _client.SearchAsync(
@@ -215,6 +347,7 @@ public sealed class QdrantVectorStore
                 PointKind: PayloadString(p.Payload, "point_kind"),
                 InodeId: PayloadString(p.Payload, "inode_id"),
                 EntityId: PayloadString(p.Payload, "entity_id"),
+                RowId: PayloadString(p.Payload, "row_id"),
                 ViewType: PayloadString(p.Payload, "view_type"),
                 TemplateVersion: PayloadString(p.Payload, "template_version"),
                 Path: PayloadString(p.Payload, "path"),
@@ -264,8 +397,9 @@ public sealed record SemanticHit(
     string Path = "",
     IReadOnlyList<string>? PathIds = null);
 
-/// <summary>对账视角的已存向量点（节点点含视图/模板版本/路径快照）。</summary>
+/// <summary>对账视角的已存向量点（节点点含视图/模板版本/路径快照，行点含 row_id）。</summary>
 public sealed record StoredVectorPoint(
     string Uuid, string PointKind, string InodeId, string? EntityId,
+    string? RowId = null,
     string? ViewType = null, string? TemplateVersion = null, string? Path = null,
     IReadOnlyList<string>? PathIds = null, long? Depth = null);

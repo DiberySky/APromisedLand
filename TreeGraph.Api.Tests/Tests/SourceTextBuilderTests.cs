@@ -99,7 +99,7 @@ public class SourceTextBuilderTests
         var secondEntity = Assert.Single(second.EntityTexts);
         Assert.Equal(firstEntity.Text, secondEntity.Text);
         Assert.Equal(firstEntity.Hash, secondEntity.Hash);
-        Assert.Contains("名称：消防水泵", firstEntity.Text);
+        Assert.Contains("名称 = 消防水泵", firstEntity.Text);
     }
 
     [Fact]

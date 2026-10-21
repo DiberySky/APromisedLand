@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.SpaceSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Entities;
 
@@ -25,15 +26,21 @@ public sealed class SourceTextBuilder
 {
     /// <summary>当前节点视图模板版本。模板文案/标签词/截断/规范化规则变化必须升版并全量重算。
     /// v2：LineNode 增加「所属线路」行；Line 成为宿主。
-    /// v3：实体文本前置宿主 path_view（层级路径/所属线路 + 当前节点）。</summary>
+    /// v3：实体文本前置宿主 path_view（层级路径/所属线路 + 当前节点）。
+    /// v4（仅 EAV 文本）：实体/行键值行统一 name = value。节点文本未变，故版本仍为 v3；
+    ///   实体点键 entity:{id} / 行点键 row:{id} 均不含版本，格式变更需强制重建这两类点。</summary>
     public const string TemplateVersion = "v3";
 
     /// <summary>节点向量视图类型。</summary>
     public const string ViewType = "path_view";
 
-    private const string PathLabel = "层级路径：";
-    private const string LineLabel = "所属线路：";
-    private const string SelfLabel = "当前节点：";
+    private const string PathKey = "层级路径";
+    private const string LineKey = "所属线路";
+    private const string SelfKey = "当前节点";
+    /// <summary>节点向量分隔符：中文冒号。</summary>
+    private const string NodeSeparator = "：";
+    /// <summary>EAV（实体/行）向量分隔符：半角等号，与行内容 name=value 同构。</summary>
+    private const string EavSeparator = " = ";
     private const string UnnamedNode = "未命名节点";
     private const string Ellipsis = "…";
     private const string PathSeparator = " > ";
@@ -122,10 +129,15 @@ public sealed class SourceTextBuilder
         }
 
         var selfName = NormalizeName(nodeName);
-        // 线路节点路径行用「所属线路：」标签，树节点用「层级路径：」
+        // 线路节点路径行用「所属线路」标签，树节点用「层级路径」
+        var pathKey = lineNode is not null ? LineKey : PathKey;
+        // 节点向量用中文冒号；EAV（实体/行）向量统一 name = value
         var nodeText = nodeName is null
             ? ""
-            : BuildNodeText(ancestorNames, selfName, lineNode is not null ? LineLabel : PathLabel);
+            : BuildNodeText(ancestorNames, selfName, pathKey, NodeSeparator);
+        var eavPrefix = nodeName is null
+            ? ""
+            : BuildNodeText(ancestorNames, selfName, pathKey, EavSeparator);
         var nodeHash = ComputeHash(TemplateVersion + "\n" + nodeText);
 
         // 4. 宿主类型与归属空间（检索按 space_id 过滤）
@@ -138,11 +150,12 @@ public sealed class SourceTextBuilder
         var spaceId = await ResolveSpaceIdAsync(space, unit, category, knowledge, inodeId, ct);
 
         // 5. 构造各实体独立文本（v3：前置宿主 path_view，实体可被路径语义命中）
+        // 前缀用 EAV 等号格式（name = value），与节点向量文案分离
         var entityTexts = new List<EntitySourceText>();
         foreach (var mount in entityMounts)
         {
             var entityText = await BuildEntityTextAsync(
-                mount.EntityType, mount.EntityId, nodeText, ct);
+                mount.EntityType, mount.EntityId, eavPrefix, ct);
             if (entityText is not null)
                 entityTexts.Add(entityText);
         }
@@ -156,7 +169,7 @@ public sealed class SourceTextBuilder
 
         return new NodeSourceText(
             inodeId, hostType, spaceId,
-            nodeText, nodeHash, entityTexts,
+            nodeText, eavPrefix, nodeHash, entityTexts,
             path, pathIds, ancestorIds.Count);
     }
 
@@ -247,27 +260,30 @@ public sealed class SourceTextBuilder
     /// path_view 两段式节点文本：层级路径行（有祖先时）+ 当前节点行。
     /// 祖先 ≤8 层全保留，超过保留 根 + … + 最近 4 层；
     /// 整条超 400 字符时逐步收短祖先路径（保根 + 最近层），当前节点行永不裁剪。
+    /// <paramref name="separator"/>：节点向量 "：" / EAV 向量 " = "。
     /// </summary>
-    private static string BuildNodeText(List<string> ancestorNames, string selfName, string pathLabel)
+    private static string BuildNodeText(
+        List<string> ancestorNames, string selfName, string pathKey, string separator)
     {
-        var selfLine = SelfLabel + Clip(selfName, MaxNameChars);
+        var selfLine = SelfKey + separator + Clip(selfName, MaxNameChars);
         if (ancestorNames.Count == 0) return selfLine;
 
         var keep = ancestorNames.Count <= MaxPathSegments
             ? ancestorNames.Count
             : MaxTailSegments;
-        var text = BuildPathLine(ancestorNames, keep, pathLabel) + "\n" + selfLine;
+        var text = BuildPathLine(ancestorNames, keep, pathKey, separator) + "\n" + selfLine;
         while (text.Length > MaxTextChars && keep > 1)
         {
             keep--;
-            text = BuildPathLine(ancestorNames, keep, pathLabel) + "\n" + selfLine;
+            text = BuildPathLine(ancestorNames, keep, pathKey, separator) + "\n" + selfLine;
         }
 
         return text.Length <= MaxTextChars ? text : selfLine;
     }
 
     /// <summary>构造层级路径行；keep 小于段数时保留 根 + … + 最近 keep 层。</summary>
-    private static string BuildPathLine(List<string> ancestorNames, int keep, string pathLabel)
+    private static string BuildPathLine(
+        List<string> ancestorNames, int keep, string pathKey, string separator)
     {
         var segs = keep >= ancestorNames.Count
             ? ancestorNames
@@ -275,7 +291,7 @@ public sealed class SourceTextBuilder
                 .Append(Ellipsis)
                 .Concat(ancestorNames.Skip(ancestorNames.Count - keep))
                 .ToList();
-        return pathLabel + string.Join(PathSeparator, segs.Select(s => Clip(s, MaxNameChars)));
+        return pathKey + separator + string.Join(PathSeparator, segs.Select(s => Clip(s, MaxNameChars)));
     }
 
     /// <summary>
@@ -313,10 +329,11 @@ public sealed class SourceTextBuilder
         text.Length <= maxChars ? text : text[..maxChars] + Ellipsis;
 
     /// <summary>
-    /// 构造单个实体的独立文本（v3：path_view 结构）。
-    /// hostNodeText 非空时前置宿主全路径（层级路径/所属线路 + 当前节点两行），
+    /// 构造单个实体的独立文本（v4 path_view 结构，键值行统一 name = value）。
+    /// hostNodeText 非空时前置宿主全路径（层级路径/所属线路 + 当前节点两行，等号格式），
     /// 独立实体（未挂载 inode）传 null → 仅类型行 + 属性行。
-    /// 仅当存在实际内容（属性值或自定义表行）时返回文本，否则返回 null。
+    /// v4：实体文本不再内嵌自定义表行（行独立成点，避免双嵌入稀释检索）；
+    /// 无属性值 → 返回 null（实体点删除，行点仍按 SyncEntityAsync 独立维护）。
     /// （internal：独立实体同步与单元测试直接调用）
     /// </summary>
     internal async Task<EntitySourceText?> BuildEntityTextAsync(
@@ -326,7 +343,7 @@ public sealed class SourceTextBuilder
         var lines = new List<string>();
         if (!string.IsNullOrWhiteSpace(hostNodeText))
             lines.Add(hostNodeText);
-        lines.Add($"类型：{entityType}");
+        lines.Add($"类型{EavSeparator}{entityType}");
         var contentCount = 0;
 
         var attrs = _db.AttributeCatalog
@@ -343,6 +360,8 @@ public sealed class SourceTextBuilder
             .ToListAsync(ct);
 
         var byAttrId = values.ToDictionary(v => v.AttributeId, v => v);
+        var attrPayload = new Dictionary<string, string>(StringComparer.Ordinal);
+        var attrNums = new Dictionary<string, double>(StringComparer.Ordinal);
 
         foreach (var def in defs)
         {
@@ -351,35 +370,51 @@ public sealed class SourceTextBuilder
 
             var display = FormatValue(val);
             if (display is null) continue;
-            lines.Add($"{def.DisplayName}：{display}");
+            lines.Add($"{def.DisplayName}{EavSeparator}{display}");
+            attrPayload[def.AttributeId] = display;
+            // 数值属性同步进数值槽（attrn_{id}），供 Range 范围过滤
+            if (val.ValueDecimal.HasValue)
+                attrNums[def.AttributeId] = (double)val.ValueDecimal.Value;
+            else if (val.ValueInt.HasValue)
+                attrNums[def.AttributeId] = val.ValueInt.Value;
             contentCount++;
         }
 
-        // 自定义表子数据
-        var tableRows = await _db.CustomTableRows
-            .AsNoTracking()
-            .Where(r => r.ParentEntityType == entityType &&
-                        r.ParentEntityId == entityId)
-            .OrderBy(r => r.RowOrder)
-            .Take(50)
-            .ToListAsync(ct);
-
-        foreach (var row in tableRows)
-        {
-            var rowText = FormatTableRow(row.RowData);
-            if (!string.IsNullOrWhiteSpace(rowText))
-            {
-                lines.Add($"行：{rowText}");
-                contentCount++;
-            }
-        }
-
-        if (contentCount == 0) return null; // 无实际内容（仅剩宿主路径/类型行）
+        if (contentCount == 0) return null; // 无属性内容（仅剩宿主路径/类型行）
 
         var text = string.Join("；", lines);
         var hash = ComputeHash(text);
 
-        return new EntitySourceText(entityId, entityType, text, hash);
+        return new EntitySourceText(entityId, entityType, text, hash, attrPayload, attrNums);
+    }
+
+    /// <summary>
+    /// 构造单个自定义表行的独立向量文本（v4，键值行统一 name = value）。
+    /// hostNodeText 非空时前置宿主 path_view（等号格式）；row 所属属性定义反查显示名作为表格标题。
+    /// 仅当行有实际内容（FormatTableRow 非空）时返回文本，否则返回 null。
+    /// （internal：行同步与单元测试直接调用）
+    /// </summary>
+    internal async Task<EntitySourceText?> BuildRowTextAsync(
+        CustomTableRow row, string? hostNodeText, CancellationToken ct = default)
+    {
+        var def = await _db.AttributeCatalog
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.AttributeId == row.AttributeId, ct);
+        var tableName = def?.DisplayName ?? row.AttributeId;
+
+        var rowContent = FormatTableRow(row.RowData);
+        if (string.IsNullOrWhiteSpace(rowContent)) return null;
+
+        var lines = new List<string>();
+        if (!string.IsNullOrWhiteSpace(hostNodeText))
+            lines.Add(hostNodeText);
+        lines.Add($"类型{EavSeparator}{row.ParentEntityType}");
+        lines.Add($"表格{EavSeparator}{tableName}");
+        lines.Add($"行{EavSeparator}{rowContent}");
+
+        var text = string.Join("；", lines);
+        var hash = ComputeHash(text);
+        return new EntitySourceText(row.RowId, row.ParentEntityType, text, hash);
     }
 
     private static string? FormatValue(NodeEavSky.Entities.AttributeValue v)
@@ -420,12 +455,16 @@ public sealed class SourceTextBuilder
     }
 }
 
-/// <summary>节点级源文本：path_view 节点文本 + 路径快照 + 挂载的全部实体独立文本。</summary>
+/// <summary>
+/// 节点级源文本：path_view 节点文本 + 路径快照 + 挂载的全部实体独立文本。
+/// EntityPrefix：供实体/行文本使用的宿主前缀（name = value 等号格式），与节点向量文案分离。
+/// </summary>
 public sealed record NodeSourceText(
     string InodeId,
     string HostType,
     string SpaceId,
     string NodeText,
+    string EntityPrefix,
     string NodeHash,
     IReadOnlyList<EntitySourceText> EntityTexts,
     string Path,
@@ -437,4 +476,8 @@ public sealed record EntitySourceText(
     string EntityId,
     string EntityType,
     string Text,
-    string Hash);
+    string Hash,
+    /// <summary>属性键值（AttributeId → 显示值），写入实体点 payload 供 hybrid 属性过滤。</summary>
+    IReadOnlyDictionary<string, string>? Attrs = null,
+    /// <summary>数值属性键值（AttributeId → 数值），写入实体点 payload attrn_{id} 供范围过滤。</summary>
+    IReadOnlyDictionary<string, double>? AttrNums = null);

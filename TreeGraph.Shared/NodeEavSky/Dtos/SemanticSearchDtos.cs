@@ -12,7 +12,23 @@ public sealed record SemanticSearchRequest
 
     /// <summary>相似度绝对下限（0~1）；为空则用服务端 SemanticSearch:MinScore 默认值。</summary>
     public float? MinScore { get; init; }
+
+    /// <summary>
+    /// hybrid 属性等值过滤（AttributeId → 候选显示值，如 "attr-3"=["110kV","220kV"]）。
+    /// 逐项 AND 叠加在向量检索之上；同一属性多值为 OR（MatchAny）语义。
+    /// 仅命中 payload attr_{id} 精确匹配的实体点。
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? AttributeFilters { get; init; }
+
+    /// <summary>
+    /// hybrid 数值范围过滤（AttributeId → 范围），命中 payload attrn_{id} 数值槽。
+    /// 仅 ValueInt/ValueDecimal 类型的属性有数值槽。
+    /// </summary>
+    public IReadOnlyDictionary<string, AttrRangeFilter>? AttributeRanges { get; init; }
 }
+
+/// <summary>数值范围过滤条件（开闭可组合，全空等价不过滤）。</summary>
+public sealed record AttrRangeFilter(double? Gte, double? Lte, double? Gt, double? Lt);
 
 /// <summary>
 /// 语义搜索响应。
