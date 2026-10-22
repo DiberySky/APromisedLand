@@ -1,7 +1,7 @@
 # 交接报告（APromisedLand / TreeGraph）
 
 > 面向接手人：本文件是本机工作的权威入口。仓库内其他文档（`Notes/交接.md` 等）是历史会话日志，仅供参考，不要当作规范。
-> 编写时间：2026-10，当前 HEAD `9110247`，工作区干净。本轮变更（P0-1 + P1 全量闭环）见第 6 节。
+> 编写时间：2026-10，当前 HEAD `fc321c6`，工作区干净。本轮变更（P0-1 + P1 全量闭环）见第 6 节。
 
 ---
 
@@ -186,7 +186,7 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 2. **游离 LineNode 生成 Warning**：`GetAsync` 里比对线路全部 LineNode vs 结构段端点 ∪ 端子节点，游离节点写入 `Diagnostics.Warnings`（非阻断，仅提示）。
 3. **`LineStructureDiagnosticsDto.Warnings` 重新加回** `List<string>`，承载所有非阻断提示。
 4. **`TieCount` + `FeedInEnergizedCount` 新增** 诊断字段，前端展示。
-5. `LineStructureDialog` 自动化测试——**未实施**（优先级 P1 中最低，当前无阻塞）。
+5. **`LineStructureDialog` bUnit 冒烟测试 ✅**（5 个用例）：[LineStructureDialogSmokeTests.cs](TreeGraph.Blazor.Shared.Tests/LineSky/LineStructureDialogSmokeTests.cs)，覆盖组件渲染/诊断区计数/端子状态列/拓扑模式默认/运行状态下拉控件。
 
 ### P2 ✅
 
@@ -195,10 +195,10 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 8. AppHost DCP 超时：环境问题，**无解**（代码层面），已在 README/HANDOVER 标注。
 9. `.trae/` 无残留临时脚本。
 
-### 测试基线（2026-10-22 回归验证）
+### 测试基线（2026-10-22 全量闭环后回归验证）
 
-- TreeGraph.Api.Tests：**321 通过 / 0 失败 / 0 跳过**（314 旧 + 7 新）
-- TreeGraph.Blazor.Shared.Tests：**227 通过 / 0 失败 / 1 跳过**
+- TreeGraph.Api.Tests：**322 通过 / 0 失败 / 0 跳过**（314 旧 + 8 新）
+- TreeGraph.Blazor.Shared.Tests：**232 通过 / 0 失败 / 1 跳过**（227 旧 + 5 新）
 
 ---
 
