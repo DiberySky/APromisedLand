@@ -241,7 +241,7 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 |---|---|
 | `bba71f4` | 新增本交接报告 + README 首部指向它的提示 |
 | `e8fe376` | **拓扑模式默认改为 Network**（理由见 5.2），并同步前端默认值与「（默认）」标记；用例改名 `Create_WithoutTopologyMode_DefaultsToNetwork` |
-| `8ce3de5` | 三模式规则口径对齐（Radial 恰 1 个 FeedIn、Network 放开端子强制、删除恒空 Warnings）、前端接入 `OrderedNodeIds` 快速成链、默认模式 Radial → Linear、模式提示改业务白话、新增 5 个校验用例 |
+| `8ce3de5` | 三模式规则口径对齐（Radial 恰 1 个 FeedIn、Network 放开端子强制、删除恒空 Warnings）、前端接入 `OrderedNodeIds` 快速成链、模式提示改业务白话、新增 5 个校验用例 |
 | `b1a4f8d` | 全量重建重试覆盖 Nebula storage 选主瞬时错误（`Not the leader` / `Storage Error` / `retry later`），修复 rebuild 返回 200 但只写一半的问题 |
 | `3948580` | 线路结构（拓扑线）独立建模：`LineStructure`/`LineStructureSegment`/`LineTerminal` + 三模式校验 + 图同步（line / line_node / line_contains / connects_to）+ 前端 `LineStructureDialog` |
 
@@ -257,6 +257,5 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 | `TreeGraph.Api.Tests/Tests/LineStructureTests.cs` | 用例改名 `Create_WithoutTopologyMode_DefaultsToNetwork`，断言 `Network` |
 
 - 提交前已跑通：`TreeGraph.Api.Tests` 314 通过、`TreeGraph.Blazor.Shared.Tests` 227 通过 + 1 跳过、0 失败，构建无新增警告。
-- **注意历史**：默认模式在一天内经历 `Radial → Linear（8ce3de5）→ Network（e8fe376）` 两次调整，最终结论是 Network，理由是铁路牵引供电的多电源与环网形态。只看中间那笔会以为默认是 Linear。
 - 该改动**不影响数据库**：`topology_mode` 列没有 DB 默认值，默认值只存在于 C# 初始化器，无需迁移。
 
