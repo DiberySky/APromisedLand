@@ -1,4 +1,5 @@
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -26,6 +27,8 @@ namespace TreeGraph.Blazor.Shared.Tests.LineSky;
 public class LineStructureDialogSmokeTests : BunitTestBase
 {
     private const string TestLineId = "line-test-001";
+    /// <summary>尚无结构的线路（模板交互用例：模板下拉在 IsExisting=false 时才可用）。</summary>
+    private const string TestNewLineId = "line-test-new-001";
 
     public LineStructureDialogSmokeTests()
     {
@@ -72,6 +75,10 @@ public class LineStructureDialogSmokeTests : BunitTestBase
 
     private static string? Route(string path, HttpMethod method)
     {
+        // GET /api/eav/lines/{TestNewLineId}/structure —— 尚无结构（模板交互用例）
+        if (path.StartsWith($"/api/eav/lines/{TestNewLineId}/structure") && method == HttpMethod.Get)
+            return Envelope(NewStructure());
+
         // GET /api/eav/lines/{lineId}/structure
         if (path.StartsWith($"/api/eav/lines/{TestLineId}/structure") && method == HttpMethod.Get)
             return Envelope(ExistingStructure());
@@ -101,7 +108,15 @@ public class LineStructureDialogSmokeTests : BunitTestBase
         IsGlobal: true, IsDirected: true,
         Description: null, IsActive: true, IsLine: true, IsLinear: true);
 
-    private static List<EdgeTypeDto> EdgeTypes() => new() { EdgeType() };
+    private static List<EdgeTypeDto> EdgeTypes() => new()
+    {
+        // Feeder 排第一：新结构默认选中它，套模板后应切到 TransmissionLine（可观测变化）
+        new EdgeTypeDto("et-feeder-1", "Feeder", "馈线",
+            FromNodeType: "LineNode", ToNodeType: "LineNode",
+            IsGlobal: true, IsDirected: true,
+            Description: null, IsActive: true, IsLine: true, IsLinear: true),
+        EdgeType()
+    };
 
     private static List<LineTemplateDto> Templates() => new()
     {
@@ -113,6 +128,21 @@ public class LineStructureDialogSmokeTests : BunitTestBase
             DefaultEdgeTypeName: "TransmissionLine",
             DefaultTerminalRole: "FeedIn",
             DefaultOperatingState: "Maintenance")
+    };
+
+    private static LineStructureDto NewStructure() => new()
+    {
+        Exists = false,
+        LineId = TestNewLineId,
+        LineName = "新建贯通线",
+        // 用户先选了 Linear 再套模板 → 切到 Network（before/after 可观测）
+        TopologyMode = TopologyMode.Linear,
+        OrderedNodeIds = [],
+        Nodes = [],
+        Segments = [],
+        Terminals = [],
+        CandidateNodes = [],
+        Diagnostics = new()
     };
 
     private static LineStructureDto ExistingStructure() => new()
@@ -299,6 +329,45 @@ public class LineStructureDialogSmokeTests : BunitTestBase
 
         // 确认拓扑模式显示的是 Network（ExistingStructure TopologyMode 确实被读取）
         Assert.Contains("Network", html);
+    }
+
+    [Fact]
+    public async Task SelectingRailwayFeedingTemplate_PrefillsTopologyEdgeTypeAndTerminalDefaults()
+    {
+        // 模板切换后的 UI 状态验证（新结构模式：IsExisting=false，模板下拉可用）
+        var provider = await OpenAsync(new DialogParameters
+        {
+            { nameof(LineStructureDialog.LineId), TestNewLineId },
+            { nameof(LineStructureDialog.LineName), "新建贯通线" }
+        });
+
+        MudSelect<string> SelectByLabel(string label) =>
+            provider.FindComponents<MudSelect<string>>().First(c => c.Instance.Label == label).Instance;
+
+        // 切换前基线：拓扑来自 DTO（Linear）；边类型取线路型列表第一项（Feeder）
+        Assert.Equal("Linear", SelectByLabel("拓扑模式").Value);
+        Assert.Equal("et-feeder-1", SelectByLabel("线路型边类型（IsLine = true）").Value);
+
+        // bUnit 无法打开 MudSelect 弹层（选项在 MudPopover 内且需要 JS 定位，MudSelectItem 未实例化，
+        // SelectOption 找不到注册项会静默无效），因此直接调用 Dialog 的模板选择处理器。
+        // MudSelect 的 ValueChanged 绑定的正是该方法（编译期接线，razor 保证），随后强制 Dialog 重渲染。
+        var dialog = provider.FindComponent<LineStructureDialog>();
+        typeof(LineStructureDialog)
+            .GetMethod("OnSelectedTemplateKeyChanged", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(dialog.Instance, new object?[] { "RailwayFeeding" });
+        dialog.Render();
+
+        // 切换后 UI 状态：
+        Assert.Equal("RailwayFeeding", SelectByLabel("模板").Value);                      // 模板选中项回显
+        Assert.Equal("Network", SelectByLabel("拓扑模式").Value);                         // 拓扑预填 Network
+        Assert.Equal("et-line-1", SelectByLabel("线路型边类型（IsLine = true）").Value);  // 边类型预填 TransmissionLine
+        Assert.Equal("FeedIn", SelectByLabel("角色").Value);                              // 端子角色默认 FeedIn
+        Assert.Equal("Maintenance", SelectByLabel("运行状态").Value);                     // 端子状态默认 Maintenance
+
+        // Snackbar 确认消息（ISnackbar 单例队列 → MudSnackbarProvider 渲染）
+        var snacks = Render<MudSnackbarProvider>();
+        snacks.Render();
+        Assert.Contains("已应用铁路牵引供电预设", snacks.Markup);
     }
 
     // ============================================================
