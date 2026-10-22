@@ -227,37 +227,48 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 
 ## 9. 接手后第一小时建议动作
 
-1. `git log --oneline -10` 看最近五笔（线路结构建模 → 图同步重试修复 → 三模式口径对齐 → 默认改 Network → 本报告），快速理解上下文。
-2. 跑第 3 节两条测试命令，确认 314 / 227 基线。
-3. 打开 `TreeGraph.Blazor.Shared/LineSky/Dialogs/LineStructureDialog.razor` 与 `TreeGraph.Api/LineSky/Services/LineStructureService.cs`，对照 5.2 的表格读一遍，就掌握了当前最大的一块业务。
-4. 就 P0-1 的三件事（状态取值 / 校验口径 / 迁移策略）找业务确认，这是下一块该做的事。
-5. 工作区已干净，无需先做清理；第 10 节记录了最近几笔提交，读一遍再动手。
+1. `git log --oneline -10` 看最近十笔（终端运行状态 + 图同步属性 + 初始迁移重建 + 前端 bUnit 测试 + README/HANDOVER 归档）。
+2. 跑基线：`dotnet test TreeGraph.Api.Tests`（322 通过 / 0 失败）、`dotnet test TreeGraph.Blazor.Shared.Tests`（232 通过 + 1 跳过）。
+3. 读 `TreeGraph.Api/LineSky/Services/LineStructureService.cs` 的 `ValidateCore`/`DeriveOrder` + `TreeGraph.Shared/LineSky/Entities/LineStructureTypes.cs` 的 `TerminalOperatingState` —— 这是本轮最大的新增点。
+4. 读 `TreeGraph.Blazor.Shared.Tests/LineSky/LineStructureDialogSmokeTests.cs` —— 这是当前仓库唯一覆盖 `LineStructureDialog` 前端渲染的自动化测试，以后改 Dialog 先跑这个。
+5. 工作区已干净，HEAD `88970fd`，无需先做清理。
+
+**重要坑提醒：重新生成 Initial 迁移时（清库后），必须在 Up() 末尾手动调 `migrationBuilder.CreateAuditPartitionTable()`，否则 `attribute_audit_log` 分区表不建，Testcontainers 启动即 `42P01 relation "attribute_audit_log" does not exist`。Down() 末尾对应调 `DropAuditPartitionTable()`。详见 `MigrationSqlExtensions.cs`。**
 
 ---
 
-## 10. 变更记录（本机最后一轮工作）
+## 10. 变更记录
 
 ### 10.1 已提交（`main`，按时间从新到旧）
 
 | 提交 | 内容 |
 |---|---|
+| `88970fd` | HANDOVER 第 9/10 节 + 迁移坑提醒 |
+| `fc321c6` | **P1-4 闭环：`LineStructureDialog` bUnit 冒烟测试 5 个**（渲染/诊断区/端子状态列/拓扑模式默认/运行状态控件） |
+| `9110247` | 补 P0-1 正反用例第 8 个：`UpsertTerminalAsync` OperatingState 往返；HANDOVER HEAD 更新 |
+| `6a83d44` | **P0-1/P1 新逻辑正反用例 7 个**：FeedIn 投运 ≤1（0/1/2 三态）+ 默认 Maintenance + Tie 起点 + 游离节点 Warning + Warnings 非阻断 |
+| `159374e` | HANDOVER 测试基线更新到 321 |
+| `adb9c30` | **P0-1 全量实现**：`TerminalOperatingState` 枚举 + `LineTerminal.OperatingState` 列 + 4 DTO + ValidateCore 校验 + DeriveOrder Tie 起点 + 图同步 3 处属性 + 前端状态下拉/端子表格状态列/诊断区 + Initial 迁移重建 |
 | `bba71f4` | 新增本交接报告 + README 首部指向它的提示 |
-| `e8fe376` | **拓扑模式默认改为 Network**（理由见 5.2），并同步前端默认值与「（默认）」标记；用例改名 `Create_WithoutTopologyMode_DefaultsToNetwork` |
-| `8ce3de5` | 三模式规则口径对齐（Radial 恰 1 个 FeedIn、Network 放开端子强制、删除恒空 Warnings）、前端接入 `OrderedNodeIds` 快速成链、模式提示改业务白话、新增 5 个校验用例 |
-| `b1a4f8d` | 全量重建重试覆盖 Nebula storage 选主瞬时错误（`Not the leader` / `Storage Error` / `retry later`），修复 rebuild 返回 200 但只写一半的问题 |
-| `3948580` | 线路结构（拓扑线）独立建模：`LineStructure`/`LineStructureSegment`/`LineTerminal` + 三模式校验 + 图同步（line / line_node / line_contains / connects_to）+ 前端 `LineStructureDialog` |
+| `e8fe376` | 拓扑模式默认改为 Network（理由见 5.2），同步前端默认值与「（默认）」标记 |
 
-### 10.2 默认模式改动明细（已随 `e8fe376` 提交）
+### 10.2 本轮（2026-10-22）关键改动
 
 | 文件 | 改动 |
 |---|---|
-| `TreeGraph.Shared/LineSky/Entities/LineStructureTypes.cs` | 注释改为「默认 Network」并写明铁路牵引供电原因 |
-| `TreeGraph.Shared/LineSky/Dtos/LineStructureDtos.cs` | `LineStructureDto` / `LineStructureRequest` 的 `TopologyMode` 默认值 → `Network` |
-| `TreeGraph.Api/LineSky/Entities/LineStructure.cs` | 头表实体默认值 → `Network`，注释同步 |
-| `TreeGraph.Api/LineSky/Services/LineStructureService.cs` | 无结构时返回 DTO 的默认模式 → `Network` |
-| `TreeGraph.Blazor.Shared/LineSky/Dialogs/LineStructureDialog.razor` | 「（默认）」标记移到 Network；`_topologyMode` 初值 → `Network`；Network 适用场合补「牵引供电的接触网（上下行并联、分区所联络、多所供电）」 |
-| `TreeGraph.Api.Tests/Tests/LineStructureTests.cs` | 用例改名 `Create_WithoutTopologyMode_DefaultsToNetwork`，断言 `Network` |
-
-- 提交前已跑通：`TreeGraph.Api.Tests` 314 通过、`TreeGraph.Blazor.Shared.Tests` 227 通过 + 1 跳过、0 失败，构建无新增警告。
-- 该改动**不影响数据库**：`topology_mode` 列没有 DB 默认值，默认值只存在于 C# 初始化器，无需迁移。
+| `TreeGraph.Shared/LineSky/Entities/LineStructureTypes.cs` | 新增 `TerminalOperatingState` 枚举（Energized/HotStandby/ColdStandby/Maintenance） |
+| `TreeGraph.Api/LineSky/Entities/LineTerminal.cs` | 加 `OperatingState` 列（默认 Maintenance） |
+| `TreeGraph.Api/Data/TreeGraphDbContext.cs` | OperatingState 显式配置（snake_case + 字符串映射） |
+| `TreeGraph.Shared/LineSky/Dtos/LineStructureDtos.cs` | 4 个 DTO 加 OperatingState 字段；DiagnosticsDto 加 Warnings/TieCount/FeedInEnergizedCount |
+| `TreeGraph.Api/LineSky/Services/LineStructureService.cs` | ValidateCore 加 FeedIn 投运 ≤1 校验；DeriveOrder 加 Tie 起点；GetAsync 加游离节点 Warning；UpsertTerminalAsync/BuildPlanAsync/ApplyPlanAsync 全链路接入状态 |
+| `TreeGraph.Api/GraphSyncSky/GraphSynchronizer.cs` | 3 处 LineTerminal 查询加 operating_state 属性 |
+| `TreeGraph.Api/GraphSyncSky/GraphSchemaInitializer.cs` | CREATE EDGE 加 operating_state 列 |
+| `TreeGraph.Api/GraphSyncSky/GraphSyncOptions.cs` | LineNodeTag.TagColumns 加 terminal_operating_state |
+| `TreeGraph.Blazor.Shared/LineSky/Dialogs/LineStructureDialog.razor` | 状态下拉 + 端子表格状态列 + 诊断区增强 |
+| `TreeGraph.Api/Data/Migrations/20261022090121_Initial.cs` | 重新生成，Up()/Down() 补 `CreateAuditPartitionTable`/`DropAuditPartitionTable` |
+| `TreeGraph.Api.Tests/Tests/LineStructureTests.cs` | 新增 8 个正反用例（322 总计） |
+| `TreeGraph.Blazor.Shared.Tests/LineSky/LineStructureDialogSmokeTests.cs` | 新增（232 总计） |
+| `HANDOVER.md` | 第 6 节全部标记已完成；第 9 节更新建议动作；第 10 节补本轮记录 |
+| `README.md` | 项目结构补 7 个 Sky 模块 + 端口表补全 + 测试数字对齐 |
+| `Notes/交接.md` | 归档到 `Notes/_archive/` |
 
