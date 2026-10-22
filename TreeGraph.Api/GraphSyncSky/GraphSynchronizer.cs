@@ -512,25 +512,30 @@ public sealed class GraphSynchronizer
                 .Select(e => e.TryGetValue("error", out var v) ? v.GetString() ?? "" : "")
                 .ToList();
 
-            if (allErrors.Count == 0 || !allErrors.Any(IsSchemaPropagationError) || attempt >= maxAttempts)
+            if (allErrors.Count == 0 || !allErrors.Any(IsRetryableBulkError) || attempt >= maxAttempts)
                 return result;
 
             _logger.LogWarning(
-                "全量重建遇到 schema 传播延迟（第 {Attempt}/{Max} 次），5s 后整体重试",
+                "全量重建遇到瞬时错误（schema 传播延迟 / storage 重选主，第 {Attempt}/{Max} 次），5s 后整体重试",
                 attempt, maxAttempts);
             await Task.Delay(TimeSpan.FromSeconds(5), ct);
         }
     }
 
     /// <summary>
-    /// 判断是否为 schema 传播延迟类错误（重试可恢复）。
-    /// DROP SPACE 重建后 storaged 侧 space 信息（含 vid 类型）刷新滞后，
-    /// 写入会报 vid 长度不符——同属传播延迟，须纳入重试。
+    /// 判断是否为可重试的瞬时错误。
+    /// ① schema 传播延迟：DROP SPACE 重建后 storaged 侧 space 信息（含 vid 类型）刷新滞后，
+    ///    写入会报 No schema found / EdgeNotFound / vid 长度不符。
+    /// ② storage 选主未完成：DROP SPACE 触发分片 leader 重选，紧随其后的写入会报
+    ///    "Not the leader of N. Please retry later."，重选完成后即可写入。
+    /// 两类均为 bulk 幂等覆盖写，整体重试安全。
     /// </summary>
-    private static bool IsSchemaPropagationError(string msg) =>
+    private static bool IsRetryableBulkError(string msg) =>
         msg.Contains("No schema found") || msg.Contains("EdgeNotFound")
         || msg.Contains("TagNotFound") || msg.Contains("SpaceNotFound")
-        || msg.Contains("Invalid space vid len");
+        || msg.Contains("Invalid space vid len")
+        || msg.Contains("Not the leader") || msg.Contains("Storage Error")
+        || msg.Contains("LeaderChanged") || msg.Contains("retry later");
 
     /// <summary>
     /// 装载线路图：Line 顶点（topology_mode）、LineNode 顶点（所属线路与端子角色）、
