@@ -76,7 +76,7 @@ public class LineStructureService
                 Exists = false,
                 LineId = lineId,
                 LineName = lineName,
-                TopologyMode = TopologyMode.Linear,
+                TopologyMode = TopologyMode.Network,
                 CandidateNodes = lineNodes
                     .Select(n => new LineStructureNodeDto { NodeId = n.Id, Name = n.Name })
                     .ToList(),

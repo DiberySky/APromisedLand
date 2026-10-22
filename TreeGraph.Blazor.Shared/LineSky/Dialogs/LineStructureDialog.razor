@@ -55,9 +55,9 @@
                            Dense="true"
                            ValueChanged="OnTopologyModeChanged"
                            Style="min-width: 300px;">
-                    <MudSelectItem T="string" Value="@("Linear")">Linear · 一条线串到底（不分叉，默认）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Linear")">Linear · 一条线串到底（不分叉）</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Radial")">Radial · 一个电源分多路</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Network")">Network · 多点互连（可成环）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Network")">Network · 多点互连（可成环，默认）</MudSelectItem>
                 </MudSelect>
             </div>
 
@@ -361,7 +361,7 @@
     private LineStructureDto? _structure;
 
     private string _edgeTypeId = "";
-    private string _topologyMode = nameof(TopologyMode.Linear);
+    private string _topologyMode = nameof(TopologyMode.Network);
     private IReadOnlyList<EdgeTypeDto> _lineEdgeTypes = [];
     private List<LineStructureNodeDto> _candidateNodes = [];
 
@@ -408,7 +408,7 @@
     {
         nameof(TopologyMode.Linear) => "整条线路是一个接一个串起来的，中途不分叉，适合单回线路、单根主干。",
         nameof(TopologyMode.Radial) => "一个电源进来，再分别向多处供电，像树干长出树枝，适合配电网、分支管线。",
-        nameof(TopologyMode.Network) => "多处互相连通、可以绕成圈，适合环网、多电源互相备用的场所。",
+        nameof(TopologyMode.Network) => "多处互相连通、可以绕成圈，牵引供电的接触网（上下行并联、分区所联络、多所供电）通常属于这一类。",
         _ => ""
     };
 

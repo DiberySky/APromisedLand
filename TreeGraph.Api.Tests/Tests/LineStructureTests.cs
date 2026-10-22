@@ -78,7 +78,7 @@ public class LineStructureTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Create_WithoutTopologyMode_DefaultsToLinear()
+    public async Task Create_WithoutTopologyMode_DefaultsToNetwork()
     {
         var et = await CreateLineTypeAsync("LSDefaultMode");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
@@ -89,7 +89,7 @@ public class LineStructureTests : IntegrationTestBase
             Segments = Segments((n[0], n[1]), (n[1], n[2]))
         });
 
-        Assert.Equal(TopologyMode.Linear, dto.TopologyMode);
+        Assert.Equal(TopologyMode.Network, dto.TopologyMode);
     }
 
     [Fact]

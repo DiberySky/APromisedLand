@@ -52,7 +52,7 @@ public class LineStructureDto
     public string? EdgeTypeId { get; set; }
     public string? EdgeTypeName { get; set; }
     public string? EdgeTypeDisplayName { get; set; }
-    public TopologyMode TopologyMode { get; set; } = TopologyMode.Linear;
+    public TopologyMode TopologyMode { get; set; } = TopologyMode.Network;
     public DateTimeOffset? UpdatedAt { get; set; }
     /// <summary>拓扑推导出的节点顺序（Linear/Radial 为链/树遍历顺序；Network 为发现顺序）。</summary>
     public List<string> OrderedNodeIds { get; set; } = new();
@@ -89,7 +89,7 @@ public class LineStructureTerminalInput
 public class LineStructureRequest
 {
     public string EdgeTypeId { get; set; } = string.Empty;
-    public TopologyMode TopologyMode { get; set; } = TopologyMode.Linear;
+    public TopologyMode TopologyMode { get; set; } = TopologyMode.Network;
     public List<string>? OrderedNodeIds { get; set; }
     public List<LineStructureSegmentInput>? Segments { get; set; }
     public List<LineStructureTerminalInput>? Terminals { get; set; }
