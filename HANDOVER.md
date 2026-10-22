@@ -1,7 +1,7 @@
 # 交接报告（APromisedLand / TreeGraph）
 
 > 面向接手人：本文件是本机工作的权威入口。仓库内其他文档（`Notes/交接.md` 等）是历史会话日志，仅供参考，不要当作规范。
-> 编写时间：2026-10，当前 HEAD `8ce3de5`。本轮「默认模式改 Network」的改动**尚未提交**，明细见第 10 节。
+> 编写时间：2026-10，当前 HEAD `bba71f4`，工作区干净。本轮变更与提交明细见第 10 节。
 
 ---
 
@@ -16,7 +16,7 @@
 | **线路结构默认拓扑模式** | **Network**（本项目主用于铁路牵引供电：多电源、上下行并联、分区所联络会成环）。Linear/Radial 需显式选择 |
 | 前端端口 | API 5773、Blazor 5783、PG 8433、NebulaFastApi 9393、FileStorageApi 5326、MafWfApi 5323、Nebula Studio 17001、LiteGraph 8701/3001 |
 | 测试基线（2026-10 实测） | API 314 通过 / Blazor.Shared 227 通过 + 1 跳过 / 0 失败 |
-| 分支 | `main`，最近提交 `8ce3de5` |
+| 分支 | `main`，最近提交 `bba71f4`（交接报告本身）；功能基线 `e8fe376` |
 
 **第一次上手建议顺序**：本文第 3 节把环境跑起来 → 第 4 节跑两个测试套件确认基线 → 第 6 节了解当前在做的线路结构功能 → 第 7 节挑未尽事项。
 
@@ -225,11 +225,11 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 
 ## 9. 接手后第一小时建议动作
 
-1. `git log --oneline -10` 看最近三笔（线路结构建模 → 图同步重试修复 → 三模式口径对齐），快速理解上下文。
+1. `git log --oneline -10` 看最近五笔（线路结构建模 → 图同步重试修复 → 三模式口径对齐 → 默认改 Network → 本报告），快速理解上下文。
 2. 跑第 3 节两条测试命令，确认 314 / 227 基线。
 3. 打开 `TreeGraph.Blazor.Shared/LineSky/Dialogs/LineStructureDialog.razor` 与 `TreeGraph.Api/LineSky/Services/LineStructureService.cs`，对照 5.2 的表格读一遍，就掌握了当前最大的一块业务。
 4. 就 P0-1 的三件事（状态取值 / 校验口径 / 迁移策略）找业务确认，这是下一块该做的事。
-5. 先提交或丢弃第 10 节列出的未提交改动（默认模式改 Network），别在脏工作区上继续开发。
+5. 工作区已干净，无需先做清理；第 10 节记录了最近几笔提交，读一遍再动手。
 
 ---
 
@@ -239,11 +239,13 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 
 | 提交 | 内容 |
 |---|---|
+| `bba71f4` | 新增本交接报告 + README 首部指向它的提示 |
+| `e8fe376` | **拓扑模式默认改为 Network**（理由见 5.2），并同步前端默认值与「（默认）」标记；用例改名 `Create_WithoutTopologyMode_DefaultsToNetwork` |
 | `8ce3de5` | 三模式规则口径对齐（Radial 恰 1 个 FeedIn、Network 放开端子强制、删除恒空 Warnings）、前端接入 `OrderedNodeIds` 快速成链、默认模式 Radial → Linear、模式提示改业务白话、新增 5 个校验用例 |
 | `b1a4f8d` | 全量重建重试覆盖 Nebula storage 选主瞬时错误（`Not the leader` / `Storage Error` / `retry later`），修复 rebuild 返回 200 但只写一半的问题 |
 | `3948580` | 线路结构（拓扑线）独立建模：`LineStructure`/`LineStructureSegment`/`LineTerminal` + 三模式校验 + 图同步（line / line_node / line_contains / connects_to）+ 前端 `LineStructureDialog` |
 
-### 10.2 未提交（截至交接时）
+### 10.2 默认模式改动明细（已随 `e8fe376` 提交）
 
 | 文件 | 改动 |
 |---|---|
@@ -253,10 +255,8 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 | `TreeGraph.Api/LineSky/Services/LineStructureService.cs` | 无结构时返回 DTO 的默认模式 → `Network` |
 | `TreeGraph.Blazor.Shared/LineSky/Dialogs/LineStructureDialog.razor` | 「（默认）」标记移到 Network；`_topologyMode` 初值 → `Network`；Network 适用场合补「牵引供电的接触网（上下行并联、分区所联络、多所供电）」 |
 | `TreeGraph.Api.Tests/Tests/LineStructureTests.cs` | 用例改名 `Create_WithoutTopologyMode_DefaultsToNetwork`，断言 `Network` |
-| `HANDOVER.md` | 本文件（新增） |
-| `README.md` | 首部加指向 `HANDOVER.md` 的提示 |
 
-- 未提交部分已跑通：`TreeGraph.Api.Tests` 314 通过、`TreeGraph.Blazor.Shared.Tests` 227 通过 + 1 跳过、0 失败，构建无新增警告。
-- **注意历史**：默认模式在一天内经历 `Radial → Linear（8ce3de5）→ Network（未提交）` 两次调整，最终结论是 Network，理由是铁路牵引供电的多电源与环网形态。若只翻提交历史，会看到 Linear，别照旧提交中的默认值理解现状。
-- 未提交部分**不影响数据库**：`topology_mode` 列没有 DB 默认值，默认值只存在于 C# 初始化器，无需迁移。
+- 提交前已跑通：`TreeGraph.Api.Tests` 314 通过、`TreeGraph.Blazor.Shared.Tests` 227 通过 + 1 跳过、0 失败，构建无新增警告。
+- **注意历史**：默认模式在一天内经历 `Radial → Linear（8ce3de5）→ Network（e8fe376）` 两次调整，最终结论是 Network，理由是铁路牵引供电的多电源与环网形态。只看中间那笔会以为默认是 Linear。
+- 该改动**不影响数据库**：`topology_mode` 列没有 DB 默认值，默认值只存在于 C# 初始化器，无需迁移。
 
