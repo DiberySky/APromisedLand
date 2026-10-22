@@ -96,6 +96,10 @@ public class LineApiClient
             $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/components",
             ct);
 
+    /// <summary>读取全部线路模板（UI 层下拉预填用）。</summary>
+    public Task<IReadOnlyList<LineTemplateDto>?> GetLineTemplatesAsync(CancellationToken ct = default)
+        => GetAsync<IReadOnlyList<LineTemplateDto>>("api/eav/line-templates", ct);
+
     // ============================================================
     // 通用助手（与 EavApiClient 同款实现）
     // ============================================================

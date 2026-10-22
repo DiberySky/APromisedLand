@@ -78,7 +78,15 @@ public class LineStructureSegmentInput
     public decimal? Weight { get; set; }
 }
 
-/// <summary>建/替换结构时的端子输入。</summary>
+/// <summary>线路模板 DTO：UI 层下拉预填用。字段用 string（枚举名），避免 MudBlazor source generator 对枚举类型的 bug。</summary>
+public record LineTemplateDto(
+    string Key,
+    string DisplayName,
+    string Description,
+    string DefaultTopologyMode,        // TopologyMode 枚举名，例 "Network"
+    string? DefaultEdgeTypeName,
+    string DefaultTerminalRole,        // TerminalRole 枚举名，例 "FeedIn"
+    string DefaultOperatingState);     // TerminalOperatingState 枚举名，例 "Maintenance"
 public class LineStructureTerminalInput
 {
     public string NodeId { get; set; } = string.Empty;

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.LineSky.Services;
+using TreeGraph.Api.LineSky.Templates;
 using TreeGraph.Api.EdgeSky.Services;
 using TreeGraph.Api.GraphSyncSky;
 using TreeGraph.Api.MessagingSky;
@@ -120,6 +121,10 @@ builder.Services.AddScoped<IInodeOwnerGuard, KnowledgeTreeInodeGuard>();
 builder.Services.AddScoped<IInodeOwnerGuard, SpaceTreeInodeGuard>();
 builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.LineSky.Services.LineNodeOwnerGuard>();
 builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.LineSky.Services.LineOwnerGuard>();
+
+// LineSky 模板（L1：快速预填；后端 ValidateCore 不感知模板，模板只在 UI 层预填默认值）
+builder.Services.AddSingleton<ILineTemplate, RailwayFeedingTemplate>();
+builder.Services.AddScoped<LineTemplateRegistry>();
 builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.EdgeSky.Services.EdgeOwnerGuard>();
 
 // ★ TreeEavSky：计量单位树 / 分类树 / 空间树（表 unit_trees、category_trees、space_trees，

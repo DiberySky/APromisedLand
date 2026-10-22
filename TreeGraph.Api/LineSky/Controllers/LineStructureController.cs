@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using TreeGraph.Api.LineSky.Services;
+using TreeGraph.Api.LineSky.Templates;
 using TreeGraph.Shared.LineSky.Dtos;
 
 namespace TreeGraph.Api.LineSky.Controllers;
@@ -85,4 +86,20 @@ public class LineStructureController : ControllerBase
         [FromRoute] string nodeId,
         CancellationToken ct)
         => Ok(await _structure.DeleteTerminalAsync(lineId, nodeId, ct));
+}
+
+/// <summary>
+/// 线路模板端点：返回全部已注册的 ILineTemplate，供前端 LineStructureDialog 下拉预填。
+/// 路由：api/eav/line-templates GET
+/// </summary>
+[ApiController]
+[Route("api/eav/line-templates")]
+public class LineTemplateController : ControllerBase
+{
+    private readonly LineTemplateRegistry _registry;
+
+    public LineTemplateController(LineTemplateRegistry registry) => _registry = registry;
+
+    [HttpGet]
+    public IActionResult Get() => Ok(_registry.All.Select(t => t.ToDto()));
 }

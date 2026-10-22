@@ -30,6 +30,11 @@
         }
         else
         {
+            @* 快速模板（L1：当前只有铁路牵引供电，用按钮） *@
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Dense="true" Class="mb-3" OnClick="ApplyRailwayFeedingTemplate" Disabled="@IsExisting">
+                🚄 应用铁路牵引供电预设
+            </MudButton>
+
             @* 边类型 + 拓扑模式 *@
             <div class="d-flex gap-3 mb-3 flex-wrap">
                 <MudSelect T="string"
@@ -513,6 +518,26 @@
         {
             _loading = false;
         }
+    }
+
+    /// <summary>L1 模板：一键应用铁路牵引供电预设（Network + RailLine + FeedIn/Maintenance）。</summary>
+    private void ApplyRailwayFeedingTemplate()
+    {
+        // 预填拓扑模式
+        _topologyMode = nameof(TopologyMode.Network);
+
+        // 预填 EdgeType：在 _lineEdgeTypes 里找 RailLine（TypeName 匹配）
+        var railLine = _lineEdgeTypes.FirstOrDefault(et => et.TypeName == "RailLine");
+        if (railLine is not null)
+            _edgeTypeId = railLine.EdgeTypeId;
+        else
+            Snackbar.Add("推荐边类型 RailLine 当前不存在", Severity.Warning);
+
+        // 预填端子默认值（只影响"添加端子"表单初始值）
+        _terminalRole = nameof(TerminalRole.FeedIn);
+        _terminalOperatingState = nameof(TerminalOperatingState.Maintenance);
+
+        Snackbar.Add("已应用铁路牵引供电预设：拓扑=Network，端子默认 FeedIn/Maintenance", Severity.Info);
     }
 
     private void OnEdgeTypeChanged(string? edgeTypeId) => _edgeTypeId = edgeTypeId ?? "";
