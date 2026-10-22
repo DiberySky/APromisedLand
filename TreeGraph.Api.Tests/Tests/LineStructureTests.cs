@@ -488,6 +488,34 @@ public class LineStructureTests : IntegrationTestBase
     // ============================================================
 
     [Fact]
+    public async Task OperatingState_UpsertTerminal_RoundTrip()
+    {
+        // 增量 upsert 路径 OperatingState 往返
+        var et = await CreateLineTypeAsync("OSUpsert");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+        await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Linear,
+            OrderedNodeIds = n.Take(3).ToList()
+        });
+
+        var upsert = await Client.PostAsJsonAsync(
+            $"/api/eav/lines/{lineId}/structure/terminals",
+            new AddLineTerminalRequest
+            {
+                NodeId = n[0], Role = TerminalRole.FeedIn,
+                OperatingState = TerminalOperatingState.Energized
+            });
+        Assert.Equal(HttpStatusCode.OK, upsert.StatusCode);
+
+        var dto = await upsert.Content.ReadEavAsync<LineStructureDto>(EnumJson);
+        var term = Assert.Single(dto!.Terminals);
+        Assert.Equal(TerminalOperatingState.Energized, term.OperatingState);
+        Assert.Equal(TerminalRole.FeedIn, term.TerminalRole);
+    }
+
+    [Fact]
     public async Task OperatingState_FeedInEnergized_One_Succeeds()
     {
         // 正向：恰好 1 个 FeedIn 投运通过
