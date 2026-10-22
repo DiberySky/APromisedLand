@@ -167,3 +167,5 @@
 - 不实现 Graph CRUD、Embedding、语义搜索、Reranker。
 - 不做增量数据库迁移（本项目无 DbContext）。
 - 不给 vLLM 容器加 Aspire 健康检查（维持 VllmExtension 既有哲学）。
+
+> 迁移说明（2026-10-23）：GraphTools 图数据源已由 LiteGraph 切换为 NebulaGraph（经 TreeGraph.NebulaFastApi 9393，POST /api/v1/graph/query），LiteGraph 基础设施已删除，编排定义保留但活跃路径不启动，详见 specs/mafwfapi-nebulagraph-migration/。

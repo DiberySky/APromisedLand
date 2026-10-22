@@ -102,8 +102,6 @@ var app = builder.Build();
 // ---------------------------------------------------------------------------
 // 8. 中间件管线（顺序与旧 MAFWorkFlowApi 一致）
 // ---------------------------------------------------------------------------
-app.UseMiddleware<LiteGraphExceptionMiddleware>();
-
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();

@@ -7,14 +7,14 @@ namespace TreeGraph.MafWfApi.Infrastructure;
 
 internal static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddLiteGraph(this IServiceCollection services, IConfiguration config)
+    public static IServiceCollection AddNebulaGraph(this IServiceCollection services, IConfiguration config)
     {
-        services.Configure<LiteGraphOptions>(
-            config.GetSection(LiteGraphOptions.SectionName));
+        services.Configure<NebulaGraphOptions>(
+            config.GetSection(NebulaGraphOptions.SectionName));
 
-        services.AddHttpClient("LiteGraph");
+        services.AddHttpClient("NebulaFastApi");
 
-        services.AddSingleton<LiteGraphRestClient>();
+        services.AddSingleton<NebulaGraphRestClient>();
 
         return services;
     }
@@ -47,16 +47,8 @@ internal static class ServiceCollectionExtensions
 
     public static IServiceCollection AddGraphDomainServices(this IServiceCollection services, IConfiguration config)
     {
-        // LiteGraph SDK + 图数据服务
-        services.AddLiteGraph(config);
-
-        services.AddSingleton<LiteGraph.Sdk.LiteGraphSdk>(sp =>
-        {
-            var options = sp.GetRequiredService<IOptions<LiteGraphOptions>>();
-            var logger  = sp.GetRequiredService<ILogger<LiteGraphRestClient>>();
-            var endpoint = LiteGraphEndpointResolver.Resolve(options.Value, logger);
-            return new LiteGraph.Sdk.LiteGraphSdk(endpoint, "default");
-        });
+        // NebulaGraph 图数据客户端（经 TreeGraph.NebulaFastApi 网关）
+        services.AddNebulaGraph(config);
 
         // Graph Function Calling Agent（Scoped）
         services.AddScoped<ToolCallContext>();

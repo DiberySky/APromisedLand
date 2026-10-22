@@ -14,8 +14,8 @@
 | 技术栈 | .NET 10 + Aspire 编排 + Blazor Server(MudBlazor 9.11) + PostgreSQL + NebulaGraph + Qdrant + RabbitMQ + Python FastAPI 网关 |
 | 数据真源 | PostgreSQL（EF Core）。NebulaGraph 只是**投影**，可从 PG 全量重建 |
 | **线路结构默认拓扑模式** | **Network**（本项目主用于铁路牵引供电：多电源、上下行并联、分区所联络会成环）。Linear/Radial 需显式选择 |
-| 前端端口 | API 5773、Blazor 5783、PG 8433、NebulaFastApi 9393、FileStorageApi 5326、MafWfApi 5323、Nebula Studio 17001、LiteGraph 8701/3001 |
-| 测试基线（2026-10 实测） | API 314 通过 / Blazor.Shared 227 通过 + 1 跳过 / 0 失败 |
+| 前端端口 | API 5773、Blazor 5783、PG 8433、NebulaFastApi 9393、FileStorageApi 5326、MafWfApi 5323、Nebula Studio 17001 |
+| 测试基线（2026-10-23 实测） | API 322 通过 / Blazor.Shared 235 通过 + 1 跳过 / MafWfApi 65 通过 / 0 失败 |
 | 分支 | `main`，最近提交 `bba71f4`（交接报告本身）；功能基线 `e8fe376` |
 
 **第一次上手建议顺序**：本文第 3 节把环境跑起来 → 第 4 节跑两个测试套件确认基线 → 第 6 节了解当前在做的线路结构功能 → 第 7 节挑未尽事项。
@@ -49,6 +49,8 @@ docker/                        dashboard + keycloak 的 compose 与 .env
 
 旁支（**不要顺手改**）：`APromisedLand.*`、`Maf*`、`Dibery*`、`ConsoleFoundry*`、`MafRagApi`、`QuestionService`、`WeatherApi`、`_archive/` 等。`APromisedLand.AppHost/AppHost.cs` 里被注释掉的 `MafRagApi()/MafWorkFlowService()` 就是这些旁支的入口，默认不启动。
 
+> LiteGraph 说明：图数据源已切换为 NebulaGraph（MafWfApi 的 GraphTools 经 NebulaFastApi 9393 查询）。LiteGraph 的容器编排定义（`LiteGraphExtension.cs`/`LiteGraphResource.cs`/`AppHostResourceContext` 属性及死代码旁支里的 `AddLiteGraph` 调用）**保留**，但 `TreeGraph()` 活跃路径不再启动 LiteGraph 容器组（原端口 8701/8702/3001 空闲）。
+
 **模块约定（必须遵守）**：每个业务域 = 一个 `XxxSky` 目录，跨三个项目同名出现：
 
 ```
@@ -71,7 +73,7 @@ TreeGraph.Blazor.Shared/XxxSky/{Dialogs,Components,Services}
 4. SeaweedFS（对象存储，FileStorageApi 依赖）
 5. RabbitMQ、Qdrant（语义搜索依赖）
 6. TreeGraph.Api（5773）、TreeGraph.FileStorageApi（5326）
-7. vLLM（chat/embedding 容器）、LiteGraph（8701）
+7. vLLM（chat/embedding 容器）
 8. TreeGraph.MafWfApi（5323）—— **必须在 Blazor 之前**，否则服务发现解析不到
 9. TreeGraph.Blazor（5783）、TreeGraph.Blazor.Maui
 

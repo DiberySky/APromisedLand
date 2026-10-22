@@ -40,12 +40,8 @@ void TreeGraph()
     //   复用 FileMetadataDb + SeaweedS3,与 EavApi 平级)
     builder.AddTreeGraphFileStorageApi(context);
 
-    // ★ vLLM Chat/Embedding 容器（LiteGraph/MAF 依赖）
+    // ★ vLLM Chat/Embedding 容器（MAF 依赖）
     builder.AddVllm(context);
-
-    // ★ LiteGraph 图数据库容器组（REST:8701/MCP:8702/UI:3001，
-    //   复用 Postgres + vLLM Embed；TreeGraph.MafWfApi 的图查询工具依赖）
-    builder.AddLiteGraph(context);
 
     // ★ TreeGraph.MafWfApi:MAF + Workflow 服务 API(vLLM 版,固定端口 5323,
     //   替代已停用的旧 MAFWorkFlowApi)

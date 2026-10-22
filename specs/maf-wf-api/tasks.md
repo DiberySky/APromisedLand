@@ -22,3 +22,5 @@
 - [x] AppHost 中无激活的 AddMafWorkFlowApi 调用
 - [x] Redis 前缀为 mawf:session:
 - [x] 无 OllamaSharp / CommunityToolkit.Aspire.OllamaSharp 引用
+
+> 迁移说明（2026-10-23）：图数据源已由 LiteGraph 切换为 NebulaGraph（经 TreeGraph.NebulaFastApi 9393），详见 specs/mafwfapi-nebulagraph-migration/。

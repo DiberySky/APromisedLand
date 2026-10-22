@@ -1,6 +1,6 @@
 # APromisedLand Aspire 编排启动脚本
 # 用法：powershell -File .\start-aspire.ps1
-# 前置：Docker Desktop 已启动（vllm / vllm-embed / LiteGraph / Redis / Postgres 等容器依赖）
+# 前置：Docker Desktop 已启动（vllm / vllm-embed / NebulaGraph / Redis / Postgres 等容器依赖）
 
 $ErrorActionPreference = 'Stop'
 $appHost = Join-Path $PSScriptRoot 'APromisedLand.AppHost'

@@ -27,8 +27,7 @@ public static class TreeGraphMafWfExtension
 
         // ─── 内部资源：链式 WireIfPresent ──────────────────────────
         context.TreeGraphMafWfApi
-            .WireIfPresent(context.Redis)
-            .WireIfPresent(context.LiteGraph);
+            .WireIfPresent(context.Redis);
 
         // ══════════════════════════════════════════════════════════
         // ★ 模型名注入（引用 VllmExtension 常量，与容器 --served-model-name 一致）
@@ -74,14 +73,23 @@ public static class TreeGraphMafWfExtension
         }
 
         // ══════════════════════════════════════════════════════════
-        // ★ LiteGraph 端点注入
+        // ★ TreeGraph.NebulaFastApi 端点注入（图查询工具数据源，
+        //   模式与 TreeGraphEavApiExtension 一致）
         // ══════════════════════════════════════════════════════════
-        if (context.LiteGraph is not null)
+        if (context.TreeGraphNebulaFastApiEndpoint is not null)
         {
             context.TreeGraphMafWfApi
-                .WithEnvironment(
-                    "LiteGraph__Endpoint",
-                    context.LiteGraph.GetEndpoint(LiteGraphResource.HttpEndpointName));
+                .WithEnvironment("NebulaFastApi__Endpoint",
+                    ReferenceExpression.Create($"{context.TreeGraphNebulaFastApiEndpoint}/"));
+
+            if (context.TreeGraphNebulaFastApi is not null)
+                context.TreeGraphMafWfApi.WaitFor(context.TreeGraphNebulaFastApi);
+
+            Console.WriteLine($"[TreeGraphMafWfApi] NebulaFastApi 端点 → {context.TreeGraphNebulaFastApiEndpoint}");
+        }
+        else
+        {
+            Console.WriteLine("[TreeGraphMafWfApi] ⚠️ context.TreeGraphNebulaFastApiEndpoint 为 null，图查询将连接 localhost:9393");
         }
 
         // ══════════════════════════════════════════════════════════

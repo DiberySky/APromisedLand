@@ -15,7 +15,7 @@ public sealed class GraphTools
 {
     private const int MaxResults = 1000;
 
-    private readonly LiteGraphRestClient _rest;
+    private readonly NebulaGraphRestClient _rest;
     private readonly ILogger<GraphTools> _logger;
     private readonly ToolCallContext _toolCtx;
     private readonly IMemoryCache _cache;
@@ -23,7 +23,7 @@ public sealed class GraphTools
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
     public GraphTools(
-        LiteGraphRestClient rest,
+        NebulaGraphRestClient rest,
         ILogger<GraphTools> logger,
         ToolCallContext toolCtx,
         IMemoryCache cache)
@@ -539,25 +539,30 @@ public sealed class GraphTools
     }
 
     // ══════════════════════════════════════════════════════
-    // 私有辅助：从 LiteGraph REST 加载图数据
+    // 私有辅助：经 NebulaFastApi 从 NebulaGraph 加载图数据
     // ══════════════════════════════════════════════════════
 
     private sealed record GraphMeta(Guid Guid, string Name);
     private sealed record NodeMeta(Guid Guid, string Name);
     private sealed record EdgeMeta(Guid From, Guid To, string Name);
 
+    /// <summary>
+    /// 整图载入（节点 + 边各一条 nGQL），交由内存算法（BFS/宽松解析）处理。
+    /// ★ NebulaGraph 单空间（treegraph）模式：graphName 仅为兼容 LLM/前端
+    ///   调用习惯而保留，不参与数据过滤；为空白时按"未找到图"处理。
+    /// </summary>
     private async Task<(GraphMeta? Graph, List<NodeMeta> Nodes, List<EdgeMeta> Edges)>
         LoadGraphAsync(string graphName, CancellationToken ct)
     {
         try
         {
-            var graphGuid = await FindGraphGuidAsync(graphName, ct);
-            if (graphGuid is null) return (null, new(), new());
+            if (string.IsNullOrWhiteSpace(graphName))
+                return (null, new(), new());
 
-            var nodes = await LoadNodesAsync(graphGuid.Value, ct);
-            var edges = await LoadEdgesAsync(graphGuid.Value, ct);
+            var nodes = await LoadNodesAsync(ct);
+            var edges = await LoadEdgesAsync(ct);
 
-            return (new GraphMeta(graphGuid.Value, graphName), nodes, edges);
+            return (new GraphMeta(Guid.Empty, graphName), nodes, edges);
         }
         catch (Exception ex)
         {
@@ -566,95 +571,64 @@ public sealed class GraphTools
         }
     }
 
-    private async Task<Guid?> FindGraphGuidAsync(string graphName, CancellationToken ct)
+    private async Task<List<NodeMeta>> LoadNodesAsync(CancellationToken ct)
     {
-        var path = $"/v1.0/tenants/{_rest.TenantGuid}/graphs";
-        var json = await _rest.GetAsync(path, ct);
-        if (json is null) return null;
+        // 所有节点 tag（space_tree/unit_tree/category_tree/knowledge_tree/line_node/line）
+        // 均有 name 属性，且每顶点单 tag，可直接 n.name 取值
+        const string ngql = """
+            MATCH (n)
+            RETURN id(n) AS vid, n.name AS name
+            LIMIT 10000
+            """;
 
-        var root = json.Value;
-        if (!root.TryGetProperty("Objects", out var objs) || objs.ValueKind != JsonValueKind.Array)
-            return null;
-
-        // 先精确匹配（忽略大小写）
-        foreach (var g in objs.EnumerateArray())
-        {
-            var name = g.TryGetProperty("Name", out var n) ? n.GetString() : null;
-            if (string.Equals(name, graphName, StringComparison.OrdinalIgnoreCase))
-                return g.TryGetProperty("GUID", out var gg) ? gg.GetGuid() : null;
-        }
-
-        // 再模糊匹配（处理 LLM 幻觉：default_graph → Default graph）
-        var normalizedInput = graphName.Replace("_", " ").Trim();
-        foreach (var g in objs.EnumerateArray())
-        {
-            var name = g.TryGetProperty("Name", out var n) ? n.GetString() : null;
-            if (name is null) continue;
-            var normalizedName = name.Replace("_", " ").Trim();
-            if (string.Equals(normalizedName, normalizedInput, StringComparison.OrdinalIgnoreCase))
-                return g.TryGetProperty("GUID", out var gg) ? gg.GetGuid() : null;
-        }
-
-        // 最后包含匹配（处理 LLM 幻觉截断：default → Default graph；取最长名避免歧义）
-        string? containsGuid = null;
-        var bestLen = -1;
-        foreach (var g in objs.EnumerateArray())
-        {
-            var name = g.TryGetProperty("Name", out var n) ? n.GetString() : null;
-            if (name is null) continue;
-            var normalizedName = name.Replace("_", " ").Trim();
-            if (normalizedName.Contains(normalizedInput, StringComparison.OrdinalIgnoreCase)
-                && name.Length > bestLen)
-            {
-                bestLen = name.Length;
-                containsGuid = g.TryGetProperty("GUID", out var gg) ? gg.GetString() : null;
-            }
-        }
-        if (containsGuid is not null && Guid.TryParse(containsGuid, out var fuzzyGuid))
-        {
-            // 记录幻觉纠正，便于排查
-            return fuzzyGuid;
-        }
-
-        return null;
-    }
-
-    private async Task<List<NodeMeta>> LoadNodesAsync(Guid graphGuid, CancellationToken ct)
-    {
-        var path = $"/v1.0/tenants/{_rest.TenantGuid}/graphs/{graphGuid}/nodes";
-        var json = await _rest.GetAsync(path, ct);
+        var result = await _rest.QueryAsync(ngql, ct);
         var list = new List<NodeMeta>();
-        if (json is null) return list;
-        if (!json.Value.TryGetProperty("Objects", out var objs) || objs.ValueKind != JsonValueKind.Array)
-            return list;
+        if (result.Data is null) return list;
 
-        foreach (var n in objs.EnumerateArray())
+        foreach (var row in result.Data)
         {
-            var guid = n.TryGetProperty("GUID", out var g) ? g.GetGuid() : Guid.Empty;
-            var name = n.TryGetProperty("Name", out var nm) ? nm.GetString() ?? "" : "";
-            if (guid != Guid.Empty && !string.IsNullOrWhiteSpace(name))
+            var name = ReadString(row, "name");
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            if (TryParseVid(ReadString(row, "vid"), out var guid))
                 list.Add(new NodeMeta(guid, name));
         }
         return list;
     }
 
-    private async Task<List<EdgeMeta>> LoadEdgesAsync(Guid graphGuid, CancellationToken ct)
+    private async Task<List<EdgeMeta>> LoadEdgesAsync(CancellationToken ct)
     {
-        var path = $"/v1.0/tenants/{_rest.TenantGuid}/graphs/{graphGuid}/edges";
-        var json = await _rest.GetAsync(path, ct);
-        var list = new List<EdgeMeta>();
-        if (json is null) return list;
-        if (!json.Value.TryGetProperty("Objects", out var objs) || objs.ValueKind != JsonValueKind.Array)
-            return list;
+        // 边显示名统一取边类型名（parent_of/line_contains/connects_to/动态边类型）
+        const string ngql = """
+            MATCH (a)-[e]->(b)
+            RETURN id(a) AS src, id(b) AS dst, type(e) AS etype
+            LIMIT 10000
+            """;
 
-        foreach (var e in objs.EnumerateArray())
+        var result = await _rest.QueryAsync(ngql, ct);
+        var list = new List<EdgeMeta>();
+        if (result.Data is null) return list;
+
+        foreach (var row in result.Data)
         {
-            var from = e.TryGetProperty("From", out var f) ? f.GetGuid() : Guid.Empty;
-            var to = e.TryGetProperty("To", out var t) ? t.GetGuid() : Guid.Empty;
-            var name = e.TryGetProperty("Name", out var nm) ? nm.GetString() ?? "" : "";
-            if (from != Guid.Empty && to != Guid.Empty)
-                list.Add(new EdgeMeta(from, to, name));
+            if (!TryParseVid(ReadString(row, "src"), out var from)) continue;
+            if (!TryParseVid(ReadString(row, "dst"), out var to)) continue;
+            list.Add(new EdgeMeta(from, to, ReadString(row, "etype") ?? ""));
         }
         return list;
+    }
+
+    private static string? ReadString(Dictionary<string, JsonElement> row, string key)
+        => row.TryGetValue(key, out var v) && v.ValueKind == JsonValueKind.String
+            ? v.GetString()
+            : null;
+
+    /// <summary>
+    /// vid 以 FIXED_STRING(64) 存储，读取后可能带 \0/空格填充，修剪后再解析 GUID。
+    /// </summary>
+    private static bool TryParseVid(string? raw, out Guid guid)
+    {
+        guid = Guid.Empty;
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+        return Guid.TryParse(raw.Trim('\0', ' ', '\t'), out guid);
     }
 }
