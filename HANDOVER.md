@@ -197,7 +197,7 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 
 ### 测试基线（2026-10-22 回归验证）
 
-- TreeGraph.Api.Tests：**314 通过 / 0 失败 / 0 跳过**
+- TreeGraph.Api.Tests：**321 通过 / 0 失败 / 0 跳过**（314 旧 + 7 新）
 - TreeGraph.Blazor.Shared.Tests：**227 通过 / 0 失败 / 1 跳过**
 
 ---
