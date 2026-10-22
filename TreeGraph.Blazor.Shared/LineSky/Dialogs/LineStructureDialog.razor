@@ -30,12 +30,7 @@
         }
         else
         {
-            @* 快速模板（L1：当前只有铁路牵引供电，用按钮） *@
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" Dense="true" Class="mb-3" OnClick="ApplyRailwayFeedingTemplate" Disabled="@IsExisting">
-                🚄 应用铁路牵引供电预设
-            </MudButton>
-
-            @* 边类型 + 拓扑模式 *@
+            @* 边类型 + 拓扑模式 + 模板下拉（模板用 C# RenderFragment 构建，绕开 .NET 10 Razor 编译器 bug） *@
             <div class="d-flex gap-3 mb-3 flex-wrap">
                 <MudSelect T="string"
                            Value="_edgeTypeId"
@@ -51,6 +46,11 @@
                             @et.DisplayName（@et.TypeName）
                         </MudSelectItem>
                     }
+                </MudSelect>
+
+                @* 模板下拉（用 RenderFragment 构建 items，绕开 .NET 10 Razor 编译器第二个 foreach bug） *@
+                <MudSelect T="string" Value="_selectedTemplateKey" Label="模板" Variant="Variant.Outlined" Dense="true" Disabled="@(IsExisting || _templateKeys.Count == 0)" ValueChanged="OnSelectedTemplateKeyChanged" Style="min-width: 220px;">
+                    @TemplateSelectItems
                 </MudSelect>
 
                 <MudSelect T="string"
@@ -391,6 +391,10 @@
     private IReadOnlyList<EdgeTypeDto> _lineEdgeTypes = [];
     private List<LineStructureNodeDto> _candidateNodes = [];
 
+    /// <summary>模板下拉测试字段：IReadOnlyList（和 _lineEdgeTypes 完全平行的集合类型）。</summary>
+    private IReadOnlyList<string> _templateKeys = [];
+    private string _selectedTemplateKey = "";
+
     private List<LineStructureSegmentInput> _draftSegments = [];
     private List<TerminalRow> _draftTerminals = [];
 
@@ -508,6 +512,14 @@
             _lineEdgeTypes = allTypes.Where(t => t.IsLine).ToList();
             if (string.IsNullOrEmpty(_edgeTypeId) && _lineEdgeTypes.Count > 0)
                 _edgeTypeId = _lineEdgeTypes[0].EdgeTypeId;
+
+            // 模板加载（只取 Key，IReadOnlyList 集合类型和 _lineEdgeTypes 对齐）
+            try
+            {
+                var templates = await LineApi.GetLineTemplatesAsync() ?? [];
+                _templateKeys = templates.Select(t => t.Key).ToList().AsReadOnly();
+            }
+            catch { _templateKeys = []; }
         }
         catch (Exception ex)
         {
@@ -541,6 +553,37 @@
     }
 
     private void OnEdgeTypeChanged(string? edgeTypeId) => _edgeTypeId = edgeTypeId ?? "";
+
+    private void OnSelectedTemplateKeyChanged(string? key)
+    {
+        _selectedTemplateKey = key ?? "";
+        if (string.IsNullOrEmpty(_selectedTemplateKey)) return;
+        ApplyRailwayFeedingTemplate();
+    }
+
+    /// <summary>C# 构建的 RenderFragment：手动写 MudSelectItem，绕开 .NET 10 Razor 编译器对第二个 @foreach 的 bug。</summary>
+    private RenderFragment TemplateSelectItems => builder =>
+    {
+        var seq = 0;
+        builder.OpenComponent<MudSelectItem<string>>(seq++);
+        builder.AddAttribute(seq++, "T", typeof(string));
+        builder.AddAttribute(seq++, "Value", "");
+        builder.OpenElement(seq++, "span");
+        builder.AddContent(seq++, "手动配置");
+        builder.CloseElement();
+        builder.CloseComponent();
+
+        foreach (var k in _templateKeys)
+        {
+            builder.OpenComponent<MudSelectItem<string>>(seq++);
+            builder.AddAttribute(seq++, "T", typeof(string));
+            builder.AddAttribute(seq++, "Value", k);
+            builder.OpenElement(seq++, "span");
+            builder.AddContent(seq++, k);
+            builder.CloseElement();
+            builder.CloseComponent();
+        }
+    };
 
     private void OnFromNodeChanged(string? nodeId) => _fromNodeId = nodeId ?? "";
 
