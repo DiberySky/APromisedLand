@@ -110,6 +110,7 @@ builder.Services.AddScoped<IEdgeNodeValidator, EdgeNodeValidator>();
 builder.Services.AddScoped<EdgeMetadataService>();
 builder.Services.AddScoped<EdgeInstanceService>();
 builder.Services.AddScoped<TreeGraph.Api.LineSky.Services.LineService>();
+builder.Services.AddScoped<TreeGraph.Api.LineSky.Services.LineStructureService>();
 
 // ★ TreeEavSky iNode 宿主守卫：节点关注类型 / 写入实体数据前校验 inodeId 是
 //   真实的 UnitTree/CategoryTree/SpaceTree 节点，防止属性数据脱离宿主节点产生孤儿数据。

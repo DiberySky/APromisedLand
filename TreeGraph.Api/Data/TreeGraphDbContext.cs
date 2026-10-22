@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Api.LineSky.Entities;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.SpaceSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Entities;
@@ -45,6 +46,11 @@ public class TreeGraphDbContext : DbContext
     // LineSky：线路（独立一等公民，实现 Inode）
     public DbSet<TreeGraph.Shared.LineSky.Entities.Line> Lines => Set<TreeGraph.Shared.LineSky.Entities.Line>();
 
+    // LineSky：线路结构（头表 + 段 + 外部连接端子）
+    public DbSet<LineStructure> LineStructures => Set<LineStructure>();
+    public DbSet<LineStructureSegment> LineStructureSegments => Set<LineStructureSegment>();
+    public DbSet<LineTerminal> LineTerminals => Set<LineTerminal>();
+
     public TreeGraphDbContext(DbContextOptions<TreeGraphDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -67,6 +73,7 @@ public class TreeGraphDbContext : DbContext
         ConfigureSpaces(mb);
         ConfigureLineNodes(mb);
         ConfigureLines(mb);
+        ConfigureLineStructures(mb);
     }
 
     // ============================================================
@@ -834,6 +841,12 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // 复合外键的 principal key：(line_id, id)。
+            // line_structure_segments 的 (line_id, from_node_id)/(line_id, to_node_id)
+            // 以此为参照，把「段端点必须同属该线路」下推到数据库层。
+            e.HasAlternateKey(x => new { x.LineId, x.Id })
+                .HasName("ak_line_nodes_line_id_id");
         });
     }
 
@@ -855,6 +868,108 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+    }
+
+    // ============================================================
+    // LineSky：线路结构（头表 + 段 + 外部连接端子）
+    // ============================================================
+    private static void ConfigureLineStructures(ModelBuilder mb)
+    {
+        mb.Entity<LineStructure>(e =>
+        {
+            e.ToTable("line_structures");
+            e.HasKey(x => x.LineId);
+            e.Property(x => x.LineId).HasColumnName("line_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.EdgeTypeId).HasColumnName("edge_type_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.TopologyMode)
+                .HasColumnName("topology_mode")
+                .HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // 线路删除 → 结构头随删（段/端子对头表的 FK 再级联）
+            e.HasOne<TreeGraph.Shared.LineSky.Entities.Line>()
+                .WithMany()
+                .HasForeignKey(x => x.LineId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // 边类型被结构引用时禁止删除（由 EdgeMetadataService 前置成 409）
+            e.HasOne<EdgeDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.EdgeTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => x.EdgeTypeId).HasDatabaseName("ix_line_structures_edge_type");
+        });
+
+        mb.Entity<LineStructureSegment>(e =>
+        {
+            e.ToTable("line_structure_segments");
+            e.HasKey(x => new { x.LineId, x.EdgeId });
+            e.Property(x => x.LineId).HasColumnName("line_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.EdgeId).HasColumnName("edge_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.FromNodeId).HasColumnName("from_node_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.ToNodeId).HasColumnName("to_node_id").HasMaxLength(36).IsRequired();
+
+            // 一条边只属于一个结构（约束而非约定）
+            e.HasIndex(x => x.EdgeId).IsUnique().HasDatabaseName("uq_lss_edge_id");
+
+            // 段随结构头级联（线路删除 → 头 → 段）
+            e.HasOne<LineStructure>()
+                .WithMany()
+                .HasForeignKey(x => x.LineId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // 边实例被段引用时禁止直接删除（由 EdgeInstanceService 前置成 409）
+            e.HasOne<EdgeInstance>()
+                .WithMany()
+                .HasForeignKey(x => x.EdgeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ★ 复合外键：段端点必须属于同一线路（line_nodes 的 (line_id, id) 备用键）
+            e.HasOne<TreeGraph.Shared.LineSky.Entities.LineNode>()
+                .WithMany()
+                .HasForeignKey(x => new { x.LineId, x.FromNodeId })
+                .HasPrincipalKey(n => new { n.LineId, n.Id })
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_lss_from_node_same_line");
+
+            e.HasOne<TreeGraph.Shared.LineSky.Entities.LineNode>()
+                .WithMany()
+                .HasForeignKey(x => new { x.LineId, x.ToNodeId })
+                .HasPrincipalKey(n => new { n.LineId, n.Id })
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_lss_to_node_same_line");
+
+            e.HasIndex(x => x.FromNodeId).HasDatabaseName("ix_lss_from_node");
+            e.HasIndex(x => x.ToNodeId).HasDatabaseName("ix_lss_to_node");
+        });
+
+        mb.Entity<LineTerminal>(e =>
+        {
+            e.ToTable("line_terminals");
+            e.HasKey(x => new { x.LineId, x.NodeId });
+            e.Property(x => x.LineId).HasColumnName("line_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.NodeId).HasColumnName("node_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.Role)
+                .HasColumnName("role")
+                .HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.ExternalNodeId).HasColumnName("external_node_id").HasMaxLength(36);
+
+            e.HasOne<LineStructure>()
+                .WithMany()
+                .HasForeignKey(x => x.LineId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // 端子节点必须属于同一线路
+            e.HasOne<TreeGraph.Shared.LineSky.Entities.LineNode>()
+                .WithMany()
+                .HasForeignKey(x => new { x.LineId, x.NodeId })
+                .HasPrincipalKey(n => new { n.LineId, n.Id })
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_lt_node_same_line");
+
+            e.HasIndex(x => x.ExternalNodeId).HasDatabaseName("ix_line_terminals_external_node");
         });
     }
 }

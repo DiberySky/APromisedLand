@@ -288,12 +288,39 @@ namespace TreeGraph.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_line_nodes", x => x.id);
+                    table.UniqueConstraint("ak_line_nodes_line_id_id", x => new { x.line_id, x.id });
                     table.ForeignKey(
                         name: "FK_line_nodes_lines_line_id",
                         column: x => x.line_id,
                         principalTable: "lines",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "line_structures",
+                columns: table => new
+                {
+                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    edge_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    topology_mode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_line_structures", x => x.line_id);
+                    table.ForeignKey(
+                        name: "FK_line_structures_edge_definitions_edge_type_id",
+                        column: x => x.edge_type_id,
+                        principalTable: "edge_definitions",
+                        principalColumn: "edge_type_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_line_structures_lines_line_id",
+                        column: x => x.line_id,
+                        principalTable: "lines",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -470,6 +497,70 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.unit_id,
                         principalTable: "unit_trees",
                         principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "line_structure_segments",
+                columns: table => new
+                {
+                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    edge_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    from_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    to_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_line_structure_segments", x => new { x.line_id, x.edge_id });
+                    table.ForeignKey(
+                        name: "FK_line_structure_segments_edge_instances_edge_id",
+                        column: x => x.edge_id,
+                        principalTable: "edge_instances",
+                        principalColumn: "edge_id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_line_structure_segments_line_structures_line_id",
+                        column: x => x.line_id,
+                        principalTable: "line_structures",
+                        principalColumn: "line_id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "fk_lss_from_node_same_line",
+                        columns: x => new { x.line_id, x.from_node_id },
+                        principalTable: "line_nodes",
+                        principalColumns: new[] { "line_id", "id" },
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_lss_to_node_same_line",
+                        columns: x => new { x.line_id, x.to_node_id },
+                        principalTable: "line_nodes",
+                        principalColumns: new[] { "line_id", "id" },
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "line_terminals",
+                columns: table => new
+                {
+                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    external_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_line_terminals", x => new { x.line_id, x.node_id });
+                    table.ForeignKey(
+                        name: "FK_line_terminals_line_structures_line_id",
+                        column: x => x.line_id,
+                        principalTable: "line_structures",
+                        principalColumn: "line_id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "fk_lt_node_same_line",
+                        columns: x => new { x.line_id, x.node_id },
+                        principalTable: "line_nodes",
+                        principalColumns: new[] { "line_id", "id" },
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -1020,6 +1111,42 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "line_id");
 
             migrationBuilder.CreateIndex(
+                name: "IX_line_structure_segments_line_id_from_node_id",
+                table: "line_structure_segments",
+                columns: new[] { "line_id", "from_node_id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_line_structure_segments_line_id_to_node_id",
+                table: "line_structure_segments",
+                columns: new[] { "line_id", "to_node_id" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_lss_from_node",
+                table: "line_structure_segments",
+                column: "from_node_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_lss_to_node",
+                table: "line_structure_segments",
+                column: "to_node_id");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_lss_edge_id",
+                table: "line_structure_segments",
+                column: "edge_id",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_line_structures_edge_type",
+                table: "line_structures",
+                column: "edge_type_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_line_terminals_external_node",
+                table: "line_terminals",
+                column: "external_node_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_lav_entity",
                 table: "location_attribute_values",
                 columns: new[] { "entity_type", "entity_id" });
@@ -1095,9 +1222,6 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "custom_table_rows");
 
             migrationBuilder.DropTable(
-                name: "edge_instances");
-
-            migrationBuilder.DropTable(
                 name: "entity_type_catalog");
 
             migrationBuilder.DropTable(
@@ -1110,7 +1234,10 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "knowledge_trees");
 
             migrationBuilder.DropTable(
-                name: "line_nodes");
+                name: "line_structure_segments");
+
+            migrationBuilder.DropTable(
+                name: "line_terminals");
 
             migrationBuilder.DropTable(
                 name: "location_attribute_values");
@@ -1125,13 +1252,22 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "spaces");
 
             migrationBuilder.DropTable(
+                name: "edge_instances");
+
+            migrationBuilder.DropTable(
+                name: "line_structures");
+
+            migrationBuilder.DropTable(
+                name: "line_nodes");
+
+            migrationBuilder.DropTable(
+                name: "attribute_catalog");
+
+            migrationBuilder.DropTable(
                 name: "edge_definitions");
 
             migrationBuilder.DropTable(
                 name: "lines");
-
-            migrationBuilder.DropTable(
-                name: "attribute_catalog");
 
             migrationBuilder.DropTable(
                 name: "composite_type_definitions");

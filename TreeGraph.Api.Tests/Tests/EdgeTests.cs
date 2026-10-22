@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.LineSky.Dtos;
+using TreeGraph.Shared.LineSky.Entities;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
 
@@ -783,7 +784,7 @@ public class EdgeTests : IntegrationTestBase
     [Fact]
     public async Task Line_Create_MultiSegment_PersistsAllEdges()
     {
-        // 回归：CreateLineAsync 曾用裸事务与 NpgsqlRetryingExecutionStrategy 冲突，
+        // 回归：结构创建事务曾用裸事务与 NpgsqlRetryingExecutionStrategy 冲突，
         // 多段创建线路直接抛"does not support user-initiated transactions"。
         // 现事务经 CreateExecutionStrategy 包裹，5 节点 4 段应全部落库。
         var et = await CreateEdgeTypeAsync("LineTx", isLine: true);
@@ -802,28 +803,28 @@ public class EdgeTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Line_Create_MidTransactionFailure_RollsBackEarlierSegments()
+    public async Task Line_Create_WhenStructureExists_Returns409AndKeepsStructure()
     {
-        // 回归：第 1 段在事务内插入成功、第 2 段命中重复边校验失败，
-        // 整体应回滚（A→B 不残留）；失败原因为业务校验而非策略异常。
+        // 同一线路已有结构时再次 POST 结构 → 409；原结构（2 段）保持不变。
         var et = await CreateEdgeTypeAsync("LineRb", isLine: true);
-        await CreateEdgeAsync(et.EdgeTypeId, "RB_B", "RB_C");
+        var lineId = await CreateLineAsync(et.EdgeTypeId, "RB_A", "RB_B", "RB_C");
 
         var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/lines/{et.EdgeTypeId}/create",
-            new CreateLineRequest { OrderedNodeIds = new List<string> { "RB_A", "RB_B", "RB_C" } });
+            $"/api/eav/lines/{lineId}/structure",
+            new LineStructureRequest
+            {
+                EdgeTypeId = et.EdgeTypeId,
+                TopologyMode = TopologyMode.Linear,
+                OrderedNodeIds = new List<string> { "RB_A", "RB_B", "RB_C" }
+            });
         var body = await resp.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("已存在", body);
+        Assert.Contains("已存在结构", body);
 
         var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
             $"/api/eav/edges/{et.EdgeTypeId}");
         Assert.NotNull(list);
-        Assert.Single(list!);
-
-        var fromTos = list!.Select(e => (e.FromNodeId, e.ToNodeId)).ToList();
-        Assert.DoesNotContain(("RB_A", "RB_B"), fromTos);   // 已回滚
-        Assert.Contains(("RB_B", "RB_C"), fromTos);         // 预置边原样保留
+        Assert.Equal(2, list!.Count);
     }
 
     [Fact]
@@ -908,15 +909,41 @@ public class EdgeTests : IntegrationTestBase
         return dto!;
     }
 
-    private async Task CreateLineAsync(string edgeTypeId, params string[] orderedNodeIds)
+    /// <summary>
+    /// 建一条 Linear 线路结构：创建 Line → 按顺序创建 LineNode → POST 结构（OrderedNodeIds）。
+    /// 返回 Line.Id。
+    /// </summary>
+    private async Task<string> CreateLineAsync(string edgeTypeId, params string[] orderedNodeIds)
     {
+        var lineId = Guid.NewGuid().ToString("N");
+
+        var lineResp = await Client.PostAsJsonAsync(
+            "/api/Lines", new Line { Id = lineId, Name = "测试线路" });
+        Assert.True(lineResp.IsSuccessStatusCode,
+            $"创建线路失败: {(int)lineResp.StatusCode} {await lineResp.Content.ReadAsStringAsync()}");
+
+        foreach (var nodeId in orderedNodeIds)
+        {
+            var nodeResp = await Client.PostAsJsonAsync(
+                "/api/LineNode",
+                new LineNode { Id = nodeId, LineId = lineId, Name = nodeId });
+            Assert.True(nodeResp.IsSuccessStatusCode,
+                $"创建线路节点失败: {(int)nodeResp.StatusCode} {await nodeResp.Content.ReadAsStringAsync()}");
+        }
+
         var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/lines/{edgeTypeId}/create",
-            new CreateLineRequest { OrderedNodeIds = orderedNodeIds.ToList() });
+            $"/api/eav/lines/{lineId}/structure",
+            new LineStructureRequest
+            {
+                EdgeTypeId = edgeTypeId,
+                TopologyMode = TopologyMode.Linear,
+                OrderedNodeIds = orderedNodeIds.ToList()
+            });
 
         var body = await resp.Content.ReadAsStringAsync();
         Assert.True(resp.StatusCode == HttpStatusCode.OK,
-            $"创建线路失败: {(int)resp.StatusCode} {body}");
+            $"创建线路结构失败: {(int)resp.StatusCode} {body}");
+        return lineId;
     }
 
     private async Task<EdgeInstanceDto> CreateEdgeAsync(

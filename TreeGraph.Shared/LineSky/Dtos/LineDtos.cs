@@ -4,15 +4,6 @@ namespace TreeGraph.Shared.LineSky.Dtos;
 
 // ============ 线路结构（Line）专用 ============
 
-/// <summary>批量创建线路：按 orderedNodeIds 顺序创建 from→to 边。</summary>
-public class CreateLineRequest
-{
-    /// <summary>有序节点列表，如 ["A", "B", "C", "D"] → 创建 A→B, B→C, C→D。</summary>
-    public List<string> OrderedNodeIds { get; set; } = new();
-    /// <summary>可选：给每段边分配权重。按顺序与节点对一一对应，长度应 = OrderedNodeIds.Count - 1。</summary>
-    public List<decimal?>? Weights { get; set; }
-}
-
 /// <summary>线路完整路径查询结果（WITH RECURSIVE CTE 返回）。</summary>
 public record LinePathResult(
     /// <summary>路径上的节点 ID 列表（按方向排列，起点在索引 0）。</summary>

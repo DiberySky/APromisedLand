@@ -107,6 +107,12 @@ public class LineNodeController : ControllerBase
         if (hasEdges)
             return Conflict(new { error = "该节点仍有边引用，无法删除" });
 
+        // 被线路结构端子引用时拒绝（line_terminals 的复合外键为 Restrict）
+        var hasTerminal = await _db.LineTerminals
+            .AnyAsync(t => t.NodeId == id, ct);
+        if (hasTerminal)
+            return Conflict(new { error = "该节点仍是线路结构的外部连接端子，无法删除。请先移除该端子。" });
+
         // 先清空自身数据才允许删本项：该节点仍有挂载实体数据时拒绝（不采用级联删除）
         var hasEntities = await _db.InodeEntities
             .AnyAsync(m => m.InodeId == id, ct);

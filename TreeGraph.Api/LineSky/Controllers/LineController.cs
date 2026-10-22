@@ -6,10 +6,10 @@ using TreeGraph.Shared.LineSky.Dtos;
 namespace TreeGraph.Api.LineSky.Controllers;
 
 /// <summary>
-/// 线路结构（Line）专用端点。
+/// 线路结构查询端点（路径 / 拓扑校验 / 连通分量）。
 ///
-/// 线路结构是 Edge（关系/边）的特例：EdgeDefinition.IsLine=true。
-/// 端点覆盖：批量创建线路、完整路径查询、拓扑校验、连通分量。
+/// 线路结构的创建与维护走 <see cref="LineStructureController"/>
+/// （api/eav/lines/{lineId}/structure）；本控制器只保留按边类型的图查询能力。
 ///
 /// 响应体统一交由 ApiEnvelopeFilter 包装为 ApiResponse，控制器不再手工套
 /// { success, message, data }，避免与全局信封叠成双层（前端只解一层信封）。
@@ -21,26 +21,6 @@ public class LineController : ControllerBase
     private readonly LineService _line;
 
     public LineController(LineService line) => _line = line;
-
-    // ============================================================
-    // 批量创建线路
-    // ============================================================
-
-    /// <summary>
-    /// 按顺序创建 A→B→C→D 的线路边。全事务，任一段失败整体回滚。
-    /// 建线前校验：节点不重复、节点存在且类型匹配、候选图不成环。
-    /// 异常统一交由 ApiEnvelopeFilter 映射：
-    ///   ArgumentException → 400；InvalidOperationException（业务规则冲突）→ 409。
-    /// </summary>
-    [HttpPost("{edgeTypeId}/create")]
-    public async Task<IActionResult> CreateLine(
-        [FromRoute] string edgeTypeId,
-        [FromBody] CreateLineRequest req,
-        CancellationToken ct)
-    {
-        var edges = await _line.CreateLineAsync(edgeTypeId, req, ct);
-        return Ok(edges);
-    }
 
     // ============================================================
     // 路径查询（仅严格线性线路）

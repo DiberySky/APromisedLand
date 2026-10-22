@@ -22,4 +22,12 @@ public static class EavJsonExtensions
         string? requestUri,
         CancellationToken cancellationToken = default) where T : class
         => (await client.GetFromJsonAsync<ApiResponse<T>>(requestUri, cancellationToken))?.Data;
+
+    /// <summary>带自定义 JSON 选项的读取（如含字符串枚举的 DTO）。</summary>
+    public static async Task<T?> GetEavAsync<T>(
+        this HttpClient client,
+        string? requestUri,
+        JsonSerializerOptions options,
+        CancellationToken cancellationToken = default) where T : class
+        => (await client.GetFromJsonAsync<ApiResponse<T>>(requestUri, options, cancellationToken))?.Data;
 }

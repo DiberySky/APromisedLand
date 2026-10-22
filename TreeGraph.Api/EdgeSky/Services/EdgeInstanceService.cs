@@ -37,20 +37,40 @@ public class EdgeInstanceService
         _publishEndpoint = publishEndpoint;
     }
 
-    public async Task<EdgeInstanceDto?> CreateAsync(
+    public Task<EdgeInstanceDto?> CreateAsync(
         string edgeTypeId, CreateEdgeRequest req, CancellationToken ct)
+        => CreateCoreAsync(edgeTypeId, req, forLineStructure: false, ct);
+
+    /// <summary>
+    /// 线路结构专用：跳过「普通接口禁止创建 IsLine 边」与节点声明类型校验，
+    /// 由 LineStructureService 负责结构拓扑与同线归属校验。
+    /// </summary>
+    internal Task<EdgeInstanceDto?> CreateLineEdgeInternalAsync(
+        string edgeTypeId, CreateEdgeRequest req, CancellationToken ct)
+        => CreateCoreAsync(edgeTypeId, req, forLineStructure: true, ct);
+
+    private async Task<EdgeInstanceDto?> CreateCoreAsync(
+        string edgeTypeId, CreateEdgeRequest req, bool forLineStructure, CancellationToken ct)
     {
         var def = await _db.EdgeDefinitions
             .FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
         if (def is null) return null;
 
+        // 线路结构边只允许经结构接口创建（唯一入口，避免绕过结构校验产生游离边）
+        if (def.IsLine && !forLineStructure)
+            throw new InvalidOperationException(
+                $"边类型 {def.DisplayName} 是线路结构类型，不能通过普通边接口创建；请使用线路结构接口");
+
         if (string.IsNullOrWhiteSpace(req.FromNodeId)
             || string.IsNullOrWhiteSpace(req.ToNodeId))
             throw new ArgumentException("FromNodeId / ToNodeId 必填");
 
-        // 节点存在性 + 声明类型校验（FromNodeType/ToNodeType 非空时生效）
-        await _nodeValidator.EnsureNodeAsync(def.FromNodeType, req.FromNodeId, ct);
-        await _nodeValidator.EnsureNodeAsync(def.ToNodeType, req.ToNodeId, ct);
+        // 节点存在性 + 声明类型校验（结构边端点由复合外键保证同线归属，此处不套用节点类型声明）
+        if (!forLineStructure)
+        {
+            await _nodeValidator.EnsureNodeAsync(def.FromNodeType, req.FromNodeId, ct);
+            await _nodeValidator.EnsureNodeAsync(def.ToNodeType, req.ToNodeId, ct);
+        }
 
         // 重复检查：有向仅看同向；无向（IsDirected=false）反向亦视为重复
         var duplicate = await _db.EdgeInstances
@@ -62,7 +82,7 @@ public class EdgeInstanceService
         if (duplicate)
             throw new InvalidOperationException("该边已存在（同类型同方向不重复）");
 
-        var enforceSingleIncoming = def.IsLine && def.IsLinear;
+        var enforceSingleIncoming = !forLineStructure && def.IsLine && def.IsLinear;
 
         // 严格线性线路：入度 ≤ 1 友好前置校验（数据库部分唯一索引 uq_ei_single_incoming 兜底）
         if (enforceSingleIncoming)
@@ -75,8 +95,8 @@ public class EdgeInstanceService
                     $"线路结构 {def.DisplayName} 是严格线性，节点 {req.ToNodeId} 入度已 = 1，不能再接");
         }
 
-        // 线路结构：自环 / 成环拦截
-        if (def.IsLine)
+        // 线路结构：自环 / 成环拦截（结构边由 LineStructureService 按拓扑模式校验）
+        if (def.IsLine && !forLineStructure)
         {
             if (req.FromNodeId == req.ToNodeId)
                 throw new InvalidOperationException("线路结构不允许自环（from 与 to 相同）");
@@ -353,11 +373,32 @@ public class EdgeInstanceService
         return def is null ? null : await BuildDtoAsync(instance, def, ct);
     }
 
-    public async Task<bool> DeleteAsync(string edgeId, CancellationToken ct)
+    public Task<bool> DeleteAsync(string edgeId, CancellationToken ct)
+        => DeleteCoreAsync(edgeId, allowStructureReferenced: false, ct);
+
+    /// <summary>
+    /// 线路结构专用：跳过「边被结构段引用」检查（段行由 LineStructureService 先行移除）。
+    /// EAV 属性与挂载实体守卫仍保留。
+    /// </summary>
+    internal Task<bool> DeleteInternalAsync(string edgeId, CancellationToken ct)
+        => DeleteCoreAsync(edgeId, allowStructureReferenced: true, ct);
+
+    private async Task<bool> DeleteCoreAsync(
+        string edgeId, bool allowStructureReferenced, CancellationToken ct)
     {
         var instance = await _db.EdgeInstances
             .FirstOrDefaultAsync(i => i.EdgeId == edgeId, ct);
         if (instance is null) return false;
+
+        // 被线路结构段引用的边只能经结构接口删除（避免结构出现悬空段）
+        if (!allowStructureReferenced)
+        {
+            var referenced = await _db.LineStructureSegments
+                .AnyAsync(s => s.EdgeId == edgeId, ct);
+            if (referenced)
+                throw new InvalidOperationException(
+                    "该边是线路结构段，无法直接删除。请先在线路结构编辑器中移除该段。");
+        }
 
         var def = await _db.EdgeDefinitions
             .FirstOrDefaultAsync(d => d.EdgeTypeId == instance.EdgeTypeId, ct);

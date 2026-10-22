@@ -18,7 +18,7 @@ namespace TreeGraph.Api.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -458,6 +458,111 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("uq_edge_instance");
 
                     b.ToTable("edge_instances", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructure", b =>
+                {
+                    b.Property<string>("LineId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("line_id");
+
+                    b.Property<string>("EdgeTypeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("edge_type_id");
+
+                    b.Property<string>("TopologyMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("topology_mode");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("LineId");
+
+                    b.HasIndex("EdgeTypeId")
+                        .HasDatabaseName("ix_line_structures_edge_type");
+
+                    b.ToTable("line_structures", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructureSegment", b =>
+                {
+                    b.Property<string>("LineId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("line_id");
+
+                    b.Property<string>("EdgeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("edge_id");
+
+                    b.Property<string>("FromNodeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("from_node_id");
+
+                    b.Property<string>("ToNodeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("to_node_id");
+
+                    b.HasKey("LineId", "EdgeId");
+
+                    b.HasIndex("EdgeId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_lss_edge_id");
+
+                    b.HasIndex("FromNodeId")
+                        .HasDatabaseName("ix_lss_from_node");
+
+                    b.HasIndex("ToNodeId")
+                        .HasDatabaseName("ix_lss_to_node");
+
+                    b.HasIndex("LineId", "FromNodeId");
+
+                    b.HasIndex("LineId", "ToNodeId");
+
+                    b.ToTable("line_structure_segments", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineTerminal", b =>
+                {
+                    b.Property<string>("LineId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("line_id");
+
+                    b.Property<string>("NodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("node_id");
+
+                    b.Property<string>("ExternalNodeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("external_node_id");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("role");
+
+                    b.HasKey("LineId", "NodeId");
+
+                    b.HasIndex("ExternalNodeId")
+                        .HasDatabaseName("ix_line_terminals_external_node");
+
+                    b.ToTable("line_terminals", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeAuditLog", b =>
@@ -2254,6 +2359,9 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("LineId", "Id")
+                        .HasName("ak_line_nodes_line_id_id");
+
                     b.HasIndex("LineId");
 
                     b.ToTable("line_nodes", (string)null);
@@ -3305,6 +3413,69 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("EdgeType");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructure", b =>
+                {
+                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("EdgeTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Shared.LineSky.Entities.Line", null)
+                        .WithMany()
+                        .HasForeignKey("LineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructureSegment", b =>
+                {
+                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeInstance", null)
+                        .WithMany()
+                        .HasForeignKey("EdgeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Api.LineSky.Entities.LineStructure", null)
+                        .WithMany()
+                        .HasForeignKey("LineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Shared.LineSky.Entities.LineNode", null)
+                        .WithMany()
+                        .HasForeignKey("LineId", "FromNodeId")
+                        .HasPrincipalKey("LineId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lss_from_node_same_line");
+
+                    b.HasOne("TreeGraph.Shared.LineSky.Entities.LineNode", null)
+                        .WithMany()
+                        .HasForeignKey("LineId", "ToNodeId")
+                        .HasPrincipalKey("LineId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lss_to_node_same_line");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineTerminal", b =>
+                {
+                    b.HasOne("TreeGraph.Api.LineSky.Entities.LineStructure", null)
+                        .WithMany()
+                        .HasForeignKey("LineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TreeGraph.Shared.LineSky.Entities.LineNode", null)
+                        .WithMany()
+                        .HasForeignKey("LineId", "NodeId")
+                        .HasPrincipalKey("LineId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lt_node_same_line");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>

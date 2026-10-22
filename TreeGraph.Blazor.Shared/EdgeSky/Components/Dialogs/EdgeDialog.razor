@@ -188,7 +188,12 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _edgeTypes = await EdgeApi.ListEdgeTypesAsync() ?? [];
+        var allTypes = await EdgeApi.ListEdgeTypesAsync() ?? [];
+        // 线路结构边（IsLine=true）只能在「线路结构」编辑器中维护；
+        // 编辑既有结构边时保留其类型用于展示，其余情况一律排除。
+        _edgeTypes = IsEdit && Editing is not null
+            ? allTypes.Where(t => !t.IsLine || t.EdgeTypeId == Editing.EdgeTypeId).ToList()
+            : allTypes.Where(t => !t.IsLine).ToList();
 
         if (IsEdit && Editing is not null)
         {

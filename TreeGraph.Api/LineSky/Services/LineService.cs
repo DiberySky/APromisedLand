@@ -22,18 +22,13 @@ public class LineService
     public const int MaxPathDepth = 500;
 
     private readonly TreeGraphDbContext _db;
-    private readonly EdgeInstanceService _edgeInst;
-    private readonly IEdgeNodeValidator _nodeValidator;
     private readonly NodeEavSky.Services.InodeOwnerGuardRegistry _inodeGuards;
 
     public LineService(
-        TreeGraphDbContext db, EdgeInstanceService edgeInst,
-        IEdgeNodeValidator nodeValidator,
+        TreeGraphDbContext db,
         NodeEavSky.Services.InodeOwnerGuardRegistry inodeGuards)
     {
         _db = db;
-        _edgeInst = edgeInst;
-        _nodeValidator = nodeValidator;
         _inodeGuards = inodeGuards;
     }
 
@@ -42,98 +37,10 @@ public class LineService
         => _db.EdgeDefinitions.FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
 
     // ============================================================
-    // ① 批量创建线路（A→B→C→D）
+    // ① 批量创建线路（已移除）
     // ============================================================
-
-    /// <summary>
-    /// 全事务创建：按 OrderedNodeIds 顺序创建 from→to 边。
-    /// 任何一段失败 → 整体回滚。
-    /// 建线前先做整线体检：节点不重复、节点存在/类型匹配、候选图不成环。
-    /// </summary>
-    public async Task<List<EdgeInstanceDto>> CreateLineAsync(
-        string edgeTypeId, CreateLineRequest req, CancellationToken ct)
-    {
-        if (req.OrderedNodeIds.Count < 2)
-            throw new ArgumentException("OrderedNodeIds 至少需要 2 个节点才能形成线路");
-
-        if (req.OrderedNodeIds.Count != req.OrderedNodeIds.Distinct().Count())
-            throw new ArgumentException(
-                "OrderedNodeIds 存在重复节点，无法形成线路（线路结构应无环且不可自环）");
-
-        if (req.Weights is not null && req.Weights.Count != req.OrderedNodeIds.Count - 1)
-            throw new ArgumentException("Weights 长度应 = OrderedNodeIds.Count - 1");
-
-        var def = await GetDefinitionAsync(edgeTypeId, ct);
-        if (def is null)
-            throw new InvalidOperationException($"EdgeType 不存在: {edgeTypeId}");
-
-        // 节点存在性 + 声明类型校验（每个节点需同时满足 from/to 节点类型声明）
-        foreach (var nodeId in req.OrderedNodeIds)
-        {
-            await _nodeValidator.EnsureNodeAsync(def.FromNodeType, nodeId, ct);
-            if (!string.Equals(def.FromNodeType, def.ToNodeType, StringComparison.Ordinal))
-                await _nodeValidator.EnsureNodeAsync(def.ToNodeType, nodeId, ct);
-        }
-
-        // 候选图成环检测：现有边 + 待新增线边。
-        // 注：IsLine=true 的类型在启用时已通过 ValidateTopology 拒绝既有环，
-        // 故此处出现的环必为本次新增引入。
-        if (def.IsLine)
-        {
-            var existing = await _db.EdgeInstances
-                .Where(e => e.EdgeTypeId == edgeTypeId)
-                .Select(e => new { e.FromNodeId, e.ToNodeId })
-                .ToListAsync(ct);
-
-            var pairs = new List<(string From, string To)>(existing.Count + req.OrderedNodeIds.Count - 1);
-            pairs.AddRange(existing.Select(e => (e.FromNodeId, e.ToNodeId)));
-            for (int i = 0; i < req.OrderedNodeIds.Count - 1; i++)
-                pairs.Add((req.OrderedNodeIds[i], req.OrderedNodeIds[i + 1]));
-
-            if (EdgeInstanceService.AnalyzeTopology(pairs).Cyclic.Count > 0)
-                throw new InvalidOperationException(
-                    "新增线路会形成环，线路结构应无环（请检查 OrderedNodeIds 是否与既有边构成回路）");
-        }
-
-        // NpgsqlRetryingExecutionStrategy 不支持用户自发起事务，须经执行策略包裹后整体执行
-        // （与 EavWriteService / E2eBaselineSeeder 的既有约定一致）。
-        var strategy = _db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-            try
-            {
-                var result = new List<EdgeInstanceDto>(req.OrderedNodeIds.Count - 1);
-
-                for (int i = 0; i < req.OrderedNodeIds.Count - 1; i++)
-                {
-                    var fromId = req.OrderedNodeIds[i];
-                    var toId = req.OrderedNodeIds[i + 1];
-                    var weight = req.Weights?[i];
-
-                    var edge = await _edgeInst.CreateAsync(
-                        edgeTypeId,
-                        new CreateEdgeRequest
-                        {
-                            FromNodeId = fromId,
-                            ToNodeId = toId,
-                            Weight = weight
-                        },
-                        ct);
-
-                    result.Add(edge!);
-                }
-
-                await transaction.CommitAsync(ct);
-                return result;
-            }
-            catch
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
-        });
-    }
+    // 线路结构统一走 LineStructureService（api/eav/lines/{lineId}/structure），
+    // 由 line_structures / line_structure_segments 表达头表与段归属。
 
     // ============================================================
     // ② 完整路径查询（WITH RECURSIVE CTE）

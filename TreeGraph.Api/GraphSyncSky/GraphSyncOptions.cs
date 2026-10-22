@@ -25,14 +25,39 @@ public static class GraphNaming
 {
     public const string ParentOfEdge = "parent_of";
 
+    /// <summary>线路 → 线路节点（Line 包含其 LineNode）。</summary>
+    public const string LineContainsEdge = "line_contains";
+
+    /// <summary>线路节点 → 外部 inode（馈入/馈出/联络，属性 role）。</summary>
+    public const string ConnectsToEdge = "connects_to";
+
     public const string SpaceTreeTag = "space_tree";
     public const string UnitTreeTag = "unit_tree";
     public const string CategoryTreeTag = "category_tree";
     public const string KnowledgeTreeTag = "knowledge_tree";
     public const string LineNodeTag = "line_node";
 
+    /// <summary>线路顶点（一条 Line 一个顶点，属性含 topology_mode）。</summary>
+    public const string LineTag = "line";
+
     public static readonly string[] AllNodeTags =
     [
-        SpaceTreeTag, UnitTreeTag, CategoryTreeTag, KnowledgeTreeTag, LineNodeTag
+        SpaceTreeTag, UnitTreeTag, CategoryTreeTag, KnowledgeTreeTag, LineNodeTag, LineTag
     ];
+
+    /// <summary>按 tag 声明属性列（schema 初始化与 ALTER 补列共用）。</summary>
+    public static readonly IReadOnlyDictionary<string, string[]> TagColumns =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            [SpaceTreeTag] = ["name", "node_type", "is_archived"],
+            [UnitTreeTag] = ["name", "node_type", "is_archived"],
+            [CategoryTreeTag] = ["name", "node_type", "is_archived"],
+            [KnowledgeTreeTag] = ["name", "node_type", "is_archived"],
+            [LineNodeTag] =
+            [
+                "name", "node_type", "is_archived",
+                "line_id", "line_name", "terminal_role"
+            ],
+            [LineTag] = ["name", "node_type", "is_archived", "topology_mode"]
+        };
 }

@@ -178,7 +178,9 @@ else
         {
             if (string.IsNullOrEmpty(_filterEdgeTypeId))
             {
-                _edgeTypes = await Api.ListEdgeTypesAsync() ?? [];
+                // 线路结构边（IsLine=true）由线路结构编辑器维护，不在普通边面板中展示/创建
+                _edgeTypes = (await Api.ListEdgeTypesAsync() ?? [])
+                    .Where(t => !t.IsLine).ToList();
                 var allOut = new List<EdgeInstanceDto>();
                 var allIn = new List<EdgeInstanceDto>();
 

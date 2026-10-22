@@ -1,12 +1,13 @@
-@* LineStructureDialog.razor — 线路结构（有序节点 → 自动建边）
+@* LineStructureDialog.razor — 线路结构图编辑器
    入口：线路维护面板 → 行内「结构」图标。
-   功能：选择线路型边类型、调整节点顺序、批量建边、查看/删除结构边、链式预览。 *@
+   功能：选择线路型边类型与拓扑模式（Linear/Radial/Network），
+        以「段 + 端子」图编辑方式增删结构；无结构时先在草稿中编辑再一次性创建。 *@
 @namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.EdgeSky.Services
 @using TreeGraph.Shared.EdgeSky.Dtos
 @using TreeGraph.Shared.LineSky.Dtos
-@inject LineNodeManageApiClient NodeApi
+@using TreeGraph.Shared.LineSky.Entities
 @inject LineApiClient LineApi
 @inject EdgeApiClient EdgeApi
 @inject IDialogService DialogService
@@ -21,23 +22,44 @@
         {
             <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
         }
+        else if (_structure is null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">
+                加载线路结构失败（线路可能已被删除）。
+            </MudAlert>
+        }
         else
         {
-            @* 边类型选择 *@
-            <MudSelect T="string"
-                       Value="_edgeTypeId"
-                       Label="线路型边类型（IsLine = true）"
-                       Variant="Variant.Outlined"
-                       Dense="true"
-                       Class="mb-3"
-                       ValueChanged="OnEdgeTypeChanged">
-                @foreach (var et in _lineEdgeTypes)
-                {
-                    <MudSelectItem T="string" Value="@et.EdgeTypeId">
-                        @et.DisplayName（@et.TypeName）
-                    </MudSelectItem>
-                }
-            </MudSelect>
+            @* 边类型 + 拓扑模式 *@
+            <div class="d-flex gap-3 mb-3 flex-wrap">
+                <MudSelect T="string"
+                           Value="_edgeTypeId"
+                           Label="线路型边类型（IsLine = true）"
+                           Variant="Variant.Outlined"
+                           Dense="true"
+                           Disabled="@(IsExisting || _lineEdgeTypes.Count == 0)"
+                           ValueChanged="OnEdgeTypeChanged"
+                           Style="min-width: 260px;">
+                    @foreach (var et in _lineEdgeTypes)
+                    {
+                        <MudSelectItem T="string" Value="@et.EdgeTypeId">
+                            @et.DisplayName（@et.TypeName）
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="string"
+                           Value="_topologyMode"
+                           Label="拓扑模式"
+                           Variant="Variant.Outlined"
+                           Dense="true"
+                           ValueChanged="OnTopologyModeChanged"
+                           Style="min-width: 180px;">
+                    <MudSelectItem T="string" Value="@("Linear")">Linear（链）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Radial")">Radial（放射状，默认）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Network")">Network（环网）</MudSelectItem>
+                </MudSelect>
+            </div>
 
             @if (_lineEdgeTypes.Count == 0)
             {
@@ -45,112 +67,205 @@
                     当前没有线路型边类型。请先到「边类型管理」创建 IsLine = true 的类型。
                 </MudAlert>
             }
-            else if (_nodes.Count < 2)
+            else if (_candidateNodes.Count == 0)
             {
                 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                    该线路的节点不足 2 个。请先在「线路节点」中添加节点。
+                    该线路暂无线路节点。请先在「线路节点」中添加节点。
+                </MudAlert>
+            }
+
+            @if (!IsExisting)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    当前线路尚无结构：在下方添加段与端子后点击「创建结构」一次性提交。
                 </MudAlert>
             }
             else
             {
-                @* 链式预览（按当前排序） *@
-                <MudPaper Elevation="0" Class="pa-2 mb-3" Style="border: 1px solid var(--mud-palette-lines-default); overflow-x: auto;">
-                    <svg width="@SvgWidth" height="96" role="img" aria-label="线路结构预览">
-                        @for (var i = 0; i < _ordered.Count; i++)
-                        {
-                            var x = 60 + i * 140;
-                            if (i < _ordered.Count - 1)
-                            {
-                                <line x1="@(x + 22)" y1="38" x2="@(x + 118)" y2="38"
-                                      stroke="var(--mud-palette-primary)"
-                                      stroke-width="2" stroke-dasharray="6 4" />
-                            }
-                            <circle cx="@x" cy="38" r="18"
-                                    fill="var(--mud-palette-primary)"
-                                    opacity="0.9" />
-                            @((MarkupString)$"<text x=\"{x}\" y=\"43\" text-anchor=\"middle\" font-size=\"11\" fill=\"var(--mud-palette-primary-text)\">{i + 1}</text>")
-                            @((MarkupString)$"<text x=\"{x}\" y=\"76\" text-anchor=\"middle\" font-size=\"11\" fill=\"var(--mud-palette-text-secondary)\">{Clip(_ordered[i].Name)}</text>")
-                        }
-                    </svg>
+                @* 诊断信息（服务端按拓扑模式校验） *@
+                var diag = _structure.Diagnostics;
+                <MudPaper Elevation="0" Class="pa-2 mb-3"
+                          Style="border: 1px solid var(--mud-palette-lines-default);">
+                    <div class="d-flex align-center flex-wrap gap-3">
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@(diag.Valid ? Color.Success : Color.Error)"
+                                 Variant="Variant.Outlined">
+                            @(diag.Valid ? "拓扑校验通过" : "拓扑校验未通过")
+                        </MudChip>
+                        <MudText Typo="Typo.caption">节点 @diag.NodeCount</MudText>
+                        <MudText Typo="Typo.caption">段 @diag.EdgeCount</MudText>
+                        <MudText Typo="Typo.caption">最大度 @diag.NodeDegreeMax</MudText>
+                        <MudText Typo="Typo.caption">端点 @diag.NodeDegreeOneCount</MudText>
+                        <MudText Typo="Typo.caption">成环 @(diag.HasCycle ? "是" : "否")</MudText>
+                        <MudText Typo="Typo.caption">FeedIn @diag.FeedInCount</MudText>
+                    </div>
+                    @foreach (var e in diag.Errors)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error">• @e</MudText>
+                    }
+                    @foreach (var w in diag.Warnings)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Warning">• @w</MudText>
+                    }
                 </MudPaper>
+            }
 
-                @* 有序节点列表 + 上移/下移 *@
-                <MudText Typo="Typo.subtitle2" Class="mb-2">节点顺序</MudText>
-                <MudTable Items="_ordered" Dense="true" Bordered="true" Hover="true" Class="mb-3">
+            @* ── 段 ── *@
+            <MudText Typo="Typo.subtitle2" Class="mb-2">段（@SegmentCount）</MudText>
+            @if (SegmentCount == 0)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                    尚未添加任何段。
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="_segmentRows" Dense="true" Bordered="true" Hover="true" Class="mb-2">
                     <HeaderContent>
-                        <MudTh Style="width: 1%;">#</MudTh>
-                        <MudTh>名称</MudTh>
-                        <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">调整</MudTh>
+                        <MudTh>起点</MudTh>
+                        <MudTh>终点</MudTh>
+                        <MudTh>权重</MudTh>
+                        <MudTh>显示名</MudTh>
+                        <MudTh Style="width: 1%;">操作</MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd>@(Index(context) + 1)</MudTd>
-                        <MudTd>@context.Name</MudTd>
-                        <MudTd Style="white-space: nowrap; text-align: right;">
-                            <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                        <MudTd>@context.FromName</MudTd>
+                        <MudTd>@context.ToName</MudTd>
+                        <MudTd>@(context.Weight.HasValue ? context.Weight.Value.ToString("0.####") : "—")</MudTd>
+                        <MudTd>@(string.IsNullOrEmpty(context.DisplayName) ? "—" : context.DisplayName)</MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                            Size="Size.Small"
-                                           Disabled="@(Index(context) == 0)"
-                                           OnClick="@(() => MoveUp(context))"
-                                           title="上移" />
-                            <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward"
-                                           Size="Size.Small"
-                                           Disabled="@(Index(context) == _ordered.Count - 1)"
-                                           OnClick="@(() => MoveDown(context))"
-                                           title="下移" />
+                                           Color="Color.Error"
+                                           Disabled="@_busy"
+                                           OnClick="@(() => DeleteSegmentAsync(context))"
+                                           title="删除该段" />
                         </MudTd>
                     </RowTemplate>
                 </MudTable>
-
-                <div class="d-flex align-center mb-3">
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Timeline"
-                               Disabled="@(_busy || string.IsNullOrEmpty(_edgeTypeId))"
-                               OnClick="BuildAsync">
-                        @(_busy ? "建线中..." : "按当前顺序建线")
-                    </MudButton>
-                    <MudSpacer />
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        将创建 @(Math.Max(0, _ordered.Count - 1)) 段边
-                    </MudText>
-                </div>
             }
 
-            @* 已存在的结构边 *@
-            @if (_lineEdgeTypes.Count > 0 && !string.IsNullOrEmpty(_edgeTypeId))
+            @* 添加段 *@
+            <div class="d-flex align-center flex-wrap gap-2 mb-4">
+                <MudSelect T="string" Value="_fromNodeId" Label="起点" Dense="true"
+                           Variant="Variant.Outlined" Style="min-width: 180px;"
+                           ValueChanged="OnFromNodeChanged">
+                    @foreach (var n in _candidateNodes)
+                    {
+                        <MudSelectItem T="string" Value="@n.NodeId">@n.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+                <MudSelect T="string" Value="_toNodeId" Label="终点" Dense="true"
+                           Variant="Variant.Outlined" Style="min-width: 180px;"
+                           ValueChanged="OnToNodeChanged">
+                    @foreach (var n in _candidateNodes)
+                    {
+                        <MudSelectItem T="string" Value="@n.NodeId">@n.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudNumericField T="decimal?" @bind-Value="_newWeight" Label="权重"
+                                 Dense="true" Variant="Variant.Outlined"
+                                 Style="width: 120px;" />
+                <MudTextField T="string" @bind-Value="_newDisplayName" Label="显示名"
+                              Dense="true" Variant="Variant.Outlined"
+                              Style="width: 160px;" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.AddLink"
+                           Disabled="@_busy"
+                           OnClick="AddSegmentAsync">
+                    添加段
+                </MudButton>
+            </div>
+
+            @* ── 端子 ── *@
+            <MudText Typo="Typo.subtitle2" Class="mb-2">端子（@TerminalCount）</MudText>
+            @if (TerminalCount == 0)
             {
-                <MudText Typo="Typo.subtitle2" Class="mb-2">
-                    已存在的结构边（@_existingEdges.Count）
-                </MudText>
-                @if (_existingEdges.Count == 0)
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                    尚未设置端子；Radial / Network 模式至少需要 1 个 FeedIn。
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="_terminalRows" Dense="true" Bordered="true" Hover="true" Class="mb-2">
+                    <HeaderContent>
+                        <MudTh>节点</MudTh>
+                        <MudTh>角色</MudTh>
+                        <MudTh>外部连接</MudTh>
+                        <MudTh Style="width: 1%;">操作</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@NodeName(context.NodeId)</MudTd>
+                        <MudTd>@RoleLabel(context.Role)</MudTd>
+                        <MudTd>@(string.IsNullOrEmpty(context.ExternalNodeId)
+                                    ? "—"
+                                    : context.ExternalNodeName ?? Clip(context.ExternalNodeId!))</MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           Disabled="@_busy"
+                                           OnClick="@(() => DeleteTerminalAsync(context.NodeId))"
+                                           title="移除端子" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            @* 设置端子 *@
+            <div class="d-flex align-center flex-wrap gap-2 mb-4">
+                <MudSelect T="string" Value="_terminalNodeId" Label="节点" Dense="true"
+                           Variant="Variant.Outlined" Style="min-width: 180px;"
+                           ValueChanged="OnTerminalNodeChanged">
+                    @foreach (var n in _terminalCandidateNodes)
+                    {
+                        <MudSelectItem T="string" Value="@n.NodeId">@n.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="string" Value="_terminalRole" Label="角色" Dense="true"
+                           Variant="Variant.Outlined" Style="min-width: 140px;"
+                           ValueChanged="OnTerminalRoleChanged">
+                    <MudSelectItem T="string" Value="@("FeedIn")">FeedIn（馈入）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("FeedOut")">FeedOut（馈出）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Tie")">Tie（联络）</MudSelectItem>
+                </MudSelect>
+                <MudTextField T="string" @bind-Value="_terminalExternalId"
+                              Label="外部连接 inode ID（可选）" Dense="true"
+                              Variant="Variant.Outlined" Style="width: 260px;" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Power"
+                           Disabled="@_busy"
+                           OnClick="SaveTerminalAsync">
+                    设置端子
+                </MudButton>
+            </div>
+
+            @* ── 提交 / 清空 ── *@
+            <div class="d-flex align-center flex-wrap gap-2">
+                @if (!IsExisting)
                 {
-                    <MudAlert Severity="Severity.Info" Dense="true">
-                        该线路尚未建立任何结构边。
-                    </MudAlert>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               Disabled="@(_busy || _draftSegments.Count == 0 || string.IsNullOrEmpty(_edgeTypeId))"
+                               OnClick="CreateStructureAsync">
+                        @(_busy ? "提交中..." : "创建结构")
+                    </MudButton>
                 }
                 else
                 {
-                    <MudTable Items="_existingEdges" Dense="true" Bordered="true" Hover="true">
-                        <HeaderContent>
-                            <MudTh>起点</MudTh>
-                            <MudTh>终点</MudTh>
-                            <MudTh>权重</MudTh>
-                            <MudTh Style="width: 1%;">操作</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd>@NodeLabel(context.FromNodeId, context.FromNodeText)</MudTd>
-                            <MudTd>@NodeLabel(context.ToNodeId, context.ToNodeText)</MudTd>
-                            <MudTd>@(context.Weight.HasValue ? context.Weight.Value.ToString("0.####") : "—")</MudTd>
-                            <MudTd>
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                               Size="Size.Small"
-                                               Color="Color.Error"
-                                               OnClick="@(async () => await DeleteEdgeAsync(context))"
-                                               title="删除该段" />
-                            </MudTd>
-                        </RowTemplate>
-                    </MudTable>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.DeleteSweep"
+                               Disabled="@_busy"
+                               OnClick="ClearStructureAsync">
+                        清空结构
+                    </MudButton>
                 }
-            }
+                <MudSpacer />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @(_busy ? "处理中..." : "结构变更即时保存")
+                </MudText>
+            </div>
         }
     </DialogContent>
 </DialogSky>
@@ -162,16 +277,59 @@
     /// <summary>线路名称（标题展示）。</summary>
     [Parameter] public string LineName { get; set; } = "";
 
+    private sealed record SegmentRow(
+        string EdgeId, string FromNodeId, string FromName,
+        string ToNodeId, string ToName, decimal? Weight, string? DisplayName);
+
+    private sealed record TerminalRow(
+        string NodeId, TerminalRole Role, string? ExternalNodeId, string? ExternalNodeName);
+
     private bool _loading = true;
     private bool _busy;
+    private LineStructureDto? _structure;
+
     private string _edgeTypeId = "";
-
-    private List<LineNodeDto> _nodes = [];
-    private List<LineNodeDto> _ordered = [];
+    private string _topologyMode = nameof(TopologyMode.Radial);
     private IReadOnlyList<EdgeTypeDto> _lineEdgeTypes = [];
-    private List<EdgeInstanceDto> _existingEdges = [];
+    private List<LineStructureNodeDto> _candidateNodes = [];
 
-    private string SvgWidth => $"{Math.Max(600, _ordered.Count * 140 + 40)}";
+    private List<LineStructureSegmentInput> _draftSegments = [];
+    private List<TerminalRow> _draftTerminals = [];
+
+    private string _fromNodeId = "";
+    private string _toNodeId = "";
+    private decimal? _newWeight;
+    private string _newDisplayName = "";
+
+    private string _terminalNodeId = "";
+    private string _terminalRole = nameof(TerminalRole.FeedIn);
+    private string _terminalExternalId = "";
+
+    private bool IsExisting => _structure?.Exists == true;
+
+    private int SegmentCount => IsExisting ? _structure!.Segments.Count : _draftSegments.Count;
+
+    private int TerminalCount => IsExisting ? _structure!.Terminals.Count : _draftTerminals.Count;
+
+    /// <summary>段/端子表格行（结构存在时取服务端数据，否则取本地草稿）。</summary>
+    private List<SegmentRow> _segmentRows => IsExisting
+        ? _structure!.Segments.Select(s => new SegmentRow(
+            s.EdgeId, s.FromNodeId, s.FromNodeName,
+            s.ToNodeId, s.ToNodeName, s.Weight, s.DisplayName)).ToList()
+        : _draftSegments.Select((s, i) => new SegmentRow(
+            $"draft-{i}", s.FromNodeId, NodeName(s.FromNodeId),
+            s.ToNodeId, NodeName(s.ToNodeId), s.Weight, null)).ToList();
+
+    private List<TerminalRow> _terminalRows => IsExisting
+        ? _structure!.Terminals.Select(t => new TerminalRow(
+            t.NodeId, t.TerminalRole ?? TerminalRole.FeedIn,
+            t.ExternalNodeId, t.ExternalNodeName)).ToList()
+        : _draftTerminals;
+
+    /// <summary>端子可选节点：已有结构时为结构内节点，草稿阶段为全部候选节点。</summary>
+    private List<LineStructureNodeDto> _terminalCandidateNodes => IsExisting
+        ? _structure!.Nodes
+        : _candidateNodes;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -180,23 +338,22 @@
         _loading = true;
         try
         {
-            _nodes = (await NodeApi.GetByLineAsync(LineId)).ToList();
+            _structure = await LineApi.GetStructureAsync(LineId);
+            if (_structure is null) return;
+
+            _candidateNodes = _structure.CandidateNodes;
+            _topologyMode = _structure.TopologyMode.ToString();
+            _edgeTypeId = _structure.EdgeTypeId ?? "";
 
             var allTypes = await EdgeApi.ListEdgeTypesAsync() ?? [];
             _lineEdgeTypes = allTypes.Where(t => t.IsLine).ToList();
-
             if (string.IsNullOrEmpty(_edgeTypeId) && _lineEdgeTypes.Count > 0)
                 _edgeTypeId = _lineEdgeTypes[0].EdgeTypeId;
-
-            _ordered = _nodes.ToList();
-            await LoadExistingEdgesAsync();
-            ApplyExistingOrder();
         }
         catch (Exception ex)
         {
             Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
-            _nodes = [];
-            _ordered = [];
+            _structure = null;
         }
         finally
         {
@@ -204,125 +361,314 @@
         }
     }
 
-    private async Task LoadExistingEdgesAsync()
+    private void OnEdgeTypeChanged(string? edgeTypeId) => _edgeTypeId = edgeTypeId ?? "";
+
+    private void OnFromNodeChanged(string? nodeId) => _fromNodeId = nodeId ?? "";
+
+    private void OnToNodeChanged(string? nodeId) => _toNodeId = nodeId ?? "";
+
+    private void OnTerminalNodeChanged(string? nodeId) => _terminalNodeId = nodeId ?? "";
+
+    private void OnTerminalRoleChanged(string? role)
+        => _terminalRole = string.IsNullOrEmpty(role) ? nameof(TerminalRole.FeedIn) : role;
+
+    private async Task OnTopologyModeChanged(string mode)
     {
-        if (string.IsNullOrEmpty(_edgeTypeId) || _nodes.Count == 0)
+        if (_structure is null) return;
+        if (!IsExisting)
         {
-            _existingEdges = [];
+            _topologyMode = mode;
             return;
         }
 
-        var ids = _nodes.Select(n => n.Id).ToList();
-        _existingEdges = (await EdgeApi.ListAllEdgesAsync(_edgeTypeId, ids))?.ToList() ?? [];
-    }
-
-    /// <summary>若已有结构边，按链推导节点顺序（首节点 → 后续节点）；无法推导时保持原顺序。</summary>
-    private void ApplyExistingOrder()
-    {
-        if (_existingEdges.Count == 0 || _ordered.Count < 2) return;
-
-        var byFrom = _existingEdges
-            .GroupBy(e => e.FromNodeId)
-            .ToDictionary(g => g.Key, g => g.First().ToNodeId, StringComparer.Ordinal);
-        var targets = _existingEdges.Select(e => e.ToNodeId).ToHashSet(StringComparer.Ordinal);
-        var start = _ordered.FirstOrDefault(n => !targets.Contains(n.Id))?.Id;
-        if (start is null) return;
-
-        var chain = new List<LineNodeDto>();
-        var guard = new HashSet<string>(StringComparer.Ordinal);
-        var current = start;
-        while (current is not null && guard.Add(current))
+        var previous = _structure.TopologyMode.ToString();
+        var (dto, error) = await LineApi.ReplaceStructureAsync(LineId, ToRequest(mode));
+        if (dto is null)
         {
-            var node = _nodes.FirstOrDefault(n => n.Id == current);
-            if (node is not null) chain.Add(node);
-            current = byFrom.TryGetValue(current, out var next) ? next : null;
+            _topologyMode = previous;
+            Snackbar.Add($"切换拓扑模式失败：{error}", Severity.Error);
+            return;
         }
 
-        if (chain.Count >= 2)
-            _ordered = chain;
+        _structure = dto;
+        _topologyMode = dto.TopologyMode.ToString();
+        Snackbar.Add("拓扑模式已更新", Severity.Success);
     }
 
-    private async Task OnEdgeTypeChanged(string edgeTypeId)
+    private async Task AddSegmentAsync()
     {
-        _edgeTypeId = edgeTypeId;
-        await LoadExistingEdgesAsync();
-        StateHasChanged();
-    }
-
-    private int Index(LineNodeDto node) => _ordered.IndexOf(node);
-
-    private void MoveUp(LineNodeDto node)
-    {
-        var i = _ordered.IndexOf(node);
-        if (i <= 0) return;
-        (_ordered[i - 1], _ordered[i]) = (_ordered[i], _ordered[i - 1]);
-    }
-
-    private void MoveDown(LineNodeDto node)
-    {
-        var i = _ordered.IndexOf(node);
-        if (i < 0 || i >= _ordered.Count - 1) return;
-        (_ordered[i + 1], _ordered[i]) = (_ordered[i], _ordered[i + 1]);
-    }
-
-    private async Task BuildAsync()
-    {
-        if (string.IsNullOrEmpty(_edgeTypeId) || _ordered.Count < 2) return;
-
-        _busy = true;
-        try
+        if (string.IsNullOrEmpty(_fromNodeId) || string.IsNullOrEmpty(_toNodeId))
         {
-            var created = await LineApi.CreateLineAsync(_edgeTypeId, new CreateLineRequest
-            {
-                OrderedNodeIds = _ordered.Select(n => n.Id).ToList()
-            });
+            Snackbar.Add("请选择起点与终点", Severity.Warning);
+            return;
+        }
+        if (_fromNodeId == _toNodeId)
+        {
+            Snackbar.Add("不允许自环（起点与终点相同）", Severity.Warning);
+            return;
+        }
 
-            if (created is null)
+        if (!IsExisting)
+        {
+            var directed = _lineEdgeTypes
+                .FirstOrDefault(t => t.EdgeTypeId == _edgeTypeId)?.IsDirected ?? true;
+            var duplicated = _draftSegments.Any(s =>
+                (s.FromNodeId == _fromNodeId && s.ToNodeId == _toNodeId)
+                || (!directed && s.FromNodeId == _toNodeId && s.ToNodeId == _fromNodeId));
+            if (duplicated)
             {
-                Snackbar.Add(
-                    "建线失败：可能存在重复边、成环或节点不在该边类型的允许范围内。请先删除已有结构边。",
-                    Severity.Error);
+                Snackbar.Add("该段已存在", Severity.Warning);
                 return;
             }
 
-            Snackbar.Add($"建线成功，创建 {created.Count} 段边", Severity.Success);
-            await LoadExistingEdgesAsync();
+            _draftSegments.Add(new LineStructureSegmentInput
+            {
+                FromNodeId = _fromNodeId,
+                ToNodeId = _toNodeId,
+                Weight = _newWeight
+            });
+            ResetSegmentInputs();
+            return;
         }
-        catch (Exception ex)
+
+        await RunBusyAsync(async () =>
         {
-            Snackbar.Add($"建线失败：{ex.Message}", Severity.Error);
+            var (dto, error) = await LineApi.AddSegmentAsync(LineId, new AddLineSegmentRequest
+            {
+                FromNodeId = _fromNodeId,
+                ToNodeId = _toNodeId,
+                Weight = _newWeight,
+                DisplayName = string.IsNullOrWhiteSpace(_newDisplayName) ? null : _newDisplayName
+            });
+            if (dto is null)
+            {
+                Snackbar.Add($"添加段失败：{error}", Severity.Error);
+                return;
+            }
+
+            _structure = dto;
+            ResetSegmentInputs();
+            Snackbar.Add("段已添加", Severity.Success);
+        });
+    }
+
+    private async Task DeleteSegmentAsync(SegmentRow segment)
+    {
+        if (!IsExisting)
+        {
+            var index = int.Parse(segment.EdgeId["draft-".Length..]);
+            if (index >= 0 && index < _draftSegments.Count)
+                _draftSegments.RemoveAt(index);
+            return;
+        }
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认删除",
+            $"确定删除这段结构吗？\n\n{segment.FromName} → {segment.ToName}",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+
+        await RunBusyAsync(async () =>
+        {
+            var (dto, error) = await LineApi.DeleteSegmentAsync(LineId, segment.EdgeId);
+            if (dto is null)
+            {
+                Snackbar.Add($"删除段失败：{error}", Severity.Error);
+                return;
+            }
+            _structure = dto;
+            Snackbar.Add("段已删除", Severity.Success);
+        });
+    }
+
+    private async Task SaveTerminalAsync()
+    {
+        if (string.IsNullOrEmpty(_terminalNodeId))
+        {
+            Snackbar.Add("请选择端子节点", Severity.Warning);
+            return;
+        }
+
+        var role = Enum.Parse<TerminalRole>(_terminalRole);
+        var externalId = string.IsNullOrWhiteSpace(_terminalExternalId)
+            ? null
+            : _terminalExternalId.Trim();
+
+        if (!IsExisting)
+        {
+            var endpoints = _draftSegments
+                .SelectMany(s => new[] { s.FromNodeId, s.ToNodeId })
+                .ToHashSet(StringComparer.Ordinal);
+            if (!endpoints.Contains(_terminalNodeId))
+            {
+                Snackbar.Add("端子节点必须属于当前结构（先加入段再设置端子）", Severity.Warning);
+                return;
+            }
+
+            _draftTerminals.RemoveAll(t => t.NodeId == _terminalNodeId);
+            _draftTerminals.Add(new TerminalRow(
+                _terminalNodeId, role, externalId, null));
+            _terminalExternalId = "";
+            return;
+        }
+
+        await RunBusyAsync(async () =>
+        {
+            var (dto, error) = await LineApi.UpsertTerminalAsync(LineId, new AddLineTerminalRequest
+            {
+                NodeId = _terminalNodeId,
+                Role = role,
+                ExternalNodeId = externalId
+            });
+            if (dto is null)
+            {
+                Snackbar.Add($"设置端子失败：{error}", Severity.Error);
+                return;
+            }
+            _structure = dto;
+            _terminalExternalId = "";
+            Snackbar.Add("端子已保存", Severity.Success);
+        });
+    }
+
+    private async Task DeleteTerminalAsync(string nodeId)
+    {
+        if (!IsExisting)
+        {
+            _draftTerminals.RemoveAll(t => t.NodeId == nodeId);
+            return;
+        }
+
+        await RunBusyAsync(async () =>
+        {
+            var (dto, error) = await LineApi.DeleteTerminalAsync(LineId, nodeId);
+            if (dto is null)
+            {
+                Snackbar.Add($"移除端子失败：{error}", Severity.Error);
+                return;
+            }
+            _structure = dto;
+            Snackbar.Add("端子已移除", Severity.Success);
+        });
+    }
+
+    private async Task CreateStructureAsync()
+    {
+        if (string.IsNullOrEmpty(_edgeTypeId))
+        {
+            Snackbar.Add("请选择线路型边类型", Severity.Warning);
+            return;
+        }
+        if (_draftSegments.Count == 0)
+        {
+            Snackbar.Add("请先添加至少一段", Severity.Warning);
+            return;
+        }
+
+        await RunBusyAsync(async () =>
+        {
+            var (dto, error) = await LineApi.CreateStructureAsync(LineId, new LineStructureRequest
+            {
+                EdgeTypeId = _edgeTypeId,
+                TopologyMode = Enum.Parse<TopologyMode>(_topologyMode),
+                Segments = _draftSegments.ToList(),
+                Terminals = _draftTerminals.Select(t => new LineStructureTerminalInput
+                {
+                    NodeId = t.NodeId,
+                    Role = t.Role,
+                    ExternalNodeId = t.ExternalNodeId
+                }).ToList()
+            });
+
+            if (dto is null)
+            {
+                Snackbar.Add($"创建结构失败：{error}", Severity.Error);
+                return;
+            }
+
+            _structure = dto;
+            _draftSegments = [];
+            _draftTerminals = [];
+            Snackbar.Add("线路结构已创建", Severity.Success);
+        });
+    }
+
+    private async Task ClearStructureAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认清空",
+            "清空后结构头、全部段与端子将一并删除，确定继续？",
+            yesText: "清空", cancelText: "取消");
+        if (confirmed != true) return;
+
+        await RunBusyAsync(async () =>
+        {
+            var (dto, error) = await LineApi.ReplaceStructureAsync(
+                LineId, new LineStructureRequest());
+            if (dto is null)
+            {
+                Snackbar.Add($"清空结构失败：{error}", Severity.Error);
+                return;
+            }
+            _structure = dto;
+            _draftSegments = [];
+            _draftTerminals = [];
+            Snackbar.Add("结构已清空", Severity.Success);
+        });
+    }
+
+    /// <summary>已有结构的全量替换请求（切换拓扑模式用）：沿用当前段与端子。</summary>
+    private LineStructureRequest ToRequest(string mode) => new()
+    {
+        EdgeTypeId = _edgeTypeId,
+        TopologyMode = Enum.Parse<TopologyMode>(mode),
+        Segments = _structure!.Segments.Select(s => new LineStructureSegmentInput
+        {
+            FromNodeId = s.FromNodeId,
+            ToNodeId = s.ToNodeId,
+            Weight = s.Weight
+        }).ToList(),
+        Terminals = _structure.Terminals.Select(t => new LineStructureTerminalInput
+        {
+            NodeId = t.NodeId,
+            Role = t.TerminalRole ?? TerminalRole.FeedIn,
+            ExternalNodeId = t.ExternalNodeId
+        }).ToList()
+    };
+
+    private async Task RunBusyAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
         }
         finally
         {
             _busy = false;
+            StateHasChanged();
         }
     }
 
-    private async Task DeleteEdgeAsync(EdgeInstanceDto edge)
+    private void ResetSegmentInputs()
     {
-        var from = NodeLabel(edge.FromNodeId, edge.FromNodeText);
-        var to = NodeLabel(edge.ToNodeId, edge.ToNodeText);
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "确认删除",
-            $"确定删除这段结构边吗？\n\n{from} → {to}",
-            yesText: "删除", cancelText: "取消");
-        if (confirmed != true) return;
-
-        var (ok, error) = await EdgeApi.DeleteEdgeAsync(edge.EdgeTypeId, edge.EdgeId);
-        if (ok)
-        {
-            Snackbar.Add("删除成功", Severity.Success);
-            await LoadExistingEdgesAsync();
-        }
-        else
-        {
-            Snackbar.Add($"删除失败：{error ?? "未知"}", Severity.Error);
-        }
+        _fromNodeId = "";
+        _toNodeId = "";
+        _newWeight = null;
+        _newDisplayName = "";
     }
 
-    private string NodeLabel(string id, string text)
-        => string.IsNullOrEmpty(text) ? id[..Math.Min(8, id.Length)] : text;
+    private string NodeName(string id)
+        => _candidateNodes.FirstOrDefault(n => n.NodeId == id)?.Name ?? Clip(id);
 
-    private static string Clip(string name)
-        => name.Length <= 8 ? name : name[..8] + "…";
+    private static string RoleLabel(TerminalRole role) => role switch
+    {
+        TerminalRole.FeedIn => "FeedIn（馈入）",
+        TerminalRole.FeedOut => "FeedOut（馈出）",
+        TerminalRole.Tie => "Tie（联络）",
+        _ => role.ToString()
+    };
+
+    private static string Clip(string s)
+        => s.Length <= 8 ? s : s[..8] + "…";
 }

@@ -160,6 +160,13 @@ public class EdgeMetadataService
             throw new InvalidOperationException(
                 $"该边类型仍有 {instanceCount} 条边实例，无法删除。请先删除全部边实例。");
 
+        // 仍被线路结构头引用时拒绝（结构头的 edge_type_id 外键为 Restrict）
+        var structureCount = await _db.LineStructures
+            .CountAsync(s => s.EdgeTypeId == edgeTypeId, ct);
+        if (structureCount > 0)
+            throw new InvalidOperationException(
+                $"该边类型仍被 {structureCount} 条线路结构引用，无法删除。请先删除对应线路结构。");
+
         // 引用为空方可删除本项：仍有活动属性定义时拒绝
         var attrCount = await _db.AttributeCatalog
             .CountAsync(a => a.EntityType == typeName && !a.IsDeleted, ct);

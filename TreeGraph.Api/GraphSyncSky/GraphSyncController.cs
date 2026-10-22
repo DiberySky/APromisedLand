@@ -37,8 +37,9 @@ public sealed class GraphSyncController : ControllerBase
         var result = await synchronizer.RebuildAllAsync(ct);
 
         _logger.LogInformation(
-            "手动图全量重建：顶点 {V} 父子边 {PE} 语义边 {SE} 错误 {Err}",
-            result.Vertices, result.ParentEdges, result.SemanticEdges, result.Errors.Count);
+            "手动图全量重建：顶点 {V} 父子边 {PE} 线路边 {LE} 语义边 {SE} 错误 {Err}",
+            result.Vertices, result.ParentEdges, result.LineEdges, result.SemanticEdges,
+            result.Errors.Count);
 
         return Ok(result);
     }
@@ -62,10 +63,11 @@ public sealed class GraphSyncController : ControllerBase
         _logger.LogInformation(
             "手动图按类别同步：{Category} 顶点 {V}/{VT} 边 {E}/{ET} 错误 {Err}",
             cat, result.VerticesWritten, result.Vertices,
-            result.EdgesWritten, result.ParentEdges + result.SemanticEdges, result.Errors.Count);
+            result.EdgesWritten, result.ParentEdges + result.LineEdges + result.SemanticEdges,
+            result.Errors.Count);
 
         return Ok(new GraphCategorySyncResultDto(
-            result.Vertices, result.ParentEdges + result.SemanticEdges,
+            result.Vertices, result.ParentEdges + result.LineEdges + result.SemanticEdges,
             result.VerticesWritten, result.EdgesWritten, result.Errors));
     }
 }

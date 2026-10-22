@@ -39,6 +39,7 @@ public class EdgeDialogSmokeTests : BunitTestBase
         });
         Services.AddSingleton<EavApiClient>();
         Services.AddSingleton<EdgeApiClient>();
+        Services.AddScoped<TreeGraph.Blazor.Shared.TreeEavSky.Dialogs.MessageService>();
     }
 
     private async Task<IRenderedComponent<MudDialogProvider>> OpenAsync<TDialog>(
@@ -218,7 +219,7 @@ public class EdgeDialogSmokeTests : BunitTestBase
 
         var html = provider.Find(".mud-dialog").InnerHtml;
         Assert.Contains("点击右侧按钮选择宿主节点", html);
-        Assert.Contains("语义搜索选择宿主节点", html);
+        Assert.Contains("语义搜索选择终点节点", html);
     }
 
     [Fact]
