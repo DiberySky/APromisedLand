@@ -538,12 +538,12 @@
         // 预填拓扑模式
         _topologyMode = nameof(TopologyMode.Network);
 
-        // 预填 EdgeType：在 _lineEdgeTypes 里找 RailLine（TypeName 匹配）
-        var railLine = _lineEdgeTypes.FirstOrDefault(et => et.TypeName == "RailLine");
-        if (railLine is not null)
-            _edgeTypeId = railLine.EdgeTypeId;
+        // 预填 EdgeType：在 _lineEdgeTypes 里找 TransmissionLine（输电线路，允许 T 接、不强制线性）
+        var transmission = _lineEdgeTypes.FirstOrDefault(et => et.TypeName == "TransmissionLine");
+        if (transmission is not null)
+            _edgeTypeId = transmission.EdgeTypeId;
         else
-            Snackbar.Add("推荐边类型 RailLine 当前不存在", Severity.Warning);
+            Snackbar.Add("推荐边类型 TransmissionLine 当前不存在", Severity.Warning);
 
         // 预填端子默认值（只影响"添加端子"表单初始值）
         _terminalRole = nameof(TerminalRole.FeedIn);

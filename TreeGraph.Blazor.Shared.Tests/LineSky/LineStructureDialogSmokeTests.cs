@@ -96,7 +96,7 @@ public class LineStructureDialogSmokeTests : BunitTestBase
     // ============================================================
 
     private static EdgeTypeDto EdgeType() => new(
-        EdgeTypeId: "et-line-1", TypeName: "RailLine", DisplayName: "铁路贯通线",
+        EdgeTypeId: "et-line-1", TypeName: "TransmissionLine", DisplayName: "输电线路",
         FromNodeType: "LineNode", ToNodeType: "LineNode",
         IsGlobal: true, IsDirected: true,
         Description: null, IsActive: true, IsLine: true, IsLinear: true);
@@ -110,7 +110,7 @@ public class LineStructureDialogSmokeTests : BunitTestBase
             DisplayName: "铁路牵引供电",
             Description: "多电源、允许成环、多所联络",
             DefaultTopologyMode: "Network",
-            DefaultEdgeTypeName: "RailLine",
+            DefaultEdgeTypeName: "TransmissionLine",
             DefaultTerminalRole: "FeedIn",
             DefaultOperatingState: "Maintenance")
     };
@@ -121,8 +121,8 @@ public class LineStructureDialogSmokeTests : BunitTestBase
         LineId = TestLineId,
         LineName = "测试贯通线",
         EdgeTypeId = "et-line-1",
-        EdgeTypeName = "RailLine",
-        EdgeTypeDisplayName = "铁路贯通线",
+        EdgeTypeName = "TransmissionLine",
+        EdgeTypeDisplayName = "输电线路",
         TopologyMode = TopologyMode.Network,
         OrderedNodeIds = new List<string> { "node-1", "node-2", "node-3" },
         Segments = new List<LineStructureSegmentDto>
