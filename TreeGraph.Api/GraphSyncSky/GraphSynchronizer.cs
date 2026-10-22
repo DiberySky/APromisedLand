@@ -129,7 +129,7 @@ public sealed class GraphSynchronizer
         // 外部连接：端子表为准（一个节点同属一条线路，故至多一条端子）
         var terminal = await _db.LineTerminals.AsNoTracking()
             .Where(t => t.NodeId == node.Id)
-            .Select(t => new { t.Role, t.ExternalNodeId })
+            .Select(t => new { t.Role, t.OperatingState, t.ExternalNodeId })
             .FirstOrDefaultAsync(ct);
 
         var connects = await _client.QueryAsync(
@@ -145,7 +145,11 @@ public sealed class GraphSynchronizer
         {
             await _client.UpsertEdgeAsync(
                 GraphNaming.ConnectsToEdge, node.Id, terminal.ExternalNodeId,
-                new Dictionary<string, object?> { ["role"] = terminal.Role.ToString() }, ct);
+                new Dictionary<string, object?>
+                {
+                    ["role"] = terminal.Role.ToString(),
+                    ["operating_state"] = terminal.OperatingState.ToString()
+                }, ct);
         }
     }
 
@@ -223,7 +227,11 @@ public sealed class GraphSynchronizer
                 .FirstOrDefaultAsync(ct) ?? string.Empty;
             var role = await _db.LineTerminals.AsNoTracking()
                 .Where(t => t.LineId == lineNode.LineId && t.NodeId == inodeId)
-                .Select(t => (TreeGraph.Shared.LineSky.Entities.TerminalRole?)t.Role)
+                .Select(t => new
+                {
+                    Role = (TreeGraph.Shared.LineSky.Entities.TerminalRole?)t.Role,
+                    OperatingState = (TreeGraph.Shared.LineSky.Entities.TerminalOperatingState?)t.OperatingState
+                })
                 .FirstOrDefaultAsync(ct);
 
             return new GraphNodeInfo(inodeId, lineNode.Name, GraphNaming.LineNodeTag,
@@ -231,7 +239,8 @@ public sealed class GraphSynchronizer
                 {
                     ["line_id"] = lineNode.LineId,
                     ["line_name"] = lineName,
-                    ["terminal_role"] = role?.ToString()
+                    ["terminal_role"] = role?.Role?.ToString(),
+                    ["terminal_operating_state"] = role?.OperatingState?.ToString()
                 });
         }
 
@@ -553,9 +562,15 @@ public sealed class GraphSynchronizer
         var topologyModes = await _db.LineStructures.AsNoTracking()
             .Select(s => new { s.LineId, s.TopologyMode })
             .ToDictionaryAsync(x => x.LineId, x => x.TopologyMode.ToString(), ct);
-        var terminalRoles = await _db.LineTerminals.AsNoTracking()
-            .Select(t => new { t.LineId, t.NodeId, t.Role })
-            .ToDictionaryAsync(x => (x.LineId, x.NodeId), x => x.Role.ToString(), ct);
+        var terminalInfo = await _db.LineTerminals.AsNoTracking()
+            .Select(t => new { t.LineId, t.NodeId, t.Role, t.OperatingState })
+            .ToListAsync(ct);
+        var terminalRoleMap = terminalInfo.ToDictionary(
+            x => (x.LineId, x.NodeId),
+            x => x.Role.ToString());
+        var terminalStateMap = terminalInfo.ToDictionary(
+            x => (x.LineId, x.NodeId),
+            x => x.OperatingState.ToString());
 
         foreach (var (lineId, name) in lineNames)
         {
@@ -574,19 +589,24 @@ public sealed class GraphSynchronizer
                 {
                     ["line_id"] = n.LineId,
                     ["line_name"] = lineNames.GetValueOrDefault(n.LineId) ?? string.Empty,
-                    ["terminal_role"] = terminalRoles.GetValueOrDefault((n.LineId, n.Id))
+                    ["terminal_role"] = terminalRoleMap.GetValueOrDefault((n.LineId, n.Id)),
+                    ["terminal_operating_state"] = terminalStateMap.GetValueOrDefault((n.LineId, n.Id))
                 }));
             edges.Add(new EdgeItem(n.LineId, n.Id, GraphNaming.LineContainsEdge, 0, null));
         }
 
         var terminals = await _db.LineTerminals.AsNoTracking()
             .Where(t => t.ExternalNodeId != null)
-            .Select(t => new { t.NodeId, t.ExternalNodeId, t.Role })
+            .Select(t => new { t.NodeId, t.ExternalNodeId, t.Role, t.OperatingState })
             .ToListAsync(ct);
         foreach (var t in terminals)
         {
             edges.Add(new EdgeItem(t.NodeId, t.ExternalNodeId!, GraphNaming.ConnectsToEdge, 0,
-                new Dictionary<string, object?> { ["role"] = t.Role.ToString() }));
+                new Dictionary<string, object?>
+                {
+                    ["role"] = t.Role.ToString(),
+                    ["operating_state"] = t.OperatingState.ToString()
+                }));
         }
 
         return edges.Count - edgeStart;

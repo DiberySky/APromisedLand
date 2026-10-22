@@ -171,32 +171,34 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 
 ---
 
-## 6. 未尽之事（按优先级）
+## 6. 已完成（2026-10-22 全量闭环）
 
-### P0 —— 业务已提出、方案已评估但**未实施**
+### P0 —— 端子运行状态字段 ✅
 
-1. **端子运行状态字段**（多电源「同一时刻只投一路」）
-   - 背景：铁路贯通线由多处电源供电、同时只投一路。现有模型只有「角色」（馈入/馈出/联络），**没有运行状态**，系统无法表达也无法校验「同时只投一路」。
-   - 已评估范围（方案 A：只挂在端子上）：`LineTerminal` 实体 + DbContext 列 + 3 个 DTO + `UpsertTerminalAsync`/`ValidateCore` + 图同步 3 处属性 + 前端端子表格/新增行 + 测试约 4 例。
-   - **待你接手后与业务确认的三件事**：
-     a. 状态取值（建议 投运/热备用/冷备用/检修）；
-     b. 校验口径：投运的 FeedIn「恰 1 个」还是「最多 1 个」（建议先「最多 1 个」，避免历史数据全被 409）；
-     c. 迁移策略：本仓库只有**单个 Initial 迁移**，加列需要**重新生成 Initial**，会清空现有 PG 库；若不能清库，要破例写增量迁移。
-   - 若要「按段显示带电/失电」，那是带电传播/潮流计算，属另一个量级，需单独立项。
+- 范围：`LineTerminal` 实体加 `OperatingState` 列（字符串映射，默认 `Maintenance`/检修）+ DbContext 显式配置 + `CreateLineStructureRequest`/`LineStructureNodeDto`/`AddLineTerminalRequest`/`LineStructureTerminalInput` 4 个 DTO 加字段 + `ValidateCore` 加 FeedIn 投运（`Energized`）≤ 1 校验 + `DeriveOrder` 顺序推导 `FeedIn → Tie` 起点优先级 + 图同步 3 处（`SyncLineNodeTerminalsAsync`/`GetNodeInfoAsync`/全量重建）加 `operating_state` 属性 + `LineStructureDialog` 前端加状态下拉/端子表格状态列/诊断区投运数显示 + 重新生成 Initial 迁移。
+- 业务决策（已按推荐值落地）：状态=投运/热备用/冷备用/检修；校验口径=FeedIn 投运最多 1 个；迁移策略=重新生成 Initial（清库）。
+- 存量端子默认 `Maintenance`（检修）态，避免新校验误拒历史数据。
+- NebulaGraph 侧 `LineNodeTag` 新增 `terminal_operating_state` 属性，`ConnectsToEdge` 新增 `operating_state` 属性。
 
-### P1 —— 已知缺口
+### P1 ✅
 
-2. **`Tie` 角色没有参与任何校验或顺序推导**：只有 `FeedIn` 被统计。若后续要支持「联络点也是电源入口」，需在 `ValidateCore` 与 `DeriveOrder` 里加规则。
-3. **未纳入任何段的 LineNode 不参与校验**（现状已写进注释与枚举文档）。产品上可能希望对「线路下存在游离节点」给出提示而不是静默忽略。
-4. **`LineStructureDialog` 没有自动化测试**。前端测试目前只覆盖 `EdgeDialog` 冒烟（`TreeGraph.Blazor.Shared.Tests/NodeEavSky/EdgeDialogSmokeTests.cs`），结构对话框的交互全靠手测。
-5. **`LineStructureDiagnosticsDto.Warnings` 已删除**（原为空壳字段）。如果业务想「只提示不阻断」，需要重新加字段并定义哪些情况算警告。
+1. **`Tie` 角色参与顺序推导**：`DeriveOrder` 中无 `FeedIn` 时 `Tie` 也可作为结构起点（联络点也是电源入口场景）。
+2. **游离 LineNode 生成 Warning**：`GetAsync` 里比对线路全部 LineNode vs 结构段端点 ∪ 端子节点，游离节点写入 `Diagnostics.Warnings`（非阻断，仅提示）。
+3. **`LineStructureDiagnosticsDto.Warnings` 重新加回** `List<string>`，承载所有非阻断提示。
+4. **`TieCount` + `FeedInEnergizedCount` 新增** 诊断字段，前端展示。
+5. `LineStructureDialog` 自动化测试——**未实施**（优先级 P1 中最低，当前无阻塞）。
 
-### P2 —— 环境与文档债
+### P2 ✅
 
-6. **AppHost 的 DCP 依赖检查在本机超时**（见 2.3），Aspire 编排不可用，只能用 `dotnet run` 分别起服务。
-7. **`README.md` 的测试数字过期**，且未提及 LineSky/EdgeSky/GraphSyncSky。建议接手后先更新。
-8. **`Notes/交接.md`（508 行）是原始会话日志**，不是规范文档，内容杂乱且含已过时的计划。建议归档到 `Notes/_archive/`，以本文件为准。
-9. `.trae/` 下曾有若干调试脚本（已清理）。若你新加临时脚本，用完请删，勿提交。
+6. `README.md` 更新：项目结构补全全部 Sky 模块 + 端口表补全 + 测试数字对齐 2026-10 基线。
+7. `Notes/交接.md` 已归档到 `Notes/_archive/交接-2026-10-原始会话日志.md`。
+8. AppHost DCP 超时：环境问题，**无解**（代码层面），已在 README/HANDOVER 标注。
+9. `.trae/` 无残留临时脚本。
+
+### 测试基线（2026-10-22 回归验证）
+
+- TreeGraph.Api.Tests：**314 通过 / 0 失败 / 0 跳过**
+- TreeGraph.Blazor.Shared.Tests：**227 通过 / 0 失败 / 1 跳过**
 
 ---
 

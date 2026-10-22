@@ -128,6 +128,18 @@ public class LineStructureService
         var validation = Validate(header.TopologyMode, nodeIds, segments, terminals);
         var ordered = DeriveOrder(header.TopologyMode, nodeIds, segments, terminals);
 
+        // P1-3: 游离 LineNode Warning —— 线路下存在但未纳入任何段、也未设置端子的节点
+        var allStructureNodeIds = nodeIds
+            .Union(terminals.Select(t => t.NodeId), StringComparer.Ordinal)
+            .ToHashSet(StringComparer.Ordinal);
+        var orphanLineNodes = lineNodes
+            .Where(n => !allStructureNodeIds.Contains(n.Id))
+            .ToList();
+        var warnings = new List<string>(validation.Warnings);
+        if (orphanLineNodes.Count > 0)
+            warnings.Add($"线路下有 {orphanLineNodes.Count} 个节点未纳入结构段（游离）：" +
+                         string.Join("、", orphanLineNodes.Select(n => n.Name)));
+
         var nodeDtos = ordered.Select(id =>
         {
             termMap.TryGetValue(id, out var term);
@@ -136,6 +148,7 @@ public class LineStructureService
                 NodeId = id,
                 Name = nameMap.GetValueOrDefault(id, id),
                 TerminalRole = term?.Role,
+                OperatingState = term?.OperatingState,
                 ExternalNodeId = term?.ExternalNodeId,
                 ExternalNodeName = term?.ExternalNodeId is not null
                     ? externalNames.GetValueOrDefault(term.ExternalNodeId)
@@ -150,6 +163,7 @@ public class LineStructureService
                 NodeId = t.NodeId,
                 Name = nameMap.GetValueOrDefault(t.NodeId, t.NodeId),
                 TerminalRole = t.Role,
+                OperatingState = t.OperatingState,
                 ExternalNodeId = t.ExternalNodeId,
                 ExternalNodeName = t.ExternalNodeId is not null
                     ? externalNames.GetValueOrDefault(t.ExternalNodeId)
@@ -178,12 +192,15 @@ public class LineStructureService
             {
                 Valid = validation.Errors.Count == 0,
                 Errors = validation.Errors,
+                Warnings = warnings,
                 NodeCount = validation.NodeCount,
                 EdgeCount = validation.EdgeCount,
                 NodeDegreeMax = validation.MaxDegree,
                 NodeDegreeOneCount = validation.DegreeOneCount,
                 HasCycle = validation.HasCycle,
-                FeedInCount = validation.FeedInCount
+                FeedInCount = validation.FeedInCount,
+                FeedInEnergizedCount = validation.FeedInEnergizedCount,
+                TieCount = validation.TieCount
             }
         };
     }
@@ -438,12 +455,14 @@ public class LineStructureService
                 LineId = lineId,
                 NodeId = req.NodeId,
                 Role = req.Role,
+                OperatingState = req.OperatingState,
                 ExternalNodeId = string.IsNullOrWhiteSpace(req.ExternalNodeId) ? null : req.ExternalNodeId
             });
         }
         else
         {
             existing.Role = req.Role;
+            existing.OperatingState = req.OperatingState;
             existing.ExternalNodeId = string.IsNullOrWhiteSpace(req.ExternalNodeId) ? null : req.ExternalNodeId;
         }
 
@@ -484,7 +503,7 @@ public class LineStructureService
         string EdgeTypeId,
         TopologyMode TopologyMode,
         List<(string From, string To, decimal? Weight, string? DisplayName)> Segments,
-        List<(string NodeId, TerminalRole Role, string? ExternalNodeId)> Terminals);
+        List<(string NodeId, TerminalRole Role, TerminalOperatingState OperatingState, string? ExternalNodeId)> Terminals);
 
     private async Task<StructurePlan> BuildPlanAsync(
         string lineId, LineStructureRequest req, CancellationToken ct)
@@ -541,6 +560,7 @@ public class LineStructureService
             {
                 NodeId = t.NodeId,
                 Role = t.Role,
+                OperatingState = t.OperatingState,
                 ExternalNodeId = string.IsNullOrWhiteSpace(t.ExternalNodeId) ? null : t.ExternalNodeId
             })
             .ToList();
@@ -553,6 +573,7 @@ public class LineStructureService
             terminalInputs.Select(t => (
                 t.NodeId,
                 t.Role,
+                t.OperatingState,
                 string.IsNullOrWhiteSpace(t.ExternalNodeId) ? null : t.ExternalNodeId)).ToList());
     }
 
@@ -600,12 +621,13 @@ public class LineStructureService
         foreach (var (from, to, weight, displayName) in plan.Segments)
             await CreateSegmentRowAsync(lineId, plan.EdgeTypeId, from, to, weight, displayName, ct);
 
-        foreach (var (nodeId, role, externalId) in plan.Terminals)
+        foreach (var (nodeId, role, operatingState, externalId) in plan.Terminals)
             _db.LineTerminals.Add(new LineTerminal
             {
                 LineId = lineId,
                 NodeId = nodeId,
                 Role = role,
+                OperatingState = operatingState,
                 ExternalNodeId = externalId
             });
 
@@ -667,12 +689,15 @@ public class LineStructureService
 
     private sealed record ValidationOutcome(
         List<string> Errors,
+        List<string> Warnings,
         int NodeCount,
         int EdgeCount,
         int MaxDegree,
         int DegreeOneCount,
         bool HasCycle,
-        int FeedInCount);
+        int FeedInCount,
+        int FeedInEnergizedCount,
+        int TieCount);
 
     private static ValidationOutcome Validate(
         TopologyMode mode,
@@ -682,7 +707,7 @@ public class LineStructureService
         => ValidateCore(
             mode, nodeIds,
             segments.Select(s => new SegmentRow(s.EdgeId, s.FromNodeId, s.ToNodeId)).ToList(),
-            terminals.Select(t => (t.NodeId, t.Role)).ToList());
+            terminals.Select(t => (t.NodeId, t.Role, t.OperatingState)).ToList());
 
     private static void EnsureValid(
         TopologyMode mode,
@@ -694,7 +719,8 @@ public class LineStructureService
             .Distinct(StringComparer.Ordinal)
             .ToList();
         var outcome = ValidateCore(
-            mode, nodeIds, segments, terminals.Select(t => (t.NodeId, t.Role)).ToList());
+            mode, nodeIds, segments,
+            terminals.Select(t => (t.NodeId, t.Role, t.OperatingState)).ToList());
         if (outcome.Errors.Count > 0)
             throw new InvalidOperationException(
                 $"线路结构拓扑校验失败（{mode}）：{string.Join("；", outcome.Errors)}");
@@ -702,12 +728,13 @@ public class LineStructureService
 
     /// <summary>
     /// 三种拓扑模式的校验。结构成员口径：只取段端点（未入任何段的线路节点不参与校验）。
+    /// 端子投运校验：FeedIn 角色中 OperatingState=Energized 的数量 ≤ 1（多电源同一时刻只投一路）。
     /// </summary>
     private static ValidationOutcome ValidateCore(
         TopologyMode mode,
         IReadOnlyCollection<string> nodeIds,
         List<SegmentRow> segments,
-        List<(string NodeId, TerminalRole Role)> terminals)
+        List<(string NodeId, TerminalRole Role, TerminalOperatingState OperatingState)> terminals)
     {
         var errors = new List<string>();
 
@@ -784,12 +811,24 @@ public class LineStructureService
 
         // 端子节点必须在结构内
         var feedInCount = 0;
-        foreach (var (nodeId, role) in terminals)
+        var feedInEnergizedCount = 0; // FeedIn 且 OperatingState=Energized 的数量
+        var tieCount = 0;
+        foreach (var (nodeId, role, state) in terminals)
         {
             if (!nodeSet.Contains(nodeId))
                 errors.Add($"端子节点 {nodeId} 不在结构段端点内");
-            if (role == TerminalRole.FeedIn) feedInCount++;
+            if (role == TerminalRole.FeedIn)
+            {
+                feedInCount++;
+                if (state == TerminalOperatingState.Energized)
+                    feedInEnergizedCount++;
+            }
+            if (role == TerminalRole.Tie) tieCount++;
         }
+
+        // 多电源校验：同一时刻投运的 FeedIn 最多 1 个（Network/Radial/Linear 都适用）
+        if (feedInEnergizedCount > 1)
+            errors.Add($"同时投运的 FeedIn 端子最多 1 个（当前有 {feedInEnergizedCount} 个投运）");
 
         switch (mode)
         {
@@ -818,8 +857,10 @@ public class LineStructureService
         }
 
         return new ValidationOutcome(
-            errors, nodeSet.Count, segments.Count,
-            maxDegree, degreeOne, hasCycle, feedInCount);
+            errors, new List<string>(),
+            nodeSet.Count, segments.Count,
+            maxDegree, degreeOne, hasCycle,
+            feedInCount, feedInEnergizedCount, tieCount);
     }
 
     /// <summary>按拓扑推导节点顺序（Linear 为链序；Radial/Network 为 BFS 序）。</summary>
@@ -845,6 +886,12 @@ public class LineStructureService
             .Select(t => t.NodeId)
             .FirstOrDefault(id => adjacency.ContainsKey(id));
 
+        // Tie（联络点）在没有 FeedIn 时也可作为起点（联络点也可能是电源入口）
+        var tie = terminals
+            .Where(t => t.Role == TerminalRole.Tie)
+            .Select(t => t.NodeId)
+            .FirstOrDefault(id => adjacency.ContainsKey(id));
+
         string start;
         if (mode == TopologyMode.Linear)
         {
@@ -861,6 +908,7 @@ public class LineStructureService
         else
         {
             start = feedIn
+                ?? tie
                 ?? nodeIds.FirstOrDefault(n => adjacency[n].Count == 1)
                 ?? nodeIds.First();
         }

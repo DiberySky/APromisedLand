@@ -11,6 +11,8 @@ public class LineStructureNodeDto
     public string Name { get; set; } = string.Empty;
     /// <summary>端子角色；非端子节点为 null。</summary>
     public TerminalRole? TerminalRole { get; set; }
+    /// <summary>端子运行状态；非端子节点或未设置状态为 null。</summary>
+    public TerminalOperatingState? OperatingState { get; set; }
     /// <summary>外部连接节点 ID（仅端子可能非空）。</summary>
     public string? ExternalNodeId { get; set; }
     /// <summary>外部连接节点显示名（能解析到时填充）。</summary>
@@ -34,12 +36,16 @@ public class LineStructureDiagnosticsDto
 {
     public bool Valid { get; set; }
     public List<string> Errors { get; set; } = new();
+    /// <summary>非阻断提示（只提示不阻断创建/替换）。</summary>
+    public List<string> Warnings { get; set; } = new();
     public int NodeCount { get; set; }
     public int EdgeCount { get; set; }
     public int NodeDegreeMax { get; set; }
     public int NodeDegreeOneCount { get; set; }
     public bool HasCycle { get; set; }
     public int FeedInCount { get; set; }
+    public int FeedInEnergizedCount { get; set; }
+    public int TieCount { get; set; }
 }
 
 /// <summary>线路结构完整视图。</summary>
@@ -77,6 +83,7 @@ public class LineStructureTerminalInput
 {
     public string NodeId { get; set; } = string.Empty;
     public TerminalRole Role { get; set; } = TerminalRole.FeedIn;
+    public TerminalOperatingState OperatingState { get; set; } = TerminalOperatingState.Maintenance;
     public string? ExternalNodeId { get; set; }
 }
 
@@ -109,5 +116,6 @@ public class AddLineTerminalRequest
 {
     public string NodeId { get; set; } = string.Empty;
     public TerminalRole Role { get; set; } = TerminalRole.FeedIn;
+    public TerminalOperatingState OperatingState { get; set; } = TerminalOperatingState.Maintenance;
     public string? ExternalNodeId { get; set; }
 }

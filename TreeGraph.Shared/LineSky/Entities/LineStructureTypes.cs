@@ -34,3 +34,19 @@ public enum TerminalRole
     FeedOut = 1,
     Tie = 2
 }
+
+/// <summary>
+/// 端子运行状态（铁路牵引供电用：多电源同一时刻只投一路）。
+///
+/// Energized    —— 投运（带电运行中）；
+/// HotStandby   —— 热备用（带电但未投运，可立即切换）；
+/// ColdStandby  —— 冷备用（断开，需要合闸才能带电）；
+/// Maintenance  —— 检修（接地/停电，不可合闸）。
+/// </summary>
+public enum TerminalOperatingState
+{
+    Energized = 0,
+    HotStandby = 1,
+    ColdStandby = 2,
+    Maintenance = 3
+}

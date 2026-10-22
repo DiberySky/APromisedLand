@@ -954,6 +954,9 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Role)
                 .HasColumnName("role")
                 .HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.OperatingState)
+                .HasColumnName("operating_state")
+                .HasConversion<string>().HasMaxLength(20).IsRequired();
             e.Property(x => x.ExternalNodeId).HasColumnName("external_node_id").HasMaxLength(36);
 
             e.HasOne<LineStructure>()

@@ -551,6 +551,12 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("external_node_id");
 
+                    b.Property<string>("OperatingState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("operating_state");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)

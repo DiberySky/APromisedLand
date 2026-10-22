@@ -545,7 +545,8 @@ namespace TreeGraph.Api.Data.Migrations
                     line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    external_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true)
+                    external_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    operating_state = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1196,14 +1197,14 @@ namespace TreeGraph.Api.Data.Migrations
                 table: "unit_trees",
                 column: "parent_id");
 
-            // attribute_audit_log 是 ExcludeFromMigrations 的分区表，EF 不生成其 DDL。
-            // SQL 本体集中在 MigrationSqlExtensions.CreateAuditPartitionTable（重建迁移时勿删本调用）。
+            // ★ attribute_audit_log 分区父表（ExcludeFromMigrations，手写 SQL 建表）
             migrationBuilder.CreateAuditPartitionTable();
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // ★ attribute_audit_log 分区父表
             migrationBuilder.DropAuditPartitionTable();
 
             migrationBuilder.DropTable(

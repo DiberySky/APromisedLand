@@ -19,4 +19,7 @@ public class LineTerminal
 
     /// <summary>外部连接节点 ID（任意 iNode，可空）。</summary>
     public string? ExternalNodeId { get; set; }
+
+    /// <summary>运行状态（牵引供电多电源「同一时刻只投一路」）。默认 Maintenance（检修），存量端子进入此态。</summary>
+    public TerminalOperatingState OperatingState { get; set; } = TerminalOperatingState.Maintenance;
 }

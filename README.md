@@ -7,14 +7,20 @@
 ## 项目结构
 
 ```
-TreeGraph.Api/              # EAV API 薄宿主（Program.cs + 编排）
+TreeGraph.Api/              # 后端 API（Program.cs + Aspire 编排）
   NodeEavSky/               # EAV 全部承载：Controllers/Services/Entities/Data/Infrastructure
-  TreeSky/                  # 树组件后端（ITreeService/TreeControllerBase/EfTreeService）
+  TreeEavSky/               # 泛型树后端（ITreeService<T>/TreeControllerBase/EfTreeService）
+  LineSky/                  # 线路与线路结构（当前重点）
+  EdgeSky/                  # 边领域
+  GraphSyncSky/             # PG → NebulaGraph 同步
+  SpaceSky/                 # 空间
+  MessagingSky/             # 消息（Wolverine + RabbitMQ）
+  MafWfSky/                 # 工作流
 TreeGraph.Blazor/           # Blazor Server 前端（MudBlazor 9.11）
-TreeGraph.Shared/           # 共享 DTO
-TreeGraph.Blazor.Shared/          # 树组件库（TreeSky 精简移植，详见其 README）
+TreeGraph.Shared/           # 共享 DTO + 枚举
+TreeGraph.Blazor.Shared/    # 前端组件库（树 + 线路 + 边 + 空间）
 TreeGraph.Api.Tests/        # API 集成测试（Testcontainers.PostgreSql）
-TreeGraph.Blazor.Shared.Tests/    # TreeSky 类库单元测试（xUnit）
+TreeGraph.Blazor.Shared.Tests/  # 组件库单元测试（xUnit + bUnit）
 TreeGraph.Blazor.Tests/     # Blazor 单元测试（bUnit）
 TreeGraph.Blazor.E2E.Tests/ # Playwright E2E 测试
 APromisedLand.AppHost/      # Aspire 编排
@@ -24,9 +30,13 @@ APromisedLand.AppHost/      # Aspire 编排
 
 | 服务 | 端口 |
 |---|---|
-| TreeGraph.Api (EAV) | 5773 |
+| TreeGraph.Api (EAV + 线路 + 边) | 5773 |
 | TreeGraph.Blazor | 5783 |
-| PostgreSQL | 8433 |
+| PostgreSQL (Aspire) | 8433 |
+| NebulaGraph (graph sync 目标) | 9669 (thrift) / 9670 (HTTP) |
+| NebulaGraph Studio | 17001 |
+| NebulaFastApi (Python) | 9393 |
+| FileStorageApi | 5326 |
 
 ## 核心模型
 
@@ -43,15 +53,13 @@ APromisedLand.AppHost/      # Aspire 编排
 - `inode_entity`：iNode 下的实体实例
 - `GET /api/inode/{id}/json`：iNode 全景 JSON（支持 `includeNull` / `displayName` / `units=default|base|original`）
 
-## 测试
+## 测试（2026-10 基线）
 
 ```
-API 集成:   100（含 TreeSky 后端测试 13）
-TreeSky 单元: 87（含 DefaultTreeActionHandler/DI 冒烟/bUnit 组件）
-Blazor 单元: 81
-E2E:        24（iNode/元数据 21 + TreeSky 演示页 smoke 3）
-─────────────
-总计:       292
+API 集成:       314 通过 / 0 失败（Testcontainers.PostgreSql）
+Blazor.Shared:  227 通过 + 1 跳过（组件库 xUnit + bUnit）
+───────────────
+总计:           541 通过 + 1 跳过
 ```
 
 ## TreeSky 树组件移植决策

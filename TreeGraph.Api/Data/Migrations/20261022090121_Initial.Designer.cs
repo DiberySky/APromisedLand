@@ -13,7 +13,7 @@ using TreeGraph.Api.Data;
 namespace TreeGraph.Api.Data.Migrations
 {
     [DbContext(typeof(TreeGraphDbContext))]
-    [Migration("20261022033100_Initial")]
+    [Migration("20261022090121_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -553,6 +553,12 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)")
                         .HasColumnName("external_node_id");
+
+                    b.Property<string>("OperatingState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("operating_state");
 
                     b.Property<string>("Role")
                         .IsRequired()

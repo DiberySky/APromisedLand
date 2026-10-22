@@ -116,8 +116,13 @@
                         <MudText Typo="Typo.caption">单点最多连接 @diag.NodeDegreeMax</MudText>
                         <MudText Typo="Typo.caption">端点 @diag.NodeDegreeOneCount</MudText>
                         <MudText Typo="Typo.caption">成环 @(diag.HasCycle ? "是" : "否")</MudText>
-                        <MudText Typo="Typo.caption">电源接入点 @diag.FeedInCount</MudText>
+                        <MudText Typo="Typo.caption">电源接入点 @diag.FeedInCount（投运 @diag.FeedInEnergizedCount）</MudText>
+                        <MudText Typo="Typo.caption">联络点 @diag.TieCount</MudText>
                     </div>
+                    @foreach (var w in diag.Warnings)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Warning">• @w</MudText>
+                    }
                     @foreach (var e in diag.Errors)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Error">• @e</MudText>
@@ -264,12 +269,19 @@
                     <HeaderContent>
                         <MudTh>节点</MudTh>
                         <MudTh>角色</MudTh>
+                        <MudTh>运行状态</MudTh>
                         <MudTh>外部连接</MudTh>
                         <MudTh Style="width: 1%;">操作</MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd>@NodeName(context.NodeId)</MudTd>
                         <MudTd>@RoleLabel(context.Role)</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@OperatingStateColor(context.OperatingState)">
+                                @OperatingStateLabel(context.OperatingState)
+                            </MudChip>
+                        </MudTd>
                         <MudTd>@(string.IsNullOrEmpty(context.ExternalNodeId)
                                     ? "—"
                                     : context.ExternalNodeName ?? Clip(context.ExternalNodeId!))</MudTd>
@@ -301,6 +313,14 @@
                     <MudSelectItem T="string" Value="@("FeedIn")">电源接入点（馈入）</MudSelectItem>
                     <MudSelectItem T="string" Value="@("FeedOut")">向外供电口（馈出）</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Tie")">联络点（与别处互备）</MudSelectItem>
+                </MudSelect>
+                <MudSelect T="string" Value="_terminalOperatingState" Label="运行状态" Dense="true"
+                           Variant="Variant.Outlined" Style="min-width: 140px;"
+                           ValueChanged="OnTerminalOperatingStateChanged">
+                    <MudSelectItem T="string" Value="@("Energized")">投运（带电）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("HotStandby")">热备用</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("ColdStandby")">冷备用</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Maintenance")">检修（停电）</MudSelectItem>
                 </MudSelect>
                 <MudTextField T="string" @bind-Value="_terminalExternalId"
                               Label="外部连接 inode ID（可选）" Dense="true"
@@ -354,7 +374,8 @@
         string ToNodeId, string ToName, decimal? Weight, string? DisplayName);
 
     private sealed record TerminalRow(
-        string NodeId, TerminalRole Role, string? ExternalNodeId, string? ExternalNodeName);
+        string NodeId, TerminalRole Role, TerminalOperatingState OperatingState,
+        string? ExternalNodeId, string? ExternalNodeName);
 
     private bool _loading = true;
     private bool _busy;
@@ -378,6 +399,7 @@
 
     private string _terminalNodeId = "";
     private string _terminalRole = nameof(TerminalRole.FeedIn);
+    private string _terminalOperatingState = nameof(TerminalOperatingState.Maintenance);
     private string _terminalExternalId = "";
 
     private bool IsExisting => _structure?.Exists == true;
@@ -454,6 +476,7 @@
     private List<TerminalRow> _terminalRows => IsExisting
         ? _structure!.Terminals.Select(t => new TerminalRow(
             t.NodeId, t.TerminalRole ?? TerminalRole.FeedIn,
+            t.OperatingState ?? TerminalOperatingState.Maintenance,
             t.ExternalNodeId, t.ExternalNodeName)).ToList()
         : _draftTerminals;
 
@@ -502,6 +525,10 @@
 
     private void OnTerminalRoleChanged(string? role)
         => _terminalRole = string.IsNullOrEmpty(role) ? nameof(TerminalRole.FeedIn) : role;
+
+    private void OnTerminalOperatingStateChanged(string? state)
+        => _terminalOperatingState = string.IsNullOrEmpty(state)
+            ? nameof(TerminalOperatingState.Maintenance) : state;
 
     private async Task OnTopologyModeChanged(string mode)
     {
@@ -621,6 +648,7 @@
         }
 
         var role = Enum.Parse<TerminalRole>(_terminalRole);
+        var state = Enum.Parse<TerminalOperatingState>(_terminalOperatingState);
         var externalId = string.IsNullOrWhiteSpace(_terminalExternalId)
             ? null
             : _terminalExternalId.Trim();
@@ -638,7 +666,7 @@
 
             _draftTerminals.RemoveAll(t => t.NodeId == _terminalNodeId);
             _draftTerminals.Add(new TerminalRow(
-                _terminalNodeId, role, externalId, null));
+                _terminalNodeId, role, state, externalId, null));
             _terminalExternalId = "";
             return;
         }
@@ -649,6 +677,7 @@
             {
                 NodeId = _terminalNodeId,
                 Role = role,
+                OperatingState = state,
                 ExternalNodeId = externalId
             });
             if (dto is null)
@@ -707,6 +736,7 @@
                 {
                     NodeId = t.NodeId,
                     Role = t.Role,
+                    OperatingState = t.OperatingState,
                     ExternalNodeId = t.ExternalNodeId
                 }).ToList()
             });
@@ -785,12 +815,14 @@
                     {
                         NodeId = t.NodeId,
                         Role = t.TerminalRole ?? TerminalRole.FeedIn,
+                        OperatingState = t.OperatingState ?? TerminalOperatingState.Maintenance,
                         ExternalNodeId = t.ExternalNodeId
                     }).ToList()
                     : _draftTerminals.Select(t => new LineStructureTerminalInput
                     {
                         NodeId = t.NodeId,
                         Role = t.Role,
+                        OperatingState = t.OperatingState,
                         ExternalNodeId = t.ExternalNodeId
                     }).ToList()
             };
@@ -829,6 +861,7 @@
         {
             NodeId = t.NodeId,
             Role = t.TerminalRole ?? TerminalRole.FeedIn,
+            OperatingState = t.OperatingState ?? TerminalOperatingState.Maintenance,
             ExternalNodeId = t.ExternalNodeId
         }).ToList()
     };
@@ -864,6 +897,24 @@
         TerminalRole.FeedOut => "向外供电口（馈出）",
         TerminalRole.Tie => "联络点（与别处互备）",
         _ => role.ToString()
+    };
+
+    private static string OperatingStateLabel(TerminalOperatingState state) => state switch
+    {
+        TerminalOperatingState.Energized => "投运",
+        TerminalOperatingState.HotStandby => "热备用",
+        TerminalOperatingState.ColdStandby => "冷备用",
+        TerminalOperatingState.Maintenance => "检修",
+        _ => state.ToString()
+    };
+
+    private static Color OperatingStateColor(TerminalOperatingState state) => state switch
+    {
+        TerminalOperatingState.Energized => Color.Success,
+        TerminalOperatingState.HotStandby => Color.Warning,
+        TerminalOperatingState.ColdStandby => Color.Info,
+        TerminalOperatingState.Maintenance => Color.Default,
+        _ => Color.Default
     };
 
     private static string Clip(string s)

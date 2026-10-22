@@ -56,7 +56,7 @@ public static class GraphNaming
             [LineNodeTag] =
             [
                 "name", "node_type", "is_archived",
-                "line_id", "line_name", "terminal_role"
+                "line_id", "line_name", "terminal_role", "terminal_operating_state"
             ],
             [LineTag] = ["name", "node_type", "is_archived", "topology_mode"]
         };

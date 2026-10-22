@@ -96,7 +96,7 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
         await _client.QueryAsync($"CREATE EDGE IF NOT EXISTS `{GraphNaming.ParentOfEdge}`()", ct);
         await _client.QueryAsync($"CREATE EDGE IF NOT EXISTS `{GraphNaming.LineContainsEdge}`()", ct);
         await _client.QueryAsync(
-            $"CREATE EDGE IF NOT EXISTS `{GraphNaming.ConnectsToEdge}`(`role` string NULL)", ct);
+            $"CREATE EDGE IF NOT EXISTS `{GraphNaming.ConnectsToEdge}`(`role` string NULL, `operating_state` string NULL)", ct);
 
         // 语义边类型：以 PG edge_definitions 为准
         await using var scope = _scopeFactory.CreateAsyncScope();
