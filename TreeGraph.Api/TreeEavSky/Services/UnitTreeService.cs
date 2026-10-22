@@ -275,6 +275,12 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
         if (hasEntities)
             throw new InvalidOperationException("该节点仍有挂载的实体数据，无法删除。请先清空其全部实体数据。");
 
+        // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
+        var declarations = await dbContext.InodeEntityTypes
+            .Where(x => x.InodeId == nodeId)
+            .ToListAsync(cancellationToken);
+        dbContext.InodeEntityTypes.RemoveRange(declarations);
+
         dbContext.UnitTrees.Remove(node);
 
         await dbContext.SaveChangesAsync(cancellationToken);

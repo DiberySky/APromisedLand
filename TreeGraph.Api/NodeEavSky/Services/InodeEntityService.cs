@@ -29,6 +29,16 @@ public interface IInodeEntityService
     Task<bool> DeleteMappingAsync(
         string inodeId, string entityType, CancellationToken ct = default);
 
+    /// <summary>
+    /// 转移实体归属：把 (sourceInodeId, entityType) 的实体改挂到 targetInodeId。
+    /// 只改映射，不触碰 EAV 数据与声明（目标侧自动补声明，与 GetOrCreate 混合模式一致）。
+    /// 返回更新后的映射；源映射不存在返回 null；
+    /// 目标宿主不存在 / 目标已有同类型实体 → 抛异常。
+    /// </summary>
+    Task<InodeEntity?> TransferAsync(
+        string sourceInodeId, string entityType, string targetInodeId,
+        CancellationToken ct = default);
+
     // ============================================================
     // 声明层
     // ============================================================
@@ -153,6 +163,59 @@ public class InodeEntityService : IInodeEntityService
         _db.InodeEntities.Remove(mapping);
         await _db.SaveChangesAsync(ct);
         return true;
+    }
+
+    public async Task<InodeEntity?> TransferAsync(
+        string sourceInodeId, string entityType, string targetInodeId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(targetInodeId))
+            throw new ArgumentException("targetInodeId 不能为空", nameof(targetInodeId));
+        if (sourceInodeId == targetInodeId)
+            throw new InvalidOperationException("目标宿主与当前宿主相同，无需转移");
+
+        var mapping = await _db.InodeEntities
+            .FirstOrDefaultAsync(
+                x => x.InodeId == sourceInodeId && x.EntityType == entityType, ct);
+        if (mapping is null) return null;
+
+        // 目标宿主存在性：必须挂到真实节点上
+        await _ownerGuards.EnsureNodeExistsAsync(targetInodeId, ct);
+
+        // 目标已有同类型实体 → 拒绝（一宿主一类型一实体）
+        var occupied = await _db.InodeEntities
+            .AnyAsync(x => x.InodeId == targetInodeId && x.EntityType == entityType, ct);
+        if (occupied)
+            throw new InvalidOperationException(
+                $"目标宿主已存在 {entityType} 类型的实体，无法转移");
+
+        // InodeId 是复合主键的一部分，EF Core 不允许改键：删旧映射 + 加新映射
+        var entityId = mapping.EntityId;
+        _db.InodeEntities.Remove(mapping);
+        var newMapping = new InodeEntity
+        {
+            InodeId = targetInodeId,
+            EntityType = entityType,
+            EntityId = entityId,
+            AttachedAt = DateTimeOffset.UtcNow
+        };
+        _db.InodeEntities.Add(newMapping);
+
+        // 目标侧自动补声明（混合模式，与 GetOrCreateEntityId 一致）
+        var declared = await _db.InodeEntityTypes.AnyAsync(
+            x => x.InodeId == targetInodeId && x.EntityType == entityType, ct);
+        if (!declared)
+        {
+            _db.InodeEntityTypes.Add(new InodeEntityType
+            {
+                InodeId = targetInodeId,
+                EntityType = entityType,
+                AttachedAt = DateTimeOffset.UtcNow
+            });
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return newMapping;
     }
 
     // ============================================================

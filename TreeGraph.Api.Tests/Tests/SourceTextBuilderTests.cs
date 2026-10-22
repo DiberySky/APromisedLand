@@ -156,4 +156,102 @@ public class SourceTextBuilderTests
 
         Assert.Null(result);
     }
+
+    // ============================================================
+    // Edge 宿主（方案 A：边接入宿主挂载体系）
+    // ============================================================
+
+    private const string EdgeId = "edge-22222222-2222-2222-2222-222222222222";
+
+    /// <summary>向给定库追加一条边宿主（可指定显示名）。</summary>
+    private static async Task SeedEdgeAsync(
+        TreeGraphDbContext db, string edgeId, string? displayName)
+    {
+        db.EdgeInstances.Add(new TreeGraph.Api.EdgeSky.Entities.EdgeInstance
+        {
+            EdgeId = edgeId,
+            EdgeTypeId = "et-1",
+            FromNodeId = "node-a",
+            ToNodeId = "node-b",
+            DisplayName = displayName
+        });
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Build_边宿主_单行文本含当前节点与显示名()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        await using var db = CreateDb(dbName, seed: false);
+        await SeedEdgeAsync(db, EdgeId, "电缆段-甲");
+
+        var result = await new SourceTextBuilder(db).BuildAsync(EdgeId);
+
+        Assert.NotNull(result);
+        Assert.Equal("edge", result!.HostType);
+        Assert.Equal("default", result.SpaceId); // 边无空间归属
+        // 单行（无层级路径行）：仅「当前节点：电缆段-甲」
+        Assert.DoesNotContain("\n", result.NodeText);
+        Assert.Contains("当前节点：电缆段-甲", result.NodeText);
+        Assert.DoesNotContain("层级路径", result.NodeText);
+    }
+
+    [Fact]
+    public async Task Build_边宿主_无显示名时回退EdgeId()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        await using var db = CreateDb(dbName, seed: false);
+        await SeedEdgeAsync(db, EdgeId, displayName: null);
+
+        var result = await new SourceTextBuilder(db).BuildAsync(EdgeId);
+
+        Assert.NotNull(result);
+        Assert.Contains($"当前节点：{EdgeId}", result!.NodeText);
+    }
+
+    [Fact]
+    public async Task Build_边宿主_同一份状态两次构造文本一致()
+    {
+        var dbName = Guid.NewGuid().ToString();
+
+        NodeSourceText first, second;
+        await using (var db = CreateDb(dbName, seed: false))
+        {
+            await SeedEdgeAsync(db, EdgeId, "电缆段-甲");
+            first = (await new SourceTextBuilder(db).BuildAsync(EdgeId))!;
+        }
+        await using (var db = CreateDb(dbName, seed: false))
+        {
+            second = (await new SourceTextBuilder(db).BuildAsync(EdgeId))!;
+        }
+
+        Assert.Equal(first.NodeText, second.NodeText);
+        Assert.Equal(first.NodeHash, second.NodeHash);
+        Assert.Equal("edge", second.HostType);
+    }
+
+    [Fact]
+    public async Task Build_边宿主_显示名变化_节点指纹变化()
+    {
+        var dbName = Guid.NewGuid().ToString();
+
+        string hashBefore;
+        await using (var db = CreateDb(dbName, seed: false))
+        {
+            await SeedEdgeAsync(db, EdgeId, "电缆段-甲");
+            hashBefore = (await new SourceTextBuilder(db).BuildAsync(EdgeId))!.NodeHash;
+
+            // 同一上下文内改显示名（InMemory 按 dbName 共享存储，重复 Add 同主键会冲突）
+            db.EdgeInstances.Single(e => e.EdgeId == EdgeId).DisplayName = "电缆段-乙";
+            await db.SaveChangesAsync();
+        }
+
+        string hashAfter;
+        await using (var db = CreateDb(dbName, seed: false))
+        {
+            hashAfter = (await new SourceTextBuilder(db).BuildAsync(EdgeId))!.NodeHash;
+        }
+
+        Assert.NotEqual(hashBefore, hashAfter);
+    }
 }

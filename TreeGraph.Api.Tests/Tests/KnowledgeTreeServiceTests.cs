@@ -61,7 +61,8 @@ public class KnowledgeTreeServiceTests
             foreach (var entityType in mb.Model.GetEntityTypes()
                          .Where(t => t.ClrType != typeof(KnowledgeTree)
                                   && t.ClrType != typeof(EdgeInstance)
-                                  && t.ClrType != typeof(InodeEntity))
+                                  && t.ClrType != typeof(InodeEntity)
+                                  && t.ClrType != typeof(InodeEntityType))
                          .ToList())
             {
                 mb.Ignore(entityType.ClrType);
@@ -73,9 +74,10 @@ public class KnowledgeTreeServiceTests
                 e.HasData(Fixture());
             });
 
-            // 节点删除守卫依赖：被边引用 / 仍有挂载实体数据
+            // 节点删除守卫依赖：被边引用 / 仍有挂载实体数据 / 类型声明随宿主清理
             mb.Entity<EdgeInstance>(e => e.HasKey(x => x.EdgeId));
             mb.Entity<InodeEntity>(e => e.HasKey(x => new { x.InodeId, x.EntityType }));
+            mb.Entity<InodeEntityType>(e => e.HasKey(x => new { x.InodeId, x.EntityType }));
         }
     }
 

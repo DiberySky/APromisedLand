@@ -17,6 +17,9 @@ namespace TreeGraph.Api.Tests.Tests;
 ///   - 边类型：仍有边实例 → 409（见 EdgeTests）
 ///   - 边实例：自身仍有属性数据 → 409（边实例有独立行，属性值在外部表）
 ///   - 树节点：仍有子节点 / 被边引用 / 仍有挂载实体数据 → 409
+///   - 线路节点：被边引用 / 仍有挂载实体数据 → 409
+///   - 线路：仍有线路节点 / 挂载实体数据 → 409
+///   - 类型声明（inode_entitytypes）不含业务数据：宿主删除时随宿主一并清理，不留孤儿声明
 /// 被拒绝时本项与其子项均保持原状（不做任何级联清理）。
 /// </summary>
 public class DeletePrincipleTests : IntegrationTestBase
@@ -402,6 +405,121 @@ public class DeletePrincipleTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
             $"/api/inode/{nodeId}/entities/{TestData.EntityType}")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Client.DeleteAsync($"/UnitTree/{nodeId}")).StatusCode);
+    }
+
+    // ============================================================
+    // 宿主删除：类型声明（无业务数据）随宿主一并清理，不留孤儿声明
+    // ============================================================
+
+    [Fact]
+    public async Task TreeNodeDelete_WhenOnlyDeclarationsExist_Succeeds_AndDeclarationsRemoved()
+    {
+        await TestData.EnsureSchemaAsync(Client);
+        await TestData.EnsureEntityTypeAsync(TestData.EntityType, "测试商品");
+        var nodeId = await CreateNodeAsync("/UnitTree");
+
+        // 仅声明类型（不产生实体数据）
+        var attach = await Client.PostAsync(
+            $"/api/inode/{nodeId}/types/{TestData.EntityType}", content: null);
+        Assert.Equal(HttpStatusCode.NoContent, attach.StatusCode);
+
+        var before = await Client.GetEavAsync<List<InodeTypeCardDto>>(
+            $"/api/inode/{nodeId}/types");
+        Assert.Single(before!);
+
+        // 无实体数据 → 节点可删
+        Assert.Equal(HttpStatusCode.OK, (await Client.DeleteAsync($"/UnitTree/{nodeId}")).StatusCode);
+
+        // 声明已随宿主清理（不残留孤儿声明）
+        var after = await Client.GetEavAsync<List<InodeTypeCardDto>>(
+            $"/api/inode/{nodeId}/types");
+        Assert.Empty(after!);
+    }
+
+    // ============================================================
+    // 线路节点：自身挂载实体数据 → 先清空自身数据才允许删本项
+    // ============================================================
+
+    [Fact]
+    public async Task LineNodeDelete_WhenAttachedEntityExists_Returns409()
+    {
+        await TestData.EnsureSchemaAsync(Client);
+        await TestData.EnsureEntityTypeAsync(TestData.EntityType, "测试商品");
+
+        // 线路 + 线路节点
+        var lineId = $"L_{Guid.NewGuid():N}";
+        var lineResp = await Client.PostAsJsonAsync(
+            "/api/Lines", new { id = lineId, name = "删除原则线路" });
+        lineResp.EnsureSuccessStatusCode();
+        var nodeId = $"LN_{Guid.NewGuid():N}";
+        var nodeResp = await Client.PostAsJsonAsync(
+            "/api/LineNode", new { id = nodeId, name = "删除原则杆塔", lineId });
+        nodeResp.EnsureSuccessStatusCode();
+
+        // 在线路节点上挂载实体
+        var put = await Client.PutAsJsonAsync(
+            $"/api/inode/{nodeId}/entities/{TestData.EntityType}", new { amount = 1 });
+        Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
+
+        // 节点自身数据非空 → 409，且不做级联删除
+        var resp = await Client.DeleteAsync($"/api/LineNode/{nodeId}");
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        Assert.Contains("实体数据", await resp.Content.ReadAsStringAsync());
+
+        // 节点与其声明都还在
+        var cards = await Client.GetEavAsync<List<InodeTypeCardDto>>(
+            $"/api/inode/{nodeId}/types");
+        Assert.Single(cards!);
+
+        // 先清空节点自身数据 → 即可删除本项（声明随宿主清理）
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
+            $"/api/inode/{nodeId}/entities/{TestData.EntityType}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
+            $"/api/LineNode/{nodeId}")).StatusCode);
+
+        var after = await Client.GetEavAsync<List<InodeTypeCardDto>>(
+            $"/api/inode/{nodeId}/types");
+        Assert.Empty(after!);
+
+        // 清理线路
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
+            $"/api/Lines/{lineId}")).StatusCode);
+    }
+
+    // ============================================================
+    // 线路：自身挂载实体数据 → 先清空自身数据才允许删本项
+    // ============================================================
+
+    [Fact]
+    public async Task LineDelete_WhenAttachedEntityExists_Returns409()
+    {
+        await TestData.EnsureSchemaAsync(Client);
+        await TestData.EnsureEntityTypeAsync(TestData.EntityType, "测试商品");
+
+        var lineId = $"L_{Guid.NewGuid():N}";
+        var lineResp = await Client.PostAsJsonAsync(
+            "/api/Lines", new { id = lineId, name = "删除原则线路" });
+        lineResp.EnsureSuccessStatusCode();
+
+        // 线路上直接挂载实体
+        var put = await Client.PutAsJsonAsync(
+            $"/api/inode/{lineId}/entities/{TestData.EntityType}", new { amount = 1 });
+        Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
+
+        // 线路自身数据非空 → 409，且不做级联删除
+        var resp = await Client.DeleteAsync($"/api/Lines/{lineId}");
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        Assert.Contains("实体数据", await resp.Content.ReadAsStringAsync());
+
+        // 先清空自身数据 → 即可删除本项（声明随宿主清理）
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
+            $"/api/inode/{lineId}/entities/{TestData.EntityType}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
+            $"/api/Lines/{lineId}")).StatusCode);
+
+        var after = await Client.GetEavAsync<List<InodeTypeCardDto>>(
+            $"/api/inode/{lineId}/types");
+        Assert.Empty(after!);
     }
 
     private sealed record TableIdResponse(string TableDefinitionId);

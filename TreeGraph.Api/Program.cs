@@ -118,6 +118,8 @@ builder.Services.AddScoped<IInodeOwnerGuard, CategoryTreeInodeGuard>();
 builder.Services.AddScoped<IInodeOwnerGuard, KnowledgeTreeInodeGuard>();
 builder.Services.AddScoped<IInodeOwnerGuard, SpaceTreeInodeGuard>();
 builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.LineSky.Services.LineNodeOwnerGuard>();
+builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.LineSky.Services.LineOwnerGuard>();
+builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.EdgeSky.Services.EdgeOwnerGuard>();
 
 // ★ TreeEavSky：计量单位树 / 分类树 / 空间树（表 unit_trees、category_trees、space_trees，
 //   前两棵随迁移 HasData 播种；自 DiberyTreeService clone，响应信封由 ApiEnvelopeFilter 统一包装）

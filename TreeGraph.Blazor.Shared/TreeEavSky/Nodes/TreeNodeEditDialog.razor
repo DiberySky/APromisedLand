@@ -55,7 +55,6 @@
                     else
                     {
                         <NodeAttributeItemsSky @ref="_attrItems"
-                                               TItem="@TItem"
                                                NodeId="@_node.Id"
                                                ReadOnly="false"
                                                AllowManage="true" />
@@ -74,7 +73,7 @@
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
 
     private MudForm _form = null!;
-    private NodeAttributeItemsSky<TItem>? _attrItems;
+    private NodeAttributeItemsSky? _attrItems;
 
     private TItem _node = null!;
     private string _title = null!;

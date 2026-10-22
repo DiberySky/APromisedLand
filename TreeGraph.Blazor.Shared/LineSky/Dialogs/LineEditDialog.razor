@@ -1,6 +1,7 @@
 @* LineEditDialog.razor — 编辑线路（DialogSky 外壳） *@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @inject LineManageApiClient Api
 @inject ISnackbar Snackbar
 
@@ -17,7 +18,18 @@
         <MudTextField @bind-Value="_form.Description"
                       Label="描述"
                       Variant="Variant.Outlined"
-                      Lines="3" />
+                      Lines="3"
+                      Class="mb-3" />
+
+        @* 属性区：线路是 iNode 宿主，可关注实体类型并填写属性 *@
+        @if (Line is not null)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mb-2">属性</MudText>
+            <NodeAttributeItemsSky @ref="_attrItems"
+                                   NodeId="@Line.Id"
+                                   ReadOnly="false"
+                                   AllowManage="true" />
+        }
     </DialogContent>
 </DialogSky>
 
@@ -27,6 +39,7 @@
     [Parameter] public LineDto? Line { get; set; }
 
     private readonly LineDto _form = new();
+    private NodeAttributeItemsSky? _attrItems;
     private bool _submitting;
 
     protected override void OnParametersSet()
@@ -47,6 +60,10 @@
             Snackbar.Add("请填写名称", Severity.Warning);
             return;
         }
+
+        // 先保存属性（任一类型失败时不关闭对话框，用户可重试）
+        if (_attrItems != null && !await _attrItems.SubmitUpdateNodeAttributesAsync())
+            return;
 
         _submitting = true;
         try

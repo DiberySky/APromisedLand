@@ -1,11 +1,11 @@
 @* NodeAttributeItemsSky.razor
-   节点属性宿主适配器：节点（iNode = 树节点 Id）需先「关注」（绑定）某个实体类型，
-   该类型的属性表单才会出现在节点上。
+   节点属性宿主适配器：宿主（iNode = 树节点 / 线路 / 线路节点 Id）需先「关注」（绑定）某个实体类型，
+   该类型的属性表单才会出现在宿主上。
      - 只读模式：仅渲染已关注类型的属性区块
      - 管理模式：额外渲染「实体类型 / 绑定」表格，勾选 = 关注、取消勾选 = 取消关注
-   数据读写走 iNode 端点 /api/inode/{nodeId}/entities/{type}。 *@
+   数据读写走 iNode 端点 /api/inode/{nodeId}/entities/{type}。
+   非泛型：仅依赖 NodeId，可用于树节点与线路/线路节点等任意 iNode 宿主。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
 @using TreeGraph.Shared.NodeEavSky.Dtos
@@ -79,7 +79,7 @@ else
 }
 
 @code {
-    /// <summary>宿主节点 ID（= iNode Id = 树节点 Id）。</summary>
+    /// <summary>宿主节点 ID（= iNode Id = 树节点 / 线路 / 线路节点 Id）。</summary>
     [Parameter, EditorRequired] public string NodeId { get; set; } = default!;
 
     /// <summary>只读模式（禁用编辑、隐藏关注/取消关注操作）。</summary>

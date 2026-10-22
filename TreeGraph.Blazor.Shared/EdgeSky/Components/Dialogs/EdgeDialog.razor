@@ -3,6 +3,7 @@
    创建入口只在树节点「操作」中发起（TreeNodeActionsDialog 传入 PreFillFromNodeId）。 *@
 @using System.Text.Json
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
+@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @inject EavApiClient EavApi
 @inject EdgeApiClient EdgeApi
 @inject ISnackbar Snackbar
@@ -89,6 +90,13 @@
                           Class="mb-3"
                           Step="0.0001M" />
 
+        @* 显示名（边宿主向量文本来源） *@
+        <MudTextField T="string?"
+                      @bind-Value="_form.DisplayName"
+                      Label="显示名（可选）"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
         @* EAV 属性（DynamicForm） *@
         @if (_schema is { Count: > 0 })
         {
@@ -112,6 +120,20 @@
                 当前边类型未定义属性。可到「边类型 → 属性定义」中为
                 <code>@_currentEdgeType?.TypeName</code> 创建属性。
             </MudAlert>
+        }
+
+        @* 挂载属性（边作为 EAV 宿主，可关注类型并填写属性；仅编辑模式） *@
+        @if (IsEdit && !string.IsNullOrEmpty(_form.EdgeId))
+        {
+            <MudDivider Class="my-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    挂载属性（边作为 EAV 宿主）
+                </MudText>
+            </MudDivider>
+            <NodeAttributeItemsSky @ref="_attrItems"
+                                   NodeId="@_form.EdgeId"
+                                   ReadOnly="false"
+                                   AllowManage="true" />
         }
     </DialogContent>
 </DialogSky>
@@ -139,6 +161,7 @@
 
     private DynamicForm? _formRef;
     private Dictionary<string, object?> _eavValues = new();
+    private NodeAttributeItemsSky? _attrItems;
 
     /// <summary>终点选中节点的显示名（选择器返回，仅用于展示）。</summary>
     private string? _toNodeName;
@@ -162,7 +185,8 @@
                 EdgeTypeDisplayName = Editing.EdgeTypeDisplayName,
                 FromNodeId = Editing.FromNodeId,
                 ToNodeId = Editing.ToNodeId,
-                Weight = Editing.Weight
+                Weight = Editing.Weight,
+                DisplayName = Editing.DisplayName
             };
 
             // 两端均为 Inode：显示名取自后端回填的 FromNodeText/ToNodeText（空则回退显示 Id）
@@ -288,6 +312,7 @@
             FromNodeId = _form.FromNodeId,
             ToNodeId = _form.ToNodeId,
             Weight = _form.Weight,
+            DisplayName = _form.DisplayName,
             Properties = _eavValues.Count > 0
                 ? ToJsonElementDict(_eavValues)
                 : null
@@ -308,8 +333,12 @@
     {
         if (Editing is null || _currentEdgeType is null) return;
 
-        // 2a. 更新边实例本身（Weight）
-        var req = new UpdateEdgeRequest { Weight = _form.Weight };
+        // 2a. 更新边实例本身（Weight + DisplayName）
+        var req = new UpdateEdgeRequest
+        {
+            Weight = _form.Weight,
+            DisplayName = _form.DisplayName
+        };
         var (ok, error) = await EdgeApi.UpdateEdgeAsync(
             Editing.EdgeTypeId, Editing.EdgeId, req);
 
@@ -332,6 +361,10 @@
                 return;
             }
         }
+
+        // 2c. 保存挂载属性（边作为 EAV 宿主；任一类型失败时不关闭对话框）
+        if (_attrItems is not null && !await _attrItems.SubmitUpdateNodeAttributesAsync())
+            return;
 
         Snackbar.Add("保存成功", Severity.Success);
         MudDialog?.Close(DialogResult.Ok(true));
@@ -364,5 +397,6 @@
         public string FromNodeId { get; set; } = "";
         public string ToNodeId { get; set; } = "";
         public decimal? Weight { get; set; }
+        public string? DisplayName { get; set; }
     }
 }

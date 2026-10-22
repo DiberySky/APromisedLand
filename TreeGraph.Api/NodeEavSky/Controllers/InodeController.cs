@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
+using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -30,6 +32,7 @@ public class InodeController : ControllerBase
     private readonly TreeGraphDbContext _db;
     private readonly CompositeValueService _compositeService;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly IEventPublisher _publisher;
 
     public InodeController(
         IInodeEntityService inodeEntities,
@@ -37,7 +40,8 @@ public class InodeController : ControllerBase
         IAttributeCache attrCache,
         TreeGraphDbContext db,
         CompositeValueService compositeService,
-        IOptions<JsonOptions> jsonOptions)
+        IOptions<JsonOptions> jsonOptions,
+        IEventPublisher publisher)
     {
         _inodeEntities = inodeEntities;
         _facade = facade;
@@ -45,6 +49,7 @@ public class InodeController : ControllerBase
         _db = db;
         _compositeService = compositeService;
         _jsonOptions = jsonOptions.Value.JsonSerializerOptions;
+        _publisher = publisher;
     }
 
     // ============================================================
@@ -74,6 +79,11 @@ public class InodeController : ControllerBase
             var mapping = mappingByType.GetValueOrDefault(decl.EntityType);
             var gt = globalTypes.FirstOrDefault(t => t.EntityType == decl.EntityType);
 
+            // 实体最近更新时间（仅已创建实体的类型需要加载）
+            DateTimeOffset? entityUpdatedAt = null;
+            if (mapping is not null)
+                entityUpdatedAt = (await _facade.LoadAsync(inodeId, decl.EntityType, ct))?.UpdatedAt;
+
             cards.Add(new InodeTypeCardDto(
                 decl.EntityType,
                 gt?.DisplayName ?? decl.EntityType,
@@ -81,7 +91,7 @@ public class InodeController : ControllerBase
                 gt?.Description,
                 Declared: true,
                 HasEntity: mapping is not null,
-                EntityUpdatedAt: null));   // 需要时再填
+                EntityUpdatedAt: entityUpdatedAt));
         }
 
         return Ok(cards);
@@ -269,6 +279,48 @@ public class InodeController : ControllerBase
             ct);
         if (!ok) return NotFound();
         return NoContent();
+    }
+
+    /// <summary>
+    /// 实体转移（换宿主）：把本 iNode 下该类型的实体改挂到目标宿主。
+    /// 只改归属映射，EAV 数据不变；目标侧自动补声明。
+    /// 源映射不存在 → 404；目标宿主不存在 → 400；目标已被同类型实体占用 → 409。
+    /// </summary>
+    [HttpPost("entities/{entityType}/transfer")]
+    [IdempotentWrite]
+    public async Task<IActionResult> TransferEntity(
+        string inodeId, string entityType,
+        [FromBody] InodeTransferRequest request,
+        CancellationToken ct)
+    {
+        try
+        {
+            var mapping = await _inodeEntities.TransferAsync(
+                inodeId, entityType, request.TargetInodeId, ct);
+            if (mapping is null) return NotFound();
+
+            // ★ 语义搜索：源与目标宿主各发一次变更事件（消费端幂等重建向量）
+            await _publisher.Publish(new InodeChangedEvent
+            {
+                InodeId = inodeId,
+                Kind = InodeChangeKind.Saved
+            }, ct);
+            await _publisher.Publish(new InodeChangedEvent
+            {
+                InodeId = request.TargetInodeId,
+                Kind = InodeChangeKind.Saved
+            }, ct);
+
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
     }
 
     /// <summary>

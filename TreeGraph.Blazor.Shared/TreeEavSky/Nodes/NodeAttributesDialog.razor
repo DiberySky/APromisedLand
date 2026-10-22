@@ -24,7 +24,6 @@
     <DialogContent>
         <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
             <NodeAttributeItemsSky @ref="_attrItems"
-                                   TItem="@TItem"
                                    NodeId="@NodeId"
                                    ReadOnly="false"
                                    AllowManage="true" />
@@ -37,7 +36,7 @@
 
     [Parameter] public required string NodeId { get; set; }
 
-    private NodeAttributeItemsSky<TItem>? _attrItems;
+    private NodeAttributeItemsSky? _attrItems;
     private string _title = null!;
 
     protected override void OnInitialized()

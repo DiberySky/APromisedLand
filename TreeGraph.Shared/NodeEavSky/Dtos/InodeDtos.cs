@@ -45,6 +45,15 @@ public class InodeQueryRequest
 }
 
 /// <summary>
+/// 实体转移请求：把 (inodeId, entityType) 的实体改挂到目标宿主。
+/// </summary>
+public class InodeTransferRequest
+{
+    /// <summary>目标宿主 iNode Id（必须真实存在）。</summary>
+    public string TargetInodeId { get; set; } = "";
+}
+
+/// <summary>
 /// 跨 iNode 查询结果项。
 /// </summary>
 public record InodeEntityDto(

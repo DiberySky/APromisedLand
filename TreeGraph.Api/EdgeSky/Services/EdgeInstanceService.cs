@@ -293,6 +293,17 @@ public class EdgeInstanceService
         // 图同步：边更新 → 通知图数据库即时刷新（消费端幂等）
         await PublishAsync(instance, def, EdgeChangeKind.Updated, ct);
 
+        // ★ 语义搜索：DisplayName 是边宿主向量文本（单行「当前节点：边名」）的来源，
+        // 仅当其变更时才重建向量（其他字段不进文本，避免无效重建）。
+        if (req.DisplayName is not null)
+        {
+            await _publishEndpoint.Publish(new InodeChangedEvent
+            {
+                InodeId = instance.EdgeId,
+                Kind = InodeChangeKind.Saved
+            }, ct);
+        }
+
         return def is null ? null : await BuildDtoAsync(instance, def, ct);
     }
 
@@ -317,6 +328,19 @@ public class EdgeInstanceService
                 throw new InvalidOperationException(
                     "该边实例仍有属性数据，无法删除。请先清空其全部属性值。");
         }
+
+        // 挂载实体守卫：边作为宿主（inode_entity）仍有实体数据时拒绝
+        var hasEntities = await _db.InodeEntities
+            .AnyAsync(m => m.InodeId == edgeId, ct);
+        if (hasEntities)
+            throw new InvalidOperationException(
+                "该边实例仍有挂载的实体数据，无法删除。请先清空其全部实体数据。");
+
+        // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
+        var declarations = await _db.InodeEntityTypes
+            .Where(x => x.InodeId == edgeId)
+            .ToListAsync(ct);
+        _db.InodeEntityTypes.RemoveRange(declarations);
 
         _db.EdgeInstances.Remove(instance);
         await _db.SaveChangesAsync(ct);

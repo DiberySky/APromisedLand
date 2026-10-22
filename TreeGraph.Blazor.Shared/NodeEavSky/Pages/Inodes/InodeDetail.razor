@@ -1,6 +1,7 @@
 @* InodeDetail.razor *@
 @page "/inodes/{InodeId}"
 @using System.Text.Json
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @inject EavApiClient Api
@@ -112,6 +113,13 @@ else
                                 @captured.Description
                             </MudText>
                         }
+
+                        @if (captured.EntityUpdatedAt is not null)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                最近更新：@captured.EntityUpdatedAt.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
+                            </MudText>
+                        }
                     </MudCardContent>
                     <MudCardActions>
                         <MudButton Size="Size.Medium"
@@ -132,6 +140,12 @@ else
                             历史
                         </MudButton>
                         <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.DriveFileMove"
+                                       Size="Size.Medium"
+                                       Color="Color.Default"
+                                       OnClick="@(async () => await TransferAsync(captured))"
+                                       Disabled="@(!captured.HasEntity)"
+                                       title="转移到其他宿主" />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                        Size="Size.Medium"
                                        Color="Color.Error"
@@ -438,6 +452,54 @@ else
         }
 
         Snackbar.Add("已取消声明", Severity.Success);
+        await LoadAsync();
+
+        // 抽屉开着时也刷新 JSON
+        if (_jsonDrawerOpen) await LoadJsonAsync();
+
+        StateHasChanged();
+    }
+
+    /// <summary>实体转移（换宿主）：语义搜索选目标宿主 → 调用转移端点 → 刷新。</summary>
+    private async Task TransferAsync(InodeTypeCardDto card)
+    {
+        if (!card.HasEntity) return;
+
+        var parameters = new DialogParameters<InodeSelectorDialog>
+        {
+            { x => x.Title, $"转移「{card.DisplayName}」到宿主" },
+        };
+        var options = new DialogConfig { MaxWidth = MaxWidth.Medium }.ToDialogOptions();
+
+        var dialog = await DialogService.ShowExAsync<InodeSelectorDialog>(
+            "选择目标宿主", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not { Canceled: false, Data: InodeSelectorDialog.InodeSelection selection })
+            return;
+
+        if (selection.InodeId == InodeId)
+        {
+            Snackbar.Add("目标宿主与当前宿主相同，无需转移", Severity.Warning);
+            return;
+        }
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "确认转移",
+            $"确定把「{card.DisplayName}」转移到「{selection.NodeName ?? selection.InodeId}」？属性数据不变，仅变更归属。",
+            yesText: "转移", cancelText: "取消");
+
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.TransferInodeEntityAsync(
+            InodeId, card.EntityType, selection.InodeId);
+        if (!ok)
+        {
+            Snackbar.Add($"转移失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("已转移", Severity.Success);
         await LoadAsync();
 
         // 抽屉开着时也刷新 JSON

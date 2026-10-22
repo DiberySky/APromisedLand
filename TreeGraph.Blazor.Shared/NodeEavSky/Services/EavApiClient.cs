@@ -1027,6 +1027,31 @@ public class EavApiClient
             $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
             $"{Uri.EscapeDataString(entityType)}", ct);
 
+    /// <summary>实体转移（换宿主）：把该 iNode 下指定类型的实体改挂到目标宿主。</summary>
+    public async Task<(bool Ok, string? Error)> TransferInodeEntityAsync(
+        string inodeId, string entityType, string targetInodeId,
+        CancellationToken ct = default)
+    {
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
+                  $"{Uri.EscapeDataString(entityType)}/transfer";
+        try
+        {
+            var resp = await _http.PostAsJsonAsync(
+                url, new InodeTransferRequest { TargetInodeId = targetInodeId }, ct);
+            if (resp.IsSuccessStatusCode) return (true, null);
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            _logger.LogWarning("POST {Url} → {Status}: {Error}",
+                url, resp.StatusCode, msg);
+            return (false, msg);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "POST {Url} 失败", url);
+            return (false, ex.Message);
+        }
+    }
+
     public async Task<IReadOnlyList<EntityHistoryDto>?> GetInodeEntityHistoryAsync(
         string inodeId, string entityType,
         DateTimeOffset? from = null, CancellationToken ct = default)

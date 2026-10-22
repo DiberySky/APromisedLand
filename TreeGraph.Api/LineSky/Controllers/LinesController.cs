@@ -100,6 +100,18 @@ public class LinesController : ControllerBase
         if (hasNodes)
             return Conflict(new { error = "该线路下仍有线路节点，请先删除节点后再删除线路" });
 
+        // 先清空自身数据才允许删本项：线路仍有挂载实体数据时拒绝（不采用级联删除）
+        var hasEntities = await _db.InodeEntities
+            .AnyAsync(m => m.InodeId == id, ct);
+        if (hasEntities)
+            return Conflict(new { error = "该线路仍有挂载的实体数据，无法删除。请先清空其全部实体数据。" });
+
+        // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
+        var declarations = await _db.InodeEntityTypes
+            .Where(x => x.InodeId == id)
+            .ToListAsync(ct);
+        _db.InodeEntityTypes.RemoveRange(declarations);
+
         _db.Lines.Remove(existing);
         await _db.SaveChangesAsync(ct);
 

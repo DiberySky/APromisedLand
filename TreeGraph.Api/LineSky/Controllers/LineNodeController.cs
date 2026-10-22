@@ -107,6 +107,18 @@ public class LineNodeController : ControllerBase
         if (hasEdges)
             return Conflict(new { error = "该节点仍有边引用，无法删除" });
 
+        // 先清空自身数据才允许删本项：该节点仍有挂载实体数据时拒绝（不采用级联删除）
+        var hasEntities = await _db.InodeEntities
+            .AnyAsync(m => m.InodeId == id, ct);
+        if (hasEntities)
+            return Conflict(new { error = "该节点仍有挂载的实体数据，无法删除。请先清空其全部实体数据。" });
+
+        // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
+        var declarations = await _db.InodeEntityTypes
+            .Where(x => x.InodeId == id)
+            .ToListAsync(ct);
+        _db.InodeEntityTypes.RemoveRange(declarations);
+
         _db.LineNodes.Remove(existing);
         await _db.SaveChangesAsync(ct);
 
