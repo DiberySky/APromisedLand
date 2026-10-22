@@ -2,6 +2,8 @@
 
 基于 .NET 10 + Aspire + PostgreSQL 的实体-属性-值（EAV）元数据系统，支持 iNode 聚合模型。
 
+> **接手本项目请先读 [HANDOVER.md](HANDOVER.md)**：项目结构、运行环境、测试基线、未尽事项与工程约定都在那里；本 README 的部分数字已过期。
+
 ## 项目结构
 
 ```
