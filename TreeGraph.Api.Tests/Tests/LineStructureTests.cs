@@ -484,6 +484,200 @@ public class LineStructureTests : IntegrationTestBase
     }
 
     // ============================================================
+    // P0-1: 端子运行状态（OperatingState）正反用例
+    // ============================================================
+
+    [Fact]
+    public async Task OperatingState_FeedInEnergized_One_Succeeds()
+    {
+        // 正向：恰好 1 个 FeedIn 投运通过
+        var et = await CreateLineTypeAsync("OSOne");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Radial,
+            Segments = Segments((n[0], n[1]), (n[1], n[2])),
+            Terminals =
+            [
+                new LineStructureTerminalInput
+                {
+                    NodeId = n[0], Role = TerminalRole.FeedIn,
+                    OperatingState = TerminalOperatingState.Energized
+                }
+            ]
+        });
+
+        Assert.True(dto.Diagnostics.Valid);
+        Assert.Equal(1, dto.Diagnostics.FeedInEnergizedCount);
+        var term = Assert.Single(dto.Terminals);
+        Assert.Equal(TerminalOperatingState.Energized, term.OperatingState);
+    }
+
+    [Fact]
+    public async Task OperatingState_FeedInEnergized_Two_Returns409()
+    {
+        // 反向：2 个 FeedIn 投运 → 409
+        var et = await CreateLineTypeAsync("OSTwo");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var resp = await PostStructureAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Network,
+            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
+            Terminals =
+            [
+                new LineStructureTerminalInput
+                {
+                    NodeId = n[0], Role = TerminalRole.FeedIn,
+                    OperatingState = TerminalOperatingState.Energized
+                },
+                new LineStructureTerminalInput
+                {
+                    NodeId = n[2], Role = TerminalRole.FeedIn,
+                    OperatingState = TerminalOperatingState.Energized
+                }
+            ]
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        var body = await resp.Content.ReadAsStringAsync();
+        Assert.Contains("投运", body);
+        Assert.Contains("FeedIn", body);
+        Assert.Contains("2", body);
+    }
+
+    [Fact]
+    public async Task OperatingState_FeedInNoneEnergized_Succeeds()
+    {
+        // 正向：FeedIn 存在但都非投运 → 通过（存量场景）
+        var et = await CreateLineTypeAsync("OSNone");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Radial,
+            Segments = Segments((n[0], n[1]), (n[1], n[2])),
+            Terminals =
+            [
+                new LineStructureTerminalInput
+                {
+                    NodeId = n[0], Role = TerminalRole.FeedIn,
+                    OperatingState = TerminalOperatingState.HotStandby
+                }
+            ]
+        });
+
+        Assert.True(dto.Diagnostics.Valid);
+        Assert.Equal(0, dto.Diagnostics.FeedInEnergizedCount);
+        Assert.Equal(1, dto.Diagnostics.FeedInCount);
+    }
+
+    [Fact]
+    public async Task OperatingState_DefaultIsMaintenance()
+    {
+        // 不传 OperatingState 默认 Maintenance
+        var et = await CreateLineTypeAsync("OSDefault");
+        var (lineId, n) = await CreateLineWithNodesAsync(2);
+
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Linear,
+            OrderedNodeIds = n,
+            Terminals =
+            [
+                new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn }
+            ]
+        });
+
+        var term = Assert.Single(dto.Terminals);
+        Assert.Equal(TerminalOperatingState.Maintenance, term.OperatingState);
+    }
+
+    // ============================================================
+    // P1-2: Tie 无 FeedIn 时作 DeriveOrder 起点
+    // ============================================================
+
+    [Fact]
+    public async Task Tie_AsStart_WhenNoFeedIn_OrderStartsAtTie()
+    {
+        // Network 模式只有 Tie 没有 FeedIn → 顺序以 Tie 为起点
+        var et = await CreateLineTypeAsync("TieStart");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Network,
+            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
+            Terminals =
+            [
+                new LineStructureTerminalInput
+                {
+                    NodeId = n[0], Role = TerminalRole.Tie,
+                    OperatingState = TerminalOperatingState.Maintenance
+                }
+            ]
+        });
+
+        Assert.Equal(n[0], dto.OrderedNodeIds[0]);
+        Assert.Equal(1, dto.Diagnostics.TieCount);
+        Assert.Equal(0, dto.Diagnostics.FeedInCount);
+    }
+
+    // ============================================================
+    // P1-3: 游离 LineNode Warning
+    // ============================================================
+
+    [Fact]
+    public async Task OrphanLineNode_GeneratesWarning()
+    {
+        // 线路有 4 个节点但结构只用了前 3 个 → 最后一个游离节点出 Warning
+        var et = await CreateLineTypeAsync("OrphanWarn");
+        var (lineId, n) = await CreateLineWithNodesAsync(4);
+
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Linear,
+            OrderedNodeIds = n.Take(3).ToList()
+        });
+
+        Assert.True(dto.Diagnostics.Valid); // Warning 不阻断
+        Assert.NotEmpty(dto.Diagnostics.Warnings);
+        var joined = string.Join("", dto.Diagnostics.Warnings);
+        Assert.Contains("游离", joined);
+        Assert.Contains("节点3", joined); // Warning 里是节点名，不是 ID
+    }
+
+    // ============================================================
+    // P1-5: Warnings 字段非阻断
+    // ============================================================
+
+    [Fact]
+    public async Task Warnings_DoNotBlock_CreateStillSucceeds()
+    {
+        // 有游离节点 Warning 但创建仍成功
+        var et = await CreateLineTypeAsync("WarnOK");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Network,
+            Segments = Segments((n[0], n[1]), (n[1], n[0])) // loop 只用 2 个节点，n[2] 游离
+        });
+
+        Assert.True(dto.Exists);
+        Assert.True(dto.Diagnostics.Valid); // Valid=true（Errors 为空）
+        Assert.NotEmpty(dto.Diagnostics.Warnings); // Warnings 非空但不阻断
+    }
+
+    // ============================================================
     // IsLine 守卫
     // ============================================================
 
