@@ -41,6 +41,11 @@
                     <MudTd>@context.Name</MudTd>
                     <MudTd>@context.Description</MudTd>
                     <MudTd Style="white-space: nowrap; text-align: right;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Hub"
+                                       Color="Color.Info"
+                                       Size="Size.Small"
+                                       OnClick="@(async () => await OpenRelationsAsync(context))"
+                                       title="关系" />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                        Color="Color.Error"
                                        Size="Size.Small"
@@ -147,5 +152,18 @@
 
         if (result is { Canceled: false })
             await LoadAsync();
+    }
+
+    /// <summary>打开该线路节点的关系对话框（复用 EdgeRelationPanel，建边/删边）。</summary>
+    private async Task OpenRelationsAsync(LineNodeDto node)
+    {
+        var parameters = new DialogParameters<LineNodeRelationsDialog>
+        {
+            { x => x.NodeId, node.Id },
+            { x => x.NodeName, node.Name }
+        };
+
+        await DialogService.ShowExAsync<LineNodeRelationsDialog>(
+            "节点关系", parameters, NestedOptions);
     }
 }

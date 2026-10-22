@@ -39,6 +39,12 @@ else
                                Size="Size.Small"
                                OnClick="@(async () => await OpenLineNodesAsync(context))"
                                title="线路节点设置" />
+                @* 线路结构：有序节点 → 自动建边（线路型边类型） *@
+                <MudIconButton Icon="@Icons.Material.Filled.Timeline"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               OnClick="@(async () => await OpenStructureAsync(context))"
+                               title="线路结构" />
             </MudTd>
             <MudTd>@context.Description</MudTd>
             <MudTd Style="white-space: nowrap; text-align: center;">
@@ -173,6 +179,28 @@ else
 
         await DialogService.ShowExAsync<LineNodeManageDialog>(
             "线路节点", parameters, options);
+    }
+
+    /// <summary>
+    /// 打开线路结构对话框：选择线路型边类型、调整节点顺序并批量建边。
+    /// </summary>
+    private async Task OpenStructureAsync(LineDto line)
+    {
+        var parameters = new DialogParameters<LineStructureDialog>
+        {
+            { x => x.LineId, line.Id },
+            { x => x.LineName, line.Name }
+        };
+        var options = new DialogOptionsEx
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            Position = DialogPosition.TopCenter,
+            MaximizeButton = true
+        };
+
+        await DialogService.ShowExAsync<LineStructureDialog>(
+            "线路结构", parameters, options);
     }
 
     /// <summary>

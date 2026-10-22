@@ -1,0 +1,21 @@
+@* LineNodeRelationsDialog.razor — 线路节点关系（复用 EdgeRelationPanel）
+   入口：线路节点管理对话框 → 行内「关系」图标。 *@
+@namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.EdgeSky.Components
+
+<DialogSky Title="@($"节点关系：{NodeName}")"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭">
+    <DialogContent>
+        <EdgeRelationPanel NodeId="@NodeId" NodeName="@NodeName" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    /// <summary>线路节点 ID（边的任一端）。</summary>
+    [Parameter, EditorRequired] public string NodeId { get; set; } = "";
+
+    /// <summary>线路节点显示名（建边时预填）。</summary>
+    [Parameter] public string NodeName { get; set; } = "";
+}

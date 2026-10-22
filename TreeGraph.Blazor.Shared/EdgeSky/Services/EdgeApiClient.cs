@@ -59,6 +59,30 @@ public class EdgeApiClient
         => await GetAsync<IReadOnlyList<EdgeInstanceDto>>(
             $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}", ct);
 
+    /// <summary>
+    /// 全局边列表（跨类型）。可选按边类型、端点节点集合（From/To 命中）、显示名关键字过滤。
+    /// </summary>
+    public async Task<IReadOnlyList<EdgeInstanceDto>?> ListAllEdgesAsync(
+        string? edgeTypeId = null,
+        IReadOnlyCollection<string>? nodeIds = null,
+        string? search = null,
+        CancellationToken ct = default)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(edgeTypeId))
+            query.Add($"edgeTypeId={Uri.EscapeDataString(edgeTypeId)}");
+        if (nodeIds is { Count: > 0 })
+            query.Add($"nodeIds={Uri.EscapeDataString(string.Join(",", nodeIds))}");
+        if (!string.IsNullOrWhiteSpace(search))
+            query.Add($"search={Uri.EscapeDataString(search)}");
+
+        var url = query.Count == 0
+            ? "api/eav/edges"
+            : "api/eav/edges?" + string.Join("&", query);
+
+        return await GetAsync<IReadOnlyList<EdgeInstanceDto>>(url, ct);
+    }
+
     public Task<EdgeInstanceDto?> GetEdgeAsync(
         string edgeTypeId, string edgeId, CancellationToken ct = default)
         => GetAsync<EdgeInstanceDto>(

@@ -1,6 +1,7 @@
 @* EdgeDialog.razor — 创建 / 编辑边实例
-   约束：创建流程来源于宿主 inode —— 起点由宿主节点固定（只读），
-   创建入口只在树节点「操作」中发起（TreeNodeActionsDialog 传入 PreFillFromNodeId）。 *@
+   创建有两种入口：
+     1) 宿主节点发起（TreeNodeActionsDialog / EdgeRelationPanel 传 PreFillFromNodeId）——起点固定只读；
+     2) 边管理独立页发起（不传 PreFillFromNodeId）——起点与终点均可用语义搜索选择。 *@
 @using System.Text.Json
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 @using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
@@ -58,7 +59,12 @@
                           Label="起点节点"
                           Variant="Variant.Outlined"
                           Class="flex-grow-1 mr-3"
-                          HelperText="@($"来自宿主节点，不可修改（ID：{_form.FromNodeId}）")"
+                          Placeholder="@(FromLocked ? "" : "点击右侧按钮选择宿主节点")"
+                          HelperText="@(FromLocked
+                              ? $"来自宿主节点，不可修改（ID：{_form.FromNodeId}）"
+                              : (_fromNodeName is not null
+                                  ? $"ID：{_form.FromNodeId}"
+                                  : "点击右侧按钮选择宿主节点"))"
                           ReadOnly="true" />
             <MudIcon Icon="@Icons.Material.Filled.ArrowForward"
                      Class="d-flex align-center mr-3"
@@ -73,12 +79,20 @@
                           HelperText="@(_toNodeName is not null
                               ? $"ID：{_form.ToNodeId}"
                               : "点击右侧按钮选择宿主节点")" />
+            @if (!IsEdit && !FromLocked)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Search"
+                               Color="Color.Primary"
+                               Class="ml-2"
+                               Title="语义搜索选择起点节点"
+                               OnClick="PickFromNodeAsync" />
+            }
             @if (!IsEdit)
             {
                 <MudIconButton Icon="@Icons.Material.Filled.Search"
                                Color="Color.Primary"
                                Class="ml-2"
-                               Title="语义搜索选择宿主节点"
+                               Title="语义搜索选择终点节点"
                                OnClick="PickToNodeAsync" />
             }
         </div>
@@ -149,6 +163,9 @@
     [Parameter] public string? PreFillEdgeTypeId { get; set; }
 
     private bool IsEdit => Editing is not null;
+
+    /// <summary>起点是否由调用方固定（宿主节点发起创建时为 true）。</summary>
+    private bool FromLocked => !string.IsNullOrEmpty(PreFillFromNodeId);
 
     private string EdgeTypeName => _currentEdgeType?.TypeName ?? "";
 
@@ -235,6 +252,32 @@
     }
 
     /// <summary>
+    /// 打开宿主 inode 选择器（语义搜索包装）：非全局边类型按 FromNodeType 限定，
+    /// 全局边类型不限类型。仅在「边管理」独立页创建时可用（无宿主预填）。
+    /// </summary>
+    private async Task PickFromNodeAsync()
+    {
+        var parameters = new DialogParameters<InodeSelectorDialog>
+        {
+            { x => x.NodeType, _currentEdgeType?.FromNodeType },
+        };
+
+        var options = new DialogConfig { MaxWidth = MaxWidth.Medium }.ToDialogOptions();
+
+        var dialog = await DialogService.ShowExAsync<InodeSelectorDialog>(
+            "选择起点节点", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: InodeSelectorDialog.InodeSelection selection })
+        {
+            _form.FromNodeId = selection.InodeId;
+            _fromNodeName = selection.NodeName ?? selection.InodeId;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
     /// 打开宿主 inode 选择器（语义搜索包装）：非全局边类型按 ToNodeType 限定，
     /// 全局边类型不限类型。
     /// </summary>
@@ -294,10 +337,10 @@
             Snackbar.Add("请选择边类型", Severity.Warning);
             return;
         }
-        // 起点必须来自宿主节点（创建流程来源于宿主 inode）
+        // 起点：宿主发起时已固定；独立页发起时需选择
         if (string.IsNullOrEmpty(_form.FromNodeId))
         {
-            Snackbar.Add("起点必须来自宿主节点，请在树节点「操作」中发起创建", Severity.Warning);
+            Snackbar.Add("请选择起点节点（点击右侧搜索按钮）", Severity.Warning);
             return;
         }
         if (string.IsNullOrEmpty(_form.ToNodeId))

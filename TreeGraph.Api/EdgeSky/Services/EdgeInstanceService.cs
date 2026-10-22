@@ -147,6 +147,52 @@ public class EdgeInstanceService
         return await BuildDtosAsync(instances, def, ct);
     }
 
+    /// <summary>
+    /// 全局边查询（跨类型）。可选过滤：边类型、端点节点集合（From 或 To 命中）、显示名关键字。
+    /// 供「边管理」独立页与线路结构视图使用（前端不需要逐类型轮询）。
+    /// </summary>
+    public async Task<IReadOnlyList<EdgeInstanceDto>> ListAsync(
+        string? edgeTypeId,
+        IReadOnlyCollection<string>? nodeIds,
+        string? search,
+        CancellationToken ct)
+    {
+        var defs = await _db.EdgeDefinitions
+            .AsNoTracking()
+            .Where(d => edgeTypeId == null || d.EdgeTypeId == edgeTypeId)
+            .ToListAsync(ct);
+        if (defs.Count == 0) return Array.Empty<EdgeInstanceDto>();
+
+        var defMap = defs.ToDictionary(d => d.EdgeTypeId, d => d, StringComparer.Ordinal);
+        var typeIds = defMap.Keys.ToList();
+
+        var query = _db.EdgeInstances
+            .AsNoTracking()
+            .Where(i => typeIds.Contains(i.EdgeTypeId));
+
+        if (nodeIds is { Count: > 0 })
+        {
+            var ids = nodeIds.ToList();
+            query = query.Where(i => ids.Contains(i.FromNodeId) || ids.Contains(i.ToNodeId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(i => i.DisplayName != null && i.DisplayName.Contains(search));
+
+        var instances = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync(ct);
+
+        // 按类型分组批量组装（每组一次 EAV 批量装载 + 一次名称解析，避免逐边 N+1）
+        var result = new List<EdgeInstanceDto>(instances.Count);
+        foreach (var group in instances.GroupBy(i => i.EdgeTypeId))
+        {
+            if (!defMap.TryGetValue(group.Key, out var def)) continue;
+            result.AddRange(await BuildDtosAsync(group.ToList(), def, ct));
+        }
+        return result;
+    }
+
     /// <summary>图查询：查某节点的出边（from）。</summary>
     public async Task<IReadOnlyList<EdgeInstanceDto>> FindOutgoingAsync(
         string edgeTypeId, string nodeId, CancellationToken ct)

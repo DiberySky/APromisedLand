@@ -234,6 +234,81 @@ public class EdgeTests : IntegrationTestBase
         Assert.Equal(2, list!.Count);
     }
 
+    // ============================================================
+    // 全局边列表（跨类型，nodeIds / edgeTypeId / search 过滤）
+    // ============================================================
+
+    [Fact]
+    public async Task Edge_ListAll_AcrossTypes_FilteredByNodeIds()
+    {
+        var et1 = await CreateEdgeTypeAsync();
+        var et2 = await CreateEdgeTypeAsync();
+        var a = Guid.NewGuid().ToString("N");
+        var b = Guid.NewGuid().ToString("N");
+        var c = Guid.NewGuid().ToString("N");
+
+        await CreateEdgeAsync(et1.EdgeTypeId, a, b);
+        await CreateEdgeAsync(et2.EdgeTypeId, b, a);
+        await CreateEdgeAsync(et1.EdgeTypeId, b, c);
+
+        // 不带过滤：3 条（跨两个类型）
+        var all = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?nodeIds={a},{b},{c}");
+        Assert.NotNull(all);
+        Assert.Equal(3, all!.Count);
+
+        // 仅节点 a：命中 a→b 与 b→a
+        var onlyA = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?nodeIds={a}");
+        Assert.Equal(2, onlyA!.Count);
+        Assert.All(onlyA, e => Assert.True(e.FromNodeId == a || e.ToNodeId == a));
+    }
+
+    [Fact]
+    public async Task Edge_ListAll_FilteredByEdgeTypeId()
+    {
+        var et1 = await CreateEdgeTypeAsync();
+        var et2 = await CreateEdgeTypeAsync();
+        var a = Guid.NewGuid().ToString("N");
+        var b = Guid.NewGuid().ToString("N");
+
+        await CreateEdgeAsync(et1.EdgeTypeId, a, b);
+        await CreateEdgeAsync(et2.EdgeTypeId, b, a);
+
+        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?edgeTypeId={et1.EdgeTypeId}");
+
+        Assert.NotNull(list);
+        var single = Assert.Single(list!);
+        Assert.Equal(et1.EdgeTypeId, single.EdgeTypeId);
+    }
+
+    [Fact]
+    public async Task Edge_ListAll_FilteredByDisplayNameSearch()
+    {
+        var et = await CreateEdgeTypeAsync();
+        var a = Guid.NewGuid().ToString("N");
+        var b = Guid.NewGuid().ToString("N");
+        var c = Guid.NewGuid().ToString("N");
+
+        await Client.PostAsJsonAsync($"/api/eav/edges/{et.EdgeTypeId}",
+            new CreateEdgeRequest
+            {
+                FromNodeId = a, ToNodeId = b, DisplayName = "电缆段-甲"
+            });
+        await Client.PostAsJsonAsync($"/api/eav/edges/{et.EdgeTypeId}",
+            new CreateEdgeRequest
+            {
+                FromNodeId = b, ToNodeId = c, DisplayName = "电缆段-乙"
+            });
+
+        var hit = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?edgeTypeId={et.EdgeTypeId}&search={Uri.EscapeDataString("甲")}");
+        Assert.NotNull(hit);
+        var single = Assert.Single(hit!);
+        Assert.Equal("电缆段-甲", single.DisplayName);
+    }
+
     [Fact]
     public async Task Edge_Update_Weight_ChangesValue()
     {
