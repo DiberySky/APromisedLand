@@ -54,12 +54,31 @@
                            Variant="Variant.Outlined"
                            Dense="true"
                            ValueChanged="OnTopologyModeChanged"
-                           Style="min-width: 180px;">
-                    <MudSelectItem T="string" Value="@("Linear")">Linear（链）</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Radial")">Radial（放射状，默认）</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Network")">Network（环网）</MudSelectItem>
+                           Style="min-width: 300px;">
+                    <MudSelectItem T="string" Value="@("Linear")">Linear · 一条线串到底（不分叉，默认）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Radial")">Radial · 一个电源分多路</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Network")">Network · 多点互连（可成环）</MudSelectItem>
                 </MudSelect>
             </div>
+
+            @* 当前拓扑模式：只说适用场合与用户需要做的事，技术判据见代码注释 *@
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                <MudText Typo="Typo.body2" Class="mb-1">
+                    <strong>@TopologyModeLabel</strong>
+                </MudText>
+                <MudText Typo="Typo.caption">适用场合：@TopologyUsage</MudText>
+                @foreach (var tip in TopologyTips)
+                {
+                    <MudText Typo="Typo.caption">• @tip</MudText>
+                }
+                <MudText Typo="Typo.caption" Class="mt-1">• @CommonTopologyRule</MudText>
+                @if (IsExisting)
+                {
+                    <MudText Typo="Typo.caption" Class="mt-1">
+                        • 切换后系统会按现有连接重新检查，不符合要求时会自动退回原来的模式。
+                    </MudText>
+                }
+            </MudAlert>
 
             @if (_lineEdgeTypes.Count == 0)
             {
@@ -94,19 +113,72 @@
                         </MudChip>
                         <MudText Typo="Typo.caption">节点 @diag.NodeCount</MudText>
                         <MudText Typo="Typo.caption">段 @diag.EdgeCount</MudText>
-                        <MudText Typo="Typo.caption">最大度 @diag.NodeDegreeMax</MudText>
+                        <MudText Typo="Typo.caption">单点最多连接 @diag.NodeDegreeMax</MudText>
                         <MudText Typo="Typo.caption">端点 @diag.NodeDegreeOneCount</MudText>
                         <MudText Typo="Typo.caption">成环 @(diag.HasCycle ? "是" : "否")</MudText>
-                        <MudText Typo="Typo.caption">FeedIn @diag.FeedInCount</MudText>
+                        <MudText Typo="Typo.caption">电源接入点 @diag.FeedInCount</MudText>
                     </div>
                     @foreach (var e in diag.Errors)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Error">• @e</MudText>
                     }
-                    @foreach (var w in diag.Warnings)
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Warning">• @w</MudText>
-                    }
+                </MudPaper>
+            }
+
+            @* ── 线性快速成链（服务端 OrderedNodeIds 便利入参） ── *@
+            @if (_topologyMode == nameof(TopologyMode.Linear))
+            {
+                <MudText Typo="Typo.subtitle2" Class="mb-2">线性快速成链</MudText>
+                <MudPaper Elevation="0" Class="pa-2 mb-3"
+                          Style="border: 1px solid var(--mud-palette-lines-default);">
+                    <MudText Typo="Typo.caption" Class="mb-2">
+                        按点击顺序串联节点（至少 2 个、不允许重复）：点击下方节点加入链，点击链上节点移除。
+                    </MudText>
+                    <div class="d-flex align-center flex-wrap gap-2 mb-2">
+                        @foreach (var n in _candidateNodes)
+                        {
+                            var inChain = _chainOrder.Contains(n.NodeId);
+                            <MudButton Variant="@(inChain ? Variant.Filled : Variant.Outlined)"
+                                       Color="@(inChain ? Color.Primary : Color.Default)"
+                                       Size="Size.Small"
+                                       Disabled="@_busy"
+                                       OnClick="@(() => ToggleChainNode(n.NodeId))">
+                                @n.Name
+                            </MudButton>
+                        }
+                    </div>
+                    <div class="d-flex align-center flex-wrap gap-1 mb-2">
+                        @if (_chainOrder.Count == 0)
+                        {
+                            <MudText Typo="Typo.caption">尚未选择节点。</MudText>
+                        }
+                        else
+                        {
+                            @for (var i = 0; i < _chainOrder.Count; i++)
+                            {
+                                var idx = i;
+                                <MudButton Variant="Variant.Text" Size="Size.Small"
+                                           Color="Color.Primary"
+                                           Disabled="@_busy"
+                                           OnClick="@(() => ToggleChainNode(_chainOrder[idx]))">
+                                    @($"{idx + 1}. {NodeName(_chainOrder[idx])}")
+                                </MudButton>
+                            }
+                        }
+                    </div>
+                    <div class="d-flex align-center flex-wrap gap-2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.AddLink"
+                                   Disabled="@(_busy || _chainOrder.Count < 2)"
+                                   OnClick="SubmitChainAsync">
+                            按此顺序成链（@Math.Max(0, _chainOrder.Count - 1) 段）
+                        </MudButton>
+                        <MudButton Variant="Variant.Text"
+                                   Disabled="@(_busy || _chainOrder.Count == 0)"
+                                   OnClick="ClearChain">
+                            清空顺序
+                        </MudButton>
+                    </div>
                 </MudPaper>
             }
 
@@ -183,7 +255,7 @@
             @if (TerminalCount == 0)
             {
                 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
-                    尚未设置端子；Radial / Network 模式至少需要 1 个 FeedIn。
+                    尚未设置端子；「一个电源分多路」模式需要设 1 个电源接入点，其他模式可以不设。
                 </MudAlert>
             }
             else
@@ -226,9 +298,9 @@
                 <MudSelect T="string" Value="_terminalRole" Label="角色" Dense="true"
                            Variant="Variant.Outlined" Style="min-width: 140px;"
                            ValueChanged="OnTerminalRoleChanged">
-                    <MudSelectItem T="string" Value="@("FeedIn")">FeedIn（馈入）</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("FeedOut")">FeedOut（馈出）</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Tie")">Tie（联络）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("FeedIn")">电源接入点（馈入）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("FeedOut")">向外供电口（馈出）</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Tie")">联络点（与别处互备）</MudSelectItem>
                 </MudSelect>
                 <MudTextField T="string" @bind-Value="_terminalExternalId"
                               Label="外部连接 inode ID（可选）" Dense="true"
@@ -289,12 +361,15 @@
     private LineStructureDto? _structure;
 
     private string _edgeTypeId = "";
-    private string _topologyMode = nameof(TopologyMode.Radial);
+    private string _topologyMode = nameof(TopologyMode.Linear);
     private IReadOnlyList<EdgeTypeDto> _lineEdgeTypes = [];
     private List<LineStructureNodeDto> _candidateNodes = [];
 
     private List<LineStructureSegmentInput> _draftSegments = [];
     private List<TerminalRow> _draftTerminals = [];
+
+    /// <summary>线性快速成链的点击顺序（Linear 模式下改用服务端 OrderedNodeIds 入参）。</summary>
+    private List<string> _chainOrder = [];
 
     private string _fromNodeId = "";
     private string _toNodeId = "";
@@ -310,6 +385,62 @@
     private int SegmentCount => IsExisting ? _structure!.Segments.Count : _draftSegments.Count;
 
     private int TerminalCount => IsExisting ? _structure!.Terminals.Count : _draftTerminals.Count;
+
+    /// <summary>当前拓扑模式的日常说法（UI 展示用）。</summary>
+    private string TopologyModeLabel => _topologyMode switch
+    {
+        nameof(TopologyMode.Linear) => "Linear（一条线串到底）",
+        nameof(TopologyMode.Radial) => "Radial（一个电源分多路）",
+        nameof(TopologyMode.Network) => "Network（多点互连）",
+        _ => _topologyMode
+    };
+
+    // ── 三种模式的技术判据（与服务端 LineStructureService.ValidateCore 一一对应）──
+    // 仅供开发者查阅，不要直接展示给最终用户；UI 文案见 TopologyModeLabel / TopologyUsage / TopologyTips。
+    //   Linear  ：每点度 ≤ 2；度为 1 的端点恰为 2 个；不允许成环（边数 = 节点数 − 1 由前两条推出）。
+    //   Radial  ：不允许成环；边数 = 节点数 − 1；FeedIn 端子恰 1 个（0 个或多个均拒绝）。
+    //   Network ：仅要求无向连通；允许环与多电源；不校验边数、不要求端子。
+    //   共同     ：至少一段；无自环（from ≠ to）；段端点须属本线路；无向 BFS 必须连通；
+    //             端子节点须落在段端点内；节点集只取段端点，未入段的线路节点不参与校验。
+
+    /// <summary>当前拓扑模式的适用场合（一句话，面向业务用户）。</summary>
+    private string TopologyUsage => _topologyMode switch
+    {
+        nameof(TopologyMode.Linear) => "整条线路是一个接一个串起来的，中途不分叉，适合单回线路、单根主干。",
+        nameof(TopologyMode.Radial) => "一个电源进来，再分别向多处供电，像树干长出树枝，适合配电网、分支管线。",
+        nameof(TopologyMode.Network) => "多处互相连通、可以绕成圈，适合环网、多电源互相备用的场所。",
+        _ => ""
+    };
+
+    /// <summary>当前拓扑模式下用户需要注意的事（不出现度数、边数等术语）。</summary>
+    private IReadOnlyList<string> TopologyTips => _topologyMode switch
+    {
+        nameof(TopologyMode.Linear) =>
+        [
+            "每个节点最多只和前后两个节点相连，整条线只有两个端点",
+            "线路不能绕回自己形成圈",
+            "不要求标注电源接入点；需要时可自行加",
+            "可用下方「线性快速成链」按点击顺序一次把整条线连好"
+        ],
+        nameof(TopologyMode.Radial) =>
+        [
+            "需要设置一个、且只设置一个「电源接入点」",
+            "线路不能绕成圈；分出去的支路不能再互相接上",
+            "有多个电源接入时请改用「多点互连」"
+        ],
+        nameof(TopologyMode.Network) =>
+        [
+            "可以绕成圈，也可以有多个电源接入",
+            "不要求设置电源接入点",
+            "整张网必须连成一片，不能分成几块互不相通"
+        ],
+        _ => []
+    };
+
+    /// <summary>三种模式共同遵守的基本要求（面向业务用户）。</summary>
+    private const string CommonTopologyRule =
+        "通用要求：每一段连接的两个节点都必须属于本线路，且不能把节点连到它自己；"
+        + "所有节点要连成一片；线路中暂时没用上的节点可以先放着，不影响保存。";
 
     /// <summary>段/端子表格行（结构存在时取服务端数据，否则取本地草稿）。</summary>
     private List<SegmentRow> _segmentRows => IsExisting
@@ -617,6 +748,72 @@
         });
     }
 
+    // ── 线性快速成链 ──
+
+    /// <summary>按点击顺序增删链上节点（点击已选节点即移除，保证无重复）。</summary>
+    private void ToggleChainNode(string nodeId)
+    {
+        if (_busy) return;
+        if (!_chainOrder.Remove(nodeId)) _chainOrder.Add(nodeId);
+    }
+
+    private void ClearChain() => _chainOrder.Clear();
+
+    /// <summary>以 OrderedNodeIds 提交：服务端按相邻节点自动生成段。</summary>
+    private async Task SubmitChainAsync()
+    {
+        if (string.IsNullOrEmpty(_edgeTypeId))
+        {
+            Snackbar.Add("请选择线路型边类型", Severity.Warning);
+            return;
+        }
+        if (_chainOrder.Count < 2)
+        {
+            Snackbar.Add("至少选择 2 个节点才能成链", Severity.Warning);
+            return;
+        }
+
+        await RunBusyAsync(async () =>
+        {
+            var request = new LineStructureRequest
+            {
+                EdgeTypeId = _edgeTypeId,
+                TopologyMode = TopologyMode.Linear,
+                OrderedNodeIds = _chainOrder.ToList(),
+                Terminals = IsExisting
+                    ? _structure!.Terminals.Select(t => new LineStructureTerminalInput
+                    {
+                        NodeId = t.NodeId,
+                        Role = t.TerminalRole ?? TerminalRole.FeedIn,
+                        ExternalNodeId = t.ExternalNodeId
+                    }).ToList()
+                    : _draftTerminals.Select(t => new LineStructureTerminalInput
+                    {
+                        NodeId = t.NodeId,
+                        Role = t.Role,
+                        ExternalNodeId = t.ExternalNodeId
+                    }).ToList()
+            };
+
+            var (dto, error) = IsExisting
+                ? await LineApi.ReplaceStructureAsync(LineId, request)
+                : await LineApi.CreateStructureAsync(LineId, request);
+
+            if (dto is null)
+            {
+                Snackbar.Add($"快速成链失败：{error}", Severity.Error);
+                return;
+            }
+
+            _structure = dto;
+            _topologyMode = dto.TopologyMode.ToString();
+            _draftSegments = [];
+            _draftTerminals = [];
+            _chainOrder = [];
+            Snackbar.Add("已按选择顺序成链", Severity.Success);
+        });
+    }
+
     /// <summary>已有结构的全量替换请求（切换拓扑模式用）：沿用当前段与端子。</summary>
     private LineStructureRequest ToRequest(string mode) => new()
     {
@@ -663,9 +860,9 @@
 
     private static string RoleLabel(TerminalRole role) => role switch
     {
-        TerminalRole.FeedIn => "FeedIn（馈入）",
-        TerminalRole.FeedOut => "FeedOut（馈出）",
-        TerminalRole.Tie => "Tie（联络）",
+        TerminalRole.FeedIn => "电源接入点（馈入）",
+        TerminalRole.FeedOut => "向外供电口（馈出）",
+        TerminalRole.Tie => "联络点（与别处互备）",
         _ => role.ToString()
     };
 

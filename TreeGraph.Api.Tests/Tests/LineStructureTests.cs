@@ -78,6 +78,21 @@ public class LineStructureTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Create_WithoutTopologyMode_DefaultsToLinear()
+    {
+        var et = await CreateLineTypeAsync("LSDefaultMode");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            Segments = Segments((n[0], n[1]), (n[1], n[2]))
+        });
+
+        Assert.Equal(TopologyMode.Linear, dto.TopologyMode);
+    }
+
+    [Fact]
     public async Task Create_Linear_Branch_Returns409()
     {
         var et = await CreateLineTypeAsync("LSLinearBranch");
@@ -178,6 +193,85 @@ public class LineStructureTests : IntegrationTestBase
         Assert.True(dto.Diagnostics.Valid);
         Assert.True(dto.Diagnostics.HasCycle);
         Assert.Equal(3, dto.Segments.Count);
+    }
+
+    [Fact]
+    public async Task Create_Radial_MultipleFeedIn_Returns409()
+    {
+        var et = await CreateLineTypeAsync("LSRadialMultiFeed");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var resp = await PostStructureAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Radial,
+            Segments = Segments((n[0], n[1]), (n[1], n[2])),
+            Terminals =
+            [
+                new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn },
+                new LineStructureTerminalInput { NodeId = n[2], Role = TerminalRole.FeedIn }
+            ]
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        var body = await resp.Content.ReadAsStringAsync();
+        Assert.Contains("FeedIn", body);
+        Assert.Contains("1", body);
+    }
+
+    [Fact]
+    public async Task Create_Network_WithoutFeedIn_Succeeds()
+    {
+        var et = await CreateLineTypeAsync("LSNetworkNoFeed");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Network,
+            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0]))
+        });
+
+        Assert.Equal(TopologyMode.Network, dto.TopologyMode);
+        Assert.True(dto.Diagnostics.Valid);
+        Assert.True(dto.Diagnostics.HasCycle);
+        Assert.Equal(0, dto.Diagnostics.FeedInCount);
+        Assert.Empty(dto.Terminals);
+    }
+
+    [Fact]
+    public async Task Create_Network_Disconnected_Returns409()
+    {
+        var et = await CreateLineTypeAsync("LSNetworkDisconnected");
+        var (lineId, n) = await CreateLineWithNodesAsync(4);
+
+        var resp = await PostStructureAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Network,
+            Segments = Segments((n[0], n[1]), (n[2], n[3]))
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        Assert.Contains("不连通", await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Create_BothSegmentsAndOrderedNodeIds_Returns400()
+    {
+        var et = await CreateLineTypeAsync("LSBothInputs");
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var resp = await PostStructureAsync(lineId, new LineStructureRequest
+        {
+            EdgeTypeId = et.EdgeTypeId,
+            TopologyMode = TopologyMode.Linear,
+            Segments = Segments((n[0], n[1])),
+            OrderedNodeIds = n.ToList()
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("二选一", await resp.Content.ReadAsStringAsync());
     }
 
     [Fact]

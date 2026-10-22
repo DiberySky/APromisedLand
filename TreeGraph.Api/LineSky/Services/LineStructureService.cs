@@ -76,7 +76,7 @@ public class LineStructureService
                 Exists = false,
                 LineId = lineId,
                 LineName = lineName,
-                TopologyMode = TopologyMode.Radial,
+                TopologyMode = TopologyMode.Linear,
                 CandidateNodes = lineNodes
                     .Select(n => new LineStructureNodeDto { NodeId = n.Id, Name = n.Name })
                     .ToList(),
@@ -178,7 +178,6 @@ public class LineStructureService
             {
                 Valid = validation.Errors.Count == 0,
                 Errors = validation.Errors,
-                Warnings = validation.Warnings,
                 NodeCount = validation.NodeCount,
                 EdgeCount = validation.EdgeCount,
                 NodeDegreeMax = validation.MaxDegree,
@@ -668,7 +667,6 @@ public class LineStructureService
 
     private sealed record ValidationOutcome(
         List<string> Errors,
-        List<string> Warnings,
         int NodeCount,
         int EdgeCount,
         int MaxDegree,
@@ -702,6 +700,9 @@ public class LineStructureService
                 $"线路结构拓扑校验失败（{mode}）：{string.Join("；", outcome.Errors)}");
     }
 
+    /// <summary>
+    /// 三种拓扑模式的校验。结构成员口径：只取段端点（未入任何段的线路节点不参与校验）。
+    /// </summary>
     private static ValidationOutcome ValidateCore(
         TopologyMode mode,
         IReadOnlyCollection<string> nodeIds,
@@ -709,7 +710,6 @@ public class LineStructureService
         List<(string NodeId, TerminalRole Role)> terminals)
     {
         var errors = new List<string>();
-        var warnings = new List<string>();
 
         var nodeSet = nodeIds.ToHashSet(StringComparer.Ordinal);
         if (segments.Count == 0)
@@ -808,18 +808,17 @@ public class LineStructureService
                 if (segments.Count > 0 && segments.Count != nodeSet.Count - 1)
                     errors.Add(
                         $"Radial 模式应为树（边数 {segments.Count} 应 = 节点数 {nodeSet.Count} - 1）");
-                if (feedInCount < 1)
-                    errors.Add("Radial 模式至少需要 1 个 FeedIn 端子");
+                if (segments.Count > 0 && feedInCount != 1)
+                    errors.Add($"Radial 模式应恰有 1 个 FeedIn 端子（当前 = {feedInCount}）");
                 break;
 
             case TopologyMode.Network:
-                if (feedInCount < 1)
-                    errors.Add("Network 模式至少需要 1 个 FeedIn 端子");
+                // 网络式允许环与多电源、也不要求端子：连通性已在上方统一校验。
                 break;
         }
 
         return new ValidationOutcome(
-            errors, warnings, nodeSet.Count, segments.Count,
+            errors, nodeSet.Count, segments.Count,
             maxDegree, degreeOne, hasCycle, feedInCount);
     }
 
