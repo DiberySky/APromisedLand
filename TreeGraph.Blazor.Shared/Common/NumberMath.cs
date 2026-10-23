@@ -49,8 +49,10 @@ internal static class NumberMath
     public static string Format(decimal v, Type target)
     {
         target = Underlying(target);
+        // decimal 直接 ToString 会保留数据库里的 scale（如 12.000000000000000），
+        // 这里按「最多 12 位小数 + 去掉末尾 0」展示，避免无意义的零。
         return target == typeof(double)
             ? ((double)v).ToString("G15", CultureInfo.InvariantCulture)
-            : v.ToString(CultureInfo.InvariantCulture);
+            : v.ToString("0.############", CultureInfo.InvariantCulture);
     }
 }

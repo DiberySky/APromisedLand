@@ -141,6 +141,12 @@
     /// <summary>动态表单 Schema。</summary>
     [Parameter, EditorRequired] public IReadOnlyList<AttributeSchemaDto> Schema { get; set; } = [];
 
+    /// <summary>
+    /// 初始值（编辑场景）。参数在父组件渲染时传入，不依赖 @ref 时序，
+    /// 因此比父组件在 OnAfterRender 里调用 LoadFrom 更可靠。
+    /// </summary>
+    [Parameter] public IReadOnlyDictionary<string, JsonElement>? InitialValues { get; set; }
+
     /// <summary>保存回调，参数为已转换为提交格式的值字典。</summary>
     [Parameter] public EventCallback<Dictionary<string, object?>> OnSubmit { get; set; }
 
@@ -167,6 +173,17 @@
                 _values[attr.AttributeName] = ConvertElement(elem, attr);
         }
         StateHasChanged();
+    }
+
+    private bool _initialValuesApplied;
+
+    protected override void OnParametersSet()
+    {
+        // 只在首次参数就绪时应用一次：编辑弹窗每次打开都是新实例，
+        // 后续父组件重渲染不会覆盖用户正在编辑的值。
+        if (_initialValuesApplied || InitialValues is null || Schema.Count == 0) return;
+        _initialValuesApplied = true;
+        LoadFrom(InitialValues);
     }
 
     private void SetValue(string key, object? value) => _values[key] = value;

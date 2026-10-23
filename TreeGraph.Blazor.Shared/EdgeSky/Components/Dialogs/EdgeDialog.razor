@@ -124,6 +124,7 @@
                          EntityType="@EdgeTypeName"
                          EntityId="@(IsEdit ? _form.EdgeId : "")"
                          Schema="@_schema"
+                         InitialValues="@(IsEdit ? Editing?.Properties : null)"
                          CompactLayout="true"
                          ReadOnly="false"
                          OnSubmit="CaptureEavValues" />
@@ -218,11 +219,6 @@
             if (type is not null)
             {
                 _schema = await EavApi.GetSchemaAsync(type.TypeName);
-                if (_schema is { Count: > 0 } && Editing.Properties is not null)
-                {
-                    // DynamicForm.LoadFrom 接受 Dictionary<string, JsonElement>
-                    _formRef?.LoadFrom(Editing.Properties);
-                }
             }
         }
         else
