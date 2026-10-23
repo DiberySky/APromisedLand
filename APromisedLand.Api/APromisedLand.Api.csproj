@@ -8,7 +8,7 @@
 
     <ItemGroup>
         <PackageReference Include="Aspire.Elastic.Clients.Elasticsearch" Version="13.3.0" />
-        <PackageReference Include="Aspire.NATS.Net" Version="13.6.1" />
+        <PackageReference Include="Aspire.NATS.Net" Version="13.6.3" />
         <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.5.3" />
 <!--        <PackageReference Include="Microsoft.AI.Foundry.Local" Version="2.0.1" />-->
 <!--        <PackageReference Include="Microsoft.AI.Foundry.Local.Core" Version="1.2.4" />-->
@@ -23,7 +23,7 @@
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
         <PackageReference Include="OllamaSharp" Version="5.5.0" />
 <!--        <PackageReference Include="OpenAI" Version="2.13.0" />-->
-        <PackageReference Include="Typesense" Version="8.5.0" />
+        <PackageReference Include="Typesense" Version="9.0.0" />
         <PackageReference Include="Zafiro.FileSystem.SeaweedFS" Version="47.1.2" />
     </ItemGroup>
 
