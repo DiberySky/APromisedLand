@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.NodeEavSky.Dtos;
@@ -13,7 +14,10 @@ namespace TreeGraph.Blazor.Shared.EdgeSky.Services;
 /// </summary>
 public class EdgeApiClient
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     private readonly HttpClient _http;
     private readonly ILogger<EdgeApiClient> _logger;

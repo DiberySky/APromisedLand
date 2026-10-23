@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using TreeGraph.Shared.LineSky.Dtos;
 using TreeGraph.Shared.EdgeSky.Dtos;
@@ -12,7 +13,10 @@ namespace TreeGraph.Blazor.Shared.LineSky.Services;
 /// </summary>
 public class LineApiClient
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     private readonly HttpClient _http;
     private readonly ILogger<LineApiClient> _logger;
@@ -111,20 +115,25 @@ public class LineApiClient
             var resp = await _http.GetAsync(relativeUrl, ct);
             if (!resp.IsSuccessStatusCode)
             {
-                _logger.LogWarning("GET {Url} → {Status}", relativeUrl, resp.StatusCode);
-                return default;
+                var body = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("GET {Url} → {Status}: {Body}", relativeUrl, resp.StatusCode, body);
+                throw new HttpRequestException(
+                    $"GET {relativeUrl} → HTTP {(int)resp.StatusCode}: {body}");
             }
             // ★ 统一 ApiResponse 信封：返回体 { success, message, data }，这里解包 data
             var envelope = await resp.Content
                 .ReadFromJsonAsync<ApiResponse<T>>(JsonOptions, ct);
-            return envelope is not null && !envelope.Success
-                ? default
-                : envelope?.Data;
+            if (envelope is not null && !envelope.Success)
+            {
+                throw new InvalidOperationException(
+                    $"GET {relativeUrl} 返回 success=false: {envelope.Message}");
+            }
+            return envelope?.Data;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GET {Url} 失败", relativeUrl);
-            return default;
+            throw;
         }
     }
 
