@@ -51,7 +51,7 @@ public class DefaultTreeActionHandler<TItem>(
         var dto = new TreeNodeDto<TItem>
         {
             Id = parent.Id,
-            Text = parent.Text(),
+            Text = parent.Name,
             Icon = TreeHelper.TreeItemIcons,
             ParentId = parent.ParentId,
             Value = parent,
@@ -59,7 +59,7 @@ public class DefaultTreeActionHandler<TItem>(
                 .Select((child, index) => new TreeNodeDto<TItem>
                 {
                     Id = child.Id,
-                    Text = child.Text(),
+                    Text = child.Name,
                     Icon = TreeHelper.TreeItemIcons,
                     ParentId = parent.Id,
                     SortOrder = index,
@@ -84,7 +84,7 @@ public class DefaultTreeActionHandler<TItem>(
         => new()
         {
             Id = node.Id,
-            Text = node.Text(),
+            Text = node.Name,
             Icon = TreeHelper.TreeItemIcons,
             ParentId = parentId,
             SortOrder = node.SortOrder,

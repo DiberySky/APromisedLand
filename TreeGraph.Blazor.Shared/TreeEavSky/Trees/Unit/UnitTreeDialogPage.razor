@@ -43,15 +43,15 @@
 
 <TreeDialogPageSky TItem="UnitTree"
                    Title="单位注册"
-                   TitleToolBar="@(ClickNode?.Value?.Parent?.Text() ?? "单位")"
+                   TitleToolBar="@(ClickNode?.Value?.Parent?.Name ?? "单位")"
                    RootId="@ClickNode?.Value?.Id"
                    EditTemplate="@editTemplate"
                    ShowDialogFunc="@ShowDialogAsync" />
 
 @code {
-    [Parameter] public ITreeItemData<UnitTree>? ClickNode { get; set; }
+    [Parameter] public TreeNodeItem<UnitTree>? ClickNode { get; set; }
 
-    private async Task ShowDialogAsync(ITreeItemData<UnitTree> node)
+    private async Task ShowDialogAsync(TreeNodeItem<UnitTree> node)
     {
         await BlazorService.ShowUnitTreeDialogPageAsync(node);
     }

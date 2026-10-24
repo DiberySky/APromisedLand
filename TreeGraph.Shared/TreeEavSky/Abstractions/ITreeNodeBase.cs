@@ -9,6 +9,9 @@ public interface ITreeNodeBase<TItem>
     string Id { get; set; }
     string? ParentId { get; set; }
 
+    /// <summary>节点名称（读穿 nodes 注册表；非映射列）</summary>
+    string? Name { get; }
+
     /// <summary>节点描述</summary>
     string? Description { get; set; }
 
@@ -20,6 +23,4 @@ public interface ITreeNodeBase<TItem>
     bool HasChildren { get; set; }
 
     TItem? Parent { get; set; }
-
-    string Text();
 }

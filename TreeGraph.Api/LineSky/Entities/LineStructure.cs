@@ -13,9 +13,6 @@ public class LineStructure
     /// <summary>线路 ID（lines.id），同时是主键。</summary>
     public string LineId { get; set; } = string.Empty;
 
-    /// <summary>结构使用的边类型（edge_definitions.edge_type_id，必须 IsLine=true）。</summary>
-    public string EdgeTypeId { get; set; } = string.Empty;
-
     /// <summary>拓扑模式（Linear / Radial / Network）。</summary>
     public TopologyMode TopologyMode { get; set; } = TopologyMode.Network;
 

@@ -37,7 +37,7 @@
         if (result == null) return;
 
         UnitId = result.Id;
-        UnitName = result.Text();
+        UnitName = result.Name;
         _fullName = UnitName;
 
         await UnitIdChanged.InvokeAsync(UnitId);

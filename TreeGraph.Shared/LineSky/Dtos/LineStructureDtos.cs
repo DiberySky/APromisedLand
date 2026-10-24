@@ -19,7 +19,7 @@ public class LineStructureNodeDto
     public string? ExternalNodeName { get; set; }
 }
 
-/// <summary>结构中的段（一条 EdgeInstance）。</summary>
+/// <summary>结构中的段（线路自身拓扑单元，不引用通用边）。</summary>
 public class LineStructureSegmentDto
 {
     public string EdgeId { get; set; } = string.Empty;
@@ -55,9 +55,6 @@ public class LineStructureDto
     public bool Exists { get; set; }
     public string LineId { get; set; } = string.Empty;
     public string LineName { get; set; } = string.Empty;
-    public string? EdgeTypeId { get; set; }
-    public string? EdgeTypeName { get; set; }
-    public string? EdgeTypeDisplayName { get; set; }
     public TopologyMode TopologyMode { get; set; } = TopologyMode.Network;
     public DateTimeOffset? UpdatedAt { get; set; }
     /// <summary>拓扑推导出的节点顺序（Linear/Radial 为链/树遍历顺序；Network 为发现顺序）。</summary>
@@ -84,7 +81,6 @@ public record LineTemplateDto(
     string DisplayName,
     string Description,
     string DefaultTopologyMode,        // TopologyMode 枚举名，例 "Network"
-    string? DefaultEdgeTypeName,
     string DefaultTerminalRole,        // TerminalRole 枚举名，例 "FeedIn"
     string DefaultOperatingState);     // TerminalOperatingState 枚举名，例 "Maintenance"
 public class LineStructureTerminalInput
@@ -103,7 +99,6 @@ public class LineStructureTerminalInput
 /// </summary>
 public class LineStructureRequest
 {
-    public string EdgeTypeId { get; set; } = string.Empty;
     public TopologyMode TopologyMode { get; set; } = TopologyMode.Network;
     public List<string>? OrderedNodeIds { get; set; }
     public List<LineStructureSegmentInput>? Segments { get; set; }

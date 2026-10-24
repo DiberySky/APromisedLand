@@ -54,15 +54,13 @@ public class EavMetadataController : ControllerBase
             return BadRequest(new { error = $"未知的 dataType: {req.DataType}" });
 
         // ---- 实体类型存在性 ----
-        // 同时支持 entity_types（iNode 实体类型）和 edge_definitions（边类型）的 TypeName
+        // 关系类型目录已并入 EAV：边类型同样登记在 entity_type_definitions
         var entityTypeExists = await _db.EntityTypes
             .AnyAsync(t => t.EntityType == req.EntityType && !t.IsDeleted, ct);
-        var edgeTypeExists = await _db.EdgeDefinitions
-            .AnyAsync(e => e.TypeName == req.EntityType, ct);
-        if (!entityTypeExists && !edgeTypeExists)
+        if (!entityTypeExists)
             return BadRequest(new
             {
-                error = $"实体类型不存在: {req.EntityType}。请先在「实体类型管理」或「边类型管理」中创建"
+                error = $"实体类型不存在: {req.EntityType}。请先在「实体类型管理」中创建"
             });
 
         // ---- 引用互斥 ----

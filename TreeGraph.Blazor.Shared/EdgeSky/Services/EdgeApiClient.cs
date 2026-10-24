@@ -8,9 +8,7 @@ using TreeGraph.Shared.NodeEavSky.Dtos;
 namespace TreeGraph.Blazor.Shared.EdgeSky.Services;
 
 /// <summary>
-/// Edge（关系/边）API 客户端：边类型元数据 + 边实例 CRUD + 图查询。
-///
-/// ★ 所有实体 ID / 元数据 ID 均为 GUID 字符串（36 字符）。
+/// Edge（关系/边）API 客户端：全局边 CRUD + 图查询（R4：类型为裸字符串）。
 /// </summary>
 public class EdgeApiClient
 {
@@ -29,52 +27,21 @@ public class EdgeApiClient
     }
 
     // ============================================================
-    // Edge Type（元数据）
-    // ============================================================
-
-    public async Task<IReadOnlyList<EdgeTypeDto>?> ListEdgeTypesAsync(
-        CancellationToken ct = default)
-        => await GetAsync<IReadOnlyList<EdgeTypeDto>>(
-            "api/eav/metadata/edge-types", ct);
-
-    public Task<EdgeTypeDto?> GetEdgeTypeAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => GetAsync<EdgeTypeDto>(
-            $"api/eav/metadata/edge-types/{edgeTypeId}", ct);
-
-    public Task<string?> CreateEdgeTypeAsync(
-        CreateEdgeTypeRequest request, CancellationToken ct = default)
-        => PostForIdAsync("api/eav/metadata/edge-types", request, "edgeTypeId", ct);
-
-    public Task<(bool Ok, string? Error)> UpdateEdgeTypeAsync(
-        string edgeTypeId, UpdateEdgeTypeRequest request, CancellationToken ct = default)
-        => PutAsync($"api/eav/metadata/edge-types/{edgeTypeId}", request, ct);
-
-    public Task<(bool Ok, string? Error)> DeleteEdgeTypeAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => DeleteWithErrorAsync($"api/eav/metadata/edge-types/{edgeTypeId}", ct);
-
-    // ============================================================
     // Edge Instance
     // ============================================================
 
-    public async Task<IReadOnlyList<EdgeInstanceDto>?> ListEdgesAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => await GetAsync<IReadOnlyList<EdgeInstanceDto>>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}", ct);
-
     /// <summary>
-    /// 全局边列表（跨类型）。可选按边类型、端点节点集合（From/To 命中）、显示名关键字过滤。
+    /// 全局边列表（跨类型）。可选按类型名、端点节点集合（From/To 命中）、关键字过滤。
     /// </summary>
     public async Task<IReadOnlyList<EdgeInstanceDto>?> ListAllEdgesAsync(
-        string? edgeTypeId = null,
+        string? typeName = null,
         IReadOnlyCollection<string>? nodeIds = null,
         string? search = null,
         CancellationToken ct = default)
     {
         var query = new List<string>();
-        if (!string.IsNullOrWhiteSpace(edgeTypeId))
-            query.Add($"edgeTypeId={Uri.EscapeDataString(edgeTypeId)}");
+        if (!string.IsNullOrWhiteSpace(typeName))
+            query.Add($"typeName={Uri.EscapeDataString(typeName)}");
         if (nodeIds is { Count: > 0 })
             query.Add($"nodeIds={Uri.EscapeDataString(string.Join(",", nodeIds))}");
         if (!string.IsNullOrWhiteSpace(search))
@@ -88,51 +55,46 @@ public class EdgeApiClient
     }
 
     public Task<EdgeInstanceDto?> GetEdgeAsync(
-        string edgeTypeId, string edgeId, CancellationToken ct = default)
+        string edgeId, CancellationToken ct = default)
         => GetAsync<EdgeInstanceDto>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}/{Uri.EscapeDataString(edgeId)}",
-            ct);
+            $"api/eav/edges/{Uri.EscapeDataString(edgeId)}", ct);
 
     public Task<string?> CreateEdgeAsync(
-        string edgeTypeId, CreateEdgeRequest request, CancellationToken ct = default)
-        => PostForIdAsync(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}",
-            request, "edgeId", ct);
+        CreateEdgeRequest request, CancellationToken ct = default)
+        => PostForIdAsync("api/eav/edges", request, "edgeId", ct);
 
     public Task<(bool Ok, string? Error)> UpdateEdgeAsync(
-        string edgeTypeId, string edgeId,
-        UpdateEdgeRequest request, CancellationToken ct = default)
+        string edgeId, UpdateEdgeRequest request, CancellationToken ct = default)
         => PutAsync(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}/{Uri.EscapeDataString(edgeId)}",
-            request, ct);
+            $"api/eav/edges/{Uri.EscapeDataString(edgeId)}", request, ct);
 
     public Task<(bool Ok, string? Error)> DeleteEdgeAsync(
-        string edgeTypeId, string edgeId, CancellationToken ct = default)
+        string edgeId, CancellationToken ct = default)
         => DeleteWithErrorAsync(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}/{Uri.EscapeDataString(edgeId)}",
-            ct);
+            $"api/eav/edges/{Uri.EscapeDataString(edgeId)}", ct);
 
     // ============================================================
     // 图查询
     // ============================================================
 
     public async Task<IReadOnlyList<EdgeInstanceDto>?> FindOutgoingEdgesAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
+        string? typeName, string nodeId, CancellationToken ct = default)
         => await GetAsync<IReadOnlyList<EdgeInstanceDto>>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}" +
-            $"/from/{Uri.EscapeDataString(nodeId)}", ct);
+            $"api/eav/edges/from/{Uri.EscapeDataString(nodeId)}" + TypeQuery(typeName), ct);
 
     public async Task<IReadOnlyList<EdgeInstanceDto>?> FindIncomingEdgesAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
+        string? typeName, string nodeId, CancellationToken ct = default)
         => await GetAsync<IReadOnlyList<EdgeInstanceDto>>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}" +
-            $"/to/{Uri.EscapeDataString(nodeId)}", ct);
+            $"api/eav/edges/to/{Uri.EscapeDataString(nodeId)}" + TypeQuery(typeName), ct);
 
     public async Task<EdgeTraverseResult?> TraverseEdgesAsync(
-        string edgeTypeId, EdgeTraverseRequest request, CancellationToken ct = default)
-        => await PostAsync<EdgeTraverseResult>(
-            $"api/eav/edges/{Uri.EscapeDataString(edgeTypeId)}/traverse",
-            request, ct);
+        EdgeTraverseRequest request, CancellationToken ct = default)
+        => await PostAsync<EdgeTraverseResult>("api/eav/edges/traverse", request, ct);
+
+    private static string TypeQuery(string? typeName)
+        => string.IsNullOrWhiteSpace(typeName)
+            ? ""
+            : $"?typeName={Uri.EscapeDataString(typeName)}";
 
     // ============================================================
     // 通用助手（与 EavApiClient 同款实现）

@@ -3,13 +3,13 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using TreeGraph.Shared.LineSky.Dtos;
-using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Blazor.Shared.LineSky.Services;
 
 /// <summary>
-/// 线路（Line）API 客户端：结构读写、上下游/全路径查询、拓扑校验、连通分量。
+/// 线路（Line）API 客户端：结构读写、模板查询。
+/// R4：按 edgeTypeId 的上下游/路径/校验/连通分量端点已随通用边类型表一并删除。
 /// </summary>
 public class LineApiClient
 {
@@ -69,36 +69,6 @@ public class LineApiClient
 
     private static string StructureUrl(string lineId)
         => $"api/eav/lines/{Uri.EscapeDataString(lineId)}/structure";
-
-    public Task<LinePathResult?> GetLineUpstreamAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => GetAsync<LinePathResult>(
-            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/upstream/{Uri.EscapeDataString(nodeId)}",
-            ct);
-
-    public Task<LinePathResult?> GetLineDownstreamAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => GetAsync<LinePathResult>(
-            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/downstream/{Uri.EscapeDataString(nodeId)}",
-            ct);
-
-    public Task<LinePathResult?> GetLineFullPathAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct = default)
-        => GetAsync<LinePathResult>(
-            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/path/{Uri.EscapeDataString(nodeId)}",
-            ct);
-
-    public Task<LineValidationResult?> ValidateLineTopologyAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => GetAsync<LineValidationResult>(
-            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/validate",
-            ct);
-
-    public Task<IReadOnlyList<LineConnectedComponent>?> GetLineComponentsAsync(
-        string edgeTypeId, CancellationToken ct = default)
-        => GetAsync<IReadOnlyList<LineConnectedComponent>>(
-            $"api/eav/lines/{Uri.EscapeDataString(edgeTypeId)}/components",
-            ct);
 
     /// <summary>读取全部线路模板（UI 层下拉预填用）。</summary>
     public Task<IReadOnlyList<LineTemplateDto>?> GetLineTemplatesAsync(CancellationToken ct = default)

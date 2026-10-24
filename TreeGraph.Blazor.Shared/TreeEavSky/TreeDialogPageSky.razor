@@ -57,7 +57,7 @@
     [Parameter] public string? TitleToolBar { get; set; }
     [Parameter] public string? RootId { get; set; }
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
-    [Parameter] public Func<ITreeItemData<TItem>, Task>? ShowDialogFunc { get; set; }
+    [Parameter] public Func<TreeNodeItem<TItem>, Task>? ShowDialogFunc { get; set; }
 
     [Parameter] public RenderFragment? TopBarRightContent { get; set; }
     [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }
@@ -73,7 +73,7 @@
         base.OnInitialized();
     }
 
-    private void HandleClickItemText(ITreeItemData<TItem>? node)
+    private void HandleClickItemText(TreeNodeItem<TItem>? node)
     {
         if (ShowDialogFunc == null || node == null) return;
 

@@ -107,25 +107,17 @@ if (!isTesting)
 builder.Services.AddGraphSync(builder.Configuration, enableSchemaInitializer: !isTesting);
 
 // Edge（关系/边）
-builder.Services.AddScoped<IEdgeNodeValidator, EdgeNodeValidator>();
-builder.Services.AddScoped<EdgeMetadataService>();
 builder.Services.AddScoped<EdgeInstanceService>();
-builder.Services.AddScoped<TreeGraph.Api.LineSky.Services.LineService>();
 builder.Services.AddScoped<TreeGraph.Api.LineSky.Services.LineStructureService>();
 
-// ★ TreeEavSky iNode 宿主守卫：节点关注类型 / 写入实体数据前校验 inodeId 是
-//   真实的 UnitTree/CategoryTree/SpaceTree 节点，防止属性数据脱离宿主节点产生孤儿数据。
-builder.Services.AddScoped<IInodeOwnerGuard, UnitTreeInodeGuard>();
-builder.Services.AddScoped<IInodeOwnerGuard, CategoryTreeInodeGuard>();
-builder.Services.AddScoped<IInodeOwnerGuard, KnowledgeTreeInodeGuard>();
-builder.Services.AddScoped<IInodeOwnerGuard, SpaceTreeInodeGuard>();
-builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.LineSky.Services.LineNodeOwnerGuard>();
+// ★ iNode 宿主守卫（R3 收敛）：nodes 注册表守卫认领全部注册节点类型；
+//   尚未收编进 nodes 的 Line 保留专用守卫。EAV 写入前校验 inodeId 真实存在。
+builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.NodeSky.Services.NodesRegistryGuard>();
 builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.LineSky.Services.LineOwnerGuard>();
 
 // LineSky 模板（L1：快速预填；后端 ValidateCore 不感知模板，模板只在 UI 层预填默认值）
 builder.Services.AddSingleton<ILineTemplate, RailwayFeedingTemplate>();
 builder.Services.AddScoped<LineTemplateRegistry>();
-builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.EdgeSky.Services.EdgeOwnerGuard>();
 
 // ★ TreeEavSky：计量单位树 / 分类树 / 空间树（表 unit_trees、category_trees、space_trees，
 //   前两棵随迁移 HasData 播种；自 DiberyTreeService clone，响应信封由 ApiEnvelopeFilter 统一包装）

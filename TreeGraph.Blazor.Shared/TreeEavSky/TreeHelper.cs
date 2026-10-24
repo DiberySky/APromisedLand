@@ -4,7 +4,7 @@ using TreeGraph.Shared.TreeEavSky.Abstractions;
 
 namespace TreeGraph.Blazor.Shared.TreeEavSky;
 /// <summary>
-/// TreeEavSky 树节点图标与 TreeItemData 转换/查找扩展。
+/// TreeEavSky 树节点图标与 TreeNodeItem 转换/查找扩展。
 ///
 /// 遍历/查找全部使用显式栈/队列迭代，深树不会 StackOverflowException。
 /// </summary>
@@ -12,10 +12,10 @@ public static class TreeHelper
 {
     public const string TreeItemIcons = Icons.Material.Outlined.Label;
 
-    public static TreeItemData<T> ToTreeItemData<T>(this TreeNodeDto<T> dto)
+    public static TreeNodeItem<T> ToTreeNodeItem<T>(this TreeNodeDto<T> dto)
         where T : class, ITreeNodeBase<T>, new()
     {
-        var item = new TreeItemData<T>
+        var item = new TreeNodeItem<T>
         {
             Icon = TreeItemIcons,
             Text = dto.Text,
@@ -23,7 +23,7 @@ public static class TreeHelper
             Expanded = dto.Expanded,
             Selected = dto.Selected,
             Expandable = dto.HasChildren,
-            Children = dto.Children?.Select(i => i.ToTreeItemData<T>()).ToList(),
+            Children = dto.Children?.Select(i => i.ToTreeNodeItem<T>()).ToList(),
         };
 
         // dto.Value 可能为 null（懒加载占位 / 后端返回空值）
@@ -34,16 +34,16 @@ public static class TreeHelper
     }
 
     /// <summary>
-    /// 在树中查找指定 ID 的 TreeItemData 节点（显式栈 DFS）。
+    /// 在树中查找指定 ID 的 TreeNodeItem 节点（显式栈 DFS）。
     /// </summary>
-    public static TreeItemData<T>? FindTreeItem<T>(
-        this IEnumerable<TreeItemData<T>> items,
+    public static TreeNodeItem<T>? FindTreeItem<T>(
+        this IEnumerable<TreeNodeItem<T>> items,
         string id)
         where T : class, ITreeNodeBase<T>
     {
         if (string.IsNullOrEmpty(id)) return null;
 
-        var stack = new Stack<TreeItemData<T>>(items.Reverse());
+        var stack = new Stack<TreeNodeItem<T>>(items.Reverse());
 
         while (stack.Count > 0)
         {
@@ -55,7 +55,7 @@ public static class TreeHelper
             if (current.Children is not { Count: > 0 }) continue;
 
             // 逆序压栈，保持与原递归一致的先左后右访问顺序
-            var children = current.Children.OfType<TreeItemData<T>>().ToList();
+            var children = current.Children.OfType<TreeNodeItem<T>>().ToList();
             for (int i = children.Count - 1; i >= 0; i--)
                 stack.Push(children[i]);
         }
@@ -68,14 +68,14 @@ public static class TreeHelper
     /// 节点若形成环，按已访问集合安全跳过。
     /// </summary>
     public static List<string>? GetPathToNode<T>(
-        this IEnumerable<TreeItemData<T>> items,
+        this IEnumerable<TreeNodeItem<T>> items,
         string targetId)
         where T : class, ITreeNodeBase<T>
     {
         if (string.IsNullOrEmpty(targetId)) return null;
 
         var parentMap = new Dictionary<string, string?>();
-        var queue = new Queue<TreeItemData<T>>();
+        var queue = new Queue<TreeNodeItem<T>>();
 
         foreach (var root in items)
         {
@@ -106,7 +106,7 @@ public static class TreeHelper
 
             foreach (var child in current.Children)
             {
-                if (child is not TreeItemData<T> { Value: not null } treeChild) continue;
+                if (child is not TreeNodeItem<T> { Value: not null } treeChild) continue;
                 if (parentMap.ContainsKey(treeChild.Value.Id)) continue; // 防环
 
                 parentMap[treeChild.Value.Id] = current.Value.Id;
@@ -121,8 +121,8 @@ public static class TreeHelper
     /// 展开指定节点并加载其子节点（单层）。
     /// </summary>
     public static async Task ExpandAsync<T>(
-        this TreeItemData<T> item,
-        Func<T?, Task<IReadOnlyCollection<TreeItemData<T>>>> loadChildren,
+        this TreeNodeItem<T> item,
+        Func<T?, Task<IReadOnlyCollection<TreeNodeItem<T>>>> loadChildren,
         CancellationToken ct = default)
         where T : class, ITreeNodeBase<T>
     {
@@ -133,9 +133,8 @@ public static class TreeHelper
             var children = await loadChildren(item.Value);
             ct.ThrowIfCancellationRequested();
 
-            // TreeItemData<T> 未重写 Equals/GetHashCode，
-            // ToHashSet 退化为按引用去重，等价于 ToList。
-            item.Children = children.ToList<ITreeItemData<T>>();
+            // 按加载结果整表装入子节点（不去重）
+            item.Children = children.ToList();
         }
     }
 
@@ -143,9 +142,9 @@ public static class TreeHelper
     /// 沿给定路径逐层展开到目标节点（路径迭代，不递归）。
     /// </summary>
     public static async Task ExpandToNodeAsync<T>(
-        this List<TreeItemData<T>> items,
+        this List<TreeNodeItem<T>> items,
         List<string> path,
-        Func<T?, Task<IReadOnlyCollection<TreeItemData<T>>>> loadChildren,
+        Func<T?, Task<IReadOnlyCollection<TreeNodeItem<T>>>> loadChildren,
         Action<T?>? onSelected = null,
         CancellationToken ct = default)
         where T : class, ITreeNodeBase<T>
@@ -170,8 +169,8 @@ public static class TreeHelper
             await item.ExpandAsync(loadChildren, ct);
 
             currentItems = item.Children?
-                .OfType<TreeItemData<T>>()
-                .ToList() ?? new List<TreeItemData<T>>();
+                .OfType<TreeNodeItem<T>>()
+                .ToList() ?? new List<TreeNodeItem<T>>();
         }
     }
 }

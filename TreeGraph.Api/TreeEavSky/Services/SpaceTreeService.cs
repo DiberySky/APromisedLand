@@ -1,6 +1,7 @@
 using TreeGraph.Api.Data;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.Messaging;
+using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Models;
@@ -19,6 +20,8 @@ public class SpaceTreeService(
     TreeGraphDbContext dbContext,
     IEventPublisher publishEndpoint) : ITreeService<SpaceTree>
 {
+    private static string BuildText(SpaceTree c) => c.Name ?? string.Empty;
+
     public async Task<IReadOnlyList<TreeNodeDto<SpaceTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
     {
@@ -27,17 +30,19 @@ public class SpaceTreeService(
         if (rootId != null)
         {
             var rootItem = await dbContext.SpaceTrees
+                .Include(c => c.Node)
                 .FirstAsync(c => c.Id == rootId, cancellationToken);
 
-            roots.Add(rootItem.ToNodeDto());
+            roots.Add(rootItem.ToNodeDto(BuildText(rootItem)));
         }
         else
         {
-            roots = await dbContext.SpaceTrees
+            var items = await dbContext.SpaceTrees
+                .Include(c => c.Node)
                 .Where(c => c.ParentId == null)
                 .OrderBy(c => c.SortOrder)
-                .Select(c => c.ToNodeDto())
                 .ToListAsync(cancellationToken);
+            roots = items.Select(c => c.ToNodeDto(BuildText(c))).ToList();
         }
 
         foreach (var rootNode in roots)
@@ -66,28 +71,30 @@ public class SpaceTreeService(
     public async Task<IReadOnlyList<TreeNodeDto<SpaceTree>>> GetChildrenAsync(string parentId,
         CancellationToken cancellationToken = default)
     {
-        var children = await dbContext.SpaceTrees
+        var childrenItems = await dbContext.SpaceTrees
+            .Include(c => c.Node)
             .Where(c => c.ParentId == parentId)
             .OrderBy(c => c.SortOrder)
-            .Select(c => c.ToNodeDto())
             .ToListAsync(cancellationToken);
+        var children = childrenItems.Select(c => c.ToNodeDto(BuildText(c))).ToList();
 
         foreach (var child in children)
         {
             var parent = await dbContext.SpaceTrees
+                .Include(c => c.Node)
                 .FirstAsync(c => c.Id == parentId, cancellationToken);
 
             child.Parent = parent;
             child.Value!.Parent = parent;
 
-            var grandson = await dbContext.SpaceTrees
+            var grandsonItems = await dbContext.SpaceTrees
+                .Include(c => c.Node)
                 .Where(c => c.ParentId == child.Id)
                 .OrderBy(c => c.SortOrder)
-                .Select(c => c.ToNodeDto())
                 .ToListAsync(cancellationToken);
 
-            child.Children = grandson.ToList();
-            child.HasChildren = grandson.Count > 0;
+            child.Children = grandsonItems.Select(c => c.ToNodeDto(BuildText(c))).ToList();
+            child.HasChildren = grandsonItems.Count > 0;
         }
 
         return children;
@@ -96,7 +103,7 @@ public class SpaceTreeService(
     public async Task<IReadOnlyList<TreeNodeDto<SpaceTree>>> QueryNodesAsync(TreeQueryParams queryParams,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.SpaceTrees.AsQueryable();
+        var query = dbContext.SpaceTrees.Include(c => c.Node).AsQueryable();
 
         if (!string.IsNullOrEmpty(queryParams.ParentId))
             query = query.Where(c => c.ParentId == queryParams.ParentId);
@@ -104,37 +111,35 @@ public class SpaceTreeService(
             query = query.Where(c => c.ParentId == null);
 
         if (!string.IsNullOrEmpty(queryParams.SearchTerm))
-            query = query.Where(c => c.Name.Contains(queryParams.SearchTerm));
+            query = query.Where(c => c.Node!.Name.Contains(queryParams.SearchTerm));
 
         if (queryParams.OnlyWithChildren)
             query = query.Where(c => c.HasChildren);
 
-        var result = await query
+        var items = await query
             .OrderBy(c => c.SortOrder)
             .Skip((queryParams.Page - 1) * queryParams.PageSize)
             .Take(queryParams.PageSize)
-            .Select(c => c.ToNodeDto())
             .ToListAsync(cancellationToken);
-        return result;
+        return items.Select(c => c.ToNodeDto(BuildText(c))).ToList();
     }
 
     public async Task<TreeNodeDto<SpaceTree>?> GetFullTreeAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
     {
-        // 1. 加载所有节点到内存
         var allNodes = await dbContext.SpaceTrees
+            .Include(c => c.Node)
             .OrderBy(c => c.SortOrder)
             .ToListAsync(cancellationToken);
         if (allNodes.Count == 0)
             return null;
 
-        // 2. 确定起始根节点
         SpaceTree? rootEntity;
         if (string.IsNullOrEmpty(rootId))
         {
             rootEntity = allNodes.FirstOrDefault(n => n.ParentId == null);
             if (rootEntity == null)
-                return null; // 没有根节点，返回 null
+                return null;
         }
         else
         {
@@ -143,21 +148,17 @@ public class SpaceTreeService(
                 return null;
         }
 
-        // 3. 建立 ID 字典，并组装父子关系（内存中填充 Children 集合）
         var dict = allNodes.ToDictionary(n => n.Id);
         foreach (var node in allNodes)
         {
             if (node.ParentId != null && dict.TryGetValue(node.ParentId, out var parent))
             {
-                // parent.Children ??= new List<SpaceTree>();
-                // parent.Children.Add(node);
             }
         }
 
-        // 4. 递归构建 DTO 树，并对子节点排序
         TreeNodeDto<SpaceTree> BuildDto(SpaceTree entity)
         {
-            var dto = entity.ToNodeDto();
+            var dto = entity.ToNodeDto(BuildText(entity));
             return dto;
         }
 
@@ -168,10 +169,12 @@ public class SpaceTreeService(
     public async Task<TreeNodeDto<SpaceTree>> CreateNodeAsync(TreeNodeDto<SpaceTree> nodeDto,
         CancellationToken cancellationToken = default)
     {
+        var id = string.IsNullOrEmpty(nodeDto.Id) ? Guid.NewGuid().ToString() : nodeDto.Id;
+        var name = nodeDto.Text ?? string.Empty;
+
         var entity = new SpaceTree
         {
-            Id = string.IsNullOrEmpty(nodeDto.Id) ? Guid.NewGuid().ToString() : nodeDto.Id,
-            Name = nodeDto.Text ?? string.Empty,
+            Id = id,
             ParentId = nodeDto.ParentId,
             SortOrder = nodeDto.SortOrder,
             CanHaveChildren = nodeDto.CanHaveChildren,
@@ -180,8 +183,9 @@ public class SpaceTreeService(
 
         if (!string.IsNullOrEmpty(entity.ParentId))
         {
-            var parent = await dbContext.SpaceTrees.FindAsync(new object[] { entity.ParentId }, cancellationToken);
-            // ★ 硬校验：父节点声明为叶子（CanHaveChildren=false）时拒绝创建子节点
+            var parent = await dbContext.SpaceTrees
+                .Include(c => c.Node)
+                .FirstOrDefaultAsync(c => c.Id == entity.ParentId, cancellationToken);
             if (parent is not null && !parent.CanHaveChildren)
                 throw new InvalidOperationException($"父节点「{parent.Name}」不允许包含子节点");
             if (parent != null && !parent.HasChildren)
@@ -191,36 +195,42 @@ public class SpaceTreeService(
             }
         }
 
+        dbContext.Nodes.Add(new Node
+        {
+            Id = id,
+            HostType = "SpaceTree",
+            Name = name,
+        });
         await dbContext.SpaceTrees.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // ★ 语义搜索：节点新增 → 即时补建向量（消费端幂等）
         await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: false, cancellationToken);
 
-        return entity.ToNodeDto();
+        return entity.ToNodeDto(name);
     }
 
     public async Task<TreeNodeDto<SpaceTree>> UpdateNodeAsync(TreeNodeDto<SpaceTree> nodeDto,
         CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.SpaceTrees.FindAsync(new object[] { nodeDto.Id }, cancellationToken);
+        var entity = await dbContext.SpaceTrees
+            .Include(c => c.Node)
+            .FirstOrDefaultAsync(c => c.Id == nodeDto.Id, cancellationToken);
         if (entity == null)
             throw new KeyNotFoundException($"节点 {nodeDto.Id} 不存在");
 
-        entity.Name = nodeDto.Text ?? entity.Name;
+        if (entity.Node != null)
+            entity.Node.Name = nodeDto.Text ?? entity.Node.Name;
         entity.SortOrder = nodeDto.SortOrder;
         entity.CanHaveChildren = nodeDto.CanHaveChildren;
 
-        // 不在此修改 ParentId，请使用 MoveNodeAsync
         entity.ParentId = nodeDto.ParentId;
 
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // ★ 语义搜索：节点改名等更新 → 即时重建向量
         await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
-        return entity.ToNodeDto();
+        return entity.ToNodeDto(BuildText(entity));
     }
 
     public async Task<TreeNodeDto<SpaceTree>> UpdateChildrenAsync(TreeNodeDto<SpaceTree> nodeDto,
@@ -243,32 +253,27 @@ public class SpaceTreeService(
 
     public async Task<bool> DeleteNodeAsync(string nodeId, CancellationToken cancellationToken = default)
     {
-        // 1. 查找节点
         var node = await dbContext.SpaceTrees
             .FirstOrDefaultAsync(c => c.Id == nodeId, cancellationToken);
 
         if (node == null)
             return false;
 
-        // 子项为空方可删除本项：仍有子节点时拒绝（不采用级联删除）
         var hasChildren = await dbContext.SpaceTrees
             .AnyAsync(c => c.ParentId == nodeId, cancellationToken);
         if (hasChildren)
             throw new InvalidOperationException("该节点仍有子节点，无法删除。请先删除全部子节点。");
 
-        // 引用为空方可删除本项：仍有边引用该节点时拒绝（不采用级联删除）
         var hasEdges = await dbContext.EdgeInstances
             .AnyAsync(e => e.FromNodeId == nodeId || e.ToNodeId == nodeId, cancellationToken);
         if (hasEdges)
             throw new InvalidOperationException("该节点仍被边引用，无法删除。请先删除引用该节点的边。");
 
-        // 先清空自身数据才允许删本项：该节点仍有挂载实体数据时拒绝（不采用级联删除）
         var hasEntities = await dbContext.InodeEntities
             .AnyAsync(m => m.InodeId == nodeId, cancellationToken);
         if (hasEntities)
             throw new InvalidOperationException("该节点仍有挂载的实体数据，无法删除。请先清空其全部实体数据。");
 
-        // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
         var declarations = await dbContext.InodeEntityTypes
             .Where(x => x.InodeId == nodeId)
             .ToListAsync(cancellationToken);
@@ -276,9 +281,11 @@ public class SpaceTreeService(
 
         dbContext.SpaceTrees.Remove(node);
 
+        var nodeRow = await dbContext.Nodes.FindAsync([nodeId], cancellationToken);
+        if (nodeRow != null) dbContext.Nodes.Remove(nodeRow);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // ★ 语义搜索：节点已删除 → 消费端据 InodeId 清除其残留向量
         await PublishAsync(nodeId, InodeChangeKind.Deleted, pathAffected: false, cancellationToken);
 
         return true;
@@ -291,7 +298,6 @@ public class SpaceTreeService(
         if (node == null)
             throw new KeyNotFoundException($"节点 '{nodeId}' 不存在");
 
-        // 循环检测：禁止移动到自身子节点下
         if (await IsDescendantAsync(nodeId, newParentId, cancellationToken))
             return false;
 
@@ -299,7 +305,6 @@ public class SpaceTreeService(
         node.ParentId = newParentId;
         dbContext.Update(node);
 
-        // 更新旧父节点 HasChildren
         if (!string.IsNullOrEmpty(oldParentId))
         {
             var oldParentChildrenCount = await dbContext.SpaceTrees
@@ -317,11 +322,11 @@ public class SpaceTreeService(
             }
         }
 
-        // 更新新父节点 HasChildren
         if (!string.IsNullOrEmpty(newParentId))
         {
-            var newParent = await dbContext.SpaceTrees.FindAsync(new object[] { newParentId }, cancellationToken);
-            // ★ 硬校验：目标父节点声明为叶子时拒绝移入
+            var newParent = await dbContext.SpaceTrees
+                .Include(c => c.Node)
+                .FirstOrDefaultAsync(c => c.Id == newParentId, cancellationToken);
             if (newParent is not null && !newParent.CanHaveChildren)
                 throw new InvalidOperationException($"目标父节点「{newParent.Name}」不允许包含子节点");
             if (newParent != null)
@@ -333,14 +338,11 @@ public class SpaceTreeService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // ★ 语义搜索：节点移动 → 即时重建向量（路径由检索时反查，此处保持索引与宿主一致）
         await PublishAsync(nodeId, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
         return true;
     }
 
-    /// <summary>发布 iNode 变更事件（语义搜索向量同步；at-least-once，消费端幂等）。
-    /// pathAffected：名称/层级位置变更（改名/移动）→ 消费端级联刷新全部后代的路径型文本。</summary>
     private async Task PublishAsync(string inodeId, InodeChangeKind kind, bool pathAffected, CancellationToken ct)
     {
         await publishEndpoint.Publish(new InodeChangedEvent
@@ -381,7 +383,6 @@ public class SpaceTreeService(
 
         while (!string.IsNullOrEmpty(currentId))
         {
-            // 只查当前节点
             var node = await dbContext.SpaceTrees
                 .Where(c => c.Id == currentId)
                 .Select(c => new { c.Id, c.ParentId })
@@ -396,13 +397,6 @@ public class SpaceTreeService(
         return path.AsReadOnly();
     }
 
-    /// <summary>
-    /// 方案	        查询次数	内存占用	适用场景
-    /// 一次加载全部	1 次	全部节点	节点数 小于 一万
-    /// </summary>
-    /// <param name="nodeId"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
     public async Task<IReadOnlyList<string>> GetAncestorPathAsyncAll(string nodeId,
         CancellationToken cancellationToken = default)
     {
@@ -411,7 +405,6 @@ public class SpaceTreeService(
 
         while (!string.IsNullOrEmpty(currentId))
         {
-            // 只查当前节点
             var node = await dbContext.SpaceTrees
                 .Where(c => c.Id == currentId)
                 .Select(c => new { c.Id, c.ParentId })

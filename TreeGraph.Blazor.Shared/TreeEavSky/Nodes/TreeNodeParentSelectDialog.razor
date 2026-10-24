@@ -82,7 +82,7 @@
     private TItem? _selectedValue;
     private TItem? SelectedParent => _selectedValue;
 
-    private string SelectedName => SelectedParent?.Text() ?? CurrentParent?.Text() ?? "根节点";
+    private string SelectedName => SelectedParent?.Name ?? CurrentParent?.Name ?? "根节点";
     private bool CanConfirm => _selectedValue != null || AllowRootSelection;
 
     protected override void OnInitialized()
@@ -103,7 +103,7 @@
 
                 builder.OpenComponent<MudTreeViewItem<TItem>>(0);
                 builder.AddAttribute(1, "Value", item);
-                builder.AddAttribute(2, "Text", item.Text());
+                builder.AddAttribute(2, "Text", item.Name);
                 builder.AddAttribute(3, "Icon", GetNodeIcon(item, isSelected));
                 builder.AddAttribute(4, "IconColor", GetNodeColor(item, isSelected));
                 builder.AddAttribute(5, "Disabled", isDisabled);
@@ -196,7 +196,7 @@
 
         var keyword = _searchText.ToLowerInvariant();
         var matchedIds = _treeItems
-            .Where(n => n.Text().ToLowerInvariant().Contains(keyword))
+            .Where(n => (n.Name ?? string.Empty).ToLowerInvariant().Contains(keyword))
             .Select(n => n.Id)
             .ToHashSet();
 

@@ -273,27 +273,28 @@ public class DeletePrincipleTests : IntegrationTestBase
     // （边实例有独立行，其 EAV 属性值存于外部表）
     // ============================================================
 
-    private async Task<EdgeTypeDto> CreateEdgeTypeAsync()
+    private static string NewEdgeTypeName() => $"DelPrincipleEdge_{Guid.NewGuid():N}";
+
+    /// <summary>创建自由节点（nodes 注册表），作为边端点。</summary>
+    private async Task<string> CreateFreeNodeAsync(string name)
     {
-        var resp = await Client.PostAsJsonAsync(
-            "/api/eav/metadata/edge-types",
-            new CreateEdgeTypeRequest
-            {
-                TypeName = $"DelPrincipleEdge_{Guid.NewGuid():N}",
-                DisplayName = "删除原则边",
-                IsGlobal = true,
-                IsDirected = true
-            });
-        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
-        return (await resp.Content.ReadEavAsync<EdgeTypeDto>())!;
+        var id = Guid.NewGuid().ToString("N");
+        var resp = await Client.PostAsJsonAsync("/api/Node", new { id, name });
+        resp.EnsureSuccessStatusCode();
+        return id;
     }
 
     private async Task<EdgeInstanceDto> CreateEdgeAsync(
-        string edgeTypeId, string fromNodeId, string toNodeId)
+        string typeName, string fromNodeId, string toNodeId)
     {
         var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{edgeTypeId}",
-            new CreateEdgeRequest { FromNodeId = fromNodeId, ToNodeId = toNodeId });
+            "/api/eav/edges",
+            new CreateEdgeRequest
+            {
+                TypeName = typeName,
+                FromNodeId = fromNodeId,
+                ToNodeId = toNodeId
+            });
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         return (await resp.Content.ReadEavAsync<EdgeInstanceDto>())!;
     }
@@ -317,15 +318,19 @@ public class DeletePrincipleTests : IntegrationTestBase
     public async Task EdgeInstanceDelete_WhenOwnPropertiesExist_Returns409()
     {
         await EnsureEntityTypeAsync();
-        var et = await CreateEdgeTypeAsync();
-        var edge = await CreateEdgeAsync(et.EdgeTypeId, "n_from", "n_to");
+        var typeName = NewEdgeTypeName();
+        // R4：边类型名即 EAV entity_type，需先登记实体类型才能定义属性
+        await TestData.EnsureEntityTypeAsync(typeName, typeName);
+        var fromNode = await CreateFreeNodeAsync("删除起点");
+        var toNode = await CreateFreeNodeAsync("删除终点");
+        var edge = await CreateEdgeAsync(typeName, fromNode, toNode);
 
         // 在边类型上定义属性，并给该边实例写入自身属性值
         var attrResp = await Client.PostAsJsonAsync(
             "/api/eav/metadata/attributes",
             new
             {
-                entityType = et.TypeName,
+                entityType = typeName,
                 attributeName = "strength",
                 displayName = "强度",
                 dataType = "decimal",
@@ -334,26 +339,26 @@ public class DeletePrincipleTests : IntegrationTestBase
         attrResp.EnsureSuccessStatusCode();
 
         var put = await Client.PutAsJsonAsync(
-            $"/api/eav/{et.TypeName}/entities/{edge.EdgeId}", new { strength = 1.5 });
+            $"/api/eav/{typeName}/entities/{edge.EdgeId}", new { strength = 1.5 });
         Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
 
         // 自身数据非空 → 409，且不做级联删除
-        var del = await Client.DeleteAsync($"/api/eav/edges/{et.EdgeTypeId}/{edge.EdgeId}");
+        var del = await Client.DeleteAsync($"/api/eav/edges/{edge.EdgeId}");
         Assert.Equal(HttpStatusCode.Conflict, del.StatusCode);
         Assert.Contains("属性数据", await del.Content.ReadAsStringAsync());
 
         // 边实例与其属性值都还在
         var got = await Client.GetEavAsync<EdgeInstanceDto>(
-            $"/api/eav/edges/{et.EdgeTypeId}/{edge.EdgeId}");
+            $"/api/eav/edges/{edge.EdgeId}");
         Assert.NotNull(got);
         Assert.True(got!.Properties!.ContainsKey("strength"));
 
         // 先清空自身数据 → 即可删除本项
         var clear = await Client.PutAsJsonAsync(
-            $"/api/eav/{et.TypeName}/entities/{edge.EdgeId}", new { });
+            $"/api/eav/{typeName}/entities/{edge.EdgeId}", new { });
         Assert.True(clear.IsSuccessStatusCode, await clear.Content.ReadAsStringAsync());
-        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/{edge.EdgeId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.DeleteAsync($"/api/eav/edges/{edge.EdgeId}")).StatusCode);
     }
 
     // ============================================================
@@ -367,8 +372,8 @@ public class DeletePrincipleTests : IntegrationTestBase
     public async Task TreeNodeDelete_WhenReferencedByEdge_Returns409(string tree)
     {
         var nodeId = await CreateNodeAsync(tree);
-        var et = await CreateEdgeTypeAsync();
-        var edge = await CreateEdgeAsync(et.EdgeTypeId, nodeId, $"{Guid.NewGuid():N}");
+        var otherNode = await CreateFreeNodeAsync("边对端");
+        var edge = await CreateEdgeAsync(NewEdgeTypeName(), nodeId, otherNode);
 
         var resp = await Client.DeleteAsync($"{tree}/{nodeId}");
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
@@ -376,12 +381,8 @@ public class DeletePrincipleTests : IntegrationTestBase
 
         // 删掉引用该节点的边 → 节点即可删除
         Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/{edge.EdgeId}")).StatusCode);
+            $"/api/eav/edges/{edge.EdgeId}")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Client.DeleteAsync($"{tree}/{nodeId}")).StatusCode);
-
-        // 类型已无实例与属性 → 也可删除
-        Assert.Equal(HttpStatusCode.OK, (await Client.DeleteAsync(
-            $"/api/eav/metadata/edge-types/{et.EdgeTypeId}")).StatusCode);
     }
 
     [Fact]

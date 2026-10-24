@@ -44,7 +44,7 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    [Parameter] public ITreeItemData<TItem>? OriginalNode { get; set; }
+    [Parameter] public TreeNodeItem<TItem>? OriginalNode { get; set; }
 
     [Parameter] public string Title { get; set; } = "请选择上级节点";
     [Parameter] public string? TitleToolBar { get; set; } = "请选择";
@@ -52,7 +52,7 @@
     [Parameter] public string? ClickNodeId { get; set; }
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
 
-    [Parameter] public Func<ITreeItemData<TItem>?, Task>? EditFunc { get; set; }
+    [Parameter] public Func<TreeNodeItem<TItem>?, Task>? EditFunc { get; set; }
 
     [Parameter] public RenderFragment? TopBarRightContent { get; set; }
     [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }
@@ -69,7 +69,7 @@
         base.OnInitialized();
     }
 
-    private void HandleClickItemText(ITreeItemData<TItem>? node)
+    private void HandleClickItemText(TreeNodeItem<TItem>? node)
     {
         if (node == null) return;
 

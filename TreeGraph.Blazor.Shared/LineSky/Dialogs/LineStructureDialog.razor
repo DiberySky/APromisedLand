@@ -1,15 +1,13 @@
 @* LineStructureDialog.razor — 线路结构图编辑器
    入口：线路维护面板 → 行内「结构」图标。
-   功能：选择线路型边类型与拓扑模式（Linear/Radial/Network），
-        以「段 + 端子」图编辑方式增删结构；无结构时先在草稿中编辑再一次性创建。 *@
+   功能：选择拓扑模式（Linear/Radial/Network），
+        以「段 + 端子」图编辑方式增删结构；无结构时先在草稿中编辑再一次性创建。
+   R4：线路结构不再依赖通用边类型（IsLine/EdgeDefinition 已删除）。 *@
 @namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Services
-@using TreeGraph.Blazor.Shared.EdgeSky.Services
-@using TreeGraph.Shared.EdgeSky.Dtos
 @using TreeGraph.Shared.LineSky.Dtos
 @using TreeGraph.Shared.LineSky.Entities
 @inject LineApiClient LineApi
-@inject EdgeApiClient EdgeApi
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -30,24 +28,8 @@
         }
         else
         {
-            @* 边类型 + 拓扑模式 + 模板下拉（模板用 C# RenderFragment 构建，绕开 .NET 10 Razor 编译器 bug） *@
+            @* 模板 + 拓扑模式下拉（模板用 C# RenderFragment 构建，绕开 .NET 10 Razor 编译器 bug） *@
             <div class="d-flex gap-3 mb-3 flex-wrap">
-                <MudSelect T="string"
-                           Value="_edgeTypeId"
-                           Label="线路型边类型（IsLine = true）"
-                           Variant="Variant.Outlined"
-                           Dense="true"
-                           Disabled="@(IsExisting || _lineEdgeTypes.Count == 0)"
-                           ValueChanged="OnEdgeTypeChanged"
-                           Style="min-width: 260px;">
-                    @foreach (var et in _lineEdgeTypes)
-                    {
-                        <MudSelectItem T="string" Value="@et.EdgeTypeId">
-                            @et.DisplayName（@et.TypeName）
-                        </MudSelectItem>
-                    }
-                </MudSelect>
-
                 @* 模板下拉（用 RenderFragment 构建 items，绕开 .NET 10 Razor 编译器第二个 foreach bug） *@
                 <MudSelect T="string" Value="_selectedTemplateKey" Label="模板" Variant="Variant.Outlined" Dense="true" Disabled="@(IsExisting || _templateKeys.Count == 0)" ValueChanged="OnSelectedTemplateKeyChanged" Style="min-width: 220px;">
                     @TemplateSelectItems
@@ -85,13 +67,7 @@
                 }
             </MudAlert>
 
-            @if (_lineEdgeTypes.Count == 0)
-            {
-                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-                    当前没有线路型边类型。请先到「边类型管理」创建 IsLine = true 的类型。
-                </MudAlert>
-            }
-            else if (_candidateNodes.Count == 0)
+            @if (_candidateNodes.Count == 0)
             {
                 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
                     该线路暂无线路节点。请先在「线路节点」中添加节点。
@@ -344,7 +320,7 @@
                 {
                     <MudButton Variant="Variant.Filled" Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.Save"
-                               Disabled="@(_busy || _draftSegments.Count == 0 || string.IsNullOrEmpty(_edgeTypeId))"
+                               Disabled="@(_busy || _draftSegments.Count == 0)"
                                OnClick="CreateStructureAsync">
                         @(_busy ? "提交中..." : "创建结构")
                     </MudButton>
@@ -386,12 +362,10 @@
     private bool _busy;
     private LineStructureDto? _structure;
 
-    private string _edgeTypeId = "";
     private string _topologyMode = nameof(TopologyMode.Network);
-    private IReadOnlyList<EdgeTypeDto> _lineEdgeTypes = [];
     private List<LineStructureNodeDto> _candidateNodes = [];
 
-    /// <summary>模板下拉测试字段：IReadOnlyList（和 _lineEdgeTypes 完全平行的集合类型）。</summary>
+    /// <summary>模板下拉测试字段。</summary>
     private IReadOnlyList<string> _templateKeys = [];
     private string _selectedTemplateKey = "";
 
@@ -506,14 +480,8 @@
 
             _candidateNodes = _structure.CandidateNodes;
             _topologyMode = _structure.TopologyMode.ToString();
-            _edgeTypeId = _structure.EdgeTypeId ?? "";
 
-            var allTypes = await EdgeApi.ListEdgeTypesAsync() ?? [];
-            _lineEdgeTypes = allTypes.Where(t => t.IsLine).ToList();
-            if (string.IsNullOrEmpty(_edgeTypeId) && _lineEdgeTypes.Count > 0)
-                _edgeTypeId = _lineEdgeTypes[0].EdgeTypeId;
-
-            // 模板加载（只取 Key，IReadOnlyList 集合类型和 _lineEdgeTypes 对齐）
+            // 模板加载（模板只预填拓扑模式与端子默认值）
             try
             {
                 var templates = await LineApi.GetLineTemplatesAsync() ?? [];
@@ -532,18 +500,11 @@
         }
     }
 
-    /// <summary>L1 模板：一键应用铁路牵引供电预设（Network + RailLine + FeedIn/Maintenance）。</summary>
+    /// <summary>L1 模板：一键应用铁路牵引供电预设（Network + FeedIn/Maintenance）。</summary>
     private void ApplyRailwayFeedingTemplate()
     {
         // 预填拓扑模式
         _topologyMode = nameof(TopologyMode.Network);
-
-        // 预填 EdgeType：在 _lineEdgeTypes 里找 TransmissionLine（输电线路，允许 T 接、不强制线性）
-        var transmission = _lineEdgeTypes.FirstOrDefault(et => et.TypeName == "TransmissionLine");
-        if (transmission is not null)
-            _edgeTypeId = transmission.EdgeTypeId;
-        else
-            Snackbar.Add("推荐边类型 TransmissionLine 当前不存在", Severity.Warning);
 
         // 预填端子默认值（只影响"添加端子"表单初始值）
         _terminalRole = nameof(TerminalRole.FeedIn);
@@ -551,8 +512,6 @@
 
         Snackbar.Add("已应用铁路牵引供电预设：拓扑=Network，端子默认 FeedIn/Maintenance", Severity.Info);
     }
-
-    private void OnEdgeTypeChanged(string? edgeTypeId) => _edgeTypeId = edgeTypeId ?? "";
 
     private void OnSelectedTemplateKeyChanged(string? key)
     {
@@ -636,11 +595,8 @@
 
         if (!IsExisting)
         {
-            var directed = _lineEdgeTypes
-                .FirstOrDefault(t => t.EdgeTypeId == _edgeTypeId)?.IsDirected ?? true;
             var duplicated = _draftSegments.Any(s =>
-                (s.FromNodeId == _fromNodeId && s.ToNodeId == _toNodeId)
-                || (!directed && s.FromNodeId == _toNodeId && s.ToNodeId == _fromNodeId));
+                s.FromNodeId == _fromNodeId && s.ToNodeId == _toNodeId);
             if (duplicated)
             {
                 Snackbar.Add("该段已存在", Severity.Warning);
@@ -782,11 +738,6 @@
 
     private async Task CreateStructureAsync()
     {
-        if (string.IsNullOrEmpty(_edgeTypeId))
-        {
-            Snackbar.Add("请选择线路型边类型", Severity.Warning);
-            return;
-        }
         if (_draftSegments.Count == 0)
         {
             Snackbar.Add("请先添加至少一段", Severity.Warning);
@@ -797,7 +748,6 @@
         {
             var (dto, error) = await LineApi.CreateStructureAsync(LineId, new LineStructureRequest
             {
-                EdgeTypeId = _edgeTypeId,
                 TopologyMode = Enum.Parse<TopologyMode>(_topologyMode),
                 Segments = _draftSegments.ToList(),
                 Terminals = _draftTerminals.Select(t => new LineStructureTerminalInput
@@ -860,11 +810,6 @@
     /// <summary>以 OrderedNodeIds 提交：服务端按相邻节点自动生成段。</summary>
     private async Task SubmitChainAsync()
     {
-        if (string.IsNullOrEmpty(_edgeTypeId))
-        {
-            Snackbar.Add("请选择线路型边类型", Severity.Warning);
-            return;
-        }
         if (_chainOrder.Count < 2)
         {
             Snackbar.Add("至少选择 2 个节点才能成链", Severity.Warning);
@@ -875,7 +820,6 @@
         {
             var request = new LineStructureRequest
             {
-                EdgeTypeId = _edgeTypeId,
                 TopologyMode = TopologyMode.Linear,
                 OrderedNodeIds = _chainOrder.ToList(),
                 Terminals = IsExisting
@@ -917,7 +861,6 @@
     /// <summary>已有结构的全量替换请求（切换拓扑模式用）：沿用当前段与端子。</summary>
     private LineStructureRequest ToRequest(string mode) => new()
     {
-        EdgeTypeId = _edgeTypeId,
         TopologyMode = Enum.Parse<TopologyMode>(mode),
         Segments = _structure!.Segments.Select(s => new LineStructureSegmentInput
         {

@@ -159,13 +159,13 @@ public class TreeNodeDialogService<TItem>(
     #region 父节点选择对话框
 
     public async Task<TItem?> ShowParentSelectDialogAsync(
-        ITreeItemData<TItem>? node = null)
+        TreeNodeItem<TItem>? node = null)
     {
         var parameters = new DialogParameters<TreeSelectDialogSky<TItem>>
         {
             { x => x.OriginalNode, node },
-            { x => x.TitleToolBar, node?.Value?.Parent?.Text() + " =>" },
-            { x => x.Title, node?.Value?.Text() },
+            { x => x.TitleToolBar, node?.Value?.Parent?.Name + " =>" },
+            { x => x.Title, node?.Value?.Name },
         };
 
         var options = blazorService.DialogOptions;
@@ -231,7 +231,7 @@ public class TreeNodeDialogService<TItem>(
     #region 拖拽排序对话框
 
     public async Task<List<TItem>?> ShowSortDialogAsync(
-        ITreeItemData<TItem> node,
+        TreeNodeItem<TItem> node,
         DialogConfig? config = null)
     {
         var parameters = new DialogParameters

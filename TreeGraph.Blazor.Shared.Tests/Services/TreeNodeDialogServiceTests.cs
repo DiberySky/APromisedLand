@@ -55,7 +55,7 @@ public class TreeNodeDialogServiceTests
         new() { Id = id, Name = $"Node-{id}", ParentId = parentId };
 
     private static NodeTemplate<UnitTree> MakeTemplate(string id) =>
-        new() { Node = new TreeItemData<UnitTree> { Value = MakeNode(id) } };
+        new() { Node = new TreeNodeItem<UnitTree> { Value = MakeNode(id) } };
 
     // ============================================================
     // ShowActionsDialogAsync
@@ -174,7 +174,7 @@ public class TreeNodeDialogServiceTests
         SetupExDialogResult<TreeNodeSortDialog<UnitTree>>(DialogResult.Cancel());
 
         var result = await _sut.ShowSortDialogAsync(
-            new TreeItemData<UnitTree> { Value = MakeNode("1") });
+            new TreeNodeItem<UnitTree> { Value = MakeNode("1") });
 
         Assert.Null(result);
     }
@@ -186,7 +186,7 @@ public class TreeNodeDialogServiceTests
         SetupExDialogResult<TreeNodeSortDialog<UnitTree>>(DialogResult.Ok(sorted));
 
         var result = await _sut.ShowSortDialogAsync(
-            new TreeItemData<UnitTree> { Value = MakeNode("1") });
+            new TreeNodeItem<UnitTree> { Value = MakeNode("1") });
 
         Assert.NotNull(result);
         Assert.Equal(2, result.Count);
@@ -256,7 +256,7 @@ public class TreeNodeDialogServiceTests
     public async Task ShowParentSelectDialogAsync_SingleNode_SameParent_ReturnsNull()
     {
         var currentParent = MakeNode("parent-1");
-        var node = new TreeItemData<UnitTree>
+        var node = new TreeNodeItem<UnitTree>
         {
             Value = new UnitTree
             {

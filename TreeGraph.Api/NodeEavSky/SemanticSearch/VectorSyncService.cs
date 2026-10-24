@@ -549,11 +549,11 @@ public sealed class VectorSynchronizer
             .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
             result[n.Id] = n.Name;
 
-        // 边宿主：显示名回退 EdgeId（DisplayName 可空）
+        // 边宿主：无业务显示名（已并入 EAV），回退 EdgeId
         foreach (var e in await _db.EdgeInstances.AsNoTracking()
             .Where(x => inodeIds.Contains(x.EdgeId))
-            .Select(x => new { x.EdgeId, x.DisplayName }).ToListAsync(ct))
-            result[e.EdgeId] = e.DisplayName ?? e.EdgeId;
+            .Select(x => new { x.EdgeId }).ToListAsync(ct))
+            result[e.EdgeId] = e.EdgeId;
 
         return result;
     }

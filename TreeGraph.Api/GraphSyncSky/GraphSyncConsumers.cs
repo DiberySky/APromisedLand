@@ -47,6 +47,48 @@ public sealed class InodeGraphSyncConsumer
 }
 
 /// <summary>
+/// RabbitMQ 消费者：线路结构变更 → 同步图内 line_segment 结构边（幂等）。
+/// PG 内线路段与通用边解耦，图内由本消费者统一拓扑。
+/// </summary>
+public sealed class LineStructureGraphSyncConsumer
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IMemoryCache _dedupCache;
+    private readonly GraphSyncOptions _options;
+    private readonly ILogger<LineStructureGraphSyncConsumer> _logger;
+
+    public LineStructureGraphSyncConsumer(
+        IServiceScopeFactory scopeFactory,
+        IMemoryCache dedupCache,
+        IOptions<GraphSyncOptions> options,
+        ILogger<LineStructureGraphSyncConsumer> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _dedupCache = dedupCache;
+        _options = options.Value;
+        _logger = logger;
+    }
+
+    public async Task Consume(LineStructureChangedEvent msg, CancellationToken ct)
+    {
+        var dedupKey = $"graph-sync-line-structure:{msg.LineId}";
+        if (_dedupCache.TryGetValue(dedupKey, out _))
+        {
+            _logger.LogDebug("去重窗口内跳过：LineStructure {LineId}", msg.LineId);
+            return;
+        }
+        _dedupCache.Set(dedupKey, true, TimeSpan.FromSeconds(_options.DedupWindowSeconds));
+
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var initializer = scope.ServiceProvider.GetRequiredService<GraphSchemaInitializer>();
+        var synchronizer = scope.ServiceProvider.GetRequiredService<GraphSynchronizer>();
+
+        await initializer.EnsureReadyAsync(ct);
+        await synchronizer.SyncLineStructureAsync(msg.LineId, ct);
+    }
+}
+
+/// <summary>
 /// RabbitMQ 消费者：边变更 → 同步语义边（幂等）。
 /// Deleted 依赖事件载荷定位图边（PG 行已删）。
 /// </summary>

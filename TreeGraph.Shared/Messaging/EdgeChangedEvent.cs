@@ -9,7 +9,7 @@ public record EdgeChangedEvent
     public required string EdgeId { get; init; }
     public required EdgeChangeKind Kind { get; init; }
 
-    /// <summary>边类型名（EdgeDefinition.TypeName，作为图 edge type）。</summary>
+    /// <summary>边类型名（edge_instances.type_name，作为图 edge type）。</summary>
     public string? EdgeTypeName { get; init; }
 
     /// <summary>起点节点 ID。</summary>
@@ -17,6 +17,9 @@ public record EdgeChangedEvent
 
     /// <summary>终点节点 ID。</summary>
     public string? ToNodeId { get; init; }
+
+    /// <summary>有向/无向（写入图边属性，随事件携带避免消费端回查）。</summary>
+    public bool IsDirected { get; init; } = true;
 
     public DateTimeOffset OccurredAt { get; init; } = DateTimeOffset.UtcNow;
 }

@@ -3,17 +3,16 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TreeGraph.Api.Tests.Fixtures;
-using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.LineSky.Dtos;
 using TreeGraph.Shared.LineSky.Entities;
-using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
 /// 线路结构（LineStructure）集成测试。
-/// 覆盖：空结构语义、三种拓扑模式校验、全量替换、段/端子增量、IsLine 守卫。
+/// 覆盖：空结构语义、三种拓扑模式校验、全量替换、段/端子增量、
+///       R4 段自存标识（不再创建/引用通用边）。
 /// </summary>
 public class LineStructureTests : IntegrationTestBase
 {
@@ -58,12 +57,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_Linear_Chain_Succeeds()
     {
-        var et = await CreateLineTypeAsync("LSLinear");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.ToList()
         });
@@ -80,12 +77,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_WithoutTopologyMode_DefaultsToNetwork()
     {
-        var et = await CreateLineTypeAsync("LSDefaultMode");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             Segments = Segments((n[0], n[1]), (n[1], n[2]))
         });
 
@@ -95,12 +90,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_Linear_Branch_Returns409()
     {
-        var et = await CreateLineTypeAsync("LSLinearBranch");
         var (lineId, n) = await CreateLineWithNodesAsync(4);
 
         var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[1], n[3]))
         });
@@ -112,12 +105,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_Radial_WithoutFeedIn_Returns409()
     {
-        var et = await CreateLineTypeAsync("LSRadialNoFeed");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Radial,
             Segments = Segments((n[0], n[1]), (n[1], n[2]))
         });
@@ -129,12 +120,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_Radial_WithFeedIn_Succeeds_AndOrderStartsAtFeedIn()
     {
-        var et = await CreateLineTypeAsync("LSRadial");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Radial,
             Segments = Segments((n[0], n[1]), (n[1], n[2])),
             Terminals =
@@ -154,12 +143,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_Radial_WithCycle_Returns409()
     {
-        var et = await CreateLineTypeAsync("LSRadialCycle");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Radial,
             Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
             Terminals =
@@ -175,12 +162,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_Network_WithCycle_Succeeds()
     {
-        var et = await CreateLineTypeAsync("LSNetwork");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Network,
             Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
             Terminals =
@@ -198,12 +183,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_Radial_MultipleFeedIn_Returns409()
     {
-        var et = await CreateLineTypeAsync("LSRadialMultiFeed");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Radial,
             Segments = Segments((n[0], n[1]), (n[1], n[2])),
             Terminals =
@@ -222,12 +205,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_Network_WithoutFeedIn_Succeeds()
     {
-        var et = await CreateLineTypeAsync("LSNetworkNoFeed");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Network,
             Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0]))
         });
@@ -242,12 +223,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_Network_Disconnected_Returns409()
     {
-        var et = await CreateLineTypeAsync("LSNetworkDisconnected");
         var (lineId, n) = await CreateLineWithNodesAsync(4);
 
         var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Network,
             Segments = Segments((n[0], n[1]), (n[2], n[3]))
         });
@@ -259,12 +238,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Create_BothSegmentsAndOrderedNodeIds_Returns400()
     {
-        var et = await CreateLineTypeAsync("LSBothInputs");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             Segments = Segments((n[0], n[1])),
             OrderedNodeIds = n.ToList()
@@ -275,20 +252,20 @@ public class LineStructureTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Create_NonLineEdgeType_Returns400()
+    public async Task Create_AnyLine_WithoutEdgeType_Succeeds()
     {
-        var et = await CreateEdgeTypeAsync("LSNonLine", isLine: false);
+        // R4：线路结构不再依赖边类型 / IsLine 守卫，任意线路可直接建结构
         var (lineId, n) = await CreateLineWithNodesAsync(2);
 
-        var resp = await PostStructureAsync(lineId, new LineStructureRequest
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.ToList()
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-        Assert.Contains("IsLine=false", await resp.Content.ReadAsStringAsync());
+        Assert.True(dto.Exists);
+        Assert.True(dto.Diagnostics.Valid);
+        Assert.Single(dto.Segments);
     }
 
     // ============================================================
@@ -298,11 +275,9 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Replace_Empty_ClearsStructure()
     {
-        var et = await CreateLineTypeAsync("LSClear");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.ToList()
         });
@@ -315,28 +290,22 @@ public class LineStructureTests : IntegrationTestBase
         Assert.NotNull(dto);
         Assert.False(dto!.Exists);
 
-        // 旧结构的边实例一并删除
-        var edges = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}");
-        Assert.NotNull(edges);
-        Assert.Empty(edges!);
+        // R4：段与通用边无关，清空结构不产生/不遗留任何通用边
+        Assert.Empty(await GetGenericEdgesAsync(n));
     }
 
     [Fact]
     public async Task Replace_NewMode_RemovesOldSegments()
     {
-        var et = await CreateLineTypeAsync("LSReplace");
         var (lineId, n) = await CreateLineWithNodesAsync(4);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.Take(3).ToList()
         });
 
         var dto = await ReplaceStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Radial,
             Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[1], n[3])),
             Terminals =
@@ -348,10 +317,8 @@ public class LineStructureTests : IntegrationTestBase
         Assert.Equal(TopologyMode.Radial, dto.TopologyMode);
         Assert.Equal(3, dto.Segments.Count);
 
-        var edges = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}");
-        Assert.NotNull(edges);
-        Assert.Equal(3, edges!.Count);
+        // R4：全量替换只重建段行，不产生任何通用边
+        Assert.Empty(await GetGenericEdgesAsync(n));
     }
 
     // ============================================================
@@ -361,11 +328,9 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task AddSegment_Duplicate_Returns409()
     {
-        var et = await CreateLineTypeAsync("LSDup");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.ToList()
         });
@@ -378,17 +343,16 @@ public class LineStructureTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Delete_LastSegment_RemovesHeaderAndEdge()
+    public async Task Delete_LastSegment_RemovesHeaderAndNoGenericEdge()
     {
-        var et = await CreateLineTypeAsync("LSDelLast");
         var (lineId, n) = await CreateLineWithNodesAsync(2);
         var created = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.ToList()
         });
         var edgeId = Assert.Single(created.Segments).EdgeId;
+        Assert.False(string.IsNullOrWhiteSpace(edgeId));
 
         var resp = await Client.DeleteAsync(
             $"/api/eav/lines/{lineId}/structure/segments/{edgeId}");
@@ -397,21 +361,18 @@ public class LineStructureTests : IntegrationTestBase
         var dto = await resp.Content.ReadEavAsync<LineStructureDto>(EnumJson);
         Assert.NotNull(dto);
         Assert.False(dto!.Exists);
+        Assert.Empty(dto.Segments);
 
-        // 边实例同步删除
-        var edgeResp = await Client.GetAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/{edgeId}");
-        Assert.Equal(HttpStatusCode.NotFound, edgeResp.StatusCode);
+        // R4：段标识不映射通用边，删除段/结构不会残留或删除通用边
+        Assert.Empty(await GetGenericEdgesAsync(n));
     }
 
     [Fact]
     public async Task Delete_SegmentOrphaningTerminal_Returns409()
     {
-        var et = await CreateLineTypeAsync("LSDelOrphan");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         var created = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Radial,
             Segments = Segments((n[0], n[1]), (n[1], n[2])),
             Terminals =
@@ -436,11 +397,9 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Terminal_Upsert_ThenDelete()
     {
-        var et = await CreateLineTypeAsync("LSTerm");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Radial,
             Segments = Segments((n[0], n[1]), (n[1], n[2])),
             Terminals =
@@ -466,11 +425,9 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Terminal_NodeNotInStructure_Returns400()
     {
-        var et = await CreateLineTypeAsync("LSTermOut");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.Take(2).ToList()
         });
@@ -491,11 +448,9 @@ public class LineStructureTests : IntegrationTestBase
     public async Task OperatingState_UpsertTerminal_RoundTrip()
     {
         // 增量 upsert 路径 OperatingState 往返
-        var et = await CreateLineTypeAsync("OSUpsert");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.Take(3).ToList()
         });
@@ -519,12 +474,10 @@ public class LineStructureTests : IntegrationTestBase
     public async Task OperatingState_FeedInEnergized_One_Succeeds()
     {
         // 正向：恰好 1 个 FeedIn 投运通过
-        var et = await CreateLineTypeAsync("OSOne");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Radial,
             Segments = Segments((n[0], n[1]), (n[1], n[2])),
             Terminals =
@@ -547,12 +500,10 @@ public class LineStructureTests : IntegrationTestBase
     public async Task OperatingState_FeedInEnergized_Two_Returns409()
     {
         // 反向：2 个 FeedIn 投运 → 409
-        var et = await CreateLineTypeAsync("OSTwo");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Network,
             Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
             Terminals =
@@ -581,12 +532,10 @@ public class LineStructureTests : IntegrationTestBase
     public async Task OperatingState_FeedInNoneEnergized_Succeeds()
     {
         // 正向：FeedIn 存在但都非投运 → 通过（存量场景）
-        var et = await CreateLineTypeAsync("OSNone");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Radial,
             Segments = Segments((n[0], n[1]), (n[1], n[2])),
             Terminals =
@@ -608,12 +557,10 @@ public class LineStructureTests : IntegrationTestBase
     public async Task OperatingState_DefaultIsMaintenance()
     {
         // 不传 OperatingState 默认 Maintenance
-        var et = await CreateLineTypeAsync("OSDefault");
         var (lineId, n) = await CreateLineWithNodesAsync(2);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n,
             Terminals =
@@ -634,12 +581,10 @@ public class LineStructureTests : IntegrationTestBase
     public async Task Tie_AsStart_WhenNoFeedIn_OrderStartsAtTie()
     {
         // Network 模式只有 Tie 没有 FeedIn → 顺序以 Tie 为起点
-        var et = await CreateLineTypeAsync("TieStart");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Network,
             Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
             Terminals =
@@ -665,12 +610,10 @@ public class LineStructureTests : IntegrationTestBase
     public async Task OrphanLineNode_GeneratesWarning()
     {
         // 线路有 4 个节点但结构只用了前 3 个 → 最后一个游离节点出 Warning
-        var et = await CreateLineTypeAsync("OrphanWarn");
         var (lineId, n) = await CreateLineWithNodesAsync(4);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.Take(3).ToList()
         });
@@ -690,12 +633,10 @@ public class LineStructureTests : IntegrationTestBase
     public async Task Warnings_DoNotBlock_CreateStillSucceeds()
     {
         // 有游离节点 Warning 但创建仍成功
-        var et = await CreateLineTypeAsync("WarnOK");
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Network,
             Segments = Segments((n[0], n[1]), (n[1], n[0])) // loop 只用 2 个节点，n[2] 游离
         });
@@ -706,45 +647,76 @@ public class LineStructureTests : IntegrationTestBase
     }
 
     // ============================================================
-    // IsLine 守卫
+    // R4: 段与通用边解耦
     // ============================================================
 
     [Fact]
-    public async Task OrdinaryEdge_Create_ForLineType_Returns409()
+    public async Task Create_Structure_DoesNotCreateGenericEdges()
     {
-        var et = await CreateLineTypeAsync("LSGuardCreate");
-        var (lineId, n) = await CreateLineWithNodesAsync(2);
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
 
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}",
-            new CreateEdgeRequest { FromNodeId = n[0], ToNodeId = n[1] });
-
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("结构", await resp.Content.ReadAsStringAsync());
-
-        // 结构未被创建
-        var dto = await Client.GetEavAsync<LineStructureDto>(
-            $"/api/eav/lines/{lineId}/structure", EnumJson);
-        Assert.False(dto!.Exists);
-    }
-
-    [Fact]
-    public async Task OrdinaryEdge_Delete_WhenReferencedByStructure_Returns409()
-    {
-        var et = await CreateLineTypeAsync("LSGuardDelete");
-        var (lineId, n) = await CreateLineWithNodesAsync(2);
-        var created = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            EdgeTypeId = et.EdgeTypeId,
             TopologyMode = TopologyMode.Linear,
             OrderedNodeIds = n.ToList()
         });
-        var edgeId = Assert.Single(created.Segments).EdgeId;
 
-        var resp = await Client.DeleteAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/{edgeId}");
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("线路结构", await resp.Content.ReadAsStringAsync());
+        Assert.True(dto.Exists);
+        Assert.Equal(2, dto.Segments.Count);
+
+        // 全局边列表中按本线路节点过滤应为空：建结构不产生任何通用边
+        Assert.Empty(await GetGenericEdgesAsync(n));
+    }
+
+    [Fact]
+    public async Task Segments_EdgeIds_AreUniqueAndNonEmpty()
+    {
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var created = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            TopologyMode = TopologyMode.Linear,
+            OrderedNodeIds = n.ToList()
+        });
+
+        Assert.Equal(2, created.Segments.Count);
+        Assert.All(created.Segments,
+            s => Assert.False(string.IsNullOrWhiteSpace(s.EdgeId)));
+        Assert.Equal(
+            created.Segments.Count,
+            created.Segments.Select(s => s.EdgeId).Distinct(StringComparer.Ordinal).Count());
+
+        // 段标识只是段自身标识，不落通用边
+        Assert.Empty(await GetGenericEdgesAsync(n));
+    }
+
+    [Fact]
+    public async Task AddSegment_WeightAndDisplayName_RoundTrip()
+    {
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+        await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            TopologyMode = TopologyMode.Linear,
+            OrderedNodeIds = n.Take(2).ToList()
+        });
+
+        var resp = await Client.PostAsJsonAsync(
+            $"/api/eav/lines/{lineId}/structure/segments",
+            new AddLineSegmentRequest
+            {
+                FromNodeId = n[1],
+                ToNodeId = n[2],
+                Weight = 12.5m,
+                DisplayName = "主线段"
+            });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        var dto = await Client.GetEavAsync<LineStructureDto>(
+            $"/api/eav/lines/{lineId}/structure", EnumJson);
+        Assert.NotNull(dto);
+        var segment = Assert.Single(dto!.Segments, s => s.ToNodeId == n[2]);
+        Assert.Equal<decimal?>(12.5m, segment.Weight);
+        Assert.Equal("主线段", segment.DisplayName);
     }
 
     // ============================================================
@@ -759,29 +731,15 @@ public class LineStructureTests : IntegrationTestBase
             ToNodeId = p.To
         }).ToList();
 
-    private async Task<EdgeTypeDto> CreateLineTypeAsync(
-        string prefix, bool isDirected = true, bool isLine = true)
+    /// <summary>全局边列表按本线路节点过滤（R4 下建/改线路结构不应产生通用边）。</summary>
+    private async Task<List<JsonElement>> GetGenericEdgesAsync(IEnumerable<string> nodeIds)
     {
-        var typeName = $"{prefix}_{Guid.NewGuid():N}";
-        var resp = await Client.PostAsJsonAsync(
-            "/api/eav/metadata/edge-types",
-            new CreateEdgeTypeRequest
-            {
-                TypeName = typeName,
-                DisplayName = $"线路类型_{typeName}",
-                IsGlobal = true,
-                IsDirected = isDirected,
-                IsLine = isLine,
-                IsLinear = true
-            });
-        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
-        var dto = await resp.Content.ReadEavAsync<EdgeTypeDto>();
-        Assert.NotNull(dto);
-        return dto!;
+        var query = string.Join(",", nodeIds);
+        var list = await Client.GetEavAsync<List<JsonElement>>(
+            $"/api/eav/edges?nodeIds={Uri.EscapeDataString(query)}");
+        Assert.NotNull(list);
+        return list!;
     }
-
-    private async Task<EdgeTypeDto> CreateEdgeTypeAsync(string prefix, bool isLine)
-        => await CreateLineTypeAsync(prefix, isDirected: true, isLine: isLine);
 
     private async Task<(string LineId, List<string> NodeIds)> CreateLineWithNodesAsync(int count)
     {

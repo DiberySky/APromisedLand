@@ -18,370 +18,10 @@ namespace TreeGraph.Api.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeDefinition", b =>
-                {
-                    b.Property<string>("EdgeTypeId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("edge_type_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("description");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
-
-                    b.Property<string>("FromNodeType")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("from_node_type");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<bool>("IsDirected")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_directed");
-
-                    b.Property<bool>("IsGlobal")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_global");
-
-                    b.Property<bool>("IsLine")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsLinear")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ToNodeType")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("to_node_type");
-
-                    b.Property<string>("TypeName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("type_name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("EdgeTypeId");
-
-                    b.HasIndex("TypeName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_edge_definition_type_name");
-
-                    b.ToTable("edge_definitions", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            EdgeTypeId = "e0000001-0000-4000-8000-000000000001",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "设备之间的电气连通（母线↔断路器、隔离开关↔线路）；物理连接对称，按无向处理。",
-                            DisplayName = "电气连接",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = false,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "ConnectedTo",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000002-0000-4000-8000-000000000002",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "下游设备指向供电上游，沿供电方向逐级上溯；线路结构支持完整供电路径查询与成环校验。",
-                            DisplayName = "供电来源",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = true,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "SuppliedBy",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000003-0000-4000-8000-000000000003",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "低压电缆组接入变压器，与电气连接配合还原「建筑—低压柜—变压器」链路。",
-                            DisplayName = "低压接入",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "LowVoltageAccess",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000004-0000-4000-8000-000000000004",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "线路段序列，属线路结构；允许 T 接分支（不限制入度）。",
-                            DisplayName = "输电线路",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = true,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "TransmissionLine",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000005-0000-4000-8000-000000000005",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "单电源馈线，线路结构且严格线性（入度≤1、无环）。",
-                            DisplayName = "馈线",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = true,
-                            IsLinear = true,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "Feeder",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000006-0000-4000-8000-000000000006",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "设备在管理上归属台区/馈线等逻辑单元；与电气连接、物理位置分开建模。",
-                            DisplayName = "逻辑归属",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "BelongsTo",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000007-0000-4000-8000-000000000007",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "设备归属运维单位，与逻辑归属分型，避免同一对点混用一条边。",
-                            DisplayName = "归属单位",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "UnitTree",
-                            TypeName = "AssignedTo",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000008-0000-4000-8000-000000000008",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "分布式光伏、储能等设备安装在建筑/站点上。",
-                            DisplayName = "安装承载",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "InstalledIn",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000009-0000-4000-8000-000000000009",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "空间实体相邻（共享边界/距离），用于台区划分与抢修路径分析；对称按无向处理。",
-                            DisplayName = "空间邻接",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = false,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "AdjacentTo",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000010-0000-4000-8000-000000000010",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "设备物理位置（站房/楼层/房间），与逻辑归属分离。",
-                            DisplayName = "位置所在",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "LocatedAt",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000011-0000-4000-8000-000000000011",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "保护装置指向被保护设备，用于故障时定位应动作的保护。",
-                            DisplayName = "保护范围",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "Protects",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000012-0000-4000-8000-000000000012",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "上下级保护配合（配合级差与时间定值），支持定值校核与越级跳闸分析。",
-                            DisplayName = "保护配合",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "BacksUp",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000013-0000-4000-8000-000000000013",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "操作票与五防规则的前置约束，例如线路带电时禁止合接地刀闸。",
-                            DisplayName = "操作前置",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "PrerequisiteFor",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000014-0000-4000-8000-000000000014",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "二次设备（保护、测控、通信）依赖一次设备或电源，用于故障溯源。",
-                            DisplayName = "二次依赖",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "DependsOn",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000015-0000-4000-8000-000000000015",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "故障事件节点指向受影响的设备/用户，表达失电或降级范围。",
-                            DisplayName = "影响范围",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "Affects",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000016-0000-4000-8000-000000000016",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "跳闸事件指向触发它的保护动作或根因故障，用于事后复盘。",
-                            DisplayName = "事件起因",
-                            FromNodeType = "SpaceTree",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = false,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "SpaceTree",
-                            TypeName = "TrippedBy",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000017-0000-4000-8000-000000000017",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "线路区段 → 交叉跨越点；空间相交但电气隔离，不参与供电拓扑遍历。",
-                            DisplayName = "跨越通过",
-                            IsActive = true,
-                            IsDirected = true,
-                            IsGlobal = true,
-                            IsLine = false,
-                            IsLinear = false,
-                            ToNodeType = "LineNode",
-                            TypeName = "PassesThrough",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        },
-                        new
-                        {
-                            EdgeTypeId = "e0000018-0000-4000-8000-000000000018",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "两个跨越点（LineNode）之间的线路区段；无向对称，属线路结构，可串联成完整路径，允许 T 接分支。",
-                            DisplayName = "线路段",
-                            FromNodeType = "LineNode",
-                            IsActive = true,
-                            IsDirected = false,
-                            IsGlobal = false,
-                            IsLine = true,
-                            IsLinear = false,
-                            ToNodeType = "LineNode",
-                            TypeName = "LineSegment",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        });
-                });
 
             modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeInstance", b =>
                 {
@@ -396,28 +36,17 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("DisplayName")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("display_name");
-
-                    b.Property<string>("EdgeTypeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("edge_type_id");
-
-                    b.Property<bool>("EnforceSingleIncoming")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("enforce_single_incoming");
-
                     b.Property<string>("FromNodeId")
                         .IsRequired()
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)")
                         .HasColumnName("from_node_id");
+
+                    b.Property<bool>("IsDirected")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_directed");
 
                     b.Property<string>("ToNodeId")
                         .IsRequired()
@@ -425,14 +54,15 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("to_node_id");
 
+                    b.Property<string>("TypeName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("type_name");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
-
-                    b.Property<decimal?>("Weight")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("weight");
 
                     b.HasKey("EdgeId");
 
@@ -442,18 +72,7 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasIndex("ToNodeId")
                         .HasDatabaseName("ix_ei_to_node");
 
-                    b.HasIndex("EdgeTypeId", "FromNodeId")
-                        .HasDatabaseName("ix_ei_from");
-
-                    b.HasIndex("EdgeTypeId", "ToNodeId")
-                        .HasDatabaseName("ix_ei_to");
-
-                    b.HasIndex("ToNodeId", "EdgeTypeId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_ei_single_incoming")
-                        .HasFilter("enforce_single_incoming = true");
-
-                    b.HasIndex("EdgeTypeId", "FromNodeId", "ToNodeId")
+                    b.HasIndex("TypeName", "FromNodeId", "ToNodeId")
                         .IsUnique()
                         .HasDatabaseName("uq_edge_instance");
 
@@ -467,12 +86,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("line_id");
 
-                    b.Property<string>("EdgeTypeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("edge_type_id");
-
                     b.Property<string>("TopologyMode")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -484,9 +97,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("LineId");
-
-                    b.HasIndex("EdgeTypeId")
-                        .HasDatabaseName("ix_line_structures_edge_type");
 
                     b.ToTable("line_structures", (string)null);
                 });
@@ -503,6 +113,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("edge_id");
 
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("display_name");
+
                     b.Property<string>("FromNodeId")
                         .IsRequired()
                         .HasMaxLength(36)
@@ -514,6 +129,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)")
                         .HasColumnName("to_node_id");
+
+                    b.Property<decimal?>("Weight")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("weight");
 
                     b.HasKey("LineId", "EdgeId");
 
@@ -2353,12 +1973,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("line_id");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -2371,6 +1985,594 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasIndex("LineId");
 
                     b.ToTable("line_nodes", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.NodeSky.Entities.Node", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()::text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("HostType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Node")
+                        .HasColumnName("host_type");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("nodes", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "计量单位"
+                        },
+                        new
+                        {
+                            Id = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "货币"
+                        },
+                        new
+                        {
+                            Id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "长度"
+                        },
+                        new
+                        {
+                            Id = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "质量"
+                        },
+                        new
+                        {
+                            Id = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "时间"
+                        },
+                        new
+                        {
+                            Id = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "温度"
+                        },
+                        new
+                        {
+                            Id = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "电流"
+                        },
+                        new
+                        {
+                            Id = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "电压"
+                        },
+                        new
+                        {
+                            Id = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "功率"
+                        },
+                        new
+                        {
+                            Id = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "面积"
+                        },
+                        new
+                        {
+                            Id = "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "体积"
+                        },
+                        new
+                        {
+                            Id = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "速度"
+                        },
+                        new
+                        {
+                            Id = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "压力"
+                        },
+                        new
+                        {
+                            Id = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "能量"
+                        },
+                        new
+                        {
+                            Id = "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "频率"
+                        },
+                        new
+                        {
+                            Id = "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "角度"
+                        },
+                        new
+                        {
+                            Id = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "元"
+                        },
+                        new
+                        {
+                            Id = "e6b7c8d9-f0a1-4b2c-3d4e-5f6a7b8c9d0e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "美元"
+                        },
+                        new
+                        {
+                            Id = "d5c6d7e8-f9a0-4b1c-2d3e-4f5a6b7c8d9e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "欧元"
+                        },
+                        new
+                        {
+                            Id = "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "英镑"
+                        },
+                        new
+                        {
+                            Id = "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "日元"
+                        },
+                        new
+                        {
+                            Id = "a5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "港元"
+                        },
+                        new
+                        {
+                            Id = "b6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "澳元"
+                        },
+                        new
+                        {
+                            Id = "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "米"
+                        },
+                        new
+                        {
+                            Id = "d1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "千米"
+                        },
+                        new
+                        {
+                            Id = "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "厘米"
+                        },
+                        new
+                        {
+                            Id = "f3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "毫米"
+                        },
+                        new
+                        {
+                            Id = "a4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "英里"
+                        },
+                        new
+                        {
+                            Id = "b5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "码"
+                        },
+                        new
+                        {
+                            Id = "c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "英尺"
+                        },
+                        new
+                        {
+                            Id = "d7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "英寸"
+                        },
+                        new
+                        {
+                            Id = "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "千克"
+                        },
+                        new
+                        {
+                            Id = "f9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "克"
+                        },
+                        new
+                        {
+                            Id = "a0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "毫克"
+                        },
+                        new
+                        {
+                            Id = "b1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "吨"
+                        },
+                        new
+                        {
+                            Id = "c2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "磅"
+                        },
+                        new
+                        {
+                            Id = "d3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "盎司"
+                        },
+                        new
+                        {
+                            Id = "e4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "秒"
+                        },
+                        new
+                        {
+                            Id = "f5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "分钟"
+                        },
+                        new
+                        {
+                            Id = "a6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "小时"
+                        },
+                        new
+                        {
+                            Id = "b7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "天"
+                        },
+                        new
+                        {
+                            Id = "c8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "摄氏度"
+                        },
+                        new
+                        {
+                            Id = "d9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "华氏度"
+                        },
+                        new
+                        {
+                            Id = "e0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "开尔文"
+                        },
+                        new
+                        {
+                            Id = "f1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "安培"
+                        },
+                        new
+                        {
+                            Id = "a2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "毫安"
+                        },
+                        new
+                        {
+                            Id = "b3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "微安"
+                        },
+                        new
+                        {
+                            Id = "c4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "伏特"
+                        },
+                        new
+                        {
+                            Id = "d5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "千伏"
+                        },
+                        new
+                        {
+                            Id = "e6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "毫伏"
+                        },
+                        new
+                        {
+                            Id = "f7d8e9f0-a1b2-4c3d-4e5f-6a7b8c9d0e1f",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "瓦特"
+                        },
+                        new
+                        {
+                            Id = "a8e9f0a1-b2c3-4d4e-5f6a-7b8c9d0e1f2a",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "千瓦"
+                        },
+                        new
+                        {
+                            Id = "b9f0a1b2-c3d4-4e5f-6a7b-8c9d0e1f2a3b",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "兆瓦"
+                        },
+                        new
+                        {
+                            Id = "a00be966-be2e-484e-92b6-9706494ac775",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "马力"
+                        },
+                        new
+                        {
+                            Id = "e88b04db-40ac-4bb7-b420-1f3b37180673",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "平方米"
+                        },
+                        new
+                        {
+                            Id = "0d7ebe17-93ae-4e4c-92f4-063a124cd181",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "平方公里"
+                        },
+                        new
+                        {
+                            Id = "a4c312d3-023e-4d4e-b5a7-fb7fcbd55c56",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "公顷"
+                        },
+                        new
+                        {
+                            Id = "fefa26a5-d608-411c-b637-469a886e558c",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "亩"
+                        },
+                        new
+                        {
+                            Id = "2d21c35a-4251-479e-b814-060b2fc84445",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "立方米"
+                        },
+                        new
+                        {
+                            Id = "7f0af6a9-ba1a-469c-b967-e32afe43cad2",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "升"
+                        },
+                        new
+                        {
+                            Id = "780e7a01-350d-45ec-b963-b36a996de614",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "毫升"
+                        },
+                        new
+                        {
+                            Id = "4cbec89d-3f52-4db3-9ab0-faeeb841ffbf",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "米/秒"
+                        },
+                        new
+                        {
+                            Id = "64e918fb-ee9d-45c7-b35a-2a55f5a5fe62",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "千米/小时"
+                        },
+                        new
+                        {
+                            Id = "405ae7a3-8a13-479d-bc1a-6f9d3c15e521",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "英里/小时"
+                        },
+                        new
+                        {
+                            Id = "221d3c45-911f-4e94-9c3e-c13e6f2bcc76",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "帕斯卡"
+                        },
+                        new
+                        {
+                            Id = "883a9940-84ec-4daa-8448-609461b984ea",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "千帕"
+                        },
+                        new
+                        {
+                            Id = "d5306eb8-324f-4088-a867-6fbc7141fd59",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "兆帕"
+                        },
+                        new
+                        {
+                            Id = "8981bd9a-bd99-4f4c-b8af-038975b799be",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "巴"
+                        },
+                        new
+                        {
+                            Id = "5db494d7-2a9c-4ae0-86e0-d4bb0dfc7b81",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "焦耳"
+                        },
+                        new
+                        {
+                            Id = "279a6b18-6d01-4437-b95b-0480ca7adc98",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "千焦"
+                        },
+                        new
+                        {
+                            Id = "e3c1f025-3b2b-461a-a5a1-015cb4e3fe38",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "千瓦时"
+                        },
+                        new
+                        {
+                            Id = "5e880060-9410-40d7-bcb4-545ccd0c1bb6",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "赫兹"
+                        },
+                        new
+                        {
+                            Id = "1a80ed3b-1b36-4d8b-b80b-3070dbc7979d",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "千赫"
+                        },
+                        new
+                        {
+                            Id = "41572712-95dd-4caf-b316-e1b924bc57c3",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "兆赫"
+                        },
+                        new
+                        {
+                            Id = "ed1b66d2-454b-453b-9d43-12605dffa456",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "度"
+                        },
+                        new
+                        {
+                            Id = "3d9088a3-7283-4f8f-b995-b193a57a6c2a",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "UnitTree",
+                            Name = "弧度"
+                        },
+                        new
+                        {
+                            Id = "d0000000-0000-4000-8000-000000000001",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "CategoryTree",
+                            Name = "项目类型"
+                        },
+                        new
+                        {
+                            Id = "beef0000-0000-4000-8000-000000000001",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            HostType = "KnowledgeTree",
+                            Name = "知识库"
+                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", b =>
@@ -2392,12 +2594,6 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean")
                         .HasColumnName("is_archived");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)")
-                        .HasColumnName("name");
 
                     b.Property<string>("ParentId")
                         .HasMaxLength(36)
@@ -2422,7 +2618,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "根分类",
                             IsArchived = false,
-                            Name = "项目类型",
                             SortOrder = 0
                         });
                 });
@@ -2447,12 +2642,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_archived");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)")
-                        .HasColumnName("name");
-
                     b.Property<string>("ParentId")
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)")
@@ -2476,7 +2665,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "根知识库",
                             IsArchived = false,
-                            Name = "知识库",
                             SortOrder = 0
                         });
                 });
@@ -2500,12 +2688,6 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Property<bool>("HasChildren")
                         .HasColumnType("boolean")
                         .HasColumnName("has_children");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
 
                     b.Property<string>("ParentId")
                         .HasMaxLength(36)
@@ -2550,12 +2732,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("has_children");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
                     b.Property<string>("ParentId")
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)")
@@ -2580,7 +2756,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "",
                             HasChildren = true,
-                            Name = "计量单位",
                             SortOrder = 0
                         },
                         new
@@ -2590,7 +2765,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "货币计量单位",
                             HasChildren = true,
-                            Name = "货币",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 0
                         },
@@ -2601,7 +2775,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "长度计量单位",
                             HasChildren = true,
-                            Name = "长度",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 1
                         },
@@ -2612,7 +2785,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "质量计量单位",
                             HasChildren = true,
-                            Name = "质量",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 2
                         },
@@ -2623,7 +2795,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "时间计量单位",
                             HasChildren = true,
-                            Name = "时间",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 3
                         },
@@ -2634,7 +2805,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "温度计量单位",
                             HasChildren = true,
-                            Name = "温度",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 4
                         },
@@ -2645,7 +2815,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "电流计量单位",
                             HasChildren = true,
-                            Name = "电流",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 5
                         },
@@ -2656,7 +2825,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "电压计量单位",
                             HasChildren = true,
-                            Name = "电压",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 6
                         },
@@ -2667,7 +2835,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "功率计量单位",
                             HasChildren = true,
-                            Name = "功率",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 7
                         },
@@ -2678,7 +2845,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "面积计量单位",
                             HasChildren = true,
-                            Name = "面积",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 8
                         },
@@ -2689,7 +2855,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "体积计量单位",
                             HasChildren = true,
-                            Name = "体积",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 9
                         },
@@ -2700,7 +2865,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "速度计量单位",
                             HasChildren = true,
-                            Name = "速度",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 10
                         },
@@ -2711,7 +2875,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "压力计量单位",
                             HasChildren = true,
-                            Name = "压力",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 11
                         },
@@ -2722,7 +2885,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "能量计量单位",
                             HasChildren = true,
-                            Name = "能量",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 12
                         },
@@ -2733,7 +2895,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "频率计量单位",
                             HasChildren = true,
-                            Name = "频率",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 13
                         },
@@ -2744,7 +2905,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = true,
                             Description = "角度计量单位",
                             HasChildren = true,
-                            Name = "角度",
                             ParentId = "9AB5700C-68F2-43F3-9D7E-805E7D5C539B",
                             SortOrder = 14
                         },
@@ -2755,7 +2915,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "人民币",
                             HasChildren = false,
-                            Name = "元",
                             ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
                             SortOrder = 15
                         },
@@ -2766,7 +2925,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "美元",
                             HasChildren = false,
-                            Name = "美元",
                             ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
                             SortOrder = 16
                         },
@@ -2777,7 +2935,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "欧元",
                             HasChildren = false,
-                            Name = "欧元",
                             ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
                             SortOrder = 17
                         },
@@ -2788,7 +2945,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "英镑",
                             HasChildren = false,
-                            Name = "英镑",
                             ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
                             SortOrder = 18
                         },
@@ -2799,7 +2955,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "日元",
                             HasChildren = false,
-                            Name = "日元",
                             ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
                             SortOrder = 19
                         },
@@ -2810,7 +2965,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "港元",
                             HasChildren = false,
-                            Name = "港元",
                             ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
                             SortOrder = 20
                         },
@@ -2821,7 +2975,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "澳元",
                             HasChildren = false,
-                            Name = "澳元",
                             ParentId = "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
                             SortOrder = 21
                         },
@@ -2832,7 +2985,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "米",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             SortOrder = 22
                         },
@@ -2843,7 +2995,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "千米",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             SortOrder = 23
                         },
@@ -2854,7 +3005,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "厘米",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             SortOrder = 24
                         },
@@ -2865,7 +3015,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "毫米",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             SortOrder = 25
                         },
@@ -2876,7 +3025,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "英里",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             SortOrder = 26
                         },
@@ -2887,7 +3035,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "码",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             SortOrder = 27
                         },
@@ -2898,7 +3045,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "英尺",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             SortOrder = 28
                         },
@@ -2909,7 +3055,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "英寸",
                             ParentId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
                             SortOrder = 29
                         },
@@ -2920,7 +3065,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "千克",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
                             SortOrder = 30
                         },
@@ -2931,7 +3075,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "克",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
                             SortOrder = 31
                         },
@@ -2942,7 +3085,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "毫克",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
                             SortOrder = 32
                         },
@@ -2953,7 +3095,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "吨",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
                             SortOrder = 33
                         },
@@ -2964,7 +3105,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "磅",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
                             SortOrder = 34
                         },
@@ -2975,7 +3115,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "盎司",
                             ParentId = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
                             SortOrder = 35
                         },
@@ -2986,7 +3125,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "秒",
                             ParentId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
                             SortOrder = 36
                         },
@@ -2997,7 +3135,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "分钟",
                             ParentId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
                             SortOrder = 37
                         },
@@ -3008,7 +3145,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "小时",
                             ParentId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
                             SortOrder = 38
                         },
@@ -3019,7 +3155,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "天",
                             ParentId = "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
                             SortOrder = 39
                         },
@@ -3030,7 +3165,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "摄氏度",
                             ParentId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
                             SortOrder = 40
                         },
@@ -3041,7 +3175,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "华氏度",
                             ParentId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
                             SortOrder = 41
                         },
@@ -3052,7 +3185,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "开尔文",
                             ParentId = "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
                             SortOrder = 42
                         },
@@ -3063,7 +3195,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "安培",
                             ParentId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
                             SortOrder = 43
                         },
@@ -3074,7 +3205,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "毫安",
                             ParentId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
                             SortOrder = 44
                         },
@@ -3085,7 +3215,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "微安",
                             ParentId = "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
                             SortOrder = 45
                         },
@@ -3096,7 +3225,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "伏特",
                             ParentId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
                             SortOrder = 46
                         },
@@ -3107,7 +3235,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "千伏",
                             ParentId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
                             SortOrder = 47
                         },
@@ -3118,7 +3245,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "毫伏",
                             ParentId = "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
                             SortOrder = 48
                         },
@@ -3129,7 +3255,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "瓦特",
                             ParentId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
                             SortOrder = 49
                         },
@@ -3140,7 +3265,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "千瓦",
                             ParentId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
                             SortOrder = 50
                         },
@@ -3151,7 +3275,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "兆瓦",
                             ParentId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
                             SortOrder = 51
                         },
@@ -3162,7 +3285,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "马力",
                             ParentId = "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
                             SortOrder = 52
                         },
@@ -3173,7 +3295,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "平方米",
                             ParentId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
                             SortOrder = 53
                         },
@@ -3184,7 +3305,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "平方公里",
                             ParentId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
                             SortOrder = 54
                         },
@@ -3195,7 +3315,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "公顷",
                             ParentId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
                             SortOrder = 55
                         },
@@ -3206,7 +3325,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "亩",
                             ParentId = "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
                             SortOrder = 56
                         },
@@ -3217,7 +3335,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "立方米",
                             ParentId = "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
                             SortOrder = 57
                         },
@@ -3228,7 +3345,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "升",
                             ParentId = "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
                             SortOrder = 58
                         },
@@ -3239,7 +3355,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "毫升",
                             ParentId = "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
                             SortOrder = 59
                         },
@@ -3250,7 +3365,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "米/秒",
                             ParentId = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
                             SortOrder = 60
                         },
@@ -3261,7 +3375,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "千米/小时",
                             ParentId = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
                             SortOrder = 61
                         },
@@ -3272,7 +3385,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "英里/小时",
                             ParentId = "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
                             SortOrder = 62
                         },
@@ -3283,7 +3395,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "帕斯卡",
                             ParentId = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
                             SortOrder = 63
                         },
@@ -3294,7 +3405,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "千帕",
                             ParentId = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
                             SortOrder = 64
                         },
@@ -3305,7 +3415,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "兆帕",
                             ParentId = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
                             SortOrder = 65
                         },
@@ -3316,7 +3425,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "巴",
                             ParentId = "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
                             SortOrder = 66
                         },
@@ -3327,7 +3435,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "焦耳",
                             ParentId = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
                             SortOrder = 67
                         },
@@ -3338,7 +3445,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "千焦",
                             ParentId = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
                             SortOrder = 68
                         },
@@ -3349,7 +3455,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "千瓦时",
                             ParentId = "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
                             SortOrder = 69
                         },
@@ -3360,7 +3465,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "赫兹",
                             ParentId = "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
                             SortOrder = 70
                         },
@@ -3371,7 +3475,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "千赫",
                             ParentId = "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
                             SortOrder = 71
                         },
@@ -3382,7 +3485,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "兆赫",
                             ParentId = "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
                             SortOrder = 72
                         },
@@ -3393,7 +3495,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "度",
                             ParentId = "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
                             SortOrder = 73
                         },
@@ -3404,7 +3505,6 @@ namespace TreeGraph.Api.Data.Migrations
                             CanHaveChildren = false,
                             Description = "",
                             HasChildren = false,
-                            Name = "弧度",
                             ParentId = "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
                             SortOrder = 74
                         });
@@ -3412,23 +3512,31 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeInstance", b =>
                 {
-                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeDefinition", "EdgeType")
-                        .WithMany("Instances")
-                        .HasForeignKey("EdgeTypeId")
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
+                        .WithOne()
+                        .HasForeignKey("TreeGraph.Api.EdgeSky.Entities.EdgeInstance", "EdgeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("EdgeType");
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
+                        .WithMany()
+                        .HasForeignKey("FromNodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ei_from_node");
+
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
+                        .WithMany()
+                        .HasForeignKey("ToNodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ei_to_node");
+
+                    b.Navigation("Node");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructure", b =>
                 {
-                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeDefinition", null)
-                        .WithMany()
-                        .HasForeignKey("EdgeTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("TreeGraph.Shared.LineSky.Entities.Line", null)
                         .WithMany()
                         .HasForeignKey("LineId")
@@ -3438,12 +3546,6 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructureSegment", b =>
                 {
-                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeInstance", null)
-                        .WithMany()
-                        .HasForeignKey("EdgeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("TreeGraph.Api.LineSky.Entities.LineStructure", null)
                         .WithMany()
                         .HasForeignKey("LineId")
@@ -3633,36 +3735,77 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.LineNode", b =>
                 {
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
+                        .WithOne()
+                        .HasForeignKey("TreeGraph.Shared.LineSky.Entities.LineNode", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("TreeGraph.Shared.LineSky.Entities.Line", null)
                         .WithMany()
                         .HasForeignKey("LineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Node");
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", b =>
+                {
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
+                        .WithOne()
+                        .HasForeignKey("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Node");
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.KnowledgeTree", b =>
+                {
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
+                        .WithOne()
+                        .HasForeignKey("TreeGraph.Shared.TreeEavSky.Entities.KnowledgeTree", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Node");
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.SpaceTree", b =>
                 {
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
+                        .WithOne()
+                        .HasForeignKey("TreeGraph.Shared.TreeEavSky.Entities.SpaceTree", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.SpaceTree", "Parent")
                         .WithMany()
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Node");
 
                     b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", b =>
                 {
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
+                        .WithOne()
+                        .HasForeignKey("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("TreeGraph.Shared.TreeEavSky.Entities.UnitTree", "Parent")
                         .WithMany()
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("Parent");
-                });
+                    b.Navigation("Node");
 
-            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeDefinition", b =>
-                {
-                    b.Navigation("Instances");
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>

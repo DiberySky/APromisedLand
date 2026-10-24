@@ -26,7 +26,7 @@ public class TreeEavSkyServiceCollectionExtensionsTests
         public int SortOrder { get; set; }
         public bool HasChildren { get; set; }
         public DiSmokeNode? Parent { get; set; }
-        public string Text() => Id;
+        public string? Name => Id;
     }
 
     /// <summary>宿主覆盖用的自定义 Handler（只验证可解析，方法不会被调用）。</summary>

@@ -13,13 +13,13 @@ public class TreeHelperIterationTests
     private const int Depth = 10_000;
 
     /// <summary>构造 1→2→…→Depth 的单链，子集合在构造期就全部挂好。</summary>
-    private static List<TreeItemData<UnitTree>> BuildLine(int depth)
+    private static List<TreeNodeItem<UnitTree>> BuildLine(int depth)
     {
-        TreeItemData<UnitTree>? leaf = null;
+        TreeNodeItem<UnitTree>? leaf = null;
 
         for (int i = depth; i >= 1; i--)
         {
-            var node = new TreeItemData<UnitTree>
+            var node = new TreeNodeItem<UnitTree>
             {
                 Value = new UnitTree { Id = i.ToString(), Name = $"N{i}" },
                 Children = leaf is null ? null : [leaf],
@@ -57,18 +57,18 @@ public class TreeHelperIterationTests
     public void GetPathToNode_CyclicGraph_DoesNotInfiniteLoop()
     {
         // 手工构造环：a ↔ b
-        var a = new TreeItemData<UnitTree>
+        var a = new TreeNodeItem<UnitTree>
         {
             Value = new UnitTree { Id = "a", Name = "A" },
         };
-        var b = new TreeItemData<UnitTree>
+        var b = new TreeNodeItem<UnitTree>
         {
             Value = new UnitTree { Id = "b", Name = "B" },
             Children = [a],
         };
         a.Children = [b];
 
-        var path = new List<TreeItemData<UnitTree>> { a }.GetPathToNode("b");
+        var path = new List<TreeNodeItem<UnitTree>> { a }.GetPathToNode("b");
 
         Assert.Equal(["a", "b"], path);
     }

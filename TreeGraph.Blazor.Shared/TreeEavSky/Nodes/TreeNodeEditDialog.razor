@@ -81,7 +81,7 @@
     protected override void OnInitialized()
     {
         _node = NodeTemplate.Node.Value!;
-        _title = IsCreate ? $"创建【{_node.Parent!.Text()}】子节点" : _node.Text();
+        _title = IsCreate ? $"创建【{_node.Parent!.Name}】子节点" : _node.Name;
 
         base.OnInitialized();
     }

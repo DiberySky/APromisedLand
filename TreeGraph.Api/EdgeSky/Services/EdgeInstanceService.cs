@@ -6,339 +6,109 @@ using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.Messaging;
+using TreeGraph.Shared.NodeSky.Entities;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 
 namespace TreeGraph.Api.EdgeSky.Services;
 
 /// <summary>
-/// Edge Instance CRUD + 图查询。
+/// 边实例 CRUD + 图查询（R4 简化版）。
 ///
-/// 属性值复用 EAV：entity_type = EdgeDefinition.TypeName, entity_id = EdgeId。
-/// 创建时支持一次性写入 Properties。
+/// 只实现两个 Node 之间的有向/无向关系：
+///   - 端点是 nodes(id) 的真外键，存在性由数据库兜底；
+///   - type_name 是裸列，业务属性一律走 EAV（entity_type = type_name, entity_id = edgeId）；
+///   - 不认识线路、不做拓扑校验，线路拓扑完全归 LineSky。
 /// </summary>
 public class EdgeInstanceService
 {
     private readonly TreeGraphDbContext _db;
     private readonly EavWriteService _eavWrite;
     private readonly EavReadService _eavRead;
-    private readonly IEdgeNodeValidator _nodeValidator;
     private readonly InodeOwnerGuardRegistry _inodeGuards;
     private readonly IEventPublisher _publishEndpoint;
 
     public EdgeInstanceService(
         TreeGraphDbContext db, EavWriteService eavWrite, EavReadService eavRead,
-        IEdgeNodeValidator nodeValidator, InodeOwnerGuardRegistry inodeGuards,
-        IEventPublisher publishEndpoint)
+        InodeOwnerGuardRegistry inodeGuards, IEventPublisher publishEndpoint)
     {
         _db = db;
         _eavWrite = eavWrite;
         _eavRead = eavRead;
-        _nodeValidator = nodeValidator;
         _inodeGuards = inodeGuards;
         _publishEndpoint = publishEndpoint;
     }
 
-    public Task<EdgeInstanceDto?> CreateAsync(
-        string edgeTypeId, CreateEdgeRequest req, CancellationToken ct)
-        => CreateCoreAsync(edgeTypeId, req, forLineStructure: false, ct);
+    // ============================================================
+    // 写
+    // ============================================================
 
-    /// <summary>
-    /// 线路结构专用：跳过「普通接口禁止创建 IsLine 边」与节点声明类型校验，
-    /// 由 LineStructureService 负责结构拓扑与同线归属校验。
-    /// </summary>
-    internal Task<EdgeInstanceDto?> CreateLineEdgeInternalAsync(
-        string edgeTypeId, CreateEdgeRequest req, CancellationToken ct)
-        => CreateCoreAsync(edgeTypeId, req, forLineStructure: true, ct);
-
-    private async Task<EdgeInstanceDto?> CreateCoreAsync(
-        string edgeTypeId, CreateEdgeRequest req, bool forLineStructure, CancellationToken ct)
+    public async Task<EdgeInstanceDto> CreateAsync(CreateEdgeRequest req, CancellationToken ct)
     {
-        var def = await _db.EdgeDefinitions
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
-        if (def is null) return null;
+        var typeName = req.TypeName?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(typeName))
+            throw Invalid("typeName", "关系类型名必填");
 
-        // 线路结构边只允许经结构接口创建（唯一入口，避免绕过结构校验产生游离边）
-        if (def.IsLine && !forLineStructure)
-            throw new InvalidOperationException(
-                $"边类型 {def.DisplayName} 是线路结构类型，不能通过普通边接口创建；请使用线路结构接口");
+        if (string.IsNullOrWhiteSpace(req.FromNodeId))
+            throw Invalid("fromNodeId", "起点节点必填");
+        if (string.IsNullOrWhiteSpace(req.ToNodeId))
+            throw Invalid("toNodeId", "终点节点必填");
 
-        if (string.IsNullOrWhiteSpace(req.FromNodeId)
-            || string.IsNullOrWhiteSpace(req.ToNodeId))
-            throw new ArgumentException("FromNodeId / ToNodeId 必填");
+        // 端点存在性：nodes 单表批量查询（自环时去重后只查一次）
+        var endpointIds = new[] { req.FromNodeId, req.ToNodeId }.Distinct().ToList();
+        var existing = await _db.Nodes
+            .AsNoTracking()
+            .Where(n => endpointIds.Contains(n.Id))
+            .Select(n => n.Id)
+            .ToListAsync(ct);
+        var missing = endpointIds.Except(existing).ToList();
+        if (missing.Count > 0)
+            throw Invalid("nodeId", $"节点不存在：{string.Join(", ", missing)}");
 
-        // 节点存在性 + 声明类型校验（结构边端点由复合外键保证同线归属，此处不套用节点类型声明）
-        if (!forLineStructure)
-        {
-            await _nodeValidator.EnsureNodeAsync(def.FromNodeType, req.FromNodeId, ct);
-            await _nodeValidator.EnsureNodeAsync(def.ToNodeType, req.ToNodeId, ct);
-        }
-
-        // 重复检查：有向仅看同向；无向（IsDirected=false）反向亦视为重复
-        var duplicate = await _db.EdgeInstances
-            .AnyAsync(i => i.EdgeTypeId == edgeTypeId
-                && (def.IsDirected
-                    ? i.FromNodeId == req.FromNodeId && i.ToNodeId == req.ToNodeId
-                    : (i.FromNodeId == req.FromNodeId && i.ToNodeId == req.ToNodeId)
-                      || (i.FromNodeId == req.ToNodeId && i.ToNodeId == req.FromNodeId)), ct);
+        // 重复判定：同类型同向；无向边反向亦视为重复（唯一索引兜底同向）
+        var isDirected = req.IsDirected;
+        var duplicate = await _db.EdgeInstances.AnyAsync(i =>
+            i.TypeName == typeName
+            && (isDirected
+                ? i.FromNodeId == req.FromNodeId && i.ToNodeId == req.ToNodeId
+                : (i.FromNodeId == req.FromNodeId && i.ToNodeId == req.ToNodeId)
+                  || (i.FromNodeId == req.ToNodeId && i.ToNodeId == req.FromNodeId)), ct);
         if (duplicate)
             throw new InvalidOperationException("该边已存在（同类型同方向不重复）");
 
-        var enforceSingleIncoming = !forLineStructure && def.IsLine && def.IsLinear;
-
-        // 严格线性线路：入度 ≤ 1 友好前置校验（数据库部分唯一索引 uq_ei_single_incoming 兜底）
-        if (enforceSingleIncoming)
-        {
-            var indegree = await _db.EdgeInstances
-                .CountAsync(i => i.EdgeTypeId == edgeTypeId
-                    && i.ToNodeId == req.ToNodeId, ct);
-            if (indegree > 0)
-                throw new InvalidOperationException(
-                    $"线路结构 {def.DisplayName} 是严格线性，节点 {req.ToNodeId} 入度已 = 1，不能再接");
-        }
-
-        // 线路结构：自环 / 成环拦截（结构边由 LineStructureService 按拓扑模式校验）
-        if (def.IsLine && !forLineStructure)
-        {
-            if (req.FromNodeId == req.ToNodeId)
-                throw new InvalidOperationException("线路结构不允许自环（from 与 to 相同）");
-
-            if (await WouldCreateCycleAsync(edgeTypeId, req.FromNodeId, req.ToNodeId, ct))
-                throw new InvalidOperationException(
-                    $"新增边 {req.FromNodeId} → {req.ToNodeId} 会形成环，线路结构应无环");
-        }
-
+        var now = DateTimeOffset.UtcNow;
         var instance = new EdgeInstance
         {
-            EdgeTypeId = edgeTypeId,
+            // 先确定 Id，才能在同一 SaveChanges 内注册 nodes 身份行（共享主键 FK）
+            EdgeId = Guid.NewGuid().ToString(),
+            TypeName = typeName,
             FromNodeId = req.FromNodeId,
             ToNodeId = req.ToNodeId,
-            Weight = req.Weight,
-            DisplayName = req.DisplayName,
-            EnforceSingleIncoming = enforceSingleIncoming,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            IsDirected = isDirected,
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
+        // 同一 SaveChanges（隐式事务）：EF 按 FK 依赖先插 nodes，再插 edge_instances
+        _db.Nodes.Add(new Node
+        {
+            Id = instance.EdgeId,
+            HostType = "EdgeInstance",
+            Name = null,   // 边的名字是派生物（from名 → to名 / EAV 属性）
+            CreatedAt = now
+        });
         _db.EdgeInstances.Add(instance);
         await _db.SaveChangesAsync(ct);
 
-        // 如有 Properties，写入 EAV
         if (req.Properties is { Count: > 0 })
         {
-            var values = JsonToDict(req.Properties);
             await _eavWrite.SaveAsync(
-                instance.EdgeId, def.TypeName,
-                values, changedBy: "edge", ct: ct);
+                instance.EdgeId, instance.TypeName,
+                JsonToDict(req.Properties), changedBy: "edge", ct: ct);
         }
 
-        // 图同步：边创建 → 通知图数据库即时写入（消费端幂等）
-        await PublishAsync(instance, def, EdgeChangeKind.Created, ct);
+        await PublishAsync(instance, EdgeChangeKind.Created, ct);
 
-        return await BuildDtoAsync(instance, def, ct);
-    }
-
-    public async Task<EdgeInstanceDto?> GetByIdAsync(string edgeId, CancellationToken ct)
-    {
-        var instance = await _db.EdgeInstances
-            .FirstOrDefaultAsync(i => i.EdgeId == edgeId, ct);
-        if (instance is null) return null;
-
-        var def = await _db.EdgeDefinitions
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == instance.EdgeTypeId, ct);
-        if (def is null) return null;
-
-        return await BuildDtoAsync(instance, def, ct);
-    }
-
-    /// <summary>查询某类型的所有边。</summary>
-    public async Task<IReadOnlyList<EdgeInstanceDto>> ListByTypeAsync(
-        string edgeTypeId, CancellationToken ct)
-    {
-        var def = await _db.EdgeDefinitions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
-        if (def is null) return Array.Empty<EdgeInstanceDto>();
-
-        var instances = await _db.EdgeInstances
-            .AsNoTracking()
-            .Where(i => i.EdgeTypeId == edgeTypeId)
-            .OrderByDescending(i => i.CreatedAt)
-            .ToListAsync(ct);
-
-        return await BuildDtosAsync(instances, def, ct);
-    }
-
-    /// <summary>
-    /// 全局边查询（跨类型）。可选过滤：边类型、端点节点集合（From 或 To 命中）、显示名关键字。
-    /// 供「边管理」独立页与线路结构视图使用（前端不需要逐类型轮询）。
-    /// </summary>
-    public async Task<IReadOnlyList<EdgeInstanceDto>> ListAsync(
-        string? edgeTypeId,
-        IReadOnlyCollection<string>? nodeIds,
-        string? search,
-        CancellationToken ct)
-    {
-        var defs = await _db.EdgeDefinitions
-            .AsNoTracking()
-            .Where(d => edgeTypeId == null || d.EdgeTypeId == edgeTypeId)
-            .ToListAsync(ct);
-        if (defs.Count == 0) return Array.Empty<EdgeInstanceDto>();
-
-        var defMap = defs.ToDictionary(d => d.EdgeTypeId, d => d, StringComparer.Ordinal);
-        var typeIds = defMap.Keys.ToList();
-
-        var query = _db.EdgeInstances
-            .AsNoTracking()
-            .Where(i => typeIds.Contains(i.EdgeTypeId));
-
-        if (nodeIds is { Count: > 0 })
-        {
-            var ids = nodeIds.ToList();
-            query = query.Where(i => ids.Contains(i.FromNodeId) || ids.Contains(i.ToNodeId));
-        }
-
-        if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(i => i.DisplayName != null && i.DisplayName.Contains(search));
-
-        var instances = await query
-            .OrderByDescending(i => i.CreatedAt)
-            .ToListAsync(ct);
-
-        // 按类型分组批量组装（每组一次 EAV 批量装载 + 一次名称解析，避免逐边 N+1）
-        var result = new List<EdgeInstanceDto>(instances.Count);
-        foreach (var group in instances.GroupBy(i => i.EdgeTypeId))
-        {
-            if (!defMap.TryGetValue(group.Key, out var def)) continue;
-            result.AddRange(await BuildDtosAsync(group.ToList(), def, ct));
-        }
-        return result;
-    }
-
-    /// <summary>图查询：查某节点的出边（from）。</summary>
-    public async Task<IReadOnlyList<EdgeInstanceDto>> FindOutgoingAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct)
-    {
-        var def = await _db.EdgeDefinitions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
-        if (def is null) return Array.Empty<EdgeInstanceDto>();
-
-        // 无向关系：方向不适用，出边 = 与该节点相连的所有边
-        var instances = def.IsDirected
-            ? await _db.EdgeInstances
-                .AsNoTracking()
-                .Where(i => i.EdgeTypeId == edgeTypeId && i.FromNodeId == nodeId)
-                .OrderByDescending(i => i.CreatedAt)
-                .ToListAsync(ct)
-            : await _db.EdgeInstances
-                .AsNoTracking()
-                .Where(i => i.EdgeTypeId == edgeTypeId
-                    && (i.FromNodeId == nodeId || i.ToNodeId == nodeId))
-                .OrderByDescending(i => i.CreatedAt)
-                .ToListAsync(ct);
-
-        return await BuildDtosAsync(instances, def, ct);
-    }
-
-    /// <summary>图查询：查某节点的入边（to）。</summary>
-    public async Task<IReadOnlyList<EdgeInstanceDto>> FindIncomingAsync(
-        string edgeTypeId, string nodeId, CancellationToken ct)
-    {
-        var def = await _db.EdgeDefinitions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
-        if (def is null) return Array.Empty<EdgeInstanceDto>();
-
-        // 无向关系：方向不适用，入边 = 与该节点相连的所有边
-        var instances = def.IsDirected
-            ? await _db.EdgeInstances
-                .AsNoTracking()
-                .Where(i => i.EdgeTypeId == edgeTypeId && i.ToNodeId == nodeId)
-                .OrderByDescending(i => i.CreatedAt)
-                .ToListAsync(ct)
-            : await _db.EdgeInstances
-                .AsNoTracking()
-                .Where(i => i.EdgeTypeId == edgeTypeId
-                    && (i.FromNodeId == nodeId || i.ToNodeId == nodeId))
-                .OrderByDescending(i => i.CreatedAt)
-                .ToListAsync(ct);
-
-        return await BuildDtosAsync(instances, def, ct);
-    }
-
-    /// <summary>
-    /// BFS 遍历。从 StartNodeId 出发，按 Direction 沿边扩展，最多 MaxDepth 层。
-    /// 每层用单次 SQL 查询（WHERE node_id = ANY @ids），避免 N+1。
-    /// 无向关系（IsDirected=false）忽略 Direction，恒定按双向展开。
-    /// </summary>
-    public async Task<EdgeTraverseResult> TraverseAsync(
-        string edgeTypeId, EdgeTraverseRequest req, CancellationToken ct)
-    {
-        var def = await _db.EdgeDefinitions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
-        if (def is null || req.MaxDepth < 1)
-            return new EdgeTraverseResult(Array.Empty<EdgeInstanceDto>(),
-                new[] { req.StartNodeId });
-
-        var visited = new HashSet<string> { req.StartNodeId };
-        var visitedEdgeIds = new HashSet<string>();
-        var resultEdges = new List<EdgeInstance>();
-
-        var frontier = new List<string> { req.StartNodeId };
-        var maxDepth = Math.Clamp(req.MaxDepth, 1, 10);
-
-        // 无向关系（IsDirected=false）：方向语义不适用，统一按双向展开
-        var direction = def.IsDirected ? req.Direction : "both";
-
-        for (int depth = 0; depth < maxDepth && frontier.Count > 0; depth++)
-        {
-            // 批量查当前层的边（只读，不进变更跟踪）
-            var edges = direction switch
-            {
-                "in" => await _db.EdgeInstances
-                    .AsNoTracking()
-                    .Where(i => i.EdgeTypeId == edgeTypeId
-                        && frontier.Contains(i.ToNodeId))
-                    .ToListAsync(ct),
-                "both" => await _db.EdgeInstances
-                    .AsNoTracking()
-                    .Where(i => i.EdgeTypeId == edgeTypeId
-                        && (frontier.Contains(i.FromNodeId)
-                            || frontier.Contains(i.ToNodeId)))
-                    .ToListAsync(ct),
-                _ => await _db.EdgeInstances   // 默认 out
-                    .AsNoTracking()
-                    .Where(i => i.EdgeTypeId == edgeTypeId
-                        && frontier.Contains(i.FromNodeId))
-                    .ToListAsync(ct),
-            };
-
-            // 去重边（同一条边可能被 both 方向在不同层遍历到）
-            var nextFrontier = new HashSet<string>();
-            foreach (var edge in edges)
-            {
-                if (!visitedEdgeIds.Add(edge.EdgeId)) continue;
-                resultEdges.Add(edge);
-
-                // 下一层节点（未访问过的）
-                var neighbor = direction == "in"
-                    ? edge.FromNodeId
-                    : direction == "out"
-                        ? edge.ToNodeId
-                        : visited.Contains(edge.FromNodeId)
-                            ? edge.ToNodeId : edge.FromNodeId;
-
-                if (visited.Add(neighbor))
-                    nextFrontier.Add(neighbor);
-            }
-
-            frontier = nextFrontier.ToList();
-        }
-
-        // 构建 DTO：单次 LoadBatchAsync 批量装载全部边的 EAV 属性（消除逐边查询的 N+1）
-        var dtos = await BuildDtosAsync(resultEdges, def, ct);
-
-        return new EdgeTraverseResult(dtos, visited.ToList());
+        return (await BuildDtosAsync([instance], ct))[0];
     }
 
     public async Task<EdgeInstanceDto?> UpdateAsync(
@@ -348,73 +118,44 @@ public class EdgeInstanceService
             .FirstOrDefaultAsync(i => i.EdgeId == edgeId, ct);
         if (instance is null) return null;
 
-        if (req.Weight.HasValue) instance.Weight = req.Weight.Value;
-        if (req.DisplayName is not null) instance.DisplayName = req.DisplayName;
-        instance.UpdatedAt = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(ct);
-
-        var def = await _db.EdgeDefinitions
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == instance.EdgeTypeId, ct);
-
-        // 图同步：边更新 → 通知图数据库即时刷新（消费端幂等）
-        await PublishAsync(instance, def, EdgeChangeKind.Updated, ct);
-
-        // ★ 语义搜索：DisplayName 是边宿主向量文本（单行「当前节点：边名」）的来源，
-        // 仅当其变更时才重建向量（其他字段不进文本，避免无效重建）。
-        if (req.DisplayName is not null)
+        if (req.IsDirected is { } directed && directed != instance.IsDirected)
         {
-            await _publishEndpoint.Publish(new InodeChangedEvent
+            if (!directed)
             {
-                InodeId = instance.EdgeId,
-                Kind = InodeChangeKind.Saved
-            }, ct);
+                // 改为无向：反向已有同类型边时即为重复
+                var reverse = await _db.EdgeInstances.AnyAsync(i =>
+                    i.EdgeId != edgeId
+                    && i.TypeName == instance.TypeName
+                    && i.FromNodeId == instance.ToNodeId
+                    && i.ToNodeId == instance.FromNodeId, ct);
+                if (reverse)
+                    throw new InvalidOperationException("该边已存在（反向同类型），不能改为无向");
+            }
+
+            instance.IsDirected = directed;
+            instance.UpdatedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync(ct);
+            await PublishAsync(instance, EdgeChangeKind.Updated, ct);
         }
 
-        return def is null ? null : await BuildDtoAsync(instance, def, ct);
+        return (await BuildDtosAsync([instance], ct))[0];
     }
 
-    public Task<bool> DeleteAsync(string edgeId, CancellationToken ct)
-        => DeleteCoreAsync(edgeId, allowStructureReferenced: false, ct);
-
-    /// <summary>
-    /// 线路结构专用：跳过「边被结构段引用」检查（段行由 LineStructureService 先行移除）。
-    /// EAV 属性与挂载实体守卫仍保留。
-    /// </summary>
-    internal Task<bool> DeleteInternalAsync(string edgeId, CancellationToken ct)
-        => DeleteCoreAsync(edgeId, allowStructureReferenced: true, ct);
-
-    private async Task<bool> DeleteCoreAsync(
-        string edgeId, bool allowStructureReferenced, CancellationToken ct)
+    public async Task<bool> DeleteAsync(string edgeId, CancellationToken ct)
     {
         var instance = await _db.EdgeInstances
             .FirstOrDefaultAsync(i => i.EdgeId == edgeId, ct);
         if (instance is null) return false;
 
-        // 被线路结构段引用的边只能经结构接口删除（避免结构出现悬空段）
-        if (!allowStructureReferenced)
-        {
-            var referenced = await _db.LineStructureSegments
-                .AnyAsync(s => s.EdgeId == edgeId, ct);
-            if (referenced)
-                throw new InvalidOperationException(
-                    "该边是线路结构段，无法直接删除。请先在线路结构编辑器中移除该段。");
-        }
-
-        var def = await _db.EdgeDefinitions
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == instance.EdgeTypeId, ct);
-
         // 先清空自身数据才允许删本项（不采用级联删除）：
-        // 边实例有独立行，其 EAV 属性值存于外部表，删除前必须先清空。
-        if (def is not null)
-        {
-            var hasValues = await _db.AttributeValues
-                    .AnyAsync(v => v.EntityId == edgeId && v.EntityType == def.TypeName, ct)
-                || await _db.LocationAttributeValues
-                    .AnyAsync(v => v.EntityId == edgeId && v.EntityType == def.TypeName, ct);
-            if (hasValues)
-                throw new InvalidOperationException(
-                    "该边实例仍有属性数据，无法删除。请先清空其全部属性值。");
-        }
+        // 边实例的 EAV 属性值存于外部表，删除前必须先清空。
+        var hasValues = await _db.AttributeValues
+                .AnyAsync(v => v.EntityId == edgeId && v.EntityType == instance.TypeName, ct)
+            || await _db.LocationAttributeValues
+                .AnyAsync(v => v.EntityId == edgeId && v.EntityType == instance.TypeName, ct);
+        if (hasValues)
+            throw new InvalidOperationException(
+                "该边实例仍有属性数据，无法删除。请先清空其全部属性值。");
 
         // 挂载实体守卫：边作为宿主（inode_entity）仍有实体数据时拒绝
         var hasEntities = await _db.InodeEntities
@@ -423,90 +164,223 @@ public class EdgeInstanceService
             throw new InvalidOperationException(
                 "该边实例仍有挂载的实体数据，无法删除。请先清空其全部实体数据。");
 
+        // 边已注册进 nodes，被其他边作为起点/终点引用时拒绝（FK Restrict 兜底）
+        var referencedByEdge = await _db.EdgeInstances.AnyAsync(
+            i => i.EdgeId != edgeId && (i.FromNodeId == edgeId || i.ToNodeId == edgeId), ct);
+        if (referencedByEdge)
+            throw new InvalidOperationException(
+                "该边仍被其他边引用（作为端点），无法删除。请先解除引用。");
+
         // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
         var declarations = await _db.InodeEntityTypes
             .Where(x => x.InodeId == edgeId)
             .ToListAsync(ct);
         _db.InodeEntityTypes.RemoveRange(declarations);
 
+        // 共享主键 FK（EdgeId 即 nodes.id）下先标记依赖方（edge_instances）为 Deleted，
+        // 再标记主方（nodes）；顺序反过来 EF 会尝试原地置空标识外键并抛「键属性不可修改」。
         _db.EdgeInstances.Remove(instance);
+
+        var nodeRow = await _db.Nodes.FirstOrDefaultAsync(n => n.Id == edgeId, ct);
+        if (nodeRow is not null)
+            _db.Nodes.Remove(nodeRow);
+
         await _db.SaveChangesAsync(ct);
 
-        // 图同步：边删除 → 通知图数据库即时移除（消费端幂等）
-        await PublishAsync(instance, def, EdgeChangeKind.Deleted, ct);
+        await PublishAsync(instance, EdgeChangeKind.Deleted, ct);
 
         return true;
     }
 
     // ============================================================
-    // 拓扑校验（入度/出度/成环）—— 迭代 Kahn，无递归
+    // 读
     // ============================================================
 
-    /// <summary>
-    /// 校验线路结构拓扑：入度/出度/成环。
-    /// 返回轻量结果（Valid + Errors），供 EdgeMetadataService 在变更 IsLine/IsLinear 时使用。
-    /// 严格线性线路（IsLine &amp;&amp; IsLinear）下，入度 &gt; 1 与成环计入 Errors。
-    /// </summary>
-    public async Task<(bool Valid, List<string> Errors)> ValidateTopologyAsync(
-        string edgeTypeId, CancellationToken ct)
+    public async Task<EdgeInstanceDto?> GetByIdAsync(string edgeId, CancellationToken ct)
     {
-        var def = await _db.EdgeDefinitions
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == edgeTypeId, ct);
+        var instance = await _db.EdgeInstances
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.EdgeId == edgeId, ct);
+        if (instance is null) return null;
 
-        var pairs = await _db.EdgeInstances
-            .Where(e => e.EdgeTypeId == edgeTypeId)
-            .Select(e => new { e.FromNodeId, e.ToNodeId })
-            .ToListAsync(ct);
-
-        var analysis = AnalyzeTopology(pairs.Select(e => (e.FromNodeId, e.ToNodeId)).ToList());
-        var treatAsStrict = def is { IsLine: true, IsLinear: true };
-
-        var errors = new List<string>();
-
-        foreach (var (nodeId, deg) in analysis.Indeg.Where(kv => kv.Value > 1))
-        {
-            var msg = $"节点 {nodeId} 入度 = {deg}（线路结构入度应 ≤ 1）";
-            if (treatAsStrict) errors.Add(msg);
-        }
-
-        foreach (var nodeId in analysis.Cyclic)
-        {
-            var msg = $"节点 {nodeId} 参与成环（线路结构应无环）";
-            if (treatAsStrict) errors.Add(msg);
-        }
-
-        return (errors.Count == 0, errors);
+        return (await BuildDtosAsync([instance], ct))[0];
     }
 
     /// <summary>
-    /// 完整拓扑分析（供 LineService 包装为 LineValidationResult）。
+    /// 全局边查询（跨类型）。可选过滤：类型名、端点节点集合（From 或 To 命中）、
+    /// 关键字（匹配类型名或端点 nodes.name）。
     /// </summary>
-    public async Task<TopologyAnalysis> AnalyzeTopologyAsync(
-        string edgeTypeId, CancellationToken ct)
+    public async Task<IReadOnlyList<EdgeInstanceDto>> ListAsync(
+        string? typeName,
+        IReadOnlyCollection<string>? nodeIds,
+        string? search,
+        CancellationToken ct)
     {
-        var pairs = await _db.EdgeInstances
-            .Where(e => e.EdgeTypeId == edgeTypeId)
-            .Select(e => new { e.FromNodeId, e.ToNodeId })
+        var query = _db.EdgeInstances.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(typeName))
+        {
+            var name = typeName.Trim();
+            query = query.Where(i => i.TypeName == name);
+        }
+
+        if (nodeIds is { Count: > 0 })
+        {
+            var ids = nodeIds.ToList();
+            query = query.Where(i => ids.Contains(i.FromNodeId) || ids.Contains(i.ToNodeId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var keyword = search.Trim();
+            var matchingIds = _db.Nodes
+                .Where(n => n.Name != null && n.Name.Contains(keyword))
+                .Select(n => n.Id);
+            query = query.Where(i =>
+                i.TypeName.Contains(keyword)
+                || matchingIds.Contains(i.FromNodeId)
+                || matchingIds.Contains(i.ToNodeId));
+        }
+
+        var instances = await query
+            .OrderByDescending(i => i.CreatedAt)
             .ToListAsync(ct);
 
-        return AnalyzeTopology(pairs.Select(e => (e.FromNodeId, e.ToNodeId)).ToList());
+        return await BuildDtosAsync(instances, ct);
+    }
+
+    /// <summary>图查询：查某节点的出边。无向实例按双向计入。</summary>
+    public async Task<IReadOnlyList<EdgeInstanceDto>> FindOutgoingAsync(
+        string? typeName, string nodeId, CancellationToken ct)
+    {
+        var query = _db.EdgeInstances.AsNoTracking()
+            .Where(i => i.FromNodeId == nodeId
+                || (!i.IsDirected && i.ToNodeId == nodeId));
+
+        if (!string.IsNullOrWhiteSpace(typeName))
+        {
+            var name = typeName.Trim();
+            query = query.Where(i => i.TypeName == name);
+        }
+
+        var instances = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync(ct);
+
+        return await BuildDtosAsync(instances, ct);
+    }
+
+    /// <summary>图查询：查某节点的入边。无向实例按双向计入。</summary>
+    public async Task<IReadOnlyList<EdgeInstanceDto>> FindIncomingAsync(
+        string? typeName, string nodeId, CancellationToken ct)
+    {
+        var query = _db.EdgeInstances.AsNoTracking()
+            .Where(i => i.ToNodeId == nodeId
+                || (!i.IsDirected && i.FromNodeId == nodeId));
+
+        if (!string.IsNullOrWhiteSpace(typeName))
+        {
+            var name = typeName.Trim();
+            query = query.Where(i => i.TypeName == name);
+        }
+
+        var instances = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync(ct);
+
+        return await BuildDtosAsync(instances, ct);
+    }
+
+    /// <summary>
+    /// BFS 遍历。从 StartNodeId 出发，按 Direction 沿边扩展，最多 MaxDepth 层。
+    /// 每条边按自身 is_directed 展开：有向按 from→to，无向双向。
+    /// </summary>
+    public async Task<EdgeTraverseResult> TraverseAsync(
+        string typeName, EdgeTraverseRequest req, CancellationToken ct)
+    {
+        var start = req.StartNodeId;
+        if (string.IsNullOrWhiteSpace(typeName)
+            || string.IsNullOrWhiteSpace(start)
+            || req.MaxDepth < 1)
+            return new EdgeTraverseResult(Array.Empty<EdgeInstanceDto>(), [start]);
+
+        var direction = req.Direction is "in" or "both" ? req.Direction : "out";
+        var maxDepth = Math.Clamp(req.MaxDepth, 1, 10);
+
+        var visited = new HashSet<string> { start };
+        var visitedEdgeIds = new HashSet<string>();
+        var resultEdges = new List<EdgeInstance>();
+
+        var frontier = new List<string> { start };
+
+        for (var depth = 0; depth < maxDepth && frontier.Count > 0; depth++)
+        {
+            var edges = direction switch
+            {
+                "in" => await _db.EdgeInstances.AsNoTracking()
+                    .Where(i => i.TypeName == typeName
+                        && (frontier.Contains(i.ToNodeId)
+                            || (!i.IsDirected && frontier.Contains(i.FromNodeId))))
+                    .ToListAsync(ct),
+                "both" => await _db.EdgeInstances.AsNoTracking()
+                    .Where(i => i.TypeName == typeName
+                        && (frontier.Contains(i.FromNodeId)
+                            || frontier.Contains(i.ToNodeId)))
+                    .ToListAsync(ct),
+                _ => await _db.EdgeInstances.AsNoTracking()
+                    .Where(i => i.TypeName == typeName
+                        && (frontier.Contains(i.FromNodeId)
+                            || (!i.IsDirected && frontier.Contains(i.ToNodeId))))
+                    .ToListAsync(ct),
+            };
+
+            var nextFrontier = new HashSet<string>();
+            foreach (var edge in edges)
+            {
+                if (!visitedEdgeIds.Add(edge.EdgeId)) continue;
+                resultEdges.Add(edge);
+
+                var fromVisited = visited.Contains(edge.FromNodeId);
+                var toVisited = visited.Contains(edge.ToNodeId);
+
+                var neighbor = direction switch
+                {
+                    "in" => toVisited ? edge.FromNodeId
+                        : (!edge.IsDirected && fromVisited ? edge.ToNodeId : null),
+                    "both" => fromVisited && !toVisited ? edge.ToNodeId
+                        : toVisited && !fromVisited ? edge.FromNodeId
+                        : null,
+                    _ => fromVisited ? edge.ToNodeId
+                        : (!edge.IsDirected && toVisited ? edge.FromNodeId : null),
+                };
+
+                if (neighbor is not null && visited.Add(neighbor))
+                    nextFrontier.Add(neighbor);
+            }
+
+            frontier = nextFrontier.ToList();
+        }
+
+        return new EdgeTraverseResult(
+            await BuildDtosAsync(resultEdges, ct),
+            visited.ToList());
     }
 
     // ============================================================
     // Helpers
     // ============================================================
 
-    /// <summary>发布边变更事件（NebulaGraph 图同步；at-least-once，消费端幂等）。</summary>
     private async Task PublishAsync(
-        EdgeInstance instance, EdgeDefinition? def, EdgeChangeKind kind, CancellationToken ct)
+        EdgeInstance instance, EdgeChangeKind kind, CancellationToken ct)
     {
         await _publishEndpoint.Publish(new EdgeChangedEvent
         {
             EdgeId = instance.EdgeId,
             Kind = kind,
-            EdgeTypeName = def?.TypeName,
+            EdgeTypeName = instance.TypeName,
             FromNodeId = instance.FromNodeId,
-            ToNodeId = instance.ToNodeId
+            ToNodeId = instance.ToNodeId,
+            IsDirected = instance.IsDirected
         }, ct);
     }
 
@@ -523,60 +397,35 @@ public class EdgeInstanceService
         };
 
     /// <summary>
-    /// 单条组装边 DTO。EdgeDefinition 由调用方传入，避免每条边重复查询。
-    /// 批量场景请使用 BuildDtosAsync（单次 LoadBatchAsync，消除逐边查询的 N+1）。
-    /// </summary>
-    private async Task<EdgeInstanceDto> BuildDtoAsync(
-        EdgeInstance inst, EdgeDefinition def, CancellationToken ct)
-    {
-        // 查 EAV 属性（如有）
-        var dyn = await _eavRead.LoadAsync(inst.EdgeId, def.TypeName, ct);
-        // 两端都是 Inode 宿主：经守卫注册表解析显示名（未认领回退空串，前端回退显示 Id）
-        var names = await _inodeGuards.ResolveNodeNamesAsync(
-            [inst.FromNodeId, inst.ToNodeId], ct);
-
-        return new EdgeInstanceDto(
-            inst.EdgeId, inst.EdgeTypeId,
-            def.TypeName, def.DisplayName,
-            inst.FromNodeId, names.GetValueOrDefault(inst.FromNodeId, ""),
-            inst.ToNodeId, names.GetValueOrDefault(inst.ToNodeId, ""),
-            inst.Weight,
-            inst.DisplayName,
-            inst.CreatedAt, inst.UpdatedAt,
-            ToProps(dyn));
-    }
-
-    /// <summary>
-    /// 批量组装边 DTO：单次 LoadBatchAsync 装载全部边的 EAV 属性（2 次 SQL），
-    /// 消除逐边 LoadAsync 的 N+1。保持 instances 的输入顺序。
+    /// 批量组装边 DTO：按类型分组，每组一次 EAV 批量装载 + 一次名称解析，消除 N+1。
+    /// 保持 instances 的输入顺序。
     /// </summary>
     private async Task<List<EdgeInstanceDto>> BuildDtosAsync(
-        IReadOnlyList<EdgeInstance> instances, EdgeDefinition def, CancellationToken ct)
+        IReadOnlyList<EdgeInstance> instances, CancellationToken ct)
     {
-        if (instances.Count == 0) return new List<EdgeInstanceDto>();
+        if (instances.Count == 0) return [];
 
-        var propMap = (await _eavRead.LoadBatchAsync(
-                instances.Select(i => i.EdgeId), def.TypeName, ct))
-            .ToDictionary(d => d.EntityId, ToProps);
-
-        // 两端 Inode 显示名：整批一次解析（每守卫一次 SQL），避免逐边 N+1
+        // 两端的显示名：整批一次解析（nodes 注册表单表查询，避免逐边 N+1）
         var names = await _inodeGuards.ResolveNodeNamesAsync(
             instances.SelectMany(i => new[] { i.FromNodeId, i.ToNodeId }), ct);
 
-        var result = new List<EdgeInstanceDto>(instances.Count);
-        foreach (var inst in instances)
+        var propMap = new Dictionary<string, Dictionary<string, JsonElement>?>(StringComparer.Ordinal);
+        foreach (var group in instances.GroupBy(i => i.TypeName))
         {
-            result.Add(new EdgeInstanceDto(
-                inst.EdgeId, inst.EdgeTypeId,
-                def.TypeName, def.DisplayName,
-                inst.FromNodeId, names.GetValueOrDefault(inst.FromNodeId, ""),
-                inst.ToNodeId, names.GetValueOrDefault(inst.ToNodeId, ""),
-                inst.Weight,
-                inst.DisplayName,
-                inst.CreatedAt, inst.UpdatedAt,
-                propMap.GetValueOrDefault(inst.EdgeId)));
+            var loaded = await _eavRead.LoadBatchAsync(
+                group.Select(i => i.EdgeId), group.Key, ct);
+            foreach (var dyn in loaded)
+                propMap[dyn.EntityId] = ToProps(dyn);
         }
-        return result;
+
+        return instances.Select(inst => new EdgeInstanceDto(
+            inst.EdgeId,
+            inst.TypeName,
+            inst.FromNodeId, names.GetValueOrDefault(inst.FromNodeId, ""),
+            inst.ToNodeId, names.GetValueOrDefault(inst.ToNodeId, ""),
+            inst.IsDirected,
+            inst.CreatedAt, inst.UpdatedAt,
+            propMap.GetValueOrDefault(inst.EdgeId))).ToList();
     }
 
     /// <summary>将 DynamicEntity 的属性序列化为 DTO 的 JsonElement 形状（与实体端点读回一致）。</summary>
@@ -591,36 +440,6 @@ public class EdgeInstanceService
             catch { props[k] = JsonSerializer.SerializeToElement(v?.ToString() ?? ""); }
         }
         return props;
-    }
-
-    /// <summary>
-    /// 成环检测：新增边 from→to 是否会成环 —— 即现有图中是否存在 to ⇝ from 的可达路径。
-    /// 用带 UNION（去重、天然防环）的递归 CTE，避免 depth 硬截断。
-    /// </summary>
-    private async Task<bool> WouldCreateCycleAsync(
-        string edgeTypeId, string fromId, string toId, CancellationToken ct)
-    {
-        const string sql = """
-            SELECT CASE WHEN EXISTS (
-                WITH RECURSIVE reach AS (
-                    SELECT to_node_id AS n FROM edge_instances
-                     WHERE edge_type_id = @et AND from_node_id = @start
-                    UNION
-                    SELECT e.to_node_id FROM edge_instances e
-                      JOIN reach r ON e.from_node_id = r.n
-                     WHERE e.edge_type_id = @et
-                )
-                SELECT 1 FROM reach WHERE n = @target
-            ) THEN 1 ELSE 0 END AS "Value"
-            """;
-
-        var rows = await _db.Database
-            .SqlQueryRaw<int>(sql,
-                new Npgsql.NpgsqlParameter("et", edgeTypeId),
-                new Npgsql.NpgsqlParameter("start", toId),
-                new Npgsql.NpgsqlParameter("target", fromId))
-            .ToListAsync(ct);
-        return rows.Count > 0 && rows[0] == 1;
     }
 
     private static Dictionary<string, object?> JsonToDict(Dictionary<string, JsonElement> json)
@@ -641,53 +460,6 @@ public class EdgeInstanceService
         return dict;
     }
 
-    /// <summary>
-    /// 迭代 Kahn 拓扑排序：返回入度表、出度表、未能消解的节点（= 成环节点）。
-    /// 无递归，避免长链导致的栈溢出；O(V+E)。
-    /// 注：环下游的节点也可能留在 Cyclic 中（Kahn 的已知特性），仅用于诊断提示。
-    /// </summary>
-    public static TopologyAnalysis AnalyzeTopology(List<(string From, string To)> edges)
-    {
-        var indeg = new Dictionary<string, int>();
-        var outdeg = new Dictionary<string, int>();
-        var adj = new Dictionary<string, List<string>>();
-
-        foreach (var (from, to) in edges)
-        {
-            if (!indeg.ContainsKey(from)) indeg[from] = 0;
-            indeg[to] = indeg.GetValueOrDefault(to) + 1;
-            outdeg[from] = outdeg.GetValueOrDefault(from) + 1;
-            if (!outdeg.ContainsKey(to)) outdeg[to] = 0;
-
-            if (!adj.TryGetValue(from, out var list)) adj[from] = list = new();
-            list.Add(to);
-        }
-
-        var remaining = new Dictionary<string, int>(indeg);
-        var queue = new Queue<string>(remaining.Where(kv => kv.Value == 0).Select(kv => kv.Key));
-        var processed = new HashSet<string>();
-
-        while (queue.Count > 0)
-        {
-            var node = queue.Dequeue();
-            processed.Add(node);
-
-            foreach (var next in adj.GetValueOrDefault(node, new()))
-            {
-                if (!remaining.ContainsKey(next)) continue;
-                remaining[next]--;
-                if (remaining[next] == 0) queue.Enqueue(next);
-            }
-        }
-
-        var cyclic = indeg.Keys.Where(n => !processed.Contains(n)).ToList();
-        return new TopologyAnalysis(indeg, outdeg, cyclic, indeg.Count);
-    }
+    private static EavValidationException Invalid(string field, string message)
+        => new([new ValidationError(field, message)]);
 }
-
-/// <summary>拓扑分析结果（入度/出度/成环节点）。</summary>
-public sealed record TopologyAnalysis(
-    Dictionary<string, int> Indeg,
-    Dictionary<string, int> Outdeg,
-    List<string> Cyclic,
-    int NodeCount);

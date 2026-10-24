@@ -4,6 +4,7 @@ using TreeGraph.Api.Data;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.LineSky.Entities;
 using TreeGraph.Shared.Messaging;
+using TreeGraph.Shared.NodeSky.Entities;
 
 namespace TreeGraph.Api.LineSky.Controllers;
 
@@ -36,12 +37,12 @@ public class LineNodeController : ControllerBase
         [FromQuery] string? search = null,
         CancellationToken ct = default)
     {
-        var query = _db.LineNodes.AsQueryable();
+        var query = _db.LineNodes.Include(n => n.Node).AsQueryable();
         if (!string.IsNullOrWhiteSpace(lineId))
             query = query.Where(n => n.LineId == lineId);
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(n => n.Name.Contains(search));
-        var items = await query.OrderBy(n => n.Name).ToListAsync(ct);
+            query = query.Where(n => n.Node!.Name.Contains(search));
+        var items = await query.OrderBy(n => n.Node!.Name).ToListAsync(ct);
         return Ok(items);
     }
 
@@ -49,7 +50,9 @@ public class LineNodeController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id, CancellationToken ct = default)
     {
-        var node = await _db.LineNodes.FindAsync([id], ct);
+        var node = await _db.LineNodes
+            .Include(n => n.Node)
+            .FirstOrDefaultAsync(n => n.Id == id, ct);
         return node is null ? NotFound() : Ok(node);
     }
 
@@ -58,38 +61,48 @@ public class LineNodeController : ControllerBase
     public async Task<IActionResult> Create([FromBody] LineNode node, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(node.Name))
-            return BadRequest("名称不能为空");
+            return BadRequest(new { error = "节点名称不能为空" });
 
         if (string.IsNullOrWhiteSpace(node.LineId))
-            return BadRequest("所属线路不能为空");
+            return BadRequest(new { error = "所属线路（lineId）不能为空" });
 
-        node.Id = string.IsNullOrWhiteSpace(node.Id) ? Guid.NewGuid().ToString() : node.Id;
+        var id = string.IsNullOrEmpty(node.Id) ? Guid.NewGuid().ToString() : node.Id;
+
+        // 名称唯一真源：nodes 注册表（同事务，先注册表后宿主）
+        _db.Nodes.Add(new Node
+        {
+            Id = id,
+            HostType = "LineNode",
+            Name = node.Name,
+        });
+
+        node.Id = id;
         node.CreatedAt = DateTimeOffset.UtcNow;
-        node.UpdatedAt = DateTimeOffset.UtcNow;
-
-        _db.LineNodes.Add(node);
+        node.UpdatedAt = null;
+        await _db.LineNodes.AddAsync(node, ct);
         await _db.SaveChangesAsync(ct);
 
-        // ★ 节点新增 → 即时同步向量/图（消费端幂等）
-        await PublishAsync(node.Id, InodeChangeKind.Saved, pathAffected: false, ct);
+        await PublishAsync(id, InodeChangeKind.Saved, pathAffected: false, ct);
 
-        return CreatedAtAction(nameof(GetById), new { id = node.Id }, node);
+        return CreatedAtAction(nameof(GetById), new { id }, node);
     }
 
     /// <summary>更新 LineNode。</summary>
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(string id, [FromBody] LineNode node, CancellationToken ct = default)
     {
-        var existing = await _db.LineNodes.FindAsync([id], ct);
+        var existing = await _db.LineNodes
+            .Include(n => n.Node)
+            .FirstOrDefaultAsync(n => n.Id == id, ct);
         if (existing is null) return NotFound();
 
-        existing.Name = node.Name;
+        if (existing.Node != null)
+            existing.Node.Name = node.Name ?? existing.Node.Name;
         existing.Description = node.Description;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
 
-        // ★ 节点更新 → 即时重建向量/图顶点（线路节点无后代，无需级联）
         await PublishAsync(id, InodeChangeKind.Saved, pathAffected: false, ct);
 
         return Ok(existing);
@@ -107,35 +120,33 @@ public class LineNodeController : ControllerBase
         if (hasEdges)
             return Conflict(new { error = "该节点仍有边引用，无法删除" });
 
-        // 被线路结构端子引用时拒绝（line_terminals 的复合外键为 Restrict）
         var hasTerminal = await _db.LineTerminals
             .AnyAsync(t => t.NodeId == id, ct);
         if (hasTerminal)
             return Conflict(new { error = "该节点仍是线路结构的外部连接端子，无法删除。请先移除该端子。" });
 
-        // 先清空自身数据才允许删本项：该节点仍有挂载实体数据时拒绝（不采用级联删除）
         var hasEntities = await _db.InodeEntities
             .AnyAsync(m => m.InodeId == id, ct);
         if (hasEntities)
             return Conflict(new { error = "该节点仍有挂载的实体数据，无法删除。请先清空其全部实体数据。" });
 
-        // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
         var declarations = await _db.InodeEntityTypes
             .Where(x => x.InodeId == id)
             .ToListAsync(ct);
         _db.InodeEntityTypes.RemoveRange(declarations);
 
         _db.LineNodes.Remove(existing);
+
+        var nodeRow = await _db.Nodes.FindAsync([id], ct);
+        if (nodeRow != null) _db.Nodes.Remove(nodeRow);
+
         await _db.SaveChangesAsync(ct);
 
-        // ★ 节点已删除 → 消费端据 InodeId 清除残留向量/图顶点
         await PublishAsync(id, InodeChangeKind.Deleted, pathAffected: false, ct);
 
         return NoContent();
     }
 
-    /// <summary>发布 iNode 变更事件（向量/图同步；at-least-once，消费端幂等）。
-    /// 线路节点无后代，pathAffected 恒为 false（线路改名的级联由 LinesController 发起）。</summary>
     private async Task PublishAsync(string inodeId, InodeChangeKind kind, bool pathAffected, CancellationToken ct)
     {
         await _publishEndpoint.Publish(new InodeChangedEvent

@@ -1,7 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Text.Json.Serialization;
-using TreeGraph.Shared.NodeEavSky.Abstractions;
+using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 
 namespace TreeGraph.Shared.TreeEavSky.Entities;
@@ -10,15 +11,25 @@ namespace TreeGraph.Shared.TreeEavSky.Entities;
 /// 知识树节点 - 实现完整的树节点接口
 /// </summary>
 public sealed class KnowledgeTree : ITreeNodeBase<KnowledgeTree>,
-    IEquatable<KnowledgeTree>, Inode
+    IEquatable<KnowledgeTree>
 {
     [Key]
     [MaxLength(36)]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [MaxLength(300)]
-    [Required]
-    public string Name { get; set; } = string.Empty;
+    /// <summary>共享主键导航：宿主 Id 即 nodes.id，名称唯一真源在 Node.Name。</summary>
+    [JsonIgnore]
+    public Node? Node { get; set; }
+
+    private string? _seedName;
+
+    /// <summary>名称（非映射列）：运行时读穿 Node.Name；种子数据通过 setter 暂存。</summary>
+    [NotMapped]
+    public string? Name
+    {
+        get => Node?.Name ?? _seedName;
+        set => _seedName = value;
+    }
 
     /// <summary>节点描述</summary>
     [MaxLength(1000)]
@@ -53,8 +64,6 @@ public sealed class KnowledgeTree : ITreeNodeBase<KnowledgeTree>,
     // [JsonIgnore]
     // [NotMapped]
     // public ICollection<KnowledgeTree>? Children { get; set; }
-
-    public string Text() => Name;
 
     /// <summary>
     /// 计算节点深度
@@ -106,4 +115,18 @@ public sealed class KnowledgeTree : ITreeNodeBase<KnowledgeTree>,
             HasChildren = false,
         },
     };
+
+    /// <summary>
+    /// 与 <see cref="SeedData"/> 同 Id 的 nodes 注册表种子行（host_type="KnowledgeTree"）。
+    /// </summary>
+    public static List<Node> SeedNodes()
+        => SeedData()
+            .Select(k => new Node
+            {
+                Id = k.Id,
+                HostType = "KnowledgeTree",
+                Name = k.Name,
+                CreatedAt = DateTimeOffset.UnixEpoch,
+            })
+            .ToList();
 }

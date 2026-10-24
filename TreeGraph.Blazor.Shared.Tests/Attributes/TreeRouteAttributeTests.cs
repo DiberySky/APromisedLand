@@ -51,7 +51,7 @@ public class TreeRouteAttributeTests
         public int SortOrder { get; set; }
         public bool HasChildren { get; set; }
         public DecoratedNode? Parent { get; set; }
-        public string Text() => Id;
+        public string? Name => Id;
     }
 
     private sealed class PlainNode : ITreeNodeBase<PlainNode>
@@ -63,7 +63,7 @@ public class TreeRouteAttributeTests
         public int SortOrder { get; set; }
         public bool HasChildren { get; set; }
         public PlainNode? Parent { get; set; }
-        public string Text() => Id;
+        public string? Name => Id;
     }
 
     [Fact]

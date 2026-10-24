@@ -36,6 +36,20 @@ public interface IInodeOwnerGuard
 }
 
 /// <summary>
+/// nodes 注册表守卫能力（R3）：按 host_type 判定节点类型。
+/// 由 NodesRegistryGuard 实现；尚未收编进 nodes 的宿主（Line）仍走精确守卫分支。
+/// </summary>
+public interface INodesRegistryGuard : IInodeOwnerGuard
+{
+    /// <summary>nodes 中存在 Id 且 host_type 等于声明类型的行。</summary>
+    Task<bool> NodeExistsOfTypeAsync(
+        string nodeType, string inodeId, CancellationToken ct = default);
+
+    /// <summary>nodes 中是否出现过该 host_type（区分「类型未认领」与「节点不存在」）。</summary>
+    Task<bool> HostTypeExistsAsync(string nodeType, CancellationToken ct = default);
+}
+
+/// <summary>
 /// 聚合所有已注册的 <see cref="IInodeOwnerGuard"/>，供 inode 写服务单点调用。
 /// 任一守卫确认节点存在即通过；无守卫注册时视为外部模式，放行。
 /// </summary>
@@ -88,4 +102,44 @@ public sealed class InodeOwnerGuardRegistry
                 $"宿主节点 '{inodeId}' 不存在，无法关注实体类型或写入其属性。")
         ]);
     }
+
+    /// <summary>
+    /// 按节点类型校验存在性（Edge 起点/终点）：先按 NodeType 精确解析守卫
+    /// （尚未收编进 nodes 的 Line），再回退到 nodes 注册表单表匹配 host_type。
+    /// </summary>
+    public async Task EnsureNodeOfTypeAsync(
+        string nodeType, string inodeId, CancellationToken ct = default)
+    {
+        var exact = Resolve(nodeType);
+        if (exact is not null)
+        {
+            if (await exact.NodeExistsAsync(inodeId, ct)) return;
+            throw NodeNotFound(nodeType, inodeId);
+        }
+
+        var typed = _guards.OfType<INodesRegistryGuard>().FirstOrDefault();
+        if (typed is not null)
+        {
+            if (await typed.NodeExistsOfTypeAsync(nodeType, inodeId, ct)) return;
+            if (!await typed.HostTypeExistsAsync(nodeType, ct))
+                throw TypeUnclaimed(nodeType);
+            throw NodeNotFound(nodeType, inodeId);
+        }
+
+        throw TypeUnclaimed(nodeType);
+    }
+
+    private static EavValidationException TypeUnclaimed(string nodeType)
+        => new(
+        [
+            new ValidationError(nodeType,
+                $"节点类型 '{nodeType}' 未实现 Inode 宿主，不能作为边的起点/终点。")
+        ]);
+
+    private static EavValidationException NodeNotFound(string nodeType, string inodeId)
+        => new(
+        [
+            new ValidationError(nodeType,
+                $"节点 '{inodeId}' 不存在于 {nodeType} 宿主表，无法建立该关系。")
+        ]);
 }

@@ -222,30 +222,30 @@ public class TreeEavSkyComponentTests : BunitTestBase {
     [Fact]
     public void RemoveNodeFromParent_DeepRemoval_WritesBackToOwner()
     {
-        TreeItemData<UnitTree> Leaf(string id) => new()
+        TreeNodeItem<UnitTree> Leaf(string id) => new()
         {
             Value = new UnitTree { Id = id, Name = id },
         };
 
-        var root = new TreeItemData<UnitTree>
+        var root = new TreeNodeItem<UnitTree>
         {
             Value = new UnitTree { Id = "1", Name = "根", HasChildren = true },
             Children = new List<ITreeItemData<UnitTree>>
             {
-                new TreeItemData<UnitTree>
+                new TreeNodeItem<UnitTree>
                 {
                     Value = new UnitTree { Id = "2", Name = "父", HasChildren = true },
                     Children = new List<ITreeItemData<UnitTree>> { Leaf("3"), Leaf("4") },
                 },
             },
         };
-        var roots = new List<TreeItemData<UnitTree>> { root };
+        var roots = new List<TreeNodeItem<UnitTree>> { root };
 
         var cut = Render<TreeEavSky<UnitTree>>();
 
         Assert.True(cut.Instance.RemoveNodeFromParent(roots, "3"));
 
-        var parent = (TreeItemData<UnitTree>)root.Children!.Single();
+        var parent = (TreeNodeItem<UnitTree>)root.Children!.Single();
         Assert.Single(parent.Children!);
         Assert.Equal("4", parent.Children!.Single().Value?.Id);
         Assert.True(parent.Value!.HasChildren);

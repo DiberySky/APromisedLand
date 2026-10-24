@@ -9,7 +9,7 @@ namespace TreeGraph.Blazor.Shared.TreeEavSky;
 
 public partial class TreeEavSky<TItem> : IDisposable
 {
-    private List<TreeItemData<TItem>>? _items;
+    private List<TreeNodeItem<TItem>>? _items;
     private string? _lastClickNodeId;
     private string HighlightedText { get; set; } = string.Empty;
 

@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.LineSky.Entities;
@@ -28,7 +29,6 @@ public class TreeGraphDbContext : DbContext
     public DbSet<InodeEntity> InodeEntities => Set<InodeEntity>();
 
     // Edge（关系/边）
-    public DbSet<EdgeDefinition> EdgeDefinitions => Set<EdgeDefinition>();
     public DbSet<EdgeInstance> EdgeInstances => Set<EdgeInstance>();
 
     // TreeEavSky：计量单位树 / 分类树 / 知识树 / 空间树
@@ -50,6 +50,10 @@ public class TreeGraphDbContext : DbContext
     public DbSet<LineStructure> LineStructures => Set<LineStructure>();
     public DbSet<LineStructureSegment> LineStructureSegments => Set<LineStructureSegment>();
     public DbSet<LineTerminal> LineTerminals => Set<LineTerminal>();
+
+    // NodeSky：通用节点（无归属一等公民；nodes 表一期为宿主主表，
+    //   重构期兼作全系统节点身份注册表，specs/node-sky §8.2）
+    public DbSet<TreeGraph.Shared.NodeSky.Entities.Node> Nodes => Set<TreeGraph.Shared.NodeSky.Entities.Node>();
 
     public TreeGraphDbContext(DbContextOptions<TreeGraphDbContext> options) : base(options) { }
 
@@ -74,6 +78,7 @@ public class TreeGraphDbContext : DbContext
         ConfigureLineNodes(mb);
         ConfigureLines(mb);
         ConfigureLineStructures(mb);
+        ConfigureNodes(mb);
     }
 
     // ============================================================
@@ -86,7 +91,6 @@ public class TreeGraphDbContext : DbContext
             e.ToTable("unit_trees");
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
             e.Property(x => x.Abbreviation).HasColumnName("abbreviation").HasMaxLength(50);
             e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
@@ -97,6 +101,12 @@ public class TreeGraphDbContext : DbContext
             e.HasOne(x => x.Parent)
                 .WithMany()
                 .HasForeignKey(x => x.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // 共享主键：宿主 Id 即 nodes.id，名称唯一真源在 nodes（R2 Name 收编）
+            e.HasOne(x => x.Node)
+                .WithOne()
+                .HasForeignKey<UnitTree>(x => x.Id)
                 .OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(x => x.ParentId).HasDatabaseName("ix_unit_trees_parent");
@@ -112,12 +122,17 @@ public class TreeGraphDbContext : DbContext
             e.ToTable("category_trees");
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(300).IsRequired();
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
             e.Property(x => x.IsArchived).HasColumnName("is_archived");
             e.Property(x => x.SortOrder).HasColumnName("sort_order");
             e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
+
+            // 共享主键：宿主 Id 即 nodes.id，名称唯一真源在 nodes（R2 Name 收编）
+            e.HasOne(x => x.Node)
+                .WithOne()
+                .HasForeignKey<CategoryTree>(x => x.Id)
+                .OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(x => x.ParentId).HasDatabaseName("ix_category_trees_parent");
 
@@ -132,12 +147,17 @@ public class TreeGraphDbContext : DbContext
             e.ToTable("knowledge_trees");
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(300).IsRequired();
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
             e.Property(x => x.IsArchived).HasColumnName("is_archived");
             e.Property(x => x.SortOrder).HasColumnName("sort_order");
             e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
+
+            // 共享主键：宿主 Id 即 nodes.id，名称唯一真源在 nodes（R2 Name 收编）
+            e.HasOne(x => x.Node)
+                .WithOne()
+                .HasForeignKey<KnowledgeTree>(x => x.Id)
+                .OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(x => x.ParentId).HasDatabaseName("ix_knowledge_trees_parent");
 
@@ -152,7 +172,6 @@ public class TreeGraphDbContext : DbContext
             e.ToTable("space_trees");
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("id").HasMaxLength(36);
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
             e.Property(x => x.ParentId).HasColumnName("parent_id").HasMaxLength(36);
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(x => x.CanHaveChildren).HasColumnName("can_have_children");
@@ -162,6 +181,12 @@ public class TreeGraphDbContext : DbContext
             e.HasOne(x => x.Parent)
                 .WithMany()
                 .HasForeignKey(x => x.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // 共享主键：宿主 Id 即 nodes.id，名称唯一真源在 nodes（R2 Name 收编）
+            e.HasOne(x => x.Node)
+                .WithOne()
+                .HasForeignKey<SpaceTree>(x => x.Id)
                 .OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(x => x.ParentId).HasDatabaseName("ix_space_trees_parent");
@@ -733,33 +758,6 @@ public class TreeGraphDbContext : DbContext
     // ============================================================
     private static void ConfigureEdges(ModelBuilder mb)
     {
-        mb.Entity<EdgeDefinition>(e =>
-        {
-            e.ToTable("edge_definitions");
-            e.HasKey(x => x.EdgeTypeId);
-            e.Property(x => x.EdgeTypeId)
-                .HasColumnName("edge_type_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(100).IsRequired();
-            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
-            e.Property(x => x.FromNodeType).HasColumnName("from_node_type").HasMaxLength(100);
-            e.Property(x => x.ToNodeType).HasColumnName("to_node_type").HasMaxLength(100);
-            e.Property(x => x.IsGlobal).HasColumnName("is_global");
-            e.Property(x => x.IsDirected).HasColumnName("is_directed");
-            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
-            e.Property(x => x.IsActive).HasColumnName("is_active");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            e.HasIndex(x => x.TypeName)
-                .IsUnique()
-                .HasDatabaseName("uq_edge_definition_type_name");
-
-            e.HasData(EdgeDefinition.SeedData());
-        });
-
         mb.Entity<EdgeInstance>(e =>
         {
             e.ToTable("edge_instances");
@@ -769,47 +767,39 @@ public class TreeGraphDbContext : DbContext
                 .HasMaxLength(36).IsRequired()
                 .HasDefaultValueSql("gen_random_uuid()::text")
                 .HasSentinel("");
-            e.Property(x => x.EdgeTypeId).HasColumnName("edge_type_id").HasMaxLength(36).IsRequired();
+            // 裸列：兼 EAV entity_type 键、唯一约束判别列、NebulaGraph 边类型名
+            e.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(100).IsRequired();
             e.Property(x => x.FromNodeId).HasColumnName("from_node_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.ToNodeId).HasColumnName("to_node_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.Weight).HasColumnName("weight").HasPrecision(18, 4);
-            e.Property(x => x.EnforceSingleIncoming)
-                .HasColumnName("enforce_single_incoming").HasDefaultValue(false);
-            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(500);
+            e.Property(x => x.IsDirected).HasColumnName("is_directed").HasDefaultValue(true);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
-            // 同类型同方向不重复（UNIQUE）
-            e.HasIndex(x => new { x.EdgeTypeId, x.FromNodeId, x.ToNodeId })
+            // 同类型同方向不重复（无向反向重复由应用层判定）
+            e.HasIndex(x => new { x.TypeName, x.FromNodeId, x.ToNodeId })
                 .IsUnique()
                 .HasDatabaseName("uq_edge_instance");
 
-            // 严格线性线路（IsLine && IsLinear）：同一类型下同一 to_node_id 至多一条边
-            // （入度 ≤ 1）。用部分唯一索引把并发下“查后插”的竞态收敛为数据库原子约束。
-            //
-            // 注意：列顺序刻意与下方通用索引 ix_ei_to 相反（ToNodeId, EdgeTypeId）。
-            // EF Core 按属性列表识别索引，相同列集合会被合并覆盖；反转顺序使二者成为
-            // 两个独立索引，既保留通用入边查询索引，又叠加唯一约束。唯一性语义与
-            // (EdgeTypeId, ToNodeId) 完全等价（列顺序不影响唯一性）。
-            e.HasIndex(x => new { x.ToNodeId, x.EdgeTypeId })
-                .IsUnique()
-                .HasFilter("enforce_single_incoming = true")
-                .HasDatabaseName("uq_ei_single_incoming");
-
             // 图查询索引：from 出边 / to 入边
-            e.HasIndex(x => new { x.EdgeTypeId, x.FromNodeId })
-                .HasDatabaseName("ix_ei_from");
-            e.HasIndex(x => new { x.EdgeTypeId, x.ToNodeId })
-                .HasDatabaseName("ix_ei_to");
-
-            // 反向图查询：按 node_id 查所有关联边（不分类型）
             e.HasIndex(x => x.FromNodeId).HasDatabaseName("ix_ei_from_node");
             e.HasIndex(x => x.ToNodeId).HasDatabaseName("ix_ei_to_node");
 
-            // FK 不采用级联删除：边实例非空时由应用层拒绝删除边类型
-            e.HasOne(x => x.EdgeType)
-                .WithMany(d => d.Instances)
-                .HasForeignKey(x => x.EdgeTypeId)
+            // 端点存在性由 nodes 真外键强制（Restrict：节点被边引用时禁止删除）
+            e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
+                .WithMany()
+                .HasForeignKey(x => x.FromNodeId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_ei_from_node");
+            e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
+                .WithMany()
+                .HasForeignKey(x => x.ToNodeId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_ei_to_node");
+
+            // 共享主键：边 Id 即 nodes.id（注册表身份）；删除 nodes 行前必须先删边行
+            e.HasOne(x => x.Node)
+                .WithOne()
+                .HasForeignKey<EdgeInstance>(x => x.EdgeId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }
@@ -837,10 +827,15 @@ public class TreeGraphDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.LineId);
 
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // 共享主键：宿主 Id 即 nodes.id，名称唯一真源在 nodes（R2 Name 收编）
+            e.HasOne(x => x.Node)
+                .WithOne()
+                .HasForeignKey<TreeGraph.Shared.LineSky.Entities.LineNode>(x => x.Id)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // 复合外键的 principal key：(line_id, id)。
             // line_structure_segments 的 (line_id, from_node_id)/(line_id, to_node_id)
@@ -848,6 +843,39 @@ public class TreeGraphDbContext : DbContext
             e.HasAlternateKey(x => new { x.LineId, x.Id })
                 .HasName("ak_line_nodes_line_id_id");
         });
+    }
+
+    // ============================================================
+    // NodeSky：通用节点（一期宿主主表；重构期全系统节点身份注册表）
+    // ============================================================
+    private static void ConfigureNodes(ModelBuilder mb)
+    {
+        mb.Entity<TreeGraph.Shared.NodeSky.Entities.Node>(e =>
+        {
+            e.ToTable("nodes");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id)
+                .HasColumnName("id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            // 宿主类型名：一期恒为 "Node"；重构期各宿主写入自己的类型名（spec §8.2）
+            e.Property(x => x.HostType).HasColumnName("host_type").HasMaxLength(16).IsRequired()
+                .HasDefaultValue("Node");
+            // 可空：边注册进 nodes 时名字为派生物（from名 → to名），存 null（spec §8.6 R3）
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200);
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        // R2 Name 收编：宿主树种子对应的 nodes 注册表行（名称唯一真源）
+        mb.Entity<TreeGraph.Shared.NodeSky.Entities.Node>()
+            .HasData(
+                UnitTree.SeedNodes()
+                    .Concat(CategoryTree.SeedNodes())
+                    .Concat(KnowledgeTree.SeedNodes())
+                    .ToList());
     }
 
     // ============================================================
@@ -881,7 +909,6 @@ public class TreeGraphDbContext : DbContext
             e.ToTable("line_structures");
             e.HasKey(x => x.LineId);
             e.Property(x => x.LineId).HasColumnName("line_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.EdgeTypeId).HasColumnName("edge_type_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.TopologyMode)
                 .HasColumnName("topology_mode")
                 .HasConversion<string>().HasMaxLength(20).IsRequired();
@@ -892,14 +919,6 @@ public class TreeGraphDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.LineId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            // 边类型被结构引用时禁止删除（由 EdgeMetadataService 前置成 409）
-            e.HasOne<EdgeDefinition>()
-                .WithMany()
-                .HasForeignKey(x => x.EdgeTypeId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            e.HasIndex(x => x.EdgeTypeId).HasDatabaseName("ix_line_structures_edge_type");
         });
 
         mb.Entity<LineStructureSegment>(e =>
@@ -910,6 +929,8 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.EdgeId).HasColumnName("edge_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.FromNodeId).HasColumnName("from_node_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.ToNodeId).HasColumnName("to_node_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.Weight).HasColumnName("weight").HasPrecision(18, 4);
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(500);
 
             // 一条边只属于一个结构（约束而非约定）
             e.HasIndex(x => x.EdgeId).IsUnique().HasDatabaseName("uq_lss_edge_id");
@@ -919,12 +940,6 @@ public class TreeGraphDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.LineId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            // 边实例被段引用时禁止直接删除（由 EdgeInstanceService 前置成 409）
-            e.HasOne<EdgeInstance>()
-                .WithMany()
-                .HasForeignKey(x => x.EdgeId)
-                .OnDelete(DeleteBehavior.Restrict);
 
             // ★ 复合外键：段端点必须属于同一线路（line_nodes 的 (line_id, id) 备用键）
             e.HasOne<TreeGraph.Shared.LineSky.Entities.LineNode>()

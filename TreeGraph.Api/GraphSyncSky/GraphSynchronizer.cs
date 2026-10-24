@@ -180,89 +180,107 @@ public sealed class GraphSynchronizer
             .Cast<string>()
             .ToList() ?? [];
 
-    /// <summary>跨 4 棵宿主树 + LineNode 解析节点（Id 全局唯一，先中先得）。</summary>
+    /// <summary>
+    /// 解析节点：先单查 nodes 身份行（name/host_type），再按 host_type 只查对应扩展表的附加属性。
+    /// 不再逐一试各个宿主守卫。
+    /// </summary>
     private async Task<GraphNodeInfo?> ResolveNodeAsync(string inodeId, CancellationToken ct)
     {
-        var space = await _db.SpaceTrees.AsNoTracking()
+        var row = await _db.Nodes.AsNoTracking()
             .Where(n => n.Id == inodeId)
-            .Select(n => new { n.Name, n.ParentId })
+            .Select(n => new { n.Id, n.Name, n.HostType })
             .FirstOrDefaultAsync(ct);
-        if (space is not null)
-            return new GraphNodeInfo(inodeId, space.Name, GraphNaming.SpaceTreeTag,
-                "SpaceTree", false, space.ParentId);
+        if (row is null) return null;
 
-        var unit = await _db.UnitTrees.AsNoTracking()
-            .Where(n => n.Id == inodeId)
-            .Select(n => new { n.Name, n.ParentId })
-            .FirstOrDefaultAsync(ct);
-        if (unit is not null)
-            return new GraphNodeInfo(inodeId, unit.Name, GraphNaming.UnitTreeTag,
-                "UnitTree", false, unit.ParentId);
-
-        var category = await _db.CategoryTrees.AsNoTracking()
-            .Where(n => n.Id == inodeId)
-            .Select(n => new { n.Name, n.ParentId, n.IsArchived })
-            .FirstOrDefaultAsync(ct);
-        if (category is not null)
-            return new GraphNodeInfo(inodeId, category.Name, GraphNaming.CategoryTreeTag,
-                "CategoryTree", category.IsArchived, category.ParentId);
-
-        var knowledge = await _db.KnowledgeTrees.AsNoTracking()
-            .Where(n => n.Id == inodeId)
-            .Select(n => new { n.Name, n.ParentId, n.IsArchived })
-            .FirstOrDefaultAsync(ct);
-        if (knowledge is not null)
-            return new GraphNodeInfo(inodeId, knowledge.Name, GraphNaming.KnowledgeTreeTag,
-                "KnowledgeTree", knowledge.IsArchived, knowledge.ParentId);
-
-        var lineNode = await _db.LineNodes.AsNoTracking()
-            .Where(n => n.Id == inodeId)
-            .Select(n => new { n.Name, n.LineId })
-            .FirstOrDefaultAsync(ct);
-        if (lineNode is not null)
+        switch (row.HostType)
         {
-            var lineName = await _db.Lines.AsNoTracking()
-                .Where(l => l.Id == lineNode.LineId)
-                .Select(l => l.Name)
-                .FirstOrDefaultAsync(ct) ?? string.Empty;
-            var role = await _db.LineTerminals.AsNoTracking()
-                .Where(t => t.LineId == lineNode.LineId && t.NodeId == inodeId)
-                .Select(t => new
-                {
-                    Role = (TreeGraph.Shared.LineSky.Entities.TerminalRole?)t.Role,
-                    OperatingState = (TreeGraph.Shared.LineSky.Entities.TerminalOperatingState?)t.OperatingState
-                })
-                .FirstOrDefaultAsync(ct);
+            case "SpaceTree":
+            {
+                var parentId = await _db.SpaceTrees.AsNoTracking()
+                    .Where(n => n.Id == inodeId)
+                    .Select(n => n.ParentId)
+                    .FirstOrDefaultAsync(ct);
+                return new GraphNodeInfo(inodeId, row.Name, GraphNaming.SpaceTreeTag,
+                    "SpaceTree", false, parentId);
+            }
+            case "UnitTree":
+            {
+                var parentId = await _db.UnitTrees.AsNoTracking()
+                    .Where(n => n.Id == inodeId)
+                    .Select(n => n.ParentId)
+                    .FirstOrDefaultAsync(ct);
+                return new GraphNodeInfo(inodeId, row.Name, GraphNaming.UnitTreeTag,
+                    "UnitTree", false, parentId);
+            }
+            case "CategoryTree":
+            {
+                var h = await _db.CategoryTrees.AsNoTracking()
+                    .Where(n => n.Id == inodeId)
+                    .Select(n => new { n.ParentId, n.IsArchived })
+                    .FirstOrDefaultAsync(ct);
+                return new GraphNodeInfo(inodeId, row.Name, GraphNaming.CategoryTreeTag,
+                    "CategoryTree", h?.IsArchived ?? false, h?.ParentId);
+            }
+            case "KnowledgeTree":
+            {
+                var h = await _db.KnowledgeTrees.AsNoTracking()
+                    .Where(n => n.Id == inodeId)
+                    .Select(n => new { n.ParentId, n.IsArchived })
+                    .FirstOrDefaultAsync(ct);
+                return new GraphNodeInfo(inodeId, row.Name, GraphNaming.KnowledgeTreeTag,
+                    "KnowledgeTree", h?.IsArchived ?? false, h?.ParentId);
+            }
+            case "LineNode":
+            {
+                var lineId = await _db.LineNodes.AsNoTracking()
+                    .Where(n => n.Id == inodeId)
+                    .Select(n => n.LineId)
+                    .FirstOrDefaultAsync(ct);
+                if (lineId is null) return null;
 
-            return new GraphNodeInfo(inodeId, lineNode.Name, GraphNaming.LineNodeTag,
-                "LineNode", false, null, new Dictionary<string, object?>
-                {
-                    ["line_id"] = lineNode.LineId,
-                    ["line_name"] = lineName,
-                    ["terminal_role"] = role?.Role?.ToString(),
-                    ["terminal_operating_state"] = role?.OperatingState?.ToString()
-                });
+                var lineName = await _db.Lines.AsNoTracking()
+                    .Where(l => l.Id == lineId)
+                    .Select(l => l.Name)
+                    .FirstOrDefaultAsync(ct) ?? string.Empty;
+                var role = await _db.LineTerminals.AsNoTracking()
+                    .Where(t => t.LineId == lineId && t.NodeId == inodeId)
+                    .Select(t => new
+                    {
+                        Role = (TreeGraph.Shared.LineSky.Entities.TerminalRole?)t.Role,
+                        OperatingState = (TreeGraph.Shared.LineSky.Entities.TerminalOperatingState?)t.OperatingState
+                    })
+                    .FirstOrDefaultAsync(ct);
+
+                return new GraphNodeInfo(inodeId, row.Name, GraphNaming.LineNodeTag,
+                    "LineNode", false, null, new Dictionary<string, object?>
+                    {
+                        ["line_id"] = lineId,
+                        ["line_name"] = lineName,
+                        ["terminal_role"] = role?.Role?.ToString(),
+                        ["terminal_operating_state"] = role?.OperatingState?.ToString()
+                    });
+            }
+            case "Line":
+            {
+                var mode = await _db.LineStructures.AsNoTracking()
+                    .Where(s => s.LineId == inodeId)
+                    .Select(s => (TreeGraph.Shared.LineSky.Entities.TopologyMode?)s.TopologyMode)
+                    .FirstOrDefaultAsync(ct);
+                return new GraphNodeInfo(inodeId, row.Name, GraphNaming.LineTag,
+                    "Line", false, null, new Dictionary<string, object?>
+                    {
+                        ["topology_mode"] = mode?.ToString()
+                    });
+            }
+            case "Node":
+                // 自由节点：无宿主扩展表，只入身份与名称
+                return new GraphNodeInfo(inodeId, row.Name, GraphNaming.NodeTag,
+                    "Node", false, null);
+
+            default:
+                // EdgeInstance 等身份暂不入图（R4 不做超边/边顶点）
+                return null;
         }
-
-        var line = await _db.Lines.AsNoTracking()
-            .Where(l => l.Id == inodeId)
-            .Select(l => new { l.Name })
-            .FirstOrDefaultAsync(ct);
-        if (line is not null)
-        {
-            var mode = await _db.LineStructures.AsNoTracking()
-                .Where(s => s.LineId == inodeId)
-                .Select(s => (TreeGraph.Shared.LineSky.Entities.TopologyMode?)s.TopologyMode)
-                .FirstOrDefaultAsync(ct);
-
-            return new GraphNodeInfo(inodeId, line.Name, GraphNaming.LineTag,
-                "Line", false, null, new Dictionary<string, object?>
-                {
-                    ["topology_mode"] = mode?.ToString()
-                });
-        }
-
-        return null;
     }
 
     // ============================================================
@@ -290,17 +308,9 @@ public sealed class GraphSynchronizer
             return;
         }
 
-        var def = await _db.EdgeDefinitions.AsNoTracking()
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == inst.EdgeTypeId, ct);
-        if (def is null)
-        {
-            _logger.LogWarning("边 {EdgeId} 的类型定义 {EdgeTypeId} 不存在，跳过", inst.EdgeId, inst.EdgeTypeId);
-            return;
-        }
-
-        await _client.UpsertEdgeAsync(def.TypeName, inst.FromNodeId, inst.ToNodeId,
+        await _client.UpsertEdgeAsync(inst.TypeName, inst.FromNodeId, inst.ToNodeId,
             EdgeProps(inst), ct);
-        _logger.LogDebug("图边已同步：{EdgeId} type={Type}", inst.EdgeId, def.TypeName);
+        _logger.LogDebug("图边已同步：{EdgeId} type={Type}", inst.EdgeId, inst.TypeName);
     }
 
     private async Task DeleteEdgeByPayloadAsync(EdgeChangedEvent evt, CancellationToken ct)
@@ -317,9 +327,89 @@ public sealed class GraphSynchronizer
     private static Dictionary<string, object?> EdgeProps(EdgeSky.Entities.EdgeInstance inst) => new()
     {
         ["edge_id"] = inst.EdgeId,
-        ["weight"] = inst.Weight.HasValue ? (double)inst.Weight.Value : null,
-        ["display_name"] = inst.DisplayName
+        ["is_directed"] = inst.IsDirected
     };
+
+    // ============================================================
+    // 线路结构边（R5：线路入图）
+    // ============================================================
+
+    /// <summary>
+    /// 同步一条线路的结构边（line_segment：线路节点 → 线路节点）。
+    /// 以 PG 现状为准：确保端点顶点存在 → upsert 当前段 → 删除已不存在的段边。幂等可重放。
+    /// </summary>
+    public async Task SyncLineStructureAsync(string lineId, CancellationToken ct = default)
+    {
+        var lineNodeIds = await _db.LineNodes.AsNoTracking()
+            .Where(n => n.LineId == lineId)
+            .Select(n => n.Id)
+            .ToListAsync(ct);
+
+        // 线路已删除：LineNode 顶点删除会连带其边，无需额外清理
+        if (lineNodeIds.Count == 0) return;
+
+        var segments = await _db.LineStructureSegments.AsNoTracking()
+            .Where(s => s.LineId == lineId)
+            .Select(s => new { s.EdgeId, s.FromNodeId, s.ToNodeId, s.Weight, s.DisplayName })
+            .ToListAsync(ct);
+
+        // 端点顶点可能尚未同步（先建段后建节点 / 事件重放），先补齐顶点再写边
+        var endpoints = segments.Select(s => s.FromNodeId)
+            .Concat(segments.Select(s => s.ToNodeId))
+            .Distinct(StringComparer.Ordinal);
+        foreach (var nodeId in endpoints)
+            await SyncInodeAsync(nodeId, ct);
+
+        var existing = await LoadLineSegmentPairsAsync(lineNodeIds, ct);
+        var desired = segments
+            .Select(s => (From: s.FromNodeId, To: s.ToNodeId))
+            .ToHashSet();
+
+        foreach (var (from, to) in existing.Where(p => !desired.Contains(p)))
+        {
+            await _client.DeleteEdgeAsync(GraphNaming.LineSegmentEdge, from, to, ct);
+            _logger.LogDebug("线路段边已删除：{LineId} {From}->{To}", lineId, from, to);
+        }
+
+        foreach (var s in segments)
+        {
+            await _client.UpsertEdgeAsync(GraphNaming.LineSegmentEdge, s.FromNodeId, s.ToNodeId,
+                new Dictionary<string, object?>
+                {
+                    ["edge_id"] = s.EdgeId,
+                    ["line_id"] = lineId,
+                    ["weight"] = s.Weight is null ? null : (double)s.Weight.Value,
+                    ["display_name"] = s.DisplayName
+                }, ct);
+        }
+
+        _logger.LogInformation(
+            "线路结构边已同步：{LineId}，段 {Segments}，清理 {Deleted}",
+            lineId, segments.Count, existing.Count(p => !desired.Contains(p)));
+    }
+
+    /// <summary>查询线路节点上已存在的结构边（src→dst）。</summary>
+    private async Task<HashSet<(string From, string To)>> LoadLineSegmentPairsAsync(
+        IReadOnlyList<string> lineNodeIds, CancellationToken ct)
+    {
+        var pairs = new HashSet<(string, string)>();
+        foreach (var vid in lineNodeIds)
+        {
+            var result = await _client.QueryAsync(
+                $"GO FROM \"{vid}\" OVER `{GraphNaming.LineSegmentEdge}` " +
+                "YIELD src(edge) AS src, dst(edge) AS dst", ct);
+
+            foreach (var row in result.Data ?? [])
+            {
+                if (row.TryGetValue("src", out var s) && row.TryGetValue("dst", out var d)
+                    && s.GetString() is { } from && d.GetString() is { } to)
+                {
+                    pairs.Add((from, to));
+                }
+            }
+        }
+        return pairs;
+    }
 
     // ============================================================
     // 全量重建
@@ -337,37 +427,49 @@ public sealed class GraphSynchronizer
         var vertices = new List<VertexItem>();
         var edges = new List<EdgeItem>();
 
-        // ── 顶点 + parent_of 树父子边 ──
+        // ── 顶点 + parent_of 树父子边 ──（名称统一来自 nodes 注册表）
+        var spaceNames = await LoadNodeNamesAsync("SpaceTree", ct);
         foreach (var n in await _db.SpaceTrees.AsNoTracking()
-                     .Select(n => new { n.Id, n.Name, n.ParentId }).ToListAsync(ct))
+                     .Select(n => new { n.Id, n.ParentId }).ToListAsync(ct))
         {
-            vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.SpaceTreeTag, "SpaceTree", false));
+            vertices.Add(MakeVertex(n.Id, spaceNames.GetValueOrDefault(n.Id) ?? "", GraphNaming.SpaceTreeTag, "SpaceTree", false));
             if (n.ParentId is not null)
                 edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
         }
 
+        var unitNames = await LoadNodeNamesAsync("UnitTree", ct);
         foreach (var n in await _db.UnitTrees.AsNoTracking()
-                     .Select(n => new { n.Id, n.Name, n.ParentId }).ToListAsync(ct))
+                     .Select(n => new { n.Id, n.ParentId }).ToListAsync(ct))
         {
-            vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.UnitTreeTag, "UnitTree", false));
+            vertices.Add(MakeVertex(n.Id, unitNames.GetValueOrDefault(n.Id) ?? "", GraphNaming.UnitTreeTag, "UnitTree", false));
             if (n.ParentId is not null)
                 edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
         }
 
+        var categoryNames = await LoadNodeNamesAsync("CategoryTree", ct);
         foreach (var n in await _db.CategoryTrees.AsNoTracking()
-                     .Select(n => new { n.Id, n.Name, n.ParentId, n.IsArchived }).ToListAsync(ct))
+                     .Select(n => new { n.Id, n.ParentId, n.IsArchived }).ToListAsync(ct))
         {
-            vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.CategoryTreeTag, "CategoryTree", n.IsArchived));
+            vertices.Add(MakeVertex(n.Id, categoryNames.GetValueOrDefault(n.Id) ?? "", GraphNaming.CategoryTreeTag, "CategoryTree", n.IsArchived));
             if (n.ParentId is not null)
                 edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
         }
 
+        var knowledgeNames = await LoadNodeNamesAsync("KnowledgeTree", ct);
         foreach (var n in await _db.KnowledgeTrees.AsNoTracking()
-                     .Select(n => new { n.Id, n.Name, n.ParentId, n.IsArchived }).ToListAsync(ct))
+                     .Select(n => new { n.Id, n.ParentId, n.IsArchived }).ToListAsync(ct))
         {
-            vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.KnowledgeTreeTag, "KnowledgeTree", n.IsArchived));
+            vertices.Add(MakeVertex(n.Id, knowledgeNames.GetValueOrDefault(n.Id) ?? "", GraphNaming.KnowledgeTreeTag, "KnowledgeTree", n.IsArchived));
             if (n.ParentId is not null)
                 edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
+        }
+
+        // ── 自由节点（nodes.host_type = "Node"）──
+        foreach (var n in await _db.Nodes.AsNoTracking()
+                     .Where(x => x.HostType == "Node")
+                     .Select(x => new { x.Id, x.Name }).ToListAsync(ct))
+        {
+            vertices.Add(MakeVertex(n.Id, n.Name ?? "", GraphNaming.NodeTag, "Node", false));
         }
 
         var parentEdgeCount = edges.Count;
@@ -376,11 +478,9 @@ public sealed class GraphSynchronizer
         var lineEdgeCount = await AddLineGraphAsync(vertices, edges, ct);
 
         // ── 语义边 ──
-        var semanticEdges = await (
-            from i in _db.EdgeInstances.AsNoTracking()
-            join d in _db.EdgeDefinitions.AsNoTracking() on i.EdgeTypeId equals d.EdgeTypeId
-            select new { i.FromNodeId, i.ToNodeId, d.TypeName, i.EdgeId, i.Weight, i.DisplayName }
-        ).ToListAsync(ct);
+        var semanticEdges = await _db.EdgeInstances.AsNoTracking()
+            .Select(i => new { i.FromNodeId, i.ToNodeId, i.TypeName, i.EdgeId, i.IsDirected })
+            .ToListAsync(ct);
 
         foreach (var e in semanticEdges)
         {
@@ -388,8 +488,7 @@ public sealed class GraphSynchronizer
                 new Dictionary<string, object?>
                 {
                     ["edge_id"] = e.EdgeId,
-                    ["weight"] = e.Weight.HasValue ? (double)e.Weight.Value : null,
-                    ["display_name"] = e.DisplayName
+                    ["is_directed"] = e.IsDirected
                 }));
         }
 
@@ -429,53 +528,59 @@ public sealed class GraphSynchronizer
         switch (category)
         {
             case SyncCategory.Space:
+            {
+                var names = await LoadNodeNamesAsync("SpaceTree", ct);
                 foreach (var n in await _db.SpaceTrees.AsNoTracking()
-                             .Select(n => new { n.Id, n.Name, n.ParentId }).ToListAsync(ct))
+                             .Select(n => new { n.Id, n.ParentId }).ToListAsync(ct))
                 {
-                    vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.SpaceTreeTag, "SpaceTree", false));
+                    vertices.Add(MakeVertex(n.Id, names.GetValueOrDefault(n.Id) ?? "", GraphNaming.SpaceTreeTag, "SpaceTree", false));
                     if (n.ParentId is not null)
                         edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
                 }
                 parentEdgeCount = edges.Count;
                 break;
+            }
 
             case SyncCategory.Tree:
+            {
+                var unitNames = await LoadNodeNamesAsync("UnitTree", ct);
                 foreach (var n in await _db.UnitTrees.AsNoTracking()
-                             .Select(n => new { n.Id, n.Name, n.ParentId }).ToListAsync(ct))
+                             .Select(n => new { n.Id, n.ParentId }).ToListAsync(ct))
                 {
-                    vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.UnitTreeTag, "UnitTree", false));
+                    vertices.Add(MakeVertex(n.Id, unitNames.GetValueOrDefault(n.Id) ?? "", GraphNaming.UnitTreeTag, "UnitTree", false));
                     if (n.ParentId is not null)
                         edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
                 }
 
+                var categoryNames = await LoadNodeNamesAsync("CategoryTree", ct);
                 foreach (var n in await _db.CategoryTrees.AsNoTracking()
-                             .Select(n => new { n.Id, n.Name, n.ParentId, n.IsArchived }).ToListAsync(ct))
+                             .Select(n => new { n.Id, n.ParentId, n.IsArchived }).ToListAsync(ct))
                 {
-                    vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.CategoryTreeTag, "CategoryTree", n.IsArchived));
+                    vertices.Add(MakeVertex(n.Id, categoryNames.GetValueOrDefault(n.Id) ?? "", GraphNaming.CategoryTreeTag, "CategoryTree", n.IsArchived));
                     if (n.ParentId is not null)
                         edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
                 }
 
+                var knowledgeNames = await LoadNodeNamesAsync("KnowledgeTree", ct);
                 foreach (var n in await _db.KnowledgeTrees.AsNoTracking()
-                             .Select(n => new { n.Id, n.Name, n.ParentId, n.IsArchived }).ToListAsync(ct))
+                             .Select(n => new { n.Id, n.ParentId, n.IsArchived }).ToListAsync(ct))
                 {
-                    vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.KnowledgeTreeTag, "KnowledgeTree", n.IsArchived));
+                    vertices.Add(MakeVertex(n.Id, knowledgeNames.GetValueOrDefault(n.Id) ?? "", GraphNaming.KnowledgeTreeTag, "KnowledgeTree", n.IsArchived));
                     if (n.ParentId is not null)
                         edges.Add(new EdgeItem(n.ParentId, n.Id, GraphNaming.ParentOfEdge, 0, null));
                 }
                 parentEdgeCount = edges.Count;
                 break;
+            }
 
             case SyncCategory.Line:
                 lineEdgeCount = await AddLineGraphAsync(vertices, edges, ct);
                 break;
 
             case SyncCategory.Edge:
-                var semanticEdges = await (
-                    from i in _db.EdgeInstances.AsNoTracking()
-                    join d in _db.EdgeDefinitions.AsNoTracking() on i.EdgeTypeId equals d.EdgeTypeId
-                    select new { i.FromNodeId, i.ToNodeId, d.TypeName, i.EdgeId, i.Weight, i.DisplayName }
-                ).ToListAsync(ct);
+                var semanticEdges = await _db.EdgeInstances.AsNoTracking()
+                    .Select(i => new { i.FromNodeId, i.ToNodeId, i.TypeName, i.EdgeId, i.IsDirected })
+                    .ToListAsync(ct);
 
                 semanticEdgeCount = semanticEdges.Count;
                 foreach (var e in semanticEdges)
@@ -484,8 +589,7 @@ public sealed class GraphSynchronizer
                         new Dictionary<string, object?>
                         {
                             ["edge_id"] = e.EdgeId,
-                            ["weight"] = e.Weight.HasValue ? (double)e.Weight.Value : null,
-                            ["display_name"] = e.DisplayName
+                            ["is_directed"] = e.IsDirected
                         }));
                 }
                 break;
@@ -581,10 +685,12 @@ public sealed class GraphSynchronizer
                 }));
         }
 
+        var lineNodeNames = await LoadNodeNamesAsync("LineNode", ct);
+
         foreach (var n in await _db.LineNodes.AsNoTracking()
-                     .Select(n => new { n.Id, n.Name, n.LineId }).ToListAsync(ct))
+                     .Select(n => new { n.Id, n.LineId }).ToListAsync(ct))
         {
-            vertices.Add(MakeVertex(n.Id, n.Name, GraphNaming.LineNodeTag, "LineNode", false,
+            vertices.Add(MakeVertex(n.Id, lineNodeNames.GetValueOrDefault(n.Id) ?? "", GraphNaming.LineNodeTag, "LineNode", false,
                 new Dictionary<string, object?>
                 {
                     ["line_id"] = n.LineId,
@@ -609,8 +715,31 @@ public sealed class GraphSynchronizer
                 }));
         }
 
+        // 线路结构段 → 图内结构边（线路节点之间，R5）
+        var segments = await _db.LineStructureSegments.AsNoTracking()
+            .Select(s => new { s.LineId, s.EdgeId, s.FromNodeId, s.ToNodeId, s.Weight, s.DisplayName })
+            .ToListAsync(ct);
+        foreach (var s in segments)
+        {
+            edges.Add(new EdgeItem(s.FromNodeId, s.ToNodeId, GraphNaming.LineSegmentEdge, 0,
+                new Dictionary<string, object?>
+                {
+                    ["edge_id"] = s.EdgeId,
+                    ["line_id"] = s.LineId,
+                    ["weight"] = s.Weight is null ? null : (double)s.Weight.Value,
+                    ["display_name"] = s.DisplayName
+                }));
+        }
+
         return edges.Count - edgeStart;
     }
+
+    /// <summary>按 host_type 从 nodes 注册表批量取名称（单表查询）。</summary>
+    private async Task<Dictionary<string, string?>> LoadNodeNamesAsync(
+        string hostType, CancellationToken ct)
+        => await _db.Nodes.AsNoTracking()
+            .Where(n => n.HostType == hostType)
+            .ToDictionaryAsync(n => n.Id, n => n.Name, ct);
 
     private static VertexItem MakeVertex(
         string id, string name, string tag, string nodeType, bool isArchived) =>

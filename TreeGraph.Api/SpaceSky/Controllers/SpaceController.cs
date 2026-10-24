@@ -44,11 +44,16 @@ public class SpaceController(TreeGraphDbContext db, IEventPublisher publisher) :
 
         db.Spaces.Add(space);
 
-        // 同步创建对应的空间树根节点：root id = space id，root name = space name
+        // 同步创建对应的空间树根节点：root id = space id；名称存 nodes 注册表（R2 Name 收编）
+        db.Nodes.Add(new TreeGraph.Shared.NodeSky.Entities.Node
+        {
+            Id = space.Id,
+            HostType = "SpaceTree",
+            Name = space.Name,
+        });
         db.SpaceTrees.Add(new SpaceTree
         {
             Id = space.Id,
-            Name = space.Name,
             Description = space.Description ?? "",
             ParentId = null,
             CanHaveChildren = true,
@@ -84,18 +89,24 @@ public class SpaceController(TreeGraphDbContext db, IEventPublisher publisher) :
         space.Description = input.Description;
         space.Type = input.Type;
 
-        // 同步空间树根节点：root id = space id；不存在则自愈补建（与创建路径一致，同一次 SaveChanges 原子提交）
+        // 同步空间树根节点：root id = space id；名称存 nodes 注册表（R2 Name 收编）
         var root = await db.SpaceTrees.FindAsync([id], cancellationToken);
         if (root != null)
         {
-            root.Name = input.Name;
+            var rootNode = await db.Nodes.FindAsync([id], cancellationToken);
+            if (rootNode != null) rootNode.Name = input.Name;
         }
         else
         {
+            db.Nodes.Add(new TreeGraph.Shared.NodeSky.Entities.Node
+            {
+                Id = space.Id,
+                HostType = "SpaceTree",
+                Name = space.Name,
+            });
             db.SpaceTrees.Add(new SpaceTree
             {
                 Id = space.Id,
-                Name = space.Name,
                 Description = space.Description ?? "",
                 ParentId = null,
                 CanHaveChildren = true,
@@ -152,6 +163,10 @@ public class SpaceController(TreeGraphDbContext db, IEventPublisher publisher) :
             db.InodeEntityTypes.RemoveRange(declarations);
 
             db.SpaceTrees.Remove(root);
+
+            // 同步注销 nodes 注册表行（R2 Name 收编：先宿主后注册表）
+            var rootNode = await db.Nodes.FindAsync([id], cancellationToken);
+            if (rootNode != null) db.Nodes.Remove(rootNode);
         }
 
         db.Spaces.Remove(space);

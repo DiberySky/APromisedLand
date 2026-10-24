@@ -22,7 +22,7 @@
         }
         else
         {
-            <MudText Color="Color.Info">@NodeTemplate.Node.Value!.Parent?.Text()</MudText>
+            <MudText Color="Color.Info">@NodeTemplate.Node.Value!.Parent?.Name</MudText>
         }
         <MudSpacer/>
         @if (!IsBoot)
@@ -45,7 +45,7 @@
                     <MudStack Spacing="2">
 
                         <MudTextField T="string"
-                                      Value="NodeTemplate.Node.Value!.Text()"
+                                      Value="NodeTemplate.Node.Value!.Name"
                                       Label="名称"
                                       Variant="Variant.Outlined"
                                       ReadOnly="true"/>
@@ -75,7 +75,7 @@
                 <MudTabPanel Text="@RelationsTabText"
                              Icon="@Icons.Material.Filled.Hub">
                     <EdgeRelationPanel NodeId="@NodeId"
-                                       NodeName="@NodeTemplate.Node.Value!.Text()"
+                                       NodeName="@NodeTemplate.Node.Value!.Name"
                                        OnSummaryChanged="OnEdgeSummaryChanged" />
                 </MudTabPanel>
 

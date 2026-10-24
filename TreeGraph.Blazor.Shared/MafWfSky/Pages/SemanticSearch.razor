@@ -426,7 +426,7 @@
         if (result is { Canceled: false, Data: TItem selectedNode })
         {
             // 显示选中节点的信息
-            _lastReply = $"已选择节点：{selectedNode.Text()} (ID: {selectedNode.Id})";
+            _lastReply = $"已选择节点：{selectedNode.Name} (ID: {selectedNode.Id})";
             StateHasChanged();
 
             // 跳转到节点详情页

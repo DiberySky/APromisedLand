@@ -38,18 +38,18 @@
 
 <TreeDialogPageSky TItem="KnowledgeTree"
                    Title="@(Title ?? "知识注册")"
-                   TitleToolBar="@(ClickNode?.Value?.Parent?.Text() ?? "知识树")"
+                   TitleToolBar="@(ClickNode?.Value?.Parent?.Name ?? "知识树")"
                    RootId="@ClickNode?.Value?.Id"
                    EditTemplate="@editTemplate"
                    ShowDialogFunc="@ShowDialogAsync" />
 
 @code {
-    [Parameter] public ITreeItemData<KnowledgeTree>? ClickNode { get; set; }
+    [Parameter] public TreeNodeItem<KnowledgeTree>? ClickNode { get; set; }
 
     /// <summary>自定义标题（可选，默认「知识注册」）。</summary>
     [Parameter] public string? Title { get; set; }
 
-    private async Task ShowDialogAsync(ITreeItemData<KnowledgeTree> node)
+    private async Task ShowDialogAsync(TreeNodeItem<KnowledgeTree> node)
     {
         await BlazorService.ShowKnowledgeTreeDialogPageAsync(node);
     }

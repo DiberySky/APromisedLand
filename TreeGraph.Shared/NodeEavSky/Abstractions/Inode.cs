@@ -12,6 +12,6 @@ public interface Inode
     /// <summary>宿主实例主键（GUID 字符串），EAV 内作为 inode_id 使用。</summary>
     string Id { get; }
 
-    /// <summary>宿主显示名。</summary>
-    string Name { get; }
+    /// <summary>宿主显示名。可空：名字为派生物的宿主（如注册进 nodes 的边）允许为 null。</summary>
+    string? Name { get; }
 }

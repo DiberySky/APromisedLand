@@ -431,8 +431,9 @@ public sealed class SubtreeService
     {
         if (string.IsNullOrEmpty(unitId)) return "";
         var unit = await _db.UnitTrees
+            .Include(u => u.Node)
             .Where(u => u.Id == unitId)
-            .Select(u => new { u.Name, u.Abbreviation })
+            .Select(u => new { Name = u.Node!.Name, u.Abbreviation })
             .AsNoTracking().FirstOrDefaultAsync(ct);
         if (unit is null) return "";
         return string.IsNullOrEmpty(unit.Abbreviation) ? unit.Name : unit.Abbreviation;
@@ -454,18 +455,22 @@ public sealed class SubtreeService
             {
                 case "SpaceTree":
                     var st = await _db.SpaceTrees.AsNoTracking()
+                        .Include(x => x.Node)
                         .FirstOrDefaultAsync(x => x.Id == current, ct);
                     name = st?.Name; parentId = st?.ParentId; break;
                 case "UnitTree":
                     var ut = await _db.UnitTrees.AsNoTracking()
+                        .Include(x => x.Node)
                         .FirstOrDefaultAsync(x => x.Id == current, ct);
                     name = ut?.Name; parentId = ut?.ParentId; break;
                 case "CategoryTree":
                     var ct2 = await _db.CategoryTrees.AsNoTracking()
+                        .Include(x => x.Node)
                         .FirstOrDefaultAsync(x => x.Id == current, ct);
                     name = ct2?.Name; parentId = ct2?.ParentId; break;
                 case "KnowledgeTree":
                     var kt = await _db.KnowledgeTrees.AsNoTracking()
+                        .Include(x => x.Node)
                         .FirstOrDefaultAsync(x => x.Id == current, ct);
                     name = kt?.Name; parentId = kt?.ParentId; break;
             }

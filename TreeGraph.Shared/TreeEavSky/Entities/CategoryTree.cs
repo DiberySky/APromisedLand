@@ -1,7 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Text.Json.Serialization;
-using TreeGraph.Shared.NodeEavSky.Abstractions;
+using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 
 namespace TreeGraph.Shared.TreeEavSky.Entities;
@@ -10,15 +11,25 @@ namespace TreeGraph.Shared.TreeEavSky.Entities;
 /// 分类树节点 - 实现完整的树节点接口
 /// </summary>
 public sealed class CategoryTree : ITreeNodeBase<CategoryTree>,
-    IEquatable<CategoryTree>, Inode
+    IEquatable<CategoryTree>
 {
     [Key]
     [MaxLength(36)]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [MaxLength(300)]
-    [Required]
-    public string Name { get; set; } = string.Empty;
+    /// <summary>共享主键导航：宿主 Id 即 nodes.id，名称唯一真源在 Node.Name。</summary>
+    [JsonIgnore]
+    public Node? Node { get; set; }
+
+    private string? _seedName;
+
+    /// <summary>名称（非映射列）：运行时读穿 Node.Name；种子数据通过 setter 暂存。</summary>
+    [NotMapped]
+    public string? Name
+    {
+        get => Node?.Name ?? _seedName;
+        set => _seedName = value;
+    }
 
     /// <summary>节点描述</summary>
     [MaxLength(1000)]
@@ -49,12 +60,10 @@ public sealed class CategoryTree : ITreeNodeBase<CategoryTree>,
     [JsonIgnore]
     [NotMapped]
     public CategoryTree? Parent { get; set; }
-    
+
     // [JsonIgnore]
     // [NotMapped]
     // public ICollection<CategoryTree>? Children { get; set; }
-
-    public string Text() => Name;
 
     /// <summary>
     /// 计算节点深度
@@ -123,4 +132,18 @@ public sealed class CategoryTree : ITreeNodeBase<CategoryTree>,
             HasChildren = false,
         },
     };
+
+    /// <summary>
+    /// 与 <see cref="SeedData"/> 同 Id 的 nodes 注册表种子行（host_type="CategoryTree"）。
+    /// </summary>
+    public static List<Node> SeedNodes()
+        => SeedData()
+            .Select(c => new Node
+            {
+                Id = c.Id,
+                HostType = "CategoryTree",
+                Name = c.Name,
+                CreatedAt = DateTimeOffset.UnixEpoch,
+            })
+            .ToList();
 }

@@ -13,7 +13,6 @@ using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Shared.EdgeSky.Dtos;
-using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.NodeEavSky;
@@ -22,6 +21,7 @@ namespace TreeGraph.Blazor.Shared.Tests.NodeEavSky;
 /// Edge（关系/边）对话框组件冒烟测试。
 /// 模式对齐 NodeEavDialogSmokeTests：真实 MudDialogProvider + 桩 HttpClient，
 /// 仅验证对话框能正常渲染（标题正确、不抛异常），提交逻辑不在本冒烟范围。
+/// R4：边不再有类型表，类型为裸字符串（TypeName），对话框只剩「关系类型名 + 节点对 + 有向/无向」。
 /// </summary>
 public class EdgeDialogSmokeTests : BunitTestBase
 {
@@ -32,7 +32,7 @@ public class EdgeDialogSmokeTests : BunitTestBase
         Services.AddMudServices();
         Services.AddSingleton<IPlatformContext>(new FakePlatformContext());
 
-        // Edge 对话框初始化时会调：ListEdgeTypes, ListEntityTypes
+        // Edge 对话框初始化时会按类型名调 GetSchemaAsync 加载 EAV 属性定义
         Services.AddSingleton(new HttpClient(new FakeHandler(Route))
         {
             BaseAddress = new Uri("http://localhost/")
@@ -62,30 +62,19 @@ public class EdgeDialogSmokeTests : BunitTestBase
             StringComparison.Ordinal);
     }
 
-    // ─── EdgeDefinition DTOs（测试数据） ───
+    // ─── Edge DTOs（测试数据） ───
 
-    private static EdgeTypeDto EdgeType() => new(
-        EdgeTypeId: "et-edge-1", TypeName: "Collaboration", DisplayName: "协作关系",
-        FromNodeType: "Department", ToNodeType: "Department",
-        IsGlobal: true, IsDirected: true,
-        Description: null, IsActive: true, IsLine: false, IsLinear: true);
-
-    private static EdgeInstanceDto EdgeInstance() => new(
-        EdgeId: "e-1", EdgeTypeId: "et-edge-1",
-        EdgeTypeName: "Collaboration", EdgeTypeDisplayName: "协作关系",
-        FromNodeId: "node-a", FromNodeText: "",
-        ToNodeId: "node-b", ToNodeText: "",
-        Weight: 3.14m, DisplayName: null,
+    private static EdgeInstanceDto EdgeInstance(bool isDirected = true) => new(
+        EdgeId: "e-1",
+        TypeName: "Collaboration",
+        FromNodeId: "node-a",
+        FromNodeText: "牵引所A",
+        ToNodeId: "node-b",
+        ToNodeText: "牵引所B",
+        IsDirected: isDirected,
         CreatedAt: DateTimeOffset.UtcNow,
-        UpdatedAt: DateTimeOffset.UtcNow, Properties: null);
-
-    private static List<EntityTypeSummaryDto> EntityTypeSummaries() => new()
-    {
-        new EntityTypeSummaryDto("Department", 0, 0, "部门", "dept-1", "部门"),
-        new EntityTypeSummaryDto("Project", 0, 0, "项目", "proj-1", "项目")
-    };
-
-    private static List<EdgeTypeDto> EdgeTypes() => new() { EdgeType() };
+        UpdatedAt: DateTimeOffset.UtcNow,
+        Properties: null);
 
     // ─── 路由桩：按 URL 返回 canned JSON ───
 
@@ -95,13 +84,7 @@ public class EdgeDialogSmokeTests : BunitTestBase
         string Envelope(object? data)
             => JsonSerializer.Serialize(new { success = true, message = (string?)null, data }, web);
 
-        if (path.StartsWith("/api/eav/metadata/edge-types") && method == HttpMethod.Get)
-            return Envelope(EdgeTypes());
-
-        if (path.StartsWith("/api/eav/metadata/entity-types/summary") && method == HttpMethod.Get)
-            return Envelope(EntityTypeSummaries());
-
-        // EdgeDialog 创建模式下可能还会调 GetSchemaAsync
+        // 编辑模式 / 预填类型名：按类型名加载 EAV schema（返回空属性列表）
         if (path.StartsWith("/api/eav/Collaboration/schema") && method == HttpMethod.Get)
             return Envelope(new { attributes = Array.Empty<object>() });
 
@@ -115,35 +98,6 @@ public class EdgeDialogSmokeTests : BunitTestBase
     // ─── 测试用例 ───
 
     [Fact]
-    public async Task EdgeDefinitionCreateDialog_Renders()
-    {
-        var provider = await OpenAsync<EdgeDefinitionCreateDialog>();
-        AssertDialog(provider, "新建边类型");
-
-        // 回归：PascalCase 校验 HelperText 应渲染
-        var html = provider.Find(".mud-dialog").InnerHtml;
-        Assert.Contains("类型名", html);
-        Assert.Contains("显示名", html);
-    }
-
-    [Fact]
-    public async Task EdgeDefinitionEditDialog_Renders()
-    {
-        var provider = await OpenAsync<EdgeDefinitionEditDialog>(
-            new DialogParameters<EdgeDefinitionEditDialog>
-            {
-                { x => x.Type, EdgeType() }
-            });
-
-        AssertDialog(provider, "编辑边类型");
-        var html = provider.Find(".mud-dialog").InnerHtml;
-        // TypeName 在编辑模式只读
-        Assert.Contains("类型名", html);
-        Assert.Contains("全局共享", html);
-        Assert.Contains("有向", html);
-    }
-
-    [Fact]
     public async Task EdgeDialog_CreateMode_Renders()
     {
         // 创建模式：传 PreFillFromNodeId（跳过 1st API 可能已在 Init 调列表）
@@ -154,10 +108,12 @@ public class EdgeDialogSmokeTests : BunitTestBase
 
         AssertDialog(provider, "创建边");
         var html = provider.Find(".mud-dialog").InnerHtml;
-        Assert.Contains("边类型", html);
+        Assert.Contains("关系类型名", html);
         Assert.Contains("起点节点", html);
         Assert.Contains("终点节点", html);
-        Assert.Contains("权重", html);
+        // 有向/无向开关存在（标签由组件状态决定）
+        Assert.Equal("有向（起点 → 终点）",
+            provider.FindComponent<MudSwitch<bool>>().Instance.Label);
     }
 
     [Fact]
@@ -170,9 +126,10 @@ public class EdgeDialogSmokeTests : BunitTestBase
 
         AssertDialog(provider, "编辑边");
         var html = provider.Find(".mud-dialog").InnerHtml;
-        // 编辑模式：TypeName 只读展示
-        Assert.Contains("协作关系", html);
-        Assert.Contains("权重", html);
+        // 编辑模式：类型名只读展示 + 两端显示名来自后端回填的 FromNodeText/ToNodeText
+        Assert.Contains("Collaboration", html);
+        Assert.Contains("牵引所A", html);
+        Assert.Contains("牵引所B", html);
     }
 
     [Fact]
@@ -218,23 +175,54 @@ public class EdgeDialogSmokeTests : BunitTestBase
         });
 
         var html = provider.Find(".mud-dialog").InnerHtml;
-        Assert.Contains("点击右侧按钮选择宿主节点", html);
+        Assert.Contains("点击右侧按钮选择节点", html);
         Assert.Contains("语义搜索选择终点节点", html);
     }
 
     [Fact]
-    public async Task EdgeDialog_PreFillEdgeType_SkipsTypeSelection()
+    public async Task EdgeDialog_PreFillTypeName_SkipsTypeSelection()
     {
         var provider = await OpenAsync<EdgeDialog>(new DialogParameters
         {
             { "PreFillFromNodeId", "X" },
-            { "PreFillEdgeTypeId", "et-edge-1" }
+            { "PreFillTypeName", "Collaboration" }
         });
 
         AssertDialog(provider, "创建边");
-        // 类型选择下拉应该渲染
+        // 类型为文本输入（无下拉选择）；预填的类型名直接回填
         var html = provider.Find(".mud-dialog").InnerHtml;
-        Assert.Contains("边类型", html);
+        Assert.Contains("关系类型名", html);
+        Assert.Contains("Collaboration", html);
+    }
+
+    [Fact]
+    public async Task EdgeDialog_CreateMode_ShowsDirectedSwitch()
+    {
+        // 新建边默认为有向，开关标签随状态切换；权重/显示名输入已移除（R4）
+        var provider = await OpenAsync<EdgeDialog>(new DialogParameters
+        {
+            { "PreFillFromNodeId", "host-node-1" }
+        });
+
+        var html = provider.Find(".mud-dialog").InnerHtml;
+        Assert.Equal("有向（起点 → 终点）",
+            provider.FindComponent<MudSwitch<bool>>().Instance.Label);
+        Assert.DoesNotContain("权重", html);
+        Assert.DoesNotContain("显示名", html);
+    }
+
+    [Fact]
+    public async Task EdgeDialog_EditMode_UndirectedSwitchState()
+    {
+        // 编辑无向边：开关标签应显示「无向（双向等同）」且类型名只读
+        var provider = await OpenAsync<EdgeDialog>(new DialogParameters
+        {
+            { "Editing", EdgeInstance(isDirected: false) }
+        });
+
+        AssertDialog(provider, "编辑边");
+        Assert.Equal("无向（双向等同）",
+            provider.FindComponent<MudSwitch<bool>>().Instance.Label);
     }
 
     // ─── FakeHandler ───

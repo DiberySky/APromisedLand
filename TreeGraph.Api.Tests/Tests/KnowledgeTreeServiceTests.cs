@@ -4,6 +4,7 @@ using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Api.TreeEavSky.Services;
+using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Models;
@@ -48,8 +49,13 @@ public class KnowledgeTreeServiceTests
         new() { Id = "beef0000-0000-4000-8000-000000000011", Name = "Sample 3.3.1", Description = "子知识 3.3.1", CanHaveChildren = false, SortOrder = 0, ParentId = "beef0000-0000-4000-8000-000000000010", HasChildren = false },
     };
 
+    /// <summary>与 Fixture() 同 Id 的 nodes 注册表种子行（host_type="KnowledgeTree"）。</summary>
+    private static List<Node> FixtureNodes() => Fixture()
+        .Select(c => new Node { Id = c.Id, HostType = "KnowledgeTree", Name = c.Name })
+        .ToList();
+
     /// <summary>
-    /// 测试专用 DbContext：忽略除 KnowledgeTree / EdgeInstance / InodeEntity 外的全部实体
+    /// 测试专用 DbContext：忽略除 KnowledgeTree / Node / EdgeInstance / InodeEntity 外的全部实体
     /// （DbSet 约定会自动发现基类所有 DbSet，其中 JsonDocument 属性在 InMemory 下无法映射），
     /// 保留节点删除守卫所依赖的表配置与种子数据。
     /// </summary>
@@ -60,6 +66,7 @@ public class KnowledgeTreeServiceTests
         {
             foreach (var entityType in mb.Model.GetEntityTypes()
                          .Where(t => t.ClrType != typeof(KnowledgeTree)
+                                  && t.ClrType != typeof(Node)
                                   && t.ClrType != typeof(EdgeInstance)
                                   && t.ClrType != typeof(InodeEntity)
                                   && t.ClrType != typeof(InodeEntityType))
@@ -68,9 +75,19 @@ public class KnowledgeTreeServiceTests
                 mb.Ignore(entityType.ClrType);
             }
 
+            mb.Entity<Node>(e =>
+            {
+                e.HasKey(x => x.Id);
+                e.HasData(FixtureNodes());
+            });
+
             mb.Entity<KnowledgeTree>(e =>
             {
                 e.HasKey(x => x.Id);
+                e.HasOne(x => x.Node)
+                    .WithOne()
+                    .HasForeignKey<KnowledgeTree>(x => x.Id)
+                    .OnDelete(DeleteBehavior.Restrict);
                 e.HasData(Fixture());
             });
 
@@ -97,10 +114,10 @@ public class KnowledgeTreeServiceTests
     // ========== 实体 ==========
 
     [Fact]
-    public void Text_ReturnsName()
+    public void Name_ReadsThroughNodeNavigation()
     {
-        var node = new KnowledgeTree { Name = "Sample 1" };
-        Assert.Equal("Sample 1", node.Text());
+        var node = new KnowledgeTree { Node = new Node { Name = "Sample 1" } };
+        Assert.Equal("Sample 1", node.Name);
     }
 
     [Fact]
@@ -226,8 +243,9 @@ public class KnowledgeTreeServiceTests
         Assert.Equal("Sample 1.2", created.Text);
 
         var entity = await db.KnowledgeTrees.FindAsync(newId);
-        Assert.Equal("Sample 1.2", entity!.Name);
-        Assert.Equal(Sample1Id, entity.ParentId);
+        var nodeRow = await db.Nodes.FindAsync(newId);
+        Assert.Equal("Sample 1.2", nodeRow!.Name);
+        Assert.Equal(Sample1Id, entity!.ParentId);
         Assert.Equal(1, entity.SortOrder);
     }
 
@@ -246,8 +264,9 @@ public class KnowledgeTreeServiceTests
         });
 
         var entity = await db.KnowledgeTrees.FindAsync(Sample1Id);
-        Assert.Equal("Sample One", entity!.Name);
-        Assert.Equal(99, entity.SortOrder);
+        var nodeRow = await db.Nodes.FindAsync(Sample1Id);
+        Assert.Equal("Sample One", nodeRow!.Name);
+        Assert.Equal(99, entity!.SortOrder);
         Assert.Equal(RootId, entity.ParentId);
     }
 

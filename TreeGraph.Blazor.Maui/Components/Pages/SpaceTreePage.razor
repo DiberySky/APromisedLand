@@ -7,7 +7,7 @@
     RenderFragment<SpaceTree> actionTemplate = (context) =>
         @<div class="node-detail">
             <MudTextField T="string"
-                          Value="@context.Text()"
+                          Value="@context.Name"
                           Label="名称"
                           Variant="Variant.Outlined"
                           ReadOnly="true"/>

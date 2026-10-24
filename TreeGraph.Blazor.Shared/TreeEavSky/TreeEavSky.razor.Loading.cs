@@ -7,7 +7,7 @@ namespace TreeGraph.Blazor.Shared.TreeEavSky;
 public partial class TreeEavSky<TItem>
 {
     // ========== 数据加载 ==========
-    private async Task<List<TreeItemData<TItem>>> LoadInitialDataAsync(
+    private async Task<List<TreeNodeItem<TItem>>> LoadInitialDataAsync(
         CancellationToken ct = default)
     {
         try
@@ -19,7 +19,7 @@ public partial class TreeEavSky<TItem>
 
             _loading = false;
 
-            return items.Select(i => i.ToTreeItemData<TItem>()).ToList();
+            return items.Select(i => i.ToTreeNodeItem<TItem>()).ToList();
         }
         catch (OperationCanceledException)
         {
@@ -33,18 +33,18 @@ public partial class TreeEavSky<TItem>
         }
     }
 
-    private async Task<IReadOnlyCollection<TreeItemData<TItem>>> LoadChildrenAsync(
+    private async Task<IReadOnlyCollection<TreeNodeItem<TItem>>> LoadChildrenAsync(
         TItem? parent, CancellationToken ct = default)
     {
         if (parent == null)
         {
             var roots = await ClientService.LoadChildrenAsync(null, ct);
-            return roots.Select(i => i.ToTreeItemData<TItem>()).ToList();
+            return roots.Select(i => i.ToTreeNodeItem<TItem>()).ToList();
         }
         else
         {
             var children = await ClientService.LoadChildrenAsync(parent, ct);
-            return children.Select(i => i.ToTreeItemData<TItem>()).ToList();
+            return children.Select(i => i.ToTreeNodeItem<TItem>()).ToList();
         }
     }
 
@@ -54,12 +54,12 @@ public partial class TreeEavSky<TItem>
         var rootItems = await ClientService.LoadChildrenAsync(null, ct);
         ct.ThrowIfCancellationRequested();
 
-        _items = rootItems?.Select(x => x.ToTreeItemData<TItem>()).ToList() ?? [];
+        _items = rootItems?.Select(x => x.ToTreeNodeItem<TItem>()).ToList() ?? [];
         StateHasChanged();
     }
 
     private async Task RefreshNodeChildrenAsync(
-        ITreeItemData<TItem> node, CancellationToken ct = default)
+        TreeNodeItem<TItem> node, CancellationToken ct = default)
     {
         SelectedValue = null;
         _ = SelectedValueChanged.InvokeAsync(null);
@@ -69,14 +69,14 @@ public partial class TreeEavSky<TItem>
         var children = await ClientService.LoadChildrenAsync(node.Value, ct);
         ct.ThrowIfCancellationRequested();
 
-        node.Children = children.Select(c => new TreeItemData<TItem>
+        node.Children = children.Select(c => new TreeNodeItem<TItem>
         {
             Value = c.Value,
             Text = c.Text,
             Icon = TreeHelper.TreeItemIcons,
             Expandable = c.HasChildren,
             Expanded = false,
-            Children = c.Children?.Select(x => x.ToTreeItemData<TItem>()).ToList()
+            Children = c.Children?.Select(x => x.ToTreeNodeItem<TItem>()).ToList()
         }).ToList();
 
         node.Expanded = true;
@@ -87,7 +87,7 @@ public partial class TreeEavSky<TItem>
     }
 
     private async Task ReLoadingAsync(
-        ITreeItemData<TItem> node, CancellationToken ct = default)
+        TreeNodeItem<TItem> node, CancellationToken ct = default)
     {
         _items = await LoadInitialDataAsync(ct);
 

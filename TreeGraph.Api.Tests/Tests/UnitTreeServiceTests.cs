@@ -4,6 +4,7 @@ using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Api.TreeEavSky.Services;
+using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Models;
@@ -14,7 +15,7 @@ namespace TreeGraph.Api.Tests.Tests;
 /// <summary>
 /// UnitTreeService 单元测试：EF Core InMemory 提供器，无需 Docker。
 /// 每个用例使用独立数据库名（Guid），互不干扰；种子数据来自
-/// <see cref="TreeGraphDbContext"/> 的 HasData(UnitTree.SeedData())。
+/// <see cref="TreeGraphDbContext"/> 的 HasData(UnitTree.SeedData()) 与 UnitTree.SeedNodes()。
 ///
 /// 注：MoveNodeAsync 移动到非空父节点路径依赖 Npgsql 原生递归 SQL
 /// （IsDescendantAsync），InMemory 不支持，该路径由集成测试覆盖。
@@ -27,7 +28,7 @@ public class UnitTreeServiceTests
     private const string YuanId = "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c"; // 元
 
     /// <summary>
-    /// 测试专用 DbContext：忽略除 UnitTree / EdgeInstance / InodeEntity 外的全部实体
+    /// 测试专用 DbContext：忽略除 UnitTree / Node / EdgeInstance / InodeEntity 外的全部实体
     /// （DbSet 约定会自动发现基类所有 DbSet，其中 JsonDocument 属性在 InMemory 下无法映射），
     /// 保留节点删除守卫所依赖的表配置与种子数据。
     /// </summary>
@@ -38,6 +39,7 @@ public class UnitTreeServiceTests
         {
             foreach (var entityType in mb.Model.GetEntityTypes()
                          .Where(t => t.ClrType != typeof(UnitTree)
+                                  && t.ClrType != typeof(Node)
                                   && t.ClrType != typeof(EdgeInstance)
                                   && t.ClrType != typeof(InodeEntity)
                                   && t.ClrType != typeof(InodeEntityType))
@@ -46,9 +48,19 @@ public class UnitTreeServiceTests
                 mb.Ignore(entityType.ClrType);
             }
 
+            mb.Entity<Node>(e =>
+            {
+                e.HasKey(x => x.Id);
+                e.HasData(UnitTree.SeedNodes());
+            });
+
             mb.Entity<UnitTree>(e =>
             {
                 e.HasKey(x => x.Id);
+                e.HasOne(x => x.Node)
+                    .WithOne()
+                    .HasForeignKey<UnitTree>(x => x.Id)
+                    .OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.Parent)
                     .WithMany()
                     .HasForeignKey(x => x.ParentId)
@@ -79,17 +91,10 @@ public class UnitTreeServiceTests
     // ========== 实体 ==========
 
     [Fact]
-    public void Text_WithAbbreviation_AppendsAbbreviation()
+    public void Name_ReadsThroughNodeNavigation()
     {
-        var node = new UnitTree { Name = "元", Abbreviation = "CNY" };
-        Assert.Equal("元 【CNY】", node.Text());
-    }
-
-    [Fact]
-    public void Text_WithoutAbbreviation_ReturnsName()
-    {
-        var node = new UnitTree { Name = "货币", Abbreviation = "" };
-        Assert.Equal("货币", node.Text());
+        var node = new UnitTree { Node = new Node { Name = "元" }, Abbreviation = "CNY" };
+        Assert.Equal("元", node.Name);
     }
 
     [Fact]
@@ -99,6 +104,20 @@ public class UnitTreeServiceTests
         var root = seed.Single(n => n.ParentId == null);
         Assert.Equal("计量单位", root.Name);
         Assert.Equal(15, seed.Count(n => n.ParentId == root.Id)); // 15 个分类
+    }
+
+    [Fact]
+    public void SeedNodes_HasMatchingNames()
+    {
+        var seedNodes = UnitTree.SeedNodes();
+        var seedData = UnitTree.SeedData();
+        Assert.Equal(seedData.Count, seedNodes.Count);
+        Assert.All(seedData, d =>
+        {
+            var n = seedNodes.Single(x => x.Id == d.Id);
+            Assert.Equal("UnitTree", n.HostType);
+            Assert.Equal(d.Name, n.Name);
+        });
     }
 
     // ========== 查询 ==========
@@ -218,17 +237,19 @@ public class UnitTreeServiceTests
         await using var db = CreateContext();
         var service = CreateService(db);
 
+        var newId = Guid.NewGuid().ToString();
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.CreateNodeAsync(new TreeNodeDto<UnitTree>
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = newId,
                 Text = "分",
                 ParentId = YuanId, // 元 为叶子（种子 CanHaveChildren=false）
             }));
 
         Assert.Contains("不允许包含子节点", ex.Message);
         // 拒绝后不应写入任何节点
-        Assert.Null(await db.UnitTrees.FirstOrDefaultAsync(x => x.Name == "分"));
+        Assert.Null(await db.UnitTrees.FindAsync(newId));
+        Assert.Null(await db.Nodes.FindAsync(newId));
     }
 
     /// <summary>回归：创建时 DTO 的 CanHaveChildren 必须落库（此前该字段在服务端被丢弃）。</summary>
@@ -266,8 +287,9 @@ public class UnitTreeServiceTests
         });
 
         var entity = await db.UnitTrees.FindAsync(YuanId);
-        Assert.Equal("人民币元", entity!.Name);
-        Assert.Equal(99, entity.SortOrder);
+        var nodeRow = await db.Nodes.FindAsync(YuanId);
+        Assert.Equal("人民币元", nodeRow!.Name);
+        Assert.Equal(99, entity!.SortOrder);
         Assert.Equal(CurrencyId, entity.ParentId);
     }
 

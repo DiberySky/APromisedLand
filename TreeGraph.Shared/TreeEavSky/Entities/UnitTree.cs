@@ -1,13 +1,28 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Text.Json.Serialization;
-using TreeGraph.Shared.NodeEavSky.Abstractions;
+using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 
 namespace TreeGraph.Shared.TreeEavSky.Entities;
 
-public class UnitTree : ITreeNodeBase<UnitTree>, Inode
+public class UnitTree : ITreeNodeBase<UnitTree>
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = string.Empty;
+
+    /// <summary>共享主键导航：宿主 Id 即 nodes.id，名称唯一真源在 Node.Name。</summary>
+    [JsonIgnore]
+    public Node? Node { get; set; }
+
+    private string? _seedName;
+
+    /// <summary>名称（非映射列）：运行时读穿 Node.Name；种子数据通过 setter 暂存（EF HasData 忽略 [NotMapped]，仅 SeedNodes 消费）。</summary>
+    [NotMapped]
+    public string? Name
+    {
+        get => Node?.Name ?? _seedName;
+        set => _seedName = value;
+    }
 
     public string Abbreviation { get; set; } = string.Empty;
     public string? ParentId { get; set; }
@@ -19,12 +34,6 @@ public class UnitTree : ITreeNodeBase<UnitTree>, Inode
     /// <summary>父节点导航属性；JSON 忽略，避免 TreeNodeDto.Value 序列化时循环引用。</summary>
     [JsonIgnore]
     public UnitTree? Parent { get; set; }
-
-    public string Text()
-    {
-        var text = string.IsNullOrEmpty(Abbreviation) ? Name : $"{Name} 【{Abbreviation}】";
-        return text;
-    }
 
     public static List<UnitTree> SeedData()
     {
@@ -921,4 +930,19 @@ public class UnitTree : ITreeNodeBase<UnitTree>, Inode
 
         return nodes;
     }
+
+    /// <summary>
+    /// 与 <see cref="SeedData"/> 同 Id 的 nodes 注册表种子行（host_type="UnitTree"）。
+    /// 名称取自种子对象的 Name（此时 Node 导航未设置，走 _seedName 后备字段）。
+    /// </summary>
+    public static List<Node> SeedNodes()
+        => SeedData()
+            .Select(u => new Node
+            {
+                Id = u.Id,
+                HostType = "UnitTree",
+                Name = u.Name,
+                CreatedAt = DateTimeOffset.UnixEpoch,
+            })
+            .ToList();
 }

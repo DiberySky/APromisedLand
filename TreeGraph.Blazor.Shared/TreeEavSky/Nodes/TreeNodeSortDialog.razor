@@ -18,7 +18,7 @@
                                        Disabled="@(index == 0)"
                                        OnClick="@(() => Move(index, -1))" />
 
-                        <MudText Typo="Typo.body1">@_children[index].Text()</MudText>
+                        <MudText Typo="Typo.body1">@_children[index].Name</MudText>
                         <MudSpacer />
                         <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward"
                                        Size="Size.Small"
@@ -35,7 +35,7 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    [Parameter] public required ITreeItemData<TItem> Node { get; set; }
+    [Parameter] public required TreeNodeItem<TItem> Node { get; set; }
     private List<TItem> _children = [];
 
     protected override void OnInitialized()

@@ -1,5 +1,4 @@
-@* EdgeInstances.razor — 边管理独立页（跨类型全局列表）
-   与树节点「关系」页签互补：不依赖宿主入口，可按类型/显示名筛选并直接建边。 *@
+@* EdgeInstances.razor — 边管理独立页（跨类型全局列表，R4 简化：类型为裸字符串） *@
 @page "/edge-instances"
 @using TreeGraph.Shared.EdgeSky.Dtos
 @using TreeGraph.Blazor.Shared.EdgeSky.Services
@@ -29,27 +28,19 @@
 </PageHeaderSky>
 
 <div class="d-flex align-center mb-3">
-    <MudSelect T="string"
-               Value="_filterEdgeTypeId"
-               Label="边类型"
-               Variant="Variant.Outlined"
-               Dense="true"
-               Clearable="true"
-               Class="mr-3"
-               Style="min-width: 220px;"
-               ValueChanged="OnFilterChanged">
-        <MudSelectItem T="string" Value="@("")">全部类型</MudSelectItem>
-        @foreach (var et in _edgeTypes)
-        {
-            <MudSelectItem T="string" Value="@et.EdgeTypeId">
-                @et.DisplayName（@et.TypeName）
-            </MudSelectItem>
-        }
-    </MudSelect>
+    <MudTextField T="string"
+                  @bind-Value="_filterTypeName"
+                  Label="关系类型名"
+                  Variant="Variant.Outlined"
+                  Dense="true"
+                  Class="mr-3"
+                  Clearable="true"
+                  Style="min-width: 220px;"
+                  OnKeyDown="OnSearchKeyDown" />
 
     <MudTextField T="string"
                   @bind-Value="_search"
-                  Label="显示名关键字"
+                  Label="端点名称关键字"
                   Variant="Variant.Outlined"
                   Dense="true"
                   Class="mr-3"
@@ -71,22 +62,18 @@
         <MudTh>类型</MudTh>
         <MudTh>起点</MudTh>
         <MudTh>终点</MudTh>
-        <MudTh>显示名</MudTh>
-        <MudTh>权重</MudTh>
+        <MudTh>方向</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">操作</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="类型">
             <MudChip T="string" Size="Size.Small" Color="Color.Info">
-                @context.EdgeTypeDisplayName
+                @context.TypeName
             </MudChip>
         </MudTd>
         <MudTd DataLabel="起点">@NodeLabel(context.FromNodeId, context.FromNodeText)</MudTd>
         <MudTd DataLabel="终点">@NodeLabel(context.ToNodeId, context.ToNodeText)</MudTd>
-        <MudTd DataLabel="显示名">@(string.IsNullOrEmpty(context.DisplayName) ? "—" : context.DisplayName)</MudTd>
-        <MudTd DataLabel="权重">
-            @(context.Weight.HasValue ? context.Weight.Value.ToString("0.####") : "—")
-        </MudTd>
+        <MudTd DataLabel="方向">@(context.IsDirected ? "有向" : "无向")</MudTd>
         <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
             <MudIconButton Icon="@Icons.Material.Filled.Delete"
                            Size="Size.Small"
@@ -111,8 +98,7 @@
 
 @code {
     private IReadOnlyList<EdgeInstanceDto> _edges = [];
-    private IReadOnlyList<EdgeTypeDto> _edgeTypes = [];
-    private string _filterEdgeTypeId = "";
+    private string? _filterTypeName;
     private string? _search;
     private bool _loading;
     private bool _initialized;
@@ -130,9 +116,8 @@
         _loading = true;
         try
         {
-            _edgeTypes = await Api.ListEdgeTypesAsync() ?? [];
             _edges = await Api.ListAllEdgesAsync(
-                string.IsNullOrEmpty(_filterEdgeTypeId) ? null : _filterEdgeTypeId,
+                string.IsNullOrWhiteSpace(_filterTypeName) ? null : _filterTypeName,
                 nodeIds: null,
                 string.IsNullOrWhiteSpace(_search) ? null : _search) ?? [];
         }
@@ -145,12 +130,6 @@
         {
             _loading = false;
         }
-    }
-
-    private Task OnFilterChanged(string? edgeTypeId)
-    {
-        _filterEdgeTypeId = edgeTypeId ?? "";
-        return LoadAsync();
     }
 
     private async Task OnSearchKeyDown(KeyboardEventArgs e)
@@ -190,11 +169,11 @@
         var to = NodeLabel(edge.ToNodeId, edge.ToNodeText);
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除这条边吗？\n\n类型：{edge.EdgeTypeDisplayName}\n从 {from} → {to}",
+            $"确定删除这条边吗？\n\n类型：{edge.TypeName}\n从 {from} → {to}",
             yesText: "删除", cancelText: "取消");
         if (confirmed != true) return;
 
-        var (ok, error) = await Api.DeleteEdgeAsync(edge.EdgeTypeId, edge.EdgeId);
+        var (ok, error) = await Api.DeleteEdgeAsync(edge.EdgeId);
         if (ok)
         {
             Snackbar.Add("删除成功", Severity.Success);

@@ -38,18 +38,18 @@
 
 <TreeDialogPageSky TItem="CategoryTree"
                    Title="@(Title ?? "分类注册")"
-                   TitleToolBar="@(ClickNode?.Value?.Parent?.Text() ?? "分类树")"
+                   TitleToolBar="@(ClickNode?.Value?.Parent?.Name ?? "分类树")"
                    RootId="@ClickNode?.Value?.Id"
                    EditTemplate="@editTemplate"
                    ShowDialogFunc="@ShowDialogAsync" />
 
 @code {
-    [Parameter] public ITreeItemData<CategoryTree>? ClickNode { get; set; }
+    [Parameter] public TreeNodeItem<CategoryTree>? ClickNode { get; set; }
 
     /// <summary>自定义标题（可选，默认「分类注册」）。</summary>
     [Parameter] public string? Title { get; set; }
 
-    private async Task ShowDialogAsync(ITreeItemData<CategoryTree> node)
+    private async Task ShowDialogAsync(TreeNodeItem<CategoryTree> node)
     {
         await BlazorService.ShowCategoryTreeDialogPageAsync(node);
     }

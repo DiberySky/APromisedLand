@@ -2,17 +2,16 @@ using System.Net;
 using System.Net.Http.Json;
 using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Shared.EdgeSky.Dtos;
-using TreeGraph.Shared.LineSky.Dtos;
-using TreeGraph.Shared.LineSky.Entities;
 using TreeGraph.Shared.NodeEavSky.Dtos;
+using TreeGraph.Shared.NodeSky.Entities;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
-/// Edge（关系/边）集成测试。
-/// 覆盖：EdgeDefinition CRUD、EdgeInstance CRUD + UNIQUE 约束、
-///       EAV 属性集成、图查询（FindOutgoing/FindIncoming）、BFS 遍历、级联删除。
+/// Edge（关系/边）集成测试（R4 简化版）。
+/// 覆盖：全局路由 CRUD、nodes 端点外键、有向/无向与重复判定、
+///       EAV 属性（entity_type = type_name）、图查询、BFS 遍历、删除守卫。
 /// </summary>
 public class EdgeTests : IntegrationTestBase
 {
@@ -22,325 +21,385 @@ public class EdgeTests : IntegrationTestBase
         => $"{prefix}_{Guid.NewGuid():N}";
 
     // ============================================================
-    // Edge Definition CRUD
-    // ============================================================
-
-    [Fact]
-    public async Task EdgeType_Create_ThenGet_ReturnsSame()
-    {
-        var typeName = NewTypeName();
-        var displayName = $"测试关系_{Guid.NewGuid():N}";
-
-        var resp = await Client.PostAsJsonAsync(
-            "/api/eav/metadata/edge-types",
-            new CreateEdgeTypeRequest
-            {
-                TypeName = typeName,
-                DisplayName = displayName,
-                IsGlobal = true,
-                IsDirected = true,
-                Description = "集成测试创建"
-            });
-
-        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
-        var created = await resp.Content.ReadEavAsync<EdgeTypeDto>();
-        Assert.NotNull(created);
-        Assert.Equal(typeName, created!.TypeName);
-        Assert.Equal(displayName, created.DisplayName);
-        Assert.True(created.IsGlobal);
-        Assert.True(created.IsDirected);
-
-        // GetById
-        var got = await Client.GetEavAsync<EdgeTypeDto>(
-            $"/api/eav/metadata/edge-types/{created.EdgeTypeId}");
-        Assert.NotNull(got);
-        Assert.Equal(created.EdgeTypeId, got!.EdgeTypeId);
-        Assert.Equal(typeName, got.TypeName);
-    }
-
-    [Fact]
-    public async Task EdgeType_Create_DuplicateTypeName_Returns409()
-    {
-        var typeName = NewTypeName();
-
-        await Client.PostAsJsonAsync(
-            "/api/eav/metadata/edge-types",
-            new CreateEdgeTypeRequest { TypeName = typeName, DisplayName = "a" });
-
-        var resp = await Client.PostAsJsonAsync(
-            "/api/eav/metadata/edge-types",
-            new CreateEdgeTypeRequest { TypeName = typeName, DisplayName = "b" });
-
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-    }
-
-    [Fact]
-    public async Task EdgeType_Create_EmptyTypeName_Returns400()
-    {
-        var resp = await Client.PostAsJsonAsync(
-            "/api/eav/metadata/edge-types",
-            new CreateEdgeTypeRequest { TypeName = "", DisplayName = "x" });
-
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-    }
-
-    [Fact]
-    public async Task EdgeType_List_ReturnsAllCreated()
-    {
-        var t1 = await CreateEdgeTypeAsync("ListA");
-        var t2 = await CreateEdgeTypeAsync("ListB");
-
-        var list = await Client.GetEavAsync<List<EdgeTypeDto>>(
-            "/api/eav/metadata/edge-types");
-
-        Assert.NotNull(list);
-        Assert.True(list!.Count >= 2);
-        Assert.Contains(list, t => t.TypeName == t1.TypeName);
-        Assert.Contains(list, t => t.TypeName == t2.TypeName);
-    }
-
-    [Fact]
-    public async Task EdgeType_Update_ChangesFields()
-    {
-        var created = await CreateEdgeTypeAsync();
-
-        var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/metadata/edge-types/{created.EdgeTypeId}",
-            new UpdateEdgeTypeRequest
-            {
-                DisplayName = "新名称",
-                IsDirected = false,
-                Description = "更新后"
-            });
-
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        var updated = await resp.Content.ReadEavAsync<EdgeTypeDto>();
-        Assert.NotNull(updated);
-        Assert.Equal("新名称", updated!.DisplayName);
-        Assert.False(updated.IsDirected);
-        Assert.Equal("更新后", updated.Description);
-        // TypeName 不可改
-        Assert.Equal(created.TypeName, updated.TypeName);
-    }
-
-    [Fact]
-    public async Task EdgeType_Delete_Unknown_Returns404()
-    {
-        var resp = await Client.DeleteAsync(
-            $"/api/eav/metadata/edge-types/{Guid.NewGuid():N}");
-        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
-    }
-
-    // ============================================================
-    // Edge Instance CRUD
+    // 创建 / 读取
     // ============================================================
 
     [Fact]
     public async Task Edge_Create_ThenGet_ReturnsSame()
     {
-        var et = await CreateEdgeTypeAsync();
-        var (fromNode, toNode) = (Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        var typeName = NewTypeName();
+        var fromNode = await CreateFreeNodeAsync("起点设备");
+        var toNode = await CreateFreeNodeAsync("终点设备");
 
         var createResp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}",
+            "/api/eav/edges",
             new CreateEdgeRequest
             {
+                TypeName = typeName,
                 FromNodeId = fromNode,
-                ToNodeId = toNode,
-                Weight = 3.1415m
+                ToNodeId = toNode
             });
 
         Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
         var created = await createResp.Content.ReadEavAsync<EdgeInstanceDto>();
         Assert.NotNull(created);
-        Assert.Equal(fromNode, created!.FromNodeId);
+        Assert.Equal(typeName, created!.TypeName);
+        Assert.Equal(fromNode, created.FromNodeId);
         Assert.Equal(toNode, created.ToNodeId);
-        Assert.Equal(3.1415m, created.Weight);
-        // 服务端应填充类型名/显示名
-        Assert.Equal(et.TypeName, created.EdgeTypeName);
-        Assert.Equal(et.DisplayName, created.EdgeTypeDisplayName);
+        Assert.True(created.IsDirected);
+        // 端点显示名由 nodes 解析（测试环境未注册守卫时为空）
 
-        // GetById
         var got = await Client.GetEavAsync<EdgeInstanceDto>(
-            $"/api/eav/edges/{et.EdgeTypeId}/{created.EdgeId}");
+            $"/api/eav/edges/{created.EdgeId}");
         Assert.NotNull(got);
         Assert.Equal(created.EdgeId, got!.EdgeId);
+        Assert.Equal(typeName, got.TypeName);
     }
 
     [Fact]
-    public async Task Edge_Create_UnknownEdgeType_Returns404()
+    public async Task Edge_Create_RegistersNodeRow()
     {
-        var unknownId = Guid.NewGuid().ToString("N");
+        var edge = await CreateEdgeAsync(NewTypeName(), "node-a", "node-b");
+
+        var nodeResp = await Client.GetAsync($"/api/Node/{edge.EdgeId}");
+        Assert.Equal(HttpStatusCode.OK, nodeResp.StatusCode);
+        var node = await nodeResp.Content.ReadFromJsonAsync<Node>();
+        Assert.NotNull(node);
+        Assert.Equal("EdgeInstance", node!.HostType);
+        Assert.Null(node.Name);
+    }
+
+    [Fact]
+    public async Task Edge_Create_EmptyTypeName_Returns400()
+    {
         var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{unknownId}",
+            "/api/eav/edges",
             new CreateEdgeRequest
             {
-                FromNodeId = "a",
-                ToNodeId = "b"
+                TypeName = "",
+                FromNodeId = "n1",
+                ToNodeId = "n2"
             });
 
-        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("类型名", await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Edge_Create_MissingFromNode_Returns400()
+    {
+        var typeName = NewTypeName();
+        var toNode = await CreateFreeNodeAsync("终点");
+
+        var resp = await Client.PostAsJsonAsync(
+            "/api/eav/edges",
+            new CreateEdgeRequest
+            {
+                TypeName = typeName,
+                FromNodeId = "ghost-from",
+                ToNodeId = toNode
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("ghost-from", await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Edge_Create_MissingToNode_Returns400()
+    {
+        var typeName = NewTypeName();
+        var fromNode = await CreateFreeNodeAsync("起点");
+
+        var resp = await Client.PostAsJsonAsync(
+            "/api/eav/edges",
+            new CreateEdgeRequest
+            {
+                TypeName = typeName,
+                FromNodeId = fromNode,
+                ToNodeId = "ghost-to"
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("ghost-to", await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Edge_Create_SelfLoop_Allowed()
+    {
+        var typeName = NewTypeName();
+        var node = await CreateFreeNodeAsync("自环节点");
+
+        var resp = await Client.PostAsJsonAsync(
+            "/api/eav/edges",
+            new CreateEdgeRequest
+            {
+                TypeName = typeName,
+                FromNodeId = node,
+                ToNodeId = node
+            });
+
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var dto = await resp.Content.ReadEavAsync<EdgeInstanceDto>();
+        Assert.NotNull(dto);
+        Assert.Equal(node, dto!.FromNodeId);
+        Assert.Equal(node, dto.ToNodeId);
     }
 
     [Fact]
     public async Task Edge_Create_Duplicate_Returns409()
     {
-        var et = await CreateEdgeTypeAsync();
-        var (fromNode, toNode) = (Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        var typeName = NewTypeName();
+        var (fromNode, toNode) = await CreateNodePairAsync();
 
-        var first = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}",
-            new CreateEdgeRequest { FromNodeId = fromNode, ToNodeId = toNode });
-        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        await CreateEdgeAsync(typeName, fromNode, toNode);
 
         var second = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}",
-            new CreateEdgeRequest { FromNodeId = fromNode, ToNodeId = toNode });
+            "/api/eav/edges",
+            new CreateEdgeRequest
+            {
+                TypeName = typeName,
+                FromNodeId = fromNode,
+                ToNodeId = toNode
+            });
+
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edge_Create_Undirected_ReverseDuplicate_Returns409()
+    {
+        var typeName = NewTypeName();
+        var (fromNode, toNode) = await CreateNodePairAsync();
+
+        await CreateEdgeAsync(typeName, fromNode, toNode, isDirected: false);
+
+        // 无向边反向存储视为同一条边
+        var reverse = await Client.PostAsJsonAsync(
+            "/api/eav/edges",
+            new CreateEdgeRequest
+            {
+                TypeName = typeName,
+                FromNodeId = toNode,
+                ToNodeId = fromNode,
+                IsDirected = false
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, reverse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edge_Create_Directed_Reverse_Allowed()
+    {
+        var typeName = NewTypeName();
+        var (fromNode, toNode) = await CreateNodePairAsync();
+
+        await CreateEdgeAsync(typeName, fromNode, toNode);
+        await CreateEdgeAsync(typeName, toNode, fromNode);
+
+        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?typeName={typeName}");
+        Assert.NotNull(list);
+        Assert.Equal(2, list!.Count);
     }
 
     [Fact]
     public async Task Edge_Create_SameNodes_DifferentTypes_Allowed()
     {
-        var et1 = await CreateEdgeTypeAsync("TypeA");
-        var et2 = await CreateEdgeTypeAsync("TypeB");
-        var (fromNode, toNode) = (Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        var (fromNode, toNode) = await CreateNodePairAsync();
 
-        var r1 = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et1.EdgeTypeId}",
-            new CreateEdgeRequest { FromNodeId = fromNode, ToNodeId = toNode });
-        var r2 = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et2.EdgeTypeId}",
-            new CreateEdgeRequest { FromNodeId = fromNode, ToNodeId = toNode });
-
-        Assert.Equal(HttpStatusCode.Created, r1.StatusCode);
-        Assert.Equal(HttpStatusCode.Created, r2.StatusCode);
+        await CreateEdgeAsync(NewTypeName("TypeA"), fromNode, toNode);
+        await CreateEdgeAsync(NewTypeName("TypeB"), fromNode, toNode);
     }
 
     [Fact]
-    public async Task Edge_List_ByType_ReturnsAll()
+    public async Task Edge_Get_Unknown_Returns404()
     {
-        var et = await CreateEdgeTypeAsync();
-        var nodeA = Guid.NewGuid().ToString("N");
-        var nodeB = Guid.NewGuid().ToString("N");
-        var nodeC = Guid.NewGuid().ToString("N");
-
-        await CreateEdgeAsync(et.EdgeTypeId, nodeA, nodeB);
-        await CreateEdgeAsync(et.EdgeTypeId, nodeB, nodeC);
-
-        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}");
-
-        Assert.NotNull(list);
-        Assert.Equal(2, list!.Count);
+        var resp = await Client.GetAsync($"/api/eav/edges/{Guid.NewGuid():N}");
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 
     // ============================================================
-    // 全局边列表（跨类型，nodeIds / edgeTypeId / search 过滤）
+    // 更新 / 删除
     // ============================================================
 
     [Fact]
-    public async Task Edge_ListAll_AcrossTypes_FilteredByNodeIds()
+    public async Task Edge_Update_IsDirected_ChangesValue()
     {
-        var et1 = await CreateEdgeTypeAsync();
-        var et2 = await CreateEdgeTypeAsync();
-        var a = Guid.NewGuid().ToString("N");
-        var b = Guid.NewGuid().ToString("N");
-        var c = Guid.NewGuid().ToString("N");
-
-        await CreateEdgeAsync(et1.EdgeTypeId, a, b);
-        await CreateEdgeAsync(et2.EdgeTypeId, b, a);
-        await CreateEdgeAsync(et1.EdgeTypeId, b, c);
-
-        // 不带过滤：3 条（跨两个类型）
-        var all = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges?nodeIds={a},{b},{c}");
-        Assert.NotNull(all);
-        Assert.Equal(3, all!.Count);
-
-        // 仅节点 a：命中 a→b 与 b→a
-        var onlyA = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges?nodeIds={a}");
-        Assert.Equal(2, onlyA!.Count);
-        Assert.All(onlyA, e => Assert.True(e.FromNodeId == a || e.ToNodeId == a));
-    }
-
-    [Fact]
-    public async Task Edge_ListAll_FilteredByEdgeTypeId()
-    {
-        var et1 = await CreateEdgeTypeAsync();
-        var et2 = await CreateEdgeTypeAsync();
-        var a = Guid.NewGuid().ToString("N");
-        var b = Guid.NewGuid().ToString("N");
-
-        await CreateEdgeAsync(et1.EdgeTypeId, a, b);
-        await CreateEdgeAsync(et2.EdgeTypeId, b, a);
-
-        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges?edgeTypeId={et1.EdgeTypeId}");
-
-        Assert.NotNull(list);
-        var single = Assert.Single(list!);
-        Assert.Equal(et1.EdgeTypeId, single.EdgeTypeId);
-    }
-
-    [Fact]
-    public async Task Edge_ListAll_FilteredByDisplayNameSearch()
-    {
-        var et = await CreateEdgeTypeAsync();
-        var a = Guid.NewGuid().ToString("N");
-        var b = Guid.NewGuid().ToString("N");
-        var c = Guid.NewGuid().ToString("N");
-
-        await Client.PostAsJsonAsync($"/api/eav/edges/{et.EdgeTypeId}",
-            new CreateEdgeRequest
-            {
-                FromNodeId = a, ToNodeId = b, DisplayName = "电缆段-甲"
-            });
-        await Client.PostAsJsonAsync($"/api/eav/edges/{et.EdgeTypeId}",
-            new CreateEdgeRequest
-            {
-                FromNodeId = b, ToNodeId = c, DisplayName = "电缆段-乙"
-            });
-
-        var hit = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges?edgeTypeId={et.EdgeTypeId}&search={Uri.EscapeDataString("甲")}");
-        Assert.NotNull(hit);
-        var single = Assert.Single(hit!);
-        Assert.Equal("电缆段-甲", single.DisplayName);
-    }
-
-    [Fact]
-    public async Task Edge_Update_Weight_ChangesValue()
-    {
-        var et = await CreateEdgeTypeAsync();
-        var nodeA = Guid.NewGuid().ToString("N");
-        var nodeB = Guid.NewGuid().ToString("N");
-        var edge = await CreateEdgeAsync(et.EdgeTypeId, nodeA, nodeB, weight: 1.0m);
+        var typeName = NewTypeName();
+        var (fromNode, toNode) = await CreateNodePairAsync();
+        var edge = await CreateEdgeAsync(typeName, fromNode, toNode);
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/{edge.EdgeId}",
-            new UpdateEdgeRequest { Weight = 99.99m });
+            $"/api/eav/edges/{edge.EdgeId}",
+            new UpdateEdgeRequest { IsDirected = false });
 
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var updated = await resp.Content.ReadEavAsync<EdgeInstanceDto>();
         Assert.NotNull(updated);
-        Assert.Equal(99.99m, updated!.Weight);
+        Assert.False(updated!.IsDirected);
+        Assert.Equal(typeName, updated.TypeName);
+    }
+
+    [Fact]
+    public async Task Edge_Update_Unknown_Returns404()
+    {
+        var resp = await Client.PutAsJsonAsync(
+            $"/api/eav/edges/{Guid.NewGuid():N}",
+            new UpdateEdgeRequest { IsDirected = false });
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edge_Update_ToUndirected_WhenReverseExists_Returns409()
+    {
+        var typeName = NewTypeName();
+        var (fromNode, toNode) = await CreateNodePairAsync();
+        var forward = await CreateEdgeAsync(typeName, fromNode, toNode);
+        await CreateEdgeAsync(typeName, toNode, fromNode);
+
+        var resp = await Client.PutAsJsonAsync(
+            $"/api/eav/edges/{forward.EdgeId}",
+            new UpdateEdgeRequest { IsDirected = false });
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+
+        var got = await Client.GetEavAsync<EdgeInstanceDto>(
+            $"/api/eav/edges/{forward.EdgeId}");
+        Assert.NotNull(got);
+        Assert.True(got!.IsDirected);
     }
 
     [Fact]
     public async Task Edge_Delete_ThenGet_Returns404()
     {
-        var et = await CreateEdgeTypeAsync();
-        var edge = await CreateEdgeAsync(et.EdgeTypeId, "nodeX", "nodeY");
+        var edge = await CreateEdgeAsync(NewTypeName(), "del-x", "del-y");
 
-        var del = await Client.DeleteAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/{edge.EdgeId}");
+        var del = await Client.DeleteAsync($"/api/eav/edges/{edge.EdgeId}");
         Assert.Equal(HttpStatusCode.NoContent, del.StatusCode);
 
-        var resp = await Client.GetAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/{edge.EdgeId}");
+        var resp = await Client.GetAsync($"/api/eav/edges/{edge.EdgeId}");
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edge_Delete_RemovesRegisteredNodeRow()
+    {
+        var edge = await CreateEdgeAsync(NewTypeName(), "del-n1", "del-n2");
+
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.DeleteAsync($"/api/eav/edges/{edge.EdgeId}")).StatusCode);
+
+        var nodeResp = await Client.GetAsync($"/api/Node/{edge.EdgeId}");
+        Assert.Equal(HttpStatusCode.NotFound, nodeResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edge_Delete_Unknown_Returns404()
+    {
+        var resp = await Client.DeleteAsync($"/api/eav/edges/{Guid.NewGuid():N}");
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edge_Delete_WhenReferencedAsEndpoint_Returns409()
+    {
+        var typeName = NewTypeName();
+        var (a, b) = await CreateNodePairAsync();
+        var target = await CreateEdgeAsync(typeName, a, b);
+
+        var c = await CreateFreeNodeAsync("第三节点");
+        var referencing = await CreateEdgeAsync(NewTypeName("Ref"), target.EdgeId, c);
+
+        // 目标边已注册进 nodes，被另一条边当作端点 → 拒删
+        var del = await Client.DeleteAsync($"/api/eav/edges/{target.EdgeId}");
+        Assert.Equal(HttpStatusCode.Conflict, del.StatusCode);
+        Assert.Contains("引用", await del.Content.ReadAsStringAsync());
+
+        // 解除引用后可删
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.DeleteAsync($"/api/eav/edges/{referencing.EdgeId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.DeleteAsync($"/api/eav/edges/{target.EdgeId}")).StatusCode);
+    }
+
+    // ============================================================
+    // 全局列表（typeName / nodeIds / search）
+    // ============================================================
+
+    [Fact]
+    public async Task Edge_List_ByTypeName_ReturnsAll()
+    {
+        var typeName = NewTypeName();
+        var a = await CreateFreeNodeAsync("L-A");
+        var b = await CreateFreeNodeAsync("L-B");
+        var c = await CreateFreeNodeAsync("L-C");
+
+        await CreateEdgeAsync(typeName, a, b);
+        await CreateEdgeAsync(typeName, b, c);
+
+        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?typeName={typeName}");
+
+        Assert.NotNull(list);
+        Assert.Equal(2, list!.Count);
+        Assert.All(list, e => Assert.Equal(typeName, e.TypeName));
+    }
+
+    [Fact]
+    public async Task Edge_List_FilteredByNodeIds()
+    {
+        var type1 = NewTypeName("N1");
+        var type2 = NewTypeName("N2");
+        var a = await CreateFreeNodeAsync("NA");
+        var b = await CreateFreeNodeAsync("NB");
+        var c = await CreateFreeNodeAsync("NC");
+
+        await CreateEdgeAsync(type1, a, b);
+        await CreateEdgeAsync(type2, b, a);
+        await CreateEdgeAsync(type1, b, c);
+
+        var all = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?nodeIds={a},{b},{c}");
+        Assert.NotNull(all);
+        Assert.Equal(3, all!.Count);
+
+        var onlyA = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?nodeIds={a}");
+        Assert.NotNull(onlyA);
+        Assert.Equal(2, onlyA!.Count);
+        Assert.All(onlyA, e => Assert.True(e.FromNodeId == a || e.ToNodeId == a));
+    }
+
+    [Fact]
+    public async Task Edge_List_Search_MatchesNodeName()
+    {
+        var typeName = NewTypeName();
+        var named = await CreateFreeNodeAsync($"搜索命中_{Guid.NewGuid():N}");
+        var other = await CreateFreeNodeAsync("其它节点");
+
+        var hit = await CreateEdgeAsync(typeName, named, other);
+        await CreateEdgeAsync(typeName, other, await CreateFreeNodeAsync("第三个"));
+
+        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?search=搜索命中");
+
+        Assert.NotNull(list);
+        Assert.Contains(list!, e => e.EdgeId == hit.EdgeId);
+    }
+
+    [Fact]
+    public async Task Edge_List_Search_MatchesTypeName()
+    {
+        var typeName = NewTypeName("SearchableType");
+        var (a, b) = await CreateNodePairAsync();
+        var hit = await CreateEdgeAsync(typeName, a, b);
+
+        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?search=SearchableType");
+
+        Assert.NotNull(list);
+        Assert.Contains(list!, e => e.EdgeId == hit.EdgeId);
     }
 
     // ============================================================
@@ -350,20 +409,18 @@ public class EdgeTests : IntegrationTestBase
     [Fact]
     public async Task EdgeGraph_Outgoing_ReturnsOnlyOutgoing()
     {
-        var et = await CreateEdgeTypeAsync();
-        var center = Guid.NewGuid().ToString("N");
-        var out1 = Guid.NewGuid().ToString("N");
-        var out2 = Guid.NewGuid().ToString("N");
-        var in1 = Guid.NewGuid().ToString("N");
+        var typeName = NewTypeName();
+        var center = await CreateFreeNodeAsync("中心");
+        var out1 = await CreateFreeNodeAsync("出1");
+        var out2 = await CreateFreeNodeAsync("出2");
+        var in1 = await CreateFreeNodeAsync("入1");
 
-        // center → out1, center → out2
-        await CreateEdgeAsync(et.EdgeTypeId, center, out1);
-        await CreateEdgeAsync(et.EdgeTypeId, center, out2);
-        // in1 → center（这条不应出现在 outgoing 中）
-        await CreateEdgeAsync(et.EdgeTypeId, in1, center);
+        await CreateEdgeAsync(typeName, center, out1);
+        await CreateEdgeAsync(typeName, center, out2);
+        await CreateEdgeAsync(typeName, in1, center);
 
         var outgoing = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}/from/{center}");
+            $"/api/eav/edges/from/{center}");
 
         Assert.NotNull(outgoing);
         Assert.Equal(2, outgoing!.Count);
@@ -373,18 +430,18 @@ public class EdgeTests : IntegrationTestBase
     [Fact]
     public async Task EdgeGraph_Incoming_ReturnsOnlyIncoming()
     {
-        var et = await CreateEdgeTypeAsync();
-        var center = Guid.NewGuid().ToString("N");
-        var out1 = Guid.NewGuid().ToString("N");
-        var in1 = Guid.NewGuid().ToString("N");
-        var in2 = Guid.NewGuid().ToString("N");
+        var typeName = NewTypeName();
+        var center = await CreateFreeNodeAsync("中心");
+        var out1 = await CreateFreeNodeAsync("出");
+        var in1 = await CreateFreeNodeAsync("入1");
+        var in2 = await CreateFreeNodeAsync("入2");
 
-        await CreateEdgeAsync(et.EdgeTypeId, center, out1);
-        await CreateEdgeAsync(et.EdgeTypeId, in1, center);
-        await CreateEdgeAsync(et.EdgeTypeId, in2, center);
+        await CreateEdgeAsync(typeName, center, out1);
+        await CreateEdgeAsync(typeName, in1, center);
+        await CreateEdgeAsync(typeName, in2, center);
 
         var incoming = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}/to/{center}");
+            $"/api/eav/edges/to/{center}");
 
         Assert.NotNull(incoming);
         Assert.Equal(2, incoming!.Count);
@@ -392,18 +449,66 @@ public class EdgeTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task EdgeGraph_NoEdges_ReturnsEmpty()
+    public async Task EdgeGraph_Undirected_OutgoingReturnsConnectedEdge()
     {
-        var et = await CreateEdgeTypeAsync();
-        var noEdgeNode = Guid.NewGuid().ToString("N");
+        // 无向：存储为 A → B，从 B 查出边也应命中
+        var (a, b) = await CreateNodePairAsync();
+        await CreateEdgeAsync(NewTypeName("UndirOut"), a, b, isDirected: false);
 
         var outgoing = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}/from/{noEdgeNode}");
+            $"/api/eav/edges/from/{b}");
+
+        Assert.NotNull(outgoing);
+        Assert.Contains(outgoing!, e => e.FromNodeId == a && e.ToNodeId == b);
+    }
+
+    [Fact]
+    public async Task EdgeGraph_Undirected_IncomingReturnsConnectedEdge()
+    {
+        // 无向：存储为 A → B，从 A 查入边也应命中
+        var (a, b) = await CreateNodePairAsync();
+        await CreateEdgeAsync(NewTypeName("UndirIn"), a, b, isDirected: false);
+
+        var incoming = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges/to/{a}");
+
+        Assert.NotNull(incoming);
+        Assert.Contains(incoming!, e => e.FromNodeId == a && e.ToNodeId == b);
+    }
+
+    [Fact]
+    public async Task EdgeGraph_NoEdges_ReturnsEmpty()
+    {
+        var noEdgeNode = await CreateFreeNodeAsync("孤立节点");
+
+        var outgoing = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges/from/{noEdgeNode}");
+        Assert.NotNull(outgoing);
         Assert.Empty(outgoing!);
 
         var incoming = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}/to/{noEdgeNode}");
+            $"/api/eav/edges/to/{noEdgeNode}");
+        Assert.NotNull(incoming);
         Assert.Empty(incoming!);
+    }
+
+    [Fact]
+    public async Task EdgeGraph_TypeNameFilter_Applies()
+    {
+        var type1 = NewTypeName("G1");
+        var type2 = NewTypeName("G2");
+        var center = await CreateFreeNodeAsync("过滤中心");
+        var other = await CreateFreeNodeAsync("过滤端点");
+
+        await CreateEdgeAsync(type1, center, other);
+        await CreateEdgeAsync(type2, center, other);
+
+        var filtered = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges/from/{center}?typeName={type1}");
+
+        Assert.NotNull(filtered);
+        var single = Assert.Single(filtered!);
+        Assert.Equal(type1, single.TypeName);
     }
 
     // ============================================================
@@ -413,554 +518,451 @@ public class EdgeTests : IntegrationTestBase
     [Fact]
     public async Task Traverse_Out_Depth2_VisitsAllNeighbors()
     {
-        // 图: A → B → C
-        var et = await CreateEdgeTypeAsync();
-        string A = "T_A", B = "T_B", C = "T_C";
-        await CreateEdgeAsync(et.EdgeTypeId, A, B);
-        await CreateEdgeAsync(et.EdgeTypeId, B, C);
+        var typeName = NewTypeName();
+        var a = await CreateFreeNodeAsync("遍历A");
+        var b = await CreateFreeNodeAsync("遍历B");
+        var c = await CreateFreeNodeAsync("遍历C");
 
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/traverse",
-            new EdgeTraverseRequest(StartNodeId: A, Direction: "out", MaxDepth: 2));
+        await CreateEdgeAsync(typeName, a, b);
+        await CreateEdgeAsync(typeName, b, c);
 
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        var result = await resp.Content.ReadEavAsync<EdgeTraverseResult>();
-        Assert.NotNull(result);
+        var result = await TraverseAsync(typeName, a, "out", 2);
 
-        // visited 应包含 A, B, C
-        Assert.Contains(A, result!.VisitedNodeIds);
-        Assert.Contains(B, result.VisitedNodeIds);
-        Assert.Contains(C, result.VisitedNodeIds);
+        Assert.Contains(a, result.VisitedNodeIds);
+        Assert.Contains(b, result.VisitedNodeIds);
+        Assert.Contains(c, result.VisitedNodeIds);
         Assert.Equal(3, result.VisitedNodeIds.Count);
-
-        // edges 应包含两条
         Assert.Equal(2, result.Edges.Count);
     }
 
     [Fact]
     public async Task Traverse_In_Depth1_FindsPredecessors()
     {
-        // 图: X → A, Y → A
-        var et = await CreateEdgeTypeAsync();
-        string A = "T2_A", X = "T2_X", Y = "T2_Y";
-        await CreateEdgeAsync(et.EdgeTypeId, X, A);
-        await CreateEdgeAsync(et.EdgeTypeId, Y, A);
+        var typeName = NewTypeName();
+        var a = await CreateFreeNodeAsync("入A");
+        var x = await CreateFreeNodeAsync("入X");
+        var y = await CreateFreeNodeAsync("入Y");
 
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/traverse",
-            new EdgeTraverseRequest(StartNodeId: A, Direction: "in", MaxDepth: 1));
+        await CreateEdgeAsync(typeName, x, a);
+        await CreateEdgeAsync(typeName, y, a);
 
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        var result = await resp.Content.ReadEavAsync<EdgeTraverseResult>();
-        Assert.NotNull(result);
+        var result = await TraverseAsync(typeName, a, "in", 1);
 
-        Assert.Equal(2, result!.Edges.Count);
-        Assert.Contains(result.VisitedNodeIds, n => n == A);
-        Assert.Contains(result.VisitedNodeIds, n => n == X);
-        Assert.Contains(result.VisitedNodeIds, n => n == Y);
+        Assert.Equal(2, result.Edges.Count);
+        Assert.Contains(a, result.VisitedNodeIds);
+        Assert.Contains(x, result.VisitedNodeIds);
+        Assert.Contains(y, result.VisitedNodeIds);
     }
 
     [Fact]
     public async Task Traverse_Both_HandlesBidirectional()
     {
-        var et = await CreateEdgeTypeAsync();
-        string A = "T3_A", B = "T3_B", C = "T3_C";
-        await CreateEdgeAsync(et.EdgeTypeId, A, B);
-        await CreateEdgeAsync(et.EdgeTypeId, C, B);
+        var typeName = NewTypeName();
+        var a = await CreateFreeNodeAsync("双A");
+        var b = await CreateFreeNodeAsync("双B");
+        var c = await CreateFreeNodeAsync("双C");
 
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/traverse",
-            new EdgeTraverseRequest(StartNodeId: B, Direction: "both", MaxDepth: 1));
+        await CreateEdgeAsync(typeName, a, b);
+        await CreateEdgeAsync(typeName, c, b);
 
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        var result = await resp.Content.ReadEavAsync<EdgeTraverseResult>();
-        Assert.NotNull(result);
-        Assert.Equal(2, result!.Edges.Count);
-        Assert.Contains(result.VisitedNodeIds, n => n == A);
-        Assert.Contains(result.VisitedNodeIds, n => n == C);
+        var result = await TraverseAsync(typeName, b, "both", 1);
+
+        Assert.Equal(2, result.Edges.Count);
+        Assert.Contains(a, result.VisitedNodeIds);
+        Assert.Contains(c, result.VisitedNodeIds);
     }
-
-    // ============================================================
-    // 无向关系（IsDirected=false）的对称化展开
-    // ============================================================
 
     [Fact]
     public async Task Traverse_Undirected_IgnoresDirection()
     {
-        // 无向关系：边存储为 A → B，但从 B 出发按 "out" 亦应走到 A
-        var et = await CreateEdgeTypeAsync("Undir", isDirected: false);
-        string A = "UD_A", B = "UD_B";
-        await CreateEdgeAsync(et.EdgeTypeId, A, B);
+        // 无向边存储为 A → B，从 B 出发按 out 亦应走到 A
+        var typeName = NewTypeName("UndirTraverse");
+        var a = await CreateFreeNodeAsync("无A");
+        var b = await CreateFreeNodeAsync("无B");
 
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/traverse",
-            new EdgeTraverseRequest(StartNodeId: B, Direction: "out", MaxDepth: 1));
+        await CreateEdgeAsync(typeName, a, b, isDirected: false);
 
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        var result = await resp.Content.ReadEavAsync<EdgeTraverseResult>();
-        Assert.NotNull(result);
-        Assert.Single(result!.Edges);
-        Assert.Contains(A, result.VisitedNodeIds);
-    }
+        var result = await TraverseAsync(typeName, b, "out", 1);
 
-    [Fact]
-    public async Task EdgeGraph_Undirected_OutgoingReturnsConnectedEdge()
-    {
-        // 无向：查 B 的出边应包含与此节点相连的边（存储为 A → B）
-        var et = await CreateEdgeTypeAsync("UndirOut", isDirected: false);
-        await CreateEdgeAsync(et.EdgeTypeId, "UDO_A", "UDO_B");
-
-        var outgoing = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}/from/UDO_B");
-
-        Assert.NotNull(outgoing);
-        Assert.Single(outgoing!);
-    }
-
-    [Fact]
-    public async Task EdgeGraph_Undirected_IncomingReturnsConnectedEdge()
-    {
-        // 无向：查 A 的入边应包含与此节点相连的边（存储为 A → B）
-        var et = await CreateEdgeTypeAsync("UndirIn", isDirected: false);
-        await CreateEdgeAsync(et.EdgeTypeId, "UDI_A", "UDI_B");
-
-        var incoming = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}/to/UDI_A");
-
-        Assert.NotNull(incoming);
-        Assert.Single(incoming!);
+        Assert.Single(result.Edges);
+        Assert.Contains(a, result.VisitedNodeIds);
     }
 
     [Fact]
     public async Task Traverse_Depth1_OnlyFirstHop()
     {
-        // 图: A → B → C → D（深度 3）
-        var et = await CreateEdgeTypeAsync();
-        string A = "T4_A", B = "T4_B", C = "T4_C", D = "T4_D";
-        await CreateEdgeAsync(et.EdgeTypeId, A, B);
-        await CreateEdgeAsync(et.EdgeTypeId, B, C);
-        await CreateEdgeAsync(et.EdgeTypeId, C, D);
+        var typeName = NewTypeName();
+        var a = await CreateFreeNodeAsync("深A");
+        var b = await CreateFreeNodeAsync("深B");
+        var c = await CreateFreeNodeAsync("深C");
+        var d = await CreateFreeNodeAsync("深D");
 
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/traverse",
-            new EdgeTraverseRequest(StartNodeId: A, Direction: "out", MaxDepth: 1));
+        await CreateEdgeAsync(typeName, a, b);
+        await CreateEdgeAsync(typeName, b, c);
+        await CreateEdgeAsync(typeName, c, d);
 
-        var result = await resp.Content.ReadEavAsync<EdgeTraverseResult>();
-        Assert.NotNull(result);
-        // 深度 1: 只拿到 A→B，visited = {A, B}
-        Assert.Single(result!.Edges);
+        var result = await TraverseAsync(typeName, a, "out", 1);
+
+        Assert.Single(result.Edges);
         Assert.Equal(2, result.VisitedNodeIds.Count);
     }
 
     [Fact]
     public async Task Traverse_CyclicGraph_NoInfiniteLoop()
     {
-        // 图: A → B → C → A（环）
-        var et = await CreateEdgeTypeAsync();
-        string A = "T5_A", B = "T5_B", C = "T5_C";
-        await CreateEdgeAsync(et.EdgeTypeId, A, B);
-        await CreateEdgeAsync(et.EdgeTypeId, B, C);
-        await CreateEdgeAsync(et.EdgeTypeId, C, A);
+        var typeName = NewTypeName();
+        var a = await CreateFreeNodeAsync("环A");
+        var b = await CreateFreeNodeAsync("环B");
+        var c = await CreateFreeNodeAsync("环C");
 
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/traverse",
-            new EdgeTraverseRequest(StartNodeId: A, Direction: "out", MaxDepth: 10));
+        await CreateEdgeAsync(typeName, a, b);
+        await CreateEdgeAsync(typeName, b, c);
+        await CreateEdgeAsync(typeName, c, a);
 
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        var result = await resp.Content.ReadEavAsync<EdgeTraverseResult>();
-        Assert.NotNull(result);
-        // visited 应去重，edges 也应去重
-        Assert.Equal(3, result!.VisitedNodeIds.Count);
+        var result = await TraverseAsync(typeName, a, "out", 10);
+
+        Assert.Equal(3, result.VisitedNodeIds.Count);
         Assert.Equal(3, result.Edges.Count);
     }
 
-    // ============================================================
-    // EAV 属性集成
-    // ============================================================
+    [Fact]
+    public async Task Traverse_TypeNameScoped_IgnoresOtherTypes()
+    {
+        var type1 = NewTypeName("Scope1");
+        var type2 = NewTypeName("Scope2");
+        var a = await CreateFreeNodeAsync("域A");
+        var b = await CreateFreeNodeAsync("域B");
+        var c = await CreateFreeNodeAsync("域C");
+
+        await CreateEdgeAsync(type1, a, b);
+        await CreateEdgeAsync(type2, b, c);
+
+        var result = await TraverseAsync(type1, a, "out", 2);
+
+        Assert.Single(result.Edges);
+        Assert.DoesNotContain(c, result.VisitedNodeIds);
+    }
 
     [Fact]
-    public async Task Edge_WithEavProperties_RoundTrips()
+    public async Task Traverse_ZeroDepth_ReturnsStartOnly()
     {
-        var et = await CreateEdgeTypeAsync();
+        var typeName = NewTypeName();
+        var a = await CreateFreeNodeAsync("零A");
+        var b = await CreateFreeNodeAsync("零B");
+        await CreateEdgeAsync(typeName, a, b);
 
-        // 为该 EdgeType 创建属性定义（dataType 必须是小写 decimal）
-        var attrResp = await Client.PostAsJsonAsync(
-            "/api/eav/metadata/attributes",
-            new
-            {
-                entityType = et.TypeName,
-                attributeName = "strength",
-                displayName = "强度",
-                dataType = "decimal",
-                isRequired = false
-            });
-        Assert.True(attrResp.IsSuccessStatusCode,
-            $"属性创建失败: {await attrResp.Content.ReadAsStringAsync()}");
+        var result = await TraverseAsync(typeName, a, "out", 0);
 
-        var (fromNode, toNode) = (Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        Assert.Empty(result.Edges);
+        var only = Assert.Single(result.VisitedNodeIds);
+        Assert.Equal(a, only);
+    }
 
-        // 先创建边实例（不带 Properties）
-        var createResp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}",
+    [Fact]
+    public async Task Edge_Create_TypeNameIsTrimmed()
+    {
+        var rawTypeName = NewTypeName("Trimmed");
+        var (fromNode, toNode) = await CreateNodePairAsync();
+
+        var resp = await Client.PostAsJsonAsync(
+            "/api/eav/edges",
             new CreateEdgeRequest
             {
+                TypeName = $"  {rawTypeName}  ",
                 FromNodeId = fromNode,
                 ToNodeId = toNode
             });
 
-        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
-        var created = await createResp.Content.ReadEavAsync<EdgeInstanceDto>();
-        Assert.NotNull(created);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var dto = await resp.Content.ReadEavAsync<EdgeInstanceDto>();
+        Assert.NotNull(dto);
+        Assert.Equal(rawTypeName, dto!.TypeName);
+    }
 
-        // 通过 EAV PUT 端点更新属性（复用标准管道）
+    [Fact]
+    public async Task Edge_Update_UndirectedToDirected_Succeeds()
+    {
+        var typeName = NewTypeName();
+        var (fromNode, toNode) = await CreateNodePairAsync();
+        var edge = await CreateEdgeAsync(typeName, fromNode, toNode, isDirected: false);
+
+        var resp = await Client.PutAsJsonAsync(
+            $"/api/eav/edges/{edge.EdgeId}",
+            new UpdateEdgeRequest { IsDirected = true });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var updated = await resp.Content.ReadEavAsync<EdgeInstanceDto>();
+        Assert.NotNull(updated);
+        Assert.True(updated!.IsDirected);
+    }
+
+    [Fact]
+    public async Task Edge_Create_Undirected_SameDirectionDuplicate_Returns409()
+    {
+        var typeName = NewTypeName();
+        var (fromNode, toNode) = await CreateNodePairAsync();
+
+        await CreateEdgeAsync(typeName, fromNode, toNode, isDirected: false);
+
+        var second = await Client.PostAsJsonAsync(
+            "/api/eav/edges",
+            new CreateEdgeRequest
+            {
+                TypeName = typeName,
+                FromNodeId = fromNode,
+                ToNodeId = toNode,
+                IsDirected = false
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edge_Create_SelfLoop_Duplicate_Returns409()
+    {
+        var typeName = NewTypeName();
+        var node = await CreateFreeNodeAsync("自环重复节点");
+        await CreateEdgeAsync(typeName, node, node);
+
+        var second = await Client.PostAsJsonAsync(
+            "/api/eav/edges",
+            new CreateEdgeRequest
+            {
+                TypeName = typeName,
+                FromNodeId = node,
+                ToNodeId = node
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task Edge_Update_NullIsDirected_KeepsValue()
+    {
+        var typeName = NewTypeName();
+        var (fromNode, toNode) = await CreateNodePairAsync();
+        var edge = await CreateEdgeAsync(typeName, fromNode, toNode, isDirected: false);
+
+        var resp = await Client.PutAsJsonAsync(
+            $"/api/eav/edges/{edge.EdgeId}",
+            new UpdateEdgeRequest { IsDirected = null });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var updated = await resp.Content.ReadEavAsync<EdgeInstanceDto>();
+        Assert.NotNull(updated);
+        Assert.False(updated!.IsDirected);
+    }
+
+    [Fact]
+    public async Task Edge_Create_Duplicate_AfterDelete_Allowed()
+    {
+        var typeName = NewTypeName();
+        var (fromNode, toNode) = await CreateNodePairAsync();
+        var first = await CreateEdgeAsync(typeName, fromNode, toNode);
+
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.DeleteAsync($"/api/eav/edges/{first.EdgeId}")).StatusCode);
+
+        // 删掉后同类型同端点可再建（唯一约束只在存活行上生效）
+        await CreateEdgeAsync(typeName, fromNode, toNode);
+    }
+
+    [Fact]
+    public async Task Edge_List_TypeName_NoMatch_ReturnsEmpty()
+    {
+        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
+            $"/api/eav/edges?typeName=NotExists_{Guid.NewGuid():N}");
+
+        Assert.NotNull(list);
+        Assert.Empty(list!);
+    }
+
+    [Fact]
+    public async Task Traverse_In_Undirected_ReachesSource()
+    {
+        // 无向边存储为 A → B，从 A 出发按 in 亦应走到 B
+        var typeName = NewTypeName("UndirInTraverse");
+        var a = await CreateFreeNodeAsync("无入A");
+        var b = await CreateFreeNodeAsync("无入B");
+
+        await CreateEdgeAsync(typeName, a, b, isDirected: false);
+
+        var result = await TraverseAsync(typeName, a, "in", 1);
+
+        Assert.Single(result.Edges);
+        Assert.Contains(b, result.VisitedNodeIds);
+    }
+
+    // ============================================================
+    // EAV 属性（entity_type = type_name）
+    // ============================================================
+
+    [Fact]
+    public async Task Edge_WithEavProperties_OnCreate_RoundTrips()
+    {
+        var typeName = NewTypeName("EavEdge");
+        await EnsureEntityTypeAndAttributeAsync(typeName, "strength", "decimal");
+        var (fromNode, toNode) = await CreateNodePairAsync();
+
+        var dto = await CreateEdgeAsync(
+            typeName, fromNode, toNode,
+            properties: new Dictionary<string, object> { ["strength"] = 42.5 });
+
+        Assert.NotNull(dto.Properties);
+        Assert.True(dto.Properties!.TryGetValue("strength", out var strength));
+        Assert.Equal(42.5m, strength.GetDecimal());
+
+        // EAV 实体端点同样可读（entity_type = type_name, entity_id = edgeId）
+        var entity = await Client.GetEavAsync<DynamicEntityDto>(
+            $"/api/eav/{typeName}/entities/{dto.EdgeId}");
+        Assert.NotNull(entity);
+        Assert.Equal(42.5m, entity!.Properties["strength"].GetDecimal());
+    }
+
+    [Fact]
+    public async Task Edge_EavPut_ThenGet_ReturnsProperties()
+    {
+        var typeName = NewTypeName("EavEdgePut");
+        await EnsureEntityTypeAndAttributeAsync(typeName, "strength", "decimal");
+        var (fromNode, toNode) = await CreateNodePairAsync();
+        var created = await CreateEdgeAsync(typeName, fromNode, toNode);
+
         var putResp = await Client.PutAsJsonAsync(
-            $"/api/eav/{et.TypeName}/entities/{created!.EdgeId}",
-            new { strength = 42.5 });
+            $"/api/eav/{typeName}/entities/{created.EdgeId}",
+            new { strength = 7.25 });
         Assert.True(putResp.IsSuccessStatusCode,
-            $"EAV PUT 失败: {await putResp.Content.ReadAsStringAsync()}");
+            await putResp.Content.ReadAsStringAsync());
 
-        // GET 边应能取回 EAV 属性
         var got = await Client.GetEavAsync<EdgeInstanceDto>(
-            $"/api/eav/edges/{et.EdgeTypeId}/{created.EdgeId}");
+            $"/api/eav/edges/{created.EdgeId}");
         Assert.NotNull(got);
         Assert.NotNull(got!.Properties);
-        Assert.True(got.Properties!.TryGetValue("strength", out var strength));
-        Assert.Equal(42.5m, strength.GetDecimal());
-    }
-
-    // ============================================================
-    // 删除不级联：子项为空方可删除
-    // ============================================================
-
-    [Fact]
-    public async Task EdgeType_Delete_WhenInstancesExist_Returns409()
-    {
-        var et = await CreateEdgeTypeAsync();
-        await CreateEdgeAsync(et.EdgeTypeId, "n1", "n2");
-        await CreateEdgeAsync(et.EdgeTypeId, "n3", "n4");
-
-        // 仍有边实例 → 拒绝删除本类型，且不做级联清理
-        var delResp = await Client.DeleteAsync(
-            $"/api/eav/metadata/edge-types/{et.EdgeTypeId}");
-        Assert.Equal(HttpStatusCode.Conflict, delResp.StatusCode);
-        Assert.Contains("边实例", await delResp.Content.ReadAsStringAsync());
-
-        // 类型与实例均保留
-        var getResp = await Client.GetAsync(
-            $"/api/eav/metadata/edge-types/{et.EdgeTypeId}");
-        Assert.Equal(HttpStatusCode.OK, getResp.StatusCode);
-
-        var instances = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}");
-        Assert.Equal(2, instances!.Count);
+        Assert.Equal(7.25m, got.Properties!["strength"].GetDecimal());
     }
 
     [Fact]
-    public async Task EdgeType_Delete_AfterInstancesRemoved_Succeeds()
+    public async Task Edge_Delete_WhenPropertiesExist_Returns409()
     {
-        var et = await CreateEdgeTypeAsync();
-        var edge = await CreateEdgeAsync(et.EdgeTypeId, "n1", "n2");
+        var typeName = NewTypeName("EavEdgeDel");
+        await EnsureEntityTypeAndAttributeAsync(typeName, "strength", "decimal");
+        var (fromNode, toNode) = await CreateNodePairAsync();
+        var edge = await CreateEdgeAsync(
+            typeName, fromNode, toNode,
+            properties: new Dictionary<string, object> { ["strength"] = 1.5 });
 
-        // 先删实例，使子项为空
-        var delEdge = await Client.DeleteAsync(
-            $"/api/eav/edges/{et.EdgeTypeId}/{edge.EdgeId}");
-        Assert.Equal(HttpStatusCode.NoContent, delEdge.StatusCode);
+        var del = await Client.DeleteAsync($"/api/eav/edges/{edge.EdgeId}");
+        Assert.Equal(HttpStatusCode.Conflict, del.StatusCode);
+        Assert.Contains("属性数据", await del.Content.ReadAsStringAsync());
 
-        var delResp = await Client.DeleteAsync(
-            $"/api/eav/metadata/edge-types/{et.EdgeTypeId}");
-        Assert.Equal(HttpStatusCode.OK, delResp.StatusCode);
+        // 清空属性值后可删
+        var clear = await Client.PutAsJsonAsync(
+            $"/api/eav/{typeName}/entities/{edge.EdgeId}", new { });
+        Assert.True(clear.IsSuccessStatusCode, await clear.Content.ReadAsStringAsync());
 
-        var delResult = await delResp.Content.ReadEavAsync<EdgeDeleteResult>();
-        Assert.NotNull(delResult);
-        Assert.True(delResult!.Deleted);
-
-        // 确认类型已不存在
-        var getResp = await Client.GetAsync(
-            $"/api/eav/metadata/edge-types/{et.EdgeTypeId}");
-        Assert.Equal(HttpStatusCode.NotFound, getResp.StatusCode);
-    }
-
-    // ============================================================
-    // IsGlobal=false 的节点类型约束
-    // ============================================================
-
-    [Fact]
-    public async Task EdgeType_Create_NonGlobalWithoutNodeTypes_Returns400()
-    {
-        var resp = await Client.PostAsJsonAsync(
-            "/api/eav/metadata/edge-types",
-            new CreateEdgeTypeRequest
-            {
-                TypeName = NewTypeName("EdgeNonGlobal"),
-                DisplayName = "非全局无边类型",
-                IsGlobal = false,
-                IsDirected = true
-            });
-
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-    }
-
-    [Fact]
-    public async Task EdgeType_Create_NonGlobalWithNodeTypes_Succeeds()
-    {
-        var resp = await Client.PostAsJsonAsync(
-            "/api/eav/metadata/edge-types",
-            new CreateEdgeTypeRequest
-            {
-                TypeName = NewTypeName("EdgeNonGlobalOk"),
-                DisplayName = "非全局限定类型",
-                IsGlobal = false,
-                IsDirected = true,
-                FromNodeType = "UnitTree",
-                ToNodeType = "UnitTree"
-            });
-
-        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
-        var dto = await resp.Content.ReadEavAsync<EdgeTypeDto>();
-        Assert.NotNull(dto);
-        Assert.False(dto!.IsGlobal);
-        Assert.Equal("UnitTree", dto.FromNodeType);
-    }
-
-    // ============================================================
-    // 无向线路（IsDirected=false）双向查询
-    // ============================================================
-
-    [Fact]
-    public async Task Line_Undirected_DownstreamAndUpstream_BothCoverWholeLine()
-    {
-        // 无向线路 A—B—C：从中间 B 出发，up/down 都应覆盖整条线路（方向被忽略）
-        var et = await CreateEdgeTypeAsync(
-            "UndirLine", isDirected: false, isLine: true, isLinear: true);
-        await CreateLineAsync(et.EdgeTypeId, "UC_A", "UC_B", "UC_C");
-
-        var down = await Client.GetEavAsync<LinePathResult>(
-            $"/api/eav/lines/{et.EdgeTypeId}/downstream/UC_B");
-        Assert.NotNull(down);
-        Assert.Equal(2, down!.Edges.Count);
-        Assert.Contains("UC_A", down.NodeIds);
-        Assert.Contains("UC_C", down.NodeIds);
-
-        var up = await Client.GetEavAsync<LinePathResult>(
-            $"/api/eav/lines/{et.EdgeTypeId}/upstream/UC_B");
-        Assert.NotNull(up);
-        Assert.Equal(2, up!.Edges.Count);
-    }
-
-    [Fact]
-    public async Task Line_Undirected_FullPath_ReturnsWholeLine()
-    {
-        var et = await CreateEdgeTypeAsync(
-            "UndirLineFull", isDirected: false, isLine: true, isLinear: true);
-        await CreateLineAsync(et.EdgeTypeId, "UCF_A", "UCF_B", "UCF_C");
-
-        var path = await Client.GetEavAsync<LinePathResult>(
-            $"/api/eav/lines/{et.EdgeTypeId}/path/UCF_B");
-        Assert.NotNull(path);
-        Assert.Equal(2, path!.Edges.Count);
-        Assert.Equal(3, path.NodeIds.Distinct().Count());
-    }
-
-    [Fact]
-    public async Task Line_Directed_Downstream_StillRespectsDirection()
-    {
-        // 回归：有向线路从中间出发，down 只覆盖下游（B→C），不含上游 A
-        var et = await CreateEdgeTypeAsync(
-            "DirLine", isDirected: true, isLine: true, isLinear: true);
-        await CreateLineAsync(et.EdgeTypeId, "DC_A", "DC_B", "DC_C");
-
-        var down = await Client.GetEavAsync<LinePathResult>(
-            $"/api/eav/lines/{et.EdgeTypeId}/downstream/DC_B");
-        Assert.NotNull(down);
-        Assert.Single(down!.Edges);
-        Assert.DoesNotContain("DC_A", down.NodeIds);
-        Assert.Contains("DC_C", down.NodeIds);
-    }
-
-    // ============================================================
-    // 缺陷回归：线路创建事务 与 递归 CTE
-    // ============================================================
-
-    [Fact]
-    public async Task Line_Create_MultiSegment_PersistsAllEdges()
-    {
-        // 回归：结构创建事务曾用裸事务与 NpgsqlRetryingExecutionStrategy 冲突，
-        // 多段创建线路直接抛"does not support user-initiated transactions"。
-        // 现事务经 CreateExecutionStrategy 包裹，5 节点 4 段应全部落库。
-        var et = await CreateEdgeTypeAsync("LineTx", isLine: true);
-        await CreateLineAsync(et.EdgeTypeId, "TX_A", "TX_B", "TX_C", "TX_D", "TX_E");
-
-        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}");
-        Assert.NotNull(list);
-        Assert.Equal(4, list!.Count);
-
-        var fromTos = list!.Select(e => (e.FromNodeId, e.ToNodeId)).ToList();
-        Assert.Contains(("TX_A", "TX_B"), fromTos);
-        Assert.Contains(("TX_B", "TX_C"), fromTos);
-        Assert.Contains(("TX_C", "TX_D"), fromTos);
-        Assert.Contains(("TX_D", "TX_E"), fromTos);
-    }
-
-    [Fact]
-    public async Task Line_Create_WhenStructureExists_Returns409AndKeepsStructure()
-    {
-        // 同一线路已有结构时再次 POST 结构 → 409；原结构（2 段）保持不变。
-        var et = await CreateEdgeTypeAsync("LineRb", isLine: true);
-        var lineId = await CreateLineAsync(et.EdgeTypeId, "RB_A", "RB_B", "RB_C");
-
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/lines/{lineId}/structure",
-            new LineStructureRequest
-            {
-                EdgeTypeId = et.EdgeTypeId,
-                TopologyMode = TopologyMode.Linear,
-                OrderedNodeIds = new List<string> { "RB_A", "RB_B", "RB_C" }
-            });
-        var body = await resp.Content.ReadAsStringAsync();
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("已存在结构", body);
-
-        var list = await Client.GetEavAsync<List<EdgeInstanceDto>>(
-            $"/api/eav/edges/{et.EdgeTypeId}");
-        Assert.NotNull(list);
-        Assert.Equal(2, list!.Count);
-    }
-
-    [Fact]
-    public async Task Line_Directed_Upstream_WalksToHead()
-    {
-        // 回归：UpstreamCteSql 的 visited 数组曾因 varchar(36)[] 与 varchar[] 不一致
-        // 触发 Postgres 42804；同时验证反向装配（NodeIds 从起点逆序至源头）。
-        var et = await CreateEdgeTypeAsync("LineUp", isLine: true);
-        await CreateLineAsync(et.EdgeTypeId, "CU_A", "CU_B", "CU_C", "CU_D");
-
-        var up = await Client.GetEavAsync<LinePathResult>(
-            $"/api/eav/lines/{et.EdgeTypeId}/upstream/CU_C");
-        Assert.NotNull(up);
-        Assert.False(up!.Truncated);
-        Assert.Equal(2, up.Edges.Count);
-        // NodeIds 从起点逆序到源头：C → B → A
-        Assert.Equal(new[] { "CU_C", "CU_B", "CU_A" }, up.NodeIds);
-        // 边按深度排序：紧邻段 B→C 在前，A→B 在后
-        Assert.Equal("CU_B", up.Edges[0].FromNodeId);
-        Assert.Equal("CU_C", up.Edges[0].ToNodeId);
-        Assert.Equal("CU_A", up.Edges[1].FromNodeId);
-        Assert.Equal("CU_B", up.Edges[1].ToNodeId);
-    }
-
-    [Fact]
-    public async Task Line_Directed_Downstream_MultiLevel_TraversesAllDepth()
-    {
-        // 回归：递归 CTE 数组元素须为 text（::text），多轮递归拼接 visited
-        // 时类型不一致会触发 42804；5 节点线路验证多轮递归全深度覆盖。
-        var et = await CreateEdgeTypeAsync("LineDeep", isLine: true);
-        await CreateLineAsync(et.EdgeTypeId, "CD_A", "CD_B", "CD_C", "CD_D", "CD_E");
-
-        var down = await Client.GetEavAsync<LinePathResult>(
-            $"/api/eav/lines/{et.EdgeTypeId}/downstream/CD_A");
-        Assert.NotNull(down);
-        Assert.False(down!.Truncated);
-        Assert.Equal(4, down.Edges.Count);
-        Assert.Equal(new[] { "CD_A", "CD_B", "CD_C", "CD_D", "CD_E" }, down.NodeIds);
-    }
-
-    [Fact]
-    public async Task Line_Undirected_MultiLevel_CoversWholeLine()
-    {
-        // 回归：无向 CTE 同时拼接 visited（节点）与 visited_edges（边）两个数组，
-        // 多轮递归下任一类型不一致即 42804；从端点出发应按深度覆盖整条线路。
-        var et = await CreateEdgeTypeAsync("UndirDeep", isDirected: false, isLine: true);
-        await CreateLineAsync(et.EdgeTypeId, "UD_A", "UD_B", "UD_C", "UD_D", "UD_E");
-
-        var down = await Client.GetEavAsync<LinePathResult>(
-            $"/api/eav/lines/{et.EdgeTypeId}/downstream/UD_A");
-        Assert.NotNull(down);
-        Assert.False(down!.Truncated);
-        Assert.Equal(4, down.Edges.Count);
-        Assert.Equal(new[] { "UD_A", "UD_B", "UD_C", "UD_D", "UD_E" }, down.NodeIds);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.DeleteAsync($"/api/eav/edges/{edge.EdgeId}")).StatusCode);
     }
 
     // ============================================================
     // 辅助方法
     // ============================================================
 
-    private async Task<EdgeTypeDto> CreateEdgeTypeAsync(
-        string? prefix = null, bool isDirected = true, bool isLine = false, bool isLinear = true)
+    private async Task<string> CreateFreeNodeAsync(string name)
     {
-        var typeName = NewTypeName(prefix ?? "EdgeTest");
-        var displayName = $"EdgeType_{typeName}";
-
-        var resp = await Client.PostAsJsonAsync(
-            "/api/eav/metadata/edge-types",
-            new CreateEdgeTypeRequest
-            {
-                TypeName = typeName,
-                DisplayName = displayName,
-                IsGlobal = true,
-                IsDirected = isDirected,
-                IsLine = isLine,
-                IsLinear = isLinear
-            });
-
-        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
-        var dto = await resp.Content.ReadEavAsync<EdgeTypeDto>();
-        Assert.NotNull(dto);
-        return dto!;
+        var id = Guid.NewGuid().ToString("N");
+        var resp = await Client.PostAsJsonAsync("/api/Node", new { id, name });
+        resp.EnsureSuccessStatusCode();
+        return id;
     }
 
-    /// <summary>
-    /// 建一条 Linear 线路结构：创建 Line → 按顺序创建 LineNode → POST 结构（OrderedNodeIds）。
-    /// 返回 Line.Id。
-    /// </summary>
-    private async Task<string> CreateLineAsync(string edgeTypeId, params string[] orderedNodeIds)
+    private async Task<(string From, string To)> CreateNodePairAsync()
     {
-        var lineId = Guid.NewGuid().ToString("N");
-
-        var lineResp = await Client.PostAsJsonAsync(
-            "/api/Lines", new Line { Id = lineId, Name = "测试线路" });
-        Assert.True(lineResp.IsSuccessStatusCode,
-            $"创建线路失败: {(int)lineResp.StatusCode} {await lineResp.Content.ReadAsStringAsync()}");
-
-        foreach (var nodeId in orderedNodeIds)
-        {
-            var nodeResp = await Client.PostAsJsonAsync(
-                "/api/LineNode",
-                new LineNode { Id = nodeId, LineId = lineId, Name = nodeId });
-            Assert.True(nodeResp.IsSuccessStatusCode,
-                $"创建线路节点失败: {(int)nodeResp.StatusCode} {await nodeResp.Content.ReadAsStringAsync()}");
-        }
-
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/lines/{lineId}/structure",
-            new LineStructureRequest
-            {
-                EdgeTypeId = edgeTypeId,
-                TopologyMode = TopologyMode.Linear,
-                OrderedNodeIds = orderedNodeIds.ToList()
-            });
-
-        var body = await resp.Content.ReadAsStringAsync();
-        Assert.True(resp.StatusCode == HttpStatusCode.OK,
-            $"创建线路结构失败: {(int)resp.StatusCode} {body}");
-        return lineId;
+        var from = await CreateFreeNodeAsync("起点节点");
+        var to = await CreateFreeNodeAsync("终点节点");
+        return (from, to);
     }
 
     private async Task<EdgeInstanceDto> CreateEdgeAsync(
-        string edgeTypeId, string fromNodeId, string toNodeId, decimal? weight = null)
+        string typeName, string fromNodeId, string toNodeId,
+        bool isDirected = true, object? properties = null)
     {
+        // 端点不存在时先注册为自由节点，保证 FK 成立（自环场景只注册一次）
+        await EnsureNodeAsync(fromNodeId);
+        await EnsureNodeAsync(toNodeId);
+
         var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/edges/{edgeTypeId}",
+            "/api/eav/edges",
             new CreateEdgeRequest
             {
+                TypeName = typeName,
                 FromNodeId = fromNodeId,
                 ToNodeId = toNodeId,
-                Weight = weight
+                IsDirected = isDirected,
+                Properties = properties is null ? null : ToJsonElements(properties)
             });
 
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var dto = await resp.Content.ReadEavAsync<EdgeInstanceDto>();
         Assert.NotNull(dto);
         return dto!;
+    }
+
+    /// <summary>确保节点存在于 nodes 注册表；已存在则跳过。</summary>
+    private async Task EnsureNodeAsync(string nodeId)
+    {
+        var existing = await Client.GetAsync($"/api/Node/{nodeId}");
+        if (existing.StatusCode == HttpStatusCode.OK) return;
+
+        var resp = await Client.PostAsJsonAsync("/api/Node", new
+        {
+            id = nodeId,
+            name = $"节点_{nodeId[^Math.Min(6, nodeId.Length)..]}"
+        });
+        Assert.True(resp.IsSuccessStatusCode, await resp.Content.ReadAsStringAsync());
+    }
+
+    private async Task<EdgeTraverseResult> TraverseAsync(
+        string typeName, string startNodeId, string direction, int maxDepth)
+    {
+        var resp = await Client.PostAsJsonAsync(
+            "/api/eav/edges/traverse",
+            new EdgeTraverseRequest(typeName, startNodeId, direction, maxDepth));
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var result = await resp.Content.ReadEavAsync<EdgeTraverseResult>();
+        Assert.NotNull(result);
+        return result!;
+    }
+
+    private async Task EnsureEntityTypeAndAttributeAsync(
+        string entityType, string attributeName, string dataType)
+    {
+        var typeResp = await Client.PostAsJsonAsync(
+            "/api/eav/entity-types",
+            new { entityType, displayName = entityType });
+        Assert.True(typeResp.IsSuccessStatusCode || typeResp.StatusCode == HttpStatusCode.Conflict,
+            await typeResp.Content.ReadAsStringAsync());
+
+        var attrResp = await Client.PostAsJsonAsync(
+            "/api/eav/metadata/attributes",
+            new
+            {
+                entityType,
+                attributeName,
+                displayName = attributeName,
+                dataType,
+                isRequired = false
+            });
+        Assert.True(attrResp.IsSuccessStatusCode || attrResp.StatusCode == HttpStatusCode.Conflict,
+            await attrResp.Content.ReadAsStringAsync());
+    }
+
+    private static Dictionary<string, System.Text.Json.JsonElement> ToJsonElements(
+        object properties)
+    {
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(properties);
+        var dict = new Dictionary<string, System.Text.Json.JsonElement>();
+        foreach (var prop in json.EnumerateObject())
+            dict[prop.Name] = prop.Value;
+        return dict;
     }
 }

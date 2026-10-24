@@ -8,7 +8,7 @@ public class NodeTemplate<TItem>
     where TItem : class, ITreeNodeBase<TItem>
 {
     /// <summary>目标节点</summary>
-    public required ITreeItemData<TItem> Node { get; set; }
+    public required TreeNodeItem<TItem> Node { get; set; }
 
     /// <summary>用户选择的操作</summary>
     public RenderFragment<TItem>? ActionTemplate { get; set; }

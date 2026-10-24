@@ -62,6 +62,16 @@ public static class BuiltinHostTypeSeeder
             DisplayOrder = 3,
             CreatedAt = SeedTime,
             UpdatedAt = SeedTime
+        },
+        new()
+        {
+            EntityTypeId = "b0000005-0000-4000-8000-000000000005",
+            EntityType = "Node",
+            DisplayName = "通用节点",
+            Description = "内置 Inode 宿主：无归属通用节点（边端点/属性挂载用）",
+            DisplayOrder = 4,
+            CreatedAt = SeedTime,
+            UpdatedAt = SeedTime
         }
     ];
 

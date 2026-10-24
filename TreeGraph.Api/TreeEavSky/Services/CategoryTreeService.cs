@@ -1,6 +1,7 @@
 using TreeGraph.Api.Data;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.Messaging;
+using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Models;
@@ -11,6 +12,8 @@ namespace TreeGraph.Api.TreeEavSky.Services;
 
 public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher publishEndpoint) : ITreeService<CategoryTree>
 {
+    private static string BuildText(CategoryTree c) => c.Name ?? string.Empty;
+
     public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
     {
@@ -19,17 +22,19 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
         if (rootId != null)
         {
             var rootItem = await dbContext.CategoryTrees
+                .Include(c => c.Node)
                 .FirstAsync(c => c.Id == rootId, cancellationToken);
 
-            roots.Add(rootItem.ToNodeDto());
+            roots.Add(rootItem.ToNodeDto(BuildText(rootItem)));
         }
         else
         {
-            roots = await dbContext.CategoryTrees
+            var items = await dbContext.CategoryTrees
+                .Include(c => c.Node)
                 .Where(c => c.ParentId == null)
                 .OrderBy(c => c.SortOrder)
-                .Select(c => c.ToNodeDto())
                 .ToListAsync(cancellationToken);
+            roots = items.Select(c => c.ToNodeDto(BuildText(c))).ToList();
         }
 
         foreach (var rootNode in roots)
@@ -58,28 +63,30 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
     public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> GetChildrenAsync(string parentId,
         CancellationToken cancellationToken = default)
     {
-        var children = await dbContext.CategoryTrees
+        var childrenItems = await dbContext.CategoryTrees
+            .Include(c => c.Node)
             .Where(c => c.ParentId == parentId)
             .OrderBy(c => c.SortOrder)
-            .Select(c => c.ToNodeDto())
             .ToListAsync(cancellationToken);
+        var children = childrenItems.Select(c => c.ToNodeDto(BuildText(c))).ToList();
 
         foreach (var child in children)
         {
             var parent = await dbContext.CategoryTrees
+                .Include(c => c.Node)
                 .FirstAsync(c => c.Id == parentId, cancellationToken);
 
             child.Parent = parent;
             child.Value!.Parent = parent;
 
-            var grandson = await dbContext.CategoryTrees
+            var grandsonItems = await dbContext.CategoryTrees
+                .Include(c => c.Node)
                 .Where(c => c.ParentId == child.Id)
                 .OrderBy(c => c.SortOrder)
-                .Select(c => c.ToNodeDto())
                 .ToListAsync(cancellationToken);
 
-            child.Children = grandson.ToList();
-            child.HasChildren = grandson.Count > 0;
+            child.Children = grandsonItems.Select(c => c.ToNodeDto(BuildText(c))).ToList();
+            child.HasChildren = grandsonItems.Count > 0;
         }
 
         return children;
@@ -88,7 +95,7 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
     public async Task<IReadOnlyList<TreeNodeDto<CategoryTree>>> QueryNodesAsync(TreeQueryParams queryParams,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.CategoryTrees.AsQueryable();
+        var query = dbContext.CategoryTrees.Include(c => c.Node).AsQueryable();
 
         if (!string.IsNullOrEmpty(queryParams.ParentId))
             query = query.Where(c => c.ParentId == queryParams.ParentId);
@@ -96,37 +103,35 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
             query = query.Where(c => c.ParentId == null);
 
         if (!string.IsNullOrEmpty(queryParams.SearchTerm))
-            query = query.Where(c => c.Name.Contains(queryParams.SearchTerm));
+            query = query.Where(c => c.Node!.Name.Contains(queryParams.SearchTerm));
 
         if (queryParams.OnlyWithChildren)
             query = query.Where(c => c.HasChildren);
 
-        var result = await query
+        var items = await query
             .OrderBy(c => c.SortOrder)
             .Skip((queryParams.Page - 1) * queryParams.PageSize)
             .Take(queryParams.PageSize)
-            .Select(c => c.ToNodeDto())
             .ToListAsync(cancellationToken);
-        return result;
+        return items.Select(c => c.ToNodeDto(BuildText(c))).ToList();
     }
 
     public async Task<TreeNodeDto<CategoryTree>?> GetFullTreeAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
     {
-        // 1. 加载所有节点到内存
         var allNodes = await dbContext.CategoryTrees
+            .Include(c => c.Node)
             .OrderBy(c => c.SortOrder)
             .ToListAsync(cancellationToken);
         if (allNodes.Count == 0)
             return null;
 
-        // 2. 确定起始根节点
         CategoryTree? rootEntity;
         if (string.IsNullOrEmpty(rootId))
         {
             rootEntity = allNodes.FirstOrDefault(n => n.ParentId == null);
             if (rootEntity == null)
-                return null; // 没有根节点，返回 null
+                return null;
         }
         else
         {
@@ -135,34 +140,17 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
                 return null;
         }
 
-        // 3. 建立 ID 字典，并组装父子关系（内存中填充 Children 集合）
         var dict = allNodes.ToDictionary(n => n.Id);
         foreach (var node in allNodes)
         {
             if (node.ParentId != null && dict.TryGetValue(node.ParentId, out var parent))
             {
-                // parent.Children ??= new List<CategoryTree>();
-                // parent.Children.Add(node);
             }
         }
 
-        // 4. 递归构建 DTO 树，并对子节点排序
         TreeNodeDto<CategoryTree> BuildDto(CategoryTree entity)
         {
-            var dto = entity.ToNodeDto();
-            // if (entity.Children != null && entity.Children.Any())
-            // {
-            //     dto.Children = entity.Children
-            //         .OrderBy(c => c.SortOrder)
-            //         .Select(child => BuildDto(child))
-            //         .ToList();
-            //     dto.HasChildren = true;
-            // }
-            // else
-            // {
-            //     dto.HasChildren = false;
-            // }
-
+            var dto = entity.ToNodeDto(BuildText(entity));
             return dto;
         }
 
@@ -173,10 +161,12 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
     public async Task<TreeNodeDto<CategoryTree>> CreateNodeAsync(TreeNodeDto<CategoryTree> nodeDto,
         CancellationToken cancellationToken = default)
     {
+        var id = string.IsNullOrEmpty(nodeDto.Id) ? Guid.NewGuid().ToString() : nodeDto.Id;
+        var name = nodeDto.Text ?? string.Empty;
+
         var entity = new CategoryTree
         {
-            Id = string.IsNullOrEmpty(nodeDto.Id) ? Guid.NewGuid().ToString() : nodeDto.Id,
-            Name = nodeDto.Text ?? string.Empty,
+            Id = id,
             ParentId = nodeDto.ParentId,
             SortOrder = nodeDto.SortOrder,
             CanHaveChildren = nodeDto.CanHaveChildren,
@@ -185,8 +175,9 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
 
         if (!string.IsNullOrEmpty(entity.ParentId))
         {
-            var parent = await dbContext.CategoryTrees.FindAsync(new object[] { entity.ParentId }, cancellationToken);
-            // ★ 硬校验：父节点声明为叶子（CanHaveChildren=false）时拒绝创建子节点
+            var parent = await dbContext.CategoryTrees
+                .Include(c => c.Node)
+                .FirstOrDefaultAsync(c => c.Id == entity.ParentId, cancellationToken);
             if (parent is not null && !parent.CanHaveChildren)
                 throw new InvalidOperationException($"父节点「{parent.Name}」不允许包含子节点");
             if (parent != null && !parent.HasChildren)
@@ -196,34 +187,42 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
             }
         }
 
+        dbContext.Nodes.Add(new Node
+        {
+            Id = id,
+            HostType = "CategoryTree",
+            Name = name,
+        });
         await dbContext.CategoryTrees.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: false, cancellationToken);
 
-        return entity.ToNodeDto();
+        return entity.ToNodeDto(name);
     }
 
     public async Task<TreeNodeDto<CategoryTree>> UpdateNodeAsync(TreeNodeDto<CategoryTree> nodeDto,
         CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.CategoryTrees.FindAsync(new object[] { nodeDto.Id }, cancellationToken);
+        var entity = await dbContext.CategoryTrees
+            .Include(c => c.Node)
+            .FirstOrDefaultAsync(c => c.Id == nodeDto.Id, cancellationToken);
         if (entity == null)
             throw new KeyNotFoundException($"节点 {nodeDto.Id} 不存在");
 
-        entity.Name = nodeDto.Text ?? entity.Name;
+        if (entity.Node != null)
+            entity.Node.Name = nodeDto.Text ?? entity.Node.Name;
         entity.SortOrder = nodeDto.SortOrder;
         entity.CanHaveChildren = nodeDto.CanHaveChildren;
 
-        // 不在此修改 ParentId，请使用 MoveNodeAsync
         entity.ParentId = nodeDto.ParentId;
-        
+
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
-        return entity.ToNodeDto();
+        return entity.ToNodeDto(BuildText(entity));
     }
 
     public async Task<TreeNodeDto<CategoryTree>> UpdateChildrenAsync(TreeNodeDto<CategoryTree> nodeDto, CancellationToken cancellationToken = default)
@@ -234,71 +233,50 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
         {
             entity.SortOrder = nodeDto.Children?.FirstOrDefault(x => x.Id == entity.Id)?.SortOrder ?? 0;
         }
-        
+
         dbContext.UpdateRange(entityChildren);
-        
+
         await dbContext.SaveChangesAsync(cancellationToken);
-        
+
         return nodeDto;
     }
 
     public async Task<bool> DeleteNodeAsync(string nodeId, CancellationToken cancellationToken = default)
     {
-        // 1. 查找节点
         var node = await dbContext.CategoryTrees
             .FirstOrDefaultAsync(c => c.Id == nodeId, cancellationToken);
 
         if (node == null)
             return false;
 
-        // 2. 子项为空方可删除本项：仍有子节点时拒绝（不采用级联删除）
         var hasChildren = await dbContext.CategoryTrees
             .AnyAsync(c => c.ParentId == nodeId, cancellationToken);
         if (hasChildren)
             throw new InvalidOperationException("该节点仍有子节点，无法删除。请先删除全部子节点。");
 
-        // 引用为空方可删除本项：仍有边引用该节点时拒绝（不采用级联删除）
         var hasEdges = await dbContext.EdgeInstances
             .AnyAsync(e => e.FromNodeId == nodeId || e.ToNodeId == nodeId, cancellationToken);
         if (hasEdges)
             throw new InvalidOperationException("该节点仍被边引用，无法删除。请先删除引用该节点的边。");
 
-        // 先清空自身数据才允许删本项：该节点仍有挂载实体数据时拒绝（不采用级联删除）
         var hasEntities = await dbContext.InodeEntities
             .AnyAsync(m => m.InodeId == nodeId, cancellationToken);
         if (hasEntities)
             throw new InvalidOperationException("该节点仍有挂载的实体数据，无法删除。请先清空其全部实体数据。");
 
-        // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
         var declarations = await dbContext.InodeEntityTypes
             .Where(x => x.InodeId == nodeId)
             .ToListAsync(cancellationToken);
         dbContext.InodeEntityTypes.RemoveRange(declarations);
 
-        // 3. 删除节点
         dbContext.CategoryTrees.Remove(node);
+
+        var nodeRow = await dbContext.Nodes.FindAsync([nodeId], cancellationToken);
+        if (nodeRow != null) dbContext.Nodes.Remove(nodeRow);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await PublishAsync(nodeId, InodeChangeKind.Deleted, pathAffected: false, cancellationToken);
-
-        // 5. 更新父节点的 HasChildren
-        // if (!string.IsNullOrEmpty(parentId))
-        // {
-        //     var parentStillHasChildren = await dbContext.CategoryTrees
-        //         .AnyAsync(c => c.ParentId == parentId, cancellationToken);
-        //
-        //     if (!parentStillHasChildren)
-        //     {
-        //         var parent = await dbContext.CategoryTrees
-        //             .FindAsync(new object[] { parentId }, cancellationToken);
-        //         if (parent != null)
-        //         {
-        //             parent.HasChildren = false;
-        //             await dbContext.SaveChangesAsync(cancellationToken);
-        //         }
-        //     }
-        // }
 
         return true;
     }
@@ -310,7 +288,6 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
         if (node == null)
             throw new KeyNotFoundException($"节点 '{nodeId}' 不存在");
 
-        // 循环检测：禁止移动到自身子节点下
         if (await IsDescendantAsync(nodeId, newParentId, cancellationToken))
             return false;
 
@@ -318,7 +295,6 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
         node.ParentId = newParentId;
         dbContext.Update(node);
 
-        // 更新旧父节点 HasChildren
         if (!string.IsNullOrEmpty(oldParentId))
         {
             var oldParentChildrenCount = await dbContext.CategoryTrees
@@ -336,11 +312,11 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
             }
         }
 
-        // 更新新父节点 HasChildren
         if (!string.IsNullOrEmpty(newParentId))
         {
-            var newParent = await dbContext.CategoryTrees.FindAsync(new object[] { newParentId }, cancellationToken);
-            // ★ 硬校验：目标父节点声明为叶子时拒绝移入
+            var newParent = await dbContext.CategoryTrees
+                .Include(c => c.Node)
+                .FirstOrDefaultAsync(c => c.Id == newParentId, cancellationToken);
             if (newParent is not null && !newParent.CanHaveChildren)
                 throw new InvalidOperationException($"目标父节点「{newParent.Name}」不允许包含子节点");
             if (newParent != null)
@@ -357,8 +333,6 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
         return true;
     }
 
-    /// <summary>发布 iNode 变更事件（向量同步 + 图同步；at-least-once，消费端幂等）。
-    /// pathAffected：名称/层级位置变更（改名/移动）→ 消费端级联刷新全部后代的路径型文本。</summary>
     private async Task PublishAsync(string inodeId, InodeChangeKind kind, bool pathAffected, CancellationToken ct)
     {
         await publishEndpoint.Publish(new InodeChangedEvent
@@ -391,16 +365,6 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
         return exists;
     }
 
-    /// <summary>
-    /// 优化版：减少内存占用（逐层查询）
-    /// 如果树很深，不需要加载全部节点：
-    /// 
-    /// 方案	   查询次数	        内存占用	适用场景
-    /// 逐层查询	N 次（路径深度）	1 个节点	节点数很大、树很深
-    /// </summary>
-    /// <param name="nodeId"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
     public async Task<IReadOnlyList<string>> GetAncestorPathAsync(string nodeId, CancellationToken cancellationToken = default)
     {
         var path = new List<string>();
@@ -408,7 +372,6 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
 
         while (!string.IsNullOrEmpty(currentId))
         {
-            // 只查当前节点
             var node = await dbContext.CategoryTrees
                 .Where(c => c.Id == currentId)
                 .Select(c => new { c.Id, c.ParentId })
@@ -423,13 +386,6 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
         return path.AsReadOnly();
     }
 
-    /// <summary>
-    /// 方案	        查询次数	内存占用	适用场景
-    /// 一次加载全部	1 次	全部节点	节点数 小于 一万
-    /// </summary>
-    /// <param name="nodeId"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
     public async Task<IReadOnlyList<string>> GetAncestorPathAsyncAll(string nodeId, CancellationToken cancellationToken = default)
     {
         var path = new List<string>();
@@ -437,7 +393,6 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
 
         while (!string.IsNullOrEmpty(currentId))
         {
-            // 只查当前节点
             var node = await dbContext.CategoryTrees
                 .Where(c => c.Id == currentId)
                 .Select(c => new { c.Id, c.ParentId })
@@ -451,6 +406,4 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
 
         return path.AsReadOnly();
     }
-    
-    
 }

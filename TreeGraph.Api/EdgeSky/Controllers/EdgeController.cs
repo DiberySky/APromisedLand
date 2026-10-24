@@ -5,98 +5,99 @@ using TreeGraph.Shared.EdgeSky.Dtos;
 namespace TreeGraph.Api.EdgeSky.Controllers;
 
 /// <summary>
-/// Edge Instance CRUD + 图查询。
+/// 边实例 CRUD + 图查询（R4 全局路由）。
 ///
 /// 路由：
-///   CRUD：  POST/GET/PUT/DELETE /api/eav/edges/{edgeTypeId}[/edgeId]
-///   图查询：GET /api/eav/edges/{edgeTypeId}/from|to/{nodeId}
-///           POST /api/eav/edges/{edgeTypeId}/traverse
+///   CRUD：  GET/POST /api/eav/edges、GET/PUT/DELETE /api/eav/edges/{edgeId}
+///   图查询：GET /api/eav/edges/from|to/{nodeId}?typeName=、POST /api/eav/edges/traverse
 ///
 /// 异常统一交由 ApiEnvelopeFilter 映射：
-///   ArgumentException → 400；InvalidOperationException（业务规则冲突）→ 409。
+///   EavValidationException / ArgumentException → 400；InvalidOperationException → 409。
 /// </summary>
 [ApiController]
-[Route("api/eav/edges/{edgeTypeId}")]
+[Route("api/eav/edges")]
 public class EdgeController : ControllerBase
 {
     private readonly EdgeInstanceService _service;
 
     public EdgeController(EdgeInstanceService service) => _service = service;
 
-    /// <summary>列出某类型的所有边。</summary>
+    /// <summary>全局边列表；nodeIds 为逗号分隔，命中 From 或 To 即返回。</summary>
     [HttpGet]
-    public async Task<IActionResult> List(string edgeTypeId, CancellationToken ct)
+    public async Task<IActionResult> List(
+        [FromQuery] string? typeName = null,
+        [FromQuery] string? nodeIds = null,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
     {
-        var list = await _service.ListByTypeAsync(edgeTypeId, ct);
+        string[]? ids = null;
+        if (!string.IsNullOrWhiteSpace(nodeIds))
+        {
+            ids = nodeIds
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        var list = await _service.ListAsync(
+            string.IsNullOrWhiteSpace(typeName) ? null : typeName,
+            ids,
+            string.IsNullOrWhiteSpace(search) ? null : search,
+            ct);
+
         return Ok(list);
     }
 
-    /// <summary>创建边。</summary>
+    /// <summary>创建边（类型名在 body 中）。</summary>
     [HttpPost]
     public async Task<IActionResult> Create(
-        string edgeTypeId, [FromBody] CreateEdgeRequest req, CancellationToken ct)
+        [FromBody] CreateEdgeRequest req, CancellationToken ct)
     {
-        var d = await _service.CreateAsync(edgeTypeId, req, ct);
-        return d is null
-            ? NotFound(new { error = $"EdgeType 不存在: {edgeTypeId}" })
-            : CreatedAtAction(nameof(Get),
-                new { edgeTypeId, edgeId = d.EdgeId }, d);
+        var d = await _service.CreateAsync(req, ct);
+        return CreatedAtAction(nameof(Get), new { edgeId = d.EdgeId }, d);
     }
 
     /// <summary>按 ID 获取边。</summary>
     [HttpGet("{edgeId}")]
-    public async Task<IActionResult> Get(
-        string edgeTypeId, string edgeId, CancellationToken ct)
+    public async Task<IActionResult> Get(string edgeId, CancellationToken ct)
     {
         var d = await _service.GetByIdAsync(edgeId, ct);
-        if (d is null) return NotFound();
-        // 类型不匹配时也返回 NotFound
-        return d.EdgeTypeId == edgeTypeId ? Ok(d) : NotFound();
+        return d is null ? NotFound() : Ok(d);
     }
 
-    /// <summary>更新边（目前仅支持 Weight）。</summary>
+    /// <summary>更新边（仅支持 IsDirected；属性走 EAV 端点）。</summary>
     [HttpPut("{edgeId}")]
     public async Task<IActionResult> Update(
-        string edgeTypeId, string edgeId,
-        [FromBody] UpdateEdgeRequest req, CancellationToken ct)
+        string edgeId, [FromBody] UpdateEdgeRequest req, CancellationToken ct)
     {
         var d = await _service.UpdateAsync(edgeId, req, ct);
-        if (d is null) return NotFound();
-        return d.EdgeTypeId == edgeTypeId ? Ok(d) : NotFound();
+        return d is null ? NotFound() : Ok(d);
     }
 
-    /// <summary>删除边（不级联：边实例自身仍有属性值时服务抛 InvalidOperationException → 409）。</summary>
+    /// <summary>删除边（不级联：仍有属性值/实体数据/被引用时服务抛 InvalidOperationException → 409）。</summary>
     [HttpDelete("{edgeId}")]
-    public async Task<IActionResult> Delete(
-        string edgeTypeId, string edgeId, CancellationToken ct)
-    {
-        // 校验路径中的 edgeTypeId 与实际所属类型一致（与 Get/Update 行为对齐）
-        var d = await _service.GetByIdAsync(edgeId, ct);
-        if (d is null || d.EdgeTypeId != edgeTypeId) return NotFound();
-
-        var ok = await _service.DeleteAsync(edgeId, ct);
-        return ok ? NoContent() : NotFound();
-    }
+    public async Task<IActionResult> Delete(string edgeId, CancellationToken ct)
+        => await _service.DeleteAsync(edgeId, ct) ? NoContent() : NotFound();
 
     // ============================================================
     // 图查询
     // ============================================================
 
-    /// <summary>查某节点的出边（from → *）。</summary>
+    /// <summary>查某节点的出边（有向 from；无向双向）。</summary>
     [HttpGet("from/{nodeId}")]
     public async Task<IActionResult> Outgoing(
-        string edgeTypeId, string nodeId, CancellationToken ct)
-        => Ok(await _service.FindOutgoingAsync(edgeTypeId, nodeId, ct));
+        string nodeId, [FromQuery] string? typeName, CancellationToken ct)
+        => Ok(await _service.FindOutgoingAsync(typeName, nodeId, ct));
 
-    /// <summary>查某节点的入边（* → to）。</summary>
+    /// <summary>查某节点的入边（有向 to；无向双向）。</summary>
     [HttpGet("to/{nodeId}")]
     public async Task<IActionResult> Incoming(
-        string edgeTypeId, string nodeId, CancellationToken ct)
-        => Ok(await _service.FindIncomingAsync(edgeTypeId, nodeId, ct));
+        string nodeId, [FromQuery] string? typeName, CancellationToken ct)
+        => Ok(await _service.FindIncomingAsync(typeName, nodeId, ct));
 
-    /// <summary>边遍历（一跳，Direction = out/in/both）。</summary>
+    /// <summary>边遍历（Direction = out/in/both）。</summary>
     [HttpPost("traverse")]
     public async Task<IActionResult> Traverse(
-        string edgeTypeId, [FromBody] EdgeTraverseRequest req, CancellationToken ct)
-        => Ok(await _service.TraverseAsync(edgeTypeId, req, ct));
+        [FromBody] EdgeTraverseRequest req, CancellationToken ct)
+        => Ok(await _service.TraverseAsync(req.TypeName, req, ct));
 }

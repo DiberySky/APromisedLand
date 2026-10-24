@@ -12,7 +12,7 @@
                     <MudField Label="ID" Variant="Variant.Text">@Node.Id</MudField>
                 </MudItem>
                 <MudItem xs="12">
-                    <MudField Label="名称" Variant="Variant.Outlined">@Node.Text()</MudField>
+                    <MudField Label="名称" Variant="Variant.Outlined">@Node.Name</MudField>
                 </MudItem>
                 <MudItem xs="12">
                     <MudField Label="描述" Variant="Variant.Outlined">
@@ -56,7 +56,7 @@
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public string? CreatedAt { get; set; }
 
-    private string ParentName => ParentNode?.Text() ?? "根分类";
+    private string ParentName => ParentNode?.Name ?? "根分类";
 
     private void Close()
     {

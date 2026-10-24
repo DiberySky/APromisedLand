@@ -1,6 +1,7 @@
 using TreeGraph.Api.Data;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.Messaging;
+using TreeGraph.Shared.NodeSky.Entities;
 using TreeGraph.Shared.TreeEavSky;
 using TreeGraph.Shared.TreeEavSky.Entities;
 using TreeGraph.Shared.TreeEavSky.Models;
@@ -15,6 +16,10 @@ namespace TreeGraph.Api.TreeEavSky.Services;
 /// </summary>
 public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publishEndpoint) : ITreeService<UnitTree>
 {
+    /// <summary>显示文本：名称（来自 nodes）+ 可选简称。</summary>
+    private static string BuildText(UnitTree c)
+        => string.IsNullOrEmpty(c.Abbreviation) ? c.Name ?? string.Empty : $"{c.Name} 【{c.Abbreviation}】";
+
     public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> GetRootNodesAsync(string? rootId = null,
         CancellationToken cancellationToken = default)
     {
@@ -23,17 +28,19 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
         if (rootId != null)
         {
             var rootItem = await dbContext.UnitTrees
+                .Include(c => c.Node)
                 .FirstAsync(c => c.Id == rootId, cancellationToken);
 
-            roots.Add(rootItem.ToNodeDto());
+            roots.Add(rootItem.ToNodeDto(BuildText(rootItem)));
         }
         else
         {
-            roots = await dbContext.UnitTrees
+            var items = await dbContext.UnitTrees
+                .Include(c => c.Node)
                 .Where(c => c.ParentId == null)
                 .OrderBy(c => c.SortOrder)
-                .Select(c => c.ToNodeDto())
                 .ToListAsync(cancellationToken);
+            roots = items.Select(c => c.ToNodeDto(BuildText(c))).ToList();
         }
 
         foreach (var rootNode in roots)
@@ -62,28 +69,30 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
     public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> GetChildrenAsync(string parentId,
         CancellationToken cancellationToken = default)
     {
-        var children = await dbContext.UnitTrees
+        var childrenItems = await dbContext.UnitTrees
+            .Include(c => c.Node)
             .Where(c => c.ParentId == parentId)
             .OrderBy(c => c.SortOrder)
-            .Select(c => c.ToNodeDto())
             .ToListAsync(cancellationToken);
+        var children = childrenItems.Select(c => c.ToNodeDto(BuildText(c))).ToList();
 
         foreach (var child in children)
         {
             var parent = await dbContext.UnitTrees
+                .Include(c => c.Node)
                 .FirstAsync(c => c.Id == parentId, cancellationToken);
 
             child.Parent = parent;
             child.Value!.Parent = parent;
 
-            var grandson = await dbContext.UnitTrees
+            var grandsonItems = await dbContext.UnitTrees
+                .Include(c => c.Node)
                 .Where(c => c.ParentId == child.Id)
                 .OrderBy(c => c.SortOrder)
-                .Select(c => c.ToNodeDto())
                 .ToListAsync(cancellationToken);
 
-            child.Children = grandson.ToList();
-            child.HasChildren = grandson.Count > 0;
+            child.Children = grandsonItems.Select(c => c.ToNodeDto(BuildText(c))).ToList();
+            child.HasChildren = grandsonItems.Count > 0;
         }
 
         return children;
@@ -92,7 +101,7 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
     public async Task<IReadOnlyList<TreeNodeDto<UnitTree>>> QueryNodesAsync(TreeQueryParams queryParams,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.UnitTrees.AsQueryable();
+        var query = dbContext.UnitTrees.Include(c => c.Node).AsQueryable();
 
         if (!string.IsNullOrEmpty(queryParams.ParentId))
             query = query.Where(c => c.ParentId == queryParams.ParentId);
@@ -100,18 +109,17 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
             query = query.Where(c => c.ParentId == null);
 
         if (!string.IsNullOrEmpty(queryParams.SearchTerm))
-            query = query.Where(c => c.Name.Contains(queryParams.SearchTerm));
+            query = query.Where(c => c.Node!.Name.Contains(queryParams.SearchTerm));
 
         if (queryParams.OnlyWithChildren)
             query = query.Where(c => c.HasChildren);
 
-        var result = await query
+        var items = await query
             .OrderBy(c => c.SortOrder)
             .Skip((queryParams.Page - 1) * queryParams.PageSize)
             .Take(queryParams.PageSize)
-            .Select(c => c.ToNodeDto())
             .ToListAsync(cancellationToken);
-        return result;
+        return items.Select(c => c.ToNodeDto(BuildText(c))).ToList();
     }
 
     public async Task<TreeNodeDto<UnitTree>?> GetFullTreeAsync(string? rootId = null,
@@ -119,6 +127,7 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
     {
         // 1. 加载所有节点到内存
         var allNodes = await dbContext.UnitTrees
+            .Include(c => c.Node)
             .OrderBy(c => c.SortOrder)
             .ToListAsync(cancellationToken);
         if (allNodes.Count == 0)
@@ -145,28 +154,13 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
         {
             if (node.ParentId != null && dict.TryGetValue(node.ParentId, out var parent))
             {
-                // parent.Children ??= new List<UnitTree>();
-                // parent.Children.Add(node);
             }
         }
 
-        // 4. 递归构建 DTO 树，并对子节点排序
+        // 4. 递归构建 DTO 树
         TreeNodeDto<UnitTree> BuildDto(UnitTree entity)
         {
-            var dto = entity.ToNodeDto();
-            // if (entity.Children != null && entity.Children.Any())
-            // {
-            //     dto.Children = entity.Children
-            //         .OrderBy(c => c.SortOrder)
-            //         .Select(child => BuildDto(child))
-            //         .ToList();
-            //     dto.HasChildren = true;
-            // }
-            // else
-            // {
-            //     dto.HasChildren = false;
-            // }
-
+            var dto = entity.ToNodeDto(BuildText(entity));
             return dto;
         }
 
@@ -177,10 +171,12 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
     public async Task<TreeNodeDto<UnitTree>> CreateNodeAsync(TreeNodeDto<UnitTree> nodeDto,
         CancellationToken cancellationToken = default)
     {
+        var id = string.IsNullOrEmpty(nodeDto.Id) ? Guid.NewGuid().ToString() : nodeDto.Id;
+        var name = nodeDto.Text ?? string.Empty;
+
         var entity = new UnitTree
         {
-            Id = string.IsNullOrEmpty(nodeDto.Id) ? Guid.NewGuid().ToString() : nodeDto.Id,
-            Name = nodeDto.Text ?? string.Empty,
+            Id = id,
             ParentId = nodeDto.ParentId,
             SortOrder = nodeDto.SortOrder,
             CanHaveChildren = nodeDto.CanHaveChildren,
@@ -189,7 +185,9 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
 
         if (!string.IsNullOrEmpty(entity.ParentId))
         {
-            var parent = await dbContext.UnitTrees.FindAsync(new object[] { entity.ParentId }, cancellationToken);
+            var parent = await dbContext.UnitTrees
+                .Include(c => c.Node)
+                .FirstOrDefaultAsync(c => c.Id == entity.ParentId, cancellationToken);
             // ★ 硬校验：父节点声明为叶子（CanHaveChildren=false）时拒绝创建子节点
             if (parent is not null && !parent.CanHaveChildren)
                 throw new InvalidOperationException($"父节点「{parent.Name}」不允许包含子节点");
@@ -200,22 +198,32 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
             }
         }
 
+        // 名称唯一真源：nodes 注册表（同事务，先注册表后宿主）
+        dbContext.Nodes.Add(new Node
+        {
+            Id = id,
+            HostType = "UnitTree",
+            Name = name,
+        });
         await dbContext.UnitTrees.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: false, cancellationToken);
 
-        return entity.ToNodeDto();
+        return entity.ToNodeDto(name);
     }
 
     public async Task<TreeNodeDto<UnitTree>> UpdateNodeAsync(TreeNodeDto<UnitTree> nodeDto,
         CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.UnitTrees.FindAsync(new object[] { nodeDto.Id }, cancellationToken);
+        var entity = await dbContext.UnitTrees
+            .Include(c => c.Node)
+            .FirstOrDefaultAsync(c => c.Id == nodeDto.Id, cancellationToken);
         if (entity == null)
             throw new KeyNotFoundException($"节点 {nodeDto.Id} 不存在");
 
-        entity.Name = nodeDto.Text ?? entity.Name;
+        if (entity.Node != null)
+            entity.Node.Name = nodeDto.Text ?? entity.Node.Name;
         entity.SortOrder = nodeDto.SortOrder;
         entity.CanHaveChildren = nodeDto.CanHaveChildren;
 
@@ -227,7 +235,7 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
 
         await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
-        return entity.ToNodeDto();
+        return entity.ToNodeDto(BuildText(entity));
     }
 
     public async Task<TreeNodeDto<UnitTree>> UpdateChildrenAsync(TreeNodeDto<UnitTree> nodeDto,
@@ -283,6 +291,10 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
 
         dbContext.UnitTrees.Remove(node);
 
+        // 同步注销 nodes 注册表行（先宿主后注册表）
+        var nodeRow = await dbContext.Nodes.FindAsync([nodeId], cancellationToken);
+        if (nodeRow != null) dbContext.Nodes.Remove(nodeRow);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await PublishAsync(nodeId, InodeChangeKind.Deleted, pathAffected: false, cancellationToken);
@@ -326,7 +338,9 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
         // 更新新父节点 HasChildren
         if (!string.IsNullOrEmpty(newParentId))
         {
-            var newParent = await dbContext.UnitTrees.FindAsync(new object[] { newParentId }, cancellationToken);
+            var newParent = await dbContext.UnitTrees
+                .Include(c => c.Node)
+                .FirstOrDefaultAsync(c => c.Id == newParentId, cancellationToken);
             // ★ 硬校验：目标父节点声明为叶子时拒绝移入
             if (newParent is not null && !newParent.CanHaveChildren)
                 throw new InvalidOperationException($"目标父节点「{newParent.Name}」不允许包含子节点");
@@ -386,7 +400,6 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
 
         while (!string.IsNullOrEmpty(currentId))
         {
-            // 只查当前节点
             var node = await dbContext.UnitTrees
                 .Where(c => c.Id == currentId)
                 .Select(c => new { c.Id, c.ParentId })
@@ -401,13 +414,6 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
         return path.AsReadOnly();
     }
 
-    /// <summary>
-    /// 方案	        查询次数	内存占用	适用场景
-    /// 一次加载全部	1 次	全部节点	节点数 小于 一万
-    /// </summary>
-    /// <param name="nodeId"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
     public async Task<IReadOnlyList<string>> GetAncestorPathAsyncAll(string nodeId,
         CancellationToken cancellationToken = default)
     {
@@ -416,7 +422,6 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
 
         while (!string.IsNullOrEmpty(currentId))
         {
-            // 只查当前节点
             var node = await dbContext.UnitTrees
                 .Where(c => c.Id == currentId)
                 .Select(c => new { c.Id, c.ParentId })
@@ -431,5 +436,3 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
         return path.AsReadOnly();
     }
 }
-    
-    

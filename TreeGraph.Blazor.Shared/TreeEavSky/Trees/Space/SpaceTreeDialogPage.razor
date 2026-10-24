@@ -35,13 +35,13 @@
 
 <TreeDialogPageSky TItem="SpaceTree"
                    Title="@(Title ?? "空间注册")"
-                   TitleToolBar="@(ClickNode?.Value?.Parent?.Text() ?? "空间")"
+                   TitleToolBar="@(ClickNode?.Value?.Parent?.Name ?? "空间")"
                    RootId="@(ClickNode?.Value?.Id ?? RootId)"
                    EditTemplate="@editTemplate"
                    ShowDialogFunc="@ShowDialogAsync" />
 
 @code {
-    [Parameter] public ITreeItemData<SpaceTree>? ClickNode { get; set; }
+    [Parameter] public TreeNodeItem<SpaceTree>? ClickNode { get; set; }
 
     /// <summary>直接指定根节点 Id（无 ClickNode 时生效，如从空间列表打开）。</summary>
     [Parameter] public string? RootId { get; set; }
@@ -49,7 +49,7 @@
     /// <summary>自定义标题（可选，默认「空间注册」）。</summary>
     [Parameter] public string? Title { get; set; }
 
-    private async Task ShowDialogAsync(ITreeItemData<SpaceTree> node)
+    private async Task ShowDialogAsync(TreeNodeItem<SpaceTree> node)
     {
         await BlazorService.ShowSpaceTreeDialogPageAsync(node);
     }

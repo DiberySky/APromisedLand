@@ -32,7 +32,7 @@ public class BlazorService(IDialogService dialogService)
     /// APromisedLand.Razor/Services/BlazorService.UnitTree.cs）。
     /// </summary>
     public async Task ShowUnitTreeDialogPageAsync(
-        ITreeItemData<UnitTree>? node = null)
+        TreeNodeItem<UnitTree>? node = null)
     {
         var parameters = new DialogParameters<UnitTreeDialogPage>
         {
@@ -49,7 +49,7 @@ public class BlazorService(IDialogService dialogService)
     /// 弹出空间树对话框页（点击节点文本时递归弹窗，克隆自 ShowUnitTreeDialogPageAsync）。
     /// </summary>
     public async Task ShowSpaceTreeDialogPageAsync(
-        ITreeItemData<SpaceTree>? node = null)
+        TreeNodeItem<SpaceTree>? node = null)
     {
         var parameters = new DialogParameters<SpaceTreeDialogPage>
         {
@@ -66,7 +66,7 @@ public class BlazorService(IDialogService dialogService)
     /// 弹出分类树对话框页（点击节点文本时递归弹窗）。
     /// </summary>
     public async Task ShowCategoryTreeDialogPageAsync(
-        ITreeItemData<CategoryTree>? node = null)
+        TreeNodeItem<CategoryTree>? node = null)
     {
         var parameters = new DialogParameters<CategoryTreeDialogPage>
         {
@@ -83,7 +83,7 @@ public class BlazorService(IDialogService dialogService)
     /// 弹出知识树对话框页（点击节点文本时递归弹窗，克隆自 ShowCategoryTreeDialogPageAsync）。
     /// </summary>
     public async Task ShowKnowledgeTreeDialogPageAsync(
-        ITreeItemData<KnowledgeTree>? node = null)
+        TreeNodeItem<KnowledgeTree>? node = null)
     {
         var parameters = new DialogParameters<KnowledgeTreeDialogPage>
         {

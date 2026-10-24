@@ -1,6 +1,7 @@
 @* EdgeRelationPanel.razor — 可复用的「节点关系」面板
-   出边 / 入边表格 + 边类型过滤 + 创建关系 + 删除关系。
-   供树节点「操作」对话框与线路节点「关系」对话框共用。 *@
+   出边 / 入边表格 + 关系类型过滤 + 创建关系 + 删除关系。
+   供树节点「操作」对话框与线路节点「关系」对话框共用。
+   R4：关系类型是裸字符串，类型选项从已加载的边中汇总，不再请求元数据。 *@
 @namespace TreeGraph.Blazor.Shared.EdgeSky.Components
 @using TreeGraph.Shared.EdgeSky.Dtos
 @using TreeGraph.Blazor.Shared.EdgeSky.Services
@@ -9,21 +10,21 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-@* 顶部：边类型过滤器 + 创建按钮 *@
+@* 顶部：关系类型过滤器 + 创建按钮 *@
 <div class="d-flex mb-3 align-center">
     <MudSelect T="string"
-               Value="_filterEdgeTypeId"
+               Value="_filterTypeName"
                ValueChanged="OnFilterChanged"
-               Label="边类型（可选过滤）"
+               Label="关系类型（可选过滤）"
                Variant="Variant.Outlined"
                Class="flex-grow-1 mr-3"
                Clearable="true"
                Dense="true">
         <MudSelectItem T="string" Value="@("")">全部类型</MudSelectItem>
-        @foreach (var et in _edgeTypes)
+        @foreach (var typeName in _typeNames)
         {
-            <MudSelectItem T="string" Value="@et.EdgeTypeId">
-                @et.DisplayName
+            <MudSelectItem T="string" Value="@typeName">
+                @typeName
             </MudSelectItem>
         }
     </MudSelect>
@@ -61,13 +62,13 @@ else
             <HeaderContent>
                 <MudTh>类型</MudTh>
                 <MudTh>终点节点</MudTh>
-                <MudTh>权重</MudTh>
+                <MudTh>方向</MudTh>
                 <MudTh>操作</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="类型">
                     <MudChip T="string" Size="Size.Small" Color="Color.Info">
-                        @context.EdgeTypeDisplayName
+                        @context.TypeName
                     </MudChip>
                 </MudTd>
                 <MudTd DataLabel="终点">
@@ -80,9 +81,7 @@ else
                         <span title="@context.ToNodeId">@context.ToNodeText</span>
                     }
                 </MudTd>
-                <MudTd DataLabel="权重">
-                    @(context.Weight.HasValue ? context.Weight.Value.ToString("0.####") : "—")
-                </MudTd>
+                <MudTd DataLabel="方向">@(context.IsDirected ? "有向" : "无向")</MudTd>
                 <MudTd DataLabel="操作">
                     <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                    Size="Size.Small"
@@ -107,13 +106,13 @@ else
             <HeaderContent>
                 <MudTh>类型</MudTh>
                 <MudTh>起点节点</MudTh>
-                <MudTh>权重</MudTh>
+                <MudTh>方向</MudTh>
                 <MudTh>操作</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="类型">
                     <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
-                        @context.EdgeTypeDisplayName
+                        @context.TypeName
                     </MudChip>
                 </MudTd>
                 <MudTd DataLabel="起点">
@@ -126,9 +125,7 @@ else
                         <span title="@context.FromNodeId">@context.FromNodeText</span>
                     }
                 </MudTd>
-                <MudTd DataLabel="权重">
-                    @(context.Weight.HasValue ? context.Weight.Value.ToString("0.####") : "—")
-                </MudTd>
+                <MudTd DataLabel="方向">@(context.IsDirected ? "有向" : "无向")</MudTd>
                 <MudTd DataLabel="操作">
                     <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                    Size="Size.Small"
@@ -151,8 +148,8 @@ else
     /// <summary>出边/入边数量变化回调（父组件据此更新选项卡标题）。</summary>
     [Parameter] public EventCallback<(int Outgoing, int Incoming)> OnSummaryChanged { get; set; }
 
-    private IReadOnlyList<EdgeTypeDto> _edgeTypes = [];
-    private string _filterEdgeTypeId = "";
+    private IReadOnlyList<string> _typeNames = [];
+    private string _filterTypeName = "";
     private bool _loading;
     private List<EdgeInstanceDto> _outgoing = [];
     private List<EdgeInstanceDto> _incoming = [];
@@ -176,31 +173,19 @@ else
         _loading = true;
         try
         {
-            if (string.IsNullOrEmpty(_filterEdgeTypeId))
-            {
-                // 线路结构边（IsLine=true）由线路结构编辑器维护，不在普通边面板中展示/创建
-                _edgeTypes = (await Api.ListEdgeTypesAsync() ?? [])
-                    .Where(t => !t.IsLine).ToList();
-                var allOut = new List<EdgeInstanceDto>();
-                var allIn = new List<EdgeInstanceDto>();
+            var typeName = string.IsNullOrEmpty(_filterTypeName) ? null : _filterTypeName;
 
-                foreach (var et in _edgeTypes)
-                {
-                    var o = await Api.FindOutgoingEdgesAsync(et.EdgeTypeId, NodeId);
-                    var i = await Api.FindIncomingEdgesAsync(et.EdgeTypeId, NodeId);
-                    if (o != null) allOut.AddRange(o);
-                    if (i != null) allIn.AddRange(i);
-                }
+            _outgoing = (await Api.FindOutgoingEdgesAsync(typeName, NodeId) ?? []).ToList();
+            _incoming = (await Api.FindIncomingEdgesAsync(typeName, NodeId) ?? []).ToList();
 
-                _outgoing = allOut;
-                _incoming = allIn;
-            }
-            else
+            // 类型选项：无过滤时从当前节点的全部边中汇总，避免额外的元数据请求
+            if (typeName is null)
             {
-                var o = await Api.FindOutgoingEdgesAsync(_filterEdgeTypeId, NodeId);
-                var i = await Api.FindIncomingEdgesAsync(_filterEdgeTypeId, NodeId);
-                _outgoing = (o ?? []).ToList();
-                _incoming = (i ?? []).ToList();
+                _typeNames = _outgoing.Concat(_incoming)
+                    .Select(e => e.TypeName)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(n => n, StringComparer.Ordinal)
+                    .ToList();
             }
         }
         finally
@@ -211,9 +196,9 @@ else
         await OnSummaryChanged.InvokeAsync((_outgoing.Count, _incoming.Count));
     }
 
-    private Task OnFilterChanged(string? edgeTypeId)
+    private Task OnFilterChanged(string? typeName)
     {
-        _filterEdgeTypeId = edgeTypeId ?? "";
+        _filterTypeName = typeName ?? "";
         _ = LoadAsync();
         return Task.CompletedTask;
     }
@@ -224,7 +209,7 @@ else
         {
             { "PreFillFromNodeId", NodeId },
             { "PreFillFromNodeName", NodeName ?? NodeId },
-            { "PreFillEdgeTypeId", string.IsNullOrEmpty(_filterEdgeTypeId) ? null : _filterEdgeTypeId }
+            { "PreFillTypeName", string.IsNullOrEmpty(_filterTypeName) ? null : _filterTypeName }
         };
 
         var options = new DialogConfig { MaxWidth = MaxWidth.Medium }.ToDialogOptions();
@@ -243,12 +228,12 @@ else
 
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除这条关系吗？\n\n类型：{edge.EdgeTypeDisplayName}\n从 {from} → {to}",
+            $"确定删除这条关系吗？\n\n类型：{edge.TypeName}\n从 {from} → {to}",
             yesText: "删除", cancelText: "取消");
 
         if (confirmed != true) return;
 
-        var (ok, error) = await Api.DeleteEdgeAsync(edge.EdgeTypeId, edge.EdgeId);
+        var (ok, error) = await Api.DeleteEdgeAsync(edge.EdgeId);
         if (ok)
         {
             Snackbar.Add("删除成功", Severity.Success);

@@ -1,4 +1,4 @@
-@* EdgeDialog.razor — 创建 / 编辑边实例
+@* EdgeDialog.razor — 创建 / 编辑边实例（R4：类型为裸字符串，只有有向/无向内核语义）
    创建有两种入口：
      1) 宿主节点发起（TreeNodeActionsDialog / EdgeRelationPanel 传 PreFillFromNodeId）——起点固定只读；
      2) 边管理独立页发起（不传 PreFillFromNodeId）——起点与终点均可用语义搜索选择。 *@
@@ -19,66 +19,52 @@
     <DialogContent>
         @if (!IsEdit)
         {
-            @* 创建模式：选类型 *@
-            <MudSelect T="string"
-                       Value="_form.EdgeTypeId"
-                       ValueChanged="OnEdgeTypeChanged"
-                       Label="边类型"
-                       Variant="Variant.Outlined"
-                       Class="mb-3"
-                       Clearable="false">
-                <MudSelectItem T="string" Value="@("")">请选择边类型</MudSelectItem>
-                @foreach (var et in _edgeTypes)
-                {
-                    <MudSelectItem T="string" Value="@et.EdgeTypeId">
-                        @et.DisplayName（@et.TypeName）
-                        @if (!et.IsGlobal)
-                        {
-                            <MudText Typo="Typo.caption" Class="ml-1" Color="Color.Secondary">
-                                [@et.FromNodeType → @et.ToNodeType]
-                            </MudText>
-                        }
-                    </MudSelectItem>
-                }
-            </MudSelect>
+            @* 创建模式：关系类型名（裸字符串，同时作为 EAV entity_type） *@
+            <MudTextField T="string"
+                          @bind-Value="_form.TypeName"
+                          Label="关系类型名"
+                          Variant="Variant.Outlined"
+                          Class="mb-3"
+                          Placeholder="例：Collaboration"
+                          HelperText="类型名同时作为 EAV 实体类型与图边类型；失焦后加载其属性定义"
+                          OnBlur="LoadSchemaAsync" />
         }
         else
         {
-            @* 编辑模式：展示类型名（只读） *@
+            @* 编辑模式：类型名只读 *@
             <MudTextField T="string"
-                          Value="@_form.EdgeTypeDisplayName"
-                          Label="边类型"
+                          Value="@_form.TypeName"
+                          Label="关系类型名"
                           Variant="Variant.Outlined"
                           ReadOnly="true"
                           Class="mb-3" />
         }
 
-        @* 节点对 + 权重（字段显示节点显示名，GUID 置于辅助文本） *@
+        @* 节点对 *@
         <div Class="d-flex mb-3">
             <MudTextField Value="@(_fromNodeName ?? _form.FromNodeId)"
                           Label="起点节点"
                           Variant="Variant.Outlined"
                           Class="flex-grow-1 mr-3"
-                          Placeholder="@(FromLocked ? "" : "点击右侧按钮选择宿主节点")"
+                          Placeholder="@(FromLocked ? "" : "点击右侧按钮选择节点")"
                           HelperText="@(FromLocked
                               ? $"来自宿主节点，不可修改（ID：{_form.FromNodeId}）"
                               : (_fromNodeName is not null
                                   ? $"ID：{_form.FromNodeId}"
-                                  : "点击右侧按钮选择宿主节点"))"
+                                  : "点击右侧按钮选择节点"))"
                           ReadOnly="true" />
             <MudIcon Icon="@Icons.Material.Filled.ArrowForward"
                      Class="d-flex align-center mr-3"
-                     Color="@(_currentEdgeType?.IsDirected == false
-                         ? Color.Tertiary : Color.Primary)" />
+                     Color="@(_form.IsDirected ? Color.Primary : Color.Tertiary)" />
             <MudTextField Value="@(_toNodeName ?? _form.ToNodeId)"
                           Label="终点节点"
                           Variant="Variant.Outlined"
                           Class="flex-grow-1"
-                          Placeholder="点击右侧按钮选择宿主节点"
+                          Placeholder="点击右侧按钮选择节点"
                           ReadOnly="true"
                           HelperText="@(_toNodeName is not null
                               ? $"ID：{_form.ToNodeId}"
-                              : "点击右侧按钮选择宿主节点")" />
+                              : "点击右侧按钮选择节点")" />
             @if (!IsEdit && !FromLocked)
             {
                 <MudIconButton Icon="@Icons.Material.Filled.Search"
@@ -97,19 +83,11 @@
             }
         </div>
 
-        @* 权重 *@
-        <NumberInputField T="decimal?"
-                          @bind-Value="_form.Weight"
-                          Label="权重（可选）"
-                          Class="mb-3"
-                          Step="0.0001M" />
-
-        @* 显示名（边宿主向量文本来源） *@
-        <MudTextField T="string?"
-                      @bind-Value="_form.DisplayName"
-                      Label="显示名（可选）"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
+        @* 有向 / 无向（边内核语义） *@
+        <MudSwitch T="bool" @bind-Value="_form.IsDirected"
+                   Label="@(_form.IsDirected ? "有向（起点 → 终点）" : "无向（双向等同）")"
+                   Color="Color.Primary"
+                   Class="mb-3" />
 
         @* EAV 属性（DynamicForm） *@
         @if (_schema is { Count: > 0 })
@@ -121,7 +99,7 @@
             </MudDivider>
 
             <DynamicForm @ref="_formRef"
-                         EntityType="@EdgeTypeName"
+                         EntityType="@_form.TypeName"
                          EntityId="@(IsEdit ? _form.EdgeId : "")"
                          Schema="@_schema"
                          InitialValues="@(IsEdit ? Editing?.Properties : null)"
@@ -129,11 +107,10 @@
                          ReadOnly="false"
                          OnSubmit="CaptureEavValues" />
         }
-        else if (!string.IsNullOrEmpty(_form.EdgeTypeId))
+        else if (!string.IsNullOrEmpty(_form.TypeName))
         {
             <MudAlert Severity="Severity.Info" Dense="true">
-                当前边类型未定义属性。可到「边类型 → 属性定义」中为
-                <code>@_currentEdgeType?.TypeName</code> 创建属性。
+                类型 <code>@_form.TypeName</code> 尚未定义属性。可到「实体类型管理」为其创建属性。
             </MudAlert>
         }
 
@@ -161,20 +138,17 @@
     /// <summary>起点宿主节点的显示名（可选；不传则字段回退显示 GUID）。</summary>
     [Parameter] public string? PreFillFromNodeName { get; set; }
     [Parameter] public string? PreFillToNodeId { get; set; }
-    [Parameter] public string? PreFillEdgeTypeId { get; set; }
+    /// <summary>创建时的推荐关系类型名（可选）。</summary>
+    [Parameter] public string? PreFillTypeName { get; set; }
 
     private bool IsEdit => Editing is not null;
 
     /// <summary>起点是否由调用方固定（宿主节点发起创建时为 true）。</summary>
     private bool FromLocked => !string.IsNullOrEmpty(PreFillFromNodeId);
 
-    private string EdgeTypeName => _currentEdgeType?.TypeName ?? "";
-
     private EdgeFormModel _form = new();
     private bool _submitting;
 
-    private IReadOnlyList<EdgeTypeDto> _edgeTypes = [];
-    private EdgeTypeDto? _currentEdgeType;
     private IReadOnlyList<AttributeSchemaDto>? _schema;
 
     private DynamicForm? _formRef;
@@ -189,37 +163,22 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var allTypes = await EdgeApi.ListEdgeTypesAsync() ?? [];
-        // 线路结构边（IsLine=true）只能在「线路结构」编辑器中维护；
-        // 编辑既有结构边时保留其类型用于展示，其余情况一律排除。
-        _edgeTypes = IsEdit && Editing is not null
-            ? allTypes.Where(t => !t.IsLine || t.EdgeTypeId == Editing.EdgeTypeId).ToList()
-            : allTypes.Where(t => !t.IsLine).ToList();
-
         if (IsEdit && Editing is not null)
         {
-            var type = _edgeTypes.FirstOrDefault(t => t.EdgeTypeId == Editing.EdgeTypeId);
-            _currentEdgeType = type;
-
             _form = new EdgeFormModel
             {
                 EdgeId = Editing.EdgeId,
-                EdgeTypeId = Editing.EdgeTypeId,
-                EdgeTypeDisplayName = Editing.EdgeTypeDisplayName,
+                TypeName = Editing.TypeName,
                 FromNodeId = Editing.FromNodeId,
                 ToNodeId = Editing.ToNodeId,
-                Weight = Editing.Weight,
-                DisplayName = Editing.DisplayName
+                IsDirected = Editing.IsDirected
             };
 
             // 两端均为 Inode：显示名取自后端回填的 FromNodeText/ToNodeText（空则回退显示 Id）
             _fromNodeName = string.IsNullOrEmpty(Editing.FromNodeText) ? null : Editing.FromNodeText;
             _toNodeName = string.IsNullOrEmpty(Editing.ToNodeText) ? null : Editing.ToNodeText;
 
-            if (type is not null)
-            {
-                _schema = await EavApi.GetSchemaAsync(type.TypeName);
-            }
+            await LoadSchemaAsync();
         }
         else
         {
@@ -227,46 +186,31 @@
             {
                 FromNodeId = PreFillFromNodeId ?? "",
                 ToNodeId = PreFillToNodeId ?? "",
-                EdgeTypeId = PreFillEdgeTypeId ?? ""
+                TypeName = PreFillTypeName ?? ""
             };
             _fromNodeName = PreFillFromNodeName;
 
-            if (!string.IsNullOrEmpty(PreFillEdgeTypeId))
-                await OnEdgeTypeChanged(PreFillEdgeTypeId);
+            if (!string.IsNullOrWhiteSpace(_form.TypeName))
+                await LoadSchemaAsync();
         }
     }
 
-    private async Task OnEdgeTypeChanged(string? edgeTypeId)
+    /// <summary>按类型名加载 EAV 属性定义（类型即 entity_type）。</summary>
+    private async Task LoadSchemaAsync()
     {
-        _form.EdgeTypeId = edgeTypeId ?? "";
-        _currentEdgeType = _edgeTypes.FirstOrDefault(t => t.EdgeTypeId == edgeTypeId);
         _eavValues.Clear();
-
-        if (_currentEdgeType is not null)
-        {
-            _schema = await EavApi.GetSchemaAsync(_currentEdgeType.TypeName);
-        }
-        else
-        {
-            _schema = null;
-        }
+        _schema = string.IsNullOrWhiteSpace(_form.TypeName)
+            ? null
+            : await EavApi.GetSchemaAsync(_form.TypeName.Trim());
     }
 
-    /// <summary>
-    /// 打开宿主 inode 选择器（语义搜索包装）：非全局边类型按 FromNodeType 限定，
-    /// 全局边类型不限类型。仅在「边管理」独立页创建时可用（无宿主预填）。
-    /// </summary>
+    /// <summary>打开宿主 inode 选择器（语义搜索包装）：类型不再限制端点类型。</summary>
     private async Task PickFromNodeAsync()
     {
-        var parameters = new DialogParameters<InodeSelectorDialog>
-        {
-            { x => x.NodeType, _currentEdgeType?.FromNodeType },
-        };
-
         var options = new DialogConfig { MaxWidth = MaxWidth.Medium }.ToDialogOptions();
 
         var dialog = await DialogService.ShowExAsync<InodeSelectorDialog>(
-            "选择起点节点", parameters, options);
+            "选择起点节点", new DialogParameters(), options);
 
         var result = await dialog.Result;
 
@@ -278,21 +222,12 @@
         }
     }
 
-    /// <summary>
-    /// 打开宿主 inode 选择器（语义搜索包装）：非全局边类型按 ToNodeType 限定，
-    /// 全局边类型不限类型。
-    /// </summary>
     private async Task PickToNodeAsync()
     {
-        var parameters = new DialogParameters<InodeSelectorDialog>
-        {
-            { x => x.NodeType, _currentEdgeType?.ToNodeType },
-        };
-
         var options = new DialogConfig { MaxWidth = MaxWidth.Medium }.ToDialogOptions();
 
         var dialog = await DialogService.ShowExAsync<InodeSelectorDialog>(
-            "选择宿主节点", parameters, options);
+            "选择终点节点", new DialogParameters(), options);
 
         var result = await dialog.Result;
 
@@ -319,8 +254,6 @@
             {
                 await _formRef.SubmitAsync();
                 // SubmitAsync 内部调 OnSubmit → CaptureEavValues
-                // 如果表单不合法会提前 return，但这里我们没简单办法知道
-                // 保守策略：即便有验证失败也继续保存边实例本身
             }
 
             if (IsEdit)
@@ -333,12 +266,11 @@
 
     private async Task CreateEdgeAsync()
     {
-        if (string.IsNullOrEmpty(_form.EdgeTypeId))
+        if (string.IsNullOrWhiteSpace(_form.TypeName))
         {
-            Snackbar.Add("请选择边类型", Severity.Warning);
+            Snackbar.Add("请填写关系类型名", Severity.Warning);
             return;
         }
-        // 起点：宿主发起时已固定；独立页发起时需选择
         if (string.IsNullOrEmpty(_form.FromNodeId))
         {
             Snackbar.Add("请选择起点节点（点击右侧搜索按钮）", Severity.Warning);
@@ -346,23 +278,22 @@
         }
         if (string.IsNullOrEmpty(_form.ToNodeId))
         {
-            Snackbar.Add("请选择终点节点（点击右侧按钮进行语义搜索选择）", Severity.Warning);
+            Snackbar.Add("请选择终点节点（点击右侧搜索按钮）", Severity.Warning);
             return;
         }
 
-        // 构造 CreateEdgeRequest（EAV 属性放 Properties）
         var request = new CreateEdgeRequest
         {
+            TypeName = _form.TypeName.Trim(),
             FromNodeId = _form.FromNodeId,
             ToNodeId = _form.ToNodeId,
-            Weight = _form.Weight,
-            DisplayName = _form.DisplayName,
+            IsDirected = _form.IsDirected,
             Properties = _eavValues.Count > 0
                 ? ToJsonElementDict(_eavValues)
                 : null
         };
 
-        var edgeId = await EdgeApi.CreateEdgeAsync(_form.EdgeTypeId, request);
+        var edgeId = await EdgeApi.CreateEdgeAsync(request);
         if (edgeId is null)
         {
             Snackbar.Add("创建失败（节点可能不存在，或该边已存在）", Severity.Error);
@@ -375,16 +306,11 @@
 
     private async Task UpdateEdgeAsync()
     {
-        if (Editing is null || _currentEdgeType is null) return;
+        if (Editing is null) return;
 
-        // 2a. 更新边实例本身（Weight + DisplayName）
-        var req = new UpdateEdgeRequest
-        {
-            Weight = _form.Weight,
-            DisplayName = _form.DisplayName
-        };
-        var (ok, error) = await EdgeApi.UpdateEdgeAsync(
-            Editing.EdgeTypeId, Editing.EdgeId, req);
+        // 2a. 更新边内核语义（有向/无向）
+        var req = new UpdateEdgeRequest { IsDirected = _form.IsDirected };
+        var (ok, error) = await EdgeApi.UpdateEdgeAsync(Editing.EdgeId, req);
 
         if (!ok)
         {
@@ -396,7 +322,7 @@
         if (_eavValues.Count > 0)
         {
             var (eavOk, eavError, _) = await EavApi.SaveEntityAsync(
-                _currentEdgeType.TypeName, Editing.EdgeId, _eavValues);
+                _form.TypeName, Editing.EdgeId, _eavValues);
 
             if (!eavOk)
             {
@@ -436,11 +362,9 @@
     private class EdgeFormModel
     {
         public string EdgeId { get; set; } = "";
-        public string EdgeTypeId { get; set; } = "";
-        public string EdgeTypeDisplayName { get; set; } = "";
+        public string TypeName { get; set; } = "";
         public string FromNodeId { get; set; } = "";
         public string ToNodeId { get; set; } = "";
-        public decimal? Weight { get; set; }
-        public string? DisplayName { get; set; }
+        public bool IsDirected { get; set; } = true;
     }
 }

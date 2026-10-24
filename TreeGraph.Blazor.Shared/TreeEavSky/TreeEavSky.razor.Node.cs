@@ -51,7 +51,7 @@ public partial class TreeEavSky<TItem>
     }
 
     // ========== 节点点击与导航 ==========
-    private async Task ClickItemText(ITreeItemData<TItem> node)
+    private async Task ClickItemText(TreeNodeItem<TItem> node)
     {
         SelectedValue = node.Value;
         _ = SelectedValueChanged.InvokeAsync(node.Value);
@@ -114,7 +114,7 @@ public partial class TreeEavSky<TItem>
     }
 
     // ========== 节点查找（显式栈迭代） ==========
-    private TItem? FindNodeById(IEnumerable<ITreeItemData<TItem>> items, string? id)
+    private TItem? FindNodeById(IEnumerable<TreeNodeItem<TItem>> items, string? id)
     {
         if (string.IsNullOrEmpty(id)) return null;
 
@@ -161,11 +161,11 @@ public partial class TreeEavSky<TItem>
     /// 从树中移除指定节点（含从父节点 Children 集合摘除）。
     /// 显式栈迭代；栈帧携带实际列表引用与属主节点，保证深层移除能回写父节点。
     /// </summary>
-    public bool RemoveNodeFromParent(List<TreeItemData<TItem>> items, string id)
+    public bool RemoveNodeFromParent(List<TreeNodeItem<TItem>> items, string id)
     {
         if (string.IsNullOrEmpty(id) || items.Count == 0) return false;
 
-        // 用非泛型 IList 作栈帧：根列表是 List<TreeItemData<T>>，
+        // 用非泛型 IList 作栈帧：根列表是 List<TreeNodeItem<T>>，
         // 子层列表是 List<ITreeItemData<T>>，两者都实现非泛型 IList，
         // 且帧内持有的是真实引用，深层移除可直接回写。
         var stack = new Stack<(System.Collections.IList Level, ITreeItemData<TItem>? Owner)>();
@@ -203,7 +203,7 @@ public partial class TreeEavSky<TItem>
                 if (node.Children is not System.Collections.IList childLevel)
                 {
                     var materialized = node.Children
-                        .OfType<TreeItemData<TItem>>()
+                        .OfType<TreeNodeItem<TItem>>()
                         .ToList<ITreeItemData<TItem>>();
                     node.Children = materialized;
                     childLevel = materialized;

@@ -1,11 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
-using TreeGraph.Api.EdgeSky.Entities;
-using TreeGraph.Api.EdgeSky.Services;
 using TreeGraph.Api.LineSky.Entities;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.LineSky.Dtos;
 using TreeGraph.Shared.LineSky.Entities;
 using TreeGraph.Shared.Messaging;
@@ -18,24 +15,21 @@ namespace TreeGraph.Api.LineSky.Services;
 /// 设计要点：
 ///   - 空结构 = 无头表：删掉最后一段时同事务删除头表；PUT 传空结构等价于清空。
 ///   - 段顺序不落库，按拓扑推导（Linear 为链、Radial/Network 为遍历序）。
-///   - 结构校验与 EdgeInstanceService 的全局图校验职责分离：这里只做结构校验。
-///   - 结构边只经本服务创建/删除（EdgeInstanceService 的 internal 绕过方法）。
+///   - R4：段自存端点与线路归属，不再创建/引用 edge_instances；线路拓扑校验完全闭环在本服务，
+///     通用边模块（EdgeSky）不认识线路。
 /// </summary>
 public class LineStructureService
 {
     private readonly TreeGraphDbContext _db;
-    private readonly EdgeInstanceService _edgeInst;
     private readonly InodeOwnerGuardRegistry _inodeGuards;
     private readonly IEventPublisher _publisher;
 
     public LineStructureService(
         TreeGraphDbContext db,
-        EdgeInstanceService edgeInst,
         InodeOwnerGuardRegistry inodeGuards,
         IEventPublisher publisher)
     {
         _db = db;
-        _edgeInst = edgeInst;
         _inodeGuards = inodeGuards;
         _publisher = publisher;
     }
@@ -57,9 +51,10 @@ public class LineStructureService
             .FirstOrDefaultAsync(s => s.LineId == lineId, ct);
 
         var lineNodes = await _db.LineNodes.AsNoTracking()
+            .Include(n => n.Node)
             .Where(n => n.LineId == lineId)
-            .OrderBy(n => n.Name)
-            .Select(n => new { n.Id, n.Name })
+            .OrderBy(n => n.Node!.Name)
+            .Select(n => new { n.Id, Name = n.Node!.Name })
             .ToListAsync(ct);
         var nameMap = lineNodes.ToDictionary(n => n.Id, n => n.Name, StringComparer.Ordinal);
 
@@ -84,16 +79,6 @@ public class LineStructureService
             };
         }
 
-        var def = await _db.EdgeDefinitions.AsNoTracking()
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == header.EdgeTypeId, ct);
-
-        var edgeIds = segments.Select(s => s.EdgeId).ToList();
-        var instances = await _db.EdgeInstances.AsNoTracking()
-            .Where(i => edgeIds.Contains(i.EdgeId))
-            .Select(i => new { i.EdgeId, i.Weight, i.DisplayName })
-            .ToListAsync(ct);
-        var instanceMap = instances.ToDictionary(i => i.EdgeId, i => i, StringComparer.Ordinal);
-
         var terminals = await _db.LineTerminals.AsNoTracking()
             .Where(t => t.LineId == lineId)
             .ToListAsync(ct);
@@ -102,19 +87,15 @@ public class LineStructureService
             terminals.Where(t => t.ExternalNodeId is not null).Select(t => t.ExternalNodeId!), ct);
 
         var segmentDtos = segments
-            .Select(s =>
+            .Select(s => new LineStructureSegmentDto
             {
-                instanceMap.TryGetValue(s.EdgeId, out var inst);
-                return new LineStructureSegmentDto
-                {
-                    EdgeId = s.EdgeId,
-                    FromNodeId = s.FromNodeId,
-                    FromNodeName = nameMap.GetValueOrDefault(s.FromNodeId, s.FromNodeId),
-                    ToNodeId = s.ToNodeId,
-                    ToNodeName = nameMap.GetValueOrDefault(s.ToNodeId, s.ToNodeId),
-                    Weight = inst?.Weight,
-                    DisplayName = inst?.DisplayName
-                };
+                EdgeId = s.EdgeId,
+                FromNodeId = s.FromNodeId,
+                FromNodeName = nameMap.GetValueOrDefault(s.FromNodeId, s.FromNodeId),
+                ToNodeId = s.ToNodeId,
+                ToNodeName = nameMap.GetValueOrDefault(s.ToNodeId, s.ToNodeId),
+                Weight = s.Weight,
+                DisplayName = s.DisplayName
             })
             .OrderBy(s => s.EdgeId, StringComparer.Ordinal)
             .ToList();
@@ -176,9 +157,6 @@ public class LineStructureService
             Exists = true,
             LineId = lineId,
             LineName = lineName,
-            EdgeTypeId = header.EdgeTypeId,
-            EdgeTypeName = def?.TypeName,
-            EdgeTypeDisplayName = def?.DisplayName,
             TopologyMode = header.TopologyMode,
             UpdatedAt = header.UpdatedAt,
             OrderedNodeIds = ordered,
@@ -238,6 +216,7 @@ public class LineStructureService
         });
 
         await PublishLineChangedAsync(lineId, ct);
+        await PublishStructureChangedAsync(lineId, ct);
         return await GetAsync(lineId, ct);
     }
 
@@ -273,6 +252,7 @@ public class LineStructureService
             });
 
             await PublishLineChangedAsync(lineId, ct);
+            await PublishStructureChangedAsync(lineId, ct);
             return await GetAsync(lineId, ct);
         }
 
@@ -296,6 +276,7 @@ public class LineStructureService
         });
 
         await PublishLineChangedAsync(lineId, ct);
+        await PublishStructureChangedAsync(lineId, ct);
         return await GetAsync(lineId, ct);
     }
 
@@ -322,16 +303,11 @@ public class LineStructureService
             .Where(t => t.LineId == lineId)
             .ToListAsync(ct);
 
-        // 重复段（同类型同方向不重复；无向时反向亦视为重复）
-        var def = await _db.EdgeDefinitions.AsNoTracking()
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == header.EdgeTypeId, ct)
-            ?? throw new InvalidOperationException("结构引用的边类型不存在");
+        // 重复段（同方向不重复；无向概念归通用边，线路结构恒按存储方向）
         var duplicated = segments.Any(s =>
-            s.FromNodeId == req.FromNodeId && s.ToNodeId == req.ToNodeId
-            || (!def.IsDirected
-                && s.FromNodeId == req.ToNodeId && s.ToNodeId == req.FromNodeId));
+            s.FromNodeId == req.FromNodeId && s.ToNodeId == req.ToNodeId);
         if (duplicated)
-            throw new InvalidOperationException("该边已存在（同类型同方向不重复）");
+            throw new InvalidOperationException("该段已存在（同方向不重复）");
 
         var prospective = segments
             .Select(s => new SegmentRow(s.EdgeId, s.FromNodeId, s.ToNodeId))
@@ -346,7 +322,7 @@ public class LineStructureService
             try
             {
                 await CreateSegmentRowAsync(
-                    lineId, header.EdgeTypeId, req.FromNodeId, req.ToNodeId, req.Weight, req.DisplayName, ct);
+                    lineId, req.FromNodeId, req.ToNodeId, req.Weight, req.DisplayName, ct);
                 await _db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
             }
@@ -358,6 +334,7 @@ public class LineStructureService
         });
 
         await PublishLineChangedAsync(lineId, ct);
+        await PublishStructureChangedAsync(lineId, ct);
         return (await GetAsync(lineId, ct))!;
     }
 
@@ -405,7 +382,6 @@ public class LineStructureService
                     await _db.SaveChangesAsync(ct);
                 }
 
-                await _edgeInst.DeleteInternalAsync(edgeId, ct);
                 await tx.CommitAsync(ct);
             }
             catch
@@ -416,6 +392,7 @@ public class LineStructureService
         });
 
         await PublishLineChangedAsync(lineId, ct);
+        await PublishStructureChangedAsync(lineId, ct);
         return (await GetAsync(lineId, ct))!;
     }
 
@@ -471,6 +448,7 @@ public class LineStructureService
 
         await PublishNodeChangedAsync(req.NodeId, ct);
         await PublishLineChangedAsync(lineId, ct);
+        await PublishStructureChangedAsync(lineId, ct);
         return (await GetAsync(lineId, ct))!;
     }
 
@@ -490,6 +468,7 @@ public class LineStructureService
 
         await PublishNodeChangedAsync(nodeId, ct);
         await PublishLineChangedAsync(lineId, ct);
+        await PublishStructureChangedAsync(lineId, ct);
         return (await GetAsync(lineId, ct))!;
     }
 
@@ -500,7 +479,6 @@ public class LineStructureService
     private sealed record SegmentRow(string EdgeId, string FromNodeId, string ToNodeId);
 
     private sealed record StructurePlan(
-        string EdgeTypeId,
         TopologyMode TopologyMode,
         List<(string From, string To, decimal? Weight, string? DisplayName)> Segments,
         List<(string NodeId, TerminalRole Role, TerminalOperatingState OperatingState, string? ExternalNodeId)> Terminals);
@@ -508,15 +486,6 @@ public class LineStructureService
     private async Task<StructurePlan> BuildPlanAsync(
         string lineId, LineStructureRequest req, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(req.EdgeTypeId))
-            throw new ArgumentException("EdgeTypeId 必填");
-
-        var def = await _db.EdgeDefinitions.AsNoTracking()
-            .FirstOrDefaultAsync(d => d.EdgeTypeId == req.EdgeTypeId, ct)
-            ?? throw new ArgumentException($"边类型不存在: {req.EdgeTypeId}");
-        if (!def.IsLine)
-            throw new ArgumentException($"边类型 {def.DisplayName} 不是线路结构类型（IsLine=false）");
-
         var segments = ResolveSegments(req);
 
         // 端点同线
@@ -540,17 +509,12 @@ public class LineStructureService
                 await _inodeGuards.EnsureNodeExistsAsync(t.ExternalNodeId, ct);
         }
 
-        // 重复段（同方向；无向边反向亦重复）
+        // 重复段（同方向不重复；无向概念归通用边，线路结构恒按存储方向）
         var duplicate = segments
             .GroupBy(s => (s.FromNodeId, s.ToNodeId))
-            .Any(g => g.Count() > 1)
-            || (!def.IsDirected && segments
-                .GroupBy(s => string.CompareOrdinal(s.FromNodeId, s.ToNodeId) <= 0
-                    ? (s.FromNodeId, s.ToNodeId)
-                    : (s.ToNodeId, s.FromNodeId))
-                .Any(g => g.Count() > 1));
+            .Any(g => g.Count() > 1);
         if (duplicate)
-            throw new InvalidOperationException("结构段存在重复边（同类型同方向不重复）");
+            throw new InvalidOperationException("结构段存在重复边（同方向不重复）");
 
         var segmentRows = segments
             .Select((s, i) => new SegmentRow($"new-{i}", s.FromNodeId, s.ToNodeId))
@@ -567,7 +531,6 @@ public class LineStructureService
         EnsureValid(req.TopologyMode, segmentRows, terminalRows);
 
         return new StructurePlan(
-            def.EdgeTypeId,
             req.TopologyMode,
             segments.Select(s => (s.FromNodeId, s.ToNodeId, s.Weight, (string?)null)).ToList(),
             terminalInputs.Select(t => (
@@ -613,13 +576,12 @@ public class LineStructureService
         _db.LineStructures.Add(new LineStructure
         {
             LineId = lineId,
-            EdgeTypeId = plan.EdgeTypeId,
             TopologyMode = plan.TopologyMode,
             UpdatedAt = DateTimeOffset.UtcNow
         });
 
         foreach (var (from, to, weight, displayName) in plan.Segments)
-            await CreateSegmentRowAsync(lineId, plan.EdgeTypeId, from, to, weight, displayName, ct);
+            await CreateSegmentRowAsync(lineId, from, to, weight, displayName, ct);
 
         foreach (var (nodeId, role, operatingState, externalId) in plan.Terminals)
             _db.LineTerminals.Add(new LineTerminal
@@ -634,33 +596,26 @@ public class LineStructureService
         await _db.SaveChangesAsync(ct);
     }
 
-    private async Task CreateSegmentRowAsync(
-        string lineId, string edgeTypeId,
+    private Task CreateSegmentRowAsync(
+        string lineId,
         string fromNodeId, string toNodeId, decimal? weight, string? displayName,
         CancellationToken ct)
     {
-        var dto = await _edgeInst.CreateLineEdgeInternalAsync(
-            edgeTypeId,
-            new CreateEdgeRequest
-            {
-                FromNodeId = fromNodeId,
-                ToNodeId = toNodeId,
-                Weight = weight,
-                DisplayName = displayName
-            },
-            ct)
-            ?? throw new InvalidOperationException("结构边创建失败");
-
+        // 段即线路自身的拓扑单元：Id 仅作段标识，不再创建通用边实例
         _db.LineStructureSegments.Add(new LineStructureSegment
         {
             LineId = lineId,
-            EdgeId = dto.EdgeId,
+            EdgeId = Guid.NewGuid().ToString(),
             FromNodeId = fromNodeId,
-            ToNodeId = toNodeId
+            ToNodeId = toNodeId,
+            Weight = weight,
+            DisplayName = displayName
         });
+
+        return Task.CompletedTask;
     }
 
-    /// <summary>删除结构头、段、端子，并逐个删除其边实例（同事务调用方负责）。</summary>
+    /// <summary>删除结构头、段、端子（段不再关联通用边，无需级联删除）。</summary>
     private async Task RemoveStructureAsync(string lineId, CancellationToken ct)
     {
         var header = await _db.LineStructures
@@ -678,9 +633,6 @@ public class LineStructureService
         _db.LineTerminals.RemoveRange(terminals);
         _db.LineStructures.Remove(header);
         await _db.SaveChangesAsync(ct);
-
-        foreach (var edgeId in segments.Select(s => s.EdgeId))
-            await _edgeInst.DeleteInternalAsync(edgeId, ct);
     }
 
     // ============================================================
@@ -983,6 +935,13 @@ public class LineStructureService
             InodeId = lineId,
             Kind = InodeChangeKind.Saved,
             PathAffected = false
+        }, ct);
+
+    /// <summary>结构（段集合）变更事件：驱动图内 line_segment 结构边同步（R5）。</summary>
+    private Task PublishStructureChangedAsync(string lineId, CancellationToken ct)
+        => _publisher.Publish(new LineStructureChangedEvent
+        {
+            LineId = lineId
         }, ct);
 
     private Task PublishNodeChangedAsync(string nodeId, CancellationToken ct)

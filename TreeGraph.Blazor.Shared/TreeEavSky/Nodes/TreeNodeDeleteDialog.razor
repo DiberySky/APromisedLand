@@ -7,7 +7,7 @@
 <MudDialog>
     <DialogContent>
         <MudContainer Class="py-4">
-            <MudText>确定要删除节点 <strong>"@Node.Text()"</strong> 吗？</MudText>
+            <MudText>确定要删除节点 <strong>"@Node.Name"</strong> 吗？</MudText>
 
             @if (HasChildren)
             {
@@ -60,7 +60,7 @@
     private string _confirmText = string.Empty;
     private bool _isDeleting = false;
 
-    private bool CanDelete => _confirmText.Trim() == Node.Text().Trim();
+    private bool CanDelete => _confirmText.Trim() == (Node.Name ?? string.Empty).Trim();
     private string _confirmIcon => CanDelete ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error;
     private Color _confirmColor => CanDelete ? Color.Success : Color.Error;
 

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.SpaceSky.Entities;
+using TreeGraph.Shared.TreeEavSky.Abstractions;
 using TreeGraph.Shared.TreeEavSky.Entities;
 
 namespace TreeGraph.Api.NodeEavSky.SemanticSearch;
@@ -70,18 +71,19 @@ public sealed class SourceTextBuilder
         // 2. 解析宿主节点（Id 全局唯一，先中先得）
         var space = await _db.SpaceTrees
             .AsNoTracking()
+            .Include(x => x.Node)
             .FirstOrDefaultAsync(n => n.Id == inodeId, ct);
         var unit = space is null
-            ? await _db.UnitTrees.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
+            ? await _db.UnitTrees.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
         var category = space is null && unit is null
-            ? await _db.CategoryTrees.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
+            ? await _db.CategoryTrees.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
         var knowledge = space is null && unit is null && category is null
-            ? await _db.KnowledgeTrees.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
+            ? await _db.KnowledgeTrees.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
         var lineNode = space is null && unit is null && category is null && knowledge is null
-            ? await _db.LineNodes.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
+            ? await _db.LineNodes.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
         var line = space is null && unit is null && category is null && knowledge is null && lineNode is null
             ? await _db.Lines.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
@@ -99,11 +101,11 @@ public sealed class SourceTextBuilder
         var isSpaceNode = space is not null &&
             await _db.Spaces.AsNoTracking().AnyAsync(s => s.Id == inodeId, ct);
 
-        // 边宿主：显示名回退 EdgeId；无空间归属、无树祖先，文本单行「当前节点：边名」
+        // 边宿主：无业务显示名（已并入 EAV），文本回退「fromId→toId」
         var nodeName = isSpaceNode
             ? null
             : space?.Name ?? unit?.Name ?? category?.Name ?? knowledge?.Name ?? lineNode?.Name ?? line?.Name
-              ?? (edge is not null ? edge.DisplayName ?? edge.EdgeId : null);
+              ?? (edge is not null ? $"{edge.FromNodeId}→{edge.ToNodeId}" : null);
 
         // 祖先链：4 棵宿主树内沿 ParentId 上溯；线路节点以所属线路为唯一"祖先"
         var ancestorNames = new List<string>();
@@ -237,15 +239,10 @@ public sealed class SourceTextBuilder
     /// 整表加载后内存上溯；父链断裂或成环时按已收集部分返回，保证确定性。
     /// </summary>
     private async Task<(List<string> Names, List<string> Ids)> BuildAncestorChainAsync<T>(
-        DbSet<T> set, string? parentId, CancellationToken ct) where T : class
+        DbSet<T> set, string? parentId, CancellationToken ct) where T : class, ITreeNodeBase<T>
     {
         var nodes = await set.AsNoTracking()
-            .Select(n => new
-            {
-                Id = EF.Property<string>(n, "Id"),
-                ParentId = EF.Property<string>(n, "ParentId"),
-                Name = EF.Property<string>(n, "Name")
-            })
+            .Include("Node")
             .ToListAsync(ct);
         var map = nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
 

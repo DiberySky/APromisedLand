@@ -8,12 +8,12 @@ namespace TreeGraph.Blazor.Shared.TreeEavSky;
 public partial class TreeEavSky<TItem>
 {
     // ========== 节点操作回调（由外部页面处理具体业务） ==========
-    private async Task ShowAddChildActionsAsync(ITreeItemData<TItem> node)
+    private async Task ShowAddChildActionsAsync(TreeNodeItem<TItem> node)
     {
         await ExecuteNodeActionAsync(NodeAction.AddChild, node);
     }
 
-    private async Task ShowNodeActionsAsync(ITreeItemData<TItem> node)
+    private async Task ShowNodeActionsAsync(TreeNodeItem<TItem> node)
     {
         if (node.Value == null) return;
 
@@ -54,7 +54,7 @@ public partial class TreeEavSky<TItem>
         }
     }
 
-    public async Task ExecuteNodeActionAsync(NodeAction action, ITreeItemData<TItem> node)
+    public async Task ExecuteNodeActionAsync(NodeAction action, TreeNodeItem<TItem> node)
     {
         switch (action)
         {
@@ -84,9 +84,9 @@ public partial class TreeEavSky<TItem>
 
     #region CRUD 操作
 
-    private async Task HandleAddChildAsync(ITreeItemData<TItem> parent)
+    private async Task HandleAddChildAsync(TreeNodeItem<TItem> parent)
     {
-        var node = new TreeItemData<TItem>
+        var node = new TreeNodeItem<TItem>
         {
             Value = new TItem(),
         };
@@ -122,7 +122,7 @@ public partial class TreeEavSky<TItem>
         }
     }
 
-    private async Task HandleEditAsync(ITreeItemData<TItem> node)
+    private async Task HandleEditAsync(TreeNodeItem<TItem> node)
     {
         var nodeTemplate = new NodeTemplate<TItem>
         {
@@ -138,7 +138,7 @@ public partial class TreeEavSky<TItem>
             var updated = await ActionHandler.UpdateNodeAsync(formModel, _cts.Token);
             if (updated is null) return;
 
-            node.Text = formModel.Text();
+            node.Text = formModel.Name;
             Message.Success("更新成功");
         }
         catch (OperationCanceledException) { }
@@ -148,7 +148,7 @@ public partial class TreeEavSky<TItem>
         }
     }
 
-    private async Task HandleDeleteAsync(ITreeItemData<TItem> node)
+    private async Task HandleDeleteAsync(TreeNodeItem<TItem> node)
     {
         // 子项为空方可删除本项：仍有子节点时直接拒绝（后端亦会拒绝）
         var hasChildren = node.Children?.Count > 0 || node.Value?.HasChildren == true;
@@ -160,7 +160,7 @@ public partial class TreeEavSky<TItem>
 
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除节点【{node.Value?.Text()}】吗？",
+            $"确定删除节点【{node.Value?.Name}】吗？",
             "删除", "取消");
 
         if (confirmed == null || !confirmed.Value) return;
@@ -208,7 +208,7 @@ public partial class TreeEavSky<TItem>
 
     #region 移动与排序
 
-    private async Task HandleMoveNodeAsync(ITreeItemData<TItem> node)
+    private async Task HandleMoveNodeAsync(TreeNodeItem<TItem> node)
     {
         if (node.Value == null) return;
 
@@ -216,7 +216,7 @@ public partial class TreeEavSky<TItem>
 
         if (selectResult == null) return;
 
-        var message = $"节点【{node.Text}】的上级节点：【{node.Value.Parent?.Text()}】 => 【{selectResult.Text()}】!";
+        var message = $"节点【{node.Text}】的上级节点：【{node.Value.Parent?.Name}】 => 【{selectResult.Name}】!";
         var result = await Message.BoolBoxAsync(message);
 
         if (!result) return;
@@ -251,13 +251,13 @@ public partial class TreeEavSky<TItem>
     /// 节点属性：打开独立属性管理对话框（与节点基础字段编辑解耦），
     /// 内部桥接 NodeEavSky 动态表单实现属性值的查看/编辑/定义管理。
     /// </summary>
-    private async Task HandleAttributeAsync(ITreeItemData<TItem> node)
+    private async Task HandleAttributeAsync(TreeNodeItem<TItem> node)
     {
         if (node.Value == null) return;
         await NodeDialogSvc.ShowNodeAttributesDialogAsync(node.Value!.Id);
     }
 
-    private async Task HandleSortAsync(ITreeItemData<TItem> node)
+    private async Task HandleSortAsync(TreeNodeItem<TItem> node)
     {
         // 懒加载：节点未展开时 Children 为空，排序对话框依赖 Children 渲染，先确保已加载
         if ((node.Children?.Count ?? 0) == 0)
