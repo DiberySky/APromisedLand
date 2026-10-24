@@ -289,9 +289,6 @@ public class LineStructureTests : IntegrationTestBase
         var dto = await resp.Content.ReadEavAsync<LineStructureDto>(EnumJson);
         Assert.NotNull(dto);
         Assert.False(dto!.Exists);
-
-        // R4：段与通用边无关，清空结构不产生/不遗留任何通用边
-        Assert.Empty(await GetGenericEdgesAsync(n));
     }
 
     [Fact]
@@ -316,9 +313,6 @@ public class LineStructureTests : IntegrationTestBase
 
         Assert.Equal(TopologyMode.Radial, dto.TopologyMode);
         Assert.Equal(3, dto.Segments.Count);
-
-        // R4：全量替换只重建段行，不产生任何通用边
-        Assert.Empty(await GetGenericEdgesAsync(n));
     }
 
     // ============================================================
@@ -362,9 +356,6 @@ public class LineStructureTests : IntegrationTestBase
         Assert.NotNull(dto);
         Assert.False(dto!.Exists);
         Assert.Empty(dto.Segments);
-
-        // R4：段标识不映射通用边，删除段/结构不会残留或删除通用边
-        Assert.Empty(await GetGenericEdgesAsync(n));
     }
 
     [Fact]
@@ -651,24 +642,6 @@ public class LineStructureTests : IntegrationTestBase
     // ============================================================
 
     [Fact]
-    public async Task Create_Structure_DoesNotCreateGenericEdges()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.ToList()
-        });
-
-        Assert.True(dto.Exists);
-        Assert.Equal(2, dto.Segments.Count);
-
-        // 全局边列表中按本线路节点过滤应为空：建结构不产生任何通用边
-        Assert.Empty(await GetGenericEdgesAsync(n));
-    }
-
-    [Fact]
     public async Task Segments_EdgeIds_AreUniqueAndNonEmpty()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(3);
@@ -685,9 +658,6 @@ public class LineStructureTests : IntegrationTestBase
         Assert.Equal(
             created.Segments.Count,
             created.Segments.Select(s => s.EdgeId).Distinct(StringComparer.Ordinal).Count());
-
-        // 段标识只是段自身标识，不落通用边
-        Assert.Empty(await GetGenericEdgesAsync(n));
     }
 
     [Fact]
@@ -730,16 +700,6 @@ public class LineStructureTests : IntegrationTestBase
             FromNodeId = p.From,
             ToNodeId = p.To
         }).ToList();
-
-    /// <summary>全局边列表按本线路节点过滤（R4 下建/改线路结构不应产生通用边）。</summary>
-    private async Task<List<JsonElement>> GetGenericEdgesAsync(IEnumerable<string> nodeIds)
-    {
-        var query = string.Join(",", nodeIds);
-        var list = await Client.GetEavAsync<List<JsonElement>>(
-            $"/api/eav/edges?nodeIds={Uri.EscapeDataString(query)}");
-        Assert.NotNull(list);
-        return list!;
-    }
 
     private async Task<(string LineId, List<string> NodeIds)> CreateLineWithNodesAsync(int count)
     {

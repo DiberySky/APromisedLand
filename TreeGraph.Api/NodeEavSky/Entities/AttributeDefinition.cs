@@ -42,6 +42,12 @@ public class AttributeDefinition
     /// </summary>
     public bool IsRecordMode { get; set; }
 
+    /// <summary>
+    /// 图边类型（仅 DataType = "relation" 时非空，创建后不可修改）：
+    /// 关系值投影到 NebulaGraph 时作为边类型名。多个属性可复用同一类型。
+    /// </summary>
+    public string? RelationType { get; set; }
+
     /// <summary>选项集关联（当 DataType = "single_choice" 时）</summary>
     public string? RefOptionSetId { get; set; }
     public OptionSet? RefOptionSet { get; set; }

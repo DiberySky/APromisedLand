@@ -278,57 +278,38 @@ public sealed class GraphSynchronizer
                     "Node", false, null);
 
             default:
-                // EdgeInstance 等身份暂不入图（R4 不做超边/边顶点）
+                // 其它宿主身份暂不入图（R4 不做超边/边顶点）
                 return null;
         }
     }
 
     // ============================================================
-    // 语义边（EdgeInstance）
+    // 关系边（relation_attribute_values）
     // ============================================================
 
     /// <summary>
-    /// 同步单条语义边。Deleted 时 PG 行已不存在，依赖事件载荷（EdgeTypeName/From/To）定位图边。
+    /// 同步单条关系边。Delete 时 PG 行已不存在，依赖事件载荷定位图边；
+    /// upsert 同样以事件载荷为准（事件在 SaveChanges 成功后发布，载荷即最新状态）。
+    /// 图边属性：value_id / attribute_id / name。
     /// </summary>
-    public async Task SyncEdgeAsync(EdgeChangedEvent evt, CancellationToken ct = default)
+    public async Task SyncRelationAsync(RelationChangedEvent evt, CancellationToken ct = default)
     {
-        if (evt.Kind == EdgeChangeKind.Deleted)
+        if (evt.Kind == RelationChangeKind.Delete)
         {
-            await DeleteEdgeByPayloadAsync(evt, ct);
+            await _client.DeleteEdgeAsync(evt.RelationType, evt.FromNodeId, evt.ToNodeId, ct);
+            _logger.LogInformation("图边已删除：{ValueId} type={Type}", evt.ValueId, evt.RelationType);
             return;
         }
 
-        var inst = await _db.EdgeInstances.AsNoTracking()
-            .FirstOrDefaultAsync(i => i.EdgeId == evt.EdgeId, ct);
-        if (inst is null)
-        {
-            // 行已删但事件为 Created/Updated（乱序）——按载荷删除对齐
-            _logger.LogInformation("边 {EdgeId} 在 PG 不存在，按载荷删除对齐", evt.EdgeId);
-            await DeleteEdgeByPayloadAsync(evt, ct);
-            return;
-        }
-
-        await _client.UpsertEdgeAsync(inst.TypeName, inst.FromNodeId, inst.ToNodeId,
-            EdgeProps(inst), ct);
-        _logger.LogDebug("图边已同步：{EdgeId} type={Type}", inst.EdgeId, inst.TypeName);
+        await _client.UpsertEdgeAsync(evt.RelationType, evt.FromNodeId, evt.ToNodeId,
+            new Dictionary<string, object?>
+            {
+                ["value_id"] = evt.ValueId,
+                ["attribute_id"] = evt.AttributeId,
+                ["name"] = evt.Name
+            }, ct);
+        _logger.LogDebug("图边已同步：{ValueId} type={Type}", evt.ValueId, evt.RelationType);
     }
-
-    private async Task DeleteEdgeByPayloadAsync(EdgeChangedEvent evt, CancellationToken ct)
-    {
-        if (evt.EdgeTypeName is null || evt.FromNodeId is null || evt.ToNodeId is null)
-        {
-            _logger.LogWarning("边删除事件 {EdgeId} 缺少类型/端点载荷，无法定位图边", evt.EdgeId);
-            return;
-        }
-        await _client.DeleteEdgeAsync(evt.EdgeTypeName, evt.FromNodeId, evt.ToNodeId, ct);
-        _logger.LogInformation("图边已删除：{EdgeId} type={Type}", evt.EdgeId, evt.EdgeTypeName);
-    }
-
-    private static Dictionary<string, object?> EdgeProps(EdgeSky.Entities.EdgeInstance inst) => new()
-    {
-        ["edge_id"] = inst.EdgeId,
-        ["is_directed"] = inst.IsDirected
-    };
 
     // ============================================================
     // 线路结构边（R5：线路入图）
@@ -477,18 +458,19 @@ public sealed class GraphSynchronizer
         // ── 线路顶点/节点 + line_contains / connects_to 边 ──
         var lineEdgeCount = await AddLineGraphAsync(vertices, edges, ct);
 
-        // ── 语义边 ──
-        var semanticEdges = await _db.EdgeInstances.AsNoTracking()
-            .Select(i => new { i.FromNodeId, i.ToNodeId, i.TypeName, i.EdgeId, i.IsDirected })
+        // ── 关系边（relation_attribute_values）──
+        var semanticEdges = await _db.RelationAttributeValues.AsNoTracking()
+            .Select(r => new { FromNodeId = r.EntityId, r.ToNodeId, r.RelationType, r.ValueId, r.AttributeId, r.Name })
             .ToListAsync(ct);
 
         foreach (var e in semanticEdges)
         {
-            edges.Add(new EdgeItem(e.FromNodeId, e.ToNodeId, e.TypeName, 0,
+            edges.Add(new EdgeItem(e.FromNodeId, e.ToNodeId, e.RelationType, 0,
                 new Dictionary<string, object?>
                 {
-                    ["edge_id"] = e.EdgeId,
-                    ["is_directed"] = e.IsDirected
+                    ["value_id"] = e.ValueId,
+                    ["attribute_id"] = e.AttributeId,
+                    ["name"] = e.Name
                 }));
         }
 
@@ -578,18 +560,19 @@ public sealed class GraphSynchronizer
                 break;
 
             case SyncCategory.Edge:
-                var semanticEdges = await _db.EdgeInstances.AsNoTracking()
-                    .Select(i => new { i.FromNodeId, i.ToNodeId, i.TypeName, i.EdgeId, i.IsDirected })
+                var semanticEdges = await _db.RelationAttributeValues.AsNoTracking()
+                    .Select(r => new { FromNodeId = r.EntityId, r.ToNodeId, r.RelationType, r.ValueId, r.AttributeId, r.Name })
                     .ToListAsync(ct);
 
                 semanticEdgeCount = semanticEdges.Count;
                 foreach (var e in semanticEdges)
                 {
-                    edges.Add(new EdgeItem(e.FromNodeId, e.ToNodeId, e.TypeName, 0,
+                    edges.Add(new EdgeItem(e.FromNodeId, e.ToNodeId, e.RelationType, 0,
                         new Dictionary<string, object?>
                         {
-                            ["edge_id"] = e.EdgeId,
-                            ["is_directed"] = e.IsDirected
+                            ["value_id"] = e.ValueId,
+                            ["attribute_id"] = e.AttributeId,
+                            ["name"] = e.Name
                         }));
                 }
                 break;

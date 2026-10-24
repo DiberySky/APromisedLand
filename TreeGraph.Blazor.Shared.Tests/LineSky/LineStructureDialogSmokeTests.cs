@@ -19,7 +19,7 @@ namespace TreeGraph.Blazor.Shared.Tests.LineSky;
 ///
 /// R4：线路结构不再依赖通用边类型（边类型下拉 / EdgeTypeId 已移除），模板只预填拓扑模式与端子默认值。
 /// 覆盖：初始化加载、拓扑模式渲染、端子下拉状态选项、诊断区 Warnings/TieCount/FeedInEnergizedCount 展示。
-/// 模式对齐 EdgeDialogSmokeTests：真实 MudDialogProvider + 桩 HttpClient + Route 按 URL 返回 canned JSON。
+/// 模式对齐其它冒烟测试：真实 MudDialogProvider + 桩 HttpClient + Route 按 URL 返回 canned JSON。
 /// </summary>
 public class LineStructureDialogSmokeTests : BunitTestBase
 {

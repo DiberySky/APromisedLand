@@ -2,7 +2,9 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Entities;
+using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -18,6 +20,7 @@ public class EavWriteService
     private readonly IOptionSetCache _optionSetCache;
     private readonly EntityOwnerGuardRegistry _ownerGuards;
     private readonly IFileStorageDeleter _fileDeleter;
+    private readonly IEventPublisher _publisher;
     private readonly ILogger<EavWriteService> _logger;
 
     public EavWriteService(
@@ -28,6 +31,7 @@ public class EavWriteService
         IOptionSetCache optionSetCache,
         EntityOwnerGuardRegistry ownerGuards,
         IFileStorageDeleter fileDeleter,
+        IEventPublisher publisher,
         ILogger<EavWriteService> logger)
     {
         _db = db;
@@ -37,6 +41,7 @@ public class EavWriteService
         _optionSetCache = optionSetCache;
         _ownerGuards = ownerGuards;
         _fileDeleter = fileDeleter;
+        _publisher = publisher;
         _logger = logger;
     }
 
@@ -133,11 +138,16 @@ public class EavWriteService
             var currentMaxLocations = await _db.LocationAttributeValues
                 .Where(l => l.EntityType == entityType && l.EntityId == entityId)
                 .MaxAsync(l => (DateTimeOffset?)l.UpdatedAt, ct);
-            var currentMax = currentMaxValues is null
-                ? currentMaxLocations
-                : currentMaxLocations is null
-                    ? currentMaxValues
-                    : currentMaxValues > currentMaxLocations ? currentMaxValues : currentMaxLocations;
+            // ★ 关系值存独立表 relation_attribute_values，同样参与上界
+            var currentMaxRelations = await _db.RelationAttributeValues
+                .Where(r => r.EntityType == entityType && r.EntityId == entityId)
+                .MaxAsync(r => (DateTimeOffset?)r.UpdatedAt, ct);
+
+            DateTimeOffset? currentMax = null;
+            foreach (var m in new[] { currentMaxValues, currentMaxLocations, currentMaxRelations })
+            {
+                if (m is { } v && (currentMax is null || v > currentMax)) currentMax = v;
+            }
 
             // ★ 修复：DateTimeOffset.!= 会比较 instant + offset，
             //   同一瞬间但 offset 不同会误判冲突。改用 UtcDateTime。
@@ -186,6 +196,31 @@ public class EavWriteService
         if (validationErrors.Count > 0)
             throw new EavValidationException(validationErrors);
 
+        // ---- 2b. 关系目标节点存在性（批量校验，缺失统一报 400）----
+        var relationTargetIds = values
+            .Where(kv => definitions.TryGetValue(kv.Key, out var d)
+                      && d.DataType == EavDataTypes.Relation
+                      && kv.Value is EavRelationValue)
+            .Select(kv => ((EavRelationValue)kv.Value!).ToNodeId)
+            .Distinct()
+            .ToList();
+
+        if (relationTargetIds.Count > 0)
+        {
+            var found = await _db.Nodes
+                .Where(n => relationTargetIds.Contains(n.Id))
+                .Select(n => n.Id)
+                .ToListAsync(ct);
+            var missing = relationTargetIds.Except(found).ToList();
+            if (missing.Count > 0)
+            {
+                throw new EavValidationException(new List<ValidationError>
+                {
+                    new("toNodeId", $"目标节点不存在：{string.Join(", ", missing)}")
+                });
+            }
+        }
+
         var existing = await _db.AttributeValues
             .Where(v => v.EntityType == entityType && v.EntityId == entityId)
             .ToListAsync(ct);
@@ -197,7 +232,18 @@ public class EavWriteService
             .ToListAsync(ct);
         var existingLocationMap = existingLocations.ToDictionary(l => l.AttributeId);
 
+        // relation 类型值存独立表，单独加载已存在的有向边
+        var existingRelations = await _db.RelationAttributeValues
+            .Where(r => r.EntityType == entityType && r.EntityId == entityId)
+            .ToListAsync(ct);
+        var existingRelationMap = existingRelations.ToDictionary(r => r.AttributeId);
+        // (relation_type, 目标节点) → 占用它的属性 Id：防同一图边类型下起点重复指向同一终点
+        var relationEndpoints = existingRelations
+            .ToDictionary(r => (r.RelationType, r.ToNodeId), r => r.AttributeId);
+
         var audits = new List<AttributeAuditLog>();
+        // 关系值变更事件：SaveChanges 成功后逐条发布（事务内发布会导致消费端读不到已提交状态）
+        var relationEvents = new List<RelationChangedEvent>();
         var now = DateTimeOffset.UtcNow;
 
         // ★ 待级联删除的 file 对象：收集所有即将被"删除"或"替换"的旧 file 值 docId/version
@@ -224,6 +270,15 @@ public class EavWriteService
             {
                 ApplyLocation(entityId, entityType, def, valueToWrite,
                     existingLocationMap, audits, changedBy, correlationId, now);
+                continue;
+            }
+
+            // relation 走独立关系表，显式 null 表示删除该有向边
+            if (def.DataType == EavDataTypes.Relation)
+            {
+                ApplyRelation(entityId, entityType, def, valueToWrite,
+                    existingRelationMap, relationEndpoints,
+                    audits, relationEvents, changedBy, correlationId, now);
                 continue;
             }
 
@@ -308,6 +363,18 @@ public class EavWriteService
                     continue;
                 }
 
+                // relation 未提供：删除独立关系表中的有向边
+                if (def.DataType == EavDataTypes.Relation)
+                {
+                    if (existingRelationMap.ContainsKey(def.AttributeId))
+                    {
+                        ApplyRelation(entityId, entityType, def, null,
+                            existingRelationMap, relationEndpoints,
+                            audits, relationEvents, changedBy, correlationId, now);
+                    }
+                    continue;
+                }
+
                 if (existingMap.TryGetValue(def.AttributeId, out var oldVal))
                 {
                     // ★ 路径 B：fullReplace 删除 file 值 → 收集级联删除目标
@@ -325,6 +392,10 @@ public class EavWriteService
 
         _db.AttributeAuditLogs.AddRange(audits);
         await _db.SaveChangesAsync(ct);
+
+        // ★ 事务提交后发布关系变更事件（图边同步）
+        foreach (var evt in relationEvents)
+            await _publisher.Publish(evt, ct);
 
         // ★ SaveChanges 成功后：统一级联删除 FileStorageApi 中的孤儿文件对象
         if (pendingFileDeletes.Count > 0)
@@ -475,6 +546,140 @@ public class EavWriteService
             label = l.Label,
             address = l.Address,
             coordinateSystem = l.CoordinateSystem
+        });
+
+    /// <summary>
+    /// relation 类型独立关系表的 upsert / delete，并写审计。
+    /// value 为 null 表示删除该有向边；与 AttributeValue 写入在同一 SaveChanges 事务提交。
+    /// </summary>
+    private void ApplyRelation(
+        string entityId, string entityType, AttributeDefinition def, object? value,
+        Dictionary<string, RelationAttributeValue> existingMap,
+        Dictionary<(string RelationType, string ToNodeId), string> endpoints,
+        List<AttributeAuditLog> audits,
+        List<RelationChangedEvent> events,
+        string changedBy, string? correlationId, DateTimeOffset now)
+    {
+        var relationType = def.RelationType;
+        if (string.IsNullOrWhiteSpace(relationType))
+            throw new InvalidOperationException(
+                $"关系属性 {def.AttributeName} 未配置 relation_type");
+
+        existingMap.TryGetValue(def.AttributeId, out var oldRel);
+
+        if (value is null)
+        {
+            if (oldRel is not null)
+            {
+                _db.RelationAttributeValues.Remove(oldRel);
+                existingMap.Remove(def.AttributeId);
+                var oldKey = (oldRel.RelationType, oldRel.ToNodeId);
+                if (endpoints.TryGetValue(oldKey, out var owner) && owner == def.AttributeId)
+                    endpoints.Remove(oldKey);
+
+                audits.Add(CreateAudit(entityId, entityType, def,
+                    SerializeRelation(oldRel), null, "Delete",
+                    changedBy, correlationId, now));
+
+                events.Add(new RelationChangedEvent
+                {
+                    ValueId = oldRel.ValueId,
+                    AttributeId = def.AttributeId,
+                    RelationType = oldRel.RelationType,
+                    FromNodeId = oldRel.EntityId,
+                    ToNodeId = oldRel.ToNodeId,
+                    Name = oldRel.Name,
+                    Kind = RelationChangeKind.Delete
+                });
+            }
+            return;
+        }
+
+        if (value is not EavRelationValue rel)
+            throw new InvalidOperationException("relation 值类型错误");
+
+        // 同一图边类型下，起点不能重复指向同一终点（防 Nebula (src,dst,type,rank=0) 覆盖）
+        var newKey = (relationType, rel.ToNodeId);
+        if (endpoints.TryGetValue(newKey, out var occupying)
+            && occupying != def.AttributeId)
+        {
+            throw new EavConflictException("同一图边类型下，该起点已指向该终点");
+        }
+
+        if (oldRel is null)
+        {
+            var row = new RelationAttributeValue
+            {
+                // valueId 即图边实例 id，服务端生成（不依赖 DB DEFAULT，便于审计与事件）
+                ValueId = Guid.NewGuid().ToString(),
+                EntityId = entityId,
+                EntityType = entityType,
+                AttributeId = def.AttributeId,
+                RelationType = relationType,
+                ToNodeId = rel.ToNodeId,
+                Name = rel.Name,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            _db.RelationAttributeValues.Add(row);
+            existingMap[def.AttributeId] = row;
+            endpoints[newKey] = def.AttributeId;
+
+            audits.Add(CreateAudit(entityId, entityType, def,
+                null, SerializeRelation(row), "Insert",
+                changedBy, correlationId, now));
+
+            events.Add(new RelationChangedEvent
+            {
+                ValueId = row.ValueId,
+                AttributeId = def.AttributeId,
+                RelationType = row.RelationType,
+                FromNodeId = row.EntityId,
+                ToNodeId = row.ToNodeId,
+                Name = row.Name,
+                Kind = RelationChangeKind.Insert
+            });
+        }
+        else
+        {
+            var oldJson = SerializeRelation(oldRel);
+            var oldKey = (oldRel.RelationType, oldRel.ToNodeId);
+            if (endpoints.TryGetValue(oldKey, out var owner) && owner == def.AttributeId)
+                endpoints.Remove(oldKey);
+
+            oldRel.RelationType = relationType;
+            oldRel.ToNodeId = rel.ToNodeId;
+            oldRel.Name = rel.Name;
+            oldRel.UpdatedAt = now;
+            endpoints[newKey] = def.AttributeId;
+
+            var newJson = SerializeRelation(oldRel);
+            if (oldJson != newJson)
+            {
+                audits.Add(CreateAudit(entityId, entityType, def,
+                    oldJson, newJson, "Update",
+                    changedBy, correlationId, now));
+
+                events.Add(new RelationChangedEvent
+                {
+                    ValueId = oldRel.ValueId,
+                    AttributeId = def.AttributeId,
+                    RelationType = oldRel.RelationType,
+                    FromNodeId = oldRel.EntityId,
+                    ToNodeId = oldRel.ToNodeId,
+                    Name = oldRel.Name,
+                    Kind = RelationChangeKind.Update
+                });
+            }
+        }
+    }
+
+    private static string SerializeRelation(RelationAttributeValue r) =>
+        JsonSerializer.Serialize(new
+        {
+            valueId = r.ValueId,
+            toNodeId = r.ToNodeId,
+            name = r.Name
         });
 
     private void SetTypedValue(
@@ -655,16 +860,20 @@ public class EavWriteService
         var hasLocations = await _db.LocationAttributeValues
             .AnyAsync(l => l.EntityType == entityType && l.EntityId == entityId, ct);
 
+        var hasRelations = await _db.RelationAttributeValues
+            .AnyAsync(r => r.EntityType == entityType && r.EntityId == entityId, ct);
+
         var hasRows = await _db.CustomTableRows
             .AnyAsync(r => r.ParentEntityType == entityType
                         && r.ParentEntityId == entityId, ct);
 
-        if (!hasValues && !hasLocations && !hasRows)
+        if (!hasValues && !hasLocations && !hasRelations && !hasRows)
             return false;
 
         var strategy = _db.Database.CreateExecutionStrategy();
 
         List<(string DocId, int? Version)> pendingFileDeletes = new();
+        var relationEvents = new List<RelationChangedEvent>();
 
         await strategy.ExecuteAsync(async () =>
         {
@@ -744,6 +953,46 @@ public class EavWriteService
             }
             _db.LocationAttributeValues.RemoveRange(locations);
 
+            // 删除关系值（独立表）并写审计
+            var relations = await _db.RelationAttributeValues
+                .Where(r => r.EntityType == entityType && r.EntityId == entityId)
+                .ToListAsync(ct);
+            if (relations.Count > 0)
+            {
+                var relDefs = _attrCache.GetDefinitions(entityType)
+                    .ToDictionary(d => d.AttributeId);
+                var relAudits = new List<AttributeAuditLog>(relations.Count);
+                foreach (var r in relations)
+                {
+                    if (!relDefs.TryGetValue(r.AttributeId, out var def)) continue;
+                    relAudits.Add(new AttributeAuditLog
+                    {
+                        EntityId = entityId,
+                        EntityType = entityType,
+                        AttributeId = def.AttributeId,
+                        AttributeName = def.AttributeName,
+                        OldValue = SerializeRelation(r),
+                        NewValue = null,
+                        ChangeType = "Delete",
+                        ChangedBy = changedBy,
+                        ChangedAt = now,
+                        CorrelationId = correlationId
+                    });
+                    relationEvents.Add(new RelationChangedEvent
+                    {
+                        ValueId = r.ValueId,
+                        AttributeId = def.AttributeId,
+                        RelationType = r.RelationType,
+                        FromNodeId = r.EntityId,
+                        ToNodeId = r.ToNodeId,
+                        Name = r.Name,
+                        Kind = RelationChangeKind.Delete
+                    });
+                }
+                _db.AttributeAuditLogs.AddRange(relAudits);
+            }
+            _db.RelationAttributeValues.RemoveRange(relations);
+
             var rows = await _db.CustomTableRows
                 .Where(r => r.ParentEntityType == entityType
                          && r.ParentEntityId == entityId)
@@ -753,6 +1002,10 @@ public class EavWriteService
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
         });
+
+        // ★ 事务提交后发布关系删除事件（图边同步）
+        foreach (var evt in relationEvents)
+            await _publisher.Publish(evt, ct);
 
         // ★ 事务提交成功后：级联删除 FileStorageApi 中的孤儿文件对象
         if (pendingFileDeletes.Count > 0)
@@ -821,7 +1074,15 @@ public class EavWriteService
             .Distinct()
             .ToListAsync(ct);
 
-        var existingSet = hasValues.Union(hasRows).Union(hasLocations).ToHashSet();
+        var hasRelations = await _db.RelationAttributeValues
+            .Where(r => r.EntityType == entityType
+                     && requested.Contains(r.EntityId))
+            .Select(r => r.EntityId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var existingSet = hasValues.Union(hasRows).Union(hasLocations)
+            .Union(hasRelations).ToHashSet();
         var toDelete = requested.Where(id => existingSet.Contains(id)).ToList();
         var notFound = requested.Where(id => !existingSet.Contains(id)).ToList();
 
@@ -832,6 +1093,7 @@ public class EavWriteService
         var strategy = _db.Database.CreateExecutionStrategy();
         int totalAttributesDeleted = 0;
         var pendingFileDeletes = new List<(string DocId, int? Version)>();
+        var relationEvents = new List<RelationChangedEvent>();
 
         await strategy.ExecuteAsync(async () =>
         {
@@ -916,6 +1178,47 @@ public class EavWriteService
             }
             _db.LocationAttributeValues.RemoveRange(locations);
 
+            // 3c. 删除关系值（独立表）并写审计
+            var relations = await _db.RelationAttributeValues
+                .Where(r => r.EntityType == entityType
+                         && toDelete.Contains(r.EntityId))
+                .ToListAsync(ct);
+            if (relations.Count > 0)
+            {
+                var relDefs = _attrCache.GetDefinitions(entityType)
+                    .ToDictionary(d => d.AttributeId);
+                var relAudits = new List<AttributeAuditLog>(relations.Count);
+                foreach (var r in relations)
+                {
+                    if (!relDefs.TryGetValue(r.AttributeId, out var def)) continue;
+                    relAudits.Add(new AttributeAuditLog
+                    {
+                        EntityId = r.EntityId,
+                        EntityType = entityType,
+                        AttributeId = def.AttributeId,
+                        AttributeName = def.AttributeName,
+                        OldValue = SerializeRelation(r),
+                        NewValue = null,
+                        ChangeType = "Delete",
+                        ChangedBy = changedBy,
+                        ChangedAt = now,
+                        CorrelationId = correlationId
+                    });
+                    relationEvents.Add(new RelationChangedEvent
+                    {
+                        ValueId = r.ValueId,
+                        AttributeId = def.AttributeId,
+                        RelationType = r.RelationType,
+                        FromNodeId = r.EntityId,
+                        ToNodeId = r.ToNodeId,
+                        Name = r.Name,
+                        Kind = RelationChangeKind.Delete
+                    });
+                }
+                _db.AttributeAuditLogs.AddRange(relAudits);
+            }
+            _db.RelationAttributeValues.RemoveRange(relations);
+
             // 4. 删除自定义表行
             var rows = await _db.CustomTableRows
                 .Where(r => r.ParentEntityType == entityType
@@ -926,6 +1229,10 @@ public class EavWriteService
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
         });
+
+        // ★ 事务提交后发布关系删除事件（图边同步）
+        foreach (var evt in relationEvents)
+            await _publisher.Publish(evt, ct);
 
         // ★ 批量删除事务提交成功后：级联删除 FileStorageApi 中的孤儿文件对象
         if (pendingFileDeletes.Count > 0)
@@ -976,4 +1283,12 @@ public class EavConcurrencyException : Exception
         ExpectedUpdatedAt = expectedUpdatedAt;
         CurrentUpdatedAt = currentUpdatedAt;
     }
+}
+
+/// <summary>
+/// 业务冲突异常（如关系端点冲突）。EavController 捕获后返回 409 Conflict。
+/// </summary>
+public class EavConflictException : Exception
+{
+    public EavConflictException(string message) : base(message) { }
 }

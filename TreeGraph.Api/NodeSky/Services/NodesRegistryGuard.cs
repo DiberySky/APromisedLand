@@ -6,10 +6,9 @@ namespace TreeGraph.Api.NodeSky.Services;
 
 /// <summary>
 /// nodes 注册表守卫（R3）：认领所有注册进 nodes 的节点类型
-/// （四棵宿主树 / LineNode / EdgeInstance / Node）。
+/// （四棵宿主树 / LineNode / Node）。
 ///
-/// EAV 宿主校验 = nodes 有一行；Edge 起点终点校验 = nodes 行且 host_type 匹配。
-/// 尚未收编进 nodes 的 Line 由 LineOwnerGuard 精确认领。
+/// EAV 宿主校验 = nodes 有一行；尚未收编进 nodes 的 Line 由 LineOwnerGuard 精确认领。
 /// </summary>
 public sealed class NodesRegistryGuard(TreeGraphDbContext dbContext) : INodesRegistryGuard
 {
@@ -58,22 +57,7 @@ public sealed class NodesRegistryGuard(TreeGraphDbContext dbContext) : INodesReg
             }
         }
 
-        // ② 边：nodes.name 为 null，显示名投影为 "fromId→toId"（DisplayName 已并入 EAV）
-        var edgeIds = rows
-            .Where(r => r.HostType == "EdgeInstance" && r.Name is null)
-            .Select(r => r.Id)
-            .ToList();
-        if (edgeIds.Count > 0)
-        {
-            var edges = await dbContext.EdgeInstances
-                .AsNoTracking()
-                .Where(e => edgeIds.Contains(e.EdgeId))
-                .Select(e => new { e.EdgeId, e.FromNodeId, e.ToNodeId })
-                .ToListAsync(ct);
-
-            foreach (var edge in edges)
-                result[edge.EdgeId] = $"{edge.FromNodeId}→{edge.ToNodeId}";
-        }
+        // ② 关系边不再注册为节点（R6），无额外名称投影
 
         return result;
     }

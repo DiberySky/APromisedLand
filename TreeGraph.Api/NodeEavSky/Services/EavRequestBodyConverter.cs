@@ -72,7 +72,33 @@ public static class EavRequestBodyConverter
             EavDataTypes.File => JsonDocument.Parse(elem.GetRawText()),
             EavDataTypes.Composite => ParseComposite(elem, def, compositeService),
             EavDataTypes.Location => ParseLocation(elem),
+            EavDataTypes.Relation => ParseRelation(elem),
             _ => elem.GetString()
+        };
+    }
+
+    /// <summary>
+    /// 解析关系（relation）值：{ toNodeId, name? }。toNodeId 必填且非空。
+    /// </summary>
+    public static EavRelationValue ParseRelation(JsonElement elem)
+    {
+        if (elem.ValueKind != JsonValueKind.Object)
+            throw new ArgumentException("关系（relation）值必须是对象 { toNodeId, name? }");
+
+        if (!elem.TryGetProperty("toNodeId", out var toEl)
+            || toEl.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(toEl.GetString()))
+        {
+            throw new ArgumentException("关系值必须包含非空字符串 toNodeId（目标节点 id）");
+        }
+
+        return new EavRelationValue
+        {
+            ToNodeId = toEl.GetString()!.Trim(),
+            Name = elem.TryGetProperty("name", out var nm)
+                && nm.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(nm.GetString())
+                    ? nm.GetString()!.Trim() : null
         };
     }
 

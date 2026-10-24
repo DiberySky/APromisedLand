@@ -10,7 +10,7 @@ namespace TreeGraph.Shared.NodeSky.Entities;
 ///
 /// 双角色（specs/node-sky §8.2）：
 ///   一期：独立 Node 的宿主主表（host_type 恒为 "Node"）；
-///   重构期：全系统节点身份注册表（LineNode / TreeNode / EdgeInstance 均注册于此）。
+///   重构期：全系统节点身份注册表（LineNode / TreeNode 等注册于此）。
 ///
 /// 通用性约束：不设 Kind/NodeType 业务分类列——"它是什么"完全交给 EAV 实体类型声明表达；
 /// 不设归属列——归属关系一律走 Edge。
@@ -22,7 +22,7 @@ public class Node : Inode
 
     /// <summary>
     /// 宿主类型名（与 InodeOwnerGuard.NodeType / EAV entity_type 一致）。
-    /// 一期恒为 "Node"；重构期各宿主注册自己的类型名（"LineNode"/"SpaceTree"/"EdgeInstance"…）。
+    /// 一期恒为 "Node"；重构期各宿主注册自己的类型名（"LineNode"/"SpaceTree"…）。
     /// </summary>
     public string HostType { get; set; } = "Node";
 

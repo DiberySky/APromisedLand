@@ -159,6 +159,10 @@ public class EavController : ControllerBase
                 expectedUpdatedAt = ex.ExpectedUpdatedAt
             });
         }
+        catch (EavConflictException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
         catch (EavValidationException ex)
         {
             return BadRequest(new { errors = ex.Errors });
@@ -317,6 +321,10 @@ public class EavController : ControllerBase
                 expectedUpdatedAt = ex.ExpectedUpdatedAt
             });
         }
+        catch (EavConflictException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
         catch (EavValidationException ex)
         {
             return BadRequest(new { errors = ex.Errors });
@@ -412,7 +420,7 @@ public class EavController : ControllerBase
             d.AllowedValues?.RootElement.Clone(),
             d.ValidationRule?.RootElement.Clone(),
             composite, d.UnitId, unitName, optionSet,
-            d.RefTableDefinitionId, d.IsRecordMode);
+            d.RefTableDefinitionId, d.IsRecordMode, d.RelationType);
     }
 
     /// <summary>
@@ -533,6 +541,7 @@ public class EavController : ControllerBase
             EavDataTypes.File => JsonDocument.Parse(elem.GetRawText()),
             EavDataTypes.Composite => JsonToComposite(elem, def),
             EavDataTypes.Location => EavRequestBodyConverter.ParseLocation(elem),
+            EavDataTypes.Relation => EavRequestBodyConverter.ParseRelation(elem),
             _ => elem.GetString()
         };
     }

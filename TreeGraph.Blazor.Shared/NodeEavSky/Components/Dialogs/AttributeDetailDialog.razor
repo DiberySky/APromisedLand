@@ -37,6 +37,16 @@
                     <MudText Typo="Typo.body1">@_detail.EntityType</MudText>
                 </MudItem>
 
+                @if (!string.IsNullOrEmpty(_detail.RelationType))
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">图边类型</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">
+                            <code>@_detail.RelationType</code>
+                        </MudChip>
+                    </MudItem>
+                }
+
                 <MudItem xs="12" sm="4">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">必填</MudText>
                     <MudIcon Icon="@(_detail.IsRequired ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)"
@@ -169,6 +179,7 @@
         "composite" => Color.Dark,
         "table" => Color.Info,
         "file" => Color.Default,
+        "relation" => Color.Secondary,
         _ => Color.Default
     };
 }

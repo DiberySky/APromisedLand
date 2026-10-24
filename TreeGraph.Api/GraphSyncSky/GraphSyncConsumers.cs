@@ -89,21 +89,21 @@ public sealed class LineStructureGraphSyncConsumer
 }
 
 /// <summary>
-/// RabbitMQ 消费者：边变更 → 同步语义边（幂等）。
-/// Deleted 依赖事件载荷定位图边（PG 行已删）。
+/// RabbitMQ 消费者：关系属性值变更 → 同步语义边（幂等）。
+/// Delete 依赖事件载荷（RelationType/From/To）定位图边（PG 行已删）。
 /// </summary>
-public sealed class EdgeGraphSyncConsumer
+public sealed class RelationGraphSyncConsumer
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IMemoryCache _dedupCache;
     private readonly GraphSyncOptions _options;
-    private readonly ILogger<EdgeGraphSyncConsumer> _logger;
+    private readonly ILogger<RelationGraphSyncConsumer> _logger;
 
-    public EdgeGraphSyncConsumer(
+    public RelationGraphSyncConsumer(
         IServiceScopeFactory scopeFactory,
         IMemoryCache dedupCache,
         IOptions<GraphSyncOptions> options,
-        ILogger<EdgeGraphSyncConsumer> logger)
+        ILogger<RelationGraphSyncConsumer> logger)
     {
         _scopeFactory = scopeFactory;
         _dedupCache = dedupCache;
@@ -111,12 +111,13 @@ public sealed class EdgeGraphSyncConsumer
         _logger = logger;
     }
 
-    public async Task Consume(EdgeChangedEvent msg, CancellationToken ct)
+    public async Task Consume(RelationChangedEvent msg, CancellationToken ct)
     {
-        var dedupKey = $"graph-sync-edge:{msg.EdgeId}:{(msg.Kind == EdgeChangeKind.Deleted ? "del" : "upsert")}";
+        // 去重键带 kind 组（upsert/delete），避免同 ValueId 连续变更被窗口吞掉
+        var dedupKey = $"graph-sync-relation:{msg.ValueId}:{(msg.Kind == RelationChangeKind.Delete ? "del" : "upsert")}";
         if (_dedupCache.TryGetValue(dedupKey, out _))
         {
-            _logger.LogDebug("去重窗口内跳过：{EdgeId} {Kind}", msg.EdgeId, msg.Kind);
+            _logger.LogDebug("去重窗口内跳过：{ValueId} {Kind}", msg.ValueId, msg.Kind);
             return;
         }
         _dedupCache.Set(dedupKey, true, TimeSpan.FromSeconds(_options.DedupWindowSeconds));
@@ -126,6 +127,6 @@ public sealed class EdgeGraphSyncConsumer
         var synchronizer = scope.ServiceProvider.GetRequiredService<GraphSynchronizer>();
 
         await initializer.EnsureReadyAsync(ct);
-        await synchronizer.SyncEdgeAsync(msg, ct);
+        await synchronizer.SyncRelationAsync(msg, ct);
     }
 }

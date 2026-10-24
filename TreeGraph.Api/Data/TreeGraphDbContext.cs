@@ -1,6 +1,5 @@
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
-using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.LineSky.Entities;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.SpaceSky.Entities;
@@ -15,6 +14,8 @@ public class TreeGraphDbContext : DbContext
     public DbSet<AttributeValue> AttributeValues => Set<AttributeValue>();
     /// <summary>位置属性值（location 类型，独立坐标表）。</summary>
     public DbSet<LocationAttributeValue> LocationAttributeValues => Set<LocationAttributeValue>();
+    /// <summary>关系属性值（relation 类型，一条记录 = 一条有向边）。</summary>
+    public DbSet<RelationAttributeValue> RelationAttributeValues => Set<RelationAttributeValue>();
     public DbSet<CompositeTypeDefinition> CompositeTypes => Set<CompositeTypeDefinition>();
     public DbSet<CompositeFieldDefinition> CompositeFields => Set<CompositeFieldDefinition>();
     public DbSet<AttributeAuditLog> AttributeAuditLogs => Set<AttributeAuditLog>();
@@ -27,9 +28,6 @@ public class TreeGraphDbContext : DbContext
     // iNode 关联（外挂表，不改动现有 EAV 表）
     public DbSet<InodeEntityType> InodeEntityTypes => Set<InodeEntityType>();
     public DbSet<InodeEntity> InodeEntities => Set<InodeEntity>();
-
-    // Edge（关系/边）
-    public DbSet<EdgeInstance> EdgeInstances => Set<EdgeInstance>();
 
     // TreeEavSky：计量单位树 / 分类树 / 知识树 / 空间树
     public DbSet<UnitTree> UnitTrees => Set<UnitTree>();
@@ -66,10 +64,10 @@ public class TreeGraphDbContext : DbContext
         ConfigureAttributeCatalog(mb);
         ConfigureAttributeValues(mb);
         ConfigureLocationAttributeValues(mb);
+        ConfigureRelationAttributeValues(mb);
         ConfigureCompositeTypes(mb);
         ConfigureCustomTables(mb);
         ConfigureAuditLog(mb);
-        ConfigureEdges(mb);
         ConfigureUnitTrees(mb);
         ConfigureCategoryTrees(mb);
         ConfigureKnowledgeTrees(mb);
@@ -321,6 +319,8 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
+            // 图边类型：仅 data_type='relation' 时非空，创建后不可修改，不唯一
+            e.Property(x => x.RelationType).HasColumnName("relation_type").HasMaxLength(100);
             e.Property(x => x.IsRequired).HasColumnName("is_required");
             e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
             e.Property(x => x.IsSortable).HasColumnName("is_sortable");
@@ -473,6 +473,49 @@ public class TreeGraphDbContext : DbContext
 
             e.HasOne(x => x.Attribute).WithMany()
                 .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureRelationAttributeValues(ModelBuilder mb)
+    {
+        mb.Entity<RelationAttributeValue>(e =>
+        {
+            e.ToTable("relation_attribute_values");
+            e.HasKey(x => x.ValueId);
+            e.Property(x => x.ValueId)
+                .HasColumnName("value_id")
+                .HasMaxLength(36).IsRequired()
+                .HasDefaultValueSql("gen_random_uuid()::text")
+                .HasSentinel("");
+            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.RelationType).HasColumnName("relation_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.ToNodeId).HasColumnName("to_node_id").HasMaxLength(36).IsRequired();
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // 一个实体的一个关系属性最多一个值（单值语义，与 uq_lav_entity_attr 同构）
+            e.HasIndex(x => new { x.EntityId, x.EntityType, x.AttributeId })
+                .IsUnique().HasDatabaseName("uq_rav_entity_attr");
+
+            // 同一图边类型下起点不能重复指向同一终点（防 Nebula (src,dst,type,rank=0) 覆盖）
+            e.HasIndex(x => new { x.RelationType, x.EntityId, x.ToNodeId })
+                .IsUnique().HasDatabaseName("uq_rav_type_endpoints");
+
+            e.HasIndex(x => x.EntityId).HasDatabaseName("ix_rav_entity");
+            e.HasIndex(x => x.ToNodeId).HasDatabaseName("ix_rav_to_node");
+
+            e.HasOne(x => x.Attribute).WithMany()
+                .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Restrict);
+
+            // 目标节点必须是 nodes 中的真实节点（Restrict：被关系指向时禁止删除）
+            e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
+                .WithMany()
+                .HasForeignKey(x => x.ToNodeId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_rav_to_node");
         });
     }
 
@@ -750,57 +793,6 @@ public class TreeGraphDbContext : DbContext
                 .HasDatabaseName("ix_audit_entity")
                 .IsDescending(false, false, true);
             e.HasIndex(x => x.ChangedAt).HasDatabaseName("ix_audit_time");
-        });
-    }
-
-    // ============================================================
-    // Edge（关系/边）
-    // ============================================================
-    private static void ConfigureEdges(ModelBuilder mb)
-    {
-        mb.Entity<EdgeInstance>(e =>
-        {
-            e.ToTable("edge_instances");
-            e.HasKey(x => x.EdgeId);
-            e.Property(x => x.EdgeId)
-                .HasColumnName("edge_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            // 裸列：兼 EAV entity_type 键、唯一约束判别列、NebulaGraph 边类型名
-            e.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(100).IsRequired();
-            e.Property(x => x.FromNodeId).HasColumnName("from_node_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.ToNodeId).HasColumnName("to_node_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.IsDirected).HasColumnName("is_directed").HasDefaultValue(true);
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            // 同类型同方向不重复（无向反向重复由应用层判定）
-            e.HasIndex(x => new { x.TypeName, x.FromNodeId, x.ToNodeId })
-                .IsUnique()
-                .HasDatabaseName("uq_edge_instance");
-
-            // 图查询索引：from 出边 / to 入边
-            e.HasIndex(x => x.FromNodeId).HasDatabaseName("ix_ei_from_node");
-            e.HasIndex(x => x.ToNodeId).HasDatabaseName("ix_ei_to_node");
-
-            // 端点存在性由 nodes 真外键强制（Restrict：节点被边引用时禁止删除）
-            e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
-                .WithMany()
-                .HasForeignKey(x => x.FromNodeId)
-                .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("fk_ei_from_node");
-            e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
-                .WithMany()
-                .HasForeignKey(x => x.ToNodeId)
-                .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("fk_ei_to_node");
-
-            // 共享主键：边 Id 即 nodes.id（注册表身份）；删除 nodes 行前必须先删边行
-            e.HasOne(x => x.Node)
-                .WithOne()
-                .HasForeignKey<EdgeInstance>(x => x.EdgeId)
-                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 

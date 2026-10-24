@@ -74,6 +74,10 @@ public class EavValidationService
         if (def.DataType == EavDataTypes.Location)
             return ValidateLocation(def, value);
 
+        // 关系类型：结构校验（目标存在性由写入服务批量查库）
+        if (def.DataType == EavDataTypes.Relation)
+            return ValidateRelation(def, value);
+
         // 类型转换
         if (!TryConvert(def.DataType, value, out var converted))
         {
@@ -161,6 +165,28 @@ public class EavValidationService
         return new ValidationResult(errors.Count == 0, errors);
     }
 
+    /// <summary>
+    /// 关系值校验：必须为 EavRelationValue，toNodeId 非空，name ≤200。
+    /// 目标节点是否存在于 nodes 由写入服务统一批量校验。
+    /// </summary>
+    private ValidationResult ValidateRelation(AttributeDefinition def, object? value)
+    {
+        var errors = new List<ValidationError>();
+
+        if (value is not EavRelationValue rel)
+        {
+            errors.Add(new(def.AttributeName, "关系值格式错误，应包含 toNodeId 与可选 name"));
+            return new ValidationResult(false, errors);
+        }
+
+        if (string.IsNullOrWhiteSpace(rel.ToNodeId))
+            errors.Add(new(def.AttributeName, "toNodeId 必填"));
+
+        if (rel.Name is { Length: > 200 })
+            errors.Add(new(def.AttributeName, "关系名称不能超过 200 个字符"));
+
+        return new ValidationResult(errors.Count == 0, errors);
+    }
 
     private static (decimal? Value, string? UnitId) UnwrapNumeric(object value)
     {

@@ -41,15 +41,23 @@ public class EavReadService
             .AsNoTracking()
             .ToListAsync(ct);
 
+        var relRows = await _db.RelationAttributeValues
+            .Where(r => r.EntityType == entityType && r.EntityId == entityId)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
         var result = new DynamicEntity(entityId, entityType);
 
-        // ★ #3：填充 UpdatedAt（供乐观锁使用），需合并类型化值表与位置表
+        // ★ #3：填充 UpdatedAt（供乐观锁使用），需合并类型化值表、位置表与关系表
         var valuesMax = rows.Count > 0 ? rows.Max(r => r.UpdatedAt) : (DateTimeOffset?)null;
         var locMax = locRows.Count > 0 ? locRows.Max(r => r.UpdatedAt) : (DateTimeOffset?)null;
-        result.UpdatedAt = valuesMax is null
-            ? locMax
-            : locMax is null ? valuesMax
-            : valuesMax > locMax ? valuesMax : locMax;
+        var relMax = relRows.Count > 0 ? relRows.Max(r => r.UpdatedAt) : (DateTimeOffset?)null;
+        DateTimeOffset? overallMax = null;
+        foreach (var m in new[] { valuesMax, locMax, relMax })
+        {
+            if (m is { } v && (overallMax is null || v > overallMax)) overallMax = v;
+        }
+        result.UpdatedAt = overallMax;
 
         foreach (var row in rows)
         {
@@ -64,6 +72,16 @@ public class EavReadService
                 && def.DataType == EavDataTypes.Location)
             {
                 result.SetProperty(def.AttributeName, ToLocationValue(loc));
+            }
+        }
+
+        foreach (var rel in relRows)
+        {
+            if (defMap.TryGetValue(rel.AttributeId, out var def)
+                && def.DataType == EavDataTypes.Relation)
+            {
+                result.SetProperty(def.AttributeName,
+                    new EavRelationReadValue(rel.ValueId, rel.ToNodeId, rel.Name));
             }
         }
 
@@ -88,8 +106,15 @@ public class EavReadService
             .AsNoTracking()
             .ToListAsync(ct);
 
+        var allRelRows = await _db.RelationAttributeValues
+            .Where(r => r.EntityType == entityType && ids.Contains(r.EntityId))
+            .AsNoTracking()
+            .ToListAsync(ct);
+
         var grouped = allRows.GroupBy(r => r.EntityId);
         var locGrouped = allLocRows.GroupBy(l => l.EntityId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var relGrouped = allRelRows.GroupBy(r => r.EntityId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
         // ★ 保持输入 ids 的顺序——FilterEntityIdsAsync 已按业务键排好序，
@@ -98,9 +123,10 @@ public class EavReadService
             .Select((id, idx) => (id, idx))
             .ToDictionary(x => x.id, x => x.idx);
 
-        // 普通值表与位置表出现过的实体并集（实体可能仅有位置坐标）
+        // 普通值表、位置表与关系表出现过的实体并集
         var allEntityIds = grouped.Select(g => g.Key)
             .Union(locGrouped.Keys)
+            .Union(relGrouped.Keys)
             .ToList();
 
         return allEntityIds.Select(entityId =>
@@ -129,6 +155,21 @@ public class EavReadService
                         && def.DataType == EavDataTypes.Location)
                     {
                         entity.SetProperty(def.AttributeName, ToLocationValue(loc));
+                    }
+                }
+            }
+
+            if (relGrouped.TryGetValue(entityId, out var rels))
+            {
+                var relMax = rels.Max(r => r.UpdatedAt);
+                maxUpdated = maxUpdated is null || relMax > maxUpdated ? relMax : maxUpdated;
+                foreach (var rel in rels)
+                {
+                    if (defMap.TryGetValue(rel.AttributeId, out var def)
+                        && def.DataType == EavDataTypes.Relation)
+                    {
+                        entity.SetProperty(def.AttributeName,
+                            new EavRelationReadValue(rel.ValueId, rel.ToNodeId, rel.Name));
                     }
                 }
             }

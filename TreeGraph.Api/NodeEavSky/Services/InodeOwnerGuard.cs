@@ -19,7 +19,7 @@ public interface IInodeOwnerGuard
 {
     /// <summary>
     /// 本守卫认领的宿主节点类型名（与宿主类名 / EAV entity_type 一致，如 "UnitTree"）。
-    /// 供需要按类型精确分流校验的场景使用（如 EdgeSky 起点终点节点校验）。
+    /// 供需要按类型精确分流校验的场景使用（如线路结构端点节点校验）。
     /// </summary>
     string NodeType { get; }
 

@@ -15,8 +15,7 @@ namespace TreeGraph.Api.LineSky.Services;
 /// 设计要点：
 ///   - 空结构 = 无头表：删掉最后一段时同事务删除头表；PUT 传空结构等价于清空。
 ///   - 段顺序不落库，按拓扑推导（Linear 为链、Radial/Network 为遍历序）。
-///   - R4：段自存端点与线路归属，不再创建/引用 edge_instances；线路拓扑校验完全闭环在本服务，
-///     通用边模块（EdgeSky）不认识线路。
+///   - R4：段自存端点与线路归属，线路拓扑校验完全闭环在本服务。
 /// </summary>
 public class LineStructureService
 {

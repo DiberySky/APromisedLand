@@ -3,7 +3,6 @@
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @implements IDisposable
-@using TreeGraph.Blazor.Shared.EdgeSky.Components
 
 <style>
     /* 选项卡图标小号（MudTabPanel 无 Size 参数，用作用域 CSS 控制） */
@@ -71,14 +70,6 @@
                     </MudStack>
                 </MudTabPanel>
 
-                @* ===== Tab 2: 关系 ===== *@
-                <MudTabPanel Text="@RelationsTabText"
-                             Icon="@Icons.Material.Filled.Hub">
-                    <EdgeRelationPanel NodeId="@NodeId"
-                                       NodeName="@NodeTemplate.Node.Value!.Name"
-                                       OnSummaryChanged="OnEdgeSummaryChanged" />
-                </MudTabPanel>
-
             </MudTabs>
         </MudContainer>
     </DialogContent>
@@ -144,29 +135,6 @@
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
-
-   
-
-    // ---- 关系（汇总计数由 EdgeRelationPanel 回传，仅用于选项卡标题） ----
-    private int _outCount;
-    private int _inCount;
-
-    private string NodeId => NodeTemplate.Node.Value!.Id;
-
-    private string RelationsTabText
-    {
-        get
-        {
-            var total = _outCount + _inCount;
-            return total > 0 ? $"关系 ({total})" : "关系";
-        }
-    }
-
-    private void OnEdgeSummaryChanged((int Outgoing, int Incoming) summary)
-    {
-        _outCount = summary.Outgoing;
-        _inCount = summary.Incoming;
-    }
 
     private void OnAddChild() => CloseWithAction(NodeAction.AddChild);
     private void OnEdit() => CloseWithAction(NodeAction.Edit);

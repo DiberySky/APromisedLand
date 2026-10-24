@@ -3,7 +3,6 @@ using TreeGraph.Api.Data;
 using TreeGraph.Api.Data.Seeding;
 using TreeGraph.Api.LineSky.Services;
 using TreeGraph.Api.LineSky.Templates;
-using TreeGraph.Api.EdgeSky.Services;
 using TreeGraph.Api.GraphSyncSky;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
@@ -106,8 +105,7 @@ if (!isTesting)
     builder.Host.UseWolverine(opts => opts.UseTreeGraphMessaging(builder.Configuration));
 builder.Services.AddGraphSync(builder.Configuration, enableSchemaInitializer: !isTesting);
 
-// Edge（关系/边）
-builder.Services.AddScoped<EdgeInstanceService>();
+// LineSky 服务
 builder.Services.AddScoped<TreeGraph.Api.LineSky.Services.LineStructureService>();
 
 // ★ iNode 宿主守卫（R3 收敛）：nodes 注册表守卫认领全部注册节点类型；

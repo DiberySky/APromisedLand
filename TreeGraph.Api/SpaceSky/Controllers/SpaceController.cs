@@ -144,11 +144,11 @@ public class SpaceController(TreeGraphDbContext db, IEventPublisher publisher) :
             if (hasChildren)
                 return Conflict(new { error = "空间树存在子节点，无法删除" });
 
-            // 引用为空方可删除本项：仍有边引用根节点时拒绝（不采用级联删除）
-            var hasEdges = await db.EdgeInstances
-                .AnyAsync(e => e.FromNodeId == id || e.ToNodeId == id, cancellationToken);
-            if (hasEdges)
-                return Conflict(new { error = "空间根节点仍被边引用，无法删除。请先删除引用该节点的边。" });
+            // 引用为空方可删除本项：仍有关系引用根节点时拒绝（不采用级联删除）
+            var hasRelations = await db.RelationAttributeValues
+                .AnyAsync(r => r.EntityId == id || r.ToNodeId == id, cancellationToken);
+            if (hasRelations)
+                return Conflict(new { error = "空间根节点仍被关系引用，无法删除。请先删除引用该节点的关系。" });
 
             // 先清空自身数据才允许删本项：根节点仍有挂载实体数据时拒绝（不采用级联删除）
             var hasEntities = await db.InodeEntities

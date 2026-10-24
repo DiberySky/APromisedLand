@@ -95,37 +95,74 @@ public class NodeController : ControllerBase
         return Ok(existing);
     }
 
-    /// <summary>删除 Node（有边引用或仍挂实体数据时拒绝；不做 force 级联，spec §4/§9.2）。</summary>
+    /// <summary>删除 Node（仍挂 EAV 属性值、关系或实体数据时拒绝；不做 force 级联，spec §4/§9.2）。</summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct = default)
     {
-        var existing = await _db.Nodes.FindAsync([id], ct);
-        if (existing is null) return NotFound();
+        // Npgsql 执行策略不支持用户事务，需整体包裹
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<IActionResult>(async () =>
+        {
+            // 同一事务内先检测后删除，避免检测与删除之间插入新数据
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
-        var hasEdges = await _db.EdgeInstances
-            .AnyAsync(e => e.FromNodeId == id || e.ToNodeId == id, ct);
-        if (hasEdges)
-            return Conflict(new { error = "该节点仍有边引用，无法删除" });
+            var existing = await _db.Nodes.FindAsync([id], ct);
+            if (existing is null) return NotFound();
 
-        // 先清空自身数据才允许删本项：该节点仍有挂载实体数据时拒绝（不采用级联删除）
-        var hasEntities = await _db.InodeEntities
-            .AnyAsync(m => m.InodeId == id, ct);
-        if (hasEntities)
-            return Conflict(new { error = "该节点仍有挂载的实体数据，无法删除。请先清空其全部实体数据。" });
+            // EAV 属性值（含位置坐标表）：仍挂业务数据时拒绝（不采用级联删除）
+            var attrValueCount = await _db.AttributeValues.CountAsync(v => v.EntityId == id, ct);
+            var locationCount = await _db.LocationAttributeValues.CountAsync(l => l.EntityId == id, ct);
+            if (attrValueCount + locationCount > 0)
+            {
+                return Conflict(new
+                {
+                    error = $"该节点仍有 EAV 属性数据（{attrValueCount + locationCount} 项），无法删除。请先清空属性值。"
+                });
+            }
 
-        // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
-        var declarations = await _db.InodeEntityTypes
-            .Where(x => x.InodeId == id)
-            .ToListAsync(ct);
-        _db.InodeEntityTypes.RemoveRange(declarations);
+            // 关系值：作为起点
+            var outgoingRelations = await _db.RelationAttributeValues
+                .CountAsync(r => r.EntityId == id, ct);
+            if (outgoingRelations > 0)
+            {
+                return Conflict(new
+                {
+                    error = $"该节点仍有 {outgoingRelations} 条关系（作为起点），无法删除。请先删除相关关系。"
+                });
+            }
 
-        _db.Nodes.Remove(existing);
-        await _db.SaveChangesAsync(ct);
+            // 关系值：作为终点被引用
+            var incomingRelations = await _db.RelationAttributeValues
+                .CountAsync(r => r.ToNodeId == id, ct);
+            if (incomingRelations > 0)
+            {
+                return Conflict(new
+                {
+                    error = $"该节点仍被 {incomingRelations} 条关系引用，无法删除。请先删除相关关系。"
+                });
+            }
 
-        // ★ 节点已删除 → 消费端据 InodeId 清除残留向量/图顶点
-        await PublishAsync(id, InodeChangeKind.Deleted, pathAffected: false, ct);
+            // 先清空自身数据才允许删本项：该节点仍有挂载实体数据时拒绝（不采用级联删除）
+            var hasEntities = await _db.InodeEntities
+                .AnyAsync(m => m.InodeId == id, ct);
+            if (hasEntities)
+                return Conflict(new { error = "该节点仍有挂载的实体数据，无法删除。请先清空其全部实体数据。" });
 
-        return NoContent();
+            // 类型声明（inode_entitytypes）不含业务数据，随宿主一并清理，避免孤儿声明
+            var declarations = await _db.InodeEntityTypes
+                .Where(x => x.InodeId == id)
+                .ToListAsync(ct);
+            _db.InodeEntityTypes.RemoveRange(declarations);
+
+            _db.Nodes.Remove(existing);
+            await _db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            // ★ 节点已删除 → 消费端据 InodeId 清除残留向量/图顶点
+            await PublishAsync(id, InodeChangeKind.Deleted, pathAffected: false, ct);
+
+            return NoContent();
+        });
     }
 
     /// <summary>发布 iNode 变更事件（向量/图同步；at-least-once，消费端幂等）。

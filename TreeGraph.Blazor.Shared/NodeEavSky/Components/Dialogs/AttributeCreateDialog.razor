@@ -156,6 +156,18 @@
             }
         }
 
+        @* relation：图边类型（留空按英文属性名推导） *@
+        @if (_createForm.DataType == "relation")
+        {
+            <NamingTextField @bind-Value="_createForm.RelationType"
+                             SourceText="@_createForm.DisplayName"
+                             NameCase="snake"
+                             Label="图边类型"
+                             Placeholder="如 belongs_to；留空则按英文属性名推导"
+                             HelperText="小写字母开头，只含字母/数字/下划线，最长 100；parent_of / line_contains / connects_to / line_segment 为系统保留"
+                             Class="mb-3" />
+        }
+
         <NumberInputField T="int"
                           @bind-Value="_createForm.DisplayOrder"
                           Label="显示顺序"
@@ -232,6 +244,7 @@
         ("time",     "时间"),
         ("single_choice", "单选"),
         ("location", "位置"),
+        ("relation", "关系"),
         ("file",     "文件"),
         ("composite", "组合类型"),
         ("table",    "自定义表"),
@@ -302,8 +315,10 @@
         if (dt != "composite") _createForm.RefCompositeTypeId = null;
         if (dt != "table") { _createForm.RefTableDefinitionId = null; }
         if (dt != "single_choice") _createForm.RefOptionSetId = null;
-        // 位置（经纬度坐标）不参与文本筛选/搜索
-        _createForm.IsSearchable = dt != "location";
+        if (dt != "relation") _createForm.RelationType = null;
+        // 位置 / 关系不参与文本筛选与排序
+        _createForm.IsSearchable = dt is not ("location" or "relation");
+        if (dt == "relation") _createForm.IsSortable = false;
     }
 
     private async Task CreateAsync()
@@ -368,7 +383,10 @@
                     : null,
                 RefCompositeTypeId = f.RefCompositeTypeId,
                 RefTableDefinitionId = f.RefTableDefinitionId,
-                RefOptionSetId = f.RefOptionSetId
+                RefOptionSetId = f.RefOptionSetId,
+                RelationType = string.IsNullOrWhiteSpace(f.RelationType)
+                    ? null
+                    : f.RelationType.Trim()
             });
 
             if (id is null)
@@ -403,5 +421,7 @@
         public string? RefCompositeTypeId { get; set; }
         public string? RefTableDefinitionId { get; set; }
         public string? RefOptionSetId { get; set; }
+        /// <summary>relation 图边类型（留空按英文属性名推导）</summary>
+        public string? RelationType { get; set; }
     }
 }

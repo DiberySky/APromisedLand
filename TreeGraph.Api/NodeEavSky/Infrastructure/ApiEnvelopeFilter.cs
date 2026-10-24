@@ -36,8 +36,6 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
                || cad.ControllerTypeInfo.Namespace?.Contains(
                    "SpaceSky.Controllers", StringComparison.Ordinal) == true
                || cad.ControllerTypeInfo.Namespace?.Contains(
-                   "EdgeSky.Controllers", StringComparison.Ordinal) == true
-               || cad.ControllerTypeInfo.Namespace?.Contains(
                    "LineSky.Controllers", StringComparison.Ordinal) == true);
 
     // ------------------------------------------------------------
@@ -238,10 +236,10 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
                 context.ExceptionHandled = true;
                 break;
 
-            // Edge/Line 家族：InvalidOperationException 的语义是"业务规则冲突"
-            //（重复边、子项非空拒绝、拓扑破坏等），映射为 409，
+            // Line 家族：InvalidOperationException 的语义是"业务规则冲突"
+            //（子项非空拒绝、拓扑破坏等），映射为 409，
             // 与控制器就地 try/catch 时代的 Conflict 行为保持一致。
-            case InvalidOperationException when IsEdgeFamily(context):
+            case InvalidOperationException when IsLineFamily(context):
                 context.Result = new ObjectResult(
                     ApiResponse.Fail(context.Exception.Message))
                 {
@@ -262,13 +260,11 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
     }
 
     /// <summary>
-    /// Edge/Line 家族控制器判定（EdgeSky.Controllers / LineSky.Controllers 命名空间）。
+    /// Line 家族控制器判定（LineSky.Controllers 命名空间）。
     /// 仅用于异常映射的家族级差异；结果包装仍由 <see cref="AppliesTo"/> 统一判定。
     /// </summary>
-    private static bool IsEdgeFamily(FilterContext context)
+    private static bool IsLineFamily(FilterContext context)
         => context.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor cad
-           && (cad.ControllerTypeInfo.Namespace?.Contains(
-                   "EdgeSky.Controllers", StringComparison.Ordinal) == true
-               || cad.ControllerTypeInfo.Namespace?.Contains(
-                   "LineSky.Controllers", StringComparison.Ordinal) == true);
+           && cad.ControllerTypeInfo.Namespace?.Contains(
+                   "LineSky.Controllers", StringComparison.Ordinal) == true;
 }

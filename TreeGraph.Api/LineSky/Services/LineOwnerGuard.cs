@@ -7,8 +7,7 @@ namespace TreeGraph.Api.LineSky.Services;
 
 /// <summary>
 /// Line 宿主守卫：实现 <see cref="IInodeOwnerGuard"/>，
-/// 使 Line 可作为 EAV 宿主挂载实体（声明类型 / 写入属性数据前校验线路真实存在），
-/// 并可作为 EdgeInstance 的起终点参与校验与显示名解析。
+/// 使 Line 可作为 EAV 宿主挂载实体（声明类型 / 写入属性数据前校验线路真实存在）。
 /// </summary>
 public class LineOwnerGuard(TreeGraphDbContext dbContext) : IInodeOwnerGuard
 {

@@ -115,10 +115,10 @@ public class LineNodeController : ControllerBase
         var existing = await _db.LineNodes.FindAsync([id], ct);
         if (existing is null) return NotFound();
 
-        var hasEdges = await _db.EdgeInstances
-            .AnyAsync(e => e.FromNodeId == id || e.ToNodeId == id, ct);
-        if (hasEdges)
-            return Conflict(new { error = "该节点仍有边引用，无法删除" });
+        var hasRelations = await _db.RelationAttributeValues
+            .AnyAsync(r => r.EntityId == id || r.ToNodeId == id, ct);
+        if (hasRelations)
+            return Conflict(new { error = "该节点仍被关系引用，无法删除" });
 
         var hasTerminal = await _db.LineTerminals
             .AnyAsync(t => t.NodeId == id, ct);

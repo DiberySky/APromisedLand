@@ -81,6 +81,11 @@ public class EavMetadataController : ControllerBase
             or EavDataTypes.SingleChoice) && refCount > 0)
             return BadRequest(new { error = "当前 dataType 不支持引用" });
 
+        // ---- relation_type 与 dataType 的匹配（值解析在属性名确定后）----
+        if (req.DataType != EavDataTypes.Relation
+            && !string.IsNullOrWhiteSpace(req.RelationType))
+            return BadRequest(new { error = "只有 relation 类型可以填写 relationType" });
+
         // ---- 引用存在性 ----
         if (req.UnitId is { } uid
             && !await _db.UnitTrees.AnyAsync(u => u.Id == uid, ct))
@@ -145,6 +150,16 @@ public class EavMetadataController : ControllerBase
             attributeName = GenerateAttributeName();
         }
 
+        // ---- relation_type 解析（显式 → 属性名驼峰回退 → 自动名报错）----
+        string? relationType = null;
+        if (req.DataType == EavDataTypes.Relation)
+        {
+            var (value, error) = RelationNaming.Resolve(
+                req.RelationType, attributeName, userSpecified);
+            if (error is not null) return BadRequest(new { error });
+            relationType = value;
+        }
+
         // ---- 创建 ----
         var def = new AttributeDefinition
         {
@@ -152,9 +167,11 @@ public class EavMetadataController : ControllerBase
             AttributeName = attributeName,
             DisplayName = req.DisplayName.Trim(),
             DataType = req.DataType,
+            RelationType = relationType,
             IsRequired = req.IsRequired,
-            IsSearchable = req.IsSearchable,
-            IsSortable = req.IsSortable,
+            // relation 不支持检索/排序（元数据层忽略）
+            IsSearchable = req.DataType == EavDataTypes.Relation ? false : req.IsSearchable,
+            IsSortable = req.DataType == EavDataTypes.Relation ? false : req.IsSortable,
             DisplayOrder = req.DisplayOrder,
             UnitId = req.UnitId,
             RefCompositeTypeId = req.RefCompositeTypeId,
@@ -864,7 +881,7 @@ public class EavMetadataController : ControllerBase
     /// 更新属性定义。
     ///
     /// ★ int / decimal 均可绑定单位。
-    /// 不可修改：EntityType、AttributeName、DataType。
+    /// 不可修改：EntityType、AttributeName、DataType、RelationType。
     /// </summary>
     [HttpPut("attributes/{id}")]
     public async Task<IActionResult> UpdateAttribute(
@@ -967,8 +984,9 @@ public class EavMetadataController : ControllerBase
         // 子项为空方可删除本项（不采用级联删除）：该属性已产生实例数据时拒绝
         var hasValues = await _db.AttributeValues.AnyAsync(v => v.AttributeId == id, ct);
         var hasLocations = await _db.LocationAttributeValues.AnyAsync(l => l.AttributeId == id, ct);
+        var hasRelations = await _db.RelationAttributeValues.AnyAsync(r => r.AttributeId == id, ct);
         var hasRows = await _db.CustomTableRows.AnyAsync(r => r.AttributeId == id, ct);
-        if (hasValues || hasLocations || hasRows)
+        if (hasValues || hasLocations || hasRelations || hasRows)
             return BadRequest(new { error = "该属性已产生实例数据，无法删除。请先清空该属性的全部数据。" });
 
         def.IsDeleted = true;
@@ -992,7 +1010,8 @@ public class EavMetadataController : ControllerBase
         a.RefCompositeTypeId, a.RefCompositeType?.TypeName, a.RefCompositeType?.DisplayName,
         a.RefTableDefinitionId, a.RefTableDefinition?.TableName, a.RefTableDefinition?.DisplayName,
         a.IsRecordMode,
-        a.RefOptionSetId, a.RefOptionSet?.SetName, a.RefOptionSet?.DisplayName);
+        a.RefOptionSetId, a.RefOptionSet?.SetName, a.RefOptionSet?.DisplayName,
+        a.RelationType);
 
     private static CustomTableDetailDto ToCustomTableDto(CustomTableDefinition t) => new(
         t.TableDefinitionId, t.EntityType, t.TableName, t.DisplayName,

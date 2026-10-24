@@ -199,7 +199,7 @@ public sealed class VectorSynchronizer
 
     /// <summary>
     /// 对账：比较 PG 期望向量集合与 Qdrant 已存集合，补缺删孤。
-    /// PG 活跃集合 = InodeEntities 挂载的 inode ∪ 4 棵宿主树节点 ∪ Lines ∪ LineNodes ∪ EdgeInstances
+    /// PG 活跃集合 = InodeEntities 挂载的 inode ∪ 4 棵宿主树节点 ∪ Lines ∪ LineNodes
     /// （Id 在 spaces 空间实体列表内的 space 节点除外，不创建向量）。
     /// 比对范围四选一：category（按数据类别）> spaceId（按空间子树）> lineId（按单线路）> 全量。
     /// onProgress：逐项异步进度回调（fix=同步节点 / purge=清理孤儿），流式端点逐行 await 推送；null 时零开销。
@@ -250,8 +250,6 @@ public sealed class VectorSynchronizer
             .Select(n => n.Id).ToListAsync(ct));
         hostNodeIds.AddRange(await _db.Lines.AsNoTracking()
             .Select(n => n.Id).ToListAsync(ct));
-        hostNodeIds.AddRange(await _db.EdgeInstances.AsNoTracking()
-            .Select(e => e.EdgeId).ToListAsync(ct));
 
         if (scope is not null)
         {
@@ -548,12 +546,6 @@ public sealed class VectorSynchronizer
             .Where(n => inodeIds.Contains(n.Id))
             .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
             result[n.Id] = n.Name;
-
-        // 边宿主：无业务显示名（已并入 EAV），回退 EdgeId
-        foreach (var e in await _db.EdgeInstances.AsNoTracking()
-            .Where(x => inodeIds.Contains(x.EdgeId))
-            .Select(x => new { x.EdgeId }).ToListAsync(ct))
-            result[e.EdgeId] = e.EdgeId;
 
         return result;
     }

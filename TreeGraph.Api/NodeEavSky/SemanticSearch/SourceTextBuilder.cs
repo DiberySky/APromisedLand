@@ -88,12 +88,9 @@ public sealed class SourceTextBuilder
         var line = space is null && unit is null && category is null && knowledge is null && lineNode is null
             ? await _db.Lines.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
-        var edge = space is null && unit is null && category is null && knowledge is null && lineNode is null && line is null
-            ? await _db.EdgeInstances.AsNoTracking().FirstOrDefaultAsync(e => e.EdgeId == inodeId, ct)
-            : null;
 
         if (space is null && unit is null && category is null &&
-            knowledge is null && lineNode is null && line is null && edge is null && entityMounts.Count == 0)
+            knowledge is null && lineNode is null && line is null && entityMounts.Count == 0)
             return null; // 既无实体也不在任何宿主 → 删除向量
 
         // 3. 构造节点文本（path_view 两段式：层级路径/所属线路 + 当前节点）。
@@ -101,11 +98,10 @@ public sealed class SourceTextBuilder
         var isSpaceNode = space is not null &&
             await _db.Spaces.AsNoTracking().AnyAsync(s => s.Id == inodeId, ct);
 
-        // 边宿主：无业务显示名（已并入 EAV），文本回退「fromId→toId」
+        // 空间节点本身不建向量；其余宿主取业务显示名
         var nodeName = isSpaceNode
             ? null
-            : space?.Name ?? unit?.Name ?? category?.Name ?? knowledge?.Name ?? lineNode?.Name ?? line?.Name
-              ?? (edge is not null ? $"{edge.FromNodeId}→{edge.ToNodeId}" : null);
+            : space?.Name ?? unit?.Name ?? category?.Name ?? knowledge?.Name ?? lineNode?.Name ?? line?.Name;
 
         // 祖先链：4 棵宿主树内沿 ParentId 上溯；线路节点以所属线路为唯一"祖先"
         var ancestorNames = new List<string>();
@@ -154,7 +150,6 @@ public sealed class SourceTextBuilder
             : category is not null ? "category_tree"
             : knowledge is not null ? "knowledge_tree"
             : line is not null ? "line"
-            : edge is not null ? "edge"
             : "line_node";
         var spaceId = await ResolveSpaceIdAsync(space, unit, category, knowledge, inodeId, ct);
 

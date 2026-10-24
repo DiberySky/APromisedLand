@@ -102,6 +102,13 @@
                      Color="@GetDataTypeColor(context.DataType)">
                 @EavDataTypeLabels.GetLabel(context.DataType)
             </MudChip>
+            @if (context.DataType == EavDataTypes.Relation
+                 && !string.IsNullOrEmpty(context.RelationType))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    图边：@context.RelationType
+                </MudText>
+            }
         </MudTd>
         <MudTd DataLabel="必填">
             @if (context.IsRequired)
@@ -411,6 +418,7 @@
         "composite" => Color.Dark,
         "table" => Color.Info,
         "file" => Color.Default,
+        "relation" => Color.Secondary,
         _ => Color.Default
     };
 }

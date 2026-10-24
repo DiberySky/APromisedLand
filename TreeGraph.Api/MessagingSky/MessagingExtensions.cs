@@ -10,7 +10,7 @@ namespace TreeGraph.Api.MessagingSky;
 ///
 /// 拓扑：每事件类型一条 durable 队列，直发直收（无 exchange）：
 ///   InodeChangedEvent → treegraph.inode-changed（向量同步 + 图同步两个 handler 级联消费）
-///   EdgeChangedEvent  → treegraph.edge-changed（图同步）
+///   RelationChangedEvent  → treegraph.relation-changed（图边同步）
 ///   LineStructureChangedEvent → treegraph.line-structure-changed（图结构边同步）
 ///
 /// 消费语义：同一消息类型的多个 handler 由 Wolverine 合并为一个逻辑 handler 串行执行；
@@ -32,8 +32,8 @@ public static class MessagingExtensions
         opts.PublishMessage<InodeChangedEvent>().ToRabbitQueue("treegraph.inode-changed");
         opts.ListenToRabbitQueue("treegraph.inode-changed");
 
-        opts.PublishMessage<EdgeChangedEvent>().ToRabbitQueue("treegraph.edge-changed");
-        opts.ListenToRabbitQueue("treegraph.edge-changed");
+        opts.PublishMessage<RelationChangedEvent>().ToRabbitQueue("treegraph.relation-changed");
+        opts.ListenToRabbitQueue("treegraph.relation-changed");
 
         opts.PublishMessage<LineStructureChangedEvent>().ToRabbitQueue("treegraph.line-structure-changed");
         opts.ListenToRabbitQueue("treegraph.line-structure-changed");

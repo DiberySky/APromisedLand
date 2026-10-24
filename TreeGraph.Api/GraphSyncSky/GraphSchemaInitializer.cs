@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
+using TreeGraph.Shared.NodeEavSky;
 
 namespace TreeGraph.Api.GraphSyncSky;
 
@@ -69,7 +70,7 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
     /// <summary>
     /// 幂等创建：space（FIXED_STRING(64) vid，覆盖 GUID）、6 个节点 tag、
     /// parent_of 树父子边、line_contains / connects_to 线路结构边、
-    /// PG edge_definitions 中全部语义边类型。
+    /// attribute_catalog 中全部活动 relation 属性的图边类型。
     /// 已有 space 的 line_node 缺新列时用 DESCRIBE + ALTER 补齐。
     /// CREATE SPACE 生效需约两个心跳周期，失败由调用方重试。
     /// </summary>
@@ -105,20 +106,27 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
         await EnsureEdgeColumnsAsync(GraphNaming.LineSegmentEdge,
             [("edge_id", "string"), ("line_id", "string"), ("weight", "double"), ("display_name", "string")], ct);
 
-        // 语义边类型：以 PG edge_instances.type_name 为准（类型目录已并入 EAV）
+        // 语义边类型：以 PG attribute_catalog 中活动 relation 属性的 relation_type 为准
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
-        var typeNames = await db.EdgeInstances
+        var relationTypes = await db.AttributeCatalog
             .AsNoTracking()
-            .Select(e => e.TypeName)
+            .Where(a => a.DataType == EavDataTypes.Relation
+                     && !a.IsDeleted
+                     && a.RelationType != null)
+            .Select(a => a.RelationType!)
             .Distinct()
             .ToListAsync(ct);
 
-        foreach (var typeName in typeNames)
+        foreach (var typeName in relationTypes)
         {
             await _client.QueryAsync(
                 $"CREATE EDGE IF NOT EXISTS `{typeName}`(" +
-                "`edge_id` string NULL, `is_directed` bool NULL)", ct);
+                "`value_id` string NULL, `attribute_id` string NULL, `name` string NULL)", ct);
+
+            // 存量图空间：旧语义边边列不同，补列后再写入（IF NOT EXISTS 不会补列）
+            await EnsureEdgeColumnsAsync(typeName,
+                [("value_id", "string"), ("attribute_id", "string"), ("name", "string")], ct);
         }
     }
 
