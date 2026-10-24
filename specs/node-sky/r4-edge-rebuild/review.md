@@ -60,18 +60,14 @@
 - `ResolveNodeAsync` 改为 `nodes` 单查 + `host_type` 分派；树顶点名称统一从 `nodes.name` 读取，修掉宿主 `Name` 已 `NotMapped` 的潜在运行时问题；`EdgeInstance` 宿主不作为图顶点解析。
 - `GraphNaming` 新增 `NodeTag = "node"`（`name/node_type/is_archived`）；全量重建补充 `host_type="Node"` 顶点。
 
-## 7. 迁移风险
+## 7. 迁移（开发期策略）
 
-迁移 `20261024031103_RebuildEdgeModule` 为**不可逆、破坏性**：
+R4 落地时曾生成增量迁移 `20261024031103_RebuildEdgeModule`（不可逆、破坏性清理旧边数据）。按开发期既定策略——**drop 库 + 重建单一 Initial 迁移**——该增量迁移已连同其他历史迁移一并删除，当前仓库只保留一个 `InitialCreate`（由最终模型一次性生成）。
 
-1. 先删除 `line_structure_segments → edge_instances`、`line_structures → edge_definitions`、`edge_instances → edge_definitions` 三条旧 FK。
-2. 删除旧边数据（含 EAV 值、`inode_entitytype`/`inode_entity`、属性目录、`entity_type_catalog`、`edge_instances`、`nodes` 中 `host_type='EdgeInstance'` 行）。
-3. 删旧表/旧列/旧索引，再新增 `line_structure_segments.display_name/weight`、`edge_instances.is_directed/type_name`，最后建唯一索引与两条 nodes FK。
-
-风险点：
-- 清库 SQL 依赖旧列名（`edge_definitions.type_name`），Down 不恢复数据（已在迁移注释中声明）。
-- 升级库前需确认无外部系统按旧 `edge_type_id` 读 `edge_instances`；本次明确不做兼容层。
-- 旧线路结构段的 `weight/display_name` 无法从边回填，升级后为空（业务可后续在段上补录）。
+风险点（仅在需要保留旧数据时成立）：
+- 重建 Initial 后旧库数据不再迁移，升级真实库前必须先备份；开发库直接 DROP 重建即可。
+- 旧线路结构段的 `weight/display_name` 无法从边回填，重建后为空（业务可后续在段上补录）。
+- 重建迁移不生成 `ExcludeFromMigrations` 实体的 DDL，须确认 `InitialCreate` 的 Up/Down 仍调用 `CreateAuditPartitionTable` / `DropAuditPartitionTable`（本次已核对并通过 `migrations script` 验证）。
 
 ## 8. 测试与验证
 

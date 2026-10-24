@@ -56,4 +56,4 @@
 
 - 构建：0 错误
 - 测试：Blazor.Shared.Tests 235+1 / Api.Tests 322 / MafWfApi.Tests 65 / FileStorageApi.Tests 153 / Blazor.Tests 71，全部通过
-- 迁移：`20261024014158_DropHostNameColumns.cs` 含回填 + 删列 + FK，`Down` 含反向回填
+- 迁移：当时生成了增量迁移 `DropHostNameColumns`（含回填 + 删列 + FK，`Down` 含反向回填）；按开发期「drop 库 + 重建单一 Initial」策略，现已并入 `InitialCreate`。

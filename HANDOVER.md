@@ -267,7 +267,7 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 | `TreeGraph.Api/GraphSyncSky/GraphSchemaInitializer.cs` | CREATE EDGE 加 operating_state 列 |
 | `TreeGraph.Api/GraphSyncSky/GraphSyncOptions.cs` | LineNodeTag.TagColumns 加 terminal_operating_state |
 | `TreeGraph.Blazor.Shared/LineSky/Dialogs/LineStructureDialog.razor` | 状态下拉 + 端子表格状态列 + 诊断区增强 |
-| `TreeGraph.Api/Data/Migrations/20261022090121_Initial.cs` | 重新生成，Up()/Down() 补 `CreateAuditPartitionTable`/`DropAuditPartitionTable` |
+| `TreeGraph.Api/Data/Migrations/InitialCreate.cs` | 重新生成，Up()/Down() 补 `CreateAuditPartitionTable`/`DropAuditPartitionTable` |
 | `TreeGraph.Api.Tests/Tests/LineStructureTests.cs` | 新增 8 个正反用例（322 总计） |
 | `TreeGraph.Blazor.Shared.Tests/LineSky/LineStructureDialogSmokeTests.cs` | 新增（232 总计） |
 | `HANDOVER.md` | 第 6 节全部标记已完成；第 9 节更新建议动作；第 10 节补本轮记录 |
