@@ -11,22 +11,24 @@
 <DialogSky Title="@($"AI 综合：{NodeName}")"
            CancelButtonText="关闭"
            ActionsMaxWidth="MaxWidth.Medium">
-    <ToolBarContent>
-        <NumberStepper @bind-Value="_depth" Label="包含子项" Suffix="层" Min="0" Max="10"/>
-        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
-                       Size="Size.Small"
-                       Color="Color.Primary"
-                       Title="重新综合"
-                       OnClick="RunAsync"/>
-        <MudSpacer/>
-        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                       Size="Size.Small"
-                       Color="Color.Success"
-                       Title="复制 Markdown"
-                       OnClick="CopyAsync"/>
-    </ToolBarContent>
+    @* 操作行不放 ToolBarContent：MudBlazor.Extensions 宿主在标题区注入 header-actions 后，
+       Blazor 对标题区的后续更新会打到游离节点（步进器显示值冻结）；内容区更新可靠 *@
     <DialogContent>
         <MudContainer MaxWidth="MaxWidth.Medium" Class="pa-4">
+            <MudToolBar Dense="true" DisableGutters="true" Class="mb-3">
+                <NumberStepper @bind-Value="_depth" Label="包含子项" Suffix="层" Min="0" Max="10"/>
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               Title="重新综合"
+                               OnClick="RunAsync"/>
+                <MudSpacer/>
+                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                               Size="Size.Small"
+                               Color="Color.Success"
+                               Title="复制 Markdown"
+                               OnClick="CopyAsync"/>
+            </MudToolBar>
             @if (_loading)
             {
                 <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">

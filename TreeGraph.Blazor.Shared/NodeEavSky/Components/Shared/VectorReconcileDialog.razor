@@ -1,0 +1,212 @@
+@* VectorReconcileDialog.razor — 向量刷新对话框共享实现（Line/Space 对话框的薄壳基底） *@
+@* 打开即自动执行（无确认步骤）：流式对账（补缺 + 删孤），逐项滚动展示；完成后展示统计明细；
+   单项失败不中断（feed 红项 + 统计「失败」行）；整体失败展示真实原因；底部「重新刷新」可重复执行；关闭即取消 *@
+
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@implements IDisposable
+
+<DialogSky Title="@Title"
+           CancelButtonVisible="true" CancelButtonText="关闭"
+           SubmitButtonVisible="true" SubmitButtonText="@_submitText"
+           SubmitButtonDisabled="_running"
+           OnSubmitClick="@RefreshAsync">
+    @* 状态文字不放 ToolBarContent：MudBlazor.Extensions 宿主在标题区注入 header-actions 后，
+       Blazor 对标题区的后续更新会打到游离节点（状态冻结在初始渲染值）；内容区更新可靠 *@
+    <DialogContent>
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">@StatusText</MudText>
+            @if (_running)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">@RunningText</MudText>
+            }
+            else if (_error is not null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Error">@_error</MudText>
+            }
+            else if (_result is not null)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    刷新完成：<span class="mud-success-text">新增 @_result.FixedCount 条 · 清理 @_result.DeletedCount 条</span>
+                    @if (_result.FailedCount > 0)
+                    {
+                        <span class="mud-error-text"> · 失败 @_result.FailedCount 条</span>
+                    }
+                </MudText>
+                <MudSimpleTable Hover="false" Dense="true" Bordered="true">
+                    <tbody>
+                        <tr><td>期望集合（PG 活跃节点 + 实体）</td><td align="right">@_result.Active</td></tr>
+                        <tr><td>已存向量（Qdrant）</td><td align="right">@_result.Existing</td></tr>
+                        <tr><td>缺失（本轮补算）</td><td align="right">@_result.Missing</td></tr>
+                        <tr><td>孤儿（本轮清理）</td><td align="right">@_result.Orphaned</td></tr>
+                        @if (_result.FailedCount > 0)
+                        {
+                            <tr><td>失败（单项不中断，详见同步项）</td><td align="right"><span class="mud-error-text">@_result.FailedCount</span></td></tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+
+            @* 同步项收纳：流式对账逐项追加为列表（最新在顶部），用 MudExpansion 可折叠收纳；执行后始终保留 *@
+            @if (_hasRun)
+            {
+                <MudExpansionPanels Class="mt-3" Elevation="0">
+                    <MudExpansionPanel Text="@FeedTitle"
+                                       Expanded="_feedExpanded"
+                                       ExpandedChanged="OnFeedExpandedChanged"
+                                       Dense="true">
+                        <MudList T="FeedItem" Dense="true" Class="pa-1"
+                                 Style="height:170px; overflow-y:auto;">
+                            @if (_feed.Count == 0)
+                            {
+                                <MudListItem T="FeedItem" Class="py-0">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @(_running ? "准备中…" : "本轮无同步项")
+                                    </MudText>
+                                </MudListItem>
+                            }
+                            @foreach (var item in _feed)
+                            {
+                                <MudListItem T="FeedItem" Class="py-0">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@item.Icon" Size="Size.Small" Color="@item.Color"/>
+                                        <MudText Typo="Typo.caption">@item.Text</MudText>
+                                    </MudStack>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+        </MudPaper>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>对话框标题（如「向量刷新 · {线路名}」）。</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>执行中的说明文案（如「正在整理「X」线路及其线路节点的数据…」）。</summary>
+    [Parameter, EditorRequired] public string RunningText { get; set; } = "";
+
+    /// <summary>执行委托：调用流式对账端点，逐项事件经 onEvent 回调喂给同步项列表。</summary>
+    [Parameter, EditorRequired]
+    public Func<Action<ReconcileStreamEventDto>, CancellationToken, Task<VectorReconcileOutcome>> RunAsync { get; set; } = null!;
+
+    private bool _running;
+    private bool _disposed;
+    private string _submitText = "开始刷新";
+    private VectorReconcileResultDto? _result;
+    private string? _error;
+    private CancellationTokenSource _cts = new();
+
+    /// <summary>同步项列表（最新在顶部，上限 200 条防渲染膨胀）。</summary>
+    private readonly List<FeedItem> _feed = new();
+    private const int FeedLimit = 200;
+
+    /// <summary>同步项收纳面板展开状态（运行中自动展开，用户可手动折叠收纳）。</summary>
+    private bool _feedExpanded = true;
+
+    /// <summary>是否已执行过同步（执行后面板始终保留展示，即使本轮无同步项）。</summary>
+    private bool _hasRun;
+
+    private string FeedTitle => _running
+        ? $"同步项（{_feed.Count}）· 同步中…"
+        : $"同步项（{_feed.Count}）";
+
+    private Task OnFeedExpandedChanged(bool expanded)
+    {
+        _feedExpanded = expanded;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>同步项（图标区分同步 / 已同步 / 清理 / 失败）。</summary>
+    private sealed record FeedItem(string Text, string Icon, Color Color);
+
+    private string StatusText => _running ? "刷新中" : _error is not null ? "失败" : "完成";
+
+    /// <summary>每次打开都重新执行（对话框组件实例可能被宿主复用，不能只挂 OnInitializedAsync）。</summary>
+    protected override async Task OnParametersSetAsync() => await RefreshAsync();
+
+    /// <summary>执行流式对账：逐项事件实时追加同步项，结束落统计/真实错误。</summary>
+    private async Task RefreshAsync()
+    {
+        if (_running) return;
+        _running = true;
+        _submitText = "刷新中…";
+        _result = null;
+        _error = null;
+        _feed.Clear();
+        _feedExpanded = true;
+        _hasRun = true;
+        // 复用实例时上一轮 CTS 已在关闭时取消/释放，每次执行前重建
+        _cts.Dispose();
+        _cts = new();
+        SafeRefresh();
+        try
+        {
+            var outcome = await RunAsync(
+                evt => InvokeAsync(() =>
+                {
+                    var mapped = MapFeedEvent(evt);
+                    _feed.Insert(0, new FeedItem(mapped.Text, mapped.Icon, mapped.Color));
+                    if (_feed.Count > FeedLimit)
+                        _feed.RemoveAt(_feed.Count - 1);
+                    SafeRefresh();
+                }),
+                _cts.Token);
+            _result = outcome.Summary;
+            if (_result is null)
+                _error = $"刷新失败：{outcome.Error ?? "未知错误"}";
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _error = $"刷新失败：{ex.Message}";
+        }
+        finally
+        {
+            _running = false;
+            _submitText = "重新刷新";
+            SafeRefresh();
+        }
+    }
+
+    /// <summary>
+    /// 流式事件 → 同步项文案与图标（fix=本轮补算；ok=已存在仅校验；purge=清理孤儿；error=单项失败）。
+    /// 同步刷新对话框（按类别多面板）也复用此映射。
+    /// </summary>
+    public static (string Text, string Icon, Color Color) MapFeedEvent(ReconcileStreamEventDto evt)
+    {
+        var label = string.IsNullOrEmpty(evt.Name) ? evt.InodeId : evt.Name;
+        var detail = evt.Detail.Replace("\n", " · ");
+        return evt.Stage switch
+        {
+            "fix" => (string.IsNullOrEmpty(evt.Detail) ? $"同步 · {label}" : $"同步 · {label}（{detail}）",
+                Icons.Material.Filled.Check, Color.Success),
+            "ok" => (string.IsNullOrEmpty(evt.Detail) ? $"已同步 · {label}" : $"已同步 · {label}（{detail}）",
+                Icons.Material.Filled.CheckCircle, Color.Secondary),
+            "error" => (string.IsNullOrEmpty(label) ? $"失败 · {detail}" : $"失败 · {label}（{detail}）",
+                Icons.Material.Filled.ErrorOutline, Color.Error),
+            _ => ($"清理 · {detail}", Icons.Material.Filled.DeleteOutline, Color.Warning)
+        };
+    }
+
+    private void SafeRefresh()
+    {
+        if (!_disposed) StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        try { _cts.Cancel(); _cts.Dispose(); } catch { /* 关闭竞态容错 */ }
+    }
+}

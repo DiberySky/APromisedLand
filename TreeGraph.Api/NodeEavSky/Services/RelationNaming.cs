@@ -27,10 +27,14 @@ public static class RelationNaming
     private static readonly Regex AcronymBoundary =
         new(@"(?<=[A-Z])(?=[A-Z][a-z])", RegexOptions.Compiled);
 
-    /// <summary>系统内置图边类型，关系属性不可占用。</summary>
+    /// <summary>
+    /// 系统内置图边类型，关系属性不可占用。
+    /// R7：线路归属概念废弃（Line→LineNode 走 parent_of），原归属边类型名从保留名移除；
+    /// line_segment 保留（由 seed 属性 next 占用，用户不可再占用）。
+    /// </summary>
     private static readonly HashSet<string> ReservedTypes = new(StringComparer.Ordinal)
     {
-        "parent_of", "line_contains", "connects_to", "line_segment"
+        "parent_of", "connects_to", "line_segment"
     };
 
     /// <summary>

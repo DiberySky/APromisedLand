@@ -65,7 +65,6 @@ public class RelationNamingTests
 
     [Theory]
     [InlineData("parent_of")]
-    [InlineData("line_contains")]
     [InlineData("connects_to")]
     [InlineData("line_segment")]
     public void Validate_RejectsReservedTypes(string value)

@@ -3,6 +3,7 @@
    边在向量库无对应数据，该格显示不适用；单步失败不中断后续步骤；关闭即取消剩余步骤 *@
 
 @namespace TreeGraph.Blazor.Shared.SpaceSky.Dialogs
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @implements IDisposable
@@ -13,10 +14,10 @@
            SubmitButtonVisible="true" SubmitButtonText="@_submitText"
            SubmitButtonDisabled="_running"
            OnSubmitClick="@RunAllAsync">
-    <ToolBarContent>
-        <MudText Typo="Typo.caption" Color="Color.Secondary">@SummaryText</MudText>
-    </ToolBarContent>
+    @* 状态文字不放 ToolBarContent：MudBlazor.Extensions 宿主在标题区注入 header-actions 后，
+       Blazor 对标题区的后续更新会打到游离节点（状态冻结）；内容区更新可靠 *@
     <DialogContent>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">@SummaryText</MudText>
         <MudSimpleTable Hover="false" Dense="true" Bordered="true">
             <thead>
                 <tr>
@@ -220,39 +221,32 @@
         SafeRefresh();
         try
         {
-            // 流式对账：逐项实时追加同步节点名 / 清理项到对应类别面板
-            var result = await EavApi.StreamReconcileAsync(
+            // 流式对账：逐项实时追加同步节点名 / 清理项 / 失败项到对应类别面板
+            var outcome = await EavApi.StreamReconcileAsync(
                 category: key,
                 onEvent: evt => InvokeAsync(() =>
                 {
-                    // fix=本轮补算；ok=已存在仅校验；purge=清理孤儿。Detail 为实际向量化文本
-                    var label = string.IsNullOrEmpty(evt.Name) ? evt.InodeId : evt.Name;
-                    var detail = evt.Detail.Replace("\n", " · ");
-                    var text = evt.Stage == "purge"
-                        ? $"清理 · {detail}"
-                        : $"{(evt.Stage == "fix" ? "同步" : "已同步")} · {label}"
-                          + (string.IsNullOrEmpty(evt.Detail) ? "" : $"（{detail}）");
-                    _currentItem = $"[{row.Label}] {text}";
-                    row.Feed.Insert(0, evt.Stage switch
-                    {
-                        "fix" => new FeedItem(text, Icons.Material.Filled.Check, Color.Success),
-                        "ok" => new FeedItem(text, Icons.Material.Filled.CheckCircle, Color.Secondary),
-                        _ => new FeedItem(text, Icons.Material.Filled.DeleteOutline, Color.Warning)
-                    });
+                    var mapped = VectorReconcileDialog.MapFeedEvent(evt);
+                    _currentItem = $"[{row.Label}] {mapped.Text}";
+                    row.Feed.Insert(0, new FeedItem(mapped.Text, mapped.Icon, mapped.Color));
                     if (row.Feed.Count > FeedLimit)
                         row.Feed.RemoveAt(row.Feed.Count - 1);
                     SafeRefresh();
                 }),
                 ct: _cts.Token);
-            if (result is null)
+            if (outcome.Summary is null)
             {
                 step.Status = StepStatus.Failed;
-                step.Detail = "接口未返回结果";
+                step.Detail = outcome.Error ?? "未知错误";
             }
             else
             {
+                var result = outcome.Summary;
                 step.Status = StepStatus.Done;
-                step.Detail = $"新增 {result.FixedCount} · 清理 {result.DeletedCount}";
+                step.Warn = result.FailedCount > 0;
+                step.Detail = result.FailedCount > 0
+                    ? $"新增 {result.FixedCount} · 清理 {result.DeletedCount} · 失败 {result.FailedCount}"
+                    : $"新增 {result.FixedCount} · 清理 {result.DeletedCount}";
             }
         }
         catch (OperationCanceledException)

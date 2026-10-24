@@ -83,7 +83,7 @@ public sealed class SourceTextBuilder
             ? await _db.KnowledgeTrees.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
             : null;
         var lineNode = space is null && unit is null && category is null && knowledge is null
-            ? await _db.LineNodes.AsNoTracking().Include(x => x.Node).FirstOrDefaultAsync(n => n.Id == inodeId, ct)
+            ? await _db.Nodes.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId && n.HostType == "LineNode", ct)
             : null;
         var line = space is null && unit is null && category is null && knowledge is null && lineNode is null
             ? await _db.Lines.AsNoTracking().FirstOrDefaultAsync(n => n.Id == inodeId, ct)

@@ -61,6 +61,17 @@ public class LinesController : ControllerBase
         line.UpdatedAt = DateTimeOffset.UtcNow;
 
         _db.Lines.Add(line);
+
+        // R7：Line 补注册 nodes（host_type='Line'，共享主键 Id = line.Id）——
+        // 线路身份进入全局节点注册表，LineNode 的 line_id 锚点与图顶点链路均指向此行
+        _db.Nodes.Add(new TreeGraph.Shared.NodeSky.Entities.Node
+        {
+            Id = line.Id,
+            HostType = "Line",
+            Name = line.Name,
+            Description = line.Description
+        });
+
         await _db.SaveChangesAsync(ct);
 
         // ★ 线路新增 → 即时同步向量/图（消费端幂等）
@@ -80,6 +91,15 @@ public class LinesController : ControllerBase
         existing.Description = line.Description;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
+        // R7：同步 nodes 注册行（名称唯一真源在 nodes，R2 Name 收编）
+        var nodeRow = await _db.Nodes.FindAsync([id], ct);
+        if (nodeRow is not null)
+        {
+            nodeRow.Name = line.Name;
+            nodeRow.Description = line.Description;
+            nodeRow.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
         await _db.SaveChangesAsync(ct);
 
         // ★ 线路改名 → 其下全部线路节点的「所属线路」行失效，级联重建
@@ -95,8 +115,8 @@ public class LinesController : ControllerBase
         var existing = await _db.Lines.FindAsync([id], ct);
         if (existing is null) return NotFound();
 
-        // 线路节点以 line_id 外键（Restrict）挂在线上：仍有节点时拒绝，避免 23503 直抛 500
-        var hasNodes = await _db.LineNodes.AnyAsync(n => n.LineId == id, ct);
+        // R7：线路节点以 nodes.line_id（Restrict）挂在线上：仍有节点时拒绝，避免 23503 直抛 500
+        var hasNodes = await _db.Nodes.AnyAsync(n => n.LineId == id, ct);
         if (hasNodes)
             return Conflict(new { error = "该线路下仍有线路节点，请先删除节点后再删除线路" });
 
@@ -111,6 +131,11 @@ public class LinesController : ControllerBase
             .Where(x => x.InodeId == id)
             .ToListAsync(ct);
         _db.InodeEntityTypes.RemoveRange(declarations);
+
+        // R7：双删——lines 行 + nodes 注册行
+        var nodeRow = await _db.Nodes.FindAsync([id], ct);
+        if (nodeRow is not null)
+            _db.Nodes.Remove(nodeRow);
 
         _db.Lines.Remove(existing);
         await _db.SaveChangesAsync(ct);

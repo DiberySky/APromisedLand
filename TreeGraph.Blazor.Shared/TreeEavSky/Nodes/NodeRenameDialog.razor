@@ -1,0 +1,81 @@
+@* NodeRenameDialog.razor — 轻量重命名：供语义搜索等宿主外场景直接改树节点名称。
+   提交前先读回真实 ParentId 再 PUT：后端 Update 对 ParentId=null 会静默把节点
+   变成根（宽容写），而搜索结果不带父级 Id。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@inject TreeApiClient<TItem> Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="重命名节点"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="SubmitAsync">
+    <DialogContent>
+        <MudTextField @bind-Value="_name"
+                      Label="名称"
+                      Variant="Variant.Outlined"
+                      Immediate="true" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>节点 ID（iNode）。</summary>
+    [Parameter, EditorRequired] public string NodeId { get; set; } = string.Empty;
+
+    /// <summary>当前名称（预填）。</summary>
+    [Parameter] public string CurrentName { get; set; } = "";
+
+    private string _name = "";
+    private bool _submitting;
+
+    protected override void OnInitialized() => _name = CurrentName;
+
+    private async Task SubmitAsync()
+    {
+        var name = _name.Trim();
+        if (name.Length == 0)
+        {
+            Snackbar.Add("名称不能为空", Severity.Warning);
+            return;
+        }
+        if (name == CurrentName)
+        {
+            MudDialog?.Close(DialogResult.Cancel());
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            // 服务端 Update 是宽容写：仅 Text/SortOrder/CanHaveChildren/ParentId 生效；
+            // 但 ParentId=null 会静默把节点变成根（见 UnitTreeService.UpdateNodeAsync），
+            // 而搜索结果不带父级 Id，故必须先读回真实 ParentId 再带上。
+            var parentId = await Api.GetParentIdAsync(NodeId);
+            if (parentId is null)
+            {
+                Snackbar.Add("节点不存在或已被删除", Severity.Error);
+                return;
+            }
+
+            await Api.UpdateNodeAsync(NodeId, new TreeNodeDto<TItem>
+            {
+                Id = NodeId,
+                Text = name,
+                ParentId = parentId
+            });
+            Snackbar.Add("已重命名", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"重命名失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

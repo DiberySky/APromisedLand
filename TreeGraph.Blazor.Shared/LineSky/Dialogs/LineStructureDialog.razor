@@ -1,8 +1,7 @@
-@* LineStructureDialog.razor — 线路结构图编辑器
+@* LineStructureDialog.razor — 线路结构图编辑器（R7 边集薄层）
    入口：线路维护面板 → 行内「结构」图标。
-   功能：选择拓扑模式（Linear/Radial/Network），
-        以「段 + 端子」图编辑方式增删结构；无结构时先在草稿中编辑再一次性创建。
-   R4：线路结构不再依赖通用边类型（IsLine/EdgeDefinition 已删除）。 *@
+   结构 = relation 边集（一条记录 = 一条有向边）：段列表即边列表，「加段」= 选 from/to（同线节点）。
+   拓扑模式已整体下线；诊断（连通/成环/度数/端子）只报告不阻断。 *@
 @namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Shared.LineSky.Dtos
@@ -28,44 +27,12 @@
         }
         else
         {
-            @* 模板 + 拓扑模式下拉（模板用 C# RenderFragment 构建，绕开 .NET 10 Razor 编译器 bug） *@
+            @* 模板下拉：预填端子默认值（模板用 C# RenderFragment 构建，绕开 .NET 10 Razor 编译器 bug） *@
             <div class="d-flex gap-3 mb-3 flex-wrap">
-                @* 模板下拉（用 RenderFragment 构建 items，绕开 .NET 10 Razor 编译器第二个 foreach bug） *@
-                <MudSelect T="string" Value="_selectedTemplateKey" Label="模板" Variant="Variant.Outlined" Dense="true" Disabled="@(IsExisting || _templateKeys.Count == 0)" ValueChanged="OnSelectedTemplateKeyChanged" Style="min-width: 220px;">
+                <MudSelect T="string" Value="_selectedTemplateKey" Label="模板" Variant="Variant.Outlined" Dense="true" Disabled="@(_templateKeys.Count == 0)" ValueChanged="OnSelectedTemplateKeyChanged" Style="min-width: 220px;">
                     @TemplateSelectItems
                 </MudSelect>
-
-                <MudSelect T="string"
-                           Value="_topologyMode"
-                           Label="拓扑模式"
-                           Variant="Variant.Outlined"
-                           Dense="true"
-                           ValueChanged="OnTopologyModeChanged"
-                           Style="min-width: 300px;">
-                    <MudSelectItem T="string" Value="@("Linear")">Linear · 一条线串到底（不分叉）</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Radial")">Radial · 一个电源分多路</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Network")">Network · 多点互连（可成环，默认）</MudSelectItem>
-                </MudSelect>
             </div>
-
-            @* 当前拓扑模式：只说适用场合与用户需要做的事，技术判据见代码注释 *@
-            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                <MudText Typo="Typo.body2" Class="mb-1">
-                    <strong>@TopologyModeLabel</strong>
-                </MudText>
-                <MudText Typo="Typo.caption">适用场合：@TopologyUsage</MudText>
-                @foreach (var tip in TopologyTips)
-                {
-                    <MudText Typo="Typo.caption">• @tip</MudText>
-                }
-                <MudText Typo="Typo.caption" Class="mt-1">• @CommonTopologyRule</MudText>
-                @if (IsExisting)
-                {
-                    <MudText Typo="Typo.caption" Class="mt-1">
-                        • 切换后系统会按现有连接重新检查，不符合要求时会自动退回原来的模式。
-                    </MudText>
-                }
-            </MudAlert>
 
             @if (_candidateNodes.Count == 0)
             {
@@ -74,103 +41,37 @@
                 </MudAlert>
             }
 
-            @if (!IsExisting)
-            {
-                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                    当前线路尚无结构：在下方添加段与端子后点击「创建结构」一次性提交。
-                </MudAlert>
-            }
-            else
-            {
-                @* 诊断信息（服务端按拓扑模式校验） *@
-                var diag = _structure.Diagnostics;
-                <MudPaper Elevation="0" Class="pa-2 mb-3"
-                          Style="border: 1px solid var(--mud-palette-lines-default);">
-                    <div class="d-flex align-center flex-wrap gap-3">
-                        <MudChip T="string" Size="Size.Small"
-                                 Color="@(diag.Valid ? Color.Success : Color.Error)"
-                                 Variant="Variant.Outlined">
-                            @(diag.Valid ? "拓扑校验通过" : "拓扑校验未通过")
-                        </MudChip>
-                        <MudText Typo="Typo.caption">节点 @diag.NodeCount</MudText>
-                        <MudText Typo="Typo.caption">段 @diag.EdgeCount</MudText>
-                        <MudText Typo="Typo.caption">单点最多连接 @diag.NodeDegreeMax</MudText>
-                        <MudText Typo="Typo.caption">端点 @diag.NodeDegreeOneCount</MudText>
-                        <MudText Typo="Typo.caption">成环 @(diag.HasCycle ? "是" : "否")</MudText>
-                        <MudText Typo="Typo.caption">电源接入点 @diag.FeedInCount（投运 @diag.FeedInEnergizedCount）</MudText>
-                        <MudText Typo="Typo.caption">联络点 @diag.TieCount</MudText>
-                    </div>
-                    @foreach (var w in diag.Warnings)
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Warning">• @w</MudText>
-                    }
-                    @foreach (var e in diag.Errors)
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Error">• @e</MudText>
-                    }
-                </MudPaper>
-            }
+            @* 诊断信息（只报告不阻断） *@
+            var diag = _structure.Diagnostics;
+            <MudPaper Elevation="0" Class="pa-2 mb-3"
+                      Style="border: 1px solid var(--mud-palette-lines-default);">
+                <div class="d-flex align-center flex-wrap gap-3">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(diag.Valid ? Color.Success : Color.Error)"
+                             Variant="Variant.Outlined">
+                        @(diag.Valid ? "诊断无异常" : "诊断存在异常")
+                    </MudChip>
+                    <MudText Typo="Typo.caption">节点 @diag.NodeCount</MudText>
+                    <MudText Typo="Typo.caption">段 @diag.EdgeCount</MudText>
+                    <MudText Typo="Typo.caption">单点最多连接 @diag.NodeDegreeMax</MudText>
+                    <MudText Typo="Typo.caption">端点 @diag.NodeDegreeOneCount</MudText>
+                    <MudText Typo="Typo.caption">成环 @(diag.HasCycle ? "是" : "否")</MudText>
+                    <MudText Typo="Typo.caption">电源接入点 @diag.FeedInCount（投运 @diag.FeedInEnergizedCount）</MudText>
+                    <MudText Typo="Typo.caption">联络点 @diag.TieCount</MudText>
+                </div>
+                @foreach (var w in diag.Warnings)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Warning">• @w</MudText>
+                }
+                @foreach (var e in diag.Errors)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Error">• @e</MudText>
+                }
+            </MudPaper>
 
-            @* ── 线性快速成链（服务端 OrderedNodeIds 便利入参） ── *@
-            @if (_topologyMode == nameof(TopologyMode.Linear))
-            {
-                <MudText Typo="Typo.subtitle2" Class="mb-2">线性快速成链</MudText>
-                <MudPaper Elevation="0" Class="pa-2 mb-3"
-                          Style="border: 1px solid var(--mud-palette-lines-default);">
-                    <MudText Typo="Typo.caption" Class="mb-2">
-                        按点击顺序串联节点（至少 2 个、不允许重复）：点击下方节点加入链，点击链上节点移除。
-                    </MudText>
-                    <div class="d-flex align-center flex-wrap gap-2 mb-2">
-                        @foreach (var n in _candidateNodes)
-                        {
-                            var inChain = _chainOrder.Contains(n.NodeId);
-                            <MudButton Variant="@(inChain ? Variant.Filled : Variant.Outlined)"
-                                       Color="@(inChain ? Color.Primary : Color.Default)"
-                                       Size="Size.Small"
-                                       Disabled="@_busy"
-                                       OnClick="@(() => ToggleChainNode(n.NodeId))">
-                                @n.Name
-                            </MudButton>
-                        }
-                    </div>
-                    <div class="d-flex align-center flex-wrap gap-1 mb-2">
-                        @if (_chainOrder.Count == 0)
-                        {
-                            <MudText Typo="Typo.caption">尚未选择节点。</MudText>
-                        }
-                        else
-                        {
-                            @for (var i = 0; i < _chainOrder.Count; i++)
-                            {
-                                var idx = i;
-                                <MudButton Variant="Variant.Text" Size="Size.Small"
-                                           Color="Color.Primary"
-                                           Disabled="@_busy"
-                                           OnClick="@(() => ToggleChainNode(_chainOrder[idx]))">
-                                    @($"{idx + 1}. {NodeName(_chainOrder[idx])}")
-                                </MudButton>
-                            }
-                        }
-                    </div>
-                    <div class="d-flex align-center flex-wrap gap-2">
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.AddLink"
-                                   Disabled="@(_busy || _chainOrder.Count < 2)"
-                                   OnClick="SubmitChainAsync">
-                            按此顺序成链（@Math.Max(0, _chainOrder.Count - 1) 段）
-                        </MudButton>
-                        <MudButton Variant="Variant.Text"
-                                   Disabled="@(_busy || _chainOrder.Count == 0)"
-                                   OnClick="ClearChain">
-                            清空顺序
-                        </MudButton>
-                    </div>
-                </MudPaper>
-            }
-
-            @* ── 段 ── *@
-            <MudText Typo="Typo.subtitle2" Class="mb-2">段（@SegmentCount）</MudText>
-            @if (SegmentCount == 0)
+            @* ── 段（结构边列表） ── *@
+            <MudText Typo="Typo.subtitle2" Class="mb-2">段（@_structure.Segments.Count）</MudText>
+            @if (_structure.Segments.Count == 0)
             {
                 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
                     尚未添加任何段。
@@ -178,18 +79,18 @@
             }
             else
             {
-                <MudTable Items="_segmentRows" Dense="true" Bordered="true" Hover="true" Class="mb-2">
+                <MudTable Items="_structure.Segments" Dense="true" Bordered="true" Hover="true" Class="mb-2">
                     <HeaderContent>
                         <MudTh>起点</MudTh>
                         <MudTh>终点</MudTh>
-                        <MudTh>权重</MudTh>
+                        <MudTh>类型</MudTh>
                         <MudTh>显示名</MudTh>
                         <MudTh Style="width: 1%;">操作</MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd>@context.FromName</MudTd>
-                        <MudTd>@context.ToName</MudTd>
-                        <MudTd>@(context.Weight.HasValue ? context.Weight.Value.ToString("0.####") : "—")</MudTd>
+                        <MudTd>@context.FromNodeName</MudTd>
+                        <MudTd>@context.ToNodeName</MudTd>
+                        <MudTd>@RelationTypeLabel(context.RelationType)</MudTd>
                         <MudTd>@(string.IsNullOrEmpty(context.DisplayName) ? "—" : context.DisplayName)</MudTd>
                         <MudTd>
                             <MudIconButton Icon="@Icons.Material.Filled.Delete"
@@ -222,9 +123,6 @@
                         <MudSelectItem T="string" Value="@n.NodeId">@n.Name</MudSelectItem>
                     }
                 </MudSelect>
-                <MudNumericField T="decimal?" @bind-Value="_newWeight" Label="权重"
-                                 Dense="true" Variant="Variant.Outlined"
-                                 Style="width: 120px;" />
                 <MudTextField T="string" @bind-Value="_newDisplayName" Label="显示名"
                               Dense="true" Variant="Variant.Outlined"
                               Style="width: 160px;" />
@@ -237,16 +135,16 @@
             </div>
 
             @* ── 端子 ── *@
-            <MudText Typo="Typo.subtitle2" Class="mb-2">端子（@TerminalCount）</MudText>
-            @if (TerminalCount == 0)
+            <MudText Typo="Typo.subtitle2" Class="mb-2">端子（@_structure.Terminals.Count）</MudText>
+            @if (_structure.Terminals.Count == 0)
             {
                 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
-                    尚未设置端子；「一个电源分多路」模式需要设 1 个电源接入点，其他模式可以不设。
+                    尚未设置端子；投运状态的电源接入点（馈入）至多 1 个，其余不限。
                 </MudAlert>
             }
             else
             {
-                <MudTable Items="_terminalRows" Dense="true" Bordered="true" Hover="true" Class="mb-2">
+                <MudTable Items="_structure.Terminals" Dense="true" Bordered="true" Hover="true" Class="mb-2">
                     <HeaderContent>
                         <MudTh>节点</MudTh>
                         <MudTh>角色</MudTh>
@@ -256,11 +154,11 @@
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd>@NodeName(context.NodeId)</MudTd>
-                        <MudTd>@RoleLabel(context.Role)</MudTd>
+                        <MudTd>@RoleLabel(context.TerminalRole ?? TerminalRole.FeedIn)</MudTd>
                         <MudTd>
                             <MudChip T="string" Size="Size.Small"
-                                     Color="@OperatingStateColor(context.OperatingState)">
-                                @OperatingStateLabel(context.OperatingState)
+                                     Color="@OperatingStateColor(context.OperatingState ?? TerminalOperatingState.Maintenance)">
+                                @OperatingStateLabel(context.OperatingState ?? TerminalOperatingState.Maintenance)
                             </MudChip>
                         </MudTd>
                         <MudTd>@(string.IsNullOrEmpty(context.ExternalNodeId)
@@ -283,7 +181,7 @@
                 <MudSelect T="string" Value="_terminalNodeId" Label="节点" Dense="true"
                            Variant="Variant.Outlined" Style="min-width: 180px;"
                            ValueChanged="OnTerminalNodeChanged">
-                    @foreach (var n in _terminalCandidateNodes)
+                    @foreach (var n in _candidateNodes)
                     {
                         <MudSelectItem T="string" Value="@n.NodeId">@n.Name</MudSelectItem>
                     }
@@ -314,26 +212,14 @@
                 </MudButton>
             </div>
 
-            @* ── 提交 / 清空 ── *@
+            @* ── 清空 ── *@
             <div class="d-flex align-center flex-wrap gap-2">
-                @if (!IsExisting)
-                {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Save"
-                               Disabled="@(_busy || _draftSegments.Count == 0)"
-                               OnClick="CreateStructureAsync">
-                        @(_busy ? "提交中..." : "创建结构")
-                    </MudButton>
-                }
-                else
-                {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Error"
-                               StartIcon="@Icons.Material.Filled.DeleteSweep"
-                               Disabled="@_busy"
-                               OnClick="ClearStructureAsync">
-                        清空结构
-                    </MudButton>
-                }
+                <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.DeleteSweep"
+                           Disabled="@_busy"
+                           OnClick="ClearStructureAsync">
+                    清空结构
+                </MudButton>
                 <MudSpacer />
                 <MudText Typo="Typo.caption" Color="Color.Secondary">
                     @(_busy ? "处理中..." : "结构变更即时保存")
@@ -350,123 +236,24 @@
     /// <summary>线路名称（标题展示）。</summary>
     [Parameter] public string LineName { get; set; } = "";
 
-    private sealed record SegmentRow(
-        string EdgeId, string FromNodeId, string FromName,
-        string ToNodeId, string ToName, decimal? Weight, string? DisplayName);
-
-    private sealed record TerminalRow(
-        string NodeId, TerminalRole Role, TerminalOperatingState OperatingState,
-        string? ExternalNodeId, string? ExternalNodeName);
-
     private bool _loading = true;
     private bool _busy;
     private LineStructureDto? _structure;
 
-    private string _topologyMode = nameof(TopologyMode.Network);
     private List<LineStructureNodeDto> _candidateNodes = [];
 
     /// <summary>模板下拉测试字段。</summary>
     private IReadOnlyList<string> _templateKeys = [];
     private string _selectedTemplateKey = "";
 
-    private List<LineStructureSegmentInput> _draftSegments = [];
-    private List<TerminalRow> _draftTerminals = [];
-
-    /// <summary>线性快速成链的点击顺序（Linear 模式下改用服务端 OrderedNodeIds 入参）。</summary>
-    private List<string> _chainOrder = [];
-
     private string _fromNodeId = "";
     private string _toNodeId = "";
-    private decimal? _newWeight;
     private string _newDisplayName = "";
 
     private string _terminalNodeId = "";
     private string _terminalRole = nameof(TerminalRole.FeedIn);
     private string _terminalOperatingState = nameof(TerminalOperatingState.Maintenance);
     private string _terminalExternalId = "";
-
-    private bool IsExisting => _structure?.Exists == true;
-
-    private int SegmentCount => IsExisting ? _structure!.Segments.Count : _draftSegments.Count;
-
-    private int TerminalCount => IsExisting ? _structure!.Terminals.Count : _draftTerminals.Count;
-
-    /// <summary>当前拓扑模式的日常说法（UI 展示用）。</summary>
-    private string TopologyModeLabel => _topologyMode switch
-    {
-        nameof(TopologyMode.Linear) => "Linear（一条线串到底）",
-        nameof(TopologyMode.Radial) => "Radial（一个电源分多路）",
-        nameof(TopologyMode.Network) => "Network（多点互连）",
-        _ => _topologyMode
-    };
-
-    // ── 三种模式的技术判据（与服务端 LineStructureService.ValidateCore 一一对应）──
-    // 仅供开发者查阅，不要直接展示给最终用户；UI 文案见 TopologyModeLabel / TopologyUsage / TopologyTips。
-    //   Linear  ：每点度 ≤ 2；度为 1 的端点恰为 2 个；不允许成环（边数 = 节点数 − 1 由前两条推出）。
-    //   Radial  ：不允许成环；边数 = 节点数 − 1；FeedIn 端子恰 1 个（0 个或多个均拒绝）。
-    //   Network ：仅要求无向连通；允许环与多电源；不校验边数、不要求端子。
-    //   共同     ：至少一段；无自环（from ≠ to）；段端点须属本线路；无向 BFS 必须连通；
-    //             端子节点须落在段端点内；节点集只取段端点，未入段的线路节点不参与校验。
-
-    /// <summary>当前拓扑模式的适用场合（一句话，面向业务用户）。</summary>
-    private string TopologyUsage => _topologyMode switch
-    {
-        nameof(TopologyMode.Linear) => "整条线路是一个接一个串起来的，中途不分叉，适合单回线路、单根主干。",
-        nameof(TopologyMode.Radial) => "一个电源进来，再分别向多处供电，像树干长出树枝，适合配电网、分支管线。",
-        nameof(TopologyMode.Network) => "多处互相连通、可以绕成圈，牵引供电的接触网（上下行并联、分区所联络、多所供电）通常属于这一类。",
-        _ => ""
-    };
-
-    /// <summary>当前拓扑模式下用户需要注意的事（不出现度数、边数等术语）。</summary>
-    private IReadOnlyList<string> TopologyTips => _topologyMode switch
-    {
-        nameof(TopologyMode.Linear) =>
-        [
-            "每个节点最多只和前后两个节点相连，整条线只有两个端点",
-            "线路不能绕回自己形成圈",
-            "不要求标注电源接入点；需要时可自行加",
-            "可用下方「线性快速成链」按点击顺序一次把整条线连好"
-        ],
-        nameof(TopologyMode.Radial) =>
-        [
-            "需要设置一个、且只设置一个「电源接入点」",
-            "线路不能绕成圈；分出去的支路不能再互相接上",
-            "有多个电源接入时请改用「多点互连」"
-        ],
-        nameof(TopologyMode.Network) =>
-        [
-            "可以绕成圈，也可以有多个电源接入",
-            "不要求设置电源接入点",
-            "整张网必须连成一片，不能分成几块互不相通"
-        ],
-        _ => []
-    };
-
-    /// <summary>三种模式共同遵守的基本要求（面向业务用户）。</summary>
-    private const string CommonTopologyRule =
-        "通用要求：每一段连接的两个节点都必须属于本线路，且不能把节点连到它自己；"
-        + "所有节点要连成一片；线路中暂时没用上的节点可以先放着，不影响保存。";
-
-    /// <summary>段/端子表格行（结构存在时取服务端数据，否则取本地草稿）。</summary>
-    private List<SegmentRow> _segmentRows => IsExisting
-        ? _structure!.Segments.Select(s => new SegmentRow(
-            s.EdgeId, s.FromNodeId, s.FromNodeName,
-            s.ToNodeId, s.ToNodeName, s.Weight, s.DisplayName)).ToList()
-        : _draftSegments.Select((s, i) => new SegmentRow(
-            $"draft-{i}", s.FromNodeId, NodeName(s.FromNodeId),
-            s.ToNodeId, NodeName(s.ToNodeId), s.Weight, null)).ToList();
-
-    private List<TerminalRow> _terminalRows => IsExisting
-        ? _structure!.Terminals.Select(t => new TerminalRow(
-            t.NodeId, t.TerminalRole ?? TerminalRole.FeedIn,
-            t.OperatingState ?? TerminalOperatingState.Maintenance,
-            t.ExternalNodeId, t.ExternalNodeName)).ToList()
-        : _draftTerminals;
-
-    /// <summary>端子可选节点：已有结构时为结构内节点，草稿阶段为全部候选节点。</summary>
-    private List<LineStructureNodeDto> _terminalCandidateNodes => IsExisting
-        ? _structure!.Nodes
-        : _candidateNodes;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -478,10 +265,10 @@
             _structure = await LineApi.GetStructureAsync(LineId);
             if (_structure is null) return;
 
-            _candidateNodes = _structure.CandidateNodes;
-            _topologyMode = _structure.TopologyMode.ToString();
+            // 候选节点 = 本线全部线路节点（nodes where host_type='LineNode' and line_id=LineId）
+            _candidateNodes = _structure.Nodes;
 
-            // 模板加载（模板只预填拓扑模式与端子默认值）
+            // 模板加载（模板只预填端子默认值）
             try
             {
                 var templates = await LineApi.GetLineTemplatesAsync() ?? [];
@@ -500,17 +287,13 @@
         }
     }
 
-    /// <summary>L1 模板：一键应用铁路牵引供电预设（Network + FeedIn/Maintenance）。</summary>
+    /// <summary>L1 模板：一键应用铁路牵引供电预设（端子默认 FeedIn/Maintenance）。</summary>
     private void ApplyRailwayFeedingTemplate()
     {
-        // 预填拓扑模式
-        _topologyMode = nameof(TopologyMode.Network);
-
-        // 预填端子默认值（只影响"添加端子"表单初始值）
         _terminalRole = nameof(TerminalRole.FeedIn);
         _terminalOperatingState = nameof(TerminalOperatingState.Maintenance);
 
-        Snackbar.Add("已应用铁路牵引供电预设：拓扑=Network，端子默认 FeedIn/Maintenance", Severity.Info);
+        Snackbar.Add("已应用铁路牵引供电预设：端子默认 FeedIn/Maintenance", Severity.Info);
     }
 
     private void OnSelectedTemplateKeyChanged(string? key)
@@ -557,29 +340,6 @@
         => _terminalOperatingState = string.IsNullOrEmpty(state)
             ? nameof(TerminalOperatingState.Maintenance) : state;
 
-    private async Task OnTopologyModeChanged(string mode)
-    {
-        if (_structure is null) return;
-        if (!IsExisting)
-        {
-            _topologyMode = mode;
-            return;
-        }
-
-        var previous = _structure.TopologyMode.ToString();
-        var (dto, error) = await LineApi.ReplaceStructureAsync(LineId, ToRequest(mode));
-        if (dto is null)
-        {
-            _topologyMode = previous;
-            Snackbar.Add($"切换拓扑模式失败：{error}", Severity.Error);
-            return;
-        }
-
-        _structure = dto;
-        _topologyMode = dto.TopologyMode.ToString();
-        Snackbar.Add("拓扑模式已更新", Severity.Success);
-    }
-
     private async Task AddSegmentAsync()
     {
         if (string.IsNullOrEmpty(_fromNodeId) || string.IsNullOrEmpty(_toNodeId))
@@ -593,33 +353,12 @@
             return;
         }
 
-        if (!IsExisting)
-        {
-            var duplicated = _draftSegments.Any(s =>
-                s.FromNodeId == _fromNodeId && s.ToNodeId == _toNodeId);
-            if (duplicated)
-            {
-                Snackbar.Add("该段已存在", Severity.Warning);
-                return;
-            }
-
-            _draftSegments.Add(new LineStructureSegmentInput
-            {
-                FromNodeId = _fromNodeId,
-                ToNodeId = _toNodeId,
-                Weight = _newWeight
-            });
-            ResetSegmentInputs();
-            return;
-        }
-
         await RunBusyAsync(async () =>
         {
             var (dto, error) = await LineApi.AddSegmentAsync(LineId, new AddLineSegmentRequest
             {
                 FromNodeId = _fromNodeId,
                 ToNodeId = _toNodeId,
-                Weight = _newWeight,
                 DisplayName = string.IsNullOrWhiteSpace(_newDisplayName) ? null : _newDisplayName
             });
             if (dto is null)
@@ -634,19 +373,11 @@
         });
     }
 
-    private async Task DeleteSegmentAsync(SegmentRow segment)
+    private async Task DeleteSegmentAsync(LineStructureSegmentDto segment)
     {
-        if (!IsExisting)
-        {
-            var index = int.Parse(segment.EdgeId["draft-".Length..]);
-            if (index >= 0 && index < _draftSegments.Count)
-                _draftSegments.RemoveAt(index);
-            return;
-        }
-
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除这段结构吗？\n\n{segment.FromName} → {segment.ToName}",
+            $"确定删除这段结构吗？\n\n{segment.FromNodeName} → {segment.ToNodeName}",
             yesText: "删除", cancelText: "取消");
         if (confirmed != true) return;
 
@@ -677,24 +408,6 @@
             ? null
             : _terminalExternalId.Trim();
 
-        if (!IsExisting)
-        {
-            var endpoints = _draftSegments
-                .SelectMany(s => new[] { s.FromNodeId, s.ToNodeId })
-                .ToHashSet(StringComparer.Ordinal);
-            if (!endpoints.Contains(_terminalNodeId))
-            {
-                Snackbar.Add("端子节点必须属于当前结构（先加入段再设置端子）", Severity.Warning);
-                return;
-            }
-
-            _draftTerminals.RemoveAll(t => t.NodeId == _terminalNodeId);
-            _draftTerminals.Add(new TerminalRow(
-                _terminalNodeId, role, state, externalId, null));
-            _terminalExternalId = "";
-            return;
-        }
-
         await RunBusyAsync(async () =>
         {
             var (dto, error) = await LineApi.UpsertTerminalAsync(LineId, new AddLineTerminalRequest
@@ -717,12 +430,6 @@
 
     private async Task DeleteTerminalAsync(string nodeId)
     {
-        if (!IsExisting)
-        {
-            _draftTerminals.RemoveAll(t => t.NodeId == nodeId);
-            return;
-        }
-
         await RunBusyAsync(async () =>
         {
             var (dto, error) = await LineApi.DeleteTerminalAsync(LineId, nodeId);
@@ -736,47 +443,12 @@
         });
     }
 
-    private async Task CreateStructureAsync()
-    {
-        if (_draftSegments.Count == 0)
-        {
-            Snackbar.Add("请先添加至少一段", Severity.Warning);
-            return;
-        }
-
-        await RunBusyAsync(async () =>
-        {
-            var (dto, error) = await LineApi.CreateStructureAsync(LineId, new LineStructureRequest
-            {
-                TopologyMode = Enum.Parse<TopologyMode>(_topologyMode),
-                Segments = _draftSegments.ToList(),
-                Terminals = _draftTerminals.Select(t => new LineStructureTerminalInput
-                {
-                    NodeId = t.NodeId,
-                    Role = t.Role,
-                    OperatingState = t.OperatingState,
-                    ExternalNodeId = t.ExternalNodeId
-                }).ToList()
-            });
-
-            if (dto is null)
-            {
-                Snackbar.Add($"创建结构失败：{error}", Severity.Error);
-                return;
-            }
-
-            _structure = dto;
-            _draftSegments = [];
-            _draftTerminals = [];
-            Snackbar.Add("线路结构已创建", Severity.Success);
-        });
-    }
-
+    /// <summary>清空结构：全量替换为空边集 + 空端子集。</summary>
     private async Task ClearStructureAsync()
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认清空",
-            "清空后结构头、全部段与端子将一并删除，确定继续？",
+            "清空后全部段与端子将一并删除，确定继续？",
             yesText: "清空", cancelText: "取消");
         if (confirmed != true) return;
 
@@ -790,92 +462,9 @@
                 return;
             }
             _structure = dto;
-            _draftSegments = [];
-            _draftTerminals = [];
             Snackbar.Add("结构已清空", Severity.Success);
         });
     }
-
-    // ── 线性快速成链 ──
-
-    /// <summary>按点击顺序增删链上节点（点击已选节点即移除，保证无重复）。</summary>
-    private void ToggleChainNode(string nodeId)
-    {
-        if (_busy) return;
-        if (!_chainOrder.Remove(nodeId)) _chainOrder.Add(nodeId);
-    }
-
-    private void ClearChain() => _chainOrder.Clear();
-
-    /// <summary>以 OrderedNodeIds 提交：服务端按相邻节点自动生成段。</summary>
-    private async Task SubmitChainAsync()
-    {
-        if (_chainOrder.Count < 2)
-        {
-            Snackbar.Add("至少选择 2 个节点才能成链", Severity.Warning);
-            return;
-        }
-
-        await RunBusyAsync(async () =>
-        {
-            var request = new LineStructureRequest
-            {
-                TopologyMode = TopologyMode.Linear,
-                OrderedNodeIds = _chainOrder.ToList(),
-                Terminals = IsExisting
-                    ? _structure!.Terminals.Select(t => new LineStructureTerminalInput
-                    {
-                        NodeId = t.NodeId,
-                        Role = t.TerminalRole ?? TerminalRole.FeedIn,
-                        OperatingState = t.OperatingState ?? TerminalOperatingState.Maintenance,
-                        ExternalNodeId = t.ExternalNodeId
-                    }).ToList()
-                    : _draftTerminals.Select(t => new LineStructureTerminalInput
-                    {
-                        NodeId = t.NodeId,
-                        Role = t.Role,
-                        OperatingState = t.OperatingState,
-                        ExternalNodeId = t.ExternalNodeId
-                    }).ToList()
-            };
-
-            var (dto, error) = IsExisting
-                ? await LineApi.ReplaceStructureAsync(LineId, request)
-                : await LineApi.CreateStructureAsync(LineId, request);
-
-            if (dto is null)
-            {
-                Snackbar.Add($"快速成链失败：{error}", Severity.Error);
-                return;
-            }
-
-            _structure = dto;
-            _topologyMode = dto.TopologyMode.ToString();
-            _draftSegments = [];
-            _draftTerminals = [];
-            _chainOrder = [];
-            Snackbar.Add("已按选择顺序成链", Severity.Success);
-        });
-    }
-
-    /// <summary>已有结构的全量替换请求（切换拓扑模式用）：沿用当前段与端子。</summary>
-    private LineStructureRequest ToRequest(string mode) => new()
-    {
-        TopologyMode = Enum.Parse<TopologyMode>(mode),
-        Segments = _structure!.Segments.Select(s => new LineStructureSegmentInput
-        {
-            FromNodeId = s.FromNodeId,
-            ToNodeId = s.ToNodeId,
-            Weight = s.Weight
-        }).ToList(),
-        Terminals = _structure.Terminals.Select(t => new LineStructureTerminalInput
-        {
-            NodeId = t.NodeId,
-            Role = t.TerminalRole ?? TerminalRole.FeedIn,
-            OperatingState = t.OperatingState ?? TerminalOperatingState.Maintenance,
-            ExternalNodeId = t.ExternalNodeId
-        }).ToList()
-    };
 
     private async Task RunBusyAsync(Func<Task> action)
     {
@@ -895,12 +484,14 @@
     {
         _fromNodeId = "";
         _toNodeId = "";
-        _newWeight = null;
         _newDisplayName = "";
     }
 
     private string NodeName(string id)
         => _candidateNodes.FirstOrDefault(n => n.NodeId == id)?.Name ?? Clip(id);
+
+    private static string RelationTypeLabel(string relationType)
+        => relationType == "line_segment" ? "结构段" : relationType;
 
     private static string RoleLabel(TerminalRole role) => role switch
     {

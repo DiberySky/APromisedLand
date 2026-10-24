@@ -1,0 +1,52 @@
+@* TreeNodePickDialog.razor — 轻量目标父节点选择（移动到）：点击节点文本即返回其 Id。
+   与 TreeSelectDialogSky 的 SelectLeaf 语义无关，任何节点都可作为目标父节点；
+   目标是否允许子节点由后端 move 端点校验（400 透传）。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+<DialogSky Title="@Title"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="取消">
+    <DialogContent>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">
+            点击目标节点名称，将当前节点移动到其下。
+        </MudText>
+        <TreeEavSky TItem="TItem"
+                    IsSelectDialog="true"
+                    RootId="@RootId"
+                    OnClickItemText="Pick" />
+    </DialogContent>
+    <DialogLeftActions>
+        @if (AllowRoot)
+        {
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Warning"
+                       StartIcon="@Icons.Material.Filled.VerticalAlignTop"
+                       OnClick="PickRoot">
+                移至顶层
+            </MudButton>
+        }
+    </DialogLeftActions>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public string Title { get; set; } = "选择目标父节点";
+
+    /// <summary>树的根节点 ID（限定可选范围；空 = 全部根）。</summary>
+    [Parameter] public string? RootId { get; set; }
+
+    /// <summary>是否允许移动到顶层（成为根节点）。</summary>
+    [Parameter] public bool AllowRoot { get; set; } = true;
+
+    private void Pick(TreeNodeItem<TItem>? node)
+    {
+        if (node?.Value is null) return;
+        MudDialog?.Close(DialogResult.Ok(node.Value.Id));
+    }
+
+    /// <summary>移至顶层：返回空字符串表示目标为根（区别于取消）。</summary>
+    private void PickRoot() => MudDialog?.Close(DialogResult.Ok(string.Empty));
+}

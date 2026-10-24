@@ -1,6 +1,7 @@
 @page "/semantic-search-direct"
 @using Microsoft.Extensions.Logging
 @using TreeGraph.Shared.NodeEavSky.Dtos
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
 @using TreeGraph.Blazor.Shared.TreeEavSky
 @using TreeGraph.Shared.TreeEavSky.Entities
 @using TreeGraph.Shared.TreeEavSky.Abstractions
@@ -133,18 +134,13 @@
                                 </MudStack>
                             </MudStack>
 
-                            @* ★ 操作按钮：AI 综合 / 查看详情 *@
+                            @* ★ 操作菜单：按 HostType 出项（树节点 CRUD / LineNode CRUD / AI 综合 / 树定位） *@
                             <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
-                                <MudIconButton Icon="@Icons.Material.Filled.AutoAwesome"
-                                               Size="Size.Small"
-                                               Color="Color.Secondary"
-                                               Title="AI 综合"
-                                               OnClick="@(() => OpenExpandDialogAsync(item))"/>
-                                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
-                                               Size="Size.Small"
-                                               Color="Color.Primary"
-                                               Title="查看详情"
-                                               OnClick="@(() => OpenTreeDialogAsync(item))"/>
+                                <SearchResultActionsMenu Item="item"
+                                                         OnOpenTree="OpenTreeDialogAsync"
+                                                         OnAiExpand="OpenExpandDialogAsync"
+                                                         OnChanged="OnResultChangedAsync"
+                                                         OnDeleted="OnResultDeletedAsync"/>
                             </MudStack>
                         </MudListItem>
                         <MudDivider/>
@@ -228,6 +224,20 @@
         {
             await DoSearchAsync();
         }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 结果变更回调（操作菜单）
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>变更后重跑搜索（名称/结构已变，列表需刷新）。</summary>
+    private async Task OnResultChangedAsync(SemanticSearchItemDto item) => await DoSearchAsync();
+
+    private Task OnResultDeletedAsync(SemanticSearchItemDto item)
+    {
+        _results.RemoveAll(r => r.InodeId == item.InodeId);
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     // ═══════════════════════════════════════════════════════

@@ -60,11 +60,11 @@ public sealed class GraphSynchronizer
 
         await SyncParentEdgeAsync(node, ct);
 
-        // 线路结构关联：线路节点同步 line_contains（反向）与 connects_to；线路同步 line_contains（正向）
+        // 线路节点关联：connects_to（node → 外部 inode，属性 role；无端子/无外部连接时清空）。
+        // R7：Line→LineNode 归属走 parent_of（SyncParentEdgeAsync），原归属边类型已下线；
+        //     line_segment 段边即 relation 值，走 RelationGraphSyncConsumer 管道。
         if (node.Tag == GraphNaming.LineNodeTag)
             await SyncLineNodeLinksAsync(node, ct);
-        else if (node.Tag == GraphNaming.LineTag)
-            await SyncLineContainsAsync(node.Id, ct);
 
         _logger.LogDebug("图顶点已同步：{InodeId} tag={Tag}", node.Id, node.Tag);
         return true;
@@ -105,27 +105,11 @@ public sealed class GraphSynchronizer
     }
 
     /// <summary>
-    /// 线路节点关联边：
-    ///   line_contains（Line → node，反向对齐唯一所属线路）
-    ///   connects_to（node → 外部 inode，属性 role；无端子/无外部连接时清空）
+    /// 线路节点关联边：connects_to（node → 外部 inode，属性 role；无端子/无外部连接时清空）。
+    /// R7：原归属边类型的对齐段已删除（归属走 parent_of）。
     /// </summary>
     private async Task SyncLineNodeLinksAsync(GraphNodeInfo node, CancellationToken ct)
     {
-        var lineId = node.ExtraProps?.TryGetValue("line_id", out var l) == true
-            ? l as string
-            : null;
-
-        var contains = await _client.QueryAsync(
-            $"GO FROM \"{node.Id}\" OVER `{GraphNaming.LineContainsEdge}` REVERSELY " +
-            "YIELD src(edge) AS line", ct);
-        var existingLines = QueryColumn(contains, "line");
-
-        foreach (var old in existingLines.Where(x => x != lineId))
-            await _client.DeleteEdgeAsync(GraphNaming.LineContainsEdge, old, node.Id, ct);
-
-        if (lineId is not null && !existingLines.Contains(lineId))
-            await _client.UpsertEdgeAsync(GraphNaming.LineContainsEdge, lineId, node.Id, null, ct);
-
         // 外部连接：端子表为准（一个节点同属一条线路，故至多一条端子）
         var terminal = await _db.LineTerminals.AsNoTracking()
             .Where(t => t.NodeId == node.Id)
@@ -153,26 +137,6 @@ public sealed class GraphSynchronizer
         }
     }
 
-    /// <summary>对齐线路的 line_contains 边集合（Line → 其全部 LineNode）。</summary>
-    private async Task SyncLineContainsAsync(string lineId, CancellationToken ct)
-    {
-        var nodeIds = await _db.LineNodes.AsNoTracking()
-            .Where(n => n.LineId == lineId)
-            .Select(n => n.Id)
-            .ToListAsync(ct);
-
-        var result = await _client.QueryAsync(
-            $"GO FROM \"{lineId}\" OVER `{GraphNaming.LineContainsEdge}` " +
-            "YIELD dst(edge) AS node", ct);
-        var existing = QueryColumn(result, "node");
-
-        foreach (var old in existing.Where(x => !nodeIds.Contains(x)))
-            await _client.DeleteEdgeAsync(GraphNaming.LineContainsEdge, lineId, old, ct);
-
-        foreach (var nodeId in nodeIds.Where(x => !existing.Contains(x)))
-            await _client.UpsertEdgeAsync(GraphNaming.LineContainsEdge, lineId, nodeId, null, ct);
-    }
-
     private static List<string> QueryColumn(NebulaQueryResult result, string column)
         => result.Data?
             .Select(r => r.TryGetValue(column, out var v) ? v.GetString() : null)
@@ -188,7 +152,7 @@ public sealed class GraphSynchronizer
     {
         var row = await _db.Nodes.AsNoTracking()
             .Where(n => n.Id == inodeId)
-            .Select(n => new { n.Id, n.Name, n.HostType })
+            .Select(n => new { n.Id, n.Name, n.HostType, n.LineId })
             .FirstOrDefaultAsync(ct);
         if (row is null) return null;
 
@@ -232,13 +196,11 @@ public sealed class GraphSynchronizer
             }
             case "LineNode":
             {
-                var lineId = await _db.LineNodes.AsNoTracking()
-                    .Where(n => n.Id == inodeId)
-                    .Select(n => n.LineId)
-                    .FirstOrDefaultAsync(ct);
+                // R7：line_id 即 nodes.line_id（身份锚点）；parent_of 边指向所属 Line
+                var lineId = row.LineId;
                 if (lineId is null) return null;
 
-                var lineName = await _db.Lines.AsNoTracking()
+                var lineName = await _db.Nodes.AsNoTracking()
                     .Where(l => l.Id == lineId)
                     .Select(l => l.Name)
                     .FirstOrDefaultAsync(ct) ?? string.Empty;
@@ -252,7 +214,7 @@ public sealed class GraphSynchronizer
                     .FirstOrDefaultAsync(ct);
 
                 return new GraphNodeInfo(inodeId, row.Name, GraphNaming.LineNodeTag,
-                    "LineNode", false, null, new Dictionary<string, object?>
+                    "LineNode", false, lineId, new Dictionary<string, object?>
                     {
                         ["line_id"] = lineId,
                         ["line_name"] = lineName,
@@ -261,17 +223,9 @@ public sealed class GraphSynchronizer
                     });
             }
             case "Line":
-            {
-                var mode = await _db.LineStructures.AsNoTracking()
-                    .Where(s => s.LineId == inodeId)
-                    .Select(s => (TreeGraph.Shared.LineSky.Entities.TopologyMode?)s.TopologyMode)
-                    .FirstOrDefaultAsync(ct);
+                // R7：Line 注册在 nodes，顶点链路直连；拓扑模式已下线（结构由边连接定义）
                 return new GraphNodeInfo(inodeId, row.Name, GraphNaming.LineTag,
-                    "Line", false, null, new Dictionary<string, object?>
-                    {
-                        ["topology_mode"] = mode?.ToString()
-                    });
-            }
+                    "Line", false, null);
             case "Node":
                 // 自由节点：无宿主扩展表，只入身份与名称
                 return new GraphNodeInfo(inodeId, row.Name, GraphNaming.NodeTag,
@@ -309,87 +263,6 @@ public sealed class GraphSynchronizer
                 ["name"] = evt.Name
             }, ct);
         _logger.LogDebug("图边已同步：{ValueId} type={Type}", evt.ValueId, evt.RelationType);
-    }
-
-    // ============================================================
-    // 线路结构边（R5：线路入图）
-    // ============================================================
-
-    /// <summary>
-    /// 同步一条线路的结构边（line_segment：线路节点 → 线路节点）。
-    /// 以 PG 现状为准：确保端点顶点存在 → upsert 当前段 → 删除已不存在的段边。幂等可重放。
-    /// </summary>
-    public async Task SyncLineStructureAsync(string lineId, CancellationToken ct = default)
-    {
-        var lineNodeIds = await _db.LineNodes.AsNoTracking()
-            .Where(n => n.LineId == lineId)
-            .Select(n => n.Id)
-            .ToListAsync(ct);
-
-        // 线路已删除：LineNode 顶点删除会连带其边，无需额外清理
-        if (lineNodeIds.Count == 0) return;
-
-        var segments = await _db.LineStructureSegments.AsNoTracking()
-            .Where(s => s.LineId == lineId)
-            .Select(s => new { s.EdgeId, s.FromNodeId, s.ToNodeId, s.Weight, s.DisplayName })
-            .ToListAsync(ct);
-
-        // 端点顶点可能尚未同步（先建段后建节点 / 事件重放），先补齐顶点再写边
-        var endpoints = segments.Select(s => s.FromNodeId)
-            .Concat(segments.Select(s => s.ToNodeId))
-            .Distinct(StringComparer.Ordinal);
-        foreach (var nodeId in endpoints)
-            await SyncInodeAsync(nodeId, ct);
-
-        var existing = await LoadLineSegmentPairsAsync(lineNodeIds, ct);
-        var desired = segments
-            .Select(s => (From: s.FromNodeId, To: s.ToNodeId))
-            .ToHashSet();
-
-        foreach (var (from, to) in existing.Where(p => !desired.Contains(p)))
-        {
-            await _client.DeleteEdgeAsync(GraphNaming.LineSegmentEdge, from, to, ct);
-            _logger.LogDebug("线路段边已删除：{LineId} {From}->{To}", lineId, from, to);
-        }
-
-        foreach (var s in segments)
-        {
-            await _client.UpsertEdgeAsync(GraphNaming.LineSegmentEdge, s.FromNodeId, s.ToNodeId,
-                new Dictionary<string, object?>
-                {
-                    ["edge_id"] = s.EdgeId,
-                    ["line_id"] = lineId,
-                    ["weight"] = s.Weight is null ? null : (double)s.Weight.Value,
-                    ["display_name"] = s.DisplayName
-                }, ct);
-        }
-
-        _logger.LogInformation(
-            "线路结构边已同步：{LineId}，段 {Segments}，清理 {Deleted}",
-            lineId, segments.Count, existing.Count(p => !desired.Contains(p)));
-    }
-
-    /// <summary>查询线路节点上已存在的结构边（src→dst）。</summary>
-    private async Task<HashSet<(string From, string To)>> LoadLineSegmentPairsAsync(
-        IReadOnlyList<string> lineNodeIds, CancellationToken ct)
-    {
-        var pairs = new HashSet<(string, string)>();
-        foreach (var vid in lineNodeIds)
-        {
-            var result = await _client.QueryAsync(
-                $"GO FROM \"{vid}\" OVER `{GraphNaming.LineSegmentEdge}` " +
-                "YIELD src(edge) AS src, dst(edge) AS dst", ct);
-
-            foreach (var row in result.Data ?? [])
-            {
-                if (row.TryGetValue("src", out var s) && row.TryGetValue("dst", out var d)
-                    && s.GetString() is { } from && d.GetString() is { } to)
-                {
-                    pairs.Add((from, to));
-                }
-            }
-        }
-        return pairs;
     }
 
     // ============================================================
@@ -455,7 +328,7 @@ public sealed class GraphSynchronizer
 
         var parentEdgeCount = edges.Count;
 
-        // ── 线路顶点/节点 + line_contains / connects_to 边 ──
+        // ── 线路顶点/节点 + parent_of（Line→LineNode）/ connects_to 边 ──
         var lineEdgeCount = await AddLineGraphAsync(vertices, edges, ct);
 
         // ── 关系边（relation_attribute_values）──
@@ -634,8 +507,9 @@ public sealed class GraphSynchronizer
         || msg.Contains("LeaderChanged") || msg.Contains("retry later");
 
     /// <summary>
-    /// 装载线路图：Line 顶点（topology_mode）、LineNode 顶点（所属线路与端子角色）、
-    /// line_contains（Line → LineNode）与 connects_to（LineNode → 外部 inode，带 role）。
+    /// 装载线路图：Line 顶点、LineNode 顶点（所属线路与端子角色）、
+    /// parent_of（Line → LineNode，R7 归属边）与 connects_to（LineNode → 外部 inode，带 role）。
+    /// R7：line_segment 段边即 relation 值，由语义边段统一装载（计入 SemanticEdges）。
     /// 返回追加的边数。
     /// </summary>
     private async Task<int> AddLineGraphAsync(
@@ -643,12 +517,8 @@ public sealed class GraphSynchronizer
     {
         var edgeStart = edges.Count;
 
-        var lineNames = await _db.Lines.AsNoTracking()
-            .Select(l => new { l.Id, l.Name })
-            .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
-        var topologyModes = await _db.LineStructures.AsNoTracking()
-            .Select(s => new { s.LineId, s.TopologyMode })
-            .ToDictionaryAsync(x => x.LineId, x => x.TopologyMode.ToString(), ct);
+        // 名称唯一真源在 nodes（R2 收编）；Line/LineNode 均注册于 nodes
+        var lineNames = await LoadNodeNamesAsync("Line", ct);
         var terminalInfo = await _db.LineTerminals.AsNoTracking()
             .Select(t => new { t.LineId, t.NodeId, t.Role, t.OperatingState })
             .ToListAsync(ct);
@@ -661,27 +531,26 @@ public sealed class GraphSynchronizer
 
         foreach (var (lineId, name) in lineNames)
         {
-            vertices.Add(MakeVertex(lineId, name, GraphNaming.LineTag, "Line", false,
-                new Dictionary<string, object?>
-                {
-                    ["topology_mode"] = topologyModes.GetValueOrDefault(lineId)
-                }));
+            vertices.Add(MakeVertex(lineId, name ?? "", GraphNaming.LineTag, "Line", false));
         }
 
-        var lineNodeNames = await LoadNodeNamesAsync("LineNode", ct);
+        var lineNodeRows = await _db.Nodes.AsNoTracking()
+            .Where(n => n.HostType == "LineNode" && n.LineId != null)
+            .Select(n => new { n.Id, n.Name, n.LineId })
+            .ToListAsync(ct);
 
-        foreach (var n in await _db.LineNodes.AsNoTracking()
-                     .Select(n => new { n.Id, n.LineId }).ToListAsync(ct))
+        foreach (var n in lineNodeRows)
         {
-            vertices.Add(MakeVertex(n.Id, lineNodeNames.GetValueOrDefault(n.Id) ?? "", GraphNaming.LineNodeTag, "LineNode", false,
+            vertices.Add(MakeVertex(n.Id, n.Name ?? "", GraphNaming.LineNodeTag, "LineNode", false,
                 new Dictionary<string, object?>
                 {
                     ["line_id"] = n.LineId,
-                    ["line_name"] = lineNames.GetValueOrDefault(n.LineId) ?? string.Empty,
-                    ["terminal_role"] = terminalRoleMap.GetValueOrDefault((n.LineId, n.Id)),
-                    ["terminal_operating_state"] = terminalStateMap.GetValueOrDefault((n.LineId, n.Id))
+                    ["line_name"] = lineNames.GetValueOrDefault(n.LineId!) ?? string.Empty,
+                    ["terminal_role"] = terminalRoleMap.GetValueOrDefault((n.LineId!, n.Id)),
+                    ["terminal_operating_state"] = terminalStateMap.GetValueOrDefault((n.LineId!, n.Id))
                 }));
-            edges.Add(new EdgeItem(n.LineId, n.Id, GraphNaming.LineContainsEdge, 0, null));
+            // R7：Line → LineNode 归属边复用 parent_of
+            edges.Add(new EdgeItem(n.LineId!, n.Id, GraphNaming.ParentOfEdge, 0, null));
         }
 
         var terminals = await _db.LineTerminals.AsNoTracking()
@@ -695,22 +564,6 @@ public sealed class GraphSynchronizer
                 {
                     ["role"] = t.Role.ToString(),
                     ["operating_state"] = t.OperatingState.ToString()
-                }));
-        }
-
-        // 线路结构段 → 图内结构边（线路节点之间，R5）
-        var segments = await _db.LineStructureSegments.AsNoTracking()
-            .Select(s => new { s.LineId, s.EdgeId, s.FromNodeId, s.ToNodeId, s.Weight, s.DisplayName })
-            .ToListAsync(ct);
-        foreach (var s in segments)
-        {
-            edges.Add(new EdgeItem(s.FromNodeId, s.ToNodeId, GraphNaming.LineSegmentEdge, 0,
-                new Dictionary<string, object?>
-                {
-                    ["edge_id"] = s.EdgeId,
-                    ["line_id"] = s.LineId,
-                    ["weight"] = s.Weight is null ? null : (double)s.Weight.Value,
-                    ["display_name"] = s.DisplayName
                 }));
         }
 

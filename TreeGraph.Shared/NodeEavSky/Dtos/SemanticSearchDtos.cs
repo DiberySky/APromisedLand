@@ -41,7 +41,7 @@ public sealed record SemanticSearchResponse(
 /// <summary>
 /// 向量对账结果（POST /api/search/reconcile）。
 /// Active/Existing 为对账时的两侧集合规模，Missing/Orphaned 为差集，
-/// FixedCount/DeletedCount 为本轮实际修复数。
+/// FixedCount/DeletedCount 为本轮实际修复数，FailedCount 为本轮失败数（单项失败不中断对账）。
 /// </summary>
 public sealed record VectorReconcileResultDto(
     int Active,
@@ -49,12 +49,14 @@ public sealed record VectorReconcileResultDto(
     int Missing,
     int Orphaned,
     int FixedCount,
-    int DeletedCount);
+    int DeletedCount,
+    int FailedCount = 0);
 
 /// <summary>
 /// 向量对账流式进度事件（POST /api/search/reconcile/stream，NDJSON 逐行）。
 /// stage=fix：同步节点（InodeId/Name）；stage=purge：清理孤儿（Detail 描述）；
-/// stage=summary：结束统计（六个计数字段，与 VectorReconcileResultDto 对应）。
+/// stage=error：单项失败或致命错误（Detail 为真实原因；致命错误后不再有 summary）；
+/// stage=summary：结束统计（七个计数字段，与 VectorReconcileResultDto 对应）。
 /// </summary>
 public sealed record ReconcileStreamEventDto(
     string Stage,
@@ -66,7 +68,8 @@ public sealed record ReconcileStreamEventDto(
     int? Missing = null,
     int? Orphaned = null,
     int? FixedCount = null,
-    int? DeletedCount = null);
+    int? DeletedCount = null,
+    int? FailedCount = null);
 
 /// <summary>
 /// 图按类别同步结果（POST /api/graph-sync/category/{category}，同步刷新对话框展示用）。

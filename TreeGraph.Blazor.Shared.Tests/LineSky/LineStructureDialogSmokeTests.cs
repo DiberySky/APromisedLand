@@ -15,16 +15,17 @@ using Xunit;
 namespace TreeGraph.Blazor.Shared.Tests.LineSky;
 
 /// <summary>
-/// LineStructureDialog 组件冒烟测试。
+/// LineStructureDialog 组件冒烟测试（R7 边集薄层形态）。
 ///
-/// R4：线路结构不再依赖通用边类型（边类型下拉 / EdgeTypeId 已移除），模板只预填拓扑模式与端子默认值。
-/// 覆盖：初始化加载、拓扑模式渲染、端子下拉状态选项、诊断区 Warnings/TieCount/FeedInEnergizedCount 展示。
+/// R7：拓扑模式整体下线（无拓扑字段 / 无拓扑下拉 / 段无 Weight），
+/// 段列表 = relation 边列表（起点/终点/类型/显示名），模板只预填端子默认值。
+/// 覆盖：初始化加载、诊断 chips、段边列表、端子运行状态、模板预填、空节点提示、请求 DTO 形状。
 /// 模式对齐其它冒烟测试：真实 MudDialogProvider + 桩 HttpClient + Route 按 URL 返回 canned JSON。
 /// </summary>
 public class LineStructureDialogSmokeTests : BunitTestBase
 {
     private const string TestLineId = "line-test-001";
-    /// <summary>尚无结构的线路（模板交互用例：模板下拉在 IsExisting=false 时才可用）。</summary>
+    /// <summary>尚无线路节点的线路（空节点提示用例）。</summary>
     private const string TestNewLineId = "line-test-new-001";
 
     public LineStructureDialogSmokeTests()
@@ -71,7 +72,7 @@ public class LineStructureDialogSmokeTests : BunitTestBase
 
     private static string? Route(string path, HttpMethod method)
     {
-        // GET /api/eav/lines/{TestNewLineId}/structure —— 尚无结构（模板交互用例）
+        // GET /api/eav/lines/{TestNewLineId}/structure —— 尚无线路节点
         if (path.StartsWith($"/api/eav/lines/{TestNewLineId}/structure") && method == HttpMethod.Get)
             return Envelope(NewStructure());
 
@@ -100,7 +101,6 @@ public class LineStructureDialogSmokeTests : BunitTestBase
             Key: "RailwayFeeding",
             DisplayName: "铁路牵引供电",
             Description: "多电源、允许成环、多所联络",
-            DefaultTopologyMode: "Network",
             DefaultTerminalRole: "FeedIn",
             DefaultOperatingState: "Maintenance")
     };
@@ -110,8 +110,6 @@ public class LineStructureDialogSmokeTests : BunitTestBase
         Exists = false,
         LineId = TestNewLineId,
         LineName = "新建贯通线",
-        // 用户先选了 Linear 再套模板 → 切到 Network（before/after 可观测）
-        TopologyMode = TopologyMode.Linear,
         OrderedNodeIds = [],
         Nodes = [],
         Segments = [],
@@ -125,13 +123,18 @@ public class LineStructureDialogSmokeTests : BunitTestBase
         Exists = true,
         LineId = TestLineId,
         LineName = "测试贯通线",
-        TopologyMode = TopologyMode.Network,
         OrderedNodeIds = new List<string> { "node-1", "node-2", "node-3" },
         Segments = new List<LineStructureSegmentDto>
         {
-            new() { EdgeId = "seg-1", FromNodeId = "node-1", ToNodeId = "node-2", Weight = null },
-            new() { EdgeId = "seg-2", FromNodeId = "node-2", ToNodeId = "node-3", Weight = null },
-            new() { EdgeId = "seg-3", FromNodeId = "node-3", ToNodeId = "node-1", Weight = null }
+            new() { EdgeId = "seg-1", FromNodeId = "node-1", FromNodeName = "牵引所A",
+                    ToNodeId = "node-2", ToNodeName = "分区所",
+                    RelationType = "line_segment", DisplayName = "主线段" },
+            new() { EdgeId = "seg-2", FromNodeId = "node-2", FromNodeName = "分区所",
+                    ToNodeId = "node-3", ToNodeName = "牵引所B",
+                    RelationType = "line_segment" },
+            new() { EdgeId = "seg-3", FromNodeId = "node-3", FromNodeName = "牵引所B",
+                    ToNodeId = "node-1", ToNodeName = "牵引所A",
+                    RelationType = "line_segment" }
         },
         Nodes = new List<LineStructureNodeDto>
         {
@@ -148,13 +151,7 @@ public class LineStructureDialogSmokeTests : BunitTestBase
             new() { NodeId = "node-3", Name = "牵引所B", TerminalRole = TerminalRole.Tie,
                     OperatingState = TerminalOperatingState.ColdStandby }
         },
-        CandidateNodes = new List<LineStructureNodeDto>
-        {
-            new() { NodeId = "node-1", Name = "牵引所A" },
-            new() { NodeId = "node-2", Name = "分区所" },
-            new() { NodeId = "node-3", Name = "牵引所B" },
-            new() { NodeId = "node-orphan", Name = "游离节点X" }
-        },
+        CandidateNodes = [],
         Diagnostics = new LineStructureDiagnosticsDto
         {
             Valid = true,
@@ -199,14 +196,40 @@ public class LineStructureDialogSmokeTests : BunitTestBase
         });
 
         var html = DialogHtml(provider);
+        // Valid Chip（R7：拓扑校验 → 诊断）
+        Assert.Contains("诊断无异常", html);
         // FeedIn + 投运数
         Assert.Contains("电源接入点 1（投运 1）", html);
         // Tie
         Assert.Contains("联络点 1", html);
         // Warnings 出现（游离节点）
         Assert.Contains("游离节点X", html);
-        // 端点 / 成环
+        // 成环
         Assert.Contains("成环 是", html);
+    }
+
+    [Fact]
+    public async Task ExistingStructure_SegmentTable_RendersEdgeColumns()
+    {
+        var provider = await OpenAsync(new DialogParameters
+        {
+            { nameof(LineStructureDialog.LineId), TestLineId },
+            { nameof(LineStructureDialog.LineName), "测试贯通线" }
+        });
+
+        var html = DialogHtml(provider);
+        // 段表列头：起点/终点/类型/显示名
+        Assert.Contains("起点", html);
+        Assert.Contains("终点", html);
+        Assert.Contains("类型", html);
+        Assert.Contains("显示名", html);
+        // line_segment → 「结构段」标签
+        Assert.Contains("结构段", html);
+        // 段显示名（relation.name）
+        Assert.Contains("主线段", html);
+        // 段两端节点名
+        Assert.Contains("牵引所A", html);
+        Assert.Contains("分区所", html);
     }
 
     [Fact]
@@ -227,45 +250,9 @@ public class LineStructureDialogSmokeTests : BunitTestBase
     }
 
     [Fact]
-    public async Task ExistingStructure_TopologyModeDefaultIsNetwork()
+    public async Task TemplateDropdown_ControlExists_TopologySelectorRemoved()
     {
-        var provider = await OpenAsync(new DialogParameters
-        {
-            { nameof(LineStructureDialog.LineId), TestLineId },
-            { nameof(LineStructureDialog.LineName), "测试贯通线" }
-        });
-
-        var html = DialogHtml(provider);
-        // 诊断区 Valid Chip
-        Assert.Contains("拓扑校验通过", html);
-        // Network 模式的 tip 文字（用 Network TopologyUsage 里真实存在的文字）
-        Assert.Contains("牵引供电", html);
-    }
-
-    [Fact]
-    public async Task TerminalOperatingState_Dropdown_ControlExists()
-    {
-        // 下拉控件本身渲染（选项是点击后才渲染的 mud-select-menu，这里只验证控件存在）
-        var provider = await OpenAsync(new DialogParameters
-        {
-            { nameof(LineStructureDialog.LineId), TestLineId },
-            { nameof(LineStructureDialog.LineName), "测试贯通线" }
-        });
-
-        var html = DialogHtml(provider);
-        // 运行状态下拉的 label 存在
-        Assert.Contains("运行状态", html);
-        // 已选端子的状态 Chip 正确渲染（投运、冷备用）
-        Assert.Contains("投运", html);
-        Assert.Contains("冷备用", html);
-    }
-
-    [Fact]
-    public async Task TemplateDropdown_ControlExists()
-    {
-        // 纯渲染冒烟：模板下拉控件本身成功渲染。
-        // RenderFragment 内的 options（手动配置/RailwayFeeding）在 MudBlazor 里只在 Value 非空或用户打开菜单后才渲染，
-        // 由浏览器测试（Playwright）覆盖交互路径。
+        // R7：拓扑模式选择器整体删除；模板下拉保留（只预填端子默认值）。
         var provider = await OpenAsync(new DialogParameters
         {
             { nameof(LineStructureDialog.LineId), TestLineId },
@@ -276,85 +263,74 @@ public class LineStructureDialogSmokeTests : BunitTestBase
 
         // 模板 MudSelect 的 label 存在 → 确认控件渲染成功
         Assert.Contains("模板", html);
-        // 确认控件顺序：模板 → 拓扑模式（R4 已移除边类型下拉）
-        Assert.Contains("拓扑模式", html);
+        // 拓扑模式 / 边类型选择器已下线
+        Assert.DoesNotContain("拓扑模式", html);
         Assert.DoesNotContain("线路型边类型", html);
     }
 
     [Fact]
-    public async Task ExistingStructure_IsExistingDisablesTemplateDropdown()
+    public async Task SelectingTemplate_AppliesTerminalDefaults()
     {
-        // 已有结构时模板下拉应该被禁用（Dis="@IsExisting"）。
-        // MudBlazor 9 的 disabled 渲染细节（class/aria/disabled attr）版本间不稳定，
-        // 此处只验证控件存在且 IsExisting 路径被走通（通过 Snackbar 不触发 Apply 逻辑间接验证）。
+        // 模板切换后的状态验证（模板只预填端子默认值：角色 FeedIn / 状态 Maintenance）。
         var provider = await OpenAsync(new DialogParameters
         {
             { nameof(LineStructureDialog.LineId), TestLineId },
             { nameof(LineStructureDialog.LineName), "测试贯通线" }
         });
 
-        var html = DialogHtml(provider);
-
-        // 模板下拉控件存在（label "模板"）
-        Assert.Contains("模板", html);
-
-        // 确认拓扑模式显示的是 Network（ExistingStructure TopologyMode 确实被读取）
-        Assert.Contains("Network", html);
-    }
-
-    [Fact]
-    public async Task SelectingRailwayFeedingTemplate_PrefillsTopologyAndTerminalDefaults()
-    {
-        // 模板切换后的 UI 状态验证（新结构模式：IsExisting=false，模板下拉可用）
-        var provider = await OpenAsync(new DialogParameters
-        {
-            { nameof(LineStructureDialog.LineId), TestNewLineId },
-            { nameof(LineStructureDialog.LineName), "新建贯通线" }
-        });
-
-        MudSelect<string> SelectByLabel(string label) =>
-            provider.FindComponents<MudSelect<string>>().First(c => c.Instance.Label == label).Instance;
-
-        // 切换前基线：拓扑来自 DTO（Linear）
-        Assert.Equal("Linear", SelectByLabel("拓扑模式").Value);
-
-        // bUnit 无法打开 MudSelect 弹层（选项在 MudPopover 内且需要 JS 定位，MudSelectItem 未实例化，
-        // SelectOption 找不到注册项会静默无效），因此直接调用 Dialog 的模板选择处理器。
-        // MudSelect 的 ValueChanged 绑定的正是该方法（编译期接线，razor 保证），随后强制 Dialog 重渲染。
+        // bUnit 无法打开 MudSelect 弹层（选项在 MudPopover 内且需要 JS 定位），
+        // 因此直接调用 Dialog 的模板选择处理器（MudSelect 的 ValueChanged 绑定的正是该方法）。
         var dialog = provider.FindComponent<LineStructureDialog>();
         typeof(LineStructureDialog)
             .GetMethod("OnSelectedTemplateKeyChanged", BindingFlags.NonPublic | BindingFlags.Instance)!
             .Invoke(dialog.Instance, new object?[] { "RailwayFeeding" });
         dialog.Render();
 
-        // 切换后 UI 状态（模板只预填拓扑模式与端子默认值，不再预填边类型）：
-        Assert.Equal("RailwayFeeding", SelectByLabel("模板").Value);   // 模板选中项回显
-        Assert.Equal("Network", SelectByLabel("拓扑模式").Value);      // 拓扑预填 Network
-        Assert.Equal("FeedIn", SelectByLabel("角色").Value);           // 端子角色默认 FeedIn
-        Assert.Equal("Maintenance", SelectByLabel("运行状态").Value);  // 端子状态默认 Maintenance
+        // 端子默认值字段（private string，枚举名）
+        var type = typeof(LineStructureDialog);
+        var role = type.GetField("_terminalRole",
+            BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(dialog.Instance);
+        var state = type.GetField("_terminalOperatingState",
+            BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(dialog.Instance);
+        Assert.Equal(nameof(TerminalRole.FeedIn), role);
+        Assert.Equal(nameof(TerminalOperatingState.Maintenance), state);
 
-        // Snackbar 确认消息（ISnackbar 单例队列 → MudSnackbarProvider 渲染）
-        var snacks = Render<MudSnackbarProvider>();
-        snacks.Render();
-        Assert.Contains("已应用铁路牵引供电预设", snacks.Markup);
+        // Snackbar 确认消息
+        var snackbar = Services.GetRequiredService<ISnackbar>();
+        Assert.Contains(snackbar.ShownSnackbars,
+            s => s.Message.Contains("已应用铁路牵引供电预设"));
     }
 
     [Fact]
-    public void LineStructureRequest_SubmitsWithoutEdgeType()
+    public async Task EmptyNodes_RendersInfoAlert()
     {
-        // R4：线路结构请求不再携带 EdgeTypeId，仅拓扑模式 + 段/端子。
+        // 该线路尚无线路节点：提示先去「线路节点」添加。
+        var provider = await OpenAsync(new DialogParameters
+        {
+            { nameof(LineStructureDialog.LineId), TestNewLineId },
+            { nameof(LineStructureDialog.LineName), "新建贯通线" }
+        });
+
+        var html = DialogHtml(provider);
+        Assert.Contains("该线路暂无线路节点", html);
+    }
+
+    [Fact]
+    public void LineStructureRequest_Serialization_OnlySegmentsAndTerminals()
+    {
+        // R7：线路结构请求只携带段/端子，不再携带拓扑模式与边类型。
         var request = new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Network,
             Segments = new List<LineStructureSegmentInput>
             {
-                new() { FromNodeId = "node-1", ToNodeId = "node-2" }
+                new() { FromNodeId = "node-1", ToNodeId = "node-2", DisplayName = "主线段" }
             }
         };
 
         var json = JsonSerializer.Serialize(request, WebJson);
 
-        Assert.Contains("topologyMode", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("segments", json);
+        Assert.DoesNotContain("topologyMode", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("edgeType", json, StringComparison.OrdinalIgnoreCase);
     }
 

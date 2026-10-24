@@ -59,7 +59,7 @@ public class AttributeDefinition
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>供配电边类型的内置示例属性种子（31 条）。</summary>
+    /// <summary>内置示例属性种子（38 条：31 条供配电 + 6 条 LineNode 跨越点 + 1 条线路结构链边）。</summary>
     public static List<AttributeDefinition> SeedData() =>
     [
         new AttributeDefinition
@@ -654,6 +654,31 @@ public class AttributeDefinition
             Version = 1,
             CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
             UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        },
+        // ============ LineStructure（线路结构）链边属性（R7）============
+        new AttributeDefinition
+        {
+            AttributeId = "a0000038-0000-4000-8000-000000000038",
+            EntityType = "LineStructure",
+            AttributeName = "next",
+            DisplayName = "下一段",
+            DataType = EavDataTypes.Relation,
+            RelationType = "line_segment",
+            DisplayOrder = 0,
+            IsRequired = false,
+            IsSearchable = false,
+            IsSortable = false,
+            IsDeleted = false,
+            Version = 1,
+            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
         }
     ];
+
+    /// <summary>内置种子 id 集合（固定 GUID，拒改拒删）。</summary>
+    private static readonly HashSet<string> BuiltinIds =
+        SeedData().Select(s => s.AttributeId).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>是否内置种子属性（内置保护：元数据端点拒改拒删）。</summary>
+    public static bool IsBuiltin(string attributeId) => BuiltinIds.Contains(attributeId);
 }

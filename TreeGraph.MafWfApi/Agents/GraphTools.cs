@@ -597,7 +597,7 @@ public sealed class GraphTools
 
     private async Task<List<EdgeMeta>> LoadEdgesAsync(CancellationToken ct)
     {
-        // 边显示名统一取边类型名（parent_of/line_contains/connects_to/动态边类型）
+        // 边显示名统一取边类型名（parent_of/connects_to/动态边类型）
         const string ngql = """
             MATCH (a)-[e]->(b)
             RETURN id(a) AS src, id(b) AS dst, type(e) AS etype

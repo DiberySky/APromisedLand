@@ -1,5 +1,6 @@
 @page "/search"
 @namespace TreeGraph.Blazor.Shared.MafWfSky.Pages
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
 @inject MafWfSseReader SseReader
 @inject NavigationManager Nav
 @inject IDialogService DialogService
@@ -116,19 +117,11 @@
                                         @((item.Score * 100).ToString("F0"))%
                                     </MudChip>
                                     <span @onclick:stopPropagation="true">
-                                        <MudIconButton Icon="@Icons.Material.Filled.AutoAwesome"
-                                                       Size="Size.Small"
-                                                       Color="Color.Warning"
-                                                       Title="AI 综合展开"
-                                                       Disabled="@(_expandingInodeId is not null && _expandingInodeId != item.InodeId)"
-                                                       OnClick="@(() => ToggleExpandAsync(item))"/>
-                                    </span>
-                                    <span @onclick:stopPropagation="true">
-                                        <MudIconButton Icon="@Icons.Material.Filled.AccountTree"
-                                                       Size="Size.Small"
-                                                       Color="Color.Primary"
-                                                       Title="打开树视图"
-                                                       OnClick="@(() => OpenTreeDialogAsync(item))"/>
+                                        @* ★ 操作菜单：按 HostType 出项（树节点 CRUD / LineNode CRUD / AI 综合 / 树定位） *@
+                                        <SearchResultActionsMenu Item="item"
+                                                                 OnOpenTree="OpenTreeDialogAsync"
+                                                                 OnAiExpand="ToggleExpandAsync"
+                                                                 OnDeleted="OnResultDeleted"/>
                                     </span>
                                 </MudStack>
 
@@ -247,6 +240,13 @@
     {
         // 现有 iNode 详情页路由（/inodes/{InodeId}），无 HostType 段
         Nav.NavigateTo($"/inodes/{item.InodeId}");
+    }
+
+    /// <summary>操作菜单：删除成功后从列表移除。</summary>
+    private void OnResultDeleted(SemanticSearchItemDto item)
+    {
+        _results.RemoveAll(r => r.InodeId == item.InodeId);
+        StateHasChanged();
     }
 
     // ═══════════════════════════════════════════════════════

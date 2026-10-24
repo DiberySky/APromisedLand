@@ -636,11 +636,12 @@ public class EavApiClient
     }
 
     /// <summary>
-    /// 流式向量对账（NDJSON 逐行进度）：每个同步/清理项实时回调 onEvent（UI 滚动展示），
-    /// 流结束返回最终统计（stage=summary 行）。失败（非 2xx/断流）返回 null。
+    /// 流式向量对账（NDJSON 逐行进度）：每个同步/清理/失败项实时回调 onEvent（UI 滚动展示），
+    /// 流结束返回最终统计（stage=summary 行）。
+    /// 失败时 Error 带真实原因（非 2xx 状态码 + 响应摘要 / error 事件 Detail / 异常消息），不再一律 null 了事。
     /// spaceId / category / lineId 三选一限定范围，皆空为全量。
     /// </summary>
-    public async Task<VectorReconcileResultDto?> StreamReconcileAsync(
+    public async Task<VectorReconcileOutcome> StreamReconcileAsync(
         string? spaceId = null, string? category = null, string? lineId = null,
         Action<ReconcileStreamEventDto>? onEvent = null,
         CancellationToken ct = default)
@@ -664,13 +665,17 @@ public class EavApiClient
                 request, HttpCompletionOption.ResponseHeadersRead, ct);
             if (!resp.IsSuccessStatusCode)
             {
-                _logger.LogWarning("POST {Url} → {Status}", url, resp.StatusCode);
-                return default;
+                var body = await resp.Content.ReadAsStringAsync(ct);
+                if (body.Length > 200) body = body[..200] + "…";
+                _logger.LogWarning("POST {Url} → {Status} {Body}", url, resp.StatusCode, body);
+                return new VectorReconcileOutcome(
+                    null, $"HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}：{body}");
             }
 
             await using var stream = await resp.Content.ReadAsStreamAsync(ct);
             using var reader = new StreamReader(stream);
             VectorReconcileResultDto? summary = null;
+            string? lastError = null;
             while (await reader.ReadLineAsync(ct) is { Length: > 0 } line)
             {
                 var evt = JsonSerializer.Deserialize<ReconcileStreamEventDto>(line, JsonOptions);
@@ -679,19 +684,28 @@ public class EavApiClient
                 {
                     summary = new VectorReconcileResultDto(
                         evt.Active ?? 0, evt.Existing ?? 0, evt.Missing ?? 0,
-                        evt.Orphaned ?? 0, evt.FixedCount ?? 0, evt.DeletedCount ?? 0);
+                        evt.Orphaned ?? 0, evt.FixedCount ?? 0, evt.DeletedCount ?? 0,
+                        evt.FailedCount ?? 0);
                 }
                 else
                 {
+                    if (evt.Stage == "error") lastError = evt.Detail;
                     onEvent?.Invoke(evt);
                 }
             }
-            return summary;
+            // 无 summary = 服务端致命失败（致命 error 事件的 Detail 即真实原因）
+            return new VectorReconcileOutcome(
+                summary,
+                summary is null ? lastError ?? "对账流中断，未收到统计结果" : null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw; // 对话框关闭触发的取消必须上抛，由调用方区分「取消」与「失败」
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "POST {Url} 流式对账失败", url);
-            return default;
+            return new VectorReconcileOutcome(null, ex.Message);
         }
     }
 
@@ -1300,3 +1314,10 @@ public class EavApiClient
         DateTimeOffset? CurrentUpdatedAt,
         DateTimeOffset? ExpectedUpdatedAt);
 }
+
+/// <summary>
+/// 流式向量对账结果：Summary 为结束统计（收到 summary 行时非空），
+/// Error 为失败真实原因（非 2xx / 服务端致命 error 事件 / 断流异常）；Summary 非空时 Error 为 null
+/// （部分单项失败经 Summary.FailedCount 与 error 事件表达，不算整体失败）。
+/// </summary>
+public sealed record VectorReconcileOutcome(VectorReconcileResultDto? Summary, string? Error);

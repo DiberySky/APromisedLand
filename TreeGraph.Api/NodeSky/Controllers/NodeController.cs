@@ -142,6 +142,26 @@ public class NodeController : ControllerBase
                 });
             }
 
+            // R7：端子引用（line_terminals.node_id FK 直指 nodes）
+            var hasTerminal = await _db.LineTerminals.AnyAsync(t => t.NodeId == id, ct);
+            if (hasTerminal)
+            {
+                return Conflict(new
+                {
+                    error = "该节点仍是线路结构的外部连接端子，无法删除。请先移除该端子。"
+                });
+            }
+
+            // R7：被作为 parent（线路锚点 nodes.line_id）引用
+            var referencedAsLine = await _db.Nodes.AnyAsync(n => n.LineId == id, ct);
+            if (referencedAsLine)
+            {
+                return Conflict(new
+                {
+                    error = "该节点仍被作为线路锚点引用（存在挂到它的线路节点），无法删除。"
+                });
+            }
+
             // 先清空自身数据才允许删本项：该节点仍有挂载实体数据时拒绝（不采用级联删除）
             var hasEntities = await _db.InodeEntities
                 .AnyAsync(m => m.InodeId == id, ct);

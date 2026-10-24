@@ -40,11 +40,8 @@ void TreeGraph()
     //   复用 FileMetadataDb + SeaweedS3,与 EavApi 平级)
     builder.AddTreeGraphFileStorageApi(context);
 
-    // ★ vLLM Chat/Embedding 容器（MAF 依赖）
-    // ★ 为节约内存，关闭 vLLM 容器。MafWfApi 仍启动但 AI Chat 功能不可用
-    //   （VLLM_HTTP 回退 localhost:8000，调用失败但进程存活）。
-    //   恢复时取消下一行注释即可。
-    // builder.AddVllm(context);
+    // ★ vLLM Chat/Embedding 容器（MAF 依赖；语义搜索向量化依赖 vllm-embed:5719）
+    builder.AddVllm(context);
 
     // ★ TreeGraph.MafWfApi:MAF + Workflow 服务 API(vLLM 版,固定端口 5323,
     //   替代已停用的旧 MAFWorkFlowApi)

@@ -890,6 +890,10 @@ public class EavMetadataController : ControllerBase
         var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
         if (def is null || def.IsDeleted) return NotFound();
 
+        // 内置种子保护：固定 id 的属性拒改（R7）
+        if (AttributeDefinition.IsBuiltin(id))
+            return Conflict(new { error = "内置种子属性不可修改" });
+
         if (req.DisplayName is not null) def.DisplayName = req.DisplayName;
         if (req.IsRequired is not null) def.IsRequired = req.IsRequired.Value;
         if (req.IsSearchable is not null) def.IsSearchable = req.IsSearchable.Value;
@@ -980,6 +984,10 @@ public class EavMetadataController : ControllerBase
     {
         var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
         if (def is null) return NotFound();
+
+        // 内置种子保护：固定 id 的属性拒删（R7）
+        if (AttributeDefinition.IsBuiltin(id))
+            return Conflict(new { error = "内置种子属性不可删除" });
 
         // 子项为空方可删除本项（不采用级联删除）：该属性已产生实例数据时拒绝
         var hasValues = await _db.AttributeValues.AnyAsync(v => v.AttributeId == id, ct);

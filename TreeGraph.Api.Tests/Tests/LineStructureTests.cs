@@ -10,22 +10,21 @@ using Xunit;
 namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
-/// 线路结构（LineStructure）集成测试。
-/// 覆盖：空结构语义、三种拓扑模式校验、全量替换、段/端子增量、
-///       R4 段自存标识（不再创建/引用通用边）。
+/// 线路结构（LineStructure）集成测试 —— R7 边集薄层。
+/// 节点集 = nodes where line_id=lineId；边集 = 两端均属本线的 relation 值；
+/// 拓扑模式已下线；诊断只报告不阻断；段 Weight 已砍（DisplayName → relation.name）。
 /// </summary>
 public class LineStructureTests : IntegrationTestBase
 {
     public LineStructureTests(EavApiFactory factory) : base(factory) { }
 
-    /// <summary>服务端枚举以字符串传输，测试读取需同样开启字符串枚举转换。</summary>
     private static readonly JsonSerializerOptions EnumJson = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() }
     };
 
     // ============================================================
-    // 读取 / 空结构语义
+    // 读取
     // ============================================================
 
     [Fact]
@@ -36,236 +35,112 @@ public class LineStructureTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Get_NoStructure_ReturnsExistsFalseWithCandidateNodes()
+    public async Task Get_LineWithoutNodes_ExistsFalse()
     {
-        var (lineId, nodeIds) = await CreateLineWithNodesAsync(3);
+        var lineId = await CreateLineAsync();
 
-        var dto = await Client.GetEavAsync<LineStructureDto>(
-            $"/api/eav/lines/{lineId}/structure", EnumJson);
-
+        var dto = await GetStructureAsync(lineId);
         Assert.NotNull(dto);
         Assert.False(dto!.Exists);
         Assert.Empty(dto.Segments);
-        Assert.Equal(3, dto.CandidateNodes.Count);
-        Assert.Equal(3, nodeIds.Intersect(dto.CandidateNodes.Select(n => n.NodeId)).Count());
+        Assert.Empty(dto.Nodes);
+        Assert.Equal(0, dto.Diagnostics.NodeCount);
+    }
+
+    [Fact]
+    public async Task Get_LineWithNodesNoEdges_ExistsTrue()
+    {
+        var (lineId, n) = await CreateLineWithNodesAsync(2);
+
+        var dto = await GetStructureAsync(lineId);
+        Assert.NotNull(dto);
+        Assert.True(dto!.Exists); // R7：有节点即存在
+        Assert.Empty(dto.Segments);
+        Assert.Equal(2, dto.Nodes.Count);
+        Assert.Equal(2, dto.OrderedNodeIds.Count);
     }
 
     // ============================================================
-    // 三种拓扑模式
+    // 建链 / 链序推导
     // ============================================================
 
     [Fact]
-    public async Task Create_Linear_Chain_Succeeds()
+    public async Task Create_BuildChain_OrderedNodeIdsFollowEdges()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.ToList()
+            Segments = Segments((n[0], n[1]), (n[1], n[2]))
         });
 
         Assert.True(dto.Exists);
-        Assert.Equal(TopologyMode.Linear, dto.TopologyMode);
         Assert.Equal(2, dto.Segments.Count);
-        Assert.Equal(n, dto.OrderedNodeIds);
+        Assert.Equal(n, dto.OrderedNodeIds); // 无入边者为起点，沿链推导
+        Assert.All(dto.Segments, s => Assert.Equal("line_segment", s.RelationType));
         Assert.True(dto.Diagnostics.Valid);
         Assert.False(dto.Diagnostics.HasCycle);
         Assert.Equal(2, dto.Diagnostics.NodeDegreeOneCount);
+        Assert.Equal(3, dto.Diagnostics.NodeCount);
+        Assert.Equal(2, dto.Diagnostics.EdgeCount);
     }
 
     [Fact]
-    public async Task Create_WithoutTopologyMode_DefaultsToNetwork()
+    public async Task Create_ExistingSegmentEdges_Returns409()
     {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        var (lineId, n) = await CreateLineWithNodesAsync(2);
+        await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            Segments = Segments((n[0], n[1]), (n[1], n[2]))
+            Segments = Segments((n[0], n[1]))
         });
-
-        Assert.Equal(TopologyMode.Network, dto.TopologyMode);
-    }
-
-    [Fact]
-    public async Task Create_Linear_Branch_Returns409()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(4);
 
         var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Linear,
-            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[1], n[3]))
+            Segments = Segments((n[1], n[0]))
         });
-
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("Linear", await resp.Content.ReadAsStringAsync());
+        Assert.Contains("已存在结构段边", await resp.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task Create_Radial_WithoutFeedIn_Returns409()
+    public async Task Create_SelfLoop_Returns400()
     {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var resp = await PostStructureAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Radial,
-            Segments = Segments((n[0], n[1]), (n[1], n[2]))
-        });
-
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("FeedIn", await resp.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task Create_Radial_WithFeedIn_Succeeds_AndOrderStartsAtFeedIn()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Radial,
-            Segments = Segments((n[0], n[1]), (n[1], n[2])),
-            Terminals =
-            [
-                new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn }
-            ]
-        });
-
-        Assert.Equal(TopologyMode.Radial, dto.TopologyMode);
-        Assert.Equal(n[0], dto.OrderedNodeIds[0]);
-        Assert.True(dto.Diagnostics.Valid);
-        Assert.Equal(1, dto.Diagnostics.FeedInCount);
-        var terminal = Assert.Single(dto.Terminals);
-        Assert.Equal(TerminalRole.FeedIn, terminal.TerminalRole);
-    }
-
-    [Fact]
-    public async Task Create_Radial_WithCycle_Returns409()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var resp = await PostStructureAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Radial,
-            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
-            Terminals =
-            [
-                new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn }
-            ]
-        });
-
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("成环", await resp.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task Create_Network_WithCycle_Succeeds()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Network,
-            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
-            Terminals =
-            [
-                new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn }
-            ]
-        });
-
-        Assert.Equal(TopologyMode.Network, dto.TopologyMode);
-        Assert.True(dto.Diagnostics.Valid);
-        Assert.True(dto.Diagnostics.HasCycle);
-        Assert.Equal(3, dto.Segments.Count);
-    }
-
-    [Fact]
-    public async Task Create_Radial_MultipleFeedIn_Returns409()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var resp = await PostStructureAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Radial,
-            Segments = Segments((n[0], n[1]), (n[1], n[2])),
-            Terminals =
-            [
-                new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn },
-                new LineStructureTerminalInput { NodeId = n[2], Role = TerminalRole.FeedIn }
-            ]
-        });
-
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        var body = await resp.Content.ReadAsStringAsync();
-        Assert.Contains("FeedIn", body);
-        Assert.Contains("1", body);
-    }
-
-    [Fact]
-    public async Task Create_Network_WithoutFeedIn_Succeeds()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Network,
-            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0]))
-        });
-
-        Assert.Equal(TopologyMode.Network, dto.TopologyMode);
-        Assert.True(dto.Diagnostics.Valid);
-        Assert.True(dto.Diagnostics.HasCycle);
-        Assert.Equal(0, dto.Diagnostics.FeedInCount);
-        Assert.Empty(dto.Terminals);
-    }
-
-    [Fact]
-    public async Task Create_Network_Disconnected_Returns409()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(4);
-
-        var resp = await PostStructureAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Network,
-            Segments = Segments((n[0], n[1]), (n[2], n[3]))
-        });
-
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("不连通", await resp.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task Create_BothSegmentsAndOrderedNodeIds_Returns400()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var resp = await PostStructureAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Linear,
-            Segments = Segments((n[0], n[1])),
-            OrderedNodeIds = n.ToList()
-        });
-
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-        Assert.Contains("二选一", await resp.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task Create_AnyLine_WithoutEdgeType_Succeeds()
-    {
-        // R4：线路结构不再依赖边类型 / IsLine 守卫，任意线路可直接建结构
         var (lineId, n) = await CreateLineWithNodesAsync(2);
 
-        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.ToList()
+            Segments = Segments((n[0], n[0]))
         });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("自环", await resp.Content.ReadAsStringAsync());
+    }
 
-        Assert.True(dto.Exists);
-        Assert.True(dto.Diagnostics.Valid);
-        Assert.Single(dto.Segments);
+    [Fact]
+    public async Task Create_CrossLineSegment_Returns400()
+    {
+        var (lineA, na) = await CreateLineWithNodesAsync(1);
+        var (_, nb) = await CreateLineWithNodesAsync(1);
+
+        var resp = await PostStructureAsync(lineA, new LineStructureRequest
+        {
+            Segments = Segments((na[0], nb[0]))
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("同属一条线路", await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Create_MultipleOutEdges_SameFrom_Returns400()
+    {
+        // next 为单值属性：同一 from 只允许一条出边；分支请定义新 relation 属性
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
+
+        var resp = await PostStructureAsync(lineId, new LineStructureRequest
+        {
+            Segments = Segments((n[0], n[1]), (n[0], n[2]))
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("有多条出边", await resp.Content.ReadAsStringAsync());
     }
 
     // ============================================================
@@ -273,13 +148,16 @@ public class LineStructureTests : IntegrationTestBase
     // ============================================================
 
     [Fact]
-    public async Task Replace_Empty_ClearsStructure()
+    public async Task Replace_Empty_ClearsSegmentsAndTerminals()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.ToList()
+            Segments = Segments((n[0], n[1]), (n[1], n[2])),
+            Terminals =
+            [
+                new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn }
+            ]
         });
 
         var resp = await Client.PutAsJsonAsync(
@@ -288,97 +166,203 @@ public class LineStructureTests : IntegrationTestBase
 
         var dto = await resp.Content.ReadEavAsync<LineStructureDto>(EnumJson);
         Assert.NotNull(dto);
-        Assert.False(dto!.Exists);
+        Assert.True(dto!.Exists); // 节点仍在，仅边/端子清空
+        Assert.Empty(dto.Segments);
+        Assert.Empty(dto.Terminals);
     }
 
     [Fact]
-    public async Task Replace_NewMode_RemovesOldSegments()
+    public async Task Replace_NewSegments_RemovesOldOnes()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(4);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.Take(3).ToList()
+            Segments = Segments((n[0], n[1]), (n[1], n[2]))
         });
 
         var dto = await ReplaceStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Radial,
-            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[1], n[3])),
-            Terminals =
+            Segments = Segments((n[0], n[3]), (n[3], n[2]))
+        });
+
+        Assert.Equal(2, dto.Segments.Count);
+        Assert.Contains(dto.Segments, s => s.FromNodeId == n[0] && s.ToNodeId == n[3]);
+        Assert.Contains(dto.Segments, s => s.FromNodeId == n[3] && s.ToNodeId == n[2]);
+        Assert.DoesNotContain(dto.Segments, s => s.ToNodeId == n[1]);
+    }
+
+    [Fact]
+    public async Task Replace_DisplayName_RoundTrips()
+    {
+        var (lineId, n) = await CreateLineWithNodesAsync(2);
+
+        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        {
+            Segments =
             [
-                new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn }
+                new LineStructureSegmentInput
+                {
+                    FromNodeId = n[0], ToNodeId = n[1], DisplayName = "主线段"
+                }
             ]
         });
 
-        Assert.Equal(TopologyMode.Radial, dto.TopologyMode);
-        Assert.Equal(3, dto.Segments.Count);
+        var seg = Assert.Single(dto.Segments);
+        Assert.Equal("主线段", seg.DisplayName);
+        Assert.False(string.IsNullOrWhiteSpace(seg.EdgeId));
     }
 
     // ============================================================
-    // 段增量
+    // 单段加/删
     // ============================================================
 
     [Fact]
-    public async Task AddSegment_Duplicate_Returns409()
+    public async Task AddSegment_SameFrom_ReplacesOldEdge()
     {
+        // 单值语义：同 from 再写 next → 旧边被替换（不会两条出边）
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.ToList()
+            Segments = Segments((n[0], n[1]))
         });
 
         var resp = await Client.PostAsJsonAsync(
             $"/api/eav/lines/{lineId}/structure/segments",
-            new AddLineSegmentRequest { FromNodeId = n[0], ToNodeId = n[1] });
+            new AddLineSegmentRequest { FromNodeId = n[0], ToNodeId = n[2] });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
 
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        var dto = await resp.Content.ReadEavAsync<LineStructureDto>(EnumJson);
+        var seg = Assert.Single(dto!.Segments);
+        Assert.Equal(n[0], seg.FromNodeId);
+        Assert.Equal(n[2], seg.ToNodeId);
     }
 
     [Fact]
-    public async Task Delete_LastSegment_RemovesHeaderAndNoGenericEdge()
+    public async Task AddSegment_SelfLoop_Returns400()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(2);
+
+        var resp = await Client.PostAsJsonAsync(
+            $"/api/eav/lines/{lineId}/structure/segments",
+            new AddLineSegmentRequest { FromNodeId = n[0], ToNodeId = n[0] });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("自环", await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task AddSegment_CrossLine_Returns400()
+    {
+        var (lineA, na) = await CreateLineWithNodesAsync(1);
+        var (_, nb) = await CreateLineWithNodesAsync(1);
+
+        var resp = await Client.PostAsJsonAsync(
+            $"/api/eav/lines/{lineA}/structure/segments",
+            new AddLineSegmentRequest { FromNodeId = na[0], ToNodeId = nb[0] });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("同属一条线路", await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task AddSegment_UnknownLine_Returns404()
+    {
+        var resp = await Client.PostAsJsonAsync(
+            $"/api/eav/lines/{Guid.NewGuid():N}/structure/segments",
+            new AddLineSegmentRequest { FromNodeId = "a", ToNodeId = "b" });
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteSegment_RoundTrip()
+    {
+        var (lineId, n) = await CreateLineWithNodesAsync(3);
         var created = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.ToList()
+            Segments = Segments((n[0], n[1]), (n[1], n[2]))
         });
-        var edgeId = Assert.Single(created.Segments).EdgeId;
-        Assert.False(string.IsNullOrWhiteSpace(edgeId));
+        var edgeId = created.Segments
+            .Single(s => s.FromNodeId == n[1] && s.ToNodeId == n[2]).EdgeId;
 
         var resp = await Client.DeleteAsync(
             $"/api/eav/lines/{lineId}/structure/segments/{edgeId}");
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
 
         var dto = await resp.Content.ReadEavAsync<LineStructureDto>(EnumJson);
-        Assert.NotNull(dto);
-        Assert.False(dto!.Exists);
-        Assert.Empty(dto.Segments);
+        var seg = Assert.Single(dto!.Segments);
+        Assert.Equal(n[0], seg.FromNodeId);
+        Assert.Equal(n[1], seg.ToNodeId);
     }
 
     [Fact]
-    public async Task Delete_SegmentOrphaningTerminal_Returns409()
+    public async Task DeleteSegment_UnknownEdge_Returns404()
+    {
+        var (lineId, _) = await CreateLineWithNodesAsync(1);
+
+        var resp = await Client.DeleteAsync(
+            $"/api/eav/lines/{lineId}/structure/segments/{Guid.NewGuid():N}");
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteSegment_EdgeNotInThisLine_Returns400()
+    {
+        var (lineA, na) = await CreateLineWithNodesAsync(2);
+        var (lineB, _) = await CreateLineWithNodesAsync(1);
+        var created = await CreateStructureOkAsync(lineA, new LineStructureRequest
+        {
+            Segments = Segments((na[0], na[1]))
+        });
+        var edgeId = Assert.Single(created.Segments).EdgeId;
+
+        var resp = await Client.DeleteAsync(
+            $"/api/eav/lines/{lineB}/structure/segments/{edgeId}");
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("不属于线路", await resp.Content.ReadAsStringAsync());
+    }
+
+    // ============================================================
+    // 多边类型分支（新 relation 属性 = 新边类型）
+    // ============================================================
+
+    [Fact]
+    public async Task BranchRelationAttribute_ShowsAsSecondEdgeType()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(3);
-        var created = await CreateStructureOkAsync(lineId, new LineStructureRequest
+        await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Radial,
-            Segments = Segments((n[0], n[1]), (n[1], n[2])),
-            Terminals =
-            [
-                new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn },
-                new LineStructureTerminalInput { NodeId = n[2], Role = TerminalRole.FeedOut }
-            ]
+            Segments = Segments((n[0], n[1]))
         });
-        var tailEdge = created.Segments.Single(s => s.FromNodeId == n[1] && s.ToNodeId == n[2]).EdgeId;
 
-        // 删掉末端后 n[2] 仍是端子但已不在结构内 → 拒绝
-        var resp = await Client.DeleteAsync(
-            $"/api/eav/lines/{lineId}/structure/segments/{tailEdge}");
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("不在结构段端点内", await resp.Content.ReadAsStringAsync());
+        // 用户自定义分支边：relation_type=line_branch（同一实体类型 LineStructure）
+        var attrName = $"line_branch_{Guid.NewGuid():N}";
+        var attrResp = await Client.PostAsJsonAsync("/api/eav/metadata/attributes", new
+        {
+            entityType = "LineStructure",
+            attributeName = attrName,
+            displayName = "分支",
+            dataType = "relation",
+            relationType = "line_branch"
+        });
+        Assert.Equal(HttpStatusCode.OK, attrResp.StatusCode);
+
+        // n1 → n2 写分支边（n1 自身无 next 出边，PUT 不影响既有段边）
+        var put = await Client.PutAsJsonAsync(
+            $"/api/eav/LineStructure/entities/{n[1]}",
+            new Dictionary<string, object?>
+            {
+                [attrName] = new { toNodeId = n[2], name = "分支段" }
+            });
+        Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
+
+        var dto = await GetStructureAsync(lineId);
+        Assert.NotNull(dto);
+        Assert.Equal(2, dto!.Segments.Count);
+        var segment = Assert.Single(dto.Segments, s => s.RelationType == "line_segment");
+        Assert.Equal(n[0], segment.FromNodeId);
+        Assert.Equal(n[1], segment.ToNodeId);
+        var branch = Assert.Single(dto.Segments, s => s.RelationType == "line_branch");
+        Assert.Equal(n[1], branch.FromNodeId);
+        Assert.Equal(n[2], branch.ToNodeId);
+        Assert.Equal("分支段", branch.DisplayName);
     }
 
     // ============================================================
@@ -388,11 +372,10 @@ public class LineStructureTests : IntegrationTestBase
     [Fact]
     public async Task Terminal_Upsert_ThenDelete()
     {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
+        var (lineId, n) = await CreateLineWithNodesAsync(2);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Radial,
-            Segments = Segments((n[0], n[1]), (n[1], n[2])),
+            Segments = Segments((n[0], n[1])),
             Terminals =
             [
                 new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn }
@@ -401,102 +384,32 @@ public class LineStructureTests : IntegrationTestBase
 
         var upsert = await Client.PostAsJsonAsync(
             $"/api/eav/lines/{lineId}/structure/terminals",
-            new AddLineTerminalRequest { NodeId = n[2], Role = TerminalRole.FeedOut });
+            new AddLineTerminalRequest
+            {
+                NodeId = n[1], Role = TerminalRole.FeedOut,
+                OperatingState = TerminalOperatingState.HotStandby
+            });
         Assert.Equal(HttpStatusCode.OK, upsert.StatusCode);
         var afterUpsert = await upsert.Content.ReadEavAsync<LineStructureDto>(EnumJson);
         Assert.Equal(2, afterUpsert!.Terminals.Count);
+        var feedOut = Assert.Single(afterUpsert.Terminals, t => t.NodeId == n[1]);
+        Assert.Equal(TerminalOperatingState.HotStandby, feedOut.OperatingState);
 
         var del = await Client.DeleteAsync(
-            $"/api/eav/lines/{lineId}/structure/terminals/{n[2]}");
+            $"/api/eav/lines/{lineId}/structure/terminals/{n[1]}");
         Assert.Equal(HttpStatusCode.OK, del.StatusCode);
         var afterDelete = await del.Content.ReadEavAsync<LineStructureDto>(EnumJson);
         Assert.Single(afterDelete!.Terminals);
     }
 
     [Fact]
-    public async Task Terminal_NodeNotInStructure_Returns400()
+    public async Task Terminal_TwoEnergizedFeedIn_Returns400()
     {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-        await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.Take(2).ToList()
-        });
-
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/lines/{lineId}/structure/terminals",
-            new AddLineTerminalRequest { NodeId = n[2], Role = TerminalRole.FeedOut });
-
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-        Assert.Contains("必须属于当前结构", await resp.Content.ReadAsStringAsync());
-    }
-
-    // ============================================================
-    // P0-1: 端子运行状态（OperatingState）正反用例
-    // ============================================================
-
-    [Fact]
-    public async Task OperatingState_UpsertTerminal_RoundTrip()
-    {
-        // 增量 upsert 路径 OperatingState 往返
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-        await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.Take(3).ToList()
-        });
-
-        var upsert = await Client.PostAsJsonAsync(
-            $"/api/eav/lines/{lineId}/structure/terminals",
-            new AddLineTerminalRequest
-            {
-                NodeId = n[0], Role = TerminalRole.FeedIn,
-                OperatingState = TerminalOperatingState.Energized
-            });
-        Assert.Equal(HttpStatusCode.OK, upsert.StatusCode);
-
-        var dto = await upsert.Content.ReadEavAsync<LineStructureDto>(EnumJson);
-        var term = Assert.Single(dto!.Terminals);
-        Assert.Equal(TerminalOperatingState.Energized, term.OperatingState);
-        Assert.Equal(TerminalRole.FeedIn, term.TerminalRole);
-    }
-
-    [Fact]
-    public async Task OperatingState_FeedInEnergized_One_Succeeds()
-    {
-        // 正向：恰好 1 个 FeedIn 投运通过
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Radial,
-            Segments = Segments((n[0], n[1]), (n[1], n[2])),
-            Terminals =
-            [
-                new LineStructureTerminalInput
-                {
-                    NodeId = n[0], Role = TerminalRole.FeedIn,
-                    OperatingState = TerminalOperatingState.Energized
-                }
-            ]
-        });
-
-        Assert.True(dto.Diagnostics.Valid);
-        Assert.Equal(1, dto.Diagnostics.FeedInEnergizedCount);
-        var term = Assert.Single(dto.Terminals);
-        Assert.Equal(TerminalOperatingState.Energized, term.OperatingState);
-    }
-
-    [Fact]
-    public async Task OperatingState_FeedInEnergized_Two_Returns409()
-    {
-        // 反向：2 个 FeedIn 投运 → 409
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var resp = await PostStructureAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Network,
-            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
+            Segments = Segments((n[0], n[1]), (n[1], n[2])),
             Terminals =
             [
                 new LineStructureTerminalInput
@@ -511,49 +424,32 @@ public class LineStructureTests : IntegrationTestBase
                 }
             ]
         });
-
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        var body = await resp.Content.ReadAsStringAsync();
-        Assert.Contains("投运", body);
-        Assert.Contains("FeedIn", body);
-        Assert.Contains("2", body);
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("同时投运的 FeedIn 端子最多 1 个",
+            await resp.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task OperatingState_FeedInNoneEnergized_Succeeds()
+    public async Task Terminal_NodeNotInLine_Returns400()
     {
-        // 正向：FeedIn 存在但都非投运 → 通过（存量场景）
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
+        var (lineA, _) = await CreateLineWithNodesAsync(1);
+        var (_, nb) = await CreateLineWithNodesAsync(1);
 
-        var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Radial,
-            Segments = Segments((n[0], n[1]), (n[1], n[2])),
-            Terminals =
-            [
-                new LineStructureTerminalInput
-                {
-                    NodeId = n[0], Role = TerminalRole.FeedIn,
-                    OperatingState = TerminalOperatingState.HotStandby
-                }
-            ]
-        });
-
-        Assert.True(dto.Diagnostics.Valid);
-        Assert.Equal(0, dto.Diagnostics.FeedInEnergizedCount);
-        Assert.Equal(1, dto.Diagnostics.FeedInCount);
+        var resp = await Client.PostAsJsonAsync(
+            $"/api/eav/lines/{lineA}/structure/terminals",
+            new AddLineTerminalRequest { NodeId = nb[0], Role = TerminalRole.FeedIn });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Contains("不属于线路", await resp.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task OperatingState_DefaultIsMaintenance()
+    public async Task Terminal_DefaultOperatingState_IsMaintenance()
     {
-        // 不传 OperatingState 默认 Maintenance
         var (lineId, n) = await CreateLineWithNodesAsync(2);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n,
+            Segments = Segments((n[0], n[1])),
             Terminals =
             [
                 new LineStructureTerminalInput { NodeId = n[0], Role = TerminalRole.FeedIn }
@@ -565,128 +461,65 @@ public class LineStructureTests : IntegrationTestBase
     }
 
     // ============================================================
-    // P1-2: Tie 无 FeedIn 时作 DeriveOrder 起点
+    // 诊断（只报告不阻断）
     // ============================================================
 
     [Fact]
-    public async Task Tie_AsStart_WhenNoFeedIn_OrderStartsAtTie()
+    public async Task Diagnostics_Cycle_StillValid_WithWarning()
     {
-        // Network 模式只有 Tie 没有 FeedIn → 顺序以 Tie 为起点
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Network,
-            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0])),
-            Terminals =
-            [
-                new LineStructureTerminalInput
-                {
-                    NodeId = n[0], Role = TerminalRole.Tie,
-                    OperatingState = TerminalOperatingState.Maintenance
-                }
-            ]
+            Segments = Segments((n[0], n[1]), (n[1], n[2]), (n[2], n[0]))
         });
 
-        Assert.Equal(n[0], dto.OrderedNodeIds[0]);
-        Assert.Equal(1, dto.Diagnostics.TieCount);
-        Assert.Equal(0, dto.Diagnostics.FeedInCount);
+        Assert.True(dto.Diagnostics.Valid); // 成环只提示，不阻断
+        Assert.True(dto.Diagnostics.HasCycle);
+        Assert.Contains(dto.Diagnostics.Warnings, w => w.Contains("环"));
     }
 
-    // ============================================================
-    // P1-3: 游离 LineNode Warning
-    // ============================================================
-
     [Fact]
-    public async Task OrphanLineNode_GeneratesWarning()
+    public async Task Diagnostics_Disconnected_WarningOnly()
     {
-        // 线路有 4 个节点但结构只用了前 3 个 → 最后一个游离节点出 Warning
         var (lineId, n) = await CreateLineWithNodesAsync(4);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.Take(3).ToList()
+            Segments = Segments((n[0], n[1]), (n[2], n[3]))
         });
 
-        Assert.True(dto.Diagnostics.Valid); // Warning 不阻断
-        Assert.NotEmpty(dto.Diagnostics.Warnings);
-        var joined = string.Join("", dto.Diagnostics.Warnings);
-        Assert.Contains("游离", joined);
-        Assert.Contains("节点3", joined); // Warning 里是节点名，不是 ID
+        Assert.True(dto.Diagnostics.Valid);
+        Assert.False(dto.Diagnostics.HasCycle);
+        Assert.Contains(dto.Diagnostics.Warnings, w => w.Contains("不连通"));
     }
 
-    // ============================================================
-    // P1-5: Warnings 字段非阻断
-    // ============================================================
-
     [Fact]
-    public async Task Warnings_DoNotBlock_CreateStillSucceeds()
+    public async Task Diagnostics_TerminalCounts()
     {
-        // 有游离节点 Warning 但创建仍成功
         var (lineId, n) = await CreateLineWithNodesAsync(3);
 
         var dto = await CreateStructureOkAsync(lineId, new LineStructureRequest
         {
-            TopologyMode = TopologyMode.Network,
-            Segments = Segments((n[0], n[1]), (n[1], n[0])) // loop 只用 2 个节点，n[2] 游离
+            Segments = Segments((n[0], n[1]), (n[1], n[2])),
+            Terminals =
+            [
+                new LineStructureTerminalInput
+                {
+                    NodeId = n[0], Role = TerminalRole.FeedIn,
+                    OperatingState = TerminalOperatingState.Energized
+                },
+                new LineStructureTerminalInput
+                {
+                    NodeId = n[2], Role = TerminalRole.Tie
+                }
+            ]
         });
 
-        Assert.True(dto.Exists);
-        Assert.True(dto.Diagnostics.Valid); // Valid=true（Errors 为空）
-        Assert.NotEmpty(dto.Diagnostics.Warnings); // Warnings 非空但不阻断
-    }
-
-    // ============================================================
-    // R4: 段与通用边解耦
-    // ============================================================
-
-    [Fact]
-    public async Task Segments_EdgeIds_AreUniqueAndNonEmpty()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-
-        var created = await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.ToList()
-        });
-
-        Assert.Equal(2, created.Segments.Count);
-        Assert.All(created.Segments,
-            s => Assert.False(string.IsNullOrWhiteSpace(s.EdgeId)));
-        Assert.Equal(
-            created.Segments.Count,
-            created.Segments.Select(s => s.EdgeId).Distinct(StringComparer.Ordinal).Count());
-    }
-
-    [Fact]
-    public async Task AddSegment_WeightAndDisplayName_RoundTrip()
-    {
-        var (lineId, n) = await CreateLineWithNodesAsync(3);
-        await CreateStructureOkAsync(lineId, new LineStructureRequest
-        {
-            TopologyMode = TopologyMode.Linear,
-            OrderedNodeIds = n.Take(2).ToList()
-        });
-
-        var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/lines/{lineId}/structure/segments",
-            new AddLineSegmentRequest
-            {
-                FromNodeId = n[1],
-                ToNodeId = n[2],
-                Weight = 12.5m,
-                DisplayName = "主线段"
-            });
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-
-        var dto = await Client.GetEavAsync<LineStructureDto>(
-            $"/api/eav/lines/{lineId}/structure", EnumJson);
-        Assert.NotNull(dto);
-        var segment = Assert.Single(dto!.Segments, s => s.ToNodeId == n[2]);
-        Assert.Equal<decimal?>(12.5m, segment.Weight);
-        Assert.Equal("主线段", segment.DisplayName);
+        Assert.Equal(1, dto.Diagnostics.FeedInCount);
+        Assert.Equal(1, dto.Diagnostics.FeedInEnergizedCount);
+        Assert.Equal(1, dto.Diagnostics.TieCount);
+        Assert.True(dto.Diagnostics.Valid);
     }
 
     // ============================================================
@@ -701,33 +534,42 @@ public class LineStructureTests : IntegrationTestBase
             ToNodeId = p.To
         }).ToList();
 
+    private async Task<string> CreateLineAsync()
+    {
+        var lineId = $"L_{Guid.NewGuid():N}";
+        var resp = await Client.PostAsJsonAsync(
+            "/api/Lines", new { id = lineId, name = "结构测试线路" });
+        Assert.True(resp.IsSuccessStatusCode,
+            $"创建线路失败: {(int)resp.StatusCode} {await resp.Content.ReadAsStringAsync()}");
+        return lineId;
+    }
+
     private async Task<(string LineId, List<string> NodeIds)> CreateLineWithNodesAsync(int count)
     {
-        var lineId = Guid.NewGuid().ToString("N");
-
-        var lineResp = await Client.PostAsJsonAsync(
-            "/api/Lines", new Line { Id = lineId, Name = "结构测试线路" });
-        Assert.True(lineResp.IsSuccessStatusCode,
-            $"创建线路失败: {(int)lineResp.StatusCode} {await lineResp.Content.ReadAsStringAsync()}");
-
+        var lineId = await CreateLineAsync();
         var nodeIds = new List<string>(count);
         for (var i = 0; i < count; i++)
         {
-            var nodeId = Guid.NewGuid().ToString("N");
-            var nodeResp = await Client.PostAsJsonAsync(
-                "/api/LineNode",
-                new LineNode { Id = nodeId, LineId = lineId, Name = $"节点{i}" });
-            Assert.True(nodeResp.IsSuccessStatusCode,
-                $"创建线路节点失败: {(int)nodeResp.StatusCode} {await nodeResp.Content.ReadAsStringAsync()}");
+            var nodeId = $"{Guid.NewGuid()}";
+            var resp = await Client.PostAsJsonAsync("/api/LineNode", new
+            {
+                id = nodeId, lineId, name = $"节点{i}",
+                description = (string?)null, predecessorId = (string?)null
+            });
+            Assert.True(resp.IsSuccessStatusCode,
+                $"创建线路节点失败: {(int)resp.StatusCode} {await resp.Content.ReadAsStringAsync()}");
             nodeIds.Add(nodeId);
         }
-
         return (lineId, nodeIds);
     }
 
     private Task<HttpResponseMessage> PostStructureAsync(
         string lineId, LineStructureRequest req)
         => Client.PostAsJsonAsync($"/api/eav/lines/{lineId}/structure", req);
+
+    private async Task<LineStructureDto?> GetStructureAsync(string lineId)
+        => await Client.GetEavAsync<LineStructureDto>(
+            $"/api/eav/lines/{lineId}/structure", EnumJson);
 
     private async Task<LineStructureDto> CreateStructureOkAsync(
         string lineId, LineStructureRequest req)

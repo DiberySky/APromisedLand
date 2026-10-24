@@ -177,25 +177,12 @@ public sealed class SearchService
     {
         var result = new Dictionary<string, (string, string)>(StringComparer.Ordinal);
 
-        foreach (var n in await _db.UnitTrees.AsNoTracking()
+        // 统一走 nodes 注册表：树节点 Name 为 [NotMapped] 读穿 Node.Name（EF.Property/直选会在 Npgsql 翻译失败或取到 null），
+        // host_type 即前端契约标签 UnitTree/CategoryTree/KnowledgeTree/SpaceTree/LineNode
+        foreach (var n in await _db.Nodes.AsNoTracking()
             .Where(n => inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = (n.Name, "UnitTree");
-
-        foreach (var n in await _db.CategoryTrees.AsNoTracking()
-            .Where(n => inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = (n.Name, "CategoryTree");
-
-        foreach (var n in await _db.KnowledgeTrees.AsNoTracking()
-            .Where(n => inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = (n.Name, "KnowledgeTree");
-
-        foreach (var n in await _db.LineNodes.AsNoTracking()
-            .Where(n => inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = (n.Name, "LineNode");
+            .Select(n => new { n.Id, n.Name, n.HostType }).ToListAsync(ct))
+            result[n.Id] = (n.Name ?? "", n.HostType);
 
         return result;
     }
@@ -210,17 +197,24 @@ public sealed class SearchService
     {
         var result = new Dictionary<string, (string, string?, string?)>(StringComparer.Ordinal);
 
+        // 树表只取已映射的 Id/ParentId（Name 为 [NotMapped] 读穿 Node.Name，EF.Property 会在 Npgsql 翻译失败），
+        // 名称按共享主键从 nodes 注册表批量取
         async Task LoadTree<T>(DbSet<T> set) where T : class
         {
-            var nodes = await set.AsNoTracking()
+            var rows = await set.AsNoTracking()
                 .Select(n => new
                 {
                     Id = EF.Property<string>(n, "Id"),
-                    ParentId = EF.Property<string>(n, "ParentId"),
-                    Name = EF.Property<string>(n, "Name")
+                    ParentId = EF.Property<string>(n, "ParentId")
                 })
                 .ToListAsync(ct);
-            var map = nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
+            var rowIds = rows.Select(r => r.Id).ToList();
+            var names = (await _db.Nodes.AsNoTracking()
+                    .Where(n => rowIds.Contains(n.Id))
+                    .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
+                .ToDictionary(n => n.Id, n => n.Name, StringComparer.Ordinal);
+            var map = rows.ToDictionary(n => n.Id, StringComparer.Ordinal);
+            string NameOf(string id) => names.TryGetValue(id, out var nm) ? nm ?? "" : "";
 
             foreach (var id in inodeIds)
             {
@@ -232,12 +226,12 @@ public sealed class SearchService
                 var guard = new HashSet<string>(StringComparer.Ordinal) { start.Id };
                 while (true)
                 {
-                    segs.Add(current.Name ?? "");
+                    segs.Add(NameOf(current.Id));
                     if (current.ParentId is null ||
                         !map.TryGetValue(current.ParentId, out var parent) ||
                         !guard.Add(parent.Id))
                         break;
-                    parentName ??= parent.Name;
+                    parentName ??= NameOf(parent.Id);
                     current = parent;
                 }
 
@@ -251,8 +245,8 @@ public sealed class SearchService
         await LoadTree(_db.KnowledgeTrees);
 
         // 线路节点：无层级，路径即自身名称，根为自身
-        foreach (var n in await _db.LineNodes.AsNoTracking()
-            .Where(n => inodeIds.Contains(n.Id))
+        foreach (var n in await _db.Nodes.AsNoTracking()
+            .Where(n => n.HostType == "LineNode" && inodeIds.Contains(n.Id))
             .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
             result[n.Id] = (n.Name ?? "", n.Id, null);
 

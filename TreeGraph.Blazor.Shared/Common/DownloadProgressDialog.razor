@@ -10,13 +10,13 @@
            SubmitButtonVisible="false"
            IconsVisible="true"
            OnCanceledClick="@CancelAsync">
-    <ToolBarContent>
-        <MudText Typo="Typo.caption" Color="Color.Secondary">
-            @StatusText
-        </MudText>
-    </ToolBarContent>
+    @* 状态文字不放 ToolBarContent：MudBlazor.Extensions 宿主在标题区注入 header-actions 后，
+       Blazor 对标题区的后续更新会打到游离节点（状态冻结）；内容区更新可靠 *@
     <DialogContent>
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">
+                @StatusText
+            </MudText>
             <MudText Typo="Typo.body2" Class="mb-2">
                 文件: @_fileName (@FormatSize(_totalBytes))
             </MudText>

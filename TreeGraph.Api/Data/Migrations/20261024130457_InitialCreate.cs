@@ -122,12 +122,19 @@ namespace TreeGraph.Api.Data.Migrations
                     host_type = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false, defaultValue: "Node"),
                     name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_nodes", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_nodes_line_id",
+                        column: x => x.line_id,
+                        principalTable: "nodes",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -159,25 +166,6 @@ namespace TreeGraph.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_spaces", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "line_structures",
-                columns: table => new
-                {
-                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    topology_mode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_line_structures", x => x.line_id);
-                    table.ForeignKey(
-                        name: "FK_line_structures_lines_line_id",
-                        column: x => x.line_id,
-                        principalTable: "lines",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -225,28 +213,27 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "line_nodes",
+                name: "line_terminals",
                 columns: table => new
                 {
-                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
                     line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                    node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    external_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    operating_state = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_line_nodes", x => x.id);
-                    table.UniqueConstraint("ak_line_nodes_line_id_id", x => new { x.line_id, x.id });
+                    table.PrimaryKey("PK_line_terminals", x => new { x.line_id, x.node_id });
                     table.ForeignKey(
-                        name: "FK_line_nodes_lines_line_id",
+                        name: "FK_line_terminals_lines_line_id",
                         column: x => x.line_id,
                         principalTable: "lines",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_line_nodes_nodes_id",
-                        column: x => x.id,
+                        name: "fk_lt_node",
+                        column: x => x.node_id,
                         principalTable: "nodes",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
@@ -330,67 +317,6 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.option_set_id,
                         principalTable: "option_sets",
                         principalColumn: "option_set_id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "line_structure_segments",
-                columns: table => new
-                {
-                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    edge_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    from_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    to_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    weight = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
-                    display_name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_line_structure_segments", x => new { x.line_id, x.edge_id });
-                    table.ForeignKey(
-                        name: "FK_line_structure_segments_line_structures_line_id",
-                        column: x => x.line_id,
-                        principalTable: "line_structures",
-                        principalColumn: "line_id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "fk_lss_from_node_same_line",
-                        columns: x => new { x.line_id, x.from_node_id },
-                        principalTable: "line_nodes",
-                        principalColumns: new[] { "line_id", "id" },
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_lss_to_node_same_line",
-                        columns: x => new { x.line_id, x.to_node_id },
-                        principalTable: "line_nodes",
-                        principalColumns: new[] { "line_id", "id" },
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "line_terminals",
-                columns: table => new
-                {
-                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    external_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    operating_state = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_line_terminals", x => new { x.line_id, x.node_id });
-                    table.ForeignKey(
-                        name: "FK_line_terminals_line_structures_line_id",
-                        column: x => x.line_id,
-                        principalTable: "line_structures",
-                        principalColumn: "line_id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "fk_lt_node_same_line",
-                        columns: x => new { x.line_id, x.node_id },
-                        principalTable: "line_nodes",
-                        principalColumns: new[] { "line_id", "id" },
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -716,92 +642,98 @@ namespace TreeGraph.Api.Data.Migrations
                     { "a0000034-0000-4000-8000-000000000034", null, "crossing_type", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "single_choice", null, "跨越物类型", 3, "LineNode", false, false, true, true, false, null, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
                     { "a0000035-0000-4000-8000-000000000035", null, "voltage_below", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "被跨线路电压等级", 4, "LineNode", false, false, false, true, false, null, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
                     { "a0000036-0000-4000-8000-000000000036", null, "location_geo", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "location", null, "经纬度", 5, "LineNode", false, false, false, false, false, null, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000037-0000-4000-8000-000000000037", null, "measured_at", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "datetime", null, "最近测量时间", 6, "LineNode", false, false, false, true, true, null, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 }
+                    { "a0000037-0000-4000-8000-000000000037", null, "measured_at", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "datetime", null, "最近测量时间", 6, "LineNode", false, false, false, true, true, null, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
+                    { "a0000038-0000-4000-8000-000000000038", null, "next", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "relation", null, "下一段", 0, "LineStructure", false, false, false, false, false, null, null, null, "line_segment", null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 }
                 });
 
             migrationBuilder.InsertData(
+                table: "entity_type_catalog",
+                columns: new[] { "entity_type_id", "created_at", "description", "display_name", "display_order", "entity_type", "is_deleted", "owner_space_id", "updated_at" },
+                values: new object[] { "e0000001-0000-4000-8000-000000000001", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "线路节点结构声明：链边属性 next（line_segment）表达 LineNode ↔ LineNode 有向段", "线路结构", 0, "LineStructure", false, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) });
+
+            migrationBuilder.InsertData(
                 table: "nodes",
-                columns: new[] { "id", "created_at", "description", "host_type", "name", "updated_at" },
+                columns: new[] { "id", "created_at", "description", "host_type", "line_id", "name", "updated_at" },
                 values: new object[,]
                 {
-                    { "0d7ebe17-93ae-4e4c-92f4-063a124cd181", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "平方公里", null },
-                    { "1a80ed3b-1b36-4d8b-b80b-3070dbc7979d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "千赫", null },
-                    { "221d3c45-911f-4e94-9c3e-c13e6f2bcc76", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "帕斯卡", null },
-                    { "279a6b18-6d01-4437-b95b-0480ca7adc98", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "千焦", null },
-                    { "2d21c35a-4251-479e-b814-060b2fc84445", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "立方米", null },
-                    { "3d9088a3-7283-4f8f-b995-b193a57a6c2a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "弧度", null },
-                    { "405ae7a3-8a13-479d-bc1a-6f9d3c15e521", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "英里/小时", null },
-                    { "41572712-95dd-4caf-b316-e1b924bc57c3", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "兆赫", null },
-                    { "4cbec89d-3f52-4db3-9ab0-faeeb841ffbf", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "米/秒", null },
-                    { "5db494d7-2a9c-4ae0-86e0-d4bb0dfc7b81", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "焦耳", null },
-                    { "5e880060-9410-40d7-bcb4-545ccd0c1bb6", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "赫兹", null },
-                    { "64e918fb-ee9d-45c7-b35a-2a55f5a5fe62", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "千米/小时", null },
-                    { "780e7a01-350d-45ec-b963-b36a996de614", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "毫升", null },
-                    { "7f0af6a9-ba1a-469c-b967-e32afe43cad2", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "升", null },
-                    { "883a9940-84ec-4daa-8448-609461b984ea", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "千帕", null },
-                    { "8981bd9a-bd99-4f4c-b8af-038975b799be", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "巴", null },
-                    { "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "计量单位", null },
-                    { "a00be966-be2e-484e-92b6-9706494ac775", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "马力", null },
-                    { "a0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "毫克", null },
-                    { "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "长度", null },
-                    { "a2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "毫安", null },
-                    { "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "频率", null },
-                    { "a4c312d3-023e-4d4e-b5a7-fb7fcbd55c56", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "公顷", null },
-                    { "a4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "英里", null },
-                    { "a5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "港元", null },
-                    { "a6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "小时", null },
-                    { "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "功率", null },
-                    { "a8e9f0a1-b2c3-4d4e-5f6a-7b8c9d0e1f2a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "千瓦", null },
-                    { "b1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "吨", null },
-                    { "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "质量", null },
-                    { "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "日元", null },
-                    { "b3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "微安", null },
-                    { "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "角度", null },
-                    { "b5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "码", null },
-                    { "b6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "澳元", null },
-                    { "b7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "天", null },
-                    { "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "面积", null },
-                    { "b9f0a1b2-c3d4-4e5f-6a7b-8c9d0e1f2a3b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "兆瓦", null },
-                    { "beef0000-0000-4000-8000-000000000001", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "KnowledgeTree", "知识库", null },
-                    { "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "米", null },
-                    { "c2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "磅", null },
-                    { "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "时间", null },
-                    { "c4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "伏特", null },
-                    { "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "英镑", null },
-                    { "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "货币", null },
-                    { "c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "英尺", null },
-                    { "c8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "摄氏度", null },
-                    { "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "体积", null },
-                    { "d0000000-0000-4000-8000-000000000001", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "CategoryTree", "项目类型", null },
-                    { "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "速度", null },
-                    { "d1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "千米", null },
-                    { "d3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "盎司", null },
-                    { "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "温度", null },
-                    { "d5306eb8-324f-4088-a867-6fbc7141fd59", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "兆帕", null },
-                    { "d5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "千伏", null },
-                    { "d5c6d7e8-f9a0-4b1c-2d3e-4f5a6b7c8d9e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "欧元", null },
-                    { "d7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "英寸", null },
-                    { "d9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "华氏度", null },
-                    { "e0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "开尔文", null },
-                    { "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "压力", null },
-                    { "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "厘米", null },
-                    { "e3c1f025-3b2b-461a-a5a1-015cb4e3fe38", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "千瓦时", null },
-                    { "e4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "秒", null },
-                    { "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "电流", null },
-                    { "e6b7c8d9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "美元", null },
-                    { "e6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "毫伏", null },
-                    { "e88b04db-40ac-4bb7-b420-1f3b37180673", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "平方米", null },
-                    { "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "千克", null },
-                    { "ed1b66d2-454b-453b-9d43-12605dffa456", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "度", null },
-                    { "f1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "安培", null },
-                    { "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "能量", null },
-                    { "f3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "毫米", null },
-                    { "f5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "分钟", null },
-                    { "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "电压", null },
-                    { "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "元", null },
-                    { "f7d8e9f0-a1b2-4c3d-4e5f-6a7b8c9d0e1f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "瓦特", null },
-                    { "f9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "克", null },
-                    { "fefa26a5-d608-411c-b637-469a886e558c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", "亩", null }
+                    { "0d7ebe17-93ae-4e4c-92f4-063a124cd181", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "平方公里", null },
+                    { "1a80ed3b-1b36-4d8b-b80b-3070dbc7979d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "千赫", null },
+                    { "221d3c45-911f-4e94-9c3e-c13e6f2bcc76", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "帕斯卡", null },
+                    { "279a6b18-6d01-4437-b95b-0480ca7adc98", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "千焦", null },
+                    { "2d21c35a-4251-479e-b814-060b2fc84445", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "立方米", null },
+                    { "3d9088a3-7283-4f8f-b995-b193a57a6c2a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "弧度", null },
+                    { "405ae7a3-8a13-479d-bc1a-6f9d3c15e521", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "英里/小时", null },
+                    { "41572712-95dd-4caf-b316-e1b924bc57c3", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "兆赫", null },
+                    { "4cbec89d-3f52-4db3-9ab0-faeeb841ffbf", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "米/秒", null },
+                    { "5db494d7-2a9c-4ae0-86e0-d4bb0dfc7b81", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "焦耳", null },
+                    { "5e880060-9410-40d7-bcb4-545ccd0c1bb6", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "赫兹", null },
+                    { "64e918fb-ee9d-45c7-b35a-2a55f5a5fe62", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "千米/小时", null },
+                    { "780e7a01-350d-45ec-b963-b36a996de614", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "毫升", null },
+                    { "7f0af6a9-ba1a-469c-b967-e32afe43cad2", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "升", null },
+                    { "883a9940-84ec-4daa-8448-609461b984ea", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "千帕", null },
+                    { "8981bd9a-bd99-4f4c-b8af-038975b799be", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "巴", null },
+                    { "9AB5700C-68F2-43F3-9D7E-805E7D5C539B", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "计量单位", null },
+                    { "a00be966-be2e-484e-92b6-9706494ac775", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "马力", null },
+                    { "a0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "毫克", null },
+                    { "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "长度", null },
+                    { "a2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "毫安", null },
+                    { "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "频率", null },
+                    { "a4c312d3-023e-4d4e-b5a7-fb7fcbd55c56", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "公顷", null },
+                    { "a4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "英里", null },
+                    { "a5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "港元", null },
+                    { "a6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "小时", null },
+                    { "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "功率", null },
+                    { "a8e9f0a1-b2c3-4d4e-5f6a-7b8c9d0e1f2a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "千瓦", null },
+                    { "b1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "吨", null },
+                    { "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "质量", null },
+                    { "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "日元", null },
+                    { "b3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "微安", null },
+                    { "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "角度", null },
+                    { "b5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "码", null },
+                    { "b6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "澳元", null },
+                    { "b7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "天", null },
+                    { "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "面积", null },
+                    { "b9f0a1b2-c3d4-4e5f-6a7b-8c9d0e1f2a3b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "兆瓦", null },
+                    { "beef0000-0000-4000-8000-000000000001", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "KnowledgeTree", null, "知识库", null },
+                    { "c0a1b2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "米", null },
+                    { "c2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "磅", null },
+                    { "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "时间", null },
+                    { "c4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "伏特", null },
+                    { "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "英镑", null },
+                    { "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "货币", null },
+                    { "c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "英尺", null },
+                    { "c8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "摄氏度", null },
+                    { "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "体积", null },
+                    { "d0000000-0000-4000-8000-000000000001", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "CategoryTree", null, "项目类型", null },
+                    { "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "速度", null },
+                    { "d1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "千米", null },
+                    { "d3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "盎司", null },
+                    { "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "温度", null },
+                    { "d5306eb8-324f-4088-a867-6fbc7141fd59", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "兆帕", null },
+                    { "d5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "千伏", null },
+                    { "d5c6d7e8-f9a0-4b1c-2d3e-4f5a6b7c8d9e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "欧元", null },
+                    { "d7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "英寸", null },
+                    { "d9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "华氏度", null },
+                    { "e0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "开尔文", null },
+                    { "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "压力", null },
+                    { "e2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "厘米", null },
+                    { "e3c1f025-3b2b-461a-a5a1-015cb4e3fe38", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "千瓦时", null },
+                    { "e4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "秒", null },
+                    { "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "电流", null },
+                    { "e6b7c8d9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "美元", null },
+                    { "e6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "毫伏", null },
+                    { "e88b04db-40ac-4bb7-b420-1f3b37180673", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "平方米", null },
+                    { "e8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "千克", null },
+                    { "ed1b66d2-454b-453b-9d43-12605dffa456", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "度", null },
+                    { "f1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "安培", null },
+                    { "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "能量", null },
+                    { "f3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "毫米", null },
+                    { "f5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "分钟", null },
+                    { "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "电压", null },
+                    { "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "元", null },
+                    { "f7d8e9f0-a1b2-4c3d-4e5f-6a7b8c9d0e1f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "瓦特", null },
+                    { "f9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "克", null },
+                    { "fefa26a5-d608-411c-b637-469a886e558c", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "UnitTree", null, "亩", null }
                 });
 
             migrationBuilder.InsertData(
@@ -1142,40 +1074,14 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "parent_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_line_nodes_line_id",
-                table: "line_nodes",
-                column: "line_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_line_structure_segments_line_id_from_node_id",
-                table: "line_structure_segments",
-                columns: new[] { "line_id", "from_node_id" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_line_structure_segments_line_id_to_node_id",
-                table: "line_structure_segments",
-                columns: new[] { "line_id", "to_node_id" });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_lss_from_node",
-                table: "line_structure_segments",
-                column: "from_node_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_lss_to_node",
-                table: "line_structure_segments",
-                column: "to_node_id");
-
-            migrationBuilder.CreateIndex(
-                name: "uq_lss_edge_id",
-                table: "line_structure_segments",
-                column: "edge_id",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "ix_line_terminals_external_node",
                 table: "line_terminals",
                 column: "external_node_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_line_terminals_node_id",
+                table: "line_terminals",
+                column: "node_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_lav_entity",
@@ -1198,6 +1104,11 @@ namespace TreeGraph.Api.Data.Migrations
                 table: "location_attribute_values",
                 columns: new[] { "entity_id", "entity_type", "attribute_id" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_nodes_line_id",
+                table: "nodes",
+                column: "line_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_option_items_set",
@@ -1254,6 +1165,7 @@ namespace TreeGraph.Api.Data.Migrations
                 table: "unit_trees",
                 column: "parent_id");
 
+            // 手写 SQL：attribute_audit_log 按月分区父表（实体 ExcludeFromMigrations，EF 不生成 DDL）
             migrationBuilder.CreateAuditPartitionTable();
         }
 
@@ -1290,9 +1202,6 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "knowledge_trees");
 
             migrationBuilder.DropTable(
-                name: "line_structure_segments");
-
-            migrationBuilder.DropTable(
                 name: "line_terminals");
 
             migrationBuilder.DropTable(
@@ -1311,16 +1220,10 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "spaces");
 
             migrationBuilder.DropTable(
-                name: "line_structures");
-
-            migrationBuilder.DropTable(
-                name: "line_nodes");
+                name: "lines");
 
             migrationBuilder.DropTable(
                 name: "attribute_catalog");
-
-            migrationBuilder.DropTable(
-                name: "lines");
 
             migrationBuilder.DropTable(
                 name: "composite_type_definitions");

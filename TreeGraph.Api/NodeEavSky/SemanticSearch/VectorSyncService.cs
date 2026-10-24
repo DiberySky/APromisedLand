@@ -246,7 +246,8 @@ public sealed class VectorSynchronizer
             .Select(n => n.Id).ToListAsync(ct));
         hostNodeIds.AddRange(await _db.KnowledgeTrees.AsNoTracking()
             .Select(n => n.Id).ToListAsync(ct));
-        hostNodeIds.AddRange(await _db.LineNodes.AsNoTracking()
+        hostNodeIds.AddRange(await _db.Nodes.AsNoTracking()
+            .Where(n => n.HostType == "LineNode")
             .Select(n => n.Id).ToListAsync(ct));
         hostNodeIds.AddRange(await _db.Lines.AsNoTracking()
             .Select(n => n.Id).ToListAsync(ct));
@@ -358,6 +359,8 @@ public sealed class VectorSynchronizer
 
         // 逐项处理范围内全部节点：缺失的补算（fix），已存在的仅校验（ok）。
         // 两者都推送进度，让对话框能展示每个节点的同步过程，而不只是缺失项。
+        // 单项失败不中断对账：推 error 进度（Detail=真实原因）、计 FailedCount 后继续；
+        // 嵌入服务连续不可达（HttpRequestException）达阈值则熔断，跳过剩余补缺避免满屏红与超时放大。
         var names = onProgress is not null
             ? await LoadHostNamesAsync(activeInodes, ct)
             : null;
@@ -367,24 +370,55 @@ public sealed class VectorSynchronizer
             .ToList();
 
         var fixedCount = 0;
+        var failedCount = 0;
+        var consecutiveInfraFailures = 0;
         for (var i = 0; i < orderedInodes.Count; i++)
         {
             var inodeId = orderedInodes[i];
             var isMissing = affectedInodes.Contains(inodeId);
-            if (isMissing)
+            var nodeName = names is not null && names.TryGetValue(inodeId, out var n) ? n : "";
+            try
             {
-                await SyncInodeAsync(inodeId, ct);
-                fixedCount++;
-            }
+                if (isMissing)
+                {
+                    await SyncInodeAsync(inodeId, ct);
+                    fixedCount++;
+                }
+                consecutiveInfraFailures = 0;
 
-            if (onProgress is not null)
+                if (onProgress is not null)
+                {
+                    // Detail = 该节点实际送去向量化的文本（SourceTextBuilder 构建结果）
+                    var source = await _builder.BuildAsync(inodeId, ct);
+                    await onProgress(new ReconcileProgress(
+                        isMissing ? "fix" : "ok", inodeId, nodeName, source?.NodeText ?? ""));
+                }
+            }
+            catch (HttpRequestException ex)
             {
-                // Detail = 该节点实际送去向量化的文本（SourceTextBuilder 构建结果）
-                var source = await _builder.BuildAsync(inodeId, ct);
-                await onProgress(new ReconcileProgress(
-                    isMissing ? "fix" : "ok", inodeId,
-                    names!.TryGetValue(inodeId, out var name) ? name : "",
-                    source?.NodeText ?? ""));
+                failedCount++;
+                consecutiveInfraFailures++;
+                _logger.LogWarning(ex, "向量对账单项失败（嵌入服务不可达）：{InodeId}", inodeId);
+                if (onProgress is not null)
+                    await onProgress(new ReconcileProgress(
+                        "error", inodeId, nodeName, $"向量嵌入服务不可用（{ex.Message}）"));
+                if (isMissing && consecutiveInfraFailures >= InfraFailureCircuitLimit)
+                {
+                    var skipped = orderedInodes.Count - i - 1;
+                    if (skipped > 0 && onProgress is not null)
+                        await onProgress(new ReconcileProgress(
+                            "error", "", "", $"向量服务持续不可用，跳过剩余 {skipped} 项补缺"));
+                    break;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                failedCount++;
+                consecutiveInfraFailures = 0;
+                _logger.LogWarning(ex, "向量对账单项失败：{InodeId}", inodeId);
+                if (onProgress is not null)
+                    await onProgress(new ReconcileProgress(
+                        "error", inodeId, nodeName, ex.Message));
             }
         }
 
@@ -392,12 +426,23 @@ public sealed class VectorSynchronizer
         foreach (var entityId in missingStandaloneEntities)
         {
             var entityType = standaloneEntityTypes![entityId];
-            await SyncEntityAsync(entityType, entityId, ct);
-            fixedCount++;
-            if (onProgress is not null)
+            try
             {
-                var src = await _builder.BuildEntityTextAsync(entityType, entityId, null, ct);
-                await onProgress(new ReconcileProgress("fix", entityId, "", src?.Text ?? ""));
+                await SyncEntityAsync(entityType, entityId, ct);
+                fixedCount++;
+                if (onProgress is not null)
+                {
+                    var src = await _builder.BuildEntityTextAsync(entityType, entityId, null, ct);
+                    await onProgress(new ReconcileProgress("fix", entityId, "", src?.Text ?? ""));
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                failedCount++;
+                _logger.LogWarning(ex, "向量对账独立实体失败：{EntityType}/{EntityId}", entityType, entityId);
+                if (onProgress is not null)
+                    await onProgress(new ReconcileProgress(
+                        "error", entityId, "", ErrorDetail(ex)));
             }
         }
 
@@ -405,11 +450,22 @@ public sealed class VectorSynchronizer
         // v4 文本变化的行承载实体经此自愈（实体点键不含模板版本，靠此路由重算）。
         foreach (var owner in missingRowOwners)
         {
-            await SyncEntityAsync(owner.EntityType, owner.EntityId, ct);
-            fixedCount++;
-            if (onProgress is not null)
-                await onProgress(new ReconcileProgress(
-                    "fix", owner.EntityId, "", $"行向量重建（实体 {owner.EntityType}）"));
+            try
+            {
+                await SyncEntityAsync(owner.EntityType, owner.EntityId, ct);
+                fixedCount++;
+                if (onProgress is not null)
+                    await onProgress(new ReconcileProgress(
+                        "fix", owner.EntityId, "", $"行向量重建（实体 {owner.EntityType}）"));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                failedCount++;
+                _logger.LogWarning(ex, "向量对账行重建失败：{EntityType}/{EntityId}", owner.EntityType, owner.EntityId);
+                if (onProgress is not null)
+                    await onProgress(new ReconcileProgress(
+                        "error", owner.EntityId, "", $"行向量重建失败：{ErrorDetail(ex)}"));
+            }
         }
 
         // 删孤儿（按 PointId）。
@@ -427,31 +483,49 @@ public sealed class VectorSynchronizer
 
             foreach (var point in freshOrphaned)
             {
-                await _store.DeletePointAsync(point.Uuid, ct);
-                deletedCount++;
-                if (onProgress is not null)
-                    await onProgress(new ReconcileProgress(
-                    "purge", point.InodeId, "",
-                    point.PointKind == "entity"
-                        ? $"实体 {point.EntityId}"
-                        : point.PointKind == "row"
-                            ? $"行 {point.RowId}"
-                            : $"节点 {point.InodeId}"));
+                try
+                {
+                    await _store.DeletePointAsync(point.Uuid, ct);
+                    deletedCount++;
+                    if (onProgress is not null)
+                        await onProgress(new ReconcileProgress(
+                        "purge", point.InodeId, "",
+                        point.PointKind == "entity"
+                            ? $"实体 {point.EntityId}"
+                            : point.PointKind == "row"
+                                ? $"行 {point.RowId}"
+                                : $"节点 {point.InodeId}"));
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    failedCount++;
+                    _logger.LogWarning(ex, "向量对账清理孤儿失败：{Uuid}", point.Uuid);
+                    if (onProgress is not null)
+                        await onProgress(new ReconcileProgress(
+                            "error", point.InodeId, "", $"清理失败：{ex.Message}"));
+                }
             }
         }
 
-        if (fixedCount > 0 || deletedCount > 0)
+        if (fixedCount > 0 || deletedCount > 0 || failedCount > 0)
         {
             _logger.LogInformation(
-                "向量对账修复：同步 {Fixed} 个节点，删除孤儿 {Deleted} 条",
-                fixedCount, deletedCount);
+                "向量对账修复：同步 {Fixed} 个节点，删除孤儿 {Deleted} 条，失败 {Failed} 项",
+                fixedCount, deletedCount, failedCount);
         }
 
         return new ReconcileResult(
             expectedKeys.Count, existing.Count,
             missing.Count, orphaned.Count,
-            fixedCount, deletedCount);
+            fixedCount, deletedCount, failedCount);
     }
+
+    /// <summary>嵌入服务连续不可达熔断阈值：达到即中止剩余补缺（本轮对账仍以 summary 正常收尾）。</summary>
+    private const int InfraFailureCircuitLimit = 3;
+
+    /// <summary>单项失败原因：嵌入服务连接失败给出可读前缀，其余取异常消息。</summary>
+    private static string ErrorDetail(Exception ex) =>
+        ex is HttpRequestException ? $"向量嵌入服务不可用（{ex.Message}）" : ex.Message;
 
     /// <summary>节点点对账键：node:{inodeId}:{viewType}:{templateVersion}（升版即换键，旧点自动成为孤儿被清理）。</summary>
     private static string NodeVectorKey(string inodeId, string templateVersion) =>
@@ -479,8 +553,8 @@ public sealed class VectorSynchronizer
         result.AddRange(await ExpandDescendantsAsync([inodeId], _db.CategoryTrees, ct));
         result.AddRange(await ExpandDescendantsAsync([inodeId], _db.KnowledgeTrees, ct));
         // 线路改名 → 其下全部线路节点的「所属线路」行失效，按 LineId 级联
-        result.AddRange(await _db.LineNodes.AsNoTracking()
-            .Where(n => n.LineId == inodeId)
+        result.AddRange(await _db.Nodes.AsNoTracking()
+            .Where(n => n.HostType == "LineNode" && n.LineId == inodeId)
             .Select(n => n.Id)
             .ToListAsync(ct));
         return result;
@@ -510,42 +584,19 @@ public sealed class VectorSynchronizer
     }
 
     /// <summary>
-    /// 批量解析宿主节点名称（4 棵宿主树 + 线路节点；进度流展示用，查不到的 Id 不在结果内）。
+    /// 批量解析宿主节点名称（进度流展示用，查不到的 Id 不在结果内）。
+    /// 统一走 nodes 注册表：树节点/线路/线路节点均以共享主键注册 nodes（树表 Name 为 [NotMapped] 读穿 Node.Name，
+    /// 直选树表 Name 在 Npgsql 下要么翻译失败要么客户端求值拿到 null）。
     /// </summary>
     private async Task<Dictionary<string, string>> LoadHostNamesAsync(
         IReadOnlyCollection<string> inodeIds, CancellationToken ct)
     {
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var n in await _db.SpaceTrees.AsNoTracking()
+        foreach (var n in await _db.Nodes.AsNoTracking()
             .Where(n => inodeIds.Contains(n.Id))
             .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = n.Name;
-
-        foreach (var n in await _db.UnitTrees.AsNoTracking()
-            .Where(n => inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = n.Name;
-
-        foreach (var n in await _db.CategoryTrees.AsNoTracking()
-            .Where(n => inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = n.Name;
-
-        foreach (var n in await _db.KnowledgeTrees.AsNoTracking()
-            .Where(n => inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = n.Name;
-
-        foreach (var n in await _db.LineNodes.AsNoTracking()
-            .Where(n => inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = n.Name;
-
-        foreach (var n in await _db.Lines.AsNoTracking()
-            .Where(n => inodeIds.Contains(n.Id))
-            .Select(n => new { n.Id, n.Name }).ToListAsync(ct))
-            result[n.Id] = n.Name;
+            result[n.Id] = n.Name ?? "";
 
         return result;
     }
@@ -582,7 +633,8 @@ public sealed class VectorSynchronizer
                 var lineScope = (await _db.Lines.AsNoTracking()
                         .Select(n => n.Id).ToListAsync(ct))
                     .ToHashSet(StringComparer.Ordinal);
-                lineScope.UnionWith(await _db.LineNodes.AsNoTracking()
+                lineScope.UnionWith(await _db.Nodes.AsNoTracking()
+                    .Where(n => n.HostType == "LineNode")
                     .Select(n => n.Id).ToListAsync(ct));
                 return lineScope;
 
@@ -656,8 +708,8 @@ public sealed class VectorSynchronizer
             return new HashSet<string>(StringComparer.Ordinal);
 
         var scope = new HashSet<string>(StringComparer.Ordinal) { lineId };
-        scope.UnionWith(await _db.LineNodes.AsNoTracking()
-            .Where(n => n.LineId == lineId)
+        scope.UnionWith(await _db.Nodes.AsNoTracking()
+            .Where(n => n.HostType == "LineNode" && n.LineId == lineId)
             .Select(n => n.Id)
             .ToListAsync(ct));
         return scope;
@@ -666,9 +718,10 @@ public sealed class VectorSynchronizer
 
 public sealed record ReconcileResult(
     int Active, int Existing, int Missing, int Orphaned,
-    int FixedCount, int DeletedCount);
+    int FixedCount, int DeletedCount, int FailedCount = 0);
 
-/// <summary>对账逐项进度事件：fix=同步节点（Name 为宿主节点名）；purge=清理孤儿（Detail 描述被删点）。</summary>
+/// <summary>对账逐项进度事件：fix=同步节点（Name 为宿主节点名）；purge=清理孤儿（Detail 描述被删点）；
+/// error=单项失败（Detail 为真实原因，不中断对账）。</summary>
 public sealed record ReconcileProgress(
     string Stage, string InodeId, string Name, string Detail);
 

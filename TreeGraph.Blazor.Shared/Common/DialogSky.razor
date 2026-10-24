@@ -100,6 +100,12 @@
     [Parameter] public string ActionsClass { get; set; } = "mud-theme-default";
     [Parameter] public string ActionsContentClass { get; set; } = "";
 
+    /// <summary>
+    /// 工具栏内容（标题栏下方，可选）。
+    /// ⚠ 仅放静态内容：MudBlazor.Extensions 宿主在标题区注入 header-actions 后，
+    /// Blazor 对标题区的后续更新会打到游离节点（动态文本/绑定值冻结在初始渲染）。
+    /// 需要随状态更新的内容（状态文字、步进器绑定值等）放 DialogContent 顶部。
+    /// </summary>
     [Parameter] public RenderFragment? ToolBarContent { get; set; }
     [Parameter] public RenderFragment? DialogContent { get; set; }
     [Parameter] public RenderFragment? DialogLeftActions { get; set; }

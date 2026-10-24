@@ -23,81 +23,6 @@ namespace TreeGraph.Api.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructure", b =>
-                {
-                    b.Property<string>("LineId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("line_id");
-
-                    b.Property<string>("TopologyMode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("topology_mode");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("LineId");
-
-                    b.ToTable("line_structures", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructureSegment", b =>
-                {
-                    b.Property<string>("LineId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("line_id");
-
-                    b.Property<string>("EdgeId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("edge_id");
-
-                    b.Property<string>("DisplayName")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("display_name");
-
-                    b.Property<string>("FromNodeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("from_node_id");
-
-                    b.Property<string>("ToNodeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("to_node_id");
-
-                    b.Property<decimal?>("Weight")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("weight");
-
-                    b.HasKey("LineId", "EdgeId");
-
-                    b.HasIndex("EdgeId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_lss_edge_id");
-
-                    b.HasIndex("FromNodeId")
-                        .HasDatabaseName("ix_lss_from_node");
-
-                    b.HasIndex("ToNodeId")
-                        .HasDatabaseName("ix_lss_to_node");
-
-                    b.HasIndex("LineId", "FromNodeId");
-
-                    b.HasIndex("LineId", "ToNodeId");
-
-                    b.ToTable("line_structure_segments", (string)null);
-                });
-
             modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineTerminal", b =>
                 {
                     b.Property<string>("LineId")
@@ -131,6 +56,8 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasIndex("ExternalNodeId")
                         .HasDatabaseName("ix_line_terminals_external_node");
+
+                    b.HasIndex("NodeId");
 
                     b.ToTable("line_terminals", (string)null);
                 });
@@ -972,6 +899,24 @@ namespace TreeGraph.Api.Data.Migrations
                             IsSortable = true,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Version = 1
+                        },
+                        new
+                        {
+                            AttributeId = "a0000038-0000-4000-8000-000000000038",
+                            AttributeName = "next",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DataType = "relation",
+                            DisplayName = "下一段",
+                            DisplayOrder = 0,
+                            EntityType = "LineStructure",
+                            IsDeleted = false,
+                            IsRecordMode = false,
+                            IsRequired = false,
+                            IsSearchable = false,
+                            IsSortable = false,
+                            RelationType = "line_segment",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Version = 1
                         });
                 });
 
@@ -1557,6 +1502,19 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("ix_entity_type_owner_space");
 
                     b.ToTable("entity_type_catalog", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            EntityTypeId = "e0000001-0000-4000-8000-000000000001",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "线路节点结构声明：链边属性 next（line_segment）表达 LineNode ↔ LineNode 有向段",
+                            DisplayName = "线路结构",
+                            DisplayOrder = 0,
+                            EntityType = "LineStructure",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", b =>
@@ -1971,44 +1929,6 @@ namespace TreeGraph.Api.Data.Migrations
                     b.ToTable("lines", (string)null);
                 });
 
-            modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.LineNode", b =>
-                {
-                    b.Property<string>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("description");
-
-                    b.Property<string>("LineId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("line_id");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasAlternateKey("LineId", "Id")
-                        .HasName("ak_line_nodes_line_id_id");
-
-                    b.HasIndex("LineId");
-
-                    b.ToTable("line_nodes", (string)null);
-                });
-
             modelBuilder.Entity("TreeGraph.Shared.NodeSky.Entities.Node", b =>
                 {
                     b.Property<string>("Id")
@@ -2035,6 +1955,11 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDefaultValue("Node")
                         .HasColumnName("host_type");
 
+                    b.Property<string>("LineId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("line_id");
+
                     b.Property<string>("Name")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
@@ -2045,6 +1970,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LineId")
+                        .HasDatabaseName("ix_nodes_line_id");
 
                     b.ToTable("nodes", (string)null);
 
@@ -3532,55 +3460,20 @@ namespace TreeGraph.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructure", b =>
+            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineTerminal", b =>
                 {
                     b.HasOne("TreeGraph.Shared.LineSky.Entities.Line", null)
                         .WithMany()
                         .HasForeignKey("LineId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineStructureSegment", b =>
-                {
-                    b.HasOne("TreeGraph.Api.LineSky.Entities.LineStructure", null)
-                        .WithMany()
-                        .HasForeignKey("LineId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("TreeGraph.Shared.LineSky.Entities.LineNode", null)
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
                         .WithMany()
-                        .HasForeignKey("LineId", "FromNodeId")
-                        .HasPrincipalKey("LineId", "Id")
+                        .HasForeignKey("NodeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_lss_from_node_same_line");
-
-                    b.HasOne("TreeGraph.Shared.LineSky.Entities.LineNode", null)
-                        .WithMany()
-                        .HasForeignKey("LineId", "ToNodeId")
-                        .HasPrincipalKey("LineId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_lss_to_node_same_line");
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineTerminal", b =>
-                {
-                    b.HasOne("TreeGraph.Api.LineSky.Entities.LineStructure", null)
-                        .WithMany()
-                        .HasForeignKey("LineId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TreeGraph.Shared.LineSky.Entities.LineNode", null)
-                        .WithMany()
-                        .HasForeignKey("LineId", "NodeId")
-                        .HasPrincipalKey("LineId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_lt_node_same_line");
+                        .HasConstraintName("fk_lt_node");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", b =>
@@ -3748,21 +3641,13 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Navigation("Attribute");
                 });
 
-            modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.LineNode", b =>
+            modelBuilder.Entity("TreeGraph.Shared.NodeSky.Entities.Node", b =>
                 {
-                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", "Node")
-                        .WithOne()
-                        .HasForeignKey("TreeGraph.Shared.LineSky.Entities.LineNode", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TreeGraph.Shared.LineSky.Entities.Line", null)
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
                         .WithMany()
                         .HasForeignKey("LineId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Node");
+                        .HasConstraintName("fk_nodes_line_id");
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.TreeEavSky.Entities.CategoryTree", b =>

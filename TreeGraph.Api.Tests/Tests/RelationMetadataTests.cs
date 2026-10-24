@@ -141,7 +141,6 @@ public class RelationMetadataTests : IntegrationTestBase
     [InlineData("user dept")]
     [InlineData("用户关系")]
     [InlineData("parent_of")]
-    [InlineData("line_contains")]
     [InlineData("connects_to")]
     [InlineData("line_segment")]
     public async Task Create_InvalidOrReservedRelationType_Returns400(string relationType)

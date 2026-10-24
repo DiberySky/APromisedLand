@@ -352,7 +352,7 @@ public class DeletePrincipleTests : IntegrationTestBase
         var lineResp = await Client.PostAsJsonAsync(
             "/api/Lines", new { id = lineId, name = "删除原则线路" });
         lineResp.EnsureSuccessStatusCode();
-        var nodeId = $"LN_{Guid.NewGuid():N}";
+        var nodeId = $"{Guid.NewGuid()}";
         var nodeResp = await Client.PostAsJsonAsync(
             "/api/LineNode", new { id = nodeId, name = "删除原则杆塔", lineId });
         nodeResp.EnsureSuccessStatusCode();
@@ -367,10 +367,10 @@ public class DeletePrincipleTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
         Assert.Contains("实体数据", await resp.Content.ReadAsStringAsync());
 
-        // 节点与其声明都还在
+        // 节点与其声明都还在（R7：创建即声明 LineStructure 类型 + 挂载的测试实体 = 2 张卡）
         var cards = await Client.GetEavAsync<List<InodeTypeCardDto>>(
             $"/api/inode/{nodeId}/types");
-        Assert.Single(cards!);
+        Assert.Equal(2, cards!.Count);
 
         // 先清空节点自身数据 → 即可删除本项（声明随宿主清理）
         Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
@@ -421,6 +421,86 @@ public class DeletePrincipleTests : IntegrationTestBase
         var after = await Client.GetEavAsync<List<InodeTypeCardDto>>(
             $"/api/inode/{lineId}/types");
         Assert.Empty(after!);
+    }
+
+    // ============================================================
+    // 线路节点：被段边引用（from 或 to）→ 先拆边才允许删本项
+    // ============================================================
+
+    [Theory]
+    [InlineData(true)]   // 删 from 端
+    [InlineData(false)]  // 删 to 端
+    public async Task LineNodeDelete_WhenSegmentEdgeReferences_Returns409(bool deleteFrom)
+    {
+        var lineId = $"L_{Guid.NewGuid():N}";
+        var lineResp = await Client.PostAsJsonAsync(
+            "/api/Lines", new { id = lineId, name = "删除原则线路" });
+        lineResp.EnsureSuccessStatusCode();
+
+        var fromId = $"{Guid.NewGuid()}";
+        var toId = $"{Guid.NewGuid()}";
+        var n1 = await Client.PostAsJsonAsync("/api/LineNode", new
+        {
+            id = fromId, lineId, name = "节点1",
+            description = (string?)null, predecessorId = (string?)null
+        });
+        n1.EnsureSuccessStatusCode();
+        var n2 = await Client.PostAsJsonAsync("/api/LineNode", new
+        {
+            id = toId, lineId, name = "节点2",
+            description = (string?)null, predecessorId = fromId
+        });
+        n2.EnsureSuccessStatusCode();
+
+        // 段边任一端被引用 → 409，不做级联删除
+        var targetId = deleteFrom ? fromId : toId;
+        var resp = await Client.DeleteAsync($"/api/LineNode/{targetId}");
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        Assert.Contains("关系/段边", await resp.Content.ReadAsStringAsync());
+
+        // 两端节点都还在
+        Assert.Equal(HttpStatusCode.OK, (await Client.GetAsync($"/api/LineNode/{fromId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Client.GetAsync($"/api/LineNode/{toId}")).StatusCode);
+    }
+
+    // ============================================================
+    // 线路：仍有线路节点（nodes.line_id 锚点）→ 先删节点才允许删线路
+    // ============================================================
+
+    [Fact]
+    public async Task LineDelete_WhenNodesRemain_Returns409_ThenSucceedsAfterNodesRemoved()
+    {
+        var lineId = $"L_{Guid.NewGuid():N}";
+        var lineResp = await Client.PostAsJsonAsync(
+            "/api/Lines", new { id = lineId, name = "删除原则线路" });
+        lineResp.EnsureSuccessStatusCode();
+
+        var nodeId = $"{Guid.NewGuid()}";
+        var nodeResp = await Client.PostAsJsonAsync("/api/LineNode", new
+        {
+            id = nodeId, lineId, name = "杆塔",
+            description = (string?)null, predecessorId = (string?)null
+        });
+        nodeResp.EnsureSuccessStatusCode();
+
+        // 仍有线路节点 → 409，不做级联删除
+        var resp = await Client.DeleteAsync($"/api/Lines/{lineId}");
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        Assert.Contains("仍有线路节点", await resp.Content.ReadAsStringAsync());
+
+        // 线路与节点都还在；先删节点 → 即可删线路（双删 lines + nodes 注册行）
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
+            $"/api/LineNode/{nodeId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
+            $"/api/Lines/{lineId}")).StatusCode);
+
+        // nodes 注册行已删：再以该 lineId 建节点 → 400
+        var recreate = await Client.PostAsJsonAsync("/api/LineNode", new
+        {
+            id = $"{Guid.NewGuid()}", lineId, name = "杆塔",
+            description = (string?)null, predecessorId = (string?)null
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, recreate.StatusCode);
     }
 
     private sealed record TableIdResponse(string TableDefinitionId);

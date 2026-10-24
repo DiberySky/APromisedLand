@@ -25,13 +25,14 @@ public static class GraphNaming
 {
     public const string ParentOfEdge = "parent_of";
 
-    /// <summary>线路 → 线路节点（Line 包含其 LineNode）。</summary>
-    public const string LineContainsEdge = "line_contains";
-
     /// <summary>线路节点 → 外部 inode（馈入/馈出/联络，属性 role）。</summary>
     public const string ConnectsToEdge = "connects_to";
 
-    /// <summary>线路结构段：线路节点 → 线路节点（R5 线路入图，属性 edge_id/line_id/weight/display_name）。</summary>
+    /// <summary>
+    /// 线路结构段边类型名（LineNode → LineNode）。
+    /// R7 起存储 = relation_attribute_values（seed 属性 LineStructure.next），
+    /// 图边 schema 经 R6 relation 管道动态创建（列 value_id/attribute_id/name），此处仅留类型名常量。
+    /// </summary>
     public const string LineSegmentEdge = "line_segment";
 
     public const string SpaceTreeTag = "space_tree";
@@ -43,7 +44,7 @@ public static class GraphNaming
     /// <summary>自由节点（nodes.host_type = "Node"，无宿主扩展表）。</summary>
     public const string NodeTag = "node";
 
-    /// <summary>线路顶点（一条 Line 一个顶点，属性含 topology_mode）。</summary>
+    /// <summary>线路顶点（一条 Line 一个顶点；R7 起无 topology_mode，结构由边连接定义）。</summary>
     public const string LineTag = "line";
 
     public static readonly string[] AllNodeTags =
@@ -65,6 +66,6 @@ public static class GraphNaming
                 "line_id", "line_name", "terminal_role", "terminal_operating_state"
             ],
             [NodeTag] = ["name", "node_type", "is_archived"],
-            [LineTag] = ["name", "node_type", "is_archived", "topology_mode"]
+            [LineTag] = ["name", "node_type", "is_archived"]
         };
 }

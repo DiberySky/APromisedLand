@@ -1,8 +1,8 @@
 @* NodeAttributesDialog.razor — 独立节点属性管理对话框
    与节点基础字段编辑解耦：管理本节点关注了哪些实体类型，并编辑各类型属性值。
-   节点（NodeId = iNode）是属性宿主：未关注的类型不显示。 *@
+   节点（NodeId = iNode）是属性宿主：未关注的类型不显示。
+   非泛型：宿主无关（树节点 / LineNode / 任意 iNode 均可），仅需 NodeId。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
-@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject IDialogService DialogService
 

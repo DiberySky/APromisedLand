@@ -1,0 +1,68 @@
+@* NodeCreateChildDialog.razor — 轻量创建子节点：供语义搜索等宿主外场景直接在指定节点下建子项。
+   父节点声明为叶子（CanHaveChildren=false）时后端硬校验拒绝，错误信息经 Snackbar 透传。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+@inject TreeApiClient<TItem> Api
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@($"新建子节点 - {ParentNodeName}")"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="SubmitAsync">
+    <DialogContent>
+        <MudTextField @bind-Value="_name"
+                      Label="名称"
+                      Variant="Variant.Outlined"
+                      Immediate="true"
+                      Class="mb-3" />
+        <MudCheckBox @bind-Value="_canHaveChildren"
+                     Label="允许添加子节点"
+                     Color="Color.Primary" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>父节点 ID（iNode）。</summary>
+    [Parameter, EditorRequired] public string ParentNodeId { get; set; } = string.Empty;
+
+    /// <summary>父节点名称（仅用于标题展示）。</summary>
+    [Parameter] public string ParentNodeName { get; set; } = "";
+
+    private string _name = "";
+    private bool _canHaveChildren = true;
+    private bool _submitting;
+
+    private async Task SubmitAsync()
+    {
+        var name = _name.Trim();
+        if (name.Length == 0)
+        {
+            Snackbar.Add("名称不能为空", Severity.Warning);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            await Api.CreateNodeAsync(new TreeNodeDto<TItem>
+            {
+                ParentId = ParentNodeId,
+                Text = name,
+                CanHaveChildren = _canHaveChildren
+            });
+            Snackbar.Add("子节点已创建", Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"创建失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

@@ -69,8 +69,8 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
 
     /// <summary>
     /// 幂等创建：space（FIXED_STRING(64) vid，覆盖 GUID）、6 个节点 tag、
-    /// parent_of 树父子边、line_contains / connects_to 线路结构边、
-    /// attribute_catalog 中全部活动 relation 属性的图边类型。
+    /// parent_of 树父子边（R7 起 Line→LineNode 也走 parent_of）、connects_to 端子外部连接边、
+    /// attribute_catalog 中全部活动 relation 属性的图边类型（含 line_segment）。
     /// 已有 space 的 line_node 缺新列时用 DESCRIBE + ALTER 补齐。
     /// CREATE SPACE 生效需约两个心跳周期，失败由调用方重试。
     /// </summary>
@@ -95,18 +95,11 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
             await EnsureTagColumnsAsync(tag, ct);
 
         await _client.QueryAsync($"CREATE EDGE IF NOT EXISTS `{GraphNaming.ParentOfEdge}`()", ct);
-        await _client.QueryAsync($"CREATE EDGE IF NOT EXISTS `{GraphNaming.LineContainsEdge}`()", ct);
         await _client.QueryAsync(
             $"CREATE EDGE IF NOT EXISTS `{GraphNaming.ConnectsToEdge}`(`role` string NULL, `operating_state` string NULL)", ct);
-        await _client.QueryAsync(
-            $"CREATE EDGE IF NOT EXISTS `{GraphNaming.LineSegmentEdge}`(" +
-            "`edge_id` string NULL, `line_id` string NULL, `weight` double NULL, `display_name` string NULL)", ct);
-
-        // 存量图空间：线路结构边缺列不会因 IF NOT EXISTS 自动补，DESCRIBE 后 ALTER。
-        await EnsureEdgeColumnsAsync(GraphNaming.LineSegmentEdge,
-            [("edge_id", "string"), ("line_id", "string"), ("weight", "double"), ("display_name", "string")], ct);
 
         // 语义边类型：以 PG attribute_catalog 中活动 relation 属性的 relation_type 为准
+        // （R7：line_segment 由 seed 属性 LineStructure.next 经此管道自动创建，列 value_id/attribute_id/name）
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
         var relationTypes = await db.AttributeCatalog

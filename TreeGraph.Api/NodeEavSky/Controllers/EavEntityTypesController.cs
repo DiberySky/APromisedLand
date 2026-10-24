@@ -266,6 +266,10 @@ public class EavEntityTypesController : ControllerBase
         var e = await _db.EntityTypes.FindAsync(new object[] { id }, ct);
         if (e is null || e.IsDeleted) return NotFound();
 
+        // 内置种子保护：固定 id 的实体类型拒改（R7）
+        if (EntityTypeDefinition.IsBuiltin(id))
+            return Conflict(new { error = "内置种子实体类型不可修改" });
+
         if (req.DisplayName is not null) e.DisplayName = req.DisplayName.Trim();
         if (req.Description is not null) e.Description = req.Description;
         if (req.DisplayOrder is not null) e.DisplayOrder = req.DisplayOrder.Value;
@@ -283,6 +287,10 @@ public class EavEntityTypesController : ControllerBase
     {
         var e = await _db.EntityTypes.FindAsync(new object[] { id }, ct);
         if (e is null || e.IsDeleted) return NotFound();
+
+        // 内置种子保护：固定 id 的实体类型拒删（R7）
+        if (EntityTypeDefinition.IsBuiltin(id))
+            return Conflict(new { error = "内置种子实体类型不可删除" });
 
         // 仍有活动属性时拒绝
         var hasAttrs = await _db.AttributeCatalog

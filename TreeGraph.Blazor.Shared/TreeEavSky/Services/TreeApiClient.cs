@@ -165,6 +165,24 @@ public class TreeApiClient<T>(HttpClient httpClient)
     }
 
     /// <summary>
+    /// 读回节点的父级 Id（根节点返回 ""，节点不存在返回 null）。
+    /// 用途：UpdateNodeAsync 宽容写时带上真实 ParentId，避免被静默置根。
+    /// </summary>
+    public async Task<string?> GetParentIdAsync(
+        string nodeId,
+        CancellationToken cancellationToken = default)
+    {
+        // 无直接“读单节点”端点，借祖先路径推父级：
+        // 服务端 GetAncestorPathAsync 返回 [根 ... 父, 自身]（含自身），
+        // 故父级 = 倒数第 2 个；长度 ≤1 即根节点（父为空）。
+        var url = $"{_basePath}/{Uri.EscapeDataString(nodeId)}/ancestors";
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        var chain = await SendAndGetDataOrNullAsync<List<string>>(request, cancellationToken);
+        if (chain is null || chain.Count == 0) return null;
+        return chain.Count >= 2 ? chain[^2] : "";
+    }
+
+    /// <summary>
     /// 创建新节点
     /// </summary>
     public async Task<TreeNodeDto<T>> CreateNodeAsync(

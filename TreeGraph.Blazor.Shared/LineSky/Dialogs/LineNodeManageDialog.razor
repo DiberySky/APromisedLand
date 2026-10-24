@@ -2,6 +2,7 @@
    入口：「空间管理」页 →「线路」选项卡 → 行内「设置」图标。 *@
 @namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Components
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
 @inject LineNodeManageApiClient Api
@@ -41,16 +42,9 @@
                     <MudTd>@context.Name</MudTd>
                     <MudTd>@context.Description</MudTd>
                     <MudTd Style="white-space: nowrap; text-align: right;">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Color="Color.Error"
-                                       Size="Size.Small"
-                                       OnClick="@(async () => await OpenDeleteAsync(context))"
-                                       title="删除节点" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                       Color="Color.Primary"
-                                       Size="Size.Small"
-                                       OnClick="@(async () => await OpenEditAsync(context))"
-                                       title="编辑节点" />
+                        <LineNodeActionsMenu Node="context"
+                                             LineName="@LineName"
+                                             OnChanged="LoadAsync" />
                     </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
@@ -113,36 +107,6 @@
 
         var dialog = await DialogService.ShowExAsync<LineNodeCreateDialog>(
             "新建线路节点", parameters, NestedOptions);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
-            await LoadAsync();
-    }
-
-    private async Task OpenEditAsync(LineNodeDto node)
-    {
-        var parameters = new DialogParameters<LineNodeEditDialog>
-        {
-            { x => x.Node, node }
-        };
-
-        var dialog = await DialogService.ShowExAsync<LineNodeEditDialog>(
-            "编辑线路节点", parameters, NestedOptions);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
-            await LoadAsync();
-    }
-
-    private async Task OpenDeleteAsync(LineNodeDto node)
-    {
-        var parameters = new DialogParameters<LineNodeDeleteDialog>
-        {
-            { x => x.Node, node }
-        };
-
-        var dialog = await DialogService.ShowExAsync<LineNodeDeleteDialog>(
-            "删除线路节点", parameters, NestedOptions);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })

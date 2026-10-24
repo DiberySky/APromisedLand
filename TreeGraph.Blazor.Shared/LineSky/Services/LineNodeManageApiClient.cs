@@ -25,6 +25,19 @@ public class LineNodeManageApiClient(HttpClient httpClient)
         return apiResponse?.Success != true || apiResponse.Data == null ? [] : apiResponse.Data;
     }
 
+    // GET api/LineNode/{id}；不存在返回 null
+    public async Task<LineNodeDto?> GetByIdAsync(
+        string id, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync(
+            $"{BasePath}/{Uri.EscapeDataString(id)}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+        await EnsureSuccessWithApiResponseAsync(response);
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<LineNodeDto>>(cancellationToken);
+        return apiResponse?.Success == true ? apiResponse.Data : null;
+    }
+
     // POST api/LineNode
     public async Task<LineNodeDto> CreateAsync(LineNodeDto node, CancellationToken cancellationToken = default)
     {

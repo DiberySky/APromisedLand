@@ -282,7 +282,7 @@ public class TreeNodeDialogService<TItem>(
             FullWidth = true,
         }).ToDialogOptions();
 
-        var dialog = await dialogService.ShowExAsync<NodeAttributesDialog<TItem>>(
+        var dialog = await dialogService.ShowExAsync<NodeAttributesDialog>(
             "节点属性", parameters, options);
 
         var result = await dialog.Result;

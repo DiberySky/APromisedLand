@@ -1,0 +1,73 @@
+@* LineNodeViewDialog.razor — 线路节点只读详情：名称/描述/所属线路/前驱节点/创建时间。
+   数据源：GET api/LineNode/{id}（LineNodeManageApiClient.GetByIdAsync）。 *@
+@namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Services
+@inject LineNodeManageApiClient Api
+
+<DialogSky Title="线路节点详情"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭">
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_node is null)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                @(_error ?? "节点不存在或已被删除")
+            </MudAlert>
+        }
+        else
+        {
+            <MudStack Spacing="2">
+                <MudTextField T="string" Value="_node.Name"
+                              Label="名称" Variant="Variant.Outlined" ReadOnly="true" />
+                <MudTextField T="string" Value="_node.Description"
+                              Label="描述" Variant="Variant.Outlined" ReadOnly="true" Lines="3" />
+                <MudTextField T="string" Value="@LineDisplay"
+                              Label="所属线路" Variant="Variant.Outlined" ReadOnly="true" />
+                <MudTextField T="string"
+                              Value="@(string.IsNullOrEmpty(_node.PredecessorName) ? "无（首节点）" : _node.PredecessorName)"
+                              Label="前驱节点" Variant="Variant.Outlined" ReadOnly="true" />
+                <MudTextField T="string"
+                              Value="@(_node.CreatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")"
+                              Label="创建时间" Variant="Variant.Outlined" ReadOnly="true" />
+            </MudStack>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    /// <summary>线路节点 ID（iNode）。</summary>
+    [Parameter, EditorRequired] public string NodeId { get; set; } = string.Empty;
+
+    /// <summary>所属线路名称（仅用于展示；空则回退显示 LineId）。</summary>
+    [Parameter] public string LineName { get; set; } = "";
+
+    private LineNodeDto? _node;
+    private bool _loading = true;
+    private string? _error;
+
+    private string LineDisplay => !string.IsNullOrEmpty(LineName)
+        ? LineName
+        : _node?.LineId ?? "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _node = await Api.GetByIdAsync(NodeId);
+        }
+        catch (Exception ex)
+        {
+            _error = $"加载失败：{ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

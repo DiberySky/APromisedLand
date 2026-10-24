@@ -101,10 +101,10 @@ public sealed class SearchController : ControllerBase
                     : await synchronizer.ReconcileAllAsync(ct);
 
         _logger.LogInformation(
-            "手动向量对账（空间={SpaceId} 类别={Category} 线路={LineId}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
+            "手动向量对账（空间={SpaceId} 类别={Category} 线路={LineId}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted} 失败={Failed}",
             spaceId ?? "*", syncCategory?.ToString() ?? "*", lineId ?? "*",
             result.Active, result.Existing, result.Missing,
-            result.Orphaned, result.FixedCount, result.DeletedCount);
+            result.Orphaned, result.FixedCount, result.DeletedCount, result.FailedCount);
 
         return Ok(new
         {
@@ -113,7 +113,8 @@ public sealed class SearchController : ControllerBase
             missing = result.Missing,
             orphaned = result.Orphaned,
             fixedCount = result.FixedCount,
-            deletedCount = result.DeletedCount
+            deletedCount = result.DeletedCount,
+            failedCount = result.FailedCount
         });
     }
 
@@ -121,7 +122,8 @@ public sealed class SearchController : ControllerBase
     /// 流式向量对账（NDJSON 逐行推送进度，同步刷新对话框滚动展示用）。
     /// 行格式：{"stage":"fix","inodeId":...,"name":...} 同步节点；
     ///        {"stage":"purge",...,"detail":...} 清理孤儿；
-    ///        {"stage":"summary",...六个计数字段} 结束统计。
+    ///        {"stage":"error",...,"detail":真实原因} 单项失败（不中断）或致命失败（无后续 summary）；
+    ///        {"stage":"summary",...七个计数字段} 结束统计。
     /// 范围四选一：category（space=空间树；tree=单位/分类/知识树；line=线路）> spaceId > lineId > 全量。
     /// 校验失败仍走普通 400 信封；成功时直接写响应体并返回 EmptyResult，不经信封包装。
     /// </summary>
@@ -158,23 +160,47 @@ public sealed class SearchController : ControllerBase
             await Response.Body.FlushAsync(ct);
         }
 
-        var result = await synchronizer.ReconcileAsync(
-            string.IsNullOrWhiteSpace(spaceId) ? null : spaceId, syncCategory,
-            string.IsNullOrWhiteSpace(lineId) ? null : lineId,
-            onProgress: async p => await WriteEventAsync(new ReconcileStreamEventDto(
-                p.Stage, p.InodeId, p.Name, p.Detail)),
-            ct);
+        ReconcileResult result;
+        try
+        {
+            result = await synchronizer.ReconcileAsync(
+                string.IsNullOrWhiteSpace(spaceId) ? null : spaceId, syncCategory,
+                string.IsNullOrWhiteSpace(lineId) ? null : lineId,
+                onProgress: async p => await WriteEventAsync(new ReconcileStreamEventDto(
+                    p.Stage, p.InodeId, p.Name, p.Detail)),
+                ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw; // 客户端关闭/断流：正常取消，不写错误事件
+        }
+        catch (Exception ex)
+        {
+            // 致命失败不裸 500：写 error 事件带真实原因（无 summary，客户端据此展示），
+            // 避免对话框只能看到「接口未返回结果」
+            _logger.LogError(ex, "流式向量对账致命失败（空间={SpaceId} 类别={Category} 线路={LineId}）",
+                spaceId ?? "*", syncCategory?.ToString() ?? "*", lineId ?? "*");
+            try
+            {
+                await WriteEventAsync(new ReconcileStreamEventDto("error", "", "", ex.Message));
+            }
+            catch (Exception writeEx)
+            {
+                _logger.LogDebug(writeEx, "流式对账错误事件写入失败（客户端可能已断开）");
+            }
+            return new EmptyResult();
+        }
 
         await WriteEventAsync(new ReconcileStreamEventDto(
             "summary", "", "", "",
             result.Active, result.Existing, result.Missing, result.Orphaned,
-            result.FixedCount, result.DeletedCount));
+            result.FixedCount, result.DeletedCount, result.FailedCount));
 
         _logger.LogInformation(
-            "手动向量对账-流式（空间={SpaceId} 类别={Category} 线路={LineId}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted}",
+            "手动向量对账-流式（空间={SpaceId} 类别={Category} 线路={LineId}）：期望={Active} 已存={Existing} 缺失={Missing} 孤儿={Orphaned} 修复={Fixed} 删除={Deleted} 失败={Failed}",
             spaceId ?? "*", syncCategory?.ToString() ?? "*", lineId ?? "*",
             result.Active, result.Existing, result.Missing,
-            result.Orphaned, result.FixedCount, result.DeletedCount);
+            result.Orphaned, result.FixedCount, result.DeletedCount, result.FailedCount);
 
         return new EmptyResult(); // 自写响应体，不经信封包装
     }

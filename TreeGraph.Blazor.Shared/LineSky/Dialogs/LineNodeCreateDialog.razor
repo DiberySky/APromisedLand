@@ -1,4 +1,6 @@
-@* LineNodeCreateDialog.razor — 新建线路节点（二级弹窗，隶属某条线路） *@
+@* LineNodeCreateDialog.razor — 新建线路节点（二级弹窗，隶属某条线路）
+   R7：创建时可选择「前驱」节点（同线已有节点），选后自动建立 前驱 → 新节点 的结构段边；
+       不选（无）= 首节点/独立节点，不建边。 *@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @inject LineNodeManageApiClient Api
@@ -17,7 +19,21 @@
         <MudTextField @bind-Value="_form.Description"
                       Label="描述"
                       Variant="Variant.Outlined"
-                      Lines="3" />
+                      Lines="3"
+                      Class="mb-3" />
+        <MudSelect T="string"
+                   @bind-Value="_form.PredecessorId"
+                   Label="前驱（可选，选后接在该节点之后）"
+                   Variant="Variant.Outlined"
+                   Dense="true"
+                   Clearable="true"
+                   Disabled="@_loadingNodes">
+            <MudSelectItem T="string" Value="@((string?)null)">无（首节点）</MudSelectItem>
+            @foreach (var n in _existingNodes)
+            {
+                <MudSelectItem T="string" Value="@((string?)n.Id)">@n.Name</MudSelectItem>
+            }
+        </MudSelect>
     </DialogContent>
 </DialogSky>
 
@@ -28,7 +44,26 @@
     [Parameter] public string LineId { get; set; } = string.Empty;
 
     private readonly LineNodeDto _form = new();
+    private IReadOnlyList<LineNodeDto> _existingNodes = [];
+    private bool _loadingNodes = true;
     private bool _submitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _existingNodes = await Api.GetByLineAsync(LineId);
+        }
+        catch
+        {
+            // 前驱候选加载失败不阻塞创建（按首节点处理）
+            _existingNodes = [];
+        }
+        finally
+        {
+            _loadingNodes = false;
+        }
+    }
 
     private async Task CreateAsync()
     {
@@ -42,6 +77,8 @@
         try
         {
             _form.LineId = LineId;
+            if (string.IsNullOrWhiteSpace(_form.PredecessorId))
+                _form.PredecessorId = null;
             var created = await Api.CreateAsync(_form);
             Snackbar.Add($"创建成功：{created.Name}", Severity.Success);
             MudDialog?.Close(DialogResult.Ok(created));

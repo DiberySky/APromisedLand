@@ -2,7 +2,7 @@ using TreeGraph.Shared.LineSky.Entities;
 
 namespace TreeGraph.Shared.LineSky.Dtos;
 
-// ============ 线路结构（LineStructure）============
+// ============ 线路结构（R7：边集薄层，结构由 relation 边定义） ============
 
 /// <summary>结构中的节点（含名称与端子角色）。</summary>
 public class LineStructureNodeDto
@@ -19,19 +19,22 @@ public class LineStructureNodeDto
     public string? ExternalNodeName { get; set; }
 }
 
-/// <summary>结构中的段（线路自身拓扑单元，不引用通用边）。</summary>
+/// <summary>结构中的段边（relation 值：EdgeId = value_id，DisplayName = 边实例名）。</summary>
 public class LineStructureSegmentDto
 {
+    /// <summary>边实例 Id（relation_attribute_values.value_id，即图边实例 id）。</summary>
     public string EdgeId { get; set; } = string.Empty;
     public string FromNodeId { get; set; } = string.Empty;
     public string FromNodeName { get; set; } = string.Empty;
     public string ToNodeId { get; set; } = string.Empty;
     public string ToNodeName { get; set; } = string.Empty;
-    public decimal? Weight { get; set; }
+    /// <summary>图边类型（line_segment 或用户自定义 relation_type）。</summary>
+    public string RelationType { get; set; } = string.Empty;
+    /// <summary>边实例展示名（relation.name）。</summary>
     public string? DisplayName { get; set; }
 }
 
-/// <summary>结构诊断：拓扑校验结果（不阻断 GET，仅展示）。</summary>
+/// <summary>结构诊断：连通/成环/度数/端子统计（只报告不阻断）。</summary>
 public class LineStructureDiagnosticsDto
 {
     public bool Valid { get; set; }
@@ -48,16 +51,15 @@ public class LineStructureDiagnosticsDto
     public int TieCount { get; set; }
 }
 
-/// <summary>线路结构完整视图。</summary>
+/// <summary>线路结构完整视图（R7：节点集 = line_id 挂靠；边集 = 两端同线的 relation 值）。</summary>
 public class LineStructureDto
 {
-    /// <summary>结构是否存在（false = 该线路尚无结构，Segments 为空）。</summary>
+    /// <summary>结构是否存在（false = 该线路尚无线路节点，Segments 为空）。</summary>
     public bool Exists { get; set; }
     public string LineId { get; set; } = string.Empty;
     public string LineName { get; set; } = string.Empty;
-    public TopologyMode TopologyMode { get; set; } = TopologyMode.Network;
     public DateTimeOffset? UpdatedAt { get; set; }
-    /// <summary>拓扑推导出的节点顺序（Linear/Radial 为链/树遍历顺序；Network 为发现顺序）。</summary>
+    /// <summary>沿 line_segment 链推导的节点顺序（无入边者为起点；分叉/环按发现序）。</summary>
     public List<string> OrderedNodeIds { get; set; } = new();
     public List<LineStructureNodeDto> Nodes { get; set; } = new();
     public List<LineStructureSegmentDto> Segments { get; set; } = new();
@@ -72,7 +74,8 @@ public class LineStructureSegmentInput
 {
     public string FromNodeId { get; set; } = string.Empty;
     public string ToNodeId { get; set; } = string.Empty;
-    public decimal? Weight { get; set; }
+    /// <summary>边实例展示名（可选，落 relation.name）。</summary>
+    public string? DisplayName { get; set; }
 }
 
 /// <summary>线路模板 DTO：UI 层下拉预填用。字段用 string（枚举名），避免 MudBlazor source generator 对枚举类型的 bug。</summary>
@@ -80,9 +83,9 @@ public record LineTemplateDto(
     string Key,
     string DisplayName,
     string Description,
-    string DefaultTopologyMode,        // TopologyMode 枚举名，例 "Network"
     string DefaultTerminalRole,        // TerminalRole 枚举名，例 "FeedIn"
     string DefaultOperatingState);     // TerminalOperatingState 枚举名，例 "Maintenance"
+
 public class LineStructureTerminalInput
 {
     public string NodeId { get; set; } = string.Empty;
@@ -92,25 +95,20 @@ public class LineStructureTerminalInput
 }
 
 /// <summary>
-/// 建/替换线路结构请求。
-///
-/// Linear 模式可只传 OrderedNodeIds（相邻两点自动成段）；
-/// 其余情况传 Segments（可同时覆盖 Linear/Radial/Network）。
+/// 建/替换线路结构请求（R7：拓扑模式已下线，结构由边连接定义）。
+/// Segments = 全量替换本线的 line_segment 边集；Terminals = 全量替换端子集。
 /// </summary>
 public class LineStructureRequest
 {
-    public TopologyMode TopologyMode { get; set; } = TopologyMode.Network;
-    public List<string>? OrderedNodeIds { get; set; }
     public List<LineStructureSegmentInput>? Segments { get; set; }
     public List<LineStructureTerminalInput>? Terminals { get; set; }
 }
 
-/// <summary>新增单段请求（节点须同属该 Line）。</summary>
+/// <summary>新增单段请求（节点须同属该 Line；写 seed 属性 next 的 line_segment 边）。</summary>
 public class AddLineSegmentRequest
 {
     public string FromNodeId { get; set; } = string.Empty;
     public string ToNodeId { get; set; } = string.Empty;
-    public decimal? Weight { get; set; }
     public string? DisplayName { get; set; }
 }
 
