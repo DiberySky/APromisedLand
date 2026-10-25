@@ -1,0 +1,88 @@
+@* LineNodeActionsDialog.razor — 线路节点宿主操作对话框（对齐 TreeNodeActionsDialog 模式）：
+   基本信息内嵌只读 + 操作按钮平铺（编辑/属性/删除/线路节点维护）。
+   按钮不直接执行，仅携带 LineNodeHostAction 关窗，由 LineNodeActions.OperateAsync 编排执行并循环重开。 *@
+@namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
+@using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Components
+@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+
+<DialogSky Title="节点操作"
+           SubmitButtonVisible="false"
+           CancelButtonVisible="true"
+           CancelButtonText="关闭">
+    <ToolBarContent>
+        @* 静态内容：所属线路名（ToolBarContent 不支持动态更新） *@
+        <MudText Color="Color.Info">@LineName</MudText>
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
+            <MudStack Spacing="2">
+                <MudTextField T="string" Value="Node.Name"
+                              Label="名称" Variant="Variant.Outlined" ReadOnly="true" />
+                <MudTextField T="string" Value="Node.Description"
+                              Label="描述" Variant="Variant.Outlined" ReadOnly="true" Lines="3" />
+                <MudTextField T="string"
+                              Value="@(string.IsNullOrEmpty(Node.PredecessorName) ? "无（首节点）" : Node.PredecessorName)"
+                              Label="前驱节点" Variant="Variant.Outlined" ReadOnly="true" />
+                <MudTextField T="string"
+                              Value="@(Node.CreatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")"
+                              Label="创建时间" Variant="Variant.Outlined" ReadOnly="true" />
+
+                @* 属性区：仅展示本节点已关注实体类型的属性（只读） *@
+                <NodeAttributeItemsSky NodeId="@Node.Id" ReadOnly="true" />
+            </MudStack>
+        </MudContainer>
+    </DialogContent>
+    <DialogLeftActions>
+        <MudButton OnClick="OnDelete"
+                   Variant="Variant.Text"
+                   Color="Color.Error"
+                   StartIcon="@Icons.Material.Outlined.Delete">
+            删除
+        </MudButton>
+    </DialogLeftActions>
+    <DialogRightActions>
+        <MudButton OnClick="OnAttribute"
+                   Variant="Variant.Text"
+                   Color="Color.Info"
+                   StartIcon="@Icons.Material.Outlined.EditAttributes">
+            属性
+        </MudButton>
+        <MudButton OnClick="OnEdit"
+                   Variant="Variant.Text"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Outlined.Edit">
+            编辑
+        </MudButton>
+        @if (ShowLineManage && !string.IsNullOrEmpty(Node.LineId))
+        {
+            <MudButton OnClick="OnLineManage"
+                       Variant="Variant.Text"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.AccountTree">
+                线路节点维护
+            </MudButton>
+        }
+    </DialogRightActions>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>目标线路节点（每轮由编排循环重新拉取的快照）。</summary>
+    [Parameter, EditorRequired] public LineNodeDto Node { get; set; } = null!;
+
+    /// <summary>所属线路名称（仅用于工具栏展示）。</summary>
+    [Parameter] public string LineName { get; set; } = "";
+
+    /// <summary>是否显示「线路节点维护」跳转项（在线路管理对话框内为 false）。</summary>
+    [Parameter] public bool ShowLineManage { get; set; }
+
+    private void OnEdit() => CloseWithAction(LineNodeHostAction.Edit);
+    private void OnAttribute() => CloseWithAction(LineNodeHostAction.Attribute);
+    private void OnDelete() => CloseWithAction(LineNodeHostAction.Delete);
+    private void OnLineManage() => CloseWithAction(LineNodeHostAction.LineManage);
+
+    private void CloseWithAction(LineNodeHostAction action)
+        => MudDialog?.Close(DialogResult.Ok(action));
+}

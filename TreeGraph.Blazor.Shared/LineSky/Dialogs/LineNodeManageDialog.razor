@@ -42,9 +42,11 @@
                     <MudTd>@context.Name</MudTd>
                     <MudTd>@context.Description</MudTd>
                     <MudTd Style="white-space: nowrap; text-align: right;">
-                        <LineNodeActionsMenu Node="context"
-                                             LineName="@LineName"
-                                             OnChanged="LoadAsync" />
+                        @* 宿主操作模式：点击打开 LineNodeActionsDialog（基本信息内嵌 + 编辑/属性/删除，连续操作循环） *@
+                        <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                                       Size="Size.Small"
+                                       title="节点操作"
+                                       OnClick="@(() => OpenActionsAsync(context))" />
                     </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
@@ -96,6 +98,15 @@
         {
             _loading = false;
         }
+    }
+
+    private async Task OpenActionsAsync(LineNodeDto node)
+    {
+        // 已在「线路节点维护」内，宿主不再提供跳转项（showLineManage: false）
+        var outcome = await LineNodeActions.OperateAsync(
+            DialogService, Api, node.Id, LineName, showLineManage: false, snackbar: Snackbar);
+        if (outcome is LineNodeHostOutcome.Changed or LineNodeHostOutcome.Deleted)
+            await LoadAsync();
     }
 
     private async Task OpenCreateAsync()
