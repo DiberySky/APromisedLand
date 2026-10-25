@@ -5,73 +5,85 @@
 @namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
 @using TreeGraph.Shared.NodeEavSky.Dtos
 
+<style>
+    .srl-row { padding: 4px 8px; border-radius: 6px; }
+    .srl-clickable { cursor: pointer; }
+    .srl-clickable:hover { background: var(--mud-palette-action-default-hover); }
+</style>
+
 @if (Items.Count > 0)
 {
     <MudList T="SemanticSearchItemDto" Dense="true">
         @foreach (var item in PageItems)
         {
-            <MudListItem Icon="@GetHostTypeIcon(item.HostType)">
-                <div class="@(OnItemClick.HasDelegate ? "srl-clickable" : null)"
-                     @onclick="() => OnItemClick.InvokeAsync(item)">
-                    <MudStack Spacing="1">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                            <MudText Typo="Typo.body1">
-                                <strong>@(item.NodeName ?? item.InodeId)</strong>
-                            </MudText>
-                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                                @if (item.MatchKind == "Entity")
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled">
-                                        实体命中@(string.IsNullOrEmpty(item.EntityType) ? "" : $"：{item.EntityType}")
+            @* 纯 div 行：整行（图标/文字/留白）都在点击热区内，避免 MudListItem 容器出现点不中的死区 *@
+            <div class="srl-row @(OnItemClick.HasDelegate ? "srl-clickable" : null)"
+                 style="@(IsSelected(item) ? "background: var(--mud-palette-action-default-hover); border-radius: 6px;" : null)"
+                 @onclick="() => OnItemClick.InvokeAsync(item)">
+                <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                        <MudIcon Icon="@GetHostTypeIcon(item.HostType)" Size="Size.Small" Color="Color.Default"/>
+                        <MudStack Spacing="1" Style="flex: 1; min-width: 0;">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.body1">
+                                    <strong>@(item.NodeName ?? item.InodeId)</strong>
+                                </MudText>
+                                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                    @if (item.MatchKind == "Entity")
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled">
+                                            实体命中@(string.IsNullOrEmpty(item.EntityType) ? "" : $"：{item.EntityType}")
+                                        </MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">
+                                            节点命中
+                                        </MudChip>
+                                    }
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
+                                        @item.HostType
                                     </MudChip>
-                                }
-                                else
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">
-                                        节点命中
-                                    </MudChip>
-                                }
-                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
-                                    @item.HostType
-                                </MudChip>
 
-                                @* 行内操作菜单：阻止冒泡，避免点图标时触发整行点击 *@
-                                <span @onclick:stopPropagation="true">
-                                    <SearchResultActionsMenu Item="item"
-                                                             OnOpenTree="OnOpenTree"
-                                                             OnAiExpand="OnAiExpand"
-                                                             OnChanged="OnChanged"
-                                                             OnDeleted="OnDeleted"/>
-                                </span>
+                                    @* 行内操作菜单：阻止冒泡，避免点图标时触发整行点击 *@
+                                    @if (ShowActions)
+                                    {
+                                        <span @onclick:stopPropagation="true">
+                                            <SearchResultActionsMenu Item="item"
+                                                                     OnOpenTree="OnOpenTree"
+                                                                     OnAiExpand="OnAiExpand"
+                                                                     OnChanged="OnChanged"
+                                                                     OnDeleted="OnDeleted"/>
+                                        </span>
+                                    }
+                                </MudStack>
                             </MudStack>
-                        </MudStack>
 
-                        @if (!string.IsNullOrEmpty(item.Path))
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                路径：@item.Path
-                            </MudText>
-                        }
-                        @if (!string.IsNullOrEmpty(item.ParentName))
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                父节点：@item.ParentName
-                            </MudText>
-                        }
+                            @if (!string.IsNullOrEmpty(item.Path))
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    路径：@item.Path
+                                </MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(item.ParentName))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    父节点：@item.ParentName
+                                </MudText>
+                            }
 
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">相似度：</MudText>
-                            <MudProgressLinear Value="@((double)item.Score * 100)"
-                                               Color="@GetScoreColor(item.Score)"
-                                               Size="Size.Small"
-                                               Style="width: 100px; height: 6px;"/>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @item.Score.ToString("F4")
-                            </MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">相似度：</MudText>
+                                <MudProgressLinear Value="@((double)item.Score * 100)"
+                                                   Color="@GetScoreColor(item.Score)"
+                                                   Size="Size.Small"
+                                                   Style="width: 100px; height: 6px;"/>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @item.Score.ToString("F4")
+                                </MudText>
+                            </MudStack>
                         </MudStack>
                     </MudStack>
                 </div>
-            </MudListItem>
             <MudDivider/>
         }
     </MudList>
@@ -144,8 +156,14 @@
     /// <summary>删除成功（或节点已不存在）后触发。</summary>
     [Parameter] public EventCallback<SemanticSearchItemDto> OnDeleted { get; set; }
 
-    /// <summary>整行点击（如跳转详情页）；不设置则整行不可点。</summary>
+    /// <summary>整行点击（如跳转详情页或选择器选中）；不设置则整行不可点。</summary>
     [Parameter] public EventCallback<SemanticSearchItemDto> OnItemClick { get; set; }
+
+    /// <summary>是否显示行内操作菜单（⋯/树定位/AI 综合）。选择器场景设为 false。</summary>
+    [Parameter] public bool ShowActions { get; set; } = true;
+
+    /// <summary>高亮选中的结果行（按 InodeId 匹配）；为空不高亮。</summary>
+    [Parameter] public string? SelectedInodeId { get; set; }
 
     private static readonly int[] PageSizeOptions = [5, 10, 20];
 
@@ -190,6 +208,9 @@
     }
 
     private void GoTo(int page) => _page = Math.Clamp(page, 1, PageCount);
+
+    private bool IsSelected(SemanticSearchItemDto item) =>
+        !string.IsNullOrEmpty(SelectedInodeId) && item.InodeId == SelectedInodeId;
 
     private static string GetHostTypeIcon(string hostType) => hostType switch
     {

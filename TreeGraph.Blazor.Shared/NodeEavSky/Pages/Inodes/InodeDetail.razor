@@ -465,18 +465,14 @@ else
     {
         if (!card.HasEntity) return;
 
-        var parameters = new DialogParameters<InodeSelectorDialog>
-        {
-            { x => x.Title, $"转移「{card.DisplayName}」到宿主" },
-        };
-        var options = new DialogConfig { MaxWidth = MaxWidth.Medium }.ToDialogOptions();
+        var selection = await NodePicker.PickAsync(
+            DialogService,
+            topK: 5,
+            minScore: 0.5f,
+            title: $"转移「{card.DisplayName}」到宿主",
+            excludeTreeNode: true);
 
-        var dialog = await DialogService.ShowExAsync<InodeSelectorDialog>(
-            "选择目标宿主", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is not { Canceled: false, Data: InodeSelectorDialog.InodeSelection selection })
-            return;
+        if (selection is null) return;
 
         if (selection.InodeId == InodeId)
         {

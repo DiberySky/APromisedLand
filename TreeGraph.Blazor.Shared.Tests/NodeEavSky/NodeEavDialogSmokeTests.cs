@@ -8,6 +8,7 @@ using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.Common;
 using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs;
+using TreeGraph.Blazor.Shared.NodeEavSky.Components.Search;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
 using TreeGraph.Blazor.Shared.TreeEavSky;
@@ -336,6 +337,58 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         Assert.Contains("删除", html);
     }
 
+    // ─── NodePickerDialog（语义搜索节点选择器） ───
+
+    [Fact]
+    public async Task NodePickerDialog_Renders_WithConfirmDisabled()
+    {
+        var provider = await OpenAsync<NodePickerDialog>(
+            new DialogParameters<NodePickerDialog>
+            {
+                { x => x.Title, "选择节点" },
+                { x => x.TopK, 20 },
+            });
+
+        AssertDialog(provider, "选择节点");
+
+        var html = provider.Find(".mud-dialog").InnerHtml;
+        Assert.Contains("搜索内容", html);
+        Assert.Contains("输入关键词搜索", html);
+        Assert.Contains("取消", html);
+        Assert.Contains("确认选择", html);
+
+        // 未选中任何结果 → 确认按钮禁用
+        var confirm = provider.FindAll("button")
+            .First(b => b.TextContent.Contains("确认选择"));
+        Assert.True(confirm.HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public async Task NodePickerDialog_SelectsRow_AndEnablesConfirm()
+    {
+        var provider = await OpenAsync<NodePickerDialog>(
+            new DialogParameters<NodePickerDialog>
+            {
+                { x => x.Title, "选择节点" },
+                { x => x.InitialQuery, "货币" },
+            });
+
+        // 初始搜索词触发自动搜索（OnAfterRenderAsync）→ 结果行出现
+        provider.WaitForAssertion(
+            () => Assert.Contains("货币", provider.Find(".mud-dialog").InnerHtml),
+            TimeSpan.FromSeconds(5));
+
+        // 点结果行 → 出现「已选」提示且确认按钮解禁
+        provider.Find(".srl-clickable").Click();
+        provider.WaitForAssertion(
+            () => Assert.Contains("已选", provider.Find(".mud-dialog").InnerHtml),
+            TimeSpan.FromSeconds(5));
+
+        var confirm = provider.FindAll("button")
+            .First(b => b.TextContent.Contains("确认选择"));
+        Assert.False(confirm.HasAttribute("disabled"));
+    }
+
     /// <summary>返回 200 OK 的桩 HttpClient（/api/inode 属性区回空列表信封，其余仅满足 DI）。</summary>
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
@@ -350,6 +403,32 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             {
                 var body = JsonSerializer.Serialize(
                     new { Success = true, Message = (string?)null, Data = Array.Empty<object>() },
+                    WebJson);
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent(body, Encoding.UTF8, "application/json")
+                });
+            }
+
+            // 语义搜索：返回一条结果，供 NodePickerDialog 选中流程验证
+            if (path.StartsWith("/api/search/semantic", StringComparison.Ordinal))
+            {
+                var data = new
+                {
+                    Items = new[]
+                    {
+                        new
+                        {
+                            InodeId = "u-1", NodeName = "货币", HostType = "UnitTree",
+                            MatchKind = "Node", EntityType = (string?)null,
+                            Score = 0.92f, Path = "演示单位/货币", ParentName = "演示单位",
+                            RootId = "u-root"
+                        }
+                    },
+                    TotalCount = 1
+                };
+                var body = JsonSerializer.Serialize(
+                    new { Success = true, Message = (string?)null, Data = data },
                     WebJson);
                 return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
                 {

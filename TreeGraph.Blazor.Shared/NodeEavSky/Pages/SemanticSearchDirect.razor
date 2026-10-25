@@ -11,6 +11,7 @@
 @inject ILogger<SemanticSearchDirect> Logger
 @inject IDialogService DialogService
 @inject BlazorService BlazorService
+@inject NavigationManager Nav
 
 <PageSky Title="语义搜索（直连）"
          ArrowBackVisible="false"
@@ -32,7 +33,7 @@
 
                 <MudStack Row="true" Spacing="2">
                     <NumberInputField @bind-Value="_topK"
-                                      Label="返回数量"
+                                      Label="结果条数"
                                       Min="1" Max="20"
                                       Style="width: 120px;"
                                       Disabled="_searching"/>
@@ -53,6 +54,14 @@
 
                     <MudSpacer/>
 
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.PersonSearch"
+                               OnClick="PickNodeAsync"
+                               Disabled="_searching">
+                        选节点
+                    </MudButton>
+
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.Search"
@@ -67,6 +76,35 @@
                 </MudStack>
             </MudStack>
         </MudPaper>
+
+        @* ═══ 已选节点（语义搜索选择器返回） ═══ *@
+        @if (_picked is not null)
+        {
+            <MudPaper Elevation="0" Class="pa-3 mt-3">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small"/>
+                    <MudText Typo="Typo.body2">
+                        已选节点：<strong>@(_picked.NodeName ?? _picked.InodeId)</strong>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-2">
+                            @_picked.HostType
+                        </MudChip>
+                    </MudText>
+                    <MudSpacer/>
+                    <MudIconButton Icon="@Icons.Material.Filled.AccountTree"
+                                   Size="Size.Small"
+                                   Title="树定位"
+                                   OnClick="@(() => OpenTreeDialogAsync(_picked))"/>
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                   Size="Size.Small"
+                                   Title="打开详情"
+                                   OnClick="@(() => Nav.NavigateTo($"/inodes/{_picked.InodeId}"))"/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                   Size="Size.Small"
+                                   Title="清除"
+                                   OnClick="ClearPicked"/>
+                </MudStack>
+            </MudPaper>
+        }
 
         @* ═══ 错误提示 ═══ *@
         @if (!string.IsNullOrEmpty(_error))
@@ -110,7 +148,7 @@
 
 @code {
     private string _query = "";
-    private int _topK = 5;
+    private int _topK = 20;
     /// <summary>最低相似度：低于该值的命中不返回（与服务端 SemanticSearch:MinScore 默认值一致）。</summary>
     private double _minScore = 0.5;
     private bool _searching;
@@ -118,6 +156,29 @@
     private string? _error;
     private string _lastQuery = "";
     private List<SemanticSearchItemDto> _results = new();
+
+    /// <summary>经「选节点」对话框选中的节点（None 表示未选择）。</summary>
+    private SemanticSearchItemDto? _picked;
+
+    /// <summary>打开语义搜索节点选择器，确认后在上方展示已选节点。</summary>
+    private async Task PickNodeAsync()
+    {
+        var picked = await NodePicker.PickAsync(
+            DialogService,
+            initialQuery: string.IsNullOrWhiteSpace(_query) ? null : _query.Trim(),
+            minScore: (float)_minScore);
+
+        if (picked is null) return;
+
+        _picked = picked;
+        StateHasChanged();
+    }
+
+    private void ClearPicked()
+    {
+        _picked = null;
+        StateHasChanged();
+    }
 
     private async Task DoSearchAsync()
     {

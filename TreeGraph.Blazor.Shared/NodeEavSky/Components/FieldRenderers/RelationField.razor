@@ -4,6 +4,7 @@
    只读态展示「名称（→ 目标名）」。 *@
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @inject EavApiClient Api
+@inject IDialogService DialogService
 
 <div class="d-flex flex-column" style="gap: 8px;">
     @if (!ReadOnly)
@@ -19,17 +20,25 @@
             }
         </MudText>
 
-        <MudAutocomplete T="NodeOptionDto"
-                         Label="目标节点"
-                         Value="_selected"
-                         ValueChanged="OnTargetChanged"
-                         SearchFunc="SearchNodesAsync"
-                         ToStringFunc="@(n => n is null ? "" : n.Name ?? n.Id)"
-                         Variant="Variant.Outlined"
-                         Clearable="true"
-                         ResetValueOnEmptyText="false"
-                         CoerceText="false"
-                         HelperText="输入节点名称搜索；清空目标即删除该关系" />
+        <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="1">
+            <div style="flex: 1;">
+                <MudAutocomplete T="NodeOptionDto"
+                                 Label="目标节点"
+                                 Value="_selected"
+                                 ValueChanged="OnTargetChanged"
+                                 SearchFunc="SearchNodesAsync"
+                                 ToStringFunc="@(n => n is null ? "" : n.Name ?? n.Id)"
+                                 Variant="Variant.Outlined"
+                                 Clearable="true"
+                                 ResetValueOnEmptyText="false"
+                                 CoerceText="false"
+                                 HelperText="输入节点名称搜索；清空目标即删除该关系" />
+            </div>
+            <MudIconButton Icon="@Icons.Material.Filled.Search"
+                           Color="Color.Primary"
+                           Title="语义搜索选择目标节点"
+                           OnClick="PickTargetAsync"/>
+        </MudStack>
 
         <MudTextField T="string" Label="关系名称（可选）"
                       Value="_name" ValueChanged="OnNameChanged"
@@ -126,6 +135,20 @@
     {
         var items = await Api.SearchNodesAsync(search, ct);
         return items;
+    }
+
+    /// <summary>语义搜索选目标节点（补充按语义找节点的入口，选中后与 autocomplete 走同一提交逻辑）。</summary>
+    private async Task PickTargetAsync()
+    {
+        var picked = await NodePicker.PickAsync(
+            DialogService,
+            topK: 10,
+            title: "选择目标节点");
+
+        if (picked is null) return;
+
+        await OnTargetChanged(
+            new NodeOptionDto(picked.InodeId, picked.NodeName ?? picked.InodeId, picked.HostType));
     }
 
     private Task OnTargetChanged(NodeOptionDto? v)

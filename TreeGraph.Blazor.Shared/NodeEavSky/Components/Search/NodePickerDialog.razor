@@ -1,0 +1,234 @@
+@* NodePickerDialog.razor — 基于语义搜索的节点选择对话框（单选，可复用）。
+   外壳使用项目自研 DialogSky（默认对话框外观），打开方式见 NodePicker.PickAsync；
+   选中结果以 DialogResult.Ok(SemanticSearchItemDto) 返回，取消返回 null。
+   行内不显示维护/树定位/AI 图标（SearchResultList ShowActions=false），点行即选中。 *@
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Shared.NodeEavSky.Dtos
+
+<DialogSky Title="@Title"
+           CancelButtonVisible="true"
+           SubmitButtonVisible="true"
+           SubmitButtonText="确认选择"
+           SubmitButtonDisabled="@(_selected is null)"
+           OnSubmitClick="Confirm">
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudTextField T="string"
+                              @bind-Value="_query"
+                              Label="搜索内容"
+                              Placeholder="按语义描述要找的节点..."
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true"
+                              Disabled="_searching"
+                              OnKeyDown="OnKeyDown"
+                              Style="flex: 1;"/>
+
+                <NumberInputField @bind-Value="_topK"
+                                  Label="结果条数"
+                                  Min="1" Max="50"
+                                  Style="width: 96px;"
+                                  Disabled="_searching"/>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="DoSearchAsync"
+                           Disabled="_searching || string.IsNullOrWhiteSpace(_query)">
+                    搜索
+                </MudButton>
+            </MudStack>
+
+            <MudStack Spacing="0">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">相似度下限</MudText>
+                    <MudText Typo="Typo.caption">@_minScore.ToString("F2")</MudText>
+                </MudStack>
+                <MudSlider T="double"
+                           Value="_minScore"
+                           ValueChanged="OnMinScoreChanged"
+                           Min="0" Max="1" Step="0.05"
+                           Color="Color.Primary"
+                           Size="Size.Small"
+                           Disabled="_searching"/>
+            </MudStack>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
+                    @_error
+                </MudAlert>
+            }
+
+            @if (_searching)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+            }
+
+            @if (_selected is not null)
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
+                    已选：<strong>@(_selected.NodeName ?? _selected.InodeId)</strong>
+                </MudAlert>
+            }
+
+            <div style="max-height: 52vh; overflow-y: auto;">
+                <SearchResultList Items="VisibleResults"
+                                  ShowActions="false"
+                                  SelectedInodeId="@_selected?.InodeId"
+                                  OnItemClick="OnRowClickAsync"/>
+            </div>
+
+            @if (_searched && !_searching && VisibleResults.Count == 0 && string.IsNullOrEmpty(_error))
+            {
+                <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
+                    未找到匹配的节点
+                </MudText>
+            }
+            @if (!_searched && !_searching)
+            {
+                <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
+                    输入关键词搜索，点结果行选中节点
+                </MudText>
+            }
+        </MudStack>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>对话框标题。</summary>
+    [Parameter] public string Title { get; set; } = "选择节点";
+
+    /// <summary>初始搜索词；非空时打开即自动搜索一次。</summary>
+    [Parameter] public string? InitialQuery { get; set; }
+
+    /// <summary>返回数量（1-50，服务端默认上限 50）。</summary>
+    [Parameter] public int TopK { get; set; } = 20;
+
+    /// <summary>最低相似度（0-1）。</summary>
+    [Parameter] public float MinScore { get; set; }
+
+    /// <summary>限定宿主类型（如 SpaceTree / UnitTree / LineNode）；为空不限。</summary>
+    [Parameter] public string? NodeType { get; set; }
+
+    /// <summary>排除未挂载树宿主的裸节点（HostType=TreeNode）。</summary>
+    [Parameter] public bool ExcludeTreeNode { get; set; }
+
+    [Inject] private EavApiClient EavApi { get; set; } = default!;
+
+    private List<SemanticSearchItemDto> _results = [];
+
+    /// <summary>可见结果：按 NodeType / 裸节点开关过滤后的结果。</summary>
+    private List<SemanticSearchItemDto> VisibleResults =>
+        _results.Where(IsVisible).ToList();
+
+    private bool IsVisible(SemanticSearchItemDto item)
+    {
+        if (ExcludeTreeNode && string.Equals(item.HostType, "TreeNode", StringComparison.Ordinal))
+            return false;
+        if (!string.IsNullOrEmpty(NodeType)
+            && !string.Equals(item.HostType, NodeType, StringComparison.Ordinal))
+            return false;
+        return true;
+    }
+
+    private SemanticSearchItemDto? _selected;
+    private string _query = string.Empty;
+    private int _topK;
+    private double _minScore;
+    private bool _searching;
+    private bool _searched;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        _topK = Math.Clamp(TopK, 1, 50);
+        _minScore = Math.Clamp((double)MinScore, 0d, 1d);
+        _query = InitialQuery ?? string.Empty;
+    }
+
+    /// <summary>拖动相似度条：更新阈值，若已搜索过则立即按新阈值重搜。</summary>
+    private async Task OnMinScoreChanged(double value)
+    {
+        _minScore = value;
+        if (_searched && !_searching && !string.IsNullOrWhiteSpace(_query))
+        {
+            await DoSearchAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !string.IsNullOrWhiteSpace(_query))
+        {
+            await DoSearchAsync();
+        }
+    }
+
+    private async Task DoSearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_query) || _searching) return;
+
+        _searching = true;
+        _searched = true;
+        _error = null;
+        _results = [];
+        _selected = null;
+        StateHasChanged();
+
+        try
+        {
+            var response = await EavApi.SemanticSearchAsync(new SemanticSearchRequest
+            {
+                Query = _query,
+                TopK = _topK,
+                MinScore = (float)_minScore,
+            });
+
+            if (response is null)
+            {
+                _error = "搜索服务返回空响应";
+            }
+            else
+            {
+                _results = response.Items?.ToList() ?? [];
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"搜索失败：{ex.Message}";
+        }
+        finally
+        {
+            _searching = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !_searching)
+        {
+            await DoSearchAsync();
+        }
+    }
+
+    private Task OnRowClickAsync(SemanticSearchItemDto item)
+    {
+        _selected = item;
+        return Task.CompletedTask;
+    }
+
+    private void Confirm()
+    {
+        if (_selected is null) return;
+        MudDialog.Close(DialogResult.Ok(_selected));
+    }
+}

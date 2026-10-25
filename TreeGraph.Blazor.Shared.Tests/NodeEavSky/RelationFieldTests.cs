@@ -5,11 +5,13 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using MudBlazor;
 using MudBlazor.Services;
 using TreeGraph.Blazor.Shared.NodeEavSky.Components;
 using TreeGraph.Blazor.Shared.NodeEavSky.Components.FieldRenderers;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
+using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
@@ -34,6 +36,9 @@ public class RelationFieldTests : BunitTestBase
         Services.AddSingleton(new EavApiClient(
             new HttpClient(new NodeStub()) { BaseAddress = new Uri("http://api.test/") },
             NullLogger<EavApiClient>.Instance));
+        // RelationField 的「语义搜索选节点」按钮依赖对话框服务（本测试不触发点击）
+        Services.AddSingleton<IDialogService>(Mock.Of<IDialogService>());
+        Services.AddSingleton<BlazorService>();
     }
 
     private static AttributeSchemaDto RelationAttr() =>
