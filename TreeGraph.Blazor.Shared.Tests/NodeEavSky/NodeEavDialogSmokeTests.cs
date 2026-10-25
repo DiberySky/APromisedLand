@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,7 +10,13 @@ using TreeGraph.Blazor.Shared.Common;
 using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs;
 using TreeGraph.Blazor.Shared.NodeEavSky.Services;
 using TreeGraph.Blazor.Shared.Platform;
+using TreeGraph.Blazor.Shared.TreeEavSky;
+using TreeGraph.Blazor.Shared.TreeEavSky.Contracts;
+using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs;
+using TreeGraph.Blazor.Shared.TreeEavSky.Nodes;
 using TreeGraph.Shared.NodeEavSky.Dtos;
+using TreeGraph.Shared.NodeSky.Entities;
+using TreeGraph.Shared.TreeEavSky.Entities;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.NodeEavSky;
@@ -39,6 +47,8 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         Services.AddScoped<TreeGraph.Blazor.Shared.TreeEavSky.Dialogs.BlazorService>();
         Services.AddScoped(
             typeof(TreeGraph.Blazor.Shared.TreeEavSky.Dialogs.TreeNodeDialogService<>));
+        // NodeAttributeItemsSky（TreeNodeActionsDialog 属性区）依赖 MessageService
+        Services.AddScoped<TreeGraph.Blazor.Shared.TreeEavSky.Dialogs.MessageService>();
     }
 
     private async Task<IRenderedComponent<MudDialogProvider>> OpenAsync<TDialog>(
@@ -278,11 +288,76 @@ public class NodeEavDialogSmokeTests : BunitTestBase
             { x => x.Longitude, 104.06 },
         }), "地图选点");
 
-    /// <summary>返回 200 OK 的桩 HttpClient（渲染阶段不发请求，仅为满足 DI）。</summary>
+    // ─── TreeNodeActionsDialog（搜索页树宿主直开的宿主操作对话框） ───
+
+    [Fact]
+    public async Task TreeNodeActionsDialog_TreeHost_Renders()
+    {
+        var parent = new UnitTree
+        {
+            Id = "u-root",
+            CanHaveChildren = true,
+            Node = new Node { Id = "u-root", HostType = "UnitTree", Name = "上级单位" }
+        };
+        var unit = new UnitTree
+        {
+            Id = "u-1",
+            ParentId = parent.Id,
+            CanHaveChildren = true,
+            HasChildren = false,
+            Description = "测试描述",
+            Node = new Node { Id = "u-1", HostType = "UnitTree", Name = "测试单位" },
+            Parent = parent
+        };
+        var nodeItem = new TreeNodeItem<UnitTree>
+        {
+            Text = "测试单位",
+            Value = unit
+        };
+
+        var provider = await OpenAsync<TreeNodeActionsDialog<UnitTree>>(
+            new DialogParameters<TreeNodeActionsDialog<UnitTree>>
+            {
+                { x => x.NodeTemplate, new NodeTemplate<UnitTree> { Node = nodeItem } },
+                { x => x.ParentNode, parent },
+                { x => x.IsBoot, false },
+            });
+
+        AssertDialog(provider, "节点操作");
+        var html = provider.Find(".mud-dialog").InnerHtml;
+        Assert.Contains("测试单位", html);
+        Assert.Contains("上级单位", html);
+        // 全量按钮集：非根 + 允许子节点 + 无子节点 → 六个操作全部可见
+        Assert.Contains("移动", html);
+        Assert.Contains("子项排序", html);
+        Assert.Contains("设置修改", html);
+        Assert.Contains("属性", html);
+        Assert.Contains("创建子项", html);
+        Assert.Contains("删除", html);
+    }
+
+    /// <summary>返回 200 OK 的桩 HttpClient（/api/inode 属性区回空列表信封，其余仅满足 DI）。</summary>
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
+        private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (request.Method == HttpMethod.Get &&
+                path.StartsWith("/api/inode", StringComparison.Ordinal))
+            {
+                var body = JsonSerializer.Serialize(
+                    new { Success = true, Message = (string?)null, Data = Array.Empty<object>() },
+                    WebJson);
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent(body, Encoding.UTF8, "application/json")
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+        }
     }
 }

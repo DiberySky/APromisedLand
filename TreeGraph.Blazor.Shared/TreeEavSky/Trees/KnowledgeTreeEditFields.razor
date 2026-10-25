@@ -1,0 +1,34 @@
+@* KnowledgeTreeEditFields.razor — 知识树节点编辑字段区（抽取自 KnowledgeTreeDialogPage 内联模板）。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Trees
+@using TreeGraph.Shared.TreeEavSky.Entities
+
+<MudStack Spacing="0">
+    <MudTextField T="string"
+                  @bind-Value="Model.Name"
+                  Label="名称"
+                  Variant="Variant.Outlined"
+                  Required="true"
+                  RequiredError="名称不能为空"
+                  MaxLength="100"
+                  Counter="100"
+                  Immediate="true" />
+
+    <MudTextField T="string"
+                  @bind-Value="Model.Description"
+                  Label="描述"
+                  Variant="Variant.Outlined"
+                  Lines="3"
+                  MaxLength="500"
+                  Counter="500"
+                  Immediate="true" />
+
+    <BoolFieldSky Label="允许包含子节点"
+                  @bind-Value="Model.CanHaveChildren" />
+
+    <BoolFieldSky Label="已归档"
+                  @bind-Value="Model.IsArchived" />
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired] public KnowledgeTree Model { get; set; } = default!;
+}

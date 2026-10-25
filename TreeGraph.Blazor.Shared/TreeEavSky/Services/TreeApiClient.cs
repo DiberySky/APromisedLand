@@ -125,6 +125,19 @@ public class TreeApiClient<T>(HttpClient httpClient)
     }
 
     /// <summary>
+    /// 按 Id 读取单个节点（含父节点值；不存在返回 null，对应后端 404）。
+    /// 用途：搜索页等树外场景按节点直开宿主操作对话框。
+    /// </summary>
+    public async Task<TreeNodeDto<T>?> GetNodeByIdAsync(
+        string id,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get,
+            $"{_basePath}/{Uri.EscapeDataString(id)}");
+        return await SendAndGetDataOrNullAsync<TreeNodeDto<T>>(request, cancellationToken);
+    }
+
+    /// <summary>
     /// 获取从根节点到指定节点的祖先路径；节点不存在时返回 null（对应后端 404）。
     /// </summary>
     public async Task<IReadOnlyList<string>?> GetAncestorPathAsync(

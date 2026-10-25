@@ -1,0 +1,23 @@
+@* TreeEditTemplates.razor — 4 棵树共享的编辑模板（TreeNodeEditDialog 的 EditTemplate 内容区）。
+   模板本体在 XxxTreeEditFields 组件内（@bind 生成的 CreateBinder 需要实例 this，
+   不能直接放进 static 模板字段）；此处仅做薄包装，供对话框页与搜索页等树外场景复用。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Trees
+@using TreeGraph.Shared.TreeEavSky.Entities
+
+@code {
+    /// <summary>单位树编辑模板（名称/缩写/描述/允许包含子节点）。</summary>
+    public static readonly RenderFragment<UnitTree> UnitEdit =
+        context => @<UnitTreeEditFields Model="context" />;
+
+    /// <summary>分类树编辑模板（名称/描述/允许包含子节点/已归档）。</summary>
+    public static readonly RenderFragment<CategoryTree> CategoryEdit =
+        context => @<CategoryTreeEditFields Model="context" />;
+
+    /// <summary>知识树编辑模板（名称/描述/允许包含子节点/已归档）。</summary>
+    public static readonly RenderFragment<KnowledgeTree> KnowledgeEdit =
+        context => @<KnowledgeTreeEditFields Model="context" />;
+
+    /// <summary>空间树编辑模板（名称/描述/允许包含子节点）。</summary>
+    public static readonly RenderFragment<SpaceTree> SpaceEdit =
+        context => @<SpaceTreeEditFields Model="context" />;
+}

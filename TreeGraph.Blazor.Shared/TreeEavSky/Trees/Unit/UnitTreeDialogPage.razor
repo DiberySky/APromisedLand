@@ -6,46 +6,11 @@
 
 @inject BlazorService BlazorService
 
-@{
-    RenderFragment<UnitTree> editTemplate = (context) =>
-        @<MudStack Spacing="0">
-            <MudTextField T="string"
-                          @bind-Value="context.Name"
-                          Label="名称"
-                          Variant="Variant.Outlined"
-                          Required="true"
-                          RequiredError="名称不能为空"
-                          MaxLength="100"
-                          Counter="100"
-                          Immediate="true" />
-
-            <MudTextField T="string"
-                          @bind-Value="context.Abbreviation"
-                          Label="缩写"
-                          Variant="Variant.Outlined"
-                          MaxLength="20"
-                          Counter="20"
-                          Immediate="true" />
-
-            <MudTextField T="string"
-                          @bind-Value="context.Description"
-                          Label="描述"
-                          Variant="Variant.Outlined"
-                          Lines="3"
-                          MaxLength="500"
-                          Counter="500"
-                          Immediate="true" />
-
-            <BoolFieldSky Label="允许包含子节点"
-                          @bind-Value="context.CanHaveChildren" />
-        </MudStack>;
-}
-
 <TreeDialogPageSky TItem="UnitTree"
                    Title="单位注册"
                    TitleToolBar="@(ClickNode?.Value?.Parent?.Name ?? "单位")"
                    RootId="@ClickNode?.Value?.Id"
-                   EditTemplate="@editTemplate"
+                   EditTemplate="@TreeEditTemplates.UnitEdit"
                    ShowDialogFunc="@ShowDialogAsync" />
 
 @code {

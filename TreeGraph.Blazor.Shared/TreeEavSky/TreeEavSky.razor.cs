@@ -3,7 +3,6 @@ using MudBlazor;
 using TreeGraph.Shared.TreeEavSky.Models;
 using TreeGraph.Shared.TreeEavSky.Abstractions;
 using TreeGraph.Blazor.Shared.TreeEavSky.Navigation;
-using TreeGraph.Blazor.Shared.TreeEavSky.Services;
 
 namespace TreeGraph.Blazor.Shared.TreeEavSky;
 
@@ -21,7 +20,6 @@ public partial class TreeEavSky<TItem> : IDisposable
     private readonly CancellationTokenSource _cts = new();
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
-    [Inject] private ITreeActionHandler<TItem> ActionHandler { get; set; } = default!;
 
     // ========== 生命周期 ==========
     protected override async Task OnInitializedAsync()

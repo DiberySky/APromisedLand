@@ -6,38 +6,11 @@
 
 @inject BlazorService BlazorService
 
-@{
-    RenderFragment<SpaceTree> editTemplate = (context) =>
-        @<MudStack Spacing="0">
-            <MudTextField T="string"
-                          @bind-Value="context.Name"
-                          Label="名称"
-                          Variant="Variant.Outlined"
-                          Required="true"
-                          RequiredError="名称不能为空"
-                          MaxLength="100"
-                          Counter="100"
-                          Immediate="true" />
-
-            <MudTextField T="string"
-                          @bind-Value="context.Description"
-                          Label="描述"
-                          Variant="Variant.Outlined"
-                          Lines="3"
-                          MaxLength="500"
-                          Counter="500"
-                          Immediate="true" />
-
-            <BoolFieldSky Label="允许包含子节点"
-                          @bind-Value="context.CanHaveChildren" />
-        </MudStack>;
-}
-
 <TreeDialogPageSky TItem="SpaceTree"
                    Title="@(Title ?? "空间注册")"
                    TitleToolBar="@(ClickNode?.Value?.Parent?.Name ?? "空间")"
                    RootId="@(ClickNode?.Value?.Id ?? RootId)"
-                   EditTemplate="@editTemplate"
+                   EditTemplate="@TreeEditTemplates.SpaceEdit"
                    ShowDialogFunc="@ShowDialogAsync" />
 
 @code {

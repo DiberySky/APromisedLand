@@ -100,6 +100,34 @@ public class SpaceTreeService(
         return children;
     }
 
+    /// <summary>
+    /// 按 Id 读取单个节点（含父节点值，供宿主操作对话框展示父名/移动确认）。
+    /// 节点不存在返回 null；Children 不填充（删除守卫用 HasChildren 标志，排序走懒加载）。
+    /// </summary>
+    public async Task<TreeNodeDto<SpaceTree>?> GetNodeByIdAsync(string id,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await dbContext.SpaceTrees
+            .Include(c => c.Node)
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+        if (entity == null) return null;
+
+        var dto = entity.ToNodeDto(BuildText(entity));
+        dto.HasChildren = await dbContext.SpaceTrees
+            .AnyAsync(c => c.ParentId == id, cancellationToken);
+
+        if (!string.IsNullOrEmpty(entity.ParentId))
+        {
+            var parent = await dbContext.SpaceTrees
+                .Include(c => c.Node)
+                .FirstOrDefaultAsync(c => c.Id == entity.ParentId, cancellationToken);
+            dto.Parent = parent;
+            if (dto.Value != null) dto.Value.Parent = parent;
+        }
+
+        return dto;
+    }
+
     public async Task<IReadOnlyList<TreeNodeDto<SpaceTree>>> QueryNodesAsync(TreeQueryParams queryParams,
         CancellationToken cancellationToken = default)
     {

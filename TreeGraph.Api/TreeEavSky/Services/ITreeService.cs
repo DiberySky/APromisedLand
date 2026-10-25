@@ -19,6 +19,12 @@ public interface ITreeService<T>
     Task<IReadOnlyList<TreeNodeDto<T>>> GetChildrenAsync(string parentId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 按 Id 读取单个节点（含父节点值；节点不存在返回 null）。
+    /// Children 不填充——删除守卫用 HasChildren 标志，排序走懒加载。
+    /// </summary>
+    Task<TreeNodeDto<T>?> GetNodeByIdAsync(string id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 根据条件查询节点
     /// </summary>
     Task<IReadOnlyList<TreeNodeDto<T>>> QueryNodesAsync(TreeQueryParams queryParams, CancellationToken cancellationToken = default);

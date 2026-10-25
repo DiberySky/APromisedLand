@@ -1,51 +1,41 @@
-@* SearchResultActionsMenu.razor — 语义搜索结果行的节点操作菜单（按 HostType/MatchKind 动态出项）。
-   树宿主（UnitTree/CategoryTree/KnowledgeTree/SpaceTree）：重命名/新建子节点/移动到/属性/树定位/AI 综合/删除；
-   LineNode：编辑/属性/详情/线路节点维护/AI 综合/删除（无移动——换线路走编辑对话框）；
-   实体命中或裸节点（Node/Line）：仅属性/树定位/AI 综合。 *@
+@* SearchResultActionsMenu.razor — 语义搜索结果行的节点操作入口（行内图标直开宿主操作对话框）。
+   维护图标（⋯）：按 HostType 直开对应宿主操作对话框——树宿主 → 物化节点后开 TreeNodeActionsDialog
+   + 共享编排循环（TreeNodeActionOrchestrator）；LineNode → LineNodeActionsDialog 连续操作循环；
+   裸节点/实体命中 → 属性对话框。
+   树定位/AI 综合为独立行内图标（页面级能力，由页面回调处理）。 *@
 @namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
 @using Microsoft.Extensions.DependencyInjection
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Components
 @using TreeGraph.Blazor.Shared.LineSky.Services
-@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@using TreeGraph.Blazor.Shared.TreeEavSky
+@using TreeGraph.Blazor.Shared.TreeEavSky.Contracts
+@using TreeGraph.Blazor.Shared.TreeEavSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Trees
+@using TreeGraph.Shared.TreeEavSky.Abstractions
 @using TreeGraph.Shared.TreeEavSky.Entities
+@using TreeGraph.Shared.TreeEavSky.Models
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject IServiceProvider Services
 @inject LineNodeManageApiClient LineNodeApi
 
-<MudMenu Icon="@Icons.Material.Filled.MoreVert"
-         Size="Size.Small"
-         Dense="true"
-         AnchorOrigin="Origin.BottomRight"
-         TransformOrigin="Origin.TopRight">
-    @if (IsTreeHost)
-    {
-        <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="RenameAsync">重命名</MudMenuItem>
-        <MudMenuItem Icon="@Icons.Material.Filled.Add" OnClick="CreateChildAsync">新建子节点</MudMenuItem>
-        <MudMenuItem Icon="@Icons.Material.Outlined.MoveUp" OnClick="MoveAsync">移动到</MudMenuItem>
-    }
-    @if (IsLineNode)
-    {
-        <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="EditLineNodeAsync">编辑</MudMenuItem>
-        <MudMenuItem Icon="@Icons.Material.Filled.Visibility" OnClick="ViewLineNodeAsync">详情</MudMenuItem>
-        <MudMenuItem Icon="@Icons.Material.Filled.AccountTree" OnClick="LineManageAsync">线路节点维护</MudMenuItem>
-    }
-    <MudMenuItem Icon="@Icons.Material.Outlined.EditAttributes" OnClick="AttributesAsync">属性</MudMenuItem>
-    @if (HasTreeLocate)
-    {
-        <MudMenuItem Icon="@Icons.Material.Filled.Forest" OnClick="OpenTreeAsync">树定位</MudMenuItem>
-    }
-    <MudMenuItem Icon="@Icons.Material.Filled.AutoAwesome" OnClick="AiExpandAsync">AI 综合</MudMenuItem>
-    @if (IsTreeHost)
-    {
-        <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="DeleteAsync">删除</MudMenuItem>
-    }
-    @if (IsLineNode)
-    {
-        <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="DeleteLineNodeAsync">删除</MudMenuItem>
-    }
-</MudMenu>
+@* 维护：直开对应 Node 类型的宿主操作对话框 *@
+<MudIconButton Icon="@Icons.Material.Filled.MoreVert"
+               Size="Size.Small"
+               title="节点操作"
+               OnClick="OpenMaintenanceAsync" />
+@if (HasTreeLocate)
+{
+    <MudIconButton Icon="@Icons.Material.Filled.Forest"
+                   Size="Size.Small"
+                   title="树定位"
+                   OnClick="OpenTreeAsync" />
+}
+<MudIconButton Icon="@Icons.Material.Filled.AutoAwesome"
+               Size="Size.Small"
+               title="AI 综合"
+               OnClick="AiExpandAsync" />
 
 @code {
     /// <summary>语义搜索结果行。</summary>
@@ -57,23 +47,37 @@
     /// <summary>AI 综合（由页面打开/触发）。</summary>
     [Parameter] public EventCallback<SemanticSearchItemDto> OnAiExpand { get; set; }
 
-    /// <summary>变更完成（重命名/建子节点/移动/编辑/线路维护）后触发。</summary>
+    /// <summary>变更完成（建子/编辑/移动/排序/线路维护）后触发。</summary>
     [Parameter] public EventCallback<SemanticSearchItemDto> OnChanged { get; set; }
 
-    /// <summary>删除成功后触发。</summary>
+    /// <summary>删除成功（或节点已不存在）后触发。</summary>
     [Parameter] public EventCallback<SemanticSearchItemDto> OnDeleted { get; set; }
 
-    private static readonly DialogOptionsEx SmallOptions = new()
-    {
-        MaxWidth = MaxWidth.Small,
-        FullWidth = true,
-        MaximizeButton = true
-    };
-
-    private bool IsTreeHost => Item.MatchKind != "Entity"
+    /// <summary>树定位可用：树宿主节点命中且有根节点信息。</summary>
+    private bool HasTreeLocate =>
+        Item.MatchKind != "Entity"
+        && !string.IsNullOrEmpty(Item.RootId)
         && Item.HostType is "UnitTree" or "CategoryTree" or "KnowledgeTree" or "SpaceTree";
-    private bool IsLineNode => Item.MatchKind != "Entity" && Item.HostType == "LineNode";
-    private bool HasTreeLocate => !string.IsNullOrEmpty(Item.RootId);
+
+    // ═══ 维护入口：按 HostType 直开宿主操作对话框 ═══
+
+    private Task OpenMaintenanceAsync()
+    {
+        if (Item.MatchKind != "Entity")
+        {
+            switch (Item.HostType)
+            {
+                case "UnitTree": return OpenTreeHostAsync<UnitTree>(TreeEditTemplates.UnitEdit);
+                case "CategoryTree": return OpenTreeHostAsync<CategoryTree>(TreeEditTemplates.CategoryEdit);
+                case "KnowledgeTree": return OpenTreeHostAsync<KnowledgeTree>(TreeEditTemplates.KnowledgeEdit);
+                case "SpaceTree": return OpenTreeHostAsync<SpaceTree>(TreeEditTemplates.SpaceEdit);
+                case "LineNode": return OpenLineNodeActionsAsync();
+            }
+        }
+
+        // 裸节点（TreeNode）/ 实体命中：属性对话框直开
+        return AttributesAsync();
+    }
 
     private Task OpenTreeAsync() => OnOpenTree.InvokeAsync(Item);
     private Task AiExpandAsync() => OnAiExpand.InvokeAsync(Item);
@@ -82,179 +86,69 @@
 
     private Task AttributesAsync() => LineNodeActions.AttributesAsync(DialogService, Item.InodeId);
 
-    // ═══ 树宿主操作（按 HostType 分发到具体泛型） ═══
+    // ═══ 树宿主：物化节点 → TreeNodeActionsDialog + 共享编排循环 ═══
 
-    private Task RenameAsync() => Item.HostType switch
+    private async Task OpenTreeHostAsync<TItem>(RenderFragment<TItem> editTemplate)
+        where TItem : class, ITreeNodeBase<TItem>, new()
     {
-        "UnitTree" => RenameTreeAsync<UnitTree>(),
-        "CategoryTree" => RenameTreeAsync<CategoryTree>(),
-        "KnowledgeTree" => RenameTreeAsync<KnowledgeTree>(),
-        "SpaceTree" => RenameTreeAsync<SpaceTree>(),
-        _ => Task.CompletedTask
-    };
+        var api = Services.GetRequiredService<TreeApiClient<TItem>>();
 
-    private Task CreateChildAsync() => Item.HostType switch
-    {
-        "UnitTree" => CreateChildTreeAsync<UnitTree>(),
-        "CategoryTree" => CreateChildTreeAsync<CategoryTree>(),
-        "KnowledgeTree" => CreateChildTreeAsync<KnowledgeTree>(),
-        "SpaceTree" => CreateChildTreeAsync<SpaceTree>(),
-        _ => Task.CompletedTask
-    };
-
-    private Task MoveAsync() => Item.HostType switch
-    {
-        "UnitTree" => MoveTreeAsync<UnitTree>(),
-        "CategoryTree" => MoveTreeAsync<CategoryTree>(),
-        "KnowledgeTree" => MoveTreeAsync<KnowledgeTree>(),
-        "SpaceTree" => MoveTreeAsync<SpaceTree>(),
-        _ => Task.CompletedTask
-    };
-
-    private Task DeleteAsync() => Item.HostType switch
-    {
-        "UnitTree" => DeleteTreeAsync<UnitTree>(),
-        "CategoryTree" => DeleteTreeAsync<CategoryTree>(),
-        "KnowledgeTree" => DeleteTreeAsync<KnowledgeTree>(),
-        "SpaceTree" => DeleteTreeAsync<SpaceTree>(),
-        _ => Task.CompletedTask
-    };
-
-    private async Task RenameTreeAsync<TItem>() where TItem : class, ITreeNodeBase<TItem>, new()
-    {
-        var parameters = new DialogParameters<NodeRenameDialog<TItem>>
+        TreeNodeDto<TItem>? dto;
+        try
         {
-            { x => x.NodeId, Item.InodeId },
-            { x => x.CurrentName, Item.NodeName ?? "" }
-        };
-        var dialog = await DialogService.ShowExAsync<NodeRenameDialog<TItem>>(
-            "重命名节点", parameters, SmallOptions);
-        var result = await dialog.Result;
-        if (result is { Canceled: false })
-            await OnChanged.InvokeAsync(Item);
-    }
-
-    private async Task CreateChildTreeAsync<TItem>() where TItem : class, ITreeNodeBase<TItem>, new()
-    {
-        var parameters = new DialogParameters<NodeCreateChildDialog<TItem>>
+            dto = await api.GetNodeByIdAsync(Item.InodeId);
+        }
+        catch (Exception ex)
         {
-            { x => x.ParentNodeId, Item.InodeId },
-            { x => x.ParentNodeName, Item.NodeName ?? Item.InodeId }
-        };
-        var dialog = await DialogService.ShowExAsync<NodeCreateChildDialog<TItem>>(
-            "新建子节点", parameters, SmallOptions);
-        var result = await dialog.Result;
-        if (result is { Canceled: false })
-            await OnChanged.InvokeAsync(Item);
-    }
-
-    private async Task MoveTreeAsync<TItem>() where TItem : class, ITreeNodeBase<TItem>, new()
-    {
-        var parameters = new DialogParameters<TreeNodePickDialog<TItem>>
-        {
-            { x => x.RootId, Item.RootId },
-            { x => x.Title, $"移动「{Item.NodeName ?? Item.InodeId}」到" }
-        };
-        var dialog = await DialogService.ShowExAsync<TreeNodePickDialog<TItem>>(
-            "移动到", parameters, SmallOptions);
-        var result = await dialog.Result;
-        if (result is not { Canceled: false } || result.Data is not string targetId)
-            return;
-
-        if (targetId == Item.InodeId)
-        {
-            Snackbar.Add("不能移动到节点自身", Severity.Warning);
+            Snackbar.Add($"加载节点失败：{ex.Message}", Severity.Error);
             return;
         }
 
-        try
+        if (dto?.Value is null)
         {
-            var api = Services.GetRequiredService<TreeApiClient<TItem>>();
-            // 空字符串 = 移至顶层（根）
-            var ok = await api.MoveNodeAsync(Item.InodeId, string.IsNullOrEmpty(targetId) ? null : targetId);
-            if (!ok)
-            {
-                Snackbar.Add("移动失败：节点或目标不存在", Severity.Error);
-                return;
-            }
-            Snackbar.Add("移动成功", Severity.Success);
-            await OnChanged.InvokeAsync(Item);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"移动失败：{ex.Message}", Severity.Error);
-        }
-    }
-
-    private async Task DeleteTreeAsync<TItem>() where TItem : class, ITreeNodeBase<TItem>, new()
-    {
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "删除节点",
-            $"确定删除节点「{Item.NodeName ?? Item.InodeId}」吗？若仍有子节点或引用将被拒绝。",
-            yesText: "删除", cancelText: "取消");
-        if (confirmed != true) return;
-
-        try
-        {
-            var api = Services.GetRequiredService<TreeApiClient<TItem>>();
-            var ok = await api.DeleteNodeAsync(Item.InodeId);
-            if (!ok)
-            {
-                Snackbar.Add("删除失败：节点不存在或已被删除", Severity.Error);
-                return;
-            }
-            Snackbar.Add("删除成功", Severity.Success);
+            Snackbar.Add("节点不存在或已被删除", Severity.Warning);
             await OnDeleted.InvokeAsync(Item);
+            return;
         }
-        catch (Exception ex)
-        {
-            // 409 守卫等真实原因透传
-            Snackbar.Add($"删除失败：{ex.Message}", Severity.Error);
-        }
-    }
 
-    // ═══ LineNode 操作（无移动：换线路走编辑对话框） ═══
+        var node = dto.ToTreeNodeItem();
+        var nodeTemplate = new NodeTemplate<TItem> { Node = node };
 
-    private async Task<LineNodeDto?> LoadLineNodeAsync()
-    {
-        try
+        // 树外场景：无可视树——刷新类回调为空操作；
+        // 父节点信息来自 GetNodeByIdAsync 填充的 Value.Parent（宿主工具条/移动确认用）。
+        var ui = new TreeNodeActionUi<TItem>
         {
-            var node = await LineNodeApi.GetByIdAsync(Item.InodeId);
-            if (node is null)
-                Snackbar.Add("线路节点不存在或已被删除", Severity.Warning);
-            return node;
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"加载线路节点失败：{ex.Message}", Severity.Error);
-            return null;
-        }
-    }
+            EditTemplate = editTemplate,
+            IsRoot = v => v.Id == Item.RootId || v.ParentId is null,
+            GetParentNode = _ => node.Value?.Parent,
+            FindLoadedNode = _ => null,
+            LoadChildrenAsync = async (v, ct) =>
+                (await api.GetChildrenAsync(v!.Id, ct)).Select(d => d.ToTreeNodeItem()).ToList(),
+            RefreshNodeChildrenAsync = (_, _) => Task.CompletedTask,
+            RefreshTreeAsync = _ => Task.CompletedTask,
+            ReloadAndExpandAsync = (_, _) => Task.CompletedTask,
+        };
 
-    private async Task EditLineNodeAsync()
-    {
-        var node = await LoadLineNodeAsync();
-        if (node is null) return;
-        if (await LineNodeActions.EditAsync(DialogService, node))
+        var ops = Services.GetRequiredService<TreeNodeActionOrchestrator<TItem>>();
+        var outcome = await ops.OperateAsync(nodeTemplate, ui);
+
+        if (outcome == TreeNodeHostOutcome.Deleted)
+            await OnDeleted.InvokeAsync(Item);
+        else if (outcome == TreeNodeHostOutcome.Changed)
             await OnChanged.InvokeAsync(Item);
     }
 
-    private async Task DeleteLineNodeAsync()
+    // ═══ LineNode：宿主操作对话框（编辑/属性/删除/线路维护连续操作循环，无移动——换线路走编辑对话框） ═══
+
+    private async Task OpenLineNodeActionsAsync()
     {
-        var node = await LoadLineNodeAsync();
-        if (node is null) return;
-        if (await LineNodeActions.DeleteAsync(DialogService, node))
+        var outcome = await LineNodeActions.OperateAsync(
+            DialogService, LineNodeApi, Item.InodeId, Item.ParentName,
+            showLineManage: true, snackbar: Snackbar);
+
+        if (outcome == LineNodeHostOutcome.Deleted)
             await OnDeleted.InvokeAsync(Item);
-    }
-
-    private Task ViewLineNodeAsync()
-        => LineNodeActions.ViewAsync(DialogService, Item.InodeId, Item.ParentName);
-
-    private async Task LineManageAsync()
-    {
-        var node = await LoadLineNodeAsync();
-        if (node is null) return;
-        await LineNodeActions.LineManageAsync(DialogService, node.LineId, Item.ParentName);
-        await OnChanged.InvokeAsync(Item);
+        else if (outcome == LineNodeHostOutcome.Changed)
+            await OnChanged.InvokeAsync(Item);
     }
 }

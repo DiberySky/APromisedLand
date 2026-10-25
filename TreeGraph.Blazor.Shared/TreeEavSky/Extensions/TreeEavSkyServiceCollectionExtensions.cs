@@ -39,6 +39,9 @@ public static class TreeEavSkyServiceCollectionExtensions
         // 默认树节点写操作 Handler（宿主可注册同接口实现覆盖）
         services.AddScoped(typeof(ITreeActionHandler<>), typeof(DefaultTreeActionHandler<>));
 
+        // 节点操作编排器（树组件与搜索页等树外场景共用）
+        services.AddScoped(typeof(TreeNodeActionOrchestrator<>));
+
         var builder = services.AddHttpClient(httpClientName);
         if (configureClient != null)
         {

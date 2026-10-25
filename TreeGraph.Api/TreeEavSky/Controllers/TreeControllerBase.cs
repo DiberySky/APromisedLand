@@ -57,6 +57,26 @@ public abstract class TreeControllerBase<T>(
         }
     }
 
+    [HttpGet("{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public virtual async Task<IActionResult> GetById(string id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var node = await TreeService.GetNodeByIdAsync(id, cancellationToken);
+            if (node == null)
+                return NotFound(new { error = $"节点 '{id}' 不存在" });
+            return Ok(node);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "获取节点失败");
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { error = $"获取节点失败: {ex.Message}" });
+        }
+    }
+
     [HttpPost("query")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public virtual async Task<IActionResult> Query([FromBody] TreeQueryParams queryParams, CancellationToken cancellationToken = default)
