@@ -86,60 +86,14 @@
             </MudStack>
         }
 
-        @* ═══ 结果列表 ═══ *@
+        @* ═══ 结果列表（分页，见 SearchResultList） ═══ *@
         @if (_results.Count > 0)
         {
-            <MudList T="string" Dense="true" Class="pa-2">
-                @for (int i = 0; i < _results.Count; i++)
-                {
-                    var idx = i;
-                    var item = _results[i];
-
-                    <MudListItem Class="pa-0 mb-2">
-                        <MudCard Elevation="1"
-                                 Style="cursor:pointer; border-radius:12px;"
-                                 @onclick="() => OnItemClick(item)">
-                            <MudCardContent Class="pa-3">
-                                <MudStack Row="true"
-                                          AlignItems="AlignItems.Center"
-                                          Spacing="2">
-                                    <MudIcon Icon="@HostIcon(item.HostType)"
-                                             Size="Size.Small"
-                                             Color="Color.Primary"/>
-                                    <MudText Typo="Typo.subtitle2"
-                                             Style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-                                             title="@item.NodeName">
-                                        @(idx + 1). @(item.NodeName ?? item.InodeId)
-                                    </MudText>
-                                    <MudChip T="string"
-                                             Size="Size.Small"
-                                             Color="@ScoreColor(item.Score)">
-                                        @((item.Score * 100).ToString("F0"))%
-                                    </MudChip>
-                                    <span @onclick:stopPropagation="true">
-                                        @* ★ 操作菜单：按 HostType 出项（树节点 CRUD / LineNode CRUD / AI 综合 / 树定位） *@
-                                        <SearchResultActionsMenu Item="item"
-                                                                 OnOpenTree="OpenTreeDialogAsync"
-                                                                 OnAiExpand="ToggleExpandAsync"
-                                                                 OnDeleted="OnResultDeleted"/>
-                                    </span>
-                                </MudStack>
-
-                                @if (!string.IsNullOrEmpty(item.Path))
-                                {
-                                    <MudText Typo="Typo.caption"
-                                             Color="Color.Secondary"
-                                             Class="mt-1"
-                                             title="@item.Path"
-                                             Style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                                        @item.Path
-                                    </MudText>
-                                }
-                            </MudCardContent>
-                        </MudCard>
-                    </MudListItem>
-                }
-            </MudList>
+            <SearchResultList Items="_results"
+                              OnOpenTree="OpenTreeDialogAsync"
+                              OnAiExpand="ToggleExpandAsync"
+                              OnDeleted="OnResultDeleted"
+                              OnItemClick="OnItemClickAsync"/>
         }
 
         @* 底部占位：给固定输入框留空间 *@
@@ -236,7 +190,7 @@
         StateHasChanged();
     }
 
-    private void OnItemClick(SemanticSearchItemDto item)
+    private void OnItemClickAsync(SemanticSearchItemDto item)
     {
         // 现有 iNode 详情页路由（/inodes/{InodeId}），无 HostType 段
         Nav.NavigateTo($"/inodes/{item.InodeId}");
@@ -433,26 +387,4 @@
             Nav.NavigateTo($"/inodes/{selectedNode.Id}");
         }
     }
-
-    // ═══════════════════════════════════════════════════════
-    // 图标 & 颜色
-    // ═══════════════════════════════════════════════════════
-
-    private static string HostIcon(string hostType) => hostType switch
-    {
-        "SpaceTree"    => Icons.Material.Filled.AccountTree,
-        "UnitTree"     => Icons.Material.Filled.Straighten,
-        "CategoryTree" => Icons.Material.Filled.Category,
-        "KnowledgeTree" => Icons.Material.Filled.MenuBook,
-        "LineNode"     => Icons.Material.Filled.AccountTree,
-        _              => Icons.Material.Filled.DeviceHub
-    };
-
-    private static Color ScoreColor(float score) => score switch
-    {
-        >= 0.85f => Color.Success,
-        >= 0.70f => Color.Info,
-        >= 0.50f => Color.Warning,
-        _        => Color.Default
-    };
 }
