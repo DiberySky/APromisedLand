@@ -367,10 +367,10 @@ public class DeletePrincipleTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
         Assert.Contains("实体数据", await resp.Content.ReadAsStringAsync());
 
-        // 节点与其声明都还在（R7：创建即声明 LineStructure 类型 + 挂载的测试实体 = 2 张卡）
+        // 节点与其声明都还在（挂载的测试实体 = 1 张卡；LineStructure 声明已随 relation 体系下线）
         var cards = await Client.GetEavAsync<List<InodeTypeCardDto>>(
             $"/api/inode/{nodeId}/types");
-        Assert.Equal(2, cards!.Count);
+        Assert.Single(cards!);
 
         // 先清空节点自身数据 → 即可删除本项（声明随宿主清理）
         Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
@@ -456,7 +456,7 @@ public class DeletePrincipleTests : IntegrationTestBase
         var targetId = deleteFrom ? fromId : toId;
         var resp = await Client.DeleteAsync($"/api/LineNode/{targetId}");
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("关系/段边", await resp.Content.ReadAsStringAsync());
+        Assert.Contains("边/段边", await resp.Content.ReadAsStringAsync());
 
         // 两端节点都还在
         Assert.Equal(HttpStatusCode.OK, (await Client.GetAsync($"/api/LineNode/{fromId}")).StatusCode);

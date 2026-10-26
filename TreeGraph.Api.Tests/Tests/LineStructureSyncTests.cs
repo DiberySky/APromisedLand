@@ -6,17 +6,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.GraphSyncSky;
-using TreeGraph.Api.NodeEavSky.Entities;
-using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeSky.Entities;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
-/// R7 线路入图：Line→LineNode 归属走 parent_of；line_segment 段边经 R6 relation 管道；
-/// 原归属边类型已整体下线（任何请求体都不得再出现该类型名，见下方负向断言）。
+/// R7 线路入图：Line→LineNode 归属走 parent_of；line_segment 段边直写 edges 表
+/// （EdgeSky 顶级边，rank 恒 0），经语义边段统一装载。
 /// 使用 InMemory 库 + 伪 NebulaGraph REST，不依赖图数据库。
 /// </summary>
 public class LineStructureSyncTests
@@ -102,25 +101,24 @@ public class LineStructureSyncTests
     }
 
     // ============================================================
-    // 全量重建：line_segment relation 值计入 SemanticEdges，边类型 = line_segment
+    // 全量重建：line_segment 段边存 edges 表，计入 SemanticEdges，边类型 = line_segment
     // ============================================================
 
     [Fact]
-    public async Task RebuildAll_LineSegmentRelationValue_CountsSemanticEdges()
+    public async Task RebuildAll_LineSegmentEdge_CountsSemanticEdges()
     {
         var dbName = Guid.NewGuid().ToString();
         await using (var seed = CreateDb(dbName))
         {
             SeedLine(seed, "line-1", "n1", "n2");
-            seed.RelationAttributeValues.Add(new RelationAttributeValue
+            seed.Edges.Add(new Edge
             {
-                ValueId = "seg-1",
-                EntityId = "n1",
-                EntityType = "LineStructure",
-                AttributeId = "attr-next",
-                RelationType = GraphNaming.LineSegmentEdge,
-                ToNodeId = "n2",
-                Name = "第一段"
+                EdgeType = GraphNaming.LineSegmentEdge,
+                SrcVid = "n1",
+                DstVid = "n2",
+                Rank = 0,
+                Props = JsonSerializer.SerializeToElement(
+                    new Dictionary<string, string> { ["name"] = "第一段" })
             });
             await seed.SaveChangesAsync();
         }
@@ -136,43 +134,34 @@ public class LineStructureSyncTests
 
         Assert.Equal(1, result.SemanticEdges);
         Assert.Equal(2, result.LineEdges); // parent_of ×2（Line→LineNode）
-        var edge = FindBulkEdge(handler, "seg-1");
-        Assert.Equal(GraphNaming.LineSegmentEdge, edge.GetProperty("edge_type").GetString());
+        var edge = FindBulkEdge(handler, GraphNaming.LineSegmentEdge);
         Assert.Equal("n1", edge.GetProperty("src_vid").GetString());
         Assert.Equal("n2", edge.GetProperty("dst_vid").GetString());
+        Assert.Equal(0, edge.GetProperty("rank").GetInt64());
         Assert.Equal("第一段", edge.GetProperty("properties").GetProperty("name").GetString());
     }
 
     // ============================================================
-    // schema 初始化：relation_type=line_segment 的属性经 R6 管道动态建边
+    // schema 初始化：语义边类型以 PG edge_types/edge_type_props 为准（line_segment 为内置 seed）
     // ============================================================
 
     [Fact]
-    public async Task Schema_CreatesEdgeTypeForLineSegmentAttribute()
+    public async Task Schema_CreatesEdgeTypeForLineSegmentSeed()
     {
         var dbName = Guid.NewGuid().ToString();
         var handler = new FakeNebulaHandler();
         await using (var seed = CreateDb(dbName))
         {
-            seed.AttributeCatalog.Add(new AttributeDefinition
-            {
-                AttributeId = Guid.NewGuid().ToString(),
-                EntityType = "LineStructure",
-                AttributeName = "next",
-                DisplayName = "下一段",
-                DataType = EavDataTypes.Relation,
-                RelationType = GraphNaming.LineSegmentEdge
-            });
-            await seed.SaveChangesAsync();
+            // 物化内置种子（EdgeType line_segment + name STRING NULL prop）：改由启动时幂等播种器写入
+            seed.Database.EnsureCreated();
+            await TreeGraph.Api.Data.Seeding.BuiltinEdgeTypeSeeder.SeedAsync(seed);
         }
 
         await CreateReadyInitializerAsync(dbName, handler);
 
         var create = Assert.Single(handler.Queries,
             q => q.Contains($"CREATE EDGE IF NOT EXISTS `{GraphNaming.LineSegmentEdge}`"));
-        Assert.Contains("`value_id` string NULL", create);
-        Assert.Contains("`attribute_id` string NULL", create);
-        Assert.Contains("`name` string NULL", create);
+        Assert.Contains("`name` STRING NULL", create);
 
         // line_contains 不再建边
         Assert.DoesNotContain(handler.QueryTexts,
@@ -255,15 +244,12 @@ public class LineStructureSyncTests
             })
             .ToList();
 
-    private static JsonElement FindBulkEdge(FakeNebulaHandler handler, string valueId)
+    private static JsonElement FindBulkEdge(FakeNebulaHandler handler, string edgeType)
     {
         var bulk = handler.Requests.Single(r => r.Path.EndsWith("/graph/bulk"));
         using var doc = JsonDocument.Parse(bulk.Body!);
         return doc.RootElement.GetProperty("edges").EnumerateArray()
-            .Single(e => e.TryGetProperty("properties", out var p)
-                         && p.ValueKind == JsonValueKind.Object
-                         && p.TryGetProperty("value_id", out var v)
-                         && v.GetString() == valueId)
+            .Single(e => e.GetProperty("edge_type").GetString() == edgeType)
             .Clone();
     }
 

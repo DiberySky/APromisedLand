@@ -30,8 +30,7 @@ public static class GraphNaming
 
     /// <summary>
     /// 线路结构段边类型名（LineNode → LineNode）。
-    /// R7 起存储 = relation_attribute_values（seed 属性 LineStructure.next），
-    /// 图边 schema 经 R6 relation 管道动态创建（列 value_id/attribute_id/name），此处仅留类型名常量。
+    /// 存储 = edges 表（EdgeSky 内置 seed EdgeType，prop: name STRING NULL），rank 恒 0。
     /// </summary>
     public const string LineSegmentEdge = "line_segment";
 

@@ -20,7 +20,6 @@ public static class EavDataTypeLabels
         EavDataTypes.Table => "自定义表",
         EavDataTypes.SingleChoice => "单选",
         EavDataTypes.Location => "位置",
-        EavDataTypes.Relation => "关系",
         _ => dataType ?? ""
     };
 }

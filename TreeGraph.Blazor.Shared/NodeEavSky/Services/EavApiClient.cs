@@ -203,24 +203,6 @@ public class EavApiClient
     }
 
     // ============================================================
-    // NodeController（关系字段的目标节点选择）
-    // ============================================================
-
-    /// <summary>按名称搜索节点（GET api/node?search=）。</summary>
-    public async Task<IReadOnlyList<NodeOptionDto>> SearchNodesAsync(
-        string? search, CancellationToken ct = default)
-    {
-        var url = string.IsNullOrWhiteSpace(search)
-            ? "api/node"
-            : $"api/node?search={Uri.EscapeDataString(search.Trim())}";
-        return await GetAsync<List<NodeOptionDto>>(url, ct) ?? new List<NodeOptionDto>();
-    }
-
-    /// <summary>按 Id 取节点（关系字段回显目标名）。</summary>
-    public Task<NodeOptionDto?> GetNodeAsync(string id, CancellationToken ct = default)
-        => GetAsync<NodeOptionDto>($"api/node/{Uri.EscapeDataString(id)}", ct);
-
-    // ============================================================
     // CustomTableDataController
     // ============================================================
 

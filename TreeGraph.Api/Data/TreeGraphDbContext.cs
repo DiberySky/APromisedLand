@@ -14,8 +14,6 @@ public class TreeGraphDbContext : DbContext
     public DbSet<AttributeValue> AttributeValues => Set<AttributeValue>();
     /// <summary>位置属性值（location 类型，独立坐标表）。</summary>
     public DbSet<LocationAttributeValue> LocationAttributeValues => Set<LocationAttributeValue>();
-    /// <summary>关系属性值（relation 类型，一条记录 = 一条有向边）。</summary>
-    public DbSet<RelationAttributeValue> RelationAttributeValues => Set<RelationAttributeValue>();
     public DbSet<CompositeTypeDefinition> CompositeTypes => Set<CompositeTypeDefinition>();
     public DbSet<CompositeFieldDefinition> CompositeFields => Set<CompositeFieldDefinition>();
     public DbSet<AttributeAuditLog> AttributeAuditLogs => Set<AttributeAuditLog>();
@@ -41,8 +39,13 @@ public class TreeGraphDbContext : DbContext
     // LineSky：线路（独立一等公民，实现 Inode；R7 起补注册 nodes，host_type='Line'）
     public DbSet<TreeGraph.Shared.LineSky.Entities.Line> Lines => Set<TreeGraph.Shared.LineSky.Entities.Line>();
 
-    // LineSky：线路外部连接端子（R7 起 node_id FK 直指 nodes；结构段 = relation_attribute_values）
+    // LineSky：线路外部连接端子（R7 起 node_id FK 直指 nodes；结构段 = edges 表 line_segment）
     public DbSet<LineTerminal> LineTerminals => Set<LineTerminal>();
+
+    // EdgeSky：边（NebulaGraph 对齐的顶级实体；EdgeType = 名称 + 属性 Schema，边实例 = 四元组）
+    public DbSet<EdgeSky.Entities.EdgeType> EdgeTypes => Set<EdgeSky.Entities.EdgeType>();
+    public DbSet<EdgeSky.Entities.EdgeTypeProp> EdgeTypeProps => Set<EdgeSky.Entities.EdgeTypeProp>();
+    public DbSet<EdgeSky.Entities.Edge> Edges => Set<EdgeSky.Entities.Edge>();
 
     // NodeSky：通用节点（无归属一等公民；nodes 表一期为宿主主表，
     //   重构期兼作全系统节点身份注册表，specs/node-sky §8.2）
@@ -59,7 +62,6 @@ public class TreeGraphDbContext : DbContext
         ConfigureAttributeCatalog(mb);
         ConfigureAttributeValues(mb);
         ConfigureLocationAttributeValues(mb);
-        ConfigureRelationAttributeValues(mb);
         ConfigureCompositeTypes(mb);
         ConfigureCustomTables(mb);
         ConfigureAuditLog(mb);
@@ -71,6 +73,7 @@ public class TreeGraphDbContext : DbContext
         ConfigureLines(mb);
         ConfigureLineTerminals(mb);
         ConfigureNodes(mb);
+        ConfigureEdgeSky(mb);
     }
 
     // ============================================================
@@ -242,7 +245,7 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => x.OwnerSpaceId)
                 .HasDatabaseName("ix_entity_type_owner_space");
 
-            // R7：内置实体类型种子（LineStructure「线路结构」，固定 id，拒改拒删）
+            // 内置实体类型种子（当前为空；曾有的 LineStructure 已随 relation 体系下线）
             e.HasData(EntityTypeDefinition.SeedData());
         });
     }
@@ -316,8 +319,6 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
-            // 图边类型：仅 data_type='relation' 时非空，创建后不可修改，不唯一
-            e.Property(x => x.RelationType).HasColumnName("relation_type").HasMaxLength(100);
             e.Property(x => x.IsRequired).HasColumnName("is_required");
             e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
             e.Property(x => x.IsSortable).HasColumnName("is_sortable");
@@ -470,49 +471,6 @@ public class TreeGraphDbContext : DbContext
 
             e.HasOne(x => x.Attribute).WithMany()
                 .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Restrict);
-        });
-    }
-
-    private static void ConfigureRelationAttributeValues(ModelBuilder mb)
-    {
-        mb.Entity<RelationAttributeValue>(e =>
-        {
-            e.ToTable("relation_attribute_values");
-            e.HasKey(x => x.ValueId);
-            e.Property(x => x.ValueId)
-                .HasColumnName("value_id")
-                .HasMaxLength(36).IsRequired()
-                .HasDefaultValueSql("gen_random_uuid()::text")
-                .HasSentinel("");
-            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.RelationType).HasColumnName("relation_type").HasMaxLength(100).IsRequired();
-            e.Property(x => x.ToNodeId).HasColumnName("to_node_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200);
-            e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-
-            // 一个实体的一个关系属性最多一个值（单值语义，与 uq_lav_entity_attr 同构）
-            e.HasIndex(x => new { x.EntityId, x.EntityType, x.AttributeId })
-                .IsUnique().HasDatabaseName("uq_rav_entity_attr");
-
-            // 同一图边类型下起点不能重复指向同一终点（防 Nebula (src,dst,type,rank=0) 覆盖）
-            e.HasIndex(x => new { x.RelationType, x.EntityId, x.ToNodeId })
-                .IsUnique().HasDatabaseName("uq_rav_type_endpoints");
-
-            e.HasIndex(x => x.EntityId).HasDatabaseName("ix_rav_entity");
-            e.HasIndex(x => x.ToNodeId).HasDatabaseName("ix_rav_to_node");
-
-            e.HasOne(x => x.Attribute).WithMany()
-                .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Restrict);
-
-            // 目标节点必须是 nodes 中的真实节点（Restrict：被关系指向时禁止删除）
-            e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
-                .WithMany()
-                .HasForeignKey(x => x.ToNodeId)
-                .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("fk_rav_to_node");
         });
     }
 
@@ -888,6 +846,89 @@ public class TreeGraphDbContext : DbContext
                 .HasConstraintName("fk_lt_node");
 
             e.HasIndex(x => x.ExternalNodeId).HasDatabaseName("ix_line_terminals_external_node");
+        });
+    }
+
+    // ============================================================
+    // EdgeSky：边类型 / 边类型属性 / 边实例（NebulaGraph 对齐）
+    // ============================================================
+    private static void ConfigureEdgeSky(ModelBuilder mb)
+    {
+        mb.Entity<EdgeSky.Entities.EdgeType>(e =>
+        {
+            // TTL 列与时长成对出现（Nebula：TTL_COL 须配 TTL_DURATION）
+            e.ToTable("edge_types", t => t.HasCheckConstraint(
+                "ck_edge_types_ttl",
+                "(ttl_col IS NULL) = (ttl_duration_seconds IS NULL)"));
+            e.HasKey(x => x.Name);
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
+            e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(1000);
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200);
+            e.Property(x => x.TtlCol).HasColumnName("ttl_col").HasMaxLength(200);
+            e.Property(x => x.TtlDurationSeconds).HasColumnName("ttl_duration_seconds");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            // 内置种子（line_segment）改由 BuiltinEdgeTypeSeeder 启动时幂等播种
+        });
+
+        mb.Entity<EdgeSky.Entities.EdgeTypeProp>(e =>
+        {
+            // Nebula 约束：NOT NULL 必须配 DEFAULT
+            e.ToTable("edge_type_props", t => t.HasCheckConstraint(
+                "ck_edge_type_props_notnull_default",
+                "nullable OR default_value IS NOT NULL"));
+            e.HasKey(x => new { x.EdgeTypeName, x.PropName });
+            e.Property(x => x.EdgeTypeName).HasColumnName("edge_type_name").HasMaxLength(100).IsRequired();
+            e.Property(x => x.PropName).HasColumnName("prop_name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
+            e.Property(x => x.Nullable).HasColumnName("nullable");
+            e.Property(x => x.DefaultValue).HasColumnName("default_value").HasColumnType("jsonb");
+            e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(1000);
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200);
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
+
+            // 属性定义是类型的内在组成：删类型前由服务层先删属性行（Restrict 兜底）
+            e.HasOne(x => x.EdgeType).WithMany(t => t.Props)
+                .HasForeignKey(x => x.EdgeTypeName).OnDelete(DeleteBehavior.Restrict);
+            // 内置种子（line_segment.name）改由 BuiltinEdgeTypeSeeder 启动时幂等播种
+        });
+
+        mb.Entity<EdgeSky.Entities.Edge>(e =>
+        {
+            e.ToTable("edges");
+            // 四元组复合主键：<起点 VID, EdgeType, Rank, 终点 VID>（Nebula 边唯一标识）
+            e.HasKey(x => new { x.EdgeType, x.SrcVid, x.Rank, x.DstVid });
+            e.Property(x => x.EdgeType).HasColumnName("edge_type").HasMaxLength(100).IsRequired();
+            e.Property(x => x.SrcVid).HasColumnName("src_vid").HasMaxLength(36).IsRequired();
+            e.Property(x => x.DstVid).HasColumnName("dst_vid").HasMaxLength(36).IsRequired();
+            e.Property(x => x.Rank).HasColumnName("rank");
+            e.Property(x => x.Props).HasColumnName("props").HasColumnType("jsonb");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.HasIndex(x => x.SrcVid).HasDatabaseName("ix_edges_src");
+            e.HasIndex(x => x.DstVid).HasDatabaseName("ix_edges_dst");
+            e.HasIndex(x => x.Props).HasDatabaseName("ix_edges_props").HasMethod("GIN")
+                .HasFilter("props IS NOT NULL");
+
+            // 两端必须是 nodes 中的真实节点（Restrict：被边引用时禁止删除）
+            e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
+                .WithMany()
+                .HasForeignKey(x => x.SrcVid)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_edges_src_node");
+            e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
+                .WithMany()
+                .HasForeignKey(x => x.DstVid)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_edges_dst_node");
+
+            // 边类型 Restrict：有实例时由服务层拒绝删类型
+            e.HasOne<EdgeSky.Entities.EdgeType>()
+                .WithMany()
+                .HasForeignKey(x => x.EdgeType)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_edges_edge_type");
         });
     }
 }

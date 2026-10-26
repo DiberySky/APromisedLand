@@ -77,7 +77,7 @@ public class LineStructureTests : IntegrationTestBase
         Assert.True(dto.Exists);
         Assert.Equal(2, dto.Segments.Count);
         Assert.Equal(n, dto.OrderedNodeIds); // 无入边者为起点，沿链推导
-        Assert.All(dto.Segments, s => Assert.Equal("line_segment", s.RelationType));
+        Assert.All(dto.Segments, s => Assert.Equal("line_segment", s.EdgeType));
         Assert.True(dto.Diagnostics.Valid);
         Assert.False(dto.Diagnostics.HasCycle);
         Assert.Equal(2, dto.Diagnostics.NodeDegreeOneCount);
@@ -297,8 +297,10 @@ public class LineStructureTests : IntegrationTestBase
     {
         var (lineId, _) = await CreateLineWithNodesAsync(1);
 
+        // 四元组编码格式合法但边不存在 → 404
+        var edgeId = $"line_segment:{Guid.NewGuid()}:0:{Guid.NewGuid()}";
         var resp = await Client.DeleteAsync(
-            $"/api/eav/lines/{lineId}/structure/segments/{Guid.NewGuid():N}");
+            $"/api/eav/lines/{lineId}/structure/segments/{edgeId}");
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 
@@ -320,11 +322,11 @@ public class LineStructureTests : IntegrationTestBase
     }
 
     // ============================================================
-    // 多边类型分支（新 relation 属性 = 新边类型）
+    // 多边类型分支（自定义 EdgeType = 新边类型，经 Edge API 写入）
     // ============================================================
 
     [Fact]
-    public async Task BranchRelationAttribute_ShowsAsSecondEdgeType()
+    public async Task BranchEdgeType_ShowsAsSecondEdgeType()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         await CreateStructureOkAsync(lineId, new LineStructureRequest
@@ -332,34 +334,28 @@ public class LineStructureTests : IntegrationTestBase
             Segments = Segments((n[0], n[1]))
         });
 
-        // 用户自定义分支边：relation_type=line_branch（同一实体类型 LineStructure）
-        var attrName = $"line_branch_{Guid.NewGuid():N}";
-        var attrResp = await Client.PostAsJsonAsync("/api/eav/metadata/attributes", new
+        // 用户自定义分支边类型（顶级 EdgeType，对齐 Nebula CREATE EDGE）
+        var branchType = $"branch_{Guid.NewGuid():N}";
+        var typeResp = await Client.PostAsJsonAsync("/api/edge/types", new
         {
-            entityType = "LineStructure",
-            attributeName = attrName,
-            displayName = "分支",
-            dataType = "relation",
-            relationType = "line_branch"
+            name = branchType,
+            props = new[] { new { propName = "name", dataType = "STRING", nullable = true } }
         });
-        Assert.Equal(HttpStatusCode.OK, attrResp.StatusCode);
+        Assert.True(typeResp.IsSuccessStatusCode, await typeResp.Content.ReadAsStringAsync());
 
-        // n1 → n2 写分支边（n1 自身无 next 出边，PUT 不影响既有段边）
+        // n1 → n2 写分支边（UPSERT 覆盖语义）
         var put = await Client.PutAsJsonAsync(
-            $"/api/eav/LineStructure/entities/{n[1]}",
-            new Dictionary<string, object?>
-            {
-                [attrName] = new { toNodeId = n[2], name = "分支段" }
-            });
+            $"/api/edge/edges/{branchType}/{n[1]}/0/{n[2]}",
+            new { props = new Dictionary<string, object?> { ["name"] = "分支段" } });
         Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
 
         var dto = await GetStructureAsync(lineId);
         Assert.NotNull(dto);
         Assert.Equal(2, dto!.Segments.Count);
-        var segment = Assert.Single(dto.Segments, s => s.RelationType == "line_segment");
+        var segment = Assert.Single(dto.Segments, s => s.EdgeType == "line_segment");
         Assert.Equal(n[0], segment.FromNodeId);
         Assert.Equal(n[1], segment.ToNodeId);
-        var branch = Assert.Single(dto.Segments, s => s.RelationType == "line_branch");
+        var branch = Assert.Single(dto.Segments, s => s.EdgeType == branchType);
         Assert.Equal(n[1], branch.FromNodeId);
         Assert.Equal(n[2], branch.ToNodeId);
         Assert.Equal("分支段", branch.DisplayName);

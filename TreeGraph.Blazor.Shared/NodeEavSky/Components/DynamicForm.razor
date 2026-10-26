@@ -80,13 +80,6 @@
                                        ValueChanged="v => SetValue(attr.AttributeName, v)" />
                         break;
 
-                    case EavDataTypes.Relation:
-                        <RelationField Attr="attr"
-                                       ReadOnly="@ReadOnly"
-                                       Value="GetRelation(attr.AttributeName)"
-                                       ValueChanged="v => SetValue(attr.AttributeName, v)" />
-                        break;
-
                     case EavDataTypes.Composite:
                         <CompositeField Attr="attr"
                                         ReadOnly="@ReadOnly"
@@ -218,10 +211,6 @@
             ? v as TreeGraph.Shared.NodeEavSky.Dtos.EavLocationValue
             : null;
 
-    // relation：关系值（{ toNodeId, name? }；读取体多一个 valueId，仅回显用）
-    private EavRelationValue? GetRelation(string key)
-        => _values.TryGetValue(key, out var v) ? v as EavRelationValue : null;
-
     // json 类型：以原文本编辑（StringField 兜底）
     private string? GetJsonText(string key)
         => _values.TryGetValue(key, out var v) ? v?.ToString() : null;
@@ -273,7 +262,6 @@
             // composite/file：保留原始 JSON（克隆避免节点归属冲突），由对应组件自行解析
             EavDataTypes.Composite or EavDataTypes.File => elem.Clone(),
             EavDataTypes.Location => ConvertLocation(elem),
-            EavDataTypes.Relation => ConvertRelation(elem),
             // json：以原文本编辑，提交时再尝试解析回 JSON
             EavDataTypes.Json => elem.GetRawText(),
             _ => null
@@ -298,21 +286,6 @@
             CoordinateSystem = elem.TryGetProperty("coordinateSystem", out var cs)
                 && cs.ValueKind == JsonValueKind.String
                 ? cs.GetString() ?? "gcj02" : "gcj02"
-        };
-    }
-
-    /// <summary>关系：把后端返回的 { valueId, toNodeId, name? } 转为 EavRelationValue（valueId 只读回显）。</summary>
-    private static EavRelationValue? ConvertRelation(JsonElement elem)
-    {
-        if (elem.ValueKind != JsonValueKind.Object) return null;
-        if (!elem.TryGetProperty("toNodeId", out var to) || to.ValueKind != JsonValueKind.String) return null;
-        if (string.IsNullOrWhiteSpace(to.GetString())) return null;
-
-        return new EavRelationValue
-        {
-            ToNodeId = to.GetString()!,
-            Name = elem.TryGetProperty("name", out var nm) && nm.ValueKind == JsonValueKind.String
-                ? nm.GetString() : null
         };
     }
 

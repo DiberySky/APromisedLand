@@ -1,0 +1,298 @@
+@* EdgeTypePropsDialog.razor — 边类型属性 Schema 管理（对齐 Nebula ALTER EDGE）：
+   DialogSky 外壳；已有属性可标记删除（TTL 列禁删）、经操作列 ✏ 对话框改显示名/类型/可空/默认值
+   （显示名立即 PATCH；其余暂存，随提交汇总 ALTER CHANGE——类型走 Nebula 白名单，
+   可空/默认值为 PG 元数据变更）；列头 + 打开新增属性对话框；
+   提交时汇总为 AlterEdgeTypeRequest 返回调用方。 *@
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject TreeGraph.Blazor.Shared.EdgeSky.Services.EdgeApiClient Api
+@using System.Text.Json
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Shared.EdgeSky
+@using TreeGraph.Shared.EdgeSky.Dtos
+
+<DialogSky Title="@($"属性 Schema — {TitleText}")"
+           SubmitButtonVisible="true"
+           SubmitButtonText="应用变更"
+           OnSubmitClick="Submit">
+    <DialogContent>
+        @* ── 属性表（已有属性 + 待提交的新增属性）── *@
+        <MudSimpleTable Dense="true" Bordered="true" Style="overflow-x: auto;">
+            <thead>
+                <tr>
+                    <th>属性名</th>
+                    <th>类型</th>
+                    <th style="text-align: center;">可空</th>
+                    <th>默认值</th>
+                    <th style="text-align: right;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                       Color="Color.Success" Size="Size.Small"
+                                       OnClick="OpenAddPropAsync"
+                                       title="添加属性" />
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (_existing.Count == 0 && _adds.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">（无属性）</MudText>
+                        </td>
+                    </tr>
+                }
+                @foreach (var row in _existing)
+                {
+                    <tr style="@(row.Dropped ? "opacity: .45; text-decoration: line-through;" : null)">
+                        <td style="white-space: nowrap;">
+                            @if (string.IsNullOrEmpty(row.Src.DisplayName))
+                            {
+                                <code style="color: inherit;">@row.Src.PropName</code>
+                            }
+                            else
+                            {
+                                @row.Src.DisplayName@(" (")<code style="color: inherit;">@row.Src.PropName</code>@(")")
+                            }
+                        </td>
+                        @* 类型展示当前生效值；有暂存变更时高亮提示「X → Y（待提交）」。
+                           修改入口在操作列的 ✏ 编辑对话框（ALTER CHANGE 白名单由服务端校验）。 *@
+                        <td style="white-space: nowrap;">
+                            @if (!string.Equals(row.SelectedType, row.Src.DataType, StringComparison.Ordinal))
+                            {
+                                <MudTooltip Text="@($"{EdgePropDataTypeLabels.Of(row.Src.DataType)} → {EdgePropDataTypeLabels.Of(row.SelectedType)}（应用变更后生效）")">
+                                    <MudText Typo="Typo.body2" Color="Color.Success" Style="display:inline">
+                                        @EdgePropDataTypeLabels.Of(row.SelectedType)
+                                    </MudText>
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                @EdgePropDataTypeLabels.Of(row.Src.DataType)
+                            }
+                        </td>
+                        <td style="white-space: nowrap; text-align: center;">
+                            @if (row.SelectedNullable != row.Src.Nullable)
+                            {
+                                <MudTooltip Text="@($"{(row.Src.Nullable ? "是" : "否")} → {(row.SelectedNullable ? "是" : "否")}（应用变更后生效）")">
+                                    <MudText Typo="Typo.body2" Color="Color.Success" Style="display:inline">
+                                        @(row.SelectedNullable ? "是" : "否")
+                                    </MudText>
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                @(row.Src.Nullable ? "是" : "否")
+                            }
+                        </td>
+                        <td style="white-space: nowrap;">
+                            @if (row.DefaultChanged)
+                            {
+                                <MudTooltip Text="默认值已修改（应用变更后生效）">
+                                    <MudText Typo="Typo.body2" Color="Color.Success" Style="display:inline">
+                                        @(row.NewDefaultValue is { } ndv ? ndv.ToString() : "—")
+                                    </MudText>
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                @(row.Src.DefaultValue is { } dv ? dv.ToString() : "—")
+                            }
+                        </td>
+                        <td style="text-align: right; white-space: nowrap;">
+                            @if (row.Dropped)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Undo"
+                                               Color="Color.Default" Size="Size.Small"
+                                               OnClick="@(() => row.Dropped = false)"
+                                               title="撤销删除" />
+                            }
+                            else
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Color="Color.Error" Size="Size.Small"
+                                               Disabled="@IsTtlCol(row.Src.PropName)"
+                                               OnClick="@(() => row.Dropped = true)"
+                                               title="@(IsTtlCol(row.Src.PropName) ? "TTL 列不可删除" : "删除属性")" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Color="Color.Primary" Size="Size.Small"
+                                               OnClick="@(async () => await OpenEditPropAsync(row))"
+                                               title="编辑属性（显示名 / 类型）" />
+                            }
+                        </td>
+                    </tr>
+                }
+                @* 待提交的新增属性（绿色高亮行） *@
+                @foreach (var p in _adds)
+                {
+                    <tr style="background: rgba(76, 175, 80, 0.08);">
+                        <td style="white-space: nowrap;">
+                            @if (string.IsNullOrEmpty(p.DisplayName))
+                            {
+                                <code style="color: inherit;">@p.PropName</code>
+                            }
+                            else
+                            {
+                                @p.DisplayName@(" (")<code style="color: inherit;">@p.PropName</code>@(")")
+                            }
+                        </td>
+                        <td>@EdgePropDataTypeLabels.Of(p.DataType)</td>
+                        <td style="text-align: center;">@(p.Nullable ? "是" : "否")</td>
+                        <td>@(p.DefaultValue is { } dv2 ? dv2.ToString() : "—")</td>
+                        <td style="text-align: right;">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error" Size="Size.Small"
+                                           OnClick="@(() => _adds.Remove(p))"
+                                           title="移除" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>目标边类型（含现有属性 Schema 与 TTL 配置）。</summary>
+    [Parameter] public EdgeTypeDto TypeInfo { get; set; } = default!;
+
+    private string TitleText =>
+        string.IsNullOrEmpty(TypeInfo.DisplayName) ? TypeInfo.Name : $"{TypeInfo.DisplayName} ({TypeInfo.Name})";
+
+    /// <summary>已有属性行视图（类型/可空/默认值变更暂存 → ALTER CHANGE；Dropped → ALTER DROP）。</summary>
+    private sealed class ExistingRow
+    {
+        public required EdgeTypePropDto Src { get; init; }
+        public string SelectedType { get; set; } = string.Empty;
+        public bool SelectedNullable { get; set; }
+        public System.Text.Json.JsonElement? NewDefaultValue { get; set; }
+        public bool DefaultChanged { get; set; }
+        public bool Dropped { get; set; }
+
+        /// <summary>是否存在任一暂存变更（类型/可空/默认值）。</summary>
+        public bool HasPendingChange =>
+            !string.Equals(SelectedType, Src.DataType, StringComparison.Ordinal)
+            || SelectedNullable != Src.Nullable
+            || DefaultChanged;
+    }
+
+    private List<ExistingRow> _existing = [];
+    /// <summary>待提交的新增属性（由 EdgePropAddDialog 返回的完整 DTO）。</summary>
+    private readonly List<EdgeTypePropDto> _adds = [];
+
+    protected override void OnParametersSet()
+    {
+        _existing = TypeInfo.Props
+            .Select(p => new ExistingRow
+            {
+                Src = p,
+                SelectedType = p.DataType,
+                SelectedNullable = p.Nullable,
+                NewDefaultValue = p.DefaultValue
+            })
+            .ToList();
+    }
+
+    private bool IsTtlCol(string propName) =>
+        string.Equals(TypeInfo.TtlCol, propName, StringComparison.Ordinal);
+
+    /// <summary>打开新增属性对话框；返回的 DTO 追加到待提交列表。</summary>
+    private async Task OpenAddPropAsync()
+    {
+        var dialog = await DialogService.ShowExAsync<EdgePropAddDialog>(
+            string.Empty,
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not EdgeTypePropDto prop)
+            return;
+
+        if (_existing.Any(r => !r.Dropped &&
+                string.Equals(r.Src.PropName, prop.PropName, StringComparison.Ordinal))
+            || _adds.Any(p => string.Equals(p.PropName, prop.PropName, StringComparison.Ordinal)))
+        {
+            Snackbar.Add($"属性 '{prop.PropName}' 已存在，无法重复新增", Severity.Warning);
+            return;
+        }
+
+        _adds.Add(prop);
+    }
+
+    /// <summary>编辑属性（显示名 + 类型/可空/默认值）：显示名立即 PATCH 生效；
+    /// 类型/可空/默认值暂存到行，随「应用变更」汇总进 ALTER CHANGE（白名单由服务端校验）。</summary>
+    private async Task OpenEditPropAsync(ExistingRow row)
+    {
+        var parameters = new DialogParameters<EdgePropEditDialog>
+        {
+            { x => x.PropName, row.Src.PropName },
+            { x => x.DisplayName, row.Src.DisplayName },
+            { x => x.DataType, row.SelectedType },
+            { x => x.Nullable, row.SelectedNullable },
+            { x => x.DefaultValue, row.DefaultChanged ? row.NewDefaultValue : row.Src.DefaultValue }
+        };
+        var dialog = await DialogService.ShowExAsync<EdgePropEditDialog>(
+            string.Empty, parameters,
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not EdgePropEditDialog.Result edit)
+            return;
+
+        // 显示名变更 → 立即 PATCH（独立于 ALTER）
+        if (!string.Equals(edit.DisplayName, row.Src.DisplayName, StringComparison.Ordinal))
+        {
+            var (ok, error) = await Api.UpdatePropDisplayNameAsync(
+                TypeInfo.Name, row.Src.PropName, edit.DisplayName);
+            if (!ok)
+            {
+                Snackbar.Add($"更新显示名失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            row.Src.DisplayName = edit.DisplayName;
+            Snackbar.Add($"属性 '{row.Src.PropName}' 显示名已更新", Severity.Success);
+        }
+
+        // 类型/可空/默认值 → 暂存（提交时汇总 ChangeProps）
+        row.SelectedType = edit.NewDataType;
+        row.SelectedNullable = edit.NewNullable;
+        row.NewDefaultValue = edit.NewDefaultValue;
+        row.DefaultChanged = !JsonElementEquals(edit.NewDefaultValue, row.Src.DefaultValue);
+    }
+
+    /// <summary>比较两个可空 JsonElement（同值视为未变更，避免重复提交）。</summary>
+    private static bool JsonElementEquals(
+        System.Text.Json.JsonElement? a, System.Text.Json.JsonElement? b)
+        => (a is null && b is null)
+           || (a is { } av && b is { } bv && av.GetRawText() == bv.GetRawText());
+
+    private void Submit()
+    {
+        var dropProps = _existing.Where(r => r.Dropped).Select(r => r.Src.PropName).ToList();
+        var changeProps = _existing
+            .Where(r => !r.Dropped && r.HasPendingChange)
+            .Select(r => new EdgeTypePropTypeChange
+            {
+                PropName = r.Src.PropName,
+                NewDataType = string.Equals(r.SelectedType, r.Src.DataType, StringComparison.Ordinal)
+                    ? string.Empty
+                    : r.SelectedType,
+                Nullable = r.SelectedNullable != r.Src.Nullable ? r.SelectedNullable : null,
+                DefaultValueSet = r.DefaultChanged,
+                DefaultValue = r.DefaultChanged ? r.NewDefaultValue : null
+            })
+            .ToList();
+
+        if (dropProps.Count == 0 && changeProps.Count == 0 && _adds.Count == 0)
+        {
+            MudDialog.Cancel();
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new AlterEdgeTypeRequest
+        {
+            AddProps = [.. _adds],
+            DropProps = dropProps,
+            ChangeProps = changeProps
+        }));
+    }
+}

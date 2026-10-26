@@ -1,0 +1,113 @@
+@* EdgePropAddDialog.razor — 新增边属性（DialogSky 外壳）：
+   属性名用 NamingTextField（尾部魔棒按中文显示名生成 snake_case 建议）；
+   NOT NULL 必配默认值（Nebula 约束）；提交返回单个 EdgeTypePropDto。 *@
+@inject ISnackbar Snackbar
+@using System.Text.Json
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.MafWfSky.Components
+@using TreeGraph.Shared.EdgeSky
+@using TreeGraph.Shared.EdgeSky.Dtos
+
+<DialogSky Title="新增属性"
+           SubmitButtonVisible="true"
+           SubmitButtonText="添加"
+           OnSubmitClick="Submit">
+    <DialogContent>
+        <MudTextField @bind-Value="_displayName" Label="显示名称" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Placeholder="中文" />
+        <NamingTextField @bind-Value="_propName"
+                         SourceText="@_displayName"
+                         NameCase="snake"
+                         Label="名称"
+                         Placeholder="英文"
+                         Class="mt-3"
+                         HelperText="命名规则：字母开头，仅字母/数字/下划线；点尾部魔棒按显示名称生成建议" />
+
+        <div class="d-flex gap-3 mt-3 align-center">
+            <MudSelect @bind-Value="_dataType" Label="类型" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Dense="true" Style="min-width: 180px;">
+                @foreach (var t in EdgePropDataTypes.All)
+                {
+                    <MudSelectItem Value="@t" Text="@EdgePropDataTypeLabels.Full(t)">
+                        @EdgePropDataTypeLabels.Full(t)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudCheckBox @bind-Value="_nullable" Label="可空（NULL）" Dense="true" />
+        </div>
+
+        <MudTextField @bind-Value="_defaultText" Label="默认值" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Class="mt-3"
+                      Placeholder="@(_nullable ? "可空属性可不设默认值" : "NOT NULL 必填")"
+                      Disabled="@_nullable" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _propName = string.Empty;
+    private string? _displayName;
+    private string _dataType = EdgePropDataTypes.String;
+    private bool _nullable = true;
+    private string? _defaultText;
+
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_propName))
+        {
+            Snackbar.Add("属性名不能为空", Severity.Warning);
+            return;
+        }
+
+        JsonElement? defaultValue = null;
+        if (!_nullable)
+        {
+            if (string.IsNullOrWhiteSpace(_defaultText))
+            {
+                Snackbar.Add($"属性 '{_propName}' 为 NOT NULL，必须配置默认值", Severity.Warning);
+                return;
+            }
+            if (!TryParseDefault(_dataType, _defaultText, out var parsed))
+            {
+                Snackbar.Add($"默认值 '{_defaultText}' 不是合法的 {_dataType}", Severity.Warning);
+                return;
+            }
+            defaultValue = parsed;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new EdgeTypePropDto
+        {
+            PropName = _propName.Trim(),
+            DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName.Trim(),
+            DataType = _dataType,
+            Nullable = _nullable,
+            DefaultValue = defaultValue
+        }));
+    }
+
+    /// <summary>按类型解析默认值文本（INT/TIMESTAMP 数值、DOUBLE 浮点、BOOL 布尔，STRING/DATE 原样）。</summary>
+    private static bool TryParseDefault(string dataType, string text, out JsonElement value)
+    {
+        value = default;
+        switch (dataType)
+        {
+            case EdgePropDataTypes.Int:
+            case EdgePropDataTypes.Timestamp:
+                if (!long.TryParse(text, out var l)) return false;
+                value = JsonSerializer.SerializeToElement(l);
+                return true;
+            case EdgePropDataTypes.Double:
+                if (!double.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out var d)) return false;
+                value = JsonSerializer.SerializeToElement(d);
+                return true;
+            case EdgePropDataTypes.Bool:
+                if (!bool.TryParse(text, out var b)) return false;
+                value = JsonSerializer.SerializeToElement(b);
+                return true;
+            default:
+                value = JsonSerializer.SerializeToElement(text);
+                return true;
+        }
+    }
+}

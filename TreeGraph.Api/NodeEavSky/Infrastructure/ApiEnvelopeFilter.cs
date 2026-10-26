@@ -36,7 +36,9 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
                || cad.ControllerTypeInfo.Namespace?.Contains(
                    "SpaceSky.Controllers", StringComparison.Ordinal) == true
                || cad.ControllerTypeInfo.Namespace?.Contains(
-                   "LineSky.Controllers", StringComparison.Ordinal) == true);
+                   "LineSky.Controllers", StringComparison.Ordinal) == true
+               || cad.ControllerTypeInfo.Namespace?.Contains(
+                   "EdgeSky.Controllers", StringComparison.Ordinal) == true);
 
     // ------------------------------------------------------------
     // 结果包装
@@ -248,6 +250,17 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
                 context.ExceptionHandled = true;
                 break;
 
+            // Edge 家族：InvalidOperationException 的语义同样是"业务规则冲突"
+            //（EdgeType 重名、有实例拒绝删除等），映射为 409。
+            case InvalidOperationException when IsEdgeFamily(context):
+                context.Result = new ObjectResult(
+                    ApiResponse.Fail(context.Exception.Message))
+                {
+                    StatusCode = StatusCodes.Status409Conflict
+                };
+                context.ExceptionHandled = true;
+                break;
+
             case ArgumentException or InvalidOperationException:
                 context.Result = new ObjectResult(
                     ApiResponse.Fail(context.Exception.Message))
@@ -267,4 +280,10 @@ public sealed class ApiEnvelopeFilter : IResultFilter, IExceptionFilter, IOrdere
         => context.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor cad
            && cad.ControllerTypeInfo.Namespace?.Contains(
                    "LineSky.Controllers", StringComparison.Ordinal) == true;
+
+    /// <summary>Edge 家族控制器判定（EdgeSky.Controllers 命名空间），仅用于异常映射差异。</summary>
+    private static bool IsEdgeFamily(FilterContext context)
+        => context.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor cad
+           && cad.ControllerTypeInfo.Namespace?.Contains(
+                   "EdgeSky.Controllers", StringComparison.Ordinal) == true;
 }

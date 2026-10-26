@@ -21,22 +21,8 @@ public class EntityTypeDefinition
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>内置实体类型种子（固定 id，拒改拒删）。R7：LineStructure「线路结构」。</summary>
-    public static List<EntityTypeDefinition> SeedData() =>
-    [
-        new EntityTypeDefinition
-        {
-            EntityTypeId = "e0000001-0000-4000-8000-000000000001",
-            EntityType = "LineStructure",
-            DisplayName = "线路结构",
-            Description = "线路节点结构声明：链边属性 next（line_segment）表达 LineNode ↔ LineNode 有向段",
-            OwnerSpaceId = null,
-            DisplayOrder = 0,
-            IsDeleted = false,
-            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
-            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
-        }
-    ];
+    /// <summary>内置实体类型种子（固定 id，拒改拒删）。当前无内置种子。</summary>
+    public static List<EntityTypeDefinition> SeedData() => [];
 
     /// <summary>内置种子 id 集合（固定 GUID，拒改拒删）。</summary>
     private static readonly HashSet<string> BuiltinIds =

@@ -42,12 +42,6 @@ public class AttributeDefinition
     /// </summary>
     public bool IsRecordMode { get; set; }
 
-    /// <summary>
-    /// 图边类型（仅 DataType = "relation" 时非空，创建后不可修改）：
-    /// 关系值投影到 NebulaGraph 时作为边类型名。多个属性可复用同一类型。
-    /// </summary>
-    public string? RelationType { get; set; }
-
     /// <summary>选项集关联（当 DataType = "single_choice" 时）</summary>
     public string? RefOptionSetId { get; set; }
     public OptionSet? RefOptionSet { get; set; }
@@ -650,24 +644,6 @@ public class AttributeDefinition
             IsRequired = false,
             IsSearchable = true,
             IsSortable = true,
-            IsDeleted = false,
-            Version = 1,
-            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
-            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
-        },
-        // ============ LineStructure（线路结构）链边属性（R7）============
-        new AttributeDefinition
-        {
-            AttributeId = "a0000038-0000-4000-8000-000000000038",
-            EntityType = "LineStructure",
-            AttributeName = "next",
-            DisplayName = "下一段",
-            DataType = EavDataTypes.Relation,
-            RelationType = "line_segment",
-            DisplayOrder = 0,
-            IsRequired = false,
-            IsSearchable = false,
-            IsSortable = false,
             IsDeleted = false,
             Version = 1,
             CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),

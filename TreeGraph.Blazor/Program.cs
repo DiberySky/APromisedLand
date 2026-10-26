@@ -99,6 +99,15 @@ builder.Services
     .RemoveAllResilienceHandlers()
     .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
 
+// ★ EdgeSky 边类型客户端（/api/edge/types）：同一后端、同款弹性策略。
+builder.Services
+    .AddHttpClient<TreeGraph.Blazor.Shared.EdgeSky.Services.EdgeApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://treegrapheavapi");
+    })
+    .RemoveAllResilienceHandlers()
+    .AddStandardResilienceHandler(NonIdempotentResilience.Configure);
+
 // ★ LineSky 线路实体 CRUD 客户端（/api/Lines）：与 SpaceApiClient 同款服务发现与弹性策略。
 builder.Services
     .AddHttpClient<LineManageApiClient>(client =>

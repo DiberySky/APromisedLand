@@ -1,0 +1,52 @@
+@* EdgeTypeCreateDialog.razor — 新建边类型（对齐 Nebula CREATE EDGE）：
+   DialogSky 外壳承载；名称（Nebula 命名规则）+ 中文显示名 + 注释；
+   属性 Schema 创建后统一在 ⚙ 属性 Schema 对话框维护。
+   名称框用 NamingTextField（尾部魔棒 → MafWf 命名服务 AI 建议 snake_case）。 *@
+@inject ISnackbar Snackbar
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.MafWfSky.Components
+@using TreeGraph.Shared.EdgeSky.Dtos
+
+<DialogSky Title="新建边类型"
+           SubmitButtonVisible="true"
+           SubmitButtonText="创建"
+           OnSubmitClick="Submit">
+    <DialogContent>
+        <MudTextField @bind-Value="_displayName" Label="显示名称" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Placeholder="中文" />
+        <NamingTextField @bind-Value="_name"
+                         SourceText="@_displayName"
+                         NameCase="snake"
+                         Label="名称"
+                         Placeholder="英文"
+                         Class="mt-3"
+                         HelperText="命名规则：字母开头，仅字母/数字/下划线，≤100 字符；创建后不可改名。点尾部魔棒按显示名称生成建议" />
+        <MudTextField @bind-Value="_comment" Label="注释" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Class="mt-3" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _name = string.Empty;
+    private string? _displayName;
+    private string? _comment;
+
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            Snackbar.Add("名称不能为空", Severity.Warning);
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new CreateEdgeTypeRequest
+        {
+            Name = _name.Trim(),
+            DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName.Trim(),
+            Comment = string.IsNullOrWhiteSpace(_comment) ? null : _comment.Trim(),
+            Props = []
+        }));
+    }
+}

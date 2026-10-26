@@ -282,11 +282,11 @@ public class CategoryTreeService(TreeGraphDbContext dbContext, IEventPublisher p
         if (hasChildren)
             throw new InvalidOperationException("该节点仍有子节点，无法删除。请先删除全部子节点。");
 
-        // 引用为空方可删除本项：仍有关系引用该节点时拒绝（不采用级联删除）
-        var hasRelations = await dbContext.RelationAttributeValues
-            .AnyAsync(r => r.EntityId == nodeId || r.ToNodeId == nodeId, cancellationToken);
-        if (hasRelations)
-            throw new InvalidOperationException("该节点仍被关系引用，无法删除。请先删除引用该节点的关系。");
+        // 引用为空方可删除本项：仍有边（edges）引用该节点时拒绝（不采用级联删除）
+        var hasEdges = await dbContext.Edges
+            .AnyAsync(e => e.SrcVid == nodeId || e.DstVid == nodeId, cancellationToken);
+        if (hasEdges)
+            throw new InvalidOperationException("该节点仍被边引用，无法删除。请先删除引用该节点的边。");
 
         var hasEntities = await dbContext.InodeEntities
             .AnyAsync(m => m.InodeId == nodeId, cancellationToken);

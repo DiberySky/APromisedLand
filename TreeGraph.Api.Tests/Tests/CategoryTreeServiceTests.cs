@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.NodeEavSky.Entities;
 using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Api.TreeEavSky.Services;
@@ -53,7 +54,7 @@ public class CategoryTreeServiceTests
         .ToList();
 
     /// <summary>
-    /// 测试专用 DbContext：忽略除 CategoryTree / Node / RelationAttributeValue / InodeEntity 外的全部实体
+    /// 测试专用 DbContext：忽略除 CategoryTree / Node / Edge / InodeEntity 外的全部实体
     /// （DbSet 约定会自动发现基类所有 DbSet，其中 JsonDocument 属性在 InMemory 下无法映射），
     /// 保留节点删除守卫所依赖的表配置与种子数据。
     /// </summary>
@@ -65,7 +66,7 @@ public class CategoryTreeServiceTests
             foreach (var entityType in mb.Model.GetEntityTypes()
                          .Where(t => t.ClrType != typeof(CategoryTree)
                                   && t.ClrType != typeof(Node)
-                                  && t.ClrType != typeof(RelationAttributeValue)
+                                  && t.ClrType != typeof(Edge)
                                   && t.ClrType != typeof(InodeEntity)
                                   && t.ClrType != typeof(InodeEntityType))
                          .ToList())
@@ -89,8 +90,8 @@ public class CategoryTreeServiceTests
                 e.HasData(Fixture());
             });
 
-            // 节点删除守卫依赖：被关系引用 / 仍有挂载实体数据 / 类型声明随宿主清理
-            mb.Entity<RelationAttributeValue>(e => e.HasKey(x => x.ValueId));
+            // 节点删除守卫依赖：被边引用 / 仍有挂载实体数据 / 类型声明随宿主清理
+            mb.Entity<Edge>(e => e.HasKey(x => new { x.EdgeType, x.SrcVid, x.Rank, x.DstVid }));
             mb.Entity<InodeEntity>(e => e.HasKey(x => new { x.InodeId, x.EntityType }));
             mb.Entity<InodeEntityType>(e => e.HasKey(x => new { x.InodeId, x.EntityType }));
         }

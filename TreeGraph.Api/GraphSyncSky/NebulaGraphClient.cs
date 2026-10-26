@@ -36,7 +36,7 @@ public sealed record EdgeItem(
     [property: JsonPropertyName("src_vid")] string SrcVid,
     [property: JsonPropertyName("dst_vid")] string DstVid,
     [property: JsonPropertyName("edge_type")] string EdgeType,
-    [property: JsonPropertyName("rank")] int Rank,
+    [property: JsonPropertyName("rank")] long Rank,
     [property: JsonPropertyName("properties")] Dictionary<string, object?>? Properties
 );
 
@@ -92,12 +92,12 @@ public sealed class NebulaGraphClient
         resp.EnsureSuccessStatusCode();
     }
 
-    /// <summary>UPSERT 语义边（INSERT 覆盖语义，幂等）。</summary>
+    /// <summary>UPSERT 边（INSERT 覆盖语义，幂等；rank 默认 0，区分同起终点同类型多边）。</summary>
     public async Task UpsertEdgeAsync(
-        string edgeType, string srcVid, string dstVid,
+        string edgeType, string srcVid, string dstVid, long rank,
         IReadOnlyDictionary<string, object?>? props, CancellationToken ct)
     {
-        var payload = new EdgeItem(srcVid, dstVid, edgeType, 0, CleanProps(props));
+        var payload = new EdgeItem(srcVid, dstVid, edgeType, rank, CleanProps(props));
         using var resp = await _http.PostAsJsonAsync(
             $"api/v1/graph/edges?space={_options.Space}", payload, JsonOpts, ct);
         resp.EnsureSuccessStatusCode();
@@ -107,13 +107,13 @@ public sealed class NebulaGraphClient
                 $"边写入失败: {result?.ErrorMsg} | {edgeType} {srcVid}->{dstVid}");
     }
 
-    /// <summary>删除指定语义边。</summary>
-    public async Task DeleteEdgeAsync(string edgeType, string srcVid, string dstVid, CancellationToken ct)
+    /// <summary>按四元组删除指定边。</summary>
+    public async Task DeleteEdgeAsync(string edgeType, string srcVid, string dstVid, long rank, CancellationToken ct)
     {
         using var req = new HttpRequestMessage(HttpMethod.Delete, "api/v1/graph/edges")
         {
             Content = JsonContent.Create(
-                new { edge_type = edgeType, src_vid = srcVid, dst_vid = dstVid, rank = 0, space = _options.Space },
+                new { edge_type = edgeType, src_vid = srcVid, dst_vid = dstVid, rank, space = _options.Space },
                 options: JsonOpts)
         };
         using var resp = await _http.SendAsync(req, ct);

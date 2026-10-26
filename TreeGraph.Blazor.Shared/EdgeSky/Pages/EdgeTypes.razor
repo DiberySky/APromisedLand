@@ -1,0 +1,197 @@
+@* EdgeTypes.razor — 边类型管理（EdgeSky，对齐 Nebula EdgeType CRUD）。
+   列表 + 新建（对话框）+ 展开查看属性 Schema + 删除（有实例时服务端 409）。 *@
+@page "/metadata/edge-types"
+@inject EdgeApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.EdgeSky.Dialogs
+@using TreeGraph.Blazor.Shared.EdgeSky.Services
+@using TreeGraph.Shared.EdgeSky.Dtos
+
+@if (!IsDialogMode)
+{
+    <PageTitle>边类型管理</PageTitle>
+    <PageHeaderSky Title="边类型管理" />
+}
+
+<MudTable Items="_types" Hover="true" Bordered="true" Dense="true"
+          Breakpoint="Breakpoint.Sm"
+          Loading="@_loading" LoadingProgressColor="Color.Primary">
+    <HeaderContent>
+        <MudTh>名称</MudTh>
+        <MudTh>注释</MudTh>
+        <MudTh>属性</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Size="Size.Small" Color="Color.Default"
+                           OnClick="LoadAsync" Disabled="@_loading"
+                           title="刷新" />
+            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                           Size="Size.Small" Color="Color.Success"
+                           OnClick="OpenCreateAsync"
+                           title="新建边类型" />
+        </MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="名称">
+            <MudText Typo="Typo.body1" Style="white-space: nowrap;">
+                @if (string.IsNullOrEmpty(context.DisplayName))
+                {
+                    <code style="color: inherit;">@context.Name</code>
+                }
+                else
+                {
+                    @context.DisplayName@(" (")<code style="color: inherit;">@context.Name</code>@(")")
+                }
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="注释">
+            <MudText Typo="Typo.caption" Color="Color.Default">
+                @(string.IsNullOrEmpty(context.Comment) ? "—" : context.Comment)
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="属性">
+            <MudBadge Content="@context.Props.Count" Color="Color.Info"
+                      Overlap="true" Bordered="true" Max="99">
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Size="Size.Small" Color="Color.Primary"
+                               OnClick="@(async () => await OpenPropsAsync(context))"
+                               title="管理属性 Schema" />
+            </MudBadge>
+        </MudTd>
+        <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Small" Color="Color.Error"
+                           OnClick="@(async () => await DeleteAsync(context))"
+                           title="删除" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                           Size="Size.Small" Color="Color.Primary"
+                           OnClick="@(async () => await OpenEditDisplayNameAsync(context))"
+                           title="编辑中文显示名" />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            暂无边类型，点击右上角「新建边类型」创建。
+        </MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    /// <summary>内嵌模式（如 /spaces 的「关系」选项卡）：隐藏页头，仅渲染内容。</summary>
+    [Parameter] public bool IsDialogMode { get; set; }
+
+    private List<EdgeTypeDto>? _types;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _types = await Api.ListEdgeTypesAsync();
+            if (_types is null)
+                Snackbar.Add("边类型加载失败，请检查后端服务是否可达", Severity.Warning);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenPropsAsync(EdgeTypeDto item)
+    {
+        var parameters = new DialogParameters<EdgeTypePropsDialog>
+        {
+            { x => x.TypeInfo, item }
+        };
+        var dialog = await DialogService.ShowExAsync<EdgeTypePropsDialog>(
+            string.Empty, parameters,
+            new DialogOptionsEx
+            {
+                MaxWidth = MaxWidth.Small, FullWidth = true,
+                Position = DialogPosition.TopCenter,
+                MaximizeButton = true
+            });
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not AlterEdgeTypeRequest req)
+            return;
+
+        var (ok, error) = await Api.AlterEdgeTypeAsync(item.Name, req);
+        if (!ok)
+        {
+            Snackbar.Add($"属性变更失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"边类型 '{item.Name}' 属性 Schema 已更新", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var dialog = await DialogService.ShowExAsync<EdgeTypeCreateDialog>(
+            string.Empty,
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not CreateEdgeTypeRequest req)
+            return;
+
+        var (ok, error) = await Api.CreateEdgeTypeAsync(req);
+        if (!ok)
+        {
+            Snackbar.Add($"创建失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"边类型 '{req.Name}' 创建成功", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task OpenEditDisplayNameAsync(EdgeTypeDto item)
+    {
+        var parameters = new DialogParameters<EdgeTypeDisplayNameDialog>
+        {
+            { x => x.Name, item.Name },
+            { x => x.DisplayName, item.DisplayName }
+        };
+        var dialog = await DialogService.ShowExAsync<EdgeTypeDisplayNameDialog>(
+            string.Empty, parameters,
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+        var result = await dialog.Result;
+        if (result?.Canceled != false)
+            return;
+
+        var (ok, error) = await Api.UpdateDisplayNameAsync(item.Name, result.Data as string);
+        if (!ok)
+        {
+            Snackbar.Add($"更新显示名失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"边类型 '{item.Name}' 显示名已更新", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(EdgeTypeDto item)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "删除边类型",
+            $"确定删除边类型 '{item.Name}' 吗？存在边实例时将被拒绝。",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteEdgeTypeAsync(item.Name);
+        if (!ok)
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"边类型 '{item.Name}' 已删除", Severity.Success);
+        await LoadAsync();
+    }
+}

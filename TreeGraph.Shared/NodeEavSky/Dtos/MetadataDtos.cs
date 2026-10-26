@@ -29,12 +29,6 @@ public class CreateAttributeRequest
     public string? RefOptionSetId { get; set; }
     public string? DefaultValue { get; set; }
 
-    /// <summary>
-    /// 图边类型（仅 dataType=relation 时使用）：留空则按驼峰属性名推导为 snake_case。
-    /// 创建后不可修改。
-    /// </summary>
-    public string? RelationType { get; set; }
-
     public JsonElement? AllowedValues { get; set; }
     public JsonElement? ValidationRule { get; set; }
 }
@@ -231,8 +225,7 @@ public record AttributeDetailDto(
     bool IsRecordMode,
     string? RefOptionSetId,
     string? OptionSetName,
-    string? OptionSetDisplayName,
-    string? RelationType = null);
+    string? OptionSetDisplayName);
 
 public class UpdateAttributeRequest
 {

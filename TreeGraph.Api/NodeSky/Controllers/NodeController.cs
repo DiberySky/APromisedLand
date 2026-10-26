@@ -120,25 +120,25 @@ public class NodeController : ControllerBase
                 });
             }
 
-            // 关系值：作为起点
-            var outgoingRelations = await _db.RelationAttributeValues
-                .CountAsync(r => r.EntityId == id, ct);
+            // 边（edges）：作为起点
+            var outgoingRelations = await _db.Edges
+                .CountAsync(e => e.SrcVid == id, ct);
             if (outgoingRelations > 0)
             {
                 return Conflict(new
                 {
-                    error = $"该节点仍有 {outgoingRelations} 条关系（作为起点），无法删除。请先删除相关关系。"
+                    error = $"该节点仍有 {outgoingRelations} 条边（作为起点），无法删除。请先删除相关边。"
                 });
             }
 
-            // 关系值：作为终点被引用
-            var incomingRelations = await _db.RelationAttributeValues
-                .CountAsync(r => r.ToNodeId == id, ct);
+            // 边（edges）：作为终点被引用
+            var incomingRelations = await _db.Edges
+                .CountAsync(e => e.DstVid == id, ct);
             if (incomingRelations > 0)
             {
                 return Conflict(new
                 {
-                    error = $"该节点仍被 {incomingRelations} 条关系引用，无法删除。请先删除相关关系。"
+                    error = $"该节点仍被 {incomingRelations} 条边引用，无法删除。请先删除相关边。"
                 });
             }
 

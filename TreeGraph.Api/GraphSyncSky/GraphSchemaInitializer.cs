@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
-using TreeGraph.Shared.NodeEavSky;
+using TreeGraph.Api.EdgeSky.Entities;
+using TreeGraph.Api.EdgeSky.Services;
 
 namespace TreeGraph.Api.GraphSyncSky;
 
@@ -70,7 +71,7 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
     /// <summary>
     /// 幂等创建：space（FIXED_STRING(64) vid，覆盖 GUID）、6 个节点 tag、
     /// parent_of 树父子边（R7 起 Line→LineNode 也走 parent_of）、connects_to 端子外部连接边、
-    /// attribute_catalog 中全部活动 relation 属性的图边类型（含 line_segment）。
+    /// edge_types/edge_type_props 中全部边类型（含内置 line_segment，列按 PG Schema 生成）。
     /// 已有 space 的 line_node 缺新列时用 DESCRIBE + ALTER 补齐。
     /// CREATE SPACE 生效需约两个心跳周期，失败由调用方重试。
     /// </summary>
@@ -98,28 +99,19 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
         await _client.QueryAsync(
             $"CREATE EDGE IF NOT EXISTS `{GraphNaming.ConnectsToEdge}`(`role` string NULL, `operating_state` string NULL)", ct);
 
-        // 语义边类型：以 PG attribute_catalog 中活动 relation 属性的 relation_type 为准
-        // （R7：line_segment 由 seed 属性 LineStructure.next 经此管道自动创建，列 value_id/attribute_id/name）
+        // 语义边类型：以 PG edge_types/edge_type_props 为准（内置 line_segment 经 seed 入表）
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
-        var relationTypes = await db.AttributeCatalog
-            .AsNoTracking()
-            .Where(a => a.DataType == EavDataTypes.Relation
-                     && !a.IsDeleted
-                     && a.RelationType != null)
-            .Select(a => a.RelationType!)
-            .Distinct()
+        var edgeTypes = await db.EdgeTypes.AsNoTracking()
+            .Include(t => t.Props)
             .ToListAsync(ct);
 
-        foreach (var typeName in relationTypes)
+        foreach (var type in edgeTypes)
         {
-            await _client.QueryAsync(
-                $"CREATE EDGE IF NOT EXISTS `{typeName}`(" +
-                "`value_id` string NULL, `attribute_id` string NULL, `name` string NULL)", ct);
+            await _client.QueryAsync(EdgeNgqlDdlBuilder.BuildCreateEdgeNgql(type), ct);
 
-            // 存量图空间：旧语义边边列不同，补列后再写入（IF NOT EXISTS 不会补列）
-            await EnsureEdgeColumnsAsync(typeName,
-                [("value_id", "string"), ("attribute_id", "string"), ("name", "string")], ct);
+            // 存量图空间：旧边类型缺新列不会因 IF NOT EXISTS 自动补，DESCRIBE 后 ALTER。
+            await EnsureEdgeColumnsAsync(type, ct);
         }
     }
 
@@ -145,11 +137,10 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
         _logger.LogInformation("NebulaGraph tag {Tag} 补齐列：{Columns}", tag, string.Join(",", missing));
     }
 
-    /// <summary>DESCRIBE EDGE 后补齐缺失列（按声明的列类型 ALTER ADD）。</summary>
-    private async Task EnsureEdgeColumnsAsync(
-        string edge, IReadOnlyList<(string Name, string Type)> columns, CancellationToken ct)
+    /// <summary>DESCRIBE EDGE 后按 PG Schema 补齐缺失列（类型/NULL/DEFAULT 与列定义一致）。</summary>
+    private async Task EnsureEdgeColumnsAsync(EdgeType type, CancellationToken ct)
     {
-        var described = await _client.QueryAsync($"DESCRIBE EDGE `{edge}`", ct);
+        var described = await _client.QueryAsync($"DESCRIBE EDGE `{type.Name}`", ct);
         var existing = described.Data?
             .Select(row => row.TryGetValue("Field", out var f) ? f.GetString() : null)
             .Where(s => !string.IsNullOrEmpty(s))
@@ -157,15 +148,15 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
             .ToHashSet(StringComparer.OrdinalIgnoreCase)
             ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var missing = columns
-            .Where(c => !existing.Contains(c.Name))
-            .Select(c => $"`{c.Name}` {c.Type} NULL")
+        var missing = type.Props
+            .Where(p => !existing.Contains(p.PropName))
+            .Select(EdgeNgqlDdlBuilder.BuildColumnDef)
             .ToList();
         if (missing.Count == 0) return;
 
         await _client.QueryAsync(
-            $"ALTER EDGE `{edge}` ADD ({string.Join(", ", missing)})", ct);
-        _logger.LogInformation("NebulaGraph edge {Edge} 补齐列：{Columns}", edge, string.Join(",", missing));
+            $"ALTER EDGE `{type.Name}` ADD ({string.Join(", ", missing)})", ct);
+        _logger.LogInformation("NebulaGraph edge {Edge} 补齐列：{Columns}", type.Name, string.Join(",", missing));
     }
 
     private async Task CreateSchemaWithRetryAsync(CancellationToken ct)

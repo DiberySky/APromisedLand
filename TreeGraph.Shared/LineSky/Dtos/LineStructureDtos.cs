@@ -2,7 +2,7 @@ using TreeGraph.Shared.LineSky.Entities;
 
 namespace TreeGraph.Shared.LineSky.Dtos;
 
-// ============ 线路结构（R7：边集薄层，结构由 relation 边定义） ============
+// ============ 线路结构（边集薄层，结构由 edges 表 line_segment 边定义） ============
 
 /// <summary>结构中的节点（含名称与端子角色）。</summary>
 public class LineStructureNodeDto
@@ -19,18 +19,18 @@ public class LineStructureNodeDto
     public string? ExternalNodeName { get; set; }
 }
 
-/// <summary>结构中的段边（relation 值：EdgeId = value_id，DisplayName = 边实例名）。</summary>
+/// <summary>结构中的段边（edges 表记录；DisplayName = props.name）。</summary>
 public class LineStructureSegmentDto
 {
-    /// <summary>边实例 Id（relation_attribute_values.value_id，即图边实例 id）。</summary>
+    /// <summary>边实例标识：四元组编码 "{edgeType}:{srcVid}:{rank}:{dstVid}"（段边 rank 恒为 0）。</summary>
     public string EdgeId { get; set; } = string.Empty;
     public string FromNodeId { get; set; } = string.Empty;
     public string FromNodeName { get; set; } = string.Empty;
     public string ToNodeId { get; set; } = string.Empty;
     public string ToNodeName { get; set; } = string.Empty;
-    /// <summary>图边类型（line_segment 或用户自定义 relation_type）。</summary>
-    public string RelationType { get; set; } = string.Empty;
-    /// <summary>边实例展示名（relation.name）。</summary>
+    /// <summary>边类型名（edges.edge_type；内置段边为 line_segment）。</summary>
+    public string EdgeType { get; set; } = string.Empty;
+    /// <summary>边实例展示名（props.name）。</summary>
     public string? DisplayName { get; set; }
 }
 
@@ -51,7 +51,7 @@ public class LineStructureDiagnosticsDto
     public int TieCount { get; set; }
 }
 
-/// <summary>线路结构完整视图（R7：节点集 = line_id 挂靠；边集 = 两端同线的 relation 值）。</summary>
+/// <summary>线路结构完整视图（节点集 = line_id 挂靠；边集 = 两端同线的 edges 记录）。</summary>
 public class LineStructureDto
 {
     /// <summary>结构是否存在（false = 该线路尚无线路节点，Segments 为空）。</summary>
@@ -74,7 +74,7 @@ public class LineStructureSegmentInput
 {
     public string FromNodeId { get; set; } = string.Empty;
     public string ToNodeId { get; set; } = string.Empty;
-    /// <summary>边实例展示名（可选，落 relation.name）。</summary>
+    /// <summary>边实例展示名（可选，落 props.name）。</summary>
     public string? DisplayName { get; set; }
 }
 
@@ -95,7 +95,7 @@ public class LineStructureTerminalInput
 }
 
 /// <summary>
-/// 建/替换线路结构请求（R7：拓扑模式已下线，结构由边连接定义）。
+/// 建/替换线路结构请求（拓扑模式已下线，结构由边连接定义）。
 /// Segments = 全量替换本线的 line_segment 边集；Terminals = 全量替换端子集。
 /// </summary>
 public class LineStructureRequest
@@ -104,7 +104,7 @@ public class LineStructureRequest
     public List<LineStructureTerminalInput>? Terminals { get; set; }
 }
 
-/// <summary>新增单段请求（节点须同属该 Line；写 seed 属性 next 的 line_segment 边）。</summary>
+/// <summary>新增单段请求（节点须同属该 Line；写 edges 表 line_segment 边，rank=0）。</summary>
 public class AddLineSegmentRequest
 {
     public string FromNodeId { get; set; } = string.Empty;

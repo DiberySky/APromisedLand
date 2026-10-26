@@ -31,7 +31,7 @@ public class InodeFlowTests : E2ETestBase
         await Page.WaitForSelectorAsync("h5:has-text('iNode 列表')");
 
         // 2. 输入 iNode GUID → 点"访问"
-        var inodeId = NewInodeId();
+        var inodeId = await NewRegisteredInodeIdAsync();
         var input = Page.Locator(
             "input[placeholder='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx']").First;
         await input.FillAsync(inodeId);
@@ -87,7 +87,7 @@ public class InodeFlowTests : E2ETestBase
         await CreateAttributeViaApiAsync(
             typeName, "amount", "金额", "int");
 
-        var inodeId = NewInodeId();
+        var inodeId = await NewRegisteredInodeIdAsync();
 
         // 1. 直接访问详情页 + 声明 + 填写
         await BlazorHelpers.GoToAsync(Page, $"/inodes/{inodeId}");
@@ -158,7 +158,7 @@ public class InodeFlowTests : E2ETestBase
         await CreateAttributeViaApiAsync(
             typeName, "warehouse", "仓库", "string");
 
-        var inodeId = NewInodeId();
+        var inodeId = await NewRegisteredInodeIdAsync();
 
         // 声明 + 填写
         await BlazorHelpers.GoToAsync(Page, $"/inodes/{inodeId}");
@@ -204,7 +204,7 @@ public class InodeFlowTests : E2ETestBase
         await CreateAttributeViaApiAsync(
             typeName, "note", "备注", "string");
 
-        var inodeId = NewInodeId();
+        var inodeId = await NewRegisteredInodeIdAsync();
 
         // 快速填写 2 次
         await BlazorHelpers.GoToAsync(Page, $"/inodes/{inodeId}");
@@ -270,7 +270,7 @@ public class InodeFlowTests : E2ETestBase
         await CreateAttributeViaApiAsync(
             typeName, "x", "X", "string");
 
-        var inodeId = NewInodeId();
+        var inodeId = await NewRegisteredInodeIdAsync();
 
         // 填写
         await BlazorHelpers.GoToAsync(Page, $"/inodes/{inodeId}");
@@ -336,7 +336,7 @@ public class InodeFlowTests : E2ETestBase
         await CreateAttributeViaApiAsync(typeName, "note", "备注", "string");
         await CreateAttributeViaApiAsync(typeName, "extra", "附加", "string");
 
-        var inodeId = NewInodeId();
+        var inodeId = await NewRegisteredInodeIdAsync();
 
         // 声明 + 填写（确保 JSON 里有数据）
         await BlazorHelpers.GoToAsync(Page, $"/inodes/{inodeId}");

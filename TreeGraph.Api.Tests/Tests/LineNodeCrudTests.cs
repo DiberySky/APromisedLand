@@ -154,7 +154,7 @@ public class LineNodeCrudTests : IntegrationTestBase
         var seg = Assert.Single(dto!.Segments);
         Assert.Equal(first, seg.FromNodeId);
         Assert.Equal(second, seg.ToNodeId);
-        Assert.Equal("line_segment", seg.RelationType);
+        Assert.Equal("line_segment", seg.EdgeType);
         Assert.False(string.IsNullOrWhiteSpace(seg.EdgeId));
         Assert.Equal([first, second], dto.OrderedNodeIds);
     }
@@ -375,7 +375,7 @@ public class LineNodeCrudTests : IntegrationTestBase
 
         var resp = await Client.DeleteAsync($"/api/LineNode/{n1}");
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("关系/段边", await resp.Content.ReadAsStringAsync());
+        Assert.Contains("边/段边", await resp.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -387,7 +387,7 @@ public class LineNodeCrudTests : IntegrationTestBase
 
         var resp = await Client.DeleteAsync($"/api/LineNode/{n2}");
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("关系/段边", await resp.Content.ReadAsStringAsync());
+        Assert.Contains("边/段边", await resp.Content.ReadAsStringAsync());
     }
 
     [Fact]

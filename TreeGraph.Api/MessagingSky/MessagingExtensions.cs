@@ -10,9 +10,7 @@ namespace TreeGraph.Api.MessagingSky;
 ///
 /// 拓扑：每事件类型一条 durable 队列，直发直收（无 exchange）：
 ///   InodeChangedEvent → treegraph.inode-changed（向量同步 + 图同步两个 handler 级联消费）
-///   RelationChangedEvent  → treegraph.relation-changed（图边同步；R7 起 line_segment 段边也走此管道）
-///
-/// R7：线路结构变更专用事件及其队列已删除（段边即 relation 值，走 relation-changed 管道）。
+///   EdgeChangedEvent  → treegraph.edge-changed（图边同步；line_segment 段边同走此管道）
 ///
 /// 消费语义：同一消息类型的多个 handler 由 Wolverine 合并为一个逻辑 handler 串行执行；
 /// 任一失败整条消息按 RetryWithCooldown 重放，消费端 IMemoryCache 去重窗口 + 幂等同步器兜底
@@ -33,8 +31,8 @@ public static class MessagingExtensions
         opts.PublishMessage<InodeChangedEvent>().ToRabbitQueue("treegraph.inode-changed");
         opts.ListenToRabbitQueue("treegraph.inode-changed");
 
-        opts.PublishMessage<RelationChangedEvent>().ToRabbitQueue("treegraph.relation-changed");
-        opts.ListenToRabbitQueue("treegraph.relation-changed");
+        opts.PublishMessage<EdgeChangedEvent>().ToRabbitQueue("treegraph.edge-changed");
+        opts.ListenToRabbitQueue("treegraph.edge-changed");
 
         // 对齐原 MassTransit 指数重试 5 次（min 1s / max 1m）
         opts.Policies.OnAnyException().RetryWithCooldown(

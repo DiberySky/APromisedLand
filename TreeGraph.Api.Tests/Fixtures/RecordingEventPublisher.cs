@@ -25,7 +25,7 @@ public sealed class RecordingEventPublisher : IEventPublisher
 
 /// <summary>
 /// 在 <see cref="EavApiFactory"/> 基础上把 IEventPublisher 换成记录器，
-/// 用于验证「结构变更 → RelationChangedEvent」（R7：段边即 relation 值，走 R6 事件链）。
+/// 用于验证「结构变更 → EdgeChangedEvent」（R7：段边直写 edges 表，走边事件链）。
 /// </summary>
 public class RecordingApiFactory : EavApiFactory
 {

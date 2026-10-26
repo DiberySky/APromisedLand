@@ -128,13 +128,13 @@ public class LineStructureDialogSmokeTests : BunitTestBase
         {
             new() { EdgeId = "seg-1", FromNodeId = "node-1", FromNodeName = "牵引所A",
                     ToNodeId = "node-2", ToNodeName = "分区所",
-                    RelationType = "line_segment", DisplayName = "主线段" },
+                    EdgeType = "line_segment", DisplayName = "主线段" },
             new() { EdgeId = "seg-2", FromNodeId = "node-2", FromNodeName = "分区所",
                     ToNodeId = "node-3", ToNodeName = "牵引所B",
-                    RelationType = "line_segment" },
+                    EdgeType = "line_segment" },
             new() { EdgeId = "seg-3", FromNodeId = "node-3", FromNodeName = "牵引所B",
                     ToNodeId = "node-1", ToNodeName = "牵引所A",
-                    RelationType = "line_segment" }
+                    EdgeType = "line_segment" }
         },
         Nodes = new List<LineStructureNodeDto>
         {

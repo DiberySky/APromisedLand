@@ -9,20 +9,14 @@ using Xunit;
 namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
-/// R7 Line 注册 nodes 与内置种子保护。
+/// R7 Line 注册 nodes。
 ///   - Line 创建：同事务双写 lines + nodes（host_type='Line'）；
 ///   - Line 更新：同步 nodes 注册行（名称唯一真源在 nodes）；
-///   - Line 删除：仍有线路节点 → 409；通过后双删；
-///   - 内置种子（LineStructure 实体类型 / next 属性）：拒改拒删 409。
+///   - Line 删除：仍有线路节点 → 409；通过后双删。
+/// （原 LineStructure 实体类型 / next 属性内置种子已随 relation 体系整体下线。）
 /// </summary>
 public class LineRegistrationTests : IntegrationTestBase
 {
-    /// <summary>seed 链边属性：LineStructure.next（固定 id）。</summary>
-    private const string NextAttributeId = "a0000038-0000-4000-8000-000000000038";
-
-    /// <summary>seed 实体类型：LineStructure（固定 id）。</summary>
-    private const string StructureEntityTypeId = "e0000001-0000-4000-8000-000000000001";
-
     public LineRegistrationTests(EavApiFactory factory) : base(factory) { }
 
     private static readonly JsonSerializerOptions EnumJson = new(JsonSerializerDefaults.Web)
@@ -113,51 +107,13 @@ public class LineRegistrationTests : IntegrationTestBase
     }
 
     // ============================================================
-    // 内置种子保护：拒改拒删（409）
+    // 段边冒烟：建链后结构端点可见 line_segment 边（edges 表）
     // ============================================================
 
     [Fact]
-    public async Task BuiltinSeed_NextAttribute_RejectModify()
+    public async Task SegmentEdge_SmokeTest()
     {
-        var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/metadata/attributes/{NextAttributeId}",
-            new { displayName = "改名" });
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("内置种子属性不可修改", await resp.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task BuiltinSeed_NextAttribute_RejectDelete()
-    {
-        var resp = await Client.DeleteAsync(
-            $"/api/eav/metadata/attributes/{NextAttributeId}");
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("内置种子属性不可删除", await resp.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task BuiltinSeed_LineStructureEntityType_RejectModify()
-    {
-        var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/entity-types/{StructureEntityTypeId}",
-            new { displayName = "改名" });
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("内置种子实体类型不可修改", await resp.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task BuiltinSeed_LineStructureEntityType_RejectDelete()
-    {
-        var resp = await Client.DeleteAsync(
-            $"/api/eav/entity-types/{StructureEntityTypeId}");
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Contains("内置种子实体类型不可删除", await resp.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task BuiltinSeed_NextAttribute_StillUsable()
-    {
-        // 拒改拒删不等于不可用：种子属性仍可写段边（建链冒烟）
+        // 建链冒烟：段边直写 edges 表，结构端点可见
         var lineId = $"L_{Guid.NewGuid():N}";
         var create = await Client.PostAsJsonAsync(
             "/api/Lines", new { id = lineId, name = "种子可用线路" });
@@ -180,6 +136,6 @@ public class LineRegistrationTests : IntegrationTestBase
         var dto = await Client.GetEavAsync<LineStructureDto>(
             $"/api/eav/lines/{lineId}/structure", EnumJson);
         var seg = Assert.Single(dto!.Segments);
-        Assert.Equal("line_segment", seg.RelationType);
+        Assert.Equal("line_segment", seg.EdgeType);
     }
 }

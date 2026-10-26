@@ -1,10 +1,13 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.LineSky.Entities;
+using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.LineSky.Dtos;
 using TreeGraph.Shared.LineSky.Entities;
-using TreeGraph.Shared.NodeEavSky.Dtos;
+using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.NodeSky.Entities;
 
 namespace TreeGraph.Api.LineSky.Services;
@@ -12,34 +15,34 @@ namespace TreeGraph.Api.LineSky.Services;
 /// <summary>
 /// 线路结构服务 —— R7 边集薄层：
 ///   节点集 = nodes where line_id=lineId（host_type='LineNode'）；
-///   边集 = relation_attribute_values 中两端均属本线的记录（一条记录 = 一条有向边）；
+///   边集 = edges 表中两端均属本线的记录（一条记录 = 一条有向边，line_segment 为链边）；
 ///   链序 = 沿 line_segment 链走（无入边者为起点；分叉/环按发现序）。
 ///
 /// 拓扑模式校验整体删除；只保留：禁自环、同线校验、诊断（连通/成环/度数，只报告不阻断）。
-/// 端子校验只留「投运 FeedIn ≤ 1」。段 Weight 已砍（DisplayName → relation.name）。
-/// 写边经 EAV 写入链（校验/审计/RelationChangedEvent 复用 R6 管道），
-/// 不再发布线路结构专用变更事件（R7 已删除）。
+/// 端子校验只留「投运 FeedIn ≤ 1」。段 Weight 已砍（DisplayName → props.name）。
+/// 段边直写 edges 表（EdgeSky：edge_type='line_segment'，rank 恒 0，props={"name":...}），
+/// 写成功后发布 EdgeChangedEvent 触发图同步。
 /// </summary>
 public class LineStructureService
 {
-    /// <summary>seed 实体类型：线路结构。</summary>
-    private const string StructureEntityType = "LineStructure";
+    /// <summary>段边在 edges 表中的属性键：显示名。</summary>
+    private const string NameProp = "name";
 
-    /// <summary>seed 链边属性：下一段（relation_type=line_segment）。</summary>
-    private const string NextAttribute = "next";
+    /// <summary>链边类型（edges.edge_type；seed 内置 EdgeType）。</summary>
+    private const string SegmentEdgeType = "line_segment";
 
     private readonly TreeGraphDbContext _db;
-    private readonly EavWriteService _eavWrite;
     private readonly InodeOwnerGuardRegistry _ownerGuards;
+    private readonly IEventPublisher _publisher;
 
     public LineStructureService(
         TreeGraphDbContext db,
-        EavWriteService eavWrite,
-        InodeOwnerGuardRegistry ownerGuards)
+        InodeOwnerGuardRegistry ownerGuards,
+        IEventPublisher publisher)
     {
         _db = db;
-        _eavWrite = eavWrite;
         _ownerGuards = ownerGuards;
+        _publisher = publisher;
     }
 
     // ============================================================
@@ -59,11 +62,11 @@ public class LineStructureService
             .ToListAsync(ct);
         var nodeIds = nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
 
-        // 边集 = 两端均属本线的 relation 值（含 line_segment 与用户自定义分支边）
+        // 边集 = 两端均属本线的 edges 记录（含 line_segment 与用户自定义分支边）
         var edges = nodeIds.Count == 0
-            ? new List<TreeGraph.Api.NodeEavSky.Entities.RelationAttributeValue>()
-            : await _db.RelationAttributeValues.AsNoTracking()
-                .Where(r => nodeIds.Contains(r.EntityId) && nodeIds.Contains(r.ToNodeId))
+            ? new List<Edge>()
+            : await _db.Edges.AsNoTracking()
+                .Where(e => nodeIds.Contains(e.SrcVid) && nodeIds.Contains(e.DstVid))
                 .ToListAsync(ct);
 
         var terminals = await _db.LineTerminals.AsNoTracking()
@@ -98,7 +101,7 @@ public class LineStructureService
         }
 
         var segmentEdges = edges
-            .Where(e => e.RelationType == "line_segment")
+            .Where(e => e.EdgeType == SegmentEdgeType)
             .ToList();
 
         return new LineStructureDto
@@ -114,13 +117,13 @@ public class LineStructureService
             Nodes = nodes.Select(ToNodeDto).ToList(),
             Segments = edges.Select(e => new LineStructureSegmentDto
             {
-                EdgeId = e.ValueId,
-                FromNodeId = e.EntityId,
-                FromNodeName = nameMap.GetValueOrDefault(e.EntityId, ""),
-                ToNodeId = e.ToNodeId,
-                ToNodeName = nameMap.GetValueOrDefault(e.ToNodeId, ""),
-                RelationType = e.RelationType,
-                DisplayName = e.Name
+                EdgeId = EncodeEdgeId(e),
+                FromNodeId = e.SrcVid,
+                FromNodeName = nameMap.GetValueOrDefault(e.SrcVid, ""),
+                ToNodeId = e.DstVid,
+                ToNodeName = nameMap.GetValueOrDefault(e.DstVid, ""),
+                EdgeType = e.EdgeType,
+                DisplayName = EdgeName(e)
             }).ToList(),
             Terminals = terminals.Select(t => new LineStructureNodeDto
             {
@@ -146,19 +149,18 @@ public class LineStructureService
     {
         if (!await LineExistsAsync(lineId, ct)) return null;
 
-        var nextAttrId = await GetNextAttributeIdAsync(ct);
         var nodeIds = await LineNodeIdsAsync(lineId, ct);
-        var hasEdges = nextAttrId is not null && nodeIds.Count > 0
-            && await _db.RelationAttributeValues.AnyAsync(
-                r => r.AttributeId == nextAttrId
-                  && nodeIds.Contains(r.EntityId) && nodeIds.Contains(r.ToNodeId), ct);
+        var hasEdges = nodeIds.Count > 0
+            && await _db.Edges.AnyAsync(
+                e => e.EdgeType == SegmentEdgeType
+                  && nodeIds.Contains(e.SrcVid) && nodeIds.Contains(e.DstVid), ct);
         if (hasEdges)
             throw new InvalidOperationException("该线路已存在结构段边，请使用替换或逐段调整");
 
         return await ReplaceAsync(lineId, req, ct);
     }
 
-    /// <summary>全量替换：段边集 + 端子集（同事务；段边经 EAV 写入链逐条落）。</summary>
+    /// <summary>全量替换：段边集 + 端子集（同事务；段边直写 edges 表，提交后发事件）。</summary>
     public async Task<LineStructureDto?> ReplaceAsync(
         string lineId, LineStructureRequest req, CancellationToken ct)
     {
@@ -171,44 +173,41 @@ public class LineStructureService
         var strategy = _db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
+            var events = new List<EdgeChangedEvent>();
             await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
             // 1. 段边全量替换（仅 line_segment；用户自定义分支边不动）
-            var nextAttrId = await GetNextAttributeIdAsync(ct);
-            if (nextAttrId is not null)
-            {
-                var existing = nodeIds.Count == 0
-                    ? new List<TreeGraph.Api.NodeEavSky.Entities.RelationAttributeValue>()
-                    : await _db.RelationAttributeValues
-                        .Where(r => r.AttributeId == nextAttrId
-                                 && nodeIds.Contains(r.EntityId) && nodeIds.Contains(r.ToNodeId))
-                        .ToListAsync(ct);
+            var existing = nodeIds.Count == 0
+                ? new List<Edge>()
+                : await _db.Edges
+                    .Where(e => e.EdgeType == SegmentEdgeType
+                             && nodeIds.Contains(e.SrcVid) && nodeIds.Contains(e.DstVid))
+                    .ToListAsync(ct);
 
-                var desiredSet = desired
-                    .Select(d => (d.FromNodeId, d.ToNodeId))
-                    .ToHashSet();
+            var desiredSet = desired
+                .Select(d => (d.FromNodeId, d.ToNodeId))
+                .ToHashSet();
 
-                // 先删不需要的旧边（释放 from 的单值占用）
-                foreach (var e in existing.Where(e => !desiredSet.Contains((e.EntityId, e.ToNodeId))))
-                    await WriteNextAsync(e.EntityId, null, null, ct);
+            // 先删不需要的旧边（释放 from 的单出边占用）
+            foreach (var e in existing.Where(e => !desiredSet.Contains((e.SrcVid, e.DstVid))))
+                DeleteSegmentEdge(e, events);
 
-                // 再写新边（已存在且一致的自然跳过）
-                var existingSet = existing
-                    .Select(e => (e.EntityId, e.ToNodeId))
-                    .ToHashSet();
-                foreach (var d in desired.Where(d => !existingSet.Contains((d.FromNodeId, d.ToNodeId))))
-                    await WriteNextAsync(d.FromNodeId, d.ToNodeId, d.DisplayName, ct);
-            }
-            else if (desired.Count > 0)
-            {
-                throw new InvalidOperationException("链边属性种子（LineStructure.next）缺失，无法写段边");
-            }
+            // 再写新边（已存在且一致的自然跳过；DisplayName 变化也覆盖更新）
+            var existingSet = existing
+                .Select(e => (e.SrcVid, e.DstVid))
+                .ToHashSet();
+            foreach (var d in desired.Where(d => !existingSet.Contains((d.FromNodeId, d.ToNodeId))))
+                UpsertSegmentEdge(d.FromNodeId, d.ToNodeId, d.DisplayName, existing, events);
 
             // 2. 端子全量替换（null = 清空；PUT = 全量替换语义，与「清空结构」一致）
             await ReplaceTerminalsAsync(lineId, nodeIds, req.Terminals ?? [], ct);
 
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
+
+            // 事务提交后发布图同步事件（消费端回查 PG 读已提交状态）
+            foreach (var evt in events)
+                await _publisher.Publish(evt, ct);
 
             return await GetAsync(lineId, ct);
         });
@@ -218,7 +217,7 @@ public class LineStructureService
     // 单段加/删
     // ============================================================
 
-    /// <summary>新增一段（写 seed 属性 next 的 line_segment 边；节点须同属该线）。</summary>
+    /// <summary>新增一段（写 edges 表 line_segment 边，rank 恒 0；节点须同属该线）。</summary>
     public async Task<LineStructureDto> AddSegmentAsync(
         string lineId, AddLineSegmentRequest req, CancellationToken ct)
     {
@@ -228,42 +227,45 @@ public class LineStructureService
         var nodeIds = await LineNodeIdsAsync(lineId, ct);
         ValidateSegmentEndpoints(req.FromNodeId, req.ToNodeId, nodeIds);
 
-        await WriteNextAsync(req.FromNodeId, req.ToNodeId, req.DisplayName, ct);
+        var events = new List<EdgeChangedEvent>();
+        // 单出边语义：同一 from 的旧 line_segment 出边先删（幂等覆盖）
+        var stale = await _db.Edges
+            .Where(e => e.EdgeType == SegmentEdgeType && e.SrcVid == req.FromNodeId)
+            .ToListAsync(ct);
+        foreach (var s in stale.Where(s => s.DstVid != req.ToNodeId))
+            DeleteSegmentEdge(s, events);
+
+        var existing = await _db.Edges
+            .Where(e => e.EdgeType == SegmentEdgeType && nodeIds.Contains(e.SrcVid))
+            .ToListAsync(ct);
+        UpsertSegmentEdge(req.FromNodeId, req.ToNodeId, req.DisplayName, existing, events);
+
+        await _db.SaveChangesAsync(ct);
+        foreach (var evt in events)
+            await _publisher.Publish(evt, ct);
+
         return (await GetAsync(lineId, ct))!;
     }
 
-    /// <summary>删除一段（按边实例 value_id；两端均属本线才可删）。</summary>
+    /// <summary>删除一段（按四元组编码 edgeId；两端均属本线才可删）。</summary>
     public async Task<LineStructureDto> DeleteSegmentAsync(
         string lineId, string edgeId, CancellationToken ct)
     {
-        var edge = await _db.RelationAttributeValues
-            .FirstOrDefaultAsync(r => r.ValueId == edgeId, ct);
+        var (edgeType, srcVid, rank, dstVid) = DecodeEdgeId(edgeId);
+
+        var edge = await _db.Edges.FindAsync([edgeType, srcVid, rank, dstVid], ct);
         if (edge is null)
             throw new KeyNotFoundException($"段边不存在: {edgeId}");
 
         var nodeIds = await LineNodeIdsAsync(lineId, ct);
-        if (!nodeIds.Contains(edge.EntityId) || !nodeIds.Contains(edge.ToNodeId))
+        if (!nodeIds.Contains(edge.SrcVid) || !nodeIds.Contains(edge.DstVid))
             throw new ArgumentException($"段边 {edgeId} 不属于线路 {lineId}");
 
-        // 经 EAV 写入链删边（审计 + RelationChangedEvent 复用 R6 管道）
-        var attrName = await _db.AttributeCatalog
-            .Where(a => a.AttributeId == edge.AttributeId)
-            .Select(a => a.AttributeName)
-            .FirstOrDefaultAsync(ct);
-        if (attrName is null)
-            throw new InvalidOperationException($"段边属性定义缺失: {edge.AttributeId}");
-
-        try
-        {
-            await _eavWrite.PatchAsync(
-                edge.EntityId, edge.EntityType,
-                new Dictionary<string, object?> { [attrName] = null },
-                changedBy: "system", correlationId: null, ct);
-        }
-        catch (EavConflictException ex)
-        {
-            throw new InvalidOperationException(ex.Message, ex);
-        }
+        var events = new List<EdgeChangedEvent>();
+        DeleteSegmentEdge(edge, events);
+        await _db.SaveChangesAsync(ct);
+        foreach (var evt in events)
+            await _publisher.Publish(evt, ct);
 
         return (await GetAsync(lineId, ct))!;
     }
@@ -355,12 +357,73 @@ public class LineStructureService
                 .ToListAsync(ct))
             .ToHashSet(StringComparer.Ordinal);
 
-    private async Task<string?> GetNextAttributeIdAsync(CancellationToken ct)
-        => await _db.AttributeCatalog
-            .Where(a => a.EntityType == StructureEntityType
-                     && a.AttributeName == NextAttribute && !a.IsDeleted)
-            .Select(a => a.AttributeId)
-            .FirstOrDefaultAsync(ct);
+    // ------------------------------------------------------------
+    // 段边读写（edges 表，直写；事件收集后由调用方在提交后发布）
+    // ------------------------------------------------------------
+
+    /// <summary>upsert 一条 line_segment 段边（覆盖语义：props={"name":displayName}）。</summary>
+    private void UpsertSegmentEdge(
+        string fromId, string toId, string? displayName,
+        List<Edge> tracked, List<EdgeChangedEvent> events)
+    {
+        var edge = tracked.FirstOrDefault(
+            e => e.EdgeType == SegmentEdgeType && e.SrcVid == fromId
+                 && e.Rank == 0 && e.DstVid == toId);
+        if (edge is null)
+        {
+            edge = new Edge { EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId };
+            _db.Edges.Add(edge);
+            tracked.Add(edge);
+        }
+
+        edge.Props = string.IsNullOrWhiteSpace(displayName)
+            ? null
+            : JsonSerializer.SerializeToElement(
+                new Dictionary<string, string> { [NameProp] = displayName });
+        edge.UpdatedAt = DateTimeOffset.UtcNow;
+
+        events.Add(new EdgeChangedEvent
+        {
+            EdgeType = edge.EdgeType, SrcVid = edge.SrcVid,
+            Rank = edge.Rank, DstVid = edge.DstVid,
+            Kind = EdgeChangeKind.Upsert
+        });
+    }
+
+    /// <summary>删除一条段边（任何 edge_type；RemoveRange 前已加载的跟踪实体）。</summary>
+    private void DeleteSegmentEdge(Edge edge, List<EdgeChangedEvent> events)
+    {
+        _db.Edges.Remove(edge);
+        events.Add(new EdgeChangedEvent
+        {
+            EdgeType = edge.EdgeType, SrcVid = edge.SrcVid,
+            Rank = edge.Rank, DstVid = edge.DstVid,
+            Kind = EdgeChangeKind.Delete
+        });
+    }
+
+    /// <summary>段边显示名 = props.name（缺失/非字符串 → null）。</summary>
+    private static string? EdgeName(Edge e)
+        => e.Props is { } p
+           && p.TryGetProperty(NameProp, out var n)
+           && n.ValueKind == JsonValueKind.String
+            ? n.GetString() : null;
+
+    /// <summary>边实例 Id = 四元组编码 "{edgeType}:{srcVid}:{rank}:{dstVid}"（各段均不含冒号）。</summary>
+    private static string EncodeEdgeId(Edge e)
+        => $"{e.EdgeType}:{e.SrcVid}:{e.Rank}:{e.DstVid}";
+
+    /// <summary>解析四元组编码 edgeId；格式非法 → ArgumentException。</summary>
+    private static (string EdgeType, string SrcVid, long Rank, string DstVid) DecodeEdgeId(string edgeId)
+    {
+        var parts = (edgeId ?? "").Split(':');
+        if (parts.Length != 4 || string.IsNullOrWhiteSpace(parts[0])
+            || string.IsNullOrWhiteSpace(parts[1])
+            || !long.TryParse(parts[2], out var rank)
+            || string.IsNullOrWhiteSpace(parts[3]))
+            throw new ArgumentException($"段边 Id 格式非法（期望 edgeType:srcVid:rank:dstVid）: {edgeId}");
+        return (parts[0], parts[1], rank, parts[3]);
+    }
 
     private static void ValidateSegmentEndpoints(
         string fromId, string toId, HashSet<string> nodeIds)
@@ -386,33 +449,10 @@ public class LineStructureService
             if (!seen.Add((s.FromNodeId, s.ToNodeId))) continue; // 幂等去重
             if (!fromUsed.Add(s.FromNodeId))
                 throw new ArgumentException(
-                    $"节点 {s.FromNodeId} 有多条出边：next 为单值属性，分支请定义新 relation 属性");
+                    $"节点 {s.FromNodeId} 有多条出边：line_segment 为单出边语义，分支请建自定义边类型");
             result.Add(s);
         }
         return result;
-    }
-
-    /// <summary>经 EAV 写入链写/删 next 边（toId 为 null = 删边）。</summary>
-    private async Task WriteNextAsync(
-        string fromId, string? toId, string? displayName, CancellationToken ct)
-    {
-        try
-        {
-            await _eavWrite.PatchAsync(
-                fromId, StructureEntityType,
-                new Dictionary<string, object?>
-                {
-                    [NextAttribute] = toId is null
-                        ? null
-                        : new EavRelationValue { ToNodeId = toId, Name = displayName }
-                },
-                changedBy: "system", correlationId: null, ct);
-        }
-        catch (EavConflictException ex)
-        {
-            // Line 家族：InvalidOperationException 映射 409
-            throw new InvalidOperationException(ex.Message, ex);
-        }
     }
 
     private async Task ReplaceTerminalsAsync(
@@ -450,14 +490,14 @@ public class LineStructureService
     /// <summary>沿 line_segment 链推导节点顺序（无入边者为起点；分叉/环按发现序）。</summary>
     private static List<string> DeriveOrder(
         List<Node> nodes,
-        List<TreeGraph.Api.NodeEavSky.Entities.RelationAttributeValue> segmentEdges)
+        List<Edge> segmentEdges)
     {
         if (nodes.Count == 0) return new List<string>();
 
         var outgoing = segmentEdges
-            .GroupBy(e => e.EntityId)
-            .ToDictionary(g => g.Key, g => g.Select(e => e.ToNodeId).ToList(), StringComparer.Ordinal);
-        var hasIncoming = segmentEdges.Select(e => e.ToNodeId).ToHashSet(StringComparer.Ordinal);
+            .GroupBy(e => e.SrcVid)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.DstVid).ToList(), StringComparer.Ordinal);
+        var hasIncoming = segmentEdges.Select(e => e.DstVid).ToHashSet(StringComparer.Ordinal);
 
         var ordered = new List<string>(nodes.Count);
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -500,15 +540,15 @@ public class LineStructureService
     /// <summary>结构诊断：连通/成环/度数/端子统计（只报告不阻断；投运 FeedIn&gt;1 才记错误）。</summary>
     private static LineStructureDiagnosticsDto Diagnose(
         List<Node> nodes,
-        List<TreeGraph.Api.NodeEavSky.Entities.RelationAttributeValue> edges,
+        List<Edge> edges,
         List<LineTerminal> terminals)
     {
         var nodeIds = nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
         var degree = nodes.ToDictionary(n => n.Id, _ => 0, StringComparer.Ordinal);
         foreach (var e in edges)
         {
-            if (degree.ContainsKey(e.EntityId)) degree[e.EntityId]++;
-            if (degree.ContainsKey(e.ToNodeId)) degree[e.ToNodeId]++;
+            if (degree.ContainsKey(e.SrcVid)) degree[e.SrcVid]++;
+            if (degree.ContainsKey(e.DstVid)) degree[e.DstVid]++;
         }
 
         // 无向连通分量 + 成环检测（边数 >= 节点数且连通则必有环，用并查集精确判定）
@@ -517,9 +557,9 @@ public class LineStructureService
         var hasCycle = false;
         foreach (var e in edges)
         {
-            if (!nodeIds.Contains(e.EntityId) || !nodeIds.Contains(e.ToNodeId)) continue;
-            if (e.EntityId == e.ToNodeId) { hasCycle = true; continue; }
-            var (ra, rb) = (Find(e.EntityId), Find(e.ToNodeId));
+            if (!nodeIds.Contains(e.SrcVid) || !nodeIds.Contains(e.DstVid)) continue;
+            if (e.SrcVid == e.DstVid) { hasCycle = true; continue; }
+            var (ra, rb) = (Find(e.SrcVid), Find(e.DstVid));
             if (ra == rb) hasCycle = true;
             else parent[ra] = rb;
         }

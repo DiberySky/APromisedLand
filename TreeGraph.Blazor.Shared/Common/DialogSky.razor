@@ -13,6 +13,8 @@
                     <MudText Color="Color.Inherit">@Title</MudText>
                 </DevDialogSourceButton>
                 <MudSpacer/>
+                @* 全屏/最大化按钮：由 MudBlazor.Extensions 在 ShowExAsync 打开时经 JS
+                   注入到标题栏右上角（DialogOptionsEx.MaximizeButton，默认开），此处不手写。 *@
             </MudToolBar>
         }
 

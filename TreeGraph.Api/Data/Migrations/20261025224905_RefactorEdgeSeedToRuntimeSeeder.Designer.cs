@@ -13,8 +13,8 @@ using TreeGraph.Api.Data;
 namespace TreeGraph.Api.Data.Migrations
 {
     [DbContext(typeof(TreeGraphDbContext))]
-    [Migration("20261024130457_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20261025224905_RefactorEdgeSeedToRuntimeSeeder")]
+    partial class RefactorEdgeSeedToRuntimeSeeder
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,6 +25,146 @@ namespace TreeGraph.Api.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.Edge", b =>
+                {
+                    b.Property<string>("EdgeType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("edge_type");
+
+                    b.Property<string>("SrcVid")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("src_vid");
+
+                    b.Property<long>("Rank")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rank");
+
+                    b.Property<string>("DstVid")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("dst_vid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<JsonElement?>("Props")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("props");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("EdgeType", "SrcVid", "Rank", "DstVid");
+
+                    b.HasIndex("DstVid")
+                        .HasDatabaseName("ix_edges_dst");
+
+                    b.HasIndex("Props")
+                        .HasDatabaseName("ix_edges_props")
+                        .HasFilter("props IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Props"), "GIN");
+
+                    b.HasIndex("SrcVid")
+                        .HasDatabaseName("ix_edges_src");
+
+                    b.ToTable("edges", (string)null);
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeType", b =>
+                {
+                    b.Property<string>("Name")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("TtlCol")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("ttl_col");
+
+                    b.Property<long?>("TtlDurationSeconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ttl_duration_seconds");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Name");
+
+                    b.ToTable("edge_types", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_edge_types_ttl", "(ttl_col IS NULL) = (ttl_duration_seconds IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeTypeProp", b =>
+                {
+                    b.Property<string>("EdgeTypeName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("edge_type_name");
+
+                    b.Property<string>("PropName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("prop_name");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("comment");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("data_type");
+
+                    b.Property<JsonElement?>("DefaultValue")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("default_value");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("Nullable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("nullable");
+
+                    b.HasKey("EdgeTypeName", "PropName");
+
+                    b.ToTable("edge_type_props", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_edge_type_props_notnull_default", "nullable OR default_value IS NOT NULL");
+                        });
+                });
 
             modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineTerminal", b =>
                 {
@@ -230,11 +370,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)")
                         .HasColumnName("ref_table_definition_id");
-
-                    b.Property<string>("RelationType")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("relation_type");
 
                     b.Property<string>("UnitId")
                         .HasMaxLength(36)
@@ -902,24 +1037,6 @@ namespace TreeGraph.Api.Data.Migrations
                             IsSortable = true,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Version = 1
-                        },
-                        new
-                        {
-                            AttributeId = "a0000038-0000-4000-8000-000000000038",
-                            AttributeName = "next",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            DataType = "relation",
-                            DisplayName = "下一段",
-                            DisplayOrder = 0,
-                            EntityType = "LineStructure",
-                            IsDeleted = false,
-                            IsRecordMode = false,
-                            IsRequired = false,
-                            IsSearchable = false,
-                            IsSortable = false,
-                            RelationType = "line_segment",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Version = 1
                         });
                 });
 
@@ -1505,19 +1622,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasDatabaseName("ix_entity_type_owner_space");
 
                     b.ToTable("entity_type_catalog", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            EntityTypeId = "e0000001-0000-4000-8000-000000000001",
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Description = "线路节点结构声明：链边属性 next（line_segment）表达 LineNode ↔ LineNode 有向段",
-                            DisplayName = "线路结构",
-                            DisplayOrder = 0,
-                            EntityType = "LineStructure",
-                            IsDeleted = false,
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        });
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", b =>
@@ -1765,79 +1869,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("option_sets", (string)null);
-                });
-
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.RelationAttributeValue", b =>
-                {
-                    b.Property<string>("ValueId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("value_id")
-                        .HasDefaultValueSql("gen_random_uuid()::text");
-
-                    b.Property<string>("AttributeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("attribute_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("entity_id");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<string>("Name")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("RelationType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("relation_type");
-
-                    b.Property<string>("ToNodeId")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)")
-                        .HasColumnName("to_node_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("ValueId");
-
-                    b.HasIndex("AttributeId");
-
-                    b.HasIndex("EntityId")
-                        .HasDatabaseName("ix_rav_entity");
-
-                    b.HasIndex("ToNodeId")
-                        .HasDatabaseName("ix_rav_to_node");
-
-                    b.HasIndex("EntityId", "EntityType", "AttributeId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_rav_entity_attr");
-
-                    b.HasIndex("RelationType", "EntityId", "ToNodeId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_rav_type_endpoints");
-
-                    b.ToTable("relation_attribute_values", (string)null);
                 });
 
             modelBuilder.Entity("TreeGraph.Api.SpaceSky.Entities.Space", b =>
@@ -3463,6 +3494,41 @@ namespace TreeGraph.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.Edge", b =>
+                {
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
+                        .WithMany()
+                        .HasForeignKey("DstVid")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_edges_dst_node");
+
+                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeType", null)
+                        .WithMany()
+                        .HasForeignKey("EdgeType")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_edges_edge_type");
+
+                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
+                        .WithMany()
+                        .HasForeignKey("SrcVid")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_edges_src_node");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeTypeProp", b =>
+                {
+                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeType", "EdgeType")
+                        .WithMany("Props")
+                        .HasForeignKey("EdgeTypeName")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("EdgeType");
+                });
+
             modelBuilder.Entity("TreeGraph.Api.LineSky.Entities.LineTerminal", b =>
                 {
                     b.HasOne("TreeGraph.Shared.LineSky.Entities.Line", null)
@@ -3626,24 +3692,6 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Navigation("OptionSet");
                 });
 
-            modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.RelationAttributeValue", b =>
-                {
-                    b.HasOne("TreeGraph.Api.NodeEavSky.Entities.AttributeDefinition", "Attribute")
-                        .WithMany()
-                        .HasForeignKey("AttributeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
-                        .WithMany()
-                        .HasForeignKey("ToNodeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_rav_to_node");
-
-                    b.Navigation("Attribute");
-                });
-
             modelBuilder.Entity("TreeGraph.Shared.NodeSky.Entities.Node", b =>
                 {
                     b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
@@ -3709,6 +3757,11 @@ namespace TreeGraph.Api.Data.Migrations
                     b.Navigation("Node");
 
                     b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeType", b =>
+                {
+                    b.Navigation("Props");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.CompositeTypeDefinition", b =>

@@ -21,15 +21,9 @@ public static class EavDataTypes
     /// </summary>
     public const string Location = "location";
 
-    /// <summary>
-    /// 关系（图边）：一条记录 = 一条有向边（宿主实体 → 目标节点）。
-    /// 值存独立表 relation_attribute_values，单属性单目标；图边类型取自属性定义的 relation_type。
-    /// </summary>
-    public const string Relation = "relation";
-
     public static readonly HashSet<string> All = new()
     {
         String, Int, Decimal, Bool, Datetime, Date, Time,
-        File, Json, Composite, Table, SingleChoice, Location, Relation
+        File, Json, Composite, Table, SingleChoice, Location
     };
 }

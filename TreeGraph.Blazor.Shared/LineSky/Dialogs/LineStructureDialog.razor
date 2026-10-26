@@ -90,7 +90,7 @@
                     <RowTemplate>
                         <MudTd>@context.FromNodeName</MudTd>
                         <MudTd>@context.ToNodeName</MudTd>
-                        <MudTd>@RelationTypeLabel(context.RelationType)</MudTd>
+                        <MudTd>@EdgeTypeLabel(context.EdgeType)</MudTd>
                         <MudTd>@(string.IsNullOrEmpty(context.DisplayName) ? "—" : context.DisplayName)</MudTd>
                         <MudTd>
                             <MudIconButton Icon="@Icons.Material.Filled.Delete"
@@ -490,8 +490,8 @@
     private string NodeName(string id)
         => _candidateNodes.FirstOrDefault(n => n.NodeId == id)?.Name ?? Clip(id);
 
-    private static string RelationTypeLabel(string relationType)
-        => relationType == "line_segment" ? "结构段" : relationType;
+    private static string EdgeTypeLabel(string edgeType)
+        => edgeType == "line_segment" ? "结构段" : edgeType;
 
     private static string RoleLabel(TerminalRole role) => role switch
     {

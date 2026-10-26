@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.MessagingSky;
-using TreeGraph.Api.NodeEavSky.Services;
 using TreeGraph.Shared.Messaging;
-using TreeGraph.Shared.NodeEavSky.Dtos;
 using TreeGraph.Shared.NodeSky.Entities;
 
 namespace TreeGraph.Api.LineSky.Controllers;
@@ -14,32 +13,27 @@ namespace TreeGraph.Api.LineSky.Controllers;
 ///
 /// 存储形态：
 ///   - 身份 = nodes 行（host_type='LineNode'，line_id = 所属 Line 的 nodes.id）；
-///   - 结构连接 = relation 值（seed 实体类型 LineStructure 的 next 属性，line_segment 边），
-///     from = 前驱节点、to = 自身；首节点无边。
+///   - 结构连接 = edges 表 line_segment 边（rank 恒 0），from = 前驱节点、to = 自身；
+///     首节点无边。
 ///
 /// DTO 形状保持 LineNodeDto（Id / LineId / Name / Description + 创建用 PredecessorId）。
-/// 写操作成功后发布 InodeChangedEvent（消费端幂等）；段边经 EAV 写入链，
-/// 校验/审计/RelationChangedEvent 复用 R6 管道。
+/// 写操作成功后发布 InodeChangedEvent（消费端幂等）；段边直写 edges 表并发布
+/// EdgeChangedEvent 触发图同步。
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class LineNodeController : ControllerBase
 {
-    /// <summary>seed 实体类型：线路结构（Task 2.1）。</summary>
-    private const string StructureEntityType = "LineStructure";
-
-    /// <summary>seed 链边属性：下一段（Task 2.2，relation_type=line_segment）。</summary>
-    private const string NextAttribute = "next";
+    /// <summary>链边类型（edges.edge_type；seed 内置 EdgeType）。</summary>
+    private const string SegmentEdgeType = "line_segment";
 
     private readonly TreeGraphDbContext _db;
-    private readonly EavWriteService _eavWrite;
     private readonly IEventPublisher _publishEndpoint;
 
     public LineNodeController(
-        TreeGraphDbContext db, EavWriteService eavWrite, IEventPublisher publishEndpoint)
+        TreeGraphDbContext db, IEventPublisher publishEndpoint)
     {
         _db = db;
-        _eavWrite = eavWrite;
         _publishEndpoint = publishEndpoint;
     }
 
@@ -87,7 +81,7 @@ public class LineNodeController : ControllerBase
 
     /// <summary>
     /// 创建 LineNode：nodes 行（line_id=lineId，目标必须为 Line）
-    /// → 声明 LineStructure 实体类型 → 有前驱则写 line_segment 边（前驱→自身，EAV 写入链）。
+    /// → 有前驱则写 line_segment 边（前驱→自身，直写 edges 表）。
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] LineNodeCreateRequest req, CancellationToken ct = default)
@@ -134,31 +128,21 @@ public class LineNodeController : ControllerBase
             };
             _db.Nodes.Add(node);
 
-            // 声明 LineStructure 实体类型（幂等；不含业务数据，随宿主清理）
-            var declared = await _db.InodeEntityTypes
-                .AnyAsync(x => x.InodeId == id && x.EntityType == StructureEntityType, ct);
-            if (!declared)
-            {
-                _db.InodeEntityTypes.Add(new TreeGraph.Api.NodeEavSky.Entities.InodeEntityType
-                {
-                    InodeId = id,
-                    EntityType = StructureEntityType,
-                    AttachedAt = now
-                });
-            }
-
-            // 先落 nodes 行：后续 EAV 写入链的 toNode 存在性校验要在同事务内查到本行
+            // 先落 nodes 行：段边 FK（edges.src_vid/dst_vid → nodes.id）要在同事务内查到本行
             await _db.SaveChangesAsync(ct);
 
             // 有前驱 → 写 line_segment 边（前驱→自身）；首节点无边
+            var edgeEvents = new List<EdgeChangedEvent>();
             if (!string.IsNullOrWhiteSpace(req.PredecessorId))
             {
-                var error = await WriteNextEdgeAsync(req.PredecessorId!, id, ct);
-                if (error is not null) return error;
+                UpsertSegmentEdge(req.PredecessorId!, id, edgeEvents);
+                await _db.SaveChangesAsync(ct);
             }
 
             await tx.CommitAsync(ct);
 
+            foreach (var evt in edgeEvents)
+                await _publishEndpoint.Publish(evt, ct);
             await PublishAsync(id, InodeChangeKind.Saved, pathAffected: false, ct);
 
             return (IActionResult)CreatedAtAction(nameof(GetById), new { id }, ToDto(node, req.PredecessorId, null));
@@ -167,7 +151,7 @@ public class LineNodeController : ControllerBase
 
     /// <summary>
     /// 更新 LineNode：改 name/description；
-    /// 提供了 PredecessorId 时重接段边（删旧前驱的 next 值 + 写新前驱的 next 值）；
+    /// 提供了 PredecessorId 时重接段边（删旧前驱→本节点的 line_segment 边 + 写新前驱→本节点）；
     /// 换线路 = 改 line_id（连带校验段边两端仍同线，否则 400）。
     /// </summary>
     [HttpPut("{id}")]
@@ -189,22 +173,18 @@ public class LineNodeController : ControllerBase
                 return BadRequest(new { error = $"所属线路不存在或不是 Line: {newLineId}" });
 
             // 连带校验：段边两端仍同线（入边起点、出边终点都必须属于新线路）
-            var nextAttrId = await GetNextAttributeIdAsync(ct);
-            if (nextAttrId is not null)
-            {
-                var endpointIds = await _db.RelationAttributeValues
-                    .Where(r => r.AttributeId == nextAttrId
-                             && (r.EntityId == id || r.ToNodeId == id))
-                    .Select(r => r.EntityId == id ? r.ToNodeId : r.EntityId)
-                    .ToListAsync(ct);
-                var alienCount = await _db.Nodes
-                    .CountAsync(n => endpointIds.Contains(n.Id) && n.LineId != newLineId, ct);
-                if (alienCount > 0)
-                    return BadRequest(new
-                    {
-                        error = "该节点仍有段边连接其他线路的节点，请先调整连接后再换线路"
-                    });
-            }
+            var endpointIds = await _db.Edges
+                .Where(e => e.EdgeType == SegmentEdgeType
+                         && (e.SrcVid == id || e.DstVid == id))
+                .Select(e => e.SrcVid == id ? e.DstVid : e.SrcVid)
+                .ToListAsync(ct);
+            var alienCount = await _db.Nodes
+                .CountAsync(n => endpointIds.Contains(n.Id) && n.LineId != newLineId, ct);
+            if (alienCount > 0)
+                return BadRequest(new
+                {
+                    error = "该节点仍有段边连接其他线路的节点，请先调整连接后再换线路"
+                });
         }
 
         // 改连接：PredecessorId 非空 = 重接到该前驱
@@ -227,35 +207,32 @@ public class LineNodeController : ControllerBase
         node.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
 
+        var edgeEvents = new List<EdgeChangedEvent>();
         if (!string.IsNullOrWhiteSpace(req.PredecessorId))
         {
             // 当前入边前驱（若已是该前驱则无需重接）
-            var nextAttrId = await GetNextAttributeIdAsync(ct);
-            var currentPredId = nextAttrId is null ? null : await _db.RelationAttributeValues
-                .Where(r => r.AttributeId == nextAttrId && r.ToNodeId == id)
-                .Select(r => r.EntityId)
-                .FirstOrDefaultAsync(ct);
+            var currentPred = await _db.Edges
+                .FirstOrDefaultAsync(e => e.EdgeType == SegmentEdgeType && e.DstVid == id, ct);
 
-            if (currentPredId != req.PredecessorId)
+            if (currentPred?.SrcVid != req.PredecessorId)
             {
-                // 删旧边（旧前驱实体上的 next 值），写新边（新前驱 → 自身）
-                if (currentPredId is not null)
-                {
-                    var error = await WriteNextEdgeAsync(currentPredId, null, ct);
-                    if (error is not null) return error;
-                }
-                var writeError = await WriteNextEdgeAsync(req.PredecessorId!, id, ct);
-                if (writeError is not null) return writeError;
+                // 删旧边（旧前驱 → 本节点），写新边（新前驱 → 自身）
+                if (currentPred is not null)
+                    DeleteSegmentEdge(currentPred, edgeEvents);
+                UpsertSegmentEdge(req.PredecessorId!, id, edgeEvents);
+                await _db.SaveChangesAsync(ct);
             }
         }
 
+        foreach (var evt in edgeEvents)
+            await _publishEndpoint.Publish(evt, ct);
         await PublishAsync(id, InodeChangeKind.Saved, pathAffected: false, ct);
 
         return Ok(ToDto(node));
     }
 
     /// <summary>
-    /// 删除 LineNode（守卫链：段边/关系引用 → 端子引用 → 自身 EAV 值 → 挂载实体
+    /// 删除 LineNode（守卫链：段边/边引用 → 端子引用 → 自身 EAV 值 → 挂载实体
     /// → 被作为 parent 引用 → 清声明 → 删 nodes 行）。
     /// </summary>
     [HttpDelete("{id}")]
@@ -265,11 +242,11 @@ public class LineNodeController : ControllerBase
             .FirstOrDefaultAsync(n => n.Id == id && n.HostType == "LineNode", ct);
         if (node is null) return NotFound();
 
-        // 段边/关系引用（from 或 to；段边即 relation 值）
-        var hasRelations = await _db.RelationAttributeValues
-            .AnyAsync(r => r.EntityId == id || r.ToNodeId == id, ct);
-        if (hasRelations)
-            return Conflict(new { error = "该节点仍被关系/段边引用，无法删除" });
+        // 段边/边引用（from 或 to；段边即 edges 表行）
+        var hasEdges = await _db.Edges
+            .AnyAsync(e => e.SrcVid == id || e.DstVid == id, ct);
+        if (hasEdges)
+            return Conflict(new { error = "该节点仍被边/段边引用，无法删除" });
 
         // 端子引用
         var hasTerminal = await _db.LineTerminals
@@ -324,53 +301,42 @@ public class LineNodeController : ControllerBase
         CreatedAt = n.CreatedAt
     };
 
-    /// <summary>批量取前驱映射：LineNode id → 前驱节点 id（seed 链边 next：from=前驱、to=自身）。</summary>
+    /// <summary>批量取前驱映射：LineNode id → 前驱节点 id（line_segment 边：from=前驱、to=自身）。</summary>
     private async Task<Dictionary<string, string>> GetPredecessorMapAsync(
         IReadOnlyCollection<string> nodeIds, CancellationToken ct)
     {
-        var nextAttrId = await GetNextAttributeIdAsync(ct);
-        if (nextAttrId is null || nodeIds.Count == 0)
+        if (nodeIds.Count == 0)
             return new Dictionary<string, string>();
 
-        return await _db.RelationAttributeValues
-            .Where(r => r.AttributeId == nextAttrId && nodeIds.Contains(r.ToNodeId))
-            .ToDictionaryAsync(r => r.ToNodeId, r => r.EntityId, ct);
+        return await _db.Edges
+            .Where(e => e.EdgeType == SegmentEdgeType && nodeIds.Contains(e.DstVid))
+            .ToDictionaryAsync(e => e.DstVid, e => e.SrcVid, ct);
     }
 
-    /// <summary>seed 链边属性 id（LineStructure.next；种子里固定存在，删除被内置保护拦截）。</summary>
-    private async Task<string?> GetNextAttributeIdAsync(CancellationToken ct)
-        => await _db.AttributeCatalog
-            .Where(a => a.EntityType == StructureEntityType
-                     && a.AttributeName == NextAttribute && !a.IsDeleted)
-            .Select(a => a.AttributeId)
-            .FirstOrDefaultAsync(ct);
-
-    /// <summary>
-    /// 经 EAV 写入链写/删 next 边（fromId 实体的 next = toId；toId 为 null = 删边）。
-    /// 校验/审计/RelationChangedEvent 复用 R6 管道。
-    /// </summary>
-    private async Task<IActionResult?> WriteNextEdgeAsync(
-        string fromId, string? toId, CancellationToken ct)
+    /// <summary>upsert 一条 line_segment 段边（rank 恒 0，无 props）。</summary>
+    private void UpsertSegmentEdge(string fromId, string toId, List<EdgeChangedEvent> events)
     {
-        try
+        _db.Edges.Add(new Edge
         {
-            await _eavWrite.PatchAsync(
-                fromId, StructureEntityType,
-                new Dictionary<string, object?>
-                {
-                    [NextAttribute] = toId is null ? null : new EavRelationValue { ToNodeId = toId }
-                },
-                changedBy: "system", correlationId: null, ct);
-            return null;
-        }
-        catch (EavConflictException ex)
+            EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId
+        });
+        events.Add(new EdgeChangedEvent
         {
-            return Conflict(new { error = ex.Message });
-        }
-        catch (EavValidationException ex)
+            EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId,
+            Kind = EdgeChangeKind.Upsert
+        });
+    }
+
+    /// <summary>删除一条已跟踪的段边。</summary>
+    private void DeleteSegmentEdge(Edge edge, List<EdgeChangedEvent> events)
+    {
+        _db.Edges.Remove(edge);
+        events.Add(new EdgeChangedEvent
         {
-            return BadRequest(new { errors = ex.Errors });
-        }
+            EdgeType = edge.EdgeType, SrcVid = edge.SrcVid,
+            Rank = edge.Rank, DstVid = edge.DstVid,
+            Kind = EdgeChangeKind.Delete
+        });
     }
 
     private async Task PublishAsync(string inodeId, InodeChangeKind kind, bool pathAffected, CancellationToken ct)

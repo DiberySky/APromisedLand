@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
@@ -62,7 +63,7 @@ public sealed class GraphSynchronizer
 
         // 线路节点关联：connects_to（node → 外部 inode，属性 role；无端子/无外部连接时清空）。
         // R7：Line→LineNode 归属走 parent_of（SyncParentEdgeAsync），原归属边类型已下线；
-        //     line_segment 段边即 relation 值，走 RelationGraphSyncConsumer 管道。
+        //     line_segment 段边为 edges 表内置边类型，走 EdgeGraphSyncConsumer 管道。
         if (node.Tag == GraphNaming.LineNodeTag)
             await SyncLineNodeLinksAsync(node, ct);
 
@@ -98,10 +99,10 @@ public sealed class GraphSynchronizer
             .ToList() ?? [];
 
         foreach (var parent in existing.Where(p => p != node.ParentId))
-            await _client.DeleteEdgeAsync(GraphNaming.ParentOfEdge, parent, node.Id, ct);
+            await _client.DeleteEdgeAsync(GraphNaming.ParentOfEdge, parent, node.Id, 0, ct);
 
         if (node.ParentId is not null && !existing.Contains(node.ParentId))
-            await _client.UpsertEdgeAsync(GraphNaming.ParentOfEdge, node.ParentId, node.Id, null, ct);
+            await _client.UpsertEdgeAsync(GraphNaming.ParentOfEdge, node.ParentId, node.Id, 0, null, ct);
     }
 
     /// <summary>
@@ -122,13 +123,13 @@ public sealed class GraphSynchronizer
         var existingTargets = QueryColumn(connects, "target");
 
         foreach (var old in existingTargets.Where(x => x != terminal?.ExternalNodeId))
-            await _client.DeleteEdgeAsync(GraphNaming.ConnectsToEdge, node.Id, old, ct);
+            await _client.DeleteEdgeAsync(GraphNaming.ConnectsToEdge, node.Id, old, 0, ct);
 
         if (terminal?.ExternalNodeId is not null
             && !existingTargets.Contains(terminal.ExternalNodeId))
         {
             await _client.UpsertEdgeAsync(
-                GraphNaming.ConnectsToEdge, node.Id, terminal.ExternalNodeId,
+                GraphNaming.ConnectsToEdge, node.Id, terminal.ExternalNodeId, 0,
                 new Dictionary<string, object?>
                 {
                     ["role"] = terminal.Role.ToString(),
@@ -238,31 +239,53 @@ public sealed class GraphSynchronizer
     }
 
     // ============================================================
-    // 关系边（relation_attribute_values）
+    // 语义边（edges 表，EdgeSky 顶级实体）
     // ============================================================
 
     /// <summary>
-    /// 同步单条关系边。Delete 时 PG 行已不存在，依赖事件载荷定位图边；
-    /// upsert 同样以事件载荷为准（事件在 SaveChanges 成功后发布，载荷即最新状态）。
-    /// 图边属性：value_id / attribute_id / name。
+    /// 同步单条边（四元组定位）。Delete 时 PG 行已不存在，依赖事件载荷定位图边；
+    /// Upsert 回查 PG edges 读 props 整包投图（事件在 SaveChanges 成功后发布，PG 即最新状态；
+    /// 行已不存在 = 事件乱序/已删，按删除兜底，幂等）。
     /// </summary>
-    public async Task SyncRelationAsync(RelationChangedEvent evt, CancellationToken ct = default)
+    public async Task SyncEdgeAsync(EdgeChangedEvent evt, CancellationToken ct = default)
     {
-        if (evt.Kind == RelationChangeKind.Delete)
+        if (evt.Kind == EdgeChangeKind.Delete)
         {
-            await _client.DeleteEdgeAsync(evt.RelationType, evt.FromNodeId, evt.ToNodeId, ct);
-            _logger.LogInformation("图边已删除：{ValueId} type={Type}", evt.ValueId, evt.RelationType);
+            await _client.DeleteEdgeAsync(evt.EdgeType, evt.SrcVid, evt.DstVid, evt.Rank, ct);
+            _logger.LogInformation("图边已删除：{Type} {Src}->{Dst}@{Rank}",
+                evt.EdgeType, evt.SrcVid, evt.DstVid, evt.Rank);
             return;
         }
 
-        await _client.UpsertEdgeAsync(evt.RelationType, evt.FromNodeId, evt.ToNodeId,
-            new Dictionary<string, object?>
-            {
-                ["value_id"] = evt.ValueId,
-                ["attribute_id"] = evt.AttributeId,
-                ["name"] = evt.Name
-            }, ct);
-        _logger.LogDebug("图边已同步：{ValueId} type={Type}", evt.ValueId, evt.RelationType);
+        var row = await _db.Edges.AsNoTracking()
+            .Where(e => e.EdgeType == evt.EdgeType && e.SrcVid == evt.SrcVid
+                     && e.Rank == evt.Rank && e.DstVid == evt.DstVid)
+            .Select(e => new { e.Props })
+            .FirstOrDefaultAsync(ct);
+
+        if (row is null)
+        {
+            await _client.DeleteEdgeAsync(evt.EdgeType, evt.SrcVid, evt.DstVid, evt.Rank, ct);
+            _logger.LogInformation("图边按删除兜底（PG 行不存在）：{Type} {Src}->{Dst}@{Rank}",
+                evt.EdgeType, evt.SrcVid, evt.DstVid, evt.Rank);
+            return;
+        }
+
+        await _client.UpsertEdgeAsync(evt.EdgeType, evt.SrcVid, evt.DstVid, evt.Rank,
+            PropsToDict(row.Props), ct);
+        _logger.LogDebug("图边已同步：{Type} {Src}->{Dst}@{Rank}",
+            evt.EdgeType, evt.SrcVid, evt.DstVid, evt.Rank);
+    }
+
+    /// <summary>props jsonb → 属性字典（JsonElement 直传，PostAsJsonAsync 原生序列化；null 值跳过）。</summary>
+    internal static Dictionary<string, object?>? PropsToDict(JsonElement? props)
+    {
+        if (props is not { } p || p.ValueKind != JsonValueKind.Object) return null;
+        var dict = new Dictionary<string, object?>();
+        foreach (var prop in p.EnumerateObject())
+            if (prop.Value.ValueKind != JsonValueKind.Null)
+                dict[prop.Name] = prop.Value;
+        return dict.Count == 0 ? null : dict;
     }
 
     // ============================================================
@@ -331,21 +354,13 @@ public sealed class GraphSynchronizer
         // ── 线路顶点/节点 + parent_of（Line→LineNode）/ connects_to 边 ──
         var lineEdgeCount = await AddLineGraphAsync(vertices, edges, ct);
 
-        // ── 关系边（relation_attribute_values）──
-        var semanticEdges = await _db.RelationAttributeValues.AsNoTracking()
-            .Select(r => new { FromNodeId = r.EntityId, r.ToNodeId, r.RelationType, r.ValueId, r.AttributeId, r.Name })
+        // ── 语义边（edges 表，props 整包投图；含 line_segment 段边）──
+        var semanticEdges = await _db.Edges.AsNoTracking()
+            .Select(e => new { e.SrcVid, e.DstVid, e.EdgeType, e.Rank, e.Props })
             .ToListAsync(ct);
 
         foreach (var e in semanticEdges)
-        {
-            edges.Add(new EdgeItem(e.FromNodeId, e.ToNodeId, e.RelationType, 0,
-                new Dictionary<string, object?>
-                {
-                    ["value_id"] = e.ValueId,
-                    ["attribute_id"] = e.AttributeId,
-                    ["name"] = e.Name
-                }));
-        }
+            edges.Add(new EdgeItem(e.SrcVid, e.DstVid, e.EdgeType, e.Rank, PropsToDict(e.Props)));
 
         // ── 批量写入 ──
         // DROP SPACE 后重建 schema，storaged 侧生效滞后于 metad（官方建议等两个心跳周期），
@@ -433,21 +448,13 @@ public sealed class GraphSynchronizer
                 break;
 
             case SyncCategory.Edge:
-                var semanticEdges = await _db.RelationAttributeValues.AsNoTracking()
-                    .Select(r => new { FromNodeId = r.EntityId, r.ToNodeId, r.RelationType, r.ValueId, r.AttributeId, r.Name })
+                var semanticEdges = await _db.Edges.AsNoTracking()
+                    .Select(e => new { e.SrcVid, e.DstVid, e.EdgeType, e.Rank, e.Props })
                     .ToListAsync(ct);
 
                 semanticEdgeCount = semanticEdges.Count;
                 foreach (var e in semanticEdges)
-                {
-                    edges.Add(new EdgeItem(e.FromNodeId, e.ToNodeId, e.RelationType, 0,
-                        new Dictionary<string, object?>
-                        {
-                            ["value_id"] = e.ValueId,
-                            ["attribute_id"] = e.AttributeId,
-                            ["name"] = e.Name
-                        }));
-                }
+                    edges.Add(new EdgeItem(e.SrcVid, e.DstVid, e.EdgeType, e.Rank, PropsToDict(e.Props)));
                 break;
         }
 
@@ -509,7 +516,7 @@ public sealed class GraphSynchronizer
     /// <summary>
     /// 装载线路图：Line 顶点、LineNode 顶点（所属线路与端子角色）、
     /// parent_of（Line → LineNode，R7 归属边）与 connects_to（LineNode → 外部 inode，带 role）。
-    /// R7：line_segment 段边即 relation 值，由语义边段统一装载（计入 SemanticEdges）。
+    /// line_segment 段边为 edges 表记录，由语义边段统一装载（计入 SemanticEdges）。
     /// 返回追加的边数。
     /// </summary>
     private async Task<int> AddLineGraphAsync(

@@ -238,25 +238,12 @@ public sealed class SubtreeService
             .AsNoTracking()
             .ToDictionaryAsync(l => l.AttributeId, ct);
 
-        var relations = await _db.RelationAttributeValues
-            .Where(r => r.EntityId == entityId && r.EntityType == entityType)
-            .AsNoTracking()
-            .ToDictionaryAsync(r => r.AttributeId, ct);
-
-        var targetIds = relations.Values.Select(r => r.ToNodeId).Distinct().ToList();
-        var targetNames = targetIds.Count == 0
-            ? new Dictionary<string, string?>()
-            : await _db.Nodes
-                .Where(n => targetIds.Contains(n.Id))
-                .Select(n => new { n.Id, n.Name })
-                .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
-
         var lines = new List<string>();
 
         foreach (var def in defs)
         {
             var text = await FormatAttributeAsync(
-                def, values, locations, relations, targetNames,
+                def, values, locations,
                 entityId, entityType, ct);
 
             if (!string.IsNullOrWhiteSpace(text))
@@ -274,20 +261,9 @@ public sealed class SubtreeService
         AttributeDefinition def,
         Dictionary<string, AttributeValue> values,
         Dictionary<string, LocationAttributeValue> locations,
-        Dictionary<string, RelationAttributeValue> relations,
-        Dictionary<string, string?> targetNames,
         string entityId, string entityType,
         CancellationToken ct)
     {
-        // relation：独立关系表，展示「名称（→ 目标名）」
-        if (def.DataType == EavDataTypes.Relation)
-        {
-            if (!relations.TryGetValue(def.AttributeId, out var rel)) return null;
-            var target = targetNames.GetValueOrDefault(rel.ToNodeId) ?? rel.ToNodeId;
-            var label = string.IsNullOrWhiteSpace(rel.Name) ? target : rel.Name;
-            return $"{label}（→ {target}）";
-        }
-
         // location：独立表
         if (def.DataType == EavDataTypes.Location)
         {

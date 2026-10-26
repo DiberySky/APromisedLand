@@ -20,19 +20,32 @@ public class MetadataOptionSetsTests : E2ETestBase
     };
 
     // ============================================================
-    // 场景 1：页面加载 + 显示种子选项集
+    // 场景 1：页面加载 + 显示自建选项集
     // ============================================================
 
     [Fact]
-    public async Task Page_Loads_ShowsSeededSets()
+    public async Task Page_Loads_ShowsCreatedSet()
     {
-        await BlazorHelpers.GoToAsync(Page, "/metadata/option-sets");
-        await Page.WaitForSelectorAsync("h5:has-text('选项集管理')");
-        await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
+        // 种子已清空（EavSeeder 空实现）：自建一个选项集后断言列表可见
+        var setName = MetadataHelpers.Unique("e2e_seed");
+        using var http = NewHttp();
+        try
+        {
+            var createResp = await http.PostAsJsonAsync(
+                "/api/eav/metadata/option-sets",
+                new { entityType = "Shared", setName, displayName = setName });
+            createResp.EnsureSuccessStatusCode();
 
-        // EavSeeder 建了 gender / quality_grade
-        await Page.WaitForSelectorAsync("text=gender");
-        await Page.WaitForSelectorAsync("text=quality_grade");
+            await BlazorHelpers.GoToAsync(Page, "/metadata/option-sets");
+            await Page.WaitForSelectorAsync("h5:has-text('选项集管理')");
+            await BlazorHelpers.WaitForLoadingCompleteAsync(Page);
+
+            await Page.WaitForSelectorAsync($"text={setName}");
+        }
+        finally
+        {
+            await MetadataHelpers.TryDeleteOptionSetByNameAsync(http, setName);
+        }
     }
 
     // ============================================================

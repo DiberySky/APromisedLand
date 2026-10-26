@@ -108,6 +108,17 @@ builder.Services.AddGraphSync(builder.Configuration, enableSchemaInitializer: !i
 // LineSky 服务
 builder.Services.AddScoped<TreeGraph.Api.LineSky.Services.LineStructureService>();
 
+// EdgeSky 服务（NebulaGraph 对齐的顶级边模块）
+builder.Services.AddScoped<TreeGraph.Api.EdgeSky.Services.EdgeTypeService>();
+builder.Services.AddScoped<TreeGraph.Api.EdgeSky.Services.EdgeService>();
+// Nebula DDL 同步网关：Testing 环境（EavApiFactory 集成测试）无 NebulaGraph，注 Noop 空桩
+if (isTesting)
+    builder.Services.AddScoped<TreeGraph.Api.EdgeSky.Services.IEdgeSchemaGateway,
+        TreeGraph.Api.EdgeSky.Services.NoopEdgeSchemaGateway>();
+else
+    builder.Services.AddScoped<TreeGraph.Api.EdgeSky.Services.IEdgeSchemaGateway,
+        TreeGraph.Api.EdgeSky.Services.NebulaEdgeSchemaGateway>();
+
 // ★ iNode 宿主守卫（R3 收敛）：nodes 注册表守卫认领全部注册节点类型；
 //   尚未收编进 nodes 的 Line 保留专用守卫。EAV 写入前校验 inodeId 真实存在。
 builder.Services.AddScoped<IInodeOwnerGuard, TreeGraph.Api.NodeSky.Services.NodesRegistryGuard>();
@@ -164,6 +175,8 @@ if (!EF.IsDesignTime)
     await EavSeeder.SeedAsync(db);
     // 内置 Inode 宿主类型（三树）：边端点下拉与属性挂载依赖目录可见（幂等 upsert）
     await BuiltinHostTypeSeeder.SeedAsync(db);
+    // 内置边类型（line_segment）：LineSky 写路径硬依赖（幂等 upsert；须在 GraphSchemaInitializer 启动前）
+    await BuiltinEdgeTypeSeeder.SeedAsync(db);
 
     // E2E 基线（item/user/project + 固定 EntityId 示例值）仅开发/测试环境注入
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))

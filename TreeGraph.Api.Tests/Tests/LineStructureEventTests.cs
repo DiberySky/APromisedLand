@@ -7,8 +7,8 @@ using Xunit;
 namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
-/// R7 线路结构事件：段边即 relation 值，结构变更经 EAV 写入链发布
-/// RelationChangedEvent（Insert/Update/Delete）；原线路结构专用事件已删除。
+/// R7 线路结构事件：段边直写 edges 表（edge_type='line_segment'，rank 恒 0），
+/// 结构变更发布 EdgeChangedEvent（Upsert/Delete）。
 /// 只验证「事件是否发出、载荷是否正确」，图内投影由 LineStructureSyncTests 覆盖。
 /// </summary>
 [Collection("LineStructureEvents")]
@@ -24,7 +24,7 @@ public class LineStructureEventTests
     }
 
     [Fact]
-    public async Task CreateStructure_PublishesRelationChangedInsert()
+    public async Task CreateStructure_PublishesEdgeChangedUpsert()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         _factory.Publisher.Clear();
@@ -41,21 +41,20 @@ public class LineStructureEventTests
             });
         Assert.True(resp.IsSuccessStatusCode, await resp.Content.ReadAsStringAsync());
 
-        var events = _factory.Publisher.Of<RelationChangedEvent>();
+        var events = _factory.Publisher.Of<EdgeChangedEvent>();
         Assert.Equal(2, events.Count);
         Assert.All(events, e =>
         {
-            Assert.Equal(RelationChangeKind.Insert, e.Kind);
-            Assert.Equal("line_segment", e.RelationType);
-            Assert.False(string.IsNullOrWhiteSpace(e.ValueId));
-            Assert.False(string.IsNullOrWhiteSpace(e.AttributeId));
+            Assert.Equal(EdgeChangeKind.Upsert, e.Kind);
+            Assert.Equal("line_segment", e.EdgeType);
+            Assert.Equal(0, e.Rank);
         });
-        Assert.Contains(events, e => e.FromNodeId == n[0] && e.ToNodeId == n[1]);
-        Assert.Contains(events, e => e.FromNodeId == n[1] && e.ToNodeId == n[2]);
+        Assert.Contains(events, e => e.SrcVid == n[0] && e.DstVid == n[1]);
+        Assert.Contains(events, e => e.SrcVid == n[1] && e.DstVid == n[2]);
     }
 
     [Fact]
-    public async Task AddSegment_PublishesRelationChangedInsert()
+    public async Task AddSegment_PublishesEdgeChangedUpsert()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(3);
         var create = await _client.PostAsJsonAsync(
@@ -70,16 +69,15 @@ public class LineStructureEventTests
             new { fromNodeId = n[1], toNodeId = n[2], displayName = "新增段" });
         Assert.True(add.IsSuccessStatusCode, await add.Content.ReadAsStringAsync());
 
-        var evt = Assert.Single(_factory.Publisher.Of<RelationChangedEvent>());
-        Assert.Equal(RelationChangeKind.Insert, evt.Kind);
-        Assert.Equal("line_segment", evt.RelationType);
-        Assert.Equal(n[1], evt.FromNodeId);
-        Assert.Equal(n[2], evt.ToNodeId);
-        Assert.Equal("新增段", evt.Name);
+        var evt = Assert.Single(_factory.Publisher.Of<EdgeChangedEvent>());
+        Assert.Equal(EdgeChangeKind.Upsert, evt.Kind);
+        Assert.Equal("line_segment", evt.EdgeType);
+        Assert.Equal(n[1], evt.SrcVid);
+        Assert.Equal(n[2], evt.DstVid);
     }
 
     [Fact]
-    public async Task DeleteSegment_PublishesRelationChangedDelete()
+    public async Task DeleteSegment_PublishesEdgeChangedDelete()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(2);
         _factory.Publisher.Clear();
@@ -89,24 +87,23 @@ public class LineStructureEventTests
             new { segments = new[] { new { fromNodeId = n[0], toNodeId = n[1] } } });
         Assert.True(create.IsSuccessStatusCode, await create.Content.ReadAsStringAsync());
 
-        // 取边实例 id（value_id）作为 edgeId
-        var inserted = Assert.Single(_factory.Publisher.Of<RelationChangedEvent>());
         _factory.Publisher.Clear();
 
+        // 段边 Id = 四元组编码 edgeType:srcVid:rank:dstVid
+        var edgeId = $"line_segment:{n[0]}:0:{n[1]}";
         var del = await _client.DeleteAsync(
-            $"/api/eav/lines/{lineId}/structure/segments/{inserted.ValueId}");
+            $"/api/eav/lines/{lineId}/structure/segments/{edgeId}");
         Assert.True(del.IsSuccessStatusCode, await del.Content.ReadAsStringAsync());
 
-        var evt = Assert.Single(_factory.Publisher.Of<RelationChangedEvent>());
-        Assert.Equal(RelationChangeKind.Delete, evt.Kind);
-        Assert.Equal("line_segment", evt.RelationType);
-        Assert.Equal(inserted.ValueId, evt.ValueId);
-        Assert.Equal(n[0], evt.FromNodeId);
-        Assert.Equal(n[1], evt.ToNodeId);
+        var evt = Assert.Single(_factory.Publisher.Of<EdgeChangedEvent>());
+        Assert.Equal(EdgeChangeKind.Delete, evt.Kind);
+        Assert.Equal("line_segment", evt.EdgeType);
+        Assert.Equal(n[0], evt.SrcVid);
+        Assert.Equal(n[1], evt.DstVid);
     }
 
     [Fact]
-    public async Task LineNodeCreate_WithPredecessor_PublishesRelationInsertAndInodeSaved()
+    public async Task LineNodeCreate_WithPredecessor_PublishesEdgeUpsertAndInodeSaved()
     {
         var (lineId, n) = await CreateLineWithNodesAsync(1);
         _factory.Publisher.Clear();
@@ -119,18 +116,18 @@ public class LineStructureEventTests
         });
         Assert.True(resp.IsSuccessStatusCode, await resp.Content.ReadAsStringAsync());
 
-        var rel = Assert.Single(_factory.Publisher.Of<RelationChangedEvent>());
-        Assert.Equal(RelationChangeKind.Insert, rel.Kind);
-        Assert.Equal("line_segment", rel.RelationType);
-        Assert.Equal(n[0], rel.FromNodeId);
-        Assert.Equal(nodeId, rel.ToNodeId);
+        var edge = Assert.Single(_factory.Publisher.Of<EdgeChangedEvent>());
+        Assert.Equal(EdgeChangeKind.Upsert, edge.Kind);
+        Assert.Equal("line_segment", edge.EdgeType);
+        Assert.Equal(n[0], edge.SrcVid);
+        Assert.Equal(nodeId, edge.DstVid);
 
         Assert.Contains(_factory.Publisher.Of<InodeChangedEvent>(),
             e => e.InodeId == nodeId && e.Kind == InodeChangeKind.Saved);
     }
 
     [Fact]
-    public async Task LineNodeCreate_FirstNode_NoRelationEvent()
+    public async Task LineNodeCreate_FirstNode_NoEdgeEvent()
     {
         var lineId = await CreateLineAsync();
         _factory.Publisher.Clear();
@@ -143,7 +140,7 @@ public class LineStructureEventTests
         });
         Assert.True(resp.IsSuccessStatusCode, await resp.Content.ReadAsStringAsync());
 
-        Assert.Empty(_factory.Publisher.Of<RelationChangedEvent>());
+        Assert.Empty(_factory.Publisher.Of<EdgeChangedEvent>());
         Assert.Contains(_factory.Publisher.Of<InodeChangedEvent>(),
             e => e.InodeId == nodeId && e.Kind == InodeChangeKind.Saved);
     }

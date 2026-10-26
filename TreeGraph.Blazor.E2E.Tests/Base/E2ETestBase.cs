@@ -67,6 +67,20 @@ public abstract class E2ETestBase : IAsyncLifetime
     protected static string NewInodeId() => Guid.NewGuid().ToString("D");
 
     /// <summary>
+    /// 生成唯一 iNode ID 并注册进 nodes 注册表（声明类型需宿主节点存在，
+    /// 见 InodeOwnerGuardRegistry.EnsureNodeExistsAsync）。
+    /// </summary>
+    protected async Task<string> NewRegisteredInodeIdAsync()
+    {
+        var inodeId = NewInodeId();
+        using var http = new HttpClient { BaseAddress = new Uri(Fixture.Settings.ApiBaseUrl) };
+        var resp = await http.PostAsJsonAsync("/api/node",
+            new { id = inodeId, name = $"E2E节点_{inodeId[..8]}" });
+        resp.EnsureSuccessStatusCode();
+        return inodeId;
+    }
+
+    /// <summary>
     /// 通过 API 建实体类型（供 E2E 前置准备）。
     /// 直接调 API 而不是 UI，避免"类型管理"页面成为 E2E 的前置依赖。
     /// 不指定 entityType → 服务端自动生成 et_xxx 标识并返回。

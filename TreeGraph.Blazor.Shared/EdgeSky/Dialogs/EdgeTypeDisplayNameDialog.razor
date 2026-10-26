@@ -1,0 +1,31 @@
+@* EdgeTypeDisplayNameDialog.razor — 编辑边类型中文显示名（非 Nebula 概念，仅 UI 展示）。 *@
+@using TreeGraph.Blazor.Shared.Common
+
+<DialogSky Title="@($"编辑显示名 - {Name}")"
+           SubmitButtonVisible="true"
+           SubmitButtonText="保存"
+           OnSubmitClick="Submit">
+    <DialogContent>
+        <MudTextField @bind-Value="_displayName" Label="中文显示名称" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Immediate="true"
+                      HelperText="留空 = 清除显示名（回退为英文名）"
+                      Placeholder="关注关系" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>边类型名（只读展示）。</summary>
+    [Parameter] public string Name { get; set; } = string.Empty;
+
+    /// <summary>当前中文显示名（可为 null）。</summary>
+    [Parameter] public string? DisplayName { get; set; }
+
+    private string? _displayName;
+
+    protected override void OnInitialized() => _displayName = DisplayName;
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(
+        string.IsNullOrWhiteSpace(_displayName) ? null : _displayName.Trim()));
+}
