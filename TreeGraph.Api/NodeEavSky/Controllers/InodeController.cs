@@ -86,7 +86,7 @@ public class InodeController : ControllerBase
 
             cards.Add(new InodeTypeCardDto(
                 decl.EntityType,
-                gt?.DisplayName ?? decl.EntityType,
+                HostTypeCatalog.DisplayNameOrSelf(decl.EntityType, gt?.DisplayName),
                 gt?.EntityTypeId,
                 gt?.Description,
                 Declared: true,

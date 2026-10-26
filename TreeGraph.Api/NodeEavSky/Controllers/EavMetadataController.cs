@@ -53,10 +53,11 @@ public class EavMetadataController : ControllerBase
         if (!EavDataTypes.All.Contains(req.DataType))
             return BadRequest(new { error = $"未知的 dataType: {req.DataType}" });
 
-        // ---- 实体类型存在性 ----
-        // 关系类型目录已并入 EAV：边类型同样登记在 entity_type_definitions
-        var entityTypeExists = await _db.EntityTypes
-            .AnyAsync(t => t.EntityType == req.EntityType && !t.IsDeleted, ct);
+        // ---- 实体类型登记 ----
+        // 用户自建类型须已登记在 entity_type_catalog；内置宿主类型（四棵树 + 通用节点）免登记。
+        var entityTypeExists = HostTypeCatalog.Contains(req.EntityType)
+            || await _db.EntityTypes
+                .AnyAsync(t => t.EntityType == req.EntityType && !t.IsDeleted, ct);
         if (!entityTypeExists)
             return BadRequest(new
             {
@@ -544,7 +545,7 @@ public class EavMetadataController : ControllerBase
         if (table is null) return NotFound();
 
         var referenced = await _db.AttributeCatalog
-            .AnyAsync(a => a.RefTableDefinitionId == id && !a.IsDeleted, ct);
+            .AnyAsync(a => a.RefTableDefinitionId == id, ct);
         if (referenced)
             return BadRequest(new { error = "该自定义表仍被属性引用，无法删除" });
 
@@ -722,7 +723,7 @@ public class EavMetadataController : ControllerBase
         if (type is null) return NotFound();
 
         var referenced = await _db.AttributeCatalog
-            .AnyAsync(a => a.RefCompositeTypeId == id && !a.IsDeleted, ct);
+            .AnyAsync(a => a.RefCompositeTypeId == id, ct);
         if (referenced)
             return BadRequest(new { error = "该组合类型仍被属性引用，无法删除" });
 
@@ -829,7 +830,6 @@ public class EavMetadataController : ControllerBase
     [HttpGet("attributes")]
     public async Task<IActionResult> ListAttributes(
         [FromQuery] string? entityType,
-        [FromQuery] bool includeDeleted = false,
         CancellationToken ct = default)
     {
         var query = _db.AttributeCatalog
@@ -837,7 +837,6 @@ public class EavMetadataController : ControllerBase
             .Include(a => a.RefTableDefinition).Include(a => a.RefOptionSet)
             .AsQueryable();
 
-        if (!includeDeleted) query = query.Where(a => !a.IsDeleted);
         if (!string.IsNullOrEmpty(entityType))
             query = query.Where(a => a.EntityType == entityType);
 
@@ -871,11 +870,7 @@ public class EavMetadataController : ControllerBase
         string id, [FromBody] UpdateAttributeRequest req, CancellationToken ct)
     {
         var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
-        if (def is null || def.IsDeleted) return NotFound();
-
-        // 内置种子保护：固定 id 的属性拒改（R7）
-        if (AttributeDefinition.IsBuiltin(id))
-            return Conflict(new { error = "内置种子属性不可修改" });
+        if (def is null) return NotFound();
 
         if (req.DisplayName is not null) def.DisplayName = req.DisplayName;
         if (req.IsRequired is not null) def.IsRequired = req.IsRequired.Value;
@@ -968,10 +963,6 @@ public class EavMetadataController : ControllerBase
         var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
         if (def is null) return NotFound();
 
-        // 内置种子保护：固定 id 的属性拒删（R7）
-        if (AttributeDefinition.IsBuiltin(id))
-            return Conflict(new { error = "内置种子属性不可删除" });
-
         // 子项为空方可删除本项（不采用级联删除）：该属性已产生实例数据时拒绝
         var hasValues = await _db.AttributeValues.AnyAsync(v => v.AttributeId == id, ct);
         var hasLocations = await _db.LocationAttributeValues.AnyAsync(l => l.AttributeId == id, ct);
@@ -979,8 +970,7 @@ public class EavMetadataController : ControllerBase
         if (hasValues || hasLocations || hasRows)
             return BadRequest(new { error = "该属性已产生实例数据，无法删除。请先清空该属性的全部数据。" });
 
-        def.IsDeleted = true;
-        def.UpdatedAt = DateTimeOffset.UtcNow;
+        _db.AttributeCatalog.Remove(def);
         await _db.SaveChangesAsync(ct);
         _attrCache.Invalidate(def.EntityType);
         return NoContent();
@@ -992,7 +982,7 @@ public class EavMetadataController : ControllerBase
 
     private static AttributeDetailDto ToAttributeDetailDto(AttributeDefinition a) => new(
         a.AttributeId, a.EntityType, a.AttributeName, a.DisplayName, a.DataType,
-        a.IsRequired, a.IsSearchable, a.IsSortable, a.IsDeleted,
+        a.IsRequired, a.IsSearchable, a.IsSortable,
         a.Version, a.DisplayOrder, a.DefaultValue, a.CreatedAt, a.UpdatedAt,
         a.AllowedValues != null ? a.AllowedValues.RootElement.Clone() : (JsonElement?)null,
         a.ValidationRule != null ? a.ValidationRule.RootElement.Clone() : (JsonElement?)null,
@@ -1042,39 +1032,6 @@ public class EavMetadataController : ControllerBase
         t.IsDeleted);                            // ★ 透出类型删除状态
 
     // ---------- 软删除恢复（undelete） ----------
-
-    /// <summary>
-    /// ★ 恢复被软删除的属性。
-    ///
-    /// 唯一约束（entity_type, attribute_name）不区分 IsDeleted：
-    /// 若已存在同名的活动属性，恢复会失败 → 返回 409。
-    /// </summary>
-    [HttpPost("attributes/{id}/undelete")]
-    public async Task<IActionResult> UndeleteAttribute(string id, CancellationToken ct)
-    {
-        var def = await _db.AttributeCatalog.FindAsync(new object[] { id }, ct);
-        if (def is null) return NotFound();
-        if (!def.IsDeleted) return NoContent();   // 幂等
-
-        var conflict = await _db.AttributeCatalog.AnyAsync(
-            a => a.AttributeId != id
-              && a.EntityType == def.EntityType
-              && a.AttributeName == def.AttributeName
-              && !a.IsDeleted, ct);
-
-        if (conflict)
-            return Conflict(new
-            {
-                error = $"同名的活动属性已存在（{def.EntityType}.{def.AttributeName}），" +
-                        "请先删除或改名后再恢复"
-            });
-
-        def.IsDeleted = false;
-        def.UpdatedAt = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(ct);
-        _attrCache.Invalidate(def.EntityType);
-        return NoContent();
-    }
 
     /// <summary>
     /// ★ 恢复被软删除的组合类型（同时恢复其字段）。

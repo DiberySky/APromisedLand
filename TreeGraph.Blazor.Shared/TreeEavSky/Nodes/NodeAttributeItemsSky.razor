@@ -126,7 +126,7 @@ else
             //（已关注但不在共享列表中的类型仍需列出，否则无法取消绑定）
             if (AllowManage)
             {
-                var allTypes = await EavApi.ListEntityTypesAsync(sharedOnly: true);
+                var allTypes = await EavApi.ListEntityTypesAsync();
                 var cardMap = _cards.ToDictionary(c => c.EntityType);
                 var rows = new List<TypeBindRow>();
                 var seen = new HashSet<string>();

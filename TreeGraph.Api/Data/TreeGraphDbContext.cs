@@ -227,9 +227,6 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Description)
                 .HasColumnName("description")
                 .HasMaxLength(1000);
-            e.Property(x => x.OwnerSpaceId)
-                .HasColumnName("owner_space_id")
-                .HasMaxLength(36);
             e.Property(x => x.DisplayOrder).HasColumnName("display_order");
             e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
@@ -240,13 +237,6 @@ public class TreeGraphDbContext : DbContext
                 .IsUnique()
                 .HasDatabaseName("uq_entity_type")
                 .HasFilter("is_deleted = false");
-
-            // 按空间过滤可见类型（共享 ∪ 本空间独占）
-            e.HasIndex(x => x.OwnerSpaceId)
-                .HasDatabaseName("ix_entity_type_owner_space");
-
-            // 内置实体类型种子（当前为空；曾有的 LineStructure 已随 relation 体系下线）
-            e.HasData(EntityTypeDefinition.SeedData());
         });
     }
 
@@ -322,7 +312,6 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.IsRequired).HasColumnName("is_required");
             e.Property(x => x.IsSearchable).HasColumnName("is_searchable");
             e.Property(x => x.IsSortable).HasColumnName("is_sortable");
-            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
             e.Property(x => x.Version).HasColumnName("version");
             e.Property(x => x.DisplayOrder).HasColumnName("display_order");
             e.Property(x => x.DefaultValue).HasColumnName("default_value").HasMaxLength(500);
@@ -341,8 +330,7 @@ public class TreeGraphDbContext : DbContext
                 .HasDatabaseName("uq_attr_catalog");
 
             e.HasIndex(x => x.EntityType)
-                .HasDatabaseName("ix_attr_catalog_entity")
-                .HasFilter("is_deleted = false");
+                .HasDatabaseName("ix_attr_catalog_entity");
 
             e.HasOne(x => x.RefCompositeType)
                 .WithMany().HasForeignKey(x => x.RefCompositeTypeId)
@@ -356,8 +344,6 @@ public class TreeGraphDbContext : DbContext
 
             e.HasOne(x => x.RefOptionSet).WithMany()
                 .HasForeignKey(x => x.RefOptionSetId).OnDelete(DeleteBehavior.Restrict);
-
-            e.HasData(AttributeDefinition.SeedData());
         });
     }
 
@@ -717,16 +703,9 @@ public class TreeGraphDbContext : DbContext
     {
         mb.Entity<AttributeAuditLog>(e =>
         {
-            // ★ 按月分区表（审计只增不减，分区便于按月归档/清理）：
-            //   分区表 DDL 由迁移中的手写 SQL 创建（PARTITION BY RANGE），
-            //   EF 只负责运行时映射，故排除出自动迁移。
-            //   ★★ 建表 SQL 位于 migrations/MigrationSqlExtensions.CreateAuditPartitionTable：
-            //     重建 Initial 迁移（drop 库 + 重建）时必须确认该扩展方法仍被迁移调用，
-            //     否则启动时 42P01 relation "attribute_audit_log" does not exist。
-            //   月度分区由 AuditPartitionMaintenance 运行时按需创建。
-            e.ToTable("attribute_audit_log", t => t.ExcludeFromMigrations());
-            // ★ PG 分区表主键必须包含分区键 changed_at。
-            e.HasKey(x => new { x.AuditId, x.ChangedAt });
+            // 审计只增不减，普通表 + 两个索引即可（此前按月分区，仅为归档便利，已取消）。
+            e.ToTable("attribute_audit_log");
+            e.HasKey(x => x.AuditId);
             e.Property(x => x.AuditId)
                 .HasColumnName("audit_id")
                 .HasMaxLength(36).IsRequired()

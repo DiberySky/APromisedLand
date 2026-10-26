@@ -235,7 +235,7 @@ dotnet test TreeGraph.Api.Tests/TreeGraph.Api.Tests.csproj --filter "FullyQualif
 4. 读 `TreeGraph.Blazor.Shared.Tests/LineSky/LineStructureDialogSmokeTests.cs` —— 这是当前仓库唯一覆盖 `LineStructureDialog` 前端渲染的自动化测试，以后改 Dialog 先跑这个。
 5. 工作区已干净，HEAD `88970fd`，无需先做清理。
 
-**重要坑提醒：重新生成 Initial 迁移时（清库后），必须在 Up() 末尾手动调 `migrationBuilder.CreateAuditPartitionTable()`，否则 `attribute_audit_log` 分区表不建，Testcontainers 启动即 `42P01 relation "attribute_audit_log" does not exist`。Down() 末尾对应调 `DropAuditPartitionTable()`。详见 `MigrationSqlExtensions.cs`。**
+**审计表说明：`attribute_audit_log` 已改为普通表（不再按月分区），由 EF 迁移正常生成建表 DDL；`MigrationSqlExtensions.cs` 与 `AuditPartitionMaintenance` 已删除，重建 Initial 迁移不再需要任何手写补丁。**
 
 ---
 

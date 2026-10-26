@@ -112,14 +112,10 @@ else
         FullWidth = true
     };
 
-    /// <summary>打开该空间的实体类型定义对话框（属性设置入口：共享 ∪ 本空间独占，新建默认独占本空间）。</summary>
+    /// <summary>打开实体类型定义对话框（动态属性入口）。</summary>
     private async Task OpenEntityTypeDefsAsync(SpaceDto space)
     {
-        var parameters = new DialogParameters<EntityTypeDefinitionsDialog>
-        {
-            { x => x.SpaceId, space.Id },
-            { x => x.SpaceName, space.Name }
-        };
+        var parameters = new DialogParameters<EntityTypeDefinitionsDialog>();
         var options = new DialogOptionsEx
         {
             Position = DialogPosition.TopCenter,

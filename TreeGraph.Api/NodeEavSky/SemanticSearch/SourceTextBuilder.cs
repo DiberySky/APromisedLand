@@ -346,7 +346,7 @@ public sealed class SourceTextBuilder
         var contentCount = 0;
 
         var attrs = _db.AttributeCatalog
-            .Where(a => a.EntityType == entityType && !a.IsDeleted)
+            .Where(a => a.EntityType == entityType)
             .ToList();
         var defs = attrs
             .OrderBy(a => a.DisplayOrder)

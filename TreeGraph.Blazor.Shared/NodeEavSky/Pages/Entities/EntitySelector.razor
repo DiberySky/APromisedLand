@@ -290,7 +290,7 @@ else
         _loading = true;
         try
         {
-            _entityTypes = await Api.ListEntityTypesAsync(sharedOnly: true);
+            _entityTypes = await Api.ListEntityTypesAsync();
             if (_entityTypes is null)
                 Snackbar.Add("实体类型加载失败，请检查后端服务", Severity.Warning);
         }

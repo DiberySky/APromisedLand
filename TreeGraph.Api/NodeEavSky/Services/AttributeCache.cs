@@ -35,7 +35,7 @@ public class AttributeCache : IAttributeCache
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
             return db.AttributeCatalog
-                .Where(a => a.EntityType == entityType && !a.IsDeleted)
+                .Where(a => a.EntityType == entityType)
                 .OrderBy(a => a.DisplayOrder)
                 .AsNoTracking()
                 .ToList();

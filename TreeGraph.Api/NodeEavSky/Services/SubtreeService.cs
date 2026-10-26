@@ -199,7 +199,8 @@ public sealed class SubtreeService
 
             foreach (var m in entities)
             {
-                var typeDisplay = typeDisplayMap.GetValueOrDefault(m.EntityType, m.EntityType);
+                var typeDisplay = HostTypeCatalog.DisplayNameOrSelf(m.EntityType,
+                    typeDisplayMap.GetValueOrDefault(m.EntityType));
                 var lines = await RenderEntityAsync(
                     m.EntityId, m.EntityType, ct);
 

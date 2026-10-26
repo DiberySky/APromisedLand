@@ -286,7 +286,7 @@ else
         try
         {
             _cards = await Api.ListInodeTypeCardsAsync(InodeId);
-            _allTypes = await Api.ListEntityTypesAsync(sharedOnly: true);
+            _allTypes = await Api.ListEntityTypesAsync();
         }
         finally
         {

@@ -5,30 +5,18 @@
 
 @using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
 
-<DialogSky Title="@_title"
+<DialogSky Title="实体类型定义"
            SubmitButtonVisible="false"
            CancelButtonVisible="true"
            CancelButtonText="关闭"
            OnCanceledClick="@Close">
     <DialogContent>
-        <EntityTypes IsDialogMode="true"
-                     SpaceId="@SpaceId"
-                     SpaceName="@SpaceName"
-                     ExclusiveOnly="true" />
+        <EntityTypes IsDialogMode="true" />
     </DialogContent>
 </DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
-
-    /// <summary>空间过滤：仅显示 共享类型 ∪ 该空间独占类型；新建时默认独占该空间。</summary>
-    [Parameter] public string? SpaceId { get; set; }
-    /// <summary>空间显示名（标题后缀）。</summary>
-    [Parameter] public string? SpaceName { get; set; }
-
-    private string _title => string.IsNullOrEmpty(SpaceName)
-        ? "实体类型定义"
-        : $"实体类型定义 · {SpaceName}";
 
     private void Close()
     {

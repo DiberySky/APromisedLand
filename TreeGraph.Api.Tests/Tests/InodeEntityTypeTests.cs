@@ -61,17 +61,21 @@ public class InodeEntityTypeTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Attach_UnknownType_Returns400()
+    public async Task Attach_TypeNotInCatalog_Succeeds()
     {
+        // EAV 不感知实体类型目录：未登记的类型同样可声明
         var inodeId = NewInodeId();
         var unknown = $"Nonexistent_{Guid.NewGuid():N}";
 
         var resp = await Client.PostAsync(
             $"/api/inode/{inodeId}/types/{unknown}", content: null);
 
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-        var body = await resp.Content.ReadAsStringAsync();
-        Assert.Contains("不存在", body);
+        Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
+
+        var list = await Client.GetEavAsync<List<InodeTypeCardDto>>(
+            $"/api/inode/{inodeId}/types");
+        Assert.NotNull(list);
+        Assert.Equal(unknown, Assert.Single(list!).EntityType);
     }
 
     // ============================================================

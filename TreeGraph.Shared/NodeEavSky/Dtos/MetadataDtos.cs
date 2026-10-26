@@ -205,7 +205,6 @@ public record AttributeDetailDto(
     bool IsRequired,
     bool IsSearchable,
     bool IsSortable,
-    bool IsDeleted,
     int Version,
     int DisplayOrder,
     string? DefaultValue,

@@ -99,15 +99,11 @@ public class InodeEntityService : IInodeEntityService
         // 1.5 宿主存在性：inodeId 必须是真实节点（树节点守卫等）
         await _ownerGuards.EnsureNodeExistsAsync(inodeId, ct);
 
-        // 2. 类型存在性（查 entity_type_catalog）
-        if (!await TypeExistsAsync(entityType, ct))
-            throw new InvalidOperationException($"实体类型不存在: {entityType}");
-
-        // 3. 生成 entity_id（与现有 EAV 用法一致，GUID 字符串）
+        // 2. 生成 entity_id（与现有 EAV 用法一致，GUID 字符串）
         var entityId = Guid.NewGuid().ToString("D");
         var now = DateTimeOffset.UtcNow;
 
-        // 4. 写归属映射
+        // 3. 写归属映射
         _db.InodeEntities.Add(new InodeEntity
         {
             InodeId = inodeId,
@@ -248,10 +244,6 @@ public class InodeEntityService : IInodeEntityService
         // 宿主存在性：只有真实节点才能关注实体类型
         await _ownerGuards.EnsureNodeExistsAsync(inodeId, ct);
 
-        // 类型存在性（查 entity_type_catalog）
-        if (!await TypeExistsAsync(entityType, ct))
-            throw new InvalidOperationException($"实体类型不存在: {entityType}");
-
         _db.InodeEntityTypes.Add(new InodeEntityType
         {
             InodeId = inodeId,
@@ -279,27 +271,5 @@ public class InodeEntityService : IInodeEntityService
         _db.InodeEntityTypes.Remove(link);
         await _db.SaveChangesAsync(ct);
         return true;
-    }
-
-    // ============================================================
-    // 内部辅助：类型存在性检查
-    // ============================================================
-
-    /// <summary>
-    /// 类型存在性检查（查 entity_type_catalog，不是 attribute_catalog）。
-    ///
-    /// ★ 之前的 bug：误查 attribute_catalog，导致"无属性的类型"被判定为不存在。
-    ///   语义上，类型是否存在于 entity_type_catalog 与是否有属性无关。
-    ///
-    ///   例外场景（允许"无属性类型"的操作）：
-    ///     - 声明（Attach）：允许
-    ///     - 创建实体（GetOrCreateEntityId）：允许，但实际写入时若无属性会被
-    ///       未知属性检查拒绝，等同"写不进任何东西"
-    /// </summary>
-    private async Task<bool> TypeExistsAsync(
-        string entityType, CancellationToken ct)
-    {
-        return await _db.EntityTypes
-            .AnyAsync(t => t.EntityType == entityType && !t.IsDeleted, ct);
     }
 }

@@ -1,9 +1,6 @@
 @* EntityTypeEditDialog.razor — 新建 / 编辑实体类型（DialogSky 外壳，与树节点对话框风格一致） *@
 @inject EavApiClient Api
-@inject SpaceApiClient SpaceApi
 @inject ISnackbar Snackbar
-@using TreeGraph.Blazor.Shared.SpaceSky
-@using TreeGraph.Blazor.Shared.SpaceSky.Services
 
 <DialogSky Title="@(Editing is null ? "新建实体类型" : "编辑实体类型")"
                SubmitButtonVisible="true"
@@ -47,44 +44,6 @@
                       Lines="2"
                       Class="mb-3" />
 
-        @* 范围（仅新建时可选）：共享 = 所有空间可见；独占 = 仅所属空间可见。
-           带空间上下文（DefaultOwnerSpaceId）时锁定为独占该空间；
-           ForceShared（仅共享视图）时隐藏选择，新建必为共享。 *@
-        @if (Editing is null && !ForceShared)
-        {
-            @if (!string.IsNullOrEmpty(DefaultOwnerSpaceId))
-            {
-                <MudAlert Severity="Severity.Normal" Dense="true" Class="mb-3" Variant="Variant.Outlined">
-                    <MudText Typo="Typo.caption">
-                        范围：独占 · @(DefaultOwnerSpaceName ?? DefaultOwnerSpaceId)
-                    </MudText>
-                </MudAlert>
-            }
-            else
-            {
-                <MudRadioGroup T="bool" @bind-Value="_form.IsExclusive" Class="mb-2">
-                    <MudRadio T="bool" Value="false" Color="Color.Success" Dense="true">共享（所有空间可见）</MudRadio>
-                    <MudRadio T="bool" Value="true" Color="Color.Warning" Dense="true">独占（仅所属空间可见）</MudRadio>
-                </MudRadioGroup>
-
-                @if (_form.IsExclusive)
-                {
-                    <MudSelect T="string"
-                               @bind-Value="_form.OwnerSpaceId"
-                               Label="所属空间"
-                               Variant="Variant.Outlined"
-                               Class="mb-3"
-                               Required="true"
-                               RequiredError="独占类型须选择所属空间">
-                        @foreach (var s in _spaces ?? [])
-                        {
-                            <MudSelectItem T="string" Value="@s.Id">@s.Name</MudSelectItem>
-                        }
-                    </MudSelect>
-                }
-            }
-        }
-
         <NumberInputField T="int"
                           @bind-Value="_form.DisplayOrder"
                           Label="显示顺序" />
@@ -98,23 +57,9 @@
     [Parameter] public EntityTypeDetailDto? Editing { get; set; }
     /// <summary>新建模式下的初始显示顺序（现有类型数 + 1）。</summary>
     [Parameter] public int InitialDisplayOrder { get; set; }
-    /// <summary>空间上下文：新建时锁定为独占该空间（隐藏范围选择）。</summary>
-    [Parameter] public string? DefaultOwnerSpaceId { get; set; }
-    /// <summary>空间上下文显示名。</summary>
-    [Parameter] public string? DefaultOwnerSpaceName { get; set; }
-    /// <summary>仅共享视图：隐藏范围选择，新建必为共享类型。</summary>
-    [Parameter] public bool ForceShared { get; set; }
 
     private FormModel _form = new();
     private bool _submitting;
-    private IReadOnlyList<SpaceDto>? _spaces;
-
-    protected override async Task OnInitializedAsync()
-    {
-        // 新建且可选范围时预载空间列表（独占需要选择所属空间）
-        if (Editing is null && string.IsNullOrEmpty(DefaultOwnerSpaceId))
-            _spaces = await SpaceApi.GetAllAsync() ?? [];
-    }
 
     protected override void OnParametersSet()
     {
@@ -141,18 +86,6 @@
         {
             if (Editing is null)
             {
-                // 范围解析：锁定上下文 > 用户选择（独占须选空间）
-                string? ownerSpaceId = !string.IsNullOrEmpty(DefaultOwnerSpaceId)
-                    ? DefaultOwnerSpaceId
-                    : _form.IsExclusive ? _form.OwnerSpaceId : null;
-
-                if (_form.IsExclusive && string.IsNullOrEmpty(DefaultOwnerSpaceId)
-                    && string.IsNullOrWhiteSpace(ownerSpaceId))
-                {
-                    Snackbar.Add("独占类型须选择所属空间", Severity.Warning);
-                    return;
-                }
-
                 // 新建：EntityType 为空时服务端自动生成 et_xxxx，否则使用用户指定值
                 var id = await Api.CreateEntityTypeAsync(new CreateEntityTypeRequest
                 {
@@ -161,8 +94,7 @@
                     DisplayName = _form.DisplayName.Trim(),
                     Description = string.IsNullOrWhiteSpace(_form.Description)
                         ? null : _form.Description,
-                    DisplayOrder = _form.DisplayOrder,
-                    OwnerSpaceId = ownerSpaceId
+                    DisplayOrder = _form.DisplayOrder
                 });
 
                 if (id is null)
@@ -208,8 +140,5 @@
         public string EntityType { get; set; } = "";
         public string Description { get; set; } = "";
         public int DisplayOrder { get; set; }
-        /// <summary>范围：false=共享；true=独占（须选 OwnerSpaceId）。</summary>
-        public bool IsExclusive { get; set; }
-        public string? OwnerSpaceId { get; set; }
     }
 }

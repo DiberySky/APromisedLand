@@ -115,7 +115,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
     private static AttributeDetailDto Attribute() => new(
         AttributeId: "a-1", EntityType: "Product", AttributeName: "color",
         DisplayName: "颜色", DataType: "string", IsRequired: false,
-        IsSearchable: true, IsSortable: true, IsDeleted: false, Version: 1,
+        IsSearchable: true, IsSortable: true, Version: 1,
         DisplayOrder: 1, DefaultValue: null, CreatedAt: DateTimeOffset.UtcNow,
         UpdatedAt: DateTimeOffset.UtcNow, AllowedValues: null, ValidationRule: null,
         UnitId: null, UnitName: null, UnitAbbreviation: null,

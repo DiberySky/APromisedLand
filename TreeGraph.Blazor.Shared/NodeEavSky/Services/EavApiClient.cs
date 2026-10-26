@@ -367,13 +367,11 @@ public class EavApiClient
     // ============================================================
 
     public async Task<IReadOnlyList<AttributeDetailDto>?> ListAttributesAsync(
-        string? entityType = null, bool includeDeleted = false,
-        CancellationToken ct = default)
+        string? entityType = null, CancellationToken ct = default)
     {
         var query = new List<string>();
         if (!string.IsNullOrEmpty(entityType))
             query.Add($"entityType={Uri.EscapeDataString(entityType)}");
-        if (includeDeleted) query.Add("includeDeleted=true");
 
         var url = "api/eav/metadata/attributes";
         if (query.Count > 0) url += "?" + string.Join("&", query);
@@ -385,31 +383,21 @@ public class EavApiClient
         string id, CancellationToken ct = default)
         => GetAsync<AttributeDetailDto>($"api/eav/metadata/attributes/{id}", ct);
 
-    /// <summary>
-    /// 实体类型摘要列表。
-    /// sharedOnly=true 时仅返回共享类型（全局选择器场景：树节点属性、实体选择等）。
-    /// </summary>
+    /// <summary>实体类型摘要列表（全局共享）。</summary>
     public async Task<IReadOnlyList<EntityTypeSummaryDto>?> ListEntityTypesAsync(
-        CancellationToken ct = default, bool sharedOnly = false)
+        CancellationToken ct = default)
         => await GetAsync<IReadOnlyList<EntityTypeSummaryDto>>(
-            sharedOnly ? "api/eav/entity-types?sharedOnly=true" : "api/eav/entity-types", ct);
+            "api/eav/entity-types", ct);
 
     /// <summary>
     /// 一次拉取所有实体类型详情（含属性计数）。
     /// 替代"ListEntityTypesAsync + N 次 GetEntityTypeAsync"的 N+1 模式。
-    /// 带 spaceId 时仅返回 共享类型 ∪ 该空间独占类型；sharedOnly 时仅返回共享类型。
     /// </summary>
     public async Task<IReadOnlyList<EntityTypeDetailDto>?> ListEntityTypeDetailsAsync(
-        bool includeDeleted = false, string? spaceId = null,
-        bool sharedOnly = false, bool exclusiveOnly = false,
-        CancellationToken ct = default)
+        bool includeDeleted = false, CancellationToken ct = default)
     {
         var url = "api/eav/entity-types/details";
-        var sep = '?';
-        if (includeDeleted) { url += "?includeDeleted=true"; sep = '&'; }
-        if (!string.IsNullOrEmpty(spaceId)) { url += $"{sep}spaceId={Uri.EscapeDataString(spaceId)}"; sep = '&'; }
-        if (sharedOnly) { url += $"{sep}sharedOnly=true"; sep = '&'; }
-        if (exclusiveOnly) url += $"{sep}exclusiveOnly=true";
+        if (includeDeleted) url += "?includeDeleted=true";
         return await GetAsync<IReadOnlyList<EntityTypeDetailDto>>(url, ct);
     }
 
@@ -541,11 +529,6 @@ public class EavApiClient
     // ============================================================
     // undelete 端点
     // ============================================================
-
-    public Task<(bool Ok, string? Error)> UndeleteAttributeAsync(
-        string attributeId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/attributes/{attributeId}/undelete", ct);
 
     public Task<(bool Ok, string? Error)> UndeleteCompositeTypeAsync(
         string compositeTypeId, CancellationToken ct = default)

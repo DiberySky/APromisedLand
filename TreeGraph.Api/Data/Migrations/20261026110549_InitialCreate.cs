@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -14,8 +14,27 @@ namespace TreeGraph.Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // 手写 SQL：attribute_audit_log 按月分区父表（实体 ExcludeFromMigrations，EF 不生成 DDL）
-            migrationBuilder.CreateAuditPartitionTable();
+            migrationBuilder.CreateTable(
+                name: "attribute_audit_log",
+                columns: table => new
+                {
+                    audit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    old_value = table.Column<string>(type: "text", nullable: true),
+                    new_value = table.Column<string>(type: "text", nullable: true),
+                    change_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    changed_by = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    changed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    correlation_id = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    client_ip = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_attribute_audit_log", x => x.audit_id);
+                });
 
             migrationBuilder.CreateTable(
                 name: "composite_type_definitions",
@@ -64,7 +83,6 @@ namespace TreeGraph.Api.Data.Migrations
                     entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    owner_space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
                     display_order = table.Column<int>(type: "integer", nullable: false),
                     is_deleted = table.Column<bool>(type: "boolean", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -340,7 +358,6 @@ namespace TreeGraph.Api.Data.Migrations
                     is_required = table.Column<bool>(type: "boolean", nullable: false),
                     is_searchable = table.Column<bool>(type: "boolean", nullable: false),
                     is_sortable = table.Column<bool>(type: "boolean", nullable: false),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
                     version = table.Column<int>(type: "integer", nullable: false),
                     display_order = table.Column<int>(type: "integer", nullable: false),
                     allowed_values = table.Column<JsonDocument>(type: "jsonb", nullable: true),
@@ -667,50 +684,6 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.InsertData(
-                table: "attribute_catalog",
-                columns: new[] { "attribute_id", "allowed_values", "attribute_name", "created_at", "data_type", "default_value", "display_name", "display_order", "entity_type", "is_deleted", "IsRecordMode", "is_required", "is_searchable", "is_sortable", "ref_composite_type_id", "ref_option_set_id", "ref_table_definition_id", "unit_id", "updated_at", "validation_rule", "version" },
-                values: new object[,]
-                {
-                    { "a0000001-0000-4000-8000-000000000001", null, "voltageLevel", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "电压等级", 0, "ConnectedTo", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000002-0000-4000-8000-000000000002", null, "connectionMode", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "连接方式", 1, "ConnectedTo", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000003-0000-4000-8000-000000000003", null, "supplyDirection", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "供电方向", 0, "SuppliedBy", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000004-0000-4000-8000-000000000004", null, "isPrimarySupply", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "bool", null, "是否主供", 1, "SuppliedBy", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000005-0000-4000-8000-000000000005", null, "cableSegmentCount", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "int", null, "电缆段数", 0, "LowVoltageAccess", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000006-0000-4000-8000-000000000006", null, "cableLength", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "decimal", null, "电缆长度", 1, "LowVoltageAccess", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000007-0000-4000-8000-000000000007", null, "voltageLevel", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "电压等级", 0, "TransmissionLine", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000008-0000-4000-8000-000000000008", null, "commissionDate", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "date", null, "投运日期", 1, "TransmissionLine", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000009-0000-4000-8000-000000000009", null, "ratedCurrent", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "decimal", null, "额定载流量", 0, "Feeder", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000010-0000-4000-8000-000000000010", null, "isSingleSource", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "bool", null, "单电源", 1, "Feeder", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000011-0000-4000-8000-000000000011", null, "belongType", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "归属类型", 0, "BelongsTo", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000012-0000-4000-8000-000000000012", null, "effectiveDate", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "date", null, "生效日期", 1, "BelongsTo", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000013-0000-4000-8000-000000000013", null, "assignType", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "归属类型", 0, "AssignedTo", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000014-0000-4000-8000-000000000014", null, "installYear", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "int", null, "安装年份", 0, "InstalledIn", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000015-0000-4000-8000-000000000015", null, "installedCapacity", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "decimal", null, "装机容量", 1, "InstalledIn", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000016-0000-4000-8000-000000000016", null, "distance", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "decimal", null, "距离", 0, "AdjacentTo", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000017-0000-4000-8000-000000000017", null, "shareBoundary", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "bool", null, "共享边界", 1, "AdjacentTo", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000018-0000-4000-8000-000000000018", null, "position", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "location", null, "位置", 0, "LocatedAt", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000019-0000-4000-8000-000000000019", null, "protectionType", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "保护类型", 0, "Protects", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000020-0000-4000-8000-000000000020", null, "settingValue", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "保护定值", 1, "Protects", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000021-0000-4000-8000-000000000021", null, "coordinationGap", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "decimal", null, "配合级差", 0, "BacksUp", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000022-0000-4000-8000-000000000022", null, "timeSetting", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "decimal", null, "时间定值", 1, "BacksUp", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000023-0000-4000-8000-000000000023", null, "ruleCode", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "规则编号", 0, "PrerequisiteFor", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000024-0000-4000-8000-000000000024", null, "precondition", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "前置条件", 1, "PrerequisiteFor", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000025-0000-4000-8000-000000000025", null, "dependencyType", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "依赖类型", 0, "DependsOn", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000026-0000-4000-8000-000000000026", null, "impactLevel", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "影响等级", 0, "Affects", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000027-0000-4000-8000-000000000027", null, "estimatedRecoveryMinutes", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "int", null, "预计恢复时长", 1, "Affects", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000028-0000-4000-8000-000000000028", null, "eventTime", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "datetime", null, "事件时刻", 0, "TrippedBy", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000029-0000-4000-8000-000000000029", null, "faultType", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "故障类型", 1, "TrippedBy", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000030-0000-4000-8000-000000000030", null, "room", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "房间", 1, "LocatedAt", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000031-0000-4000-8000-000000000031", null, "settingUnit", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "定值单位", 2, "Protects", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000032-0000-4000-8000-000000000032", null, "clearance_m", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "decimal", null, "垂直净距（米）", 1, "LineNode", false, false, true, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000033-0000-4000-8000-000000000033", null, "crossing_angle", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "decimal", null, "交叉角（度）", 2, "LineNode", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000034-0000-4000-8000-000000000034", null, "crossing_type", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "single_choice", null, "跨越物类型", 3, "LineNode", false, false, true, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000035-0000-4000-8000-000000000035", null, "voltage_below", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "string", null, "被跨线路电压等级", 4, "LineNode", false, false, false, true, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000036-0000-4000-8000-000000000036", null, "location_geo", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "location", null, "经纬度", 5, "LineNode", false, false, false, false, false, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 },
-                    { "a0000037-0000-4000-8000-000000000037", null, "measured_at", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), "datetime", null, "最近测量时间", 6, "LineNode", false, false, false, true, true, null, null, null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, 1 }
-                });
-
-            migrationBuilder.InsertData(
                 table: "nodes",
                 columns: new[] { "id", "created_at", "description", "host_type", "line_id", "name", "updated_at" },
                 values: new object[,]
@@ -900,10 +873,20 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "ix_audit_entity",
+                table: "attribute_audit_log",
+                columns: new[] { "entity_type", "entity_id", "changed_at" },
+                descending: new[] { false, false, true });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_audit_time",
+                table: "attribute_audit_log",
+                column: "changed_at");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_attr_catalog_entity",
                 table: "attribute_catalog",
-                column: "entity_type",
-                filter: "is_deleted = false");
+                column: "entity_type");
 
             migrationBuilder.CreateIndex(
                 name: "IX_attribute_catalog_ref_composite_type_id",
@@ -1107,11 +1090,6 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "src_vid");
 
             migrationBuilder.CreateIndex(
-                name: "ix_entity_type_owner_space",
-                table: "entity_type_catalog",
-                column: "owner_space_id");
-
-            migrationBuilder.CreateIndex(
                 name: "uq_entity_type",
                 table: "entity_type_catalog",
                 column: "entity_type",
@@ -1223,7 +1201,8 @@ namespace TreeGraph.Api.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropAuditPartitionTable();
+            migrationBuilder.DropTable(
+                name: "attribute_audit_log");
 
             migrationBuilder.DropTable(
                 name: "attribute_values");

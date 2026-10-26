@@ -170,11 +170,7 @@ if (!EF.IsDesignTime)
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
     await db.Database.MigrateAsync();
-    // 审计分区表：确保当月+下月分区存在（幂等；DEFAULT 分区已兜底，此处让数据按月归位）
-    await AuditPartitionMaintenance.EnsureMonthlyPartitionsAsync(db);
     await EavSeeder.SeedAsync(db);
-    // 内置 Inode 宿主类型（三树）：边端点下拉与属性挂载依赖目录可见（幂等 upsert）
-    await BuiltinHostTypeSeeder.SeedAsync(db);
     // 内置边类型（line_segment）：LineSky 写路径硬依赖（幂等 upsert；须在 GraphSchemaInitializer 启动前）
     await BuiltinEdgeTypeSeeder.SeedAsync(db);
 

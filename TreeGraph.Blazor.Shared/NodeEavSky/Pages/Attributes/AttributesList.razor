@@ -93,11 +93,6 @@
                           Immediate="true"
                           FullWidth="true" />
         </MudItem>
-        <MudItem xs="12" md="4" Class="d-flex align-center">
-            <MudSwitch T="bool" @bind-Value="_includeDeleted"
-                       Label="显示已删除"
-                       Color="Color.Warning" />
-        </MudItem>
     </MudGrid>
 </MudPaper>
 
@@ -145,13 +140,6 @@ else
                 </MudTd>
                 <MudTd>
                     <code>@context.AttributeName</code>
-                    @if (context.IsDeleted)
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Error"
-                                 Class="ml-1">
-                            已删除
-                        </MudChip>
-                    }
                 </MudTd>
                 <MudTd>@context.DisplayName</MudTd>
                 <MudTd>
@@ -256,7 +244,6 @@ else
 
     private string? _filterEntityType;
     private string? _searchText;
-    private bool _includeDeleted;
 
     private int _page = 1;
     private int _pageSize = 20;
@@ -267,7 +254,6 @@ else
 
     /// <summary>应用过滤后的全量列表（用于统计 + 分页）。</summary>
     private List<AttributeDetailDto> _filteredAll => _all
-        .Where(a => _includeDeleted || !a.IsDeleted)
         .Where(a => string.IsNullOrEmpty(_filterEntityType)
                  || a.EntityType == _filterEntityType)
         .Where(a => string.IsNullOrWhiteSpace(_searchText)
@@ -301,10 +287,9 @@ else
         _loading = true;
         try
         {
-            // 并行加载实体类型 + 全部属性（含已删除，前端过滤）
-            var entityTypesTask = Api.ListEntityTypesAsync(sharedOnly: true);
-            var attributesTask = Api.ListAttributesAsync(
-                entityType: null, includeDeleted: true);
+            // 并行加载实体类型 + 全部属性
+            var entityTypesTask = Api.ListEntityTypesAsync();
+            var attributesTask = Api.ListAttributesAsync();
 
             await Task.WhenAll(entityTypesTask, attributesTask);
 

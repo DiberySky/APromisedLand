@@ -70,7 +70,7 @@
     {
         try
         {
-            _entityTypes = (await Api.ListEntityTypesAsync(sharedOnly: true))
+            _entityTypes = (await Api.ListEntityTypesAsync())
                 ?.Where(t => !string.Equals(t.EntityType, "Shared", StringComparison.OrdinalIgnoreCase))
                 .ToList() ?? [];
         }

@@ -32,24 +32,10 @@ public class EavEntityTypesController : ControllerBase
     // ============================================================
 
     [HttpGet]
-    public async Task<IActionResult> List(
-        [FromQuery] string? spaceId,
-        [FromQuery] bool sharedOnly,
-        [FromQuery] bool exclusiveOnly,
-        CancellationToken ct)
+    public async Task<IActionResult> List(CancellationToken ct)
     {
-        // 1. 从 EntityTypeCatalog 拿活动类型。范围过滤（三选一）：
-        //    sharedOnly=true          → 仅共享（全局选择器场景）
-        //    spaceId + exclusiveOnly  → 仅该空间独占（空间行"属性设置"对话框）
-        //    spaceId                  → 共享 ∪ 该空间独占
-        //    都不带                   → 全部（管理页全局视角）
+        // 1. 从 EntityTypeCatalog 拿活动类型（纯全局共享，无空间归属）
         var query = _db.EntityTypes.Where(t => !t.IsDeleted);
-        if (sharedOnly)
-            query = query.Where(t => t.OwnerSpaceId == null);
-        else if (!string.IsNullOrEmpty(spaceId))
-            query = exclusiveOnly
-                ? query.Where(t => t.OwnerSpaceId == spaceId)
-                : query.Where(t => t.OwnerSpaceId == null || t.OwnerSpaceId == spaceId);
 
         var types = await query
             .OrderBy(t => t.DisplayOrder)
@@ -57,13 +43,13 @@ public class EavEntityTypesController : ControllerBase
             .AsNoTracking()
             .ToListAsync(ct);
 
+        // 2. 从 AttributeCatalog 聚合统计
         if (types.Count == 0)
             return Ok(Array.Empty<EntityTypeSummaryDto>());
 
-        // 2. 从 AttributeCatalog 聚合统计
         var typeNames = types.Select(t => t.EntityType).ToList();
         var stats = await _db.AttributeCatalog
-            .Where(a => !a.IsDeleted && typeNames.Contains(a.EntityType))
+            .Where(a => typeNames.Contains(a.EntityType))
             .GroupBy(a => a.EntityType)
             .Select(g => new
             {
@@ -112,22 +98,11 @@ public class EavEntityTypesController : ControllerBase
     [HttpGet("details")]
     public async Task<IActionResult> ListDetails(
         [FromQuery] bool includeDeleted = false,
-        [FromQuery] string? spaceId = null,
-        [FromQuery] bool sharedOnly = false,
-        [FromQuery] bool exclusiveOnly = false,
         CancellationToken ct = default)
     {
-        // 1. 全量类型（1 次 DB）。范围过滤同 List：
-        //    sharedOnly → 仅共享；spaceId+exclusiveOnly → 仅该空间独占；
-        //    spaceId → 共享 ∪ 该空间独占；都不带 → 全部
+        // 1. 全量类型（1 次 DB）
         var query = _db.EntityTypes
             .Where(t => includeDeleted || !t.IsDeleted);
-        if (sharedOnly)
-            query = query.Where(t => t.OwnerSpaceId == null);
-        else if (!string.IsNullOrEmpty(spaceId))
-            query = exclusiveOnly
-                ? query.Where(t => t.OwnerSpaceId == spaceId)
-                : query.Where(t => t.OwnerSpaceId == null || t.OwnerSpaceId == spaceId);
 
         var types = await query
             .OrderBy(t => t.DisplayOrder)
@@ -141,7 +116,7 @@ public class EavEntityTypesController : ControllerBase
         // 2. 属性计数（1 次 DB，GroupBy 聚合）
         var typeNames = types.Select(t => t.EntityType).ToList();
         var stats = await _db.AttributeCatalog
-            .Where(a => !a.IsDeleted && typeNames.Contains(a.EntityType))
+            .Where(a => typeNames.Contains(a.EntityType))
             .GroupBy(a => a.EntityType)
             .Select(g => new { Type = g.Key, Count = g.Count() })
             .AsNoTracking()
@@ -159,8 +134,7 @@ public class EavEntityTypesController : ControllerBase
             t.IsDeleted,
             t.CreatedAt,
             t.UpdatedAt,
-            statsMap.GetValueOrDefault(t.EntityType, 0),
-            t.OwnerSpaceId));
+            statsMap.GetValueOrDefault(t.EntityType, 0)));
 
         return Ok(result);
     }
@@ -178,12 +152,11 @@ public class EavEntityTypesController : ControllerBase
         if (t is null) return NotFound();
 
         var attrCount = await _db.AttributeCatalog
-            .CountAsync(a => a.EntityType == t.EntityType && !a.IsDeleted, ct);
+            .CountAsync(a => a.EntityType == t.EntityType, ct);
 
         return Ok(new EntityTypeDetailDto(
             t.EntityTypeId, t.EntityType, t.DisplayName, t.Description,
-            t.DisplayOrder, t.IsDeleted, t.CreatedAt, t.UpdatedAt, attrCount,
-            t.OwnerSpaceId));
+            t.DisplayOrder, t.IsDeleted, t.CreatedAt, t.UpdatedAt, attrCount));
     }
 
     // ============================================================
@@ -196,11 +169,6 @@ public class EavEntityTypesController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(req.DisplayName))
             return BadRequest(new { error = "显示名必填" });
-
-        // 独占类型：所属空间必须已存在
-        if (!string.IsNullOrWhiteSpace(req.OwnerSpaceId)
-            && !await _db.Spaces.AnyAsync(s => s.Id == req.OwnerSpaceId, ct))
-            return BadRequest(new { error = $"所属空间不存在: {req.OwnerSpaceId}" });
 
         // 生成或使用客户端指定的 EntityType
         string entityType;
@@ -239,7 +207,6 @@ public class EavEntityTypesController : ControllerBase
             EntityType = entityType,
             DisplayName = req.DisplayName.Trim(),
             Description = req.Description,
-            OwnerSpaceId = string.IsNullOrWhiteSpace(req.OwnerSpaceId) ? null : req.OwnerSpaceId,
             DisplayOrder = req.DisplayOrder
         };
         _db.EntityTypes.Add(entity);
@@ -266,10 +233,6 @@ public class EavEntityTypesController : ControllerBase
         var e = await _db.EntityTypes.FindAsync(new object[] { id }, ct);
         if (e is null || e.IsDeleted) return NotFound();
 
-        // 内置种子保护：固定 id 的实体类型拒改（R7）
-        if (EntityTypeDefinition.IsBuiltin(id))
-            return Conflict(new { error = "内置种子实体类型不可修改" });
-
         if (req.DisplayName is not null) e.DisplayName = req.DisplayName.Trim();
         if (req.Description is not null) e.Description = req.Description;
         if (req.DisplayOrder is not null) e.DisplayOrder = req.DisplayOrder.Value;
@@ -288,17 +251,13 @@ public class EavEntityTypesController : ControllerBase
         var e = await _db.EntityTypes.FindAsync(new object[] { id }, ct);
         if (e is null || e.IsDeleted) return NotFound();
 
-        // 内置种子保护：固定 id 的实体类型拒删（R7）
-        if (EntityTypeDefinition.IsBuiltin(id))
-            return Conflict(new { error = "内置种子实体类型不可删除" });
-
-        // 仍有活动属性时拒绝
+        // 仍有属性时拒绝
         var hasAttrs = await _db.AttributeCatalog
-            .AnyAsync(a => a.EntityType == e.EntityType && !a.IsDeleted, ct);
+            .AnyAsync(a => a.EntityType == e.EntityType, ct);
         if (hasAttrs)
             return BadRequest(new
             {
-                error = $"该实体类型仍有活动属性（{e.EntityType}），请先删除其属性"
+                error = $"该实体类型仍有属性（{e.EntityType}），请先删除其属性"
             });
 
         // 子项为空方可删除本项（不采用级联删除）：该类型已产生实体实例时拒绝
@@ -312,6 +271,15 @@ public class EavEntityTypesController : ControllerBase
             return BadRequest(new
             {
                 error = $"该实体类型已产生实体实例（{e.EntityType}），请先删除其实例数据"
+            });
+
+        // 被节点声明引用时拒绝：否则节点上的类型卡片会指向已删除的类型
+        var hasDeclarations = await _db.InodeEntityTypes
+            .AnyAsync(d => d.EntityType == e.EntityType, ct);
+        if (hasDeclarations)
+            return BadRequest(new
+            {
+                error = $"该实体类型已被节点声明引用（{e.EntityType}），请先解除节点上的类型声明"
             });
 
         e.IsDeleted = true;

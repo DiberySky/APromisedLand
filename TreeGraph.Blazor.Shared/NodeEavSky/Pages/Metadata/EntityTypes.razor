@@ -5,10 +5,8 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
-@inject SpaceApiClient SpaceApi
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
-@using TreeGraph.Blazor.Shared.SpaceSky.Services
 @using TreeGraph.Shared.NodeEavSky.Dtos
 
 @if (!IsDialogMode)
@@ -46,10 +44,6 @@ else
           LoadingProgressColor="Color.Primary">
     <HeaderContent>
         <MudTh>名称</MudTh>
-        @if (ShowScopeColumn)
-        {
-            <MudTh>范围</MudTh>
-        }
         <MudTh>设置</MudTh>
         <MudTh>说明</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
@@ -72,21 +66,6 @@ else
             @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
             <MudText Typo="Typo.body1">@context.DisplayName</MudText>
         </MudTd>
-        @if (ShowScopeColumn)
-        {
-            <MudTd DataLabel="范围">
-                @if (context.OwnerSpaceId is null)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Success">共享</MudChip>
-                }
-                else
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">
-                        独占 · @(_spaceNames.GetValueOrDefault(context.OwnerSpaceId) ?? "未知空间")
-                    </MudChip>
-                }
-            </MudTd>
-        }
         <MudTd DataLabel="设置">
             @* 图标入口（左）：点击打开独立属性定义对话框并锁定该类型；
                数量胶囊靠右展示 *@
@@ -144,20 +123,7 @@ else
     /// <summary>嵌入模式（对话框/选项卡）：隐藏页头与工具栏，新建按钮置于表头操作列。</summary>
     [Parameter] public bool IsDialogMode { get; set; }
 
-    /// <summary>空间过滤：仅显示 共享类型 ∪ 该空间独占类型；新建时默认独占该空间。</summary>
-    [Parameter] public string? SpaceId { get; set; }
-    /// <summary>空间显示名（范围列与新建对话框展示用）。</summary>
-    [Parameter] public string? SpaceName { get; set; }
-    /// <summary>仅显示共享类型（隐藏范围列，新建仅可创建共享类型）。</summary>
-    [Parameter] public bool SharedOnly { get; set; }
-    /// <summary>与 SpaceId 联用：仅显示该空间独占类型（隐藏范围列，新建锁定独占本空间）。</summary>
-    [Parameter] public bool ExclusiveOnly { get; set; }
-
-    /// <summary>范围列是否可见（仅共享/仅独占视图下范围无信息量）。</summary>
-    private bool ShowScopeColumn => !SharedOnly && !ExclusiveOnly;
-
     private IReadOnlyList<EntityTypeDetailDto>? _types;
-    private Dictionary<string, string> _spaceNames = [];
     private bool _loading;
     private bool _initialized;
 
@@ -182,20 +148,8 @@ else
         try
         {
             // ★ 1 次 HTTP 替代 1+N 次（原 foreach 串行 GetEntityTypeAsync）
-            // SharedOnly → 仅共享；SpaceId+ExclusiveOnly → 仅该空间独占；
-            // SpaceId → 共享 ∪ 该空间独占；否则全部
-            _types = await Api.ListEntityTypeDetailsAsync(
-                         spaceId: SpaceId, sharedOnly: SharedOnly, exclusiveOnly: ExclusiveOnly)
+            _types = await Api.ListEntityTypeDetailsAsync()
                      ?? Array.Empty<EntityTypeDetailDto>();
-
-            // 范围列的空间名映射（独占类型标注所属空间）
-            if (_types.Any(t => t.OwnerSpaceId is not null))
-            {
-                var spaces = await SpaceApi.GetAllAsync() ?? [];
-                _spaceNames = spaces.ToDictionary(s => s.Id, s => s.Name);
-                if (!string.IsNullOrEmpty(SpaceId) && !string.IsNullOrEmpty(SpaceName))
-                    _spaceNames[SpaceId] = SpaceName;
-            }
         }
         finally
         {
@@ -209,10 +163,7 @@ else
     {
         var parameters = new DialogParameters<EntityTypeEditDialog>
         {
-            { x => x.InitialDisplayOrder, (_types?.Count ?? 0) + 1 },
-            { x => x.DefaultOwnerSpaceId, SpaceId },
-            { x => x.DefaultOwnerSpaceName, SpaceName },
-            { x => x.ForceShared, SharedOnly }
+            { x => x.InitialDisplayOrder, (_types?.Count ?? 0) + 1 }
         };
 
         var dialog = await DialogService.ShowAsync<EntityTypeEditDialog>(

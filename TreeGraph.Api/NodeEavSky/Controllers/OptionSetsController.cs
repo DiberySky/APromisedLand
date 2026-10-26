@@ -112,7 +112,7 @@ public class OptionSetsController : ControllerBase
     public async Task<IActionResult> GetReferences(string setId, CancellationToken ct)
     {
         var refs = await _db.AttributeCatalog
-            .Where(a => a.RefOptionSetId == setId && !a.IsDeleted)
+            .Where(a => a.RefOptionSetId == setId)
             .Select(a => new OptionSetReferenceDto(
                 a.AttributeId, a.EntityType, a.AttributeName, a.DisplayName))
             .AsNoTracking()
@@ -139,7 +139,7 @@ public class OptionSetsController : ControllerBase
 
         // 检查是否被属性引用（保持保守策略）
         var referenced = await _db.AttributeCatalog
-            .AnyAsync(a => a.RefOptionSetId == setId && !a.IsDeleted, ct);
+            .AnyAsync(a => a.RefOptionSetId == setId, ct);
         if (referenced)
             return BadRequest(new { error = "该选项集仍被属性引用，无法删除。请先解除属性引用。" });
 

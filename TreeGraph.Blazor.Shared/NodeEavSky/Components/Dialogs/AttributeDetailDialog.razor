@@ -129,13 +129,6 @@
                     <MudText Typo="Typo.caption" Color="Color.Secondary">更新时间</MudText>
                     <MudText Typo="Typo.body2">@_detail.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
                 </MudItem>
-
-                @if (_detail.IsDeleted)
-                {
-                    <MudItem xs="12">
-                        <MudChip T="string" Color="Color.Error">已删除</MudChip>
-                    </MudItem>
-                }
             </MudGrid>
         }
     </DialogContent>

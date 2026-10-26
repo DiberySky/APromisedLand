@@ -220,13 +220,13 @@ public class DeletePrincipleTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         Assert.Contains("实例数据", await resp.Content.ReadAsStringAsync());
 
-        // 属性仍可用（未被软删）
+        // 属性仍可用（未被删除）
         var listResp = await Client.GetAsync(
             $"/api/eav/metadata/attributes?entityType={EntityType}");
         listResp.EnsureSuccessStatusCode();
         var attrs = await listResp.Content.ReadEavAsync<List<AttributeDetailDto>>();
         var attr = attrs!.Single(a => a.AttributeId == attrId);
-        Assert.False(attr.IsDeleted);
+        Assert.Equal(attributeName, attr.AttributeName);
     }
 
     // ============================================================
