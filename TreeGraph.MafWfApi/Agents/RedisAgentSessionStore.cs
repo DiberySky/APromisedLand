@@ -137,11 +137,11 @@ public sealed class RedisAgentSessionStore : AgentSessionStore, IConversationCat
         }
     }
 
-    // ⚠️ MAF 1.22+ 已从基类移除 DeleteSessionAsync，改为普通 public 方法
-    public async ValueTask DeleteSessionAsync(
+    // ⚠️ MAF 1.22+ 曾从基类移除；1.26.0 重新引入为抽象成员，此处 override
+    public override async ValueTask DeleteSessionAsync(
         AIAgent agent,
         AgentSessionStoreKey key,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var conversationId = key.SessionId;
         ValidateConversationId(conversationId);
