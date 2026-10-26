@@ -1,13 +1,16 @@
 namespace TreeGraph.Api.EdgeSky.Entities;
 
 /// <summary>
-/// EdgeType（边类型）：镜像 NebulaGraph 语义 —— 图空间内唯一、创建后不可改名，
-/// 定义 = 名称 + 属性 Schema（<see cref="EdgeTypeProp"/> 子表）+ TTL + 注释。
-/// 主键即类型名（不可改名，故可直接作 PK）。
+/// EdgeType（边类型）：镜像 NebulaGraph 语义 —— 空间内唯一（从属于一个图空间）、
+/// 创建后不可改名，定义 = 名称 + 属性 Schema（<see cref="EdgeTypeProp"/> 子表）+ TTL + 注释。
+/// 主键 = (SpaceId, Name)（不可改名，故可直接作 PK）。
 /// </summary>
 public class EdgeType
 {
-    /// <summary>边类型名（图空间内唯一，对应 nGQL 的 edge_type_name；Nebula 命名规则由服务层校验）。</summary>
+    /// <summary>所属图空间 Id（FK → spaces；Nebula：EdgeType 是空间级对象）。</summary>
+    public string SpaceId { get; set; } = string.Empty;
+
+    /// <summary>边类型名（空间内唯一，对应 nGQL 的 edge_type_name；Nebula 命名规则由服务层校验）。</summary>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>边类型级注释（nGQL COMMENT）。</summary>

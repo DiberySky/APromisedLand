@@ -97,6 +97,11 @@ public class LineNodeController : ControllerBase
         if (!lineExists)
             return BadRequest(new { error = $"所属线路不存在或不是 Line: {req.LineId}" });
 
+        // 段边写入线路所属空间（lines.space_id；lines 行缺失 = 数据异常）
+        var spaceId = await LineSpaceIdAsync(req.LineId, ct);
+        if (spaceId is null)
+            return BadRequest(new { error = $"线路缺少所属空间（lines 行缺失）: {req.LineId}" });
+
         // 前驱校验：存在、同属本线
         if (!string.IsNullOrWhiteSpace(req.PredecessorId))
         {
@@ -135,7 +140,7 @@ public class LineNodeController : ControllerBase
             var edgeEvents = new List<EdgeChangedEvent>();
             if (!string.IsNullOrWhiteSpace(req.PredecessorId))
             {
-                UpsertSegmentEdge(req.PredecessorId!, id, edgeEvents);
+                UpsertSegmentEdge(spaceId, req.PredecessorId!, id, edgeEvents);
                 await _db.SaveChangesAsync(ct);
             }
 
@@ -164,6 +169,9 @@ public class LineNodeController : ControllerBase
 
         var newLineId = string.IsNullOrWhiteSpace(req.LineId) ? node.LineId : req.LineId;
 
+        // 段边写入线路所属空间（换线路或重接前驱时使用；lines 行缺失 = 数据异常）
+        var spaceId = newLineId is null ? null : await LineSpaceIdAsync(newLineId, ct);
+
         // 换线路：目标必须是 Line
         if (newLineId != node.LineId)
         {
@@ -171,8 +179,11 @@ public class LineNodeController : ControllerBase
                 .AnyAsync(n => n.Id == newLineId && n.HostType == "Line", ct);
             if (!lineExists)
                 return BadRequest(new { error = $"所属线路不存在或不是 Line: {newLineId}" });
+            if (spaceId is null)
+                return BadRequest(new { error = $"线路缺少所属空间（lines 行缺失）: {newLineId}" });
 
             // 连带校验：段边两端仍同线（入边起点、出边终点都必须属于新线路）
+            // 注：段边在旧线路空间内，此处不按空间过滤（节点 id 全局唯一，跨空间无碰撞）
             var endpointIds = await _db.Edges
                 .Where(e => e.EdgeType == SegmentEdgeType
                          && (e.SrcVid == id || e.DstVid == id))
@@ -210,16 +221,20 @@ public class LineNodeController : ControllerBase
         var edgeEvents = new List<EdgeChangedEvent>();
         if (!string.IsNullOrWhiteSpace(req.PredecessorId))
         {
-            // 当前入边前驱（若已是该前驱则无需重接）
+            if (spaceId is null)
+                return BadRequest(new { error = $"线路缺少所属空间（lines 行缺失）: {newLineId}" });
+
+            // 当前入边前驱（若已是该前驱则无需重接；段边在本线路空间内）
             var currentPred = await _db.Edges
-                .FirstOrDefaultAsync(e => e.EdgeType == SegmentEdgeType && e.DstVid == id, ct);
+                .FirstOrDefaultAsync(e => e.SpaceId == spaceId
+                    && e.EdgeType == SegmentEdgeType && e.DstVid == id, ct);
 
             if (currentPred?.SrcVid != req.PredecessorId)
             {
                 // 删旧边（旧前驱 → 本节点），写新边（新前驱 → 自身）
                 if (currentPred is not null)
                     DeleteSegmentEdge(currentPred, edgeEvents);
-                UpsertSegmentEdge(req.PredecessorId!, id, edgeEvents);
+                UpsertSegmentEdge(spaceId, req.PredecessorId!, id, edgeEvents);
                 await _db.SaveChangesAsync(ct);
             }
         }
@@ -313,16 +328,23 @@ public class LineNodeController : ControllerBase
             .ToDictionaryAsync(e => e.DstVid, e => e.SrcVid, ct);
     }
 
-    /// <summary>upsert 一条 line_segment 段边（rank 恒 0，无 props）。</summary>
-    private void UpsertSegmentEdge(string fromId, string toId, List<EdgeChangedEvent> events)
+    /// <summary>解析线路所属空间（lines.space_id）；lines 行缺失返回 null（调用方按上下文处置）。</summary>
+    private async Task<string?> LineSpaceIdAsync(string lineId, CancellationToken ct)
+        => await _db.Lines.AsNoTracking()
+            .Where(l => l.Id == lineId)
+            .Select(l => (string?)l.SpaceId)
+            .FirstOrDefaultAsync(ct);
+
+    /// <summary>upsert 一条 line_segment 段边（rank 恒 0，无 props；写入线路所属空间）。</summary>
+    private void UpsertSegmentEdge(string spaceId, string fromId, string toId, List<EdgeChangedEvent> events)
     {
         _db.Edges.Add(new Edge
         {
-            EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId
+            SpaceId = spaceId, EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId
         });
         events.Add(new EdgeChangedEvent
         {
-            EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId,
+            SpaceId = spaceId, EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId,
             Kind = EdgeChangeKind.Upsert
         });
     }
@@ -333,7 +355,7 @@ public class LineNodeController : ControllerBase
         _db.Edges.Remove(edge);
         events.Add(new EdgeChangedEvent
         {
-            EdgeType = edge.EdgeType, SrcVid = edge.SrcVid,
+            SpaceId = edge.SpaceId, EdgeType = edge.EdgeType, SrcVid = edge.SrcVid,
             Rank = edge.Rank, DstVid = edge.DstVid,
             Kind = EdgeChangeKind.Delete
         });

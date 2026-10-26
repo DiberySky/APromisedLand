@@ -1,7 +1,11 @@
-@* LineCreateDialog.razor — 新建线路（DialogSky 外壳，与 SpaceCreateDialog 风格一致） *@
+@* LineCreateDialog.razor — 新建线路（DialogSky 外壳，与 SpaceCreateDialog 风格一致）。
+   线路为图空间级资源：创建时必须选择所属空间（创建后不可变更）。 *@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.SpaceSky
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
 @inject LineManageApiClient Api
+@inject SpaceApiClient SpaceApi
 @inject ISnackbar Snackbar
 
 <DialogSky Title="新建线路"
@@ -10,6 +14,20 @@
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="CreateAsync">
     <DialogContent>
+        <MudSelect @bind-Value="_form.SpaceId"
+                   Label="所属空间"
+                   Variant="Variant.Outlined"
+                   Margin="Margin.Dense"
+                   Dense="true"
+                   Class="mb-3">
+            @if (_spaces is not null)
+            {
+                @foreach (var s in _spaces)
+                {
+                    <MudSelectItem T="string" Value="@s.Id">@s.Name</MudSelectItem>
+                }
+            }
+        </MudSelect>
         <MudTextField @bind-Value="_form.Name"
                       Label="名称"
                       Variant="Variant.Outlined"
@@ -25,10 +43,23 @@
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     private readonly LineDto _form = new();
+    private IReadOnlyList<SpaceDto>? _spaces;
     private bool _submitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _spaces = await SpaceApi.GetAllAsync();
+        if (_spaces.Count > 0)
+            _form.SpaceId = _spaces[0].Id;
+    }
 
     private async Task CreateAsync()
     {
+        if (string.IsNullOrWhiteSpace(_form.SpaceId))
+        {
+            Snackbar.Add("请选择所属空间", Severity.Warning);
+            return;
+        }
         if (string.IsNullOrWhiteSpace(_form.Name))
         {
             Snackbar.Add("请填写名称", Severity.Warning);

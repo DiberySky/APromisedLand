@@ -10,9 +10,10 @@ namespace TreeGraph.Api.EdgeSky.Services;
 
 /// <summary>
 /// 边实例服务（镜像 NebulaGraph 语义）：
-/// 唯一标识 = 四元组 &lt;SrcVid, EdgeType, Rank, DstVid&gt;；UPSERT 为覆盖语义
-/// （未列属性落 DEFAULT/NULL），PATCH 为部分 SET；属性值按所属 EdgeType 的
-/// Schema 校验（未知键/类型不符 → 400）。写成功后发布 EdgeChangedEvent 触发图同步。
+/// 唯一标识 = 五元组 &lt;SpaceId, EdgeType, SrcVid, Rank, DstVid&gt;（边从属于图空间）；
+/// UPSERT 为覆盖语义（未列属性落 DEFAULT/NULL），PATCH 为部分 SET；
+/// 属性值按所属 EdgeType 的 Schema 校验（未知键/类型不符 → 400）。
+/// 写成功后发布 EdgeChangedEvent 触发图同步。
 /// </summary>
 public sealed class EdgeService
 {
@@ -25,11 +26,11 @@ public sealed class EdgeService
         _publisher = publisher;
     }
 
-    /// <summary>按 edge_type / src_vid / dst_vid 过滤查询。</summary>
+    /// <summary>按 space_id / edge_type / src_vid / dst_vid 过滤查询。</summary>
     public async Task<List<EdgeDto>> QueryAsync(
-        string? edgeType, string? srcVid, string? dstVid, CancellationToken ct)
+        string spaceId, string? edgeType, string? srcVid, string? dstVid, CancellationToken ct)
     {
-        var q = _db.Edges.AsNoTracking().AsQueryable();
+        var q = _db.Edges.AsNoTracking().Where(e => e.SpaceId == spaceId);
         if (!string.IsNullOrEmpty(edgeType)) q = q.Where(e => e.EdgeType == edgeType);
         if (!string.IsNullOrEmpty(srcVid)) q = q.Where(e => e.SrcVid == srcVid);
         if (!string.IsNullOrEmpty(dstVid)) q = q.Where(e => e.DstVid == dstVid);
@@ -41,11 +42,11 @@ public sealed class EdgeService
     }
 
     public async Task<EdgeDto> GetAsync(
-        string edgeType, string srcVid, long rank, string dstVid, CancellationToken ct)
+        string spaceId, string edgeType, string srcVid, long rank, string dstVid, CancellationToken ct)
     {
         var edge = await _db.Edges.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.EdgeType == edgeType && e.SrcVid == srcVid
-                                      && e.Rank == rank && e.DstVid == dstVid, ct);
+            .FirstOrDefaultAsync(e => e.SpaceId == spaceId && e.EdgeType == edgeType
+                                      && e.SrcVid == srcVid && e.Rank == rank && e.DstVid == dstVid, ct);
         return edge is null
             ? throw new KeyNotFoundException(
                 $"边不存在：{edgeType} {srcVid} -> {dstVid} @{rank}")
@@ -57,18 +58,18 @@ public sealed class EdgeService
     /// 未列出的 Schema 属性落 DEFAULT，无 DEFAULT 则 NULL。
     /// </summary>
     public async Task<EdgeDto> UpsertAsync(
-        string edgeType, string srcVid, long rank, string dstVid,
+        string spaceId, string edgeType, string srcVid, long rank, string dstVid,
         UpsertEdgeRequest req, CancellationToken ct)
     {
-        var schema = await LoadSchemaAsync(edgeType, ct);
+        var schema = await LoadSchemaAsync(spaceId, edgeType, ct);
         await EnsureNodesExistAsync(srcVid, dstVid, ct);
 
         var finalProps = ApplyUpsert(schema, req.Props);
 
-        var edge = await _db.Edges.FindAsync([edgeType, srcVid, rank, dstVid], ct);
+        var edge = await _db.Edges.FindAsync([spaceId, edgeType, srcVid, rank, dstVid], ct);
         if (edge is null)
         {
-            edge = new Edge { EdgeType = edgeType, SrcVid = srcVid, Rank = rank, DstVid = dstVid };
+            edge = new Edge { SpaceId = spaceId, EdgeType = edgeType, SrcVid = srcVid, Rank = rank, DstVid = dstVid };
             _db.Edges.Add(edge);
         }
 
@@ -85,12 +86,12 @@ public sealed class EdgeService
     /// 值 null = 清除该属性（落 NULL；NOT NULL 属性不可清除）。
     /// </summary>
     public async Task<EdgeDto> PatchAsync(
-        string edgeType, string srcVid, long rank, string dstVid,
+        string spaceId, string edgeType, string srcVid, long rank, string dstVid,
         PatchEdgeRequest req, CancellationToken ct)
     {
-        var schema = await LoadSchemaAsync(edgeType, ct);
+        var schema = await LoadSchemaAsync(spaceId, edgeType, ct);
 
-        var edge = await _db.Edges.FindAsync([edgeType, srcVid, rank, dstVid], ct)
+        var edge = await _db.Edges.FindAsync([spaceId, edgeType, srcVid, rank, dstVid], ct)
             ?? throw new KeyNotFoundException($"边不存在：{edgeType} {srcVid} -> {dstVid} @{rank}");
 
         var props = edge.Props is { } existing
@@ -126,11 +127,11 @@ public sealed class EdgeService
         return ToDto(edge);
     }
 
-    /// <summary>按四元组删除边（对齐 DELETE EDGE）。</summary>
+    /// <summary>按五元组删除边（对齐 DELETE EDGE）。</summary>
     public async Task DeleteAsync(
-        string edgeType, string srcVid, long rank, string dstVid, CancellationToken ct)
+        string spaceId, string edgeType, string srcVid, long rank, string dstVid, CancellationToken ct)
     {
-        var edge = await _db.Edges.FindAsync([edgeType, srcVid, rank, dstVid], ct)
+        var edge = await _db.Edges.FindAsync([spaceId, edgeType, srcVid, rank, dstVid], ct)
             ?? throw new KeyNotFoundException($"边不存在：{edgeType} {srcVid} -> {dstVid} @{rank}");
 
         _db.Edges.Remove(edge);
@@ -143,13 +144,13 @@ public sealed class EdgeService
     // 内部
     // ------------------------------------------------------------
 
-    /// <summary>装载边类型属性 Schema；类型不存在 → 404。</summary>
-    private async Task<List<EdgeTypeProp>> LoadSchemaAsync(string edgeType, CancellationToken ct)
+    /// <summary>装载边类型属性 Schema（空间内）；类型不存在 → 404。</summary>
+    private async Task<List<EdgeTypeProp>> LoadSchemaAsync(string spaceId, string edgeType, CancellationToken ct)
     {
-        if (!await _db.EdgeTypes.AnyAsync(t => t.Name == edgeType, ct))
+        if (!await _db.EdgeTypes.AnyAsync(t => t.SpaceId == spaceId && t.Name == edgeType, ct))
             throw new KeyNotFoundException($"边类型 '{edgeType}' 不存在");
         return await _db.EdgeTypeProps.AsNoTracking()
-            .Where(p => p.EdgeTypeName == edgeType)
+            .Where(p => p.SpaceId == spaceId && p.EdgeTypeName == edgeType)
             .ToListAsync(ct);
     }
 
@@ -210,6 +211,7 @@ public sealed class EdgeService
     private async Task PublishAsync(Edge edge, EdgeChangeKind kind, CancellationToken ct)
         => await _publisher.Publish(new EdgeChangedEvent
         {
+            SpaceId = edge.SpaceId,
             EdgeType = edge.EdgeType,
             SrcVid = edge.SrcVid,
             Rank = edge.Rank,
@@ -219,6 +221,7 @@ public sealed class EdgeService
 
     private static EdgeDto ToDto(Edge e) => new()
     {
+        SpaceId = e.SpaceId,
         EdgeType = e.EdgeType,
         SrcVid = e.SrcVid,
         Rank = e.Rank,

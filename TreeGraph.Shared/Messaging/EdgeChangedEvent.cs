@@ -2,11 +2,14 @@ namespace TreeGraph.Shared.Messaging;
 
 /// <summary>
 /// 边实例变更事件（edges 表 upsert/delete 成功后发布，at-least-once）。
-/// 四元组定位图边；Upsert 时消费端回查 PG 读 props（事件在 SaveChanges 成功后发布），
-/// Delete 时 PG 行已删，载荷即定位依据。
+/// 五元组定位图边（SpaceId 路由到目标图空间）；Upsert 时消费端回查 PG 读 props
+/// （事件在 SaveChanges 成功后发布），Delete 时 PG 行已删，载荷即定位依据。
 /// </summary>
 public record EdgeChangedEvent
 {
+    /// <summary>所属图空间 Id（路由到对应 Nebula space）。</summary>
+    public required string SpaceId { get; init; }
+
     /// <summary>边类型名（图内 edge_type）。</summary>
     public required string EdgeType { get; init; }
 

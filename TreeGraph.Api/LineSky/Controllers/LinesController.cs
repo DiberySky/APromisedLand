@@ -30,13 +30,16 @@ public class LinesController : ControllerBase
         _publisher = publisher;
     }
 
-    /// <summary>查询全部 Line（支持按名称搜索）。</summary>
+    /// <summary>查询全部 Line（支持按名称搜索、按所属空间过滤）。</summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? search = null, CancellationToken ct = default)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? search = null, [FromQuery] string? spaceId = null, CancellationToken ct = default)
     {
         var query = _db.Lines.AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(n => n.Name.Contains(search));
+        if (!string.IsNullOrWhiteSpace(spaceId))
+            query = query.Where(n => n.SpaceId == spaceId);
         var items = await query.OrderBy(n => n.Name).ToListAsync(ct);
         return Ok(items);
     }
@@ -49,12 +52,16 @@ public class LinesController : ControllerBase
         return line is null ? NotFound() : Ok(line);
     }
 
-    /// <summary>创建 Line。</summary>
+    /// <summary>创建 Line（必须指定所属图空间 SpaceId；空间不存在 → 400）。</summary>
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] Line line, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(line.Name))
             return BadRequest("名称不能为空");
+        if (string.IsNullOrWhiteSpace(line.SpaceId))
+            return BadRequest("所属空间不能为空");
+        if (!await _db.Spaces.AnyAsync(s => s.Id == line.SpaceId, ct))
+            return BadRequest($"所属空间不存在: {line.SpaceId}");
 
         line.Id = string.IsNullOrWhiteSpace(line.Id) ? Guid.NewGuid().ToString() : line.Id;
         line.CreatedAt = DateTimeOffset.UtcNow;
@@ -80,7 +87,7 @@ public class LinesController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = line.Id }, line);
     }
 
-    /// <summary>更新 Line。</summary>
+    /// <summary>更新 Line（名称/描述；SpaceId 创建后不可变更——结构段边已落在该空间）。</summary>
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(string id, [FromBody] Line line, CancellationToken ct = default)
     {
@@ -89,6 +96,7 @@ public class LinesController : ControllerBase
 
         existing.Name = line.Name;
         existing.Description = line.Description;
+        // SpaceId 不可变更：段边按 (space_id, edge_type, ...) 落库，跨空间迁移不在此语义内
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         // R7：同步 nodes 注册行（名称唯一真源在 nodes，R2 Name 收编）

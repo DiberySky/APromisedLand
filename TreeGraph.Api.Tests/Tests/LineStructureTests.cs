@@ -336,7 +336,7 @@ public class LineStructureTests : IntegrationTestBase
 
         // 用户自定义分支边类型（顶级 EdgeType，对齐 Nebula CREATE EDGE）
         var branchType = $"branch_{Guid.NewGuid():N}";
-        var typeResp = await Client.PostAsJsonAsync("/api/edge/types", new
+        var typeResp = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name = branchType,
             props = new[] { new { propName = "name", dataType = "STRING", nullable = true } }
@@ -345,7 +345,7 @@ public class LineStructureTests : IntegrationTestBase
 
         // n1 → n2 写分支边（UPSERT 覆盖语义）
         var put = await Client.PutAsJsonAsync(
-            $"/api/edge/edges/{branchType}/{n[1]}/0/{n[2]}",
+            $"{EdgeBase}/edges/{branchType}/{n[1]}/0/{n[2]}",
             new { props = new Dictionary<string, object?> { ["name"] = "分支段" } });
         Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
 
@@ -534,7 +534,7 @@ public class LineStructureTests : IntegrationTestBase
     {
         var lineId = $"L_{Guid.NewGuid():N}";
         var resp = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "结构测试线路" });
+            "/api/Lines", new { id = lineId, name = "结构测试线路", spaceId = TestSpaceId });
         Assert.True(resp.IsSuccessStatusCode,
             $"创建线路失败: {(int)resp.StatusCode} {await resp.Content.ReadAsStringAsync()}");
         return lineId;

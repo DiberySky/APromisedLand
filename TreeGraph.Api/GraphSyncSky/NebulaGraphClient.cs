@@ -40,30 +40,34 @@ public sealed record EdgeItem(
     [property: JsonPropertyName("properties")] Dictionary<string, object?>? Properties
 );
 
-/// <summary>TreeGraph.NebulaFastApi REST 客户端（幂等写入 NebulaGraph）。</summary>
+/// <summary>
+/// TreeGraph.NebulaFastApi REST 客户端（幂等写入 NebulaGraph）。
+/// 多图空间对齐：所有方法的 space 参数 = Nebula 空间名
+/// （PG 空间 Id 经 <see cref="GraphNaming.ToNebulaSpace"/> 映射后传入）。
+/// </summary>
 public sealed class NebulaGraphClient
 {
     private readonly HttpClient _http;
-    private readonly GraphSyncOptions _options;
     private readonly ILogger<NebulaGraphClient> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
-    public NebulaGraphClient(HttpClient http, IOptions<GraphSyncOptions> options, ILogger<NebulaGraphClient> logger)
+    public NebulaGraphClient(HttpClient http, ILogger<NebulaGraphClient> logger)
     {
         _http = http;
-        _options = options.Value;
         _logger = logger;
     }
 
-    public string Space => _options.Space;
-
-    /// <summary>执行 nGQL；失败抛 InvalidOperationException（交由 Wolverine 重试）。</summary>
+    /// <summary>执行 nGQL（space 之外的语句，如 CREATE/DROP SPACE，传 null）。失败抛 InvalidOperationException（交由 Wolverine 重试）。</summary>
     public async Task<NebulaQueryResult> QueryAsync(string ngql, CancellationToken ct)
+        => await QueryAsync(null, ngql, ct);
+
+    /// <summary>在指定图空间执行 nGQL；失败抛 InvalidOperationException（交由 Wolverine 重试）。</summary>
+    public async Task<NebulaQueryResult> QueryAsync(string? space, string ngql, CancellationToken ct)
     {
         using var resp = await _http.PostAsJsonAsync(
             "api/v1/graph/query",
-            new { space = _options.Space, query = ngql }, JsonOpts, ct);
+            new { space, query = ngql }, JsonOpts, ct);
         resp.EnsureSuccessStatusCode();
         var result = await resp.Content.ReadFromJsonAsync<NebulaQueryResult>(JsonOpts, ct);
         if (result is null || !result.Success)
@@ -73,55 +77,56 @@ public sealed class NebulaGraphClient
 
     /// <summary>UPSERT 顶点（INSERT 覆盖语义，幂等）。</summary>
     public async Task UpsertVertexAsync(
-        string vid, string tag, IReadOnlyDictionary<string, object?> props, CancellationToken ct)
+        string space, string vid, string tag, IReadOnlyDictionary<string, object?> props, CancellationToken ct)
     {
         var payload = new VertexItem(vid, [tag], CleanProps(props));
         using var resp = await _http.PostAsJsonAsync(
-            $"api/v1/graph/vertices?space={_options.Space}", payload, JsonOpts, ct);
+            $"api/v1/graph/vertices?space={space}", payload, JsonOpts, ct);
         resp.EnsureSuccessStatusCode();
         var result = await resp.Content.ReadFromJsonAsync<NebulaQueryResult>(JsonOpts, ct);
         if (result is not { Success: true })
-            throw new InvalidOperationException($"顶点写入失败: {result?.ErrorMsg} | vid={vid}");
+            throw new InvalidOperationException($"顶点写入失败: {result?.ErrorMsg} | space={space} vid={vid}");
     }
 
     /// <summary>删除顶点（连带所有关联边）。</summary>
-    public async Task DeleteVertexAsync(string vid, CancellationToken ct)
+    public async Task DeleteVertexAsync(string space, string vid, CancellationToken ct)
     {
         using var resp = await _http.DeleteAsync(
-            $"api/v1/graph/vertices/{Uri.EscapeDataString(vid)}?space={_options.Space}&with_edge=true", ct);
+            $"api/v1/graph/vertices/{Uri.EscapeDataString(vid)}?space={space}&with_edge=true", ct);
         resp.EnsureSuccessStatusCode();
     }
 
     /// <summary>UPSERT 边（INSERT 覆盖语义，幂等；rank 默认 0，区分同起终点同类型多边）。</summary>
     public async Task UpsertEdgeAsync(
-        string edgeType, string srcVid, string dstVid, long rank,
+        string space, string edgeType, string srcVid, string dstVid, long rank,
         IReadOnlyDictionary<string, object?>? props, CancellationToken ct)
     {
         var payload = new EdgeItem(srcVid, dstVid, edgeType, rank, CleanProps(props));
         using var resp = await _http.PostAsJsonAsync(
-            $"api/v1/graph/edges?space={_options.Space}", payload, JsonOpts, ct);
+            $"api/v1/graph/edges?space={space}", payload, JsonOpts, ct);
         resp.EnsureSuccessStatusCode();
         var result = await resp.Content.ReadFromJsonAsync<NebulaQueryResult>(JsonOpts, ct);
         if (result is not { Success: true })
             throw new InvalidOperationException(
-                $"边写入失败: {result?.ErrorMsg} | {edgeType} {srcVid}->{dstVid}");
+                $"边写入失败: {result?.ErrorMsg} | space={space} {edgeType} {srcVid}->{dstVid}");
     }
 
     /// <summary>按四元组删除指定边。</summary>
-    public async Task DeleteEdgeAsync(string edgeType, string srcVid, string dstVid, long rank, CancellationToken ct)
+    public async Task DeleteEdgeAsync(string space, string edgeType, string srcVid, string dstVid, long rank, CancellationToken ct)
     {
         using var req = new HttpRequestMessage(HttpMethod.Delete, "api/v1/graph/edges")
         {
             Content = JsonContent.Create(
-                new { edge_type = edgeType, src_vid = srcVid, dst_vid = dstVid, rank, space = _options.Space },
+                new { edge_type = edgeType, src_vid = srcVid, dst_vid = dstVid, rank, space },
                 options: JsonOpts)
         };
         using var resp = await _http.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
     }
 
-    /// <summary>批量写入（全量重建用）。</summary>
+    /// <summary>批量写入（全量重建用，按空间分批调用）。</summary>
     public async Task<BulkResult> BulkAsync(
+        string space,
         IReadOnlyList<VertexItem> vertices,
         IReadOnlyList<EdgeItem> edges,
         int batchSize,
@@ -129,7 +134,7 @@ public sealed class NebulaGraphClient
     {
         using var resp = await _http.PostAsJsonAsync(
             "api/v1/graph/bulk",
-            new { space = _options.Space, vertices, edges, batch_size = batchSize }, JsonOpts, ct);
+            new { space, vertices, edges, batch_size = batchSize }, JsonOpts, ct);
         resp.EnsureSuccessStatusCode();
         return await resp.Content.ReadFromJsonAsync<BulkResult>(JsonOpts, ct) ?? new BulkResult();
     }

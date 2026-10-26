@@ -18,6 +18,9 @@ public class Line : Inode
     /// <summary>线路描述。</summary>
     public string? Description { get; set; }
 
+    /// <summary>所属图空间 Id（FK → spaces；线路的结构段边 line_segment 写入该空间）。</summary>
+    public string SpaceId { get; set; } = string.Empty;
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }
 }

@@ -3,14 +3,17 @@ using System.Text.Json;
 namespace TreeGraph.Api.EdgeSky.Entities;
 
 /// <summary>
-/// 边实例（顶级实体，镜像 NebulaGraph）：唯一标识 = 四元组
-/// &lt;起点 VID, EdgeType, Rank, 终点 VID&gt;（复合主键）。
+/// 边实例（顶级实体，镜像 NebulaGraph）：唯一标识 = 五元组
+/// &lt;SpaceId, EdgeType, 起点 VID, Rank, 终点 VID&gt;（复合主键；边从属于图空间）。
 /// 属性值 = props jsonb 单列，属性集由所属 EdgeType 的 <see cref="EdgeTypeProp"/> Schema 校验；
 /// 写入为覆盖语义（未列出的属性落 DEFAULT，无 DEFAULT 则 NULL）。
 /// </summary>
 public class Edge
 {
-    /// <summary>边类型名（FK → edge_types，Restrict）。</summary>
+    /// <summary>所属图空间 Id（与 EdgeType 共同 FK → edge_types，Restrict）。</summary>
+    public string SpaceId { get; set; } = string.Empty;
+
+    /// <summary>边类型名（与 SpaceId 共同 FK → edge_types，Restrict）。</summary>
     public string EdgeType { get; set; } = string.Empty;
 
     /// <summary>起点节点 Id（nodes.id，FK Restrict）。</summary>

@@ -1,12 +1,16 @@
-@* EdgeTypes.razor — 边类型管理（EdgeSky，对齐 Nebula EdgeType CRUD）。
-   列表 + 新建（对话框）+ 展开查看属性 Schema + 删除（有实例时服务端 409）。 *@
+@* EdgeTypes.razor — 边类型管理（EdgeSky，对齐 Nebula EdgeType CRUD，空间级）。
+   顶部空间选择器（PG Space ↔ Nebula Space 1:1）+ 列表 + 新建（对话框）
+   + 展开查看属性 Schema + 删除（有实例时服务端 409）。 *@
 @page "/metadata/edge-types"
 @inject EdgeApiClient Api
+@inject SpaceApiClient SpaceApi
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.EdgeSky.Dialogs
 @using TreeGraph.Blazor.Shared.EdgeSky.Services
+@using TreeGraph.Blazor.Shared.SpaceSky
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
 @using TreeGraph.Shared.EdgeSky.Dtos
 
 @if (!IsDialogMode)
@@ -14,6 +18,26 @@
     <PageTitle>边类型管理</PageTitle>
     <PageHeaderSky Title="边类型管理" />
 }
+
+@* 空间选择器：边类型为图空间级资源，所有操作作用于当前选中空间 *@
+<div class="d-flex align-center mb-2" style="gap: 8px;">
+    <MudSelect T="string" Value="_spaceId" ValueChanged="OnSpaceChangedAsync"
+               Label="图空间" Variant="Variant.Outlined" Margin="Margin.Dense"
+               Dense="true" Style="max-width: 280px;"
+               Disabled="@(_spaces is null || _spaces.Count == 0)">
+        @if (_spaces is not null)
+        {
+            @foreach (var s in _spaces)
+            {
+                <MudSelectItem T="string" Value="@s.Id">@s.Name</MudSelectItem>
+            }
+        }
+    </MudSelect>
+    @if (_spaces is not null && _spaces.Count == 0)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Warning">暂无空间，请先在「空间管理」创建</MudText>
+    }
+</div>
 
 <MudTable Items="_types" Hover="true" Bordered="true" Dense="true"
           Breakpoint="Breakpoint.Sm"
@@ -25,11 +49,11 @@
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                            Size="Size.Small" Color="Color.Default"
-                           OnClick="LoadAsync" Disabled="@_loading"
+                           OnClick="LoadAsync" Disabled="@(_loading || _spaceId is null)"
                            title="刷新" />
             <MudIconButton Icon="@Icons.Material.Filled.Add"
                            Size="Size.Small" Color="Color.Success"
-                           OnClick="OpenCreateAsync"
+                           OnClick="OpenCreateAsync" Disabled="@(_spaceId is null)"
                            title="新建边类型" />
         </MudTh>
     </HeaderContent>
@@ -73,7 +97,7 @@
     </RowTemplate>
     <NoRecordsContent>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            暂无边类型，点击右上角「新建边类型」创建。
+            当前空间暂无边类型，点击右上角「新建边类型」创建。
         </MudText>
     </NoRecordsContent>
 </MudTable>
@@ -83,16 +107,31 @@
     [Parameter] public bool IsDialogMode { get; set; }
 
     private List<EdgeTypeDto>? _types;
+    private IReadOnlyList<SpaceDto>? _spaces;
+    private string? _spaceId;
     private bool _loading;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _spaces = await SpaceApi.GetAllAsync();
+        _spaceId = _spaces.Count > 0 ? _spaces[0].Id : null;
+        if (_spaceId is not null)
+            await LoadAsync();
+    }
+
+    private async Task OnSpaceChangedAsync(string spaceId)
+    {
+        _spaceId = spaceId;
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
+        if (_spaceId is null) return;
         _loading = true;
         try
         {
-            _types = await Api.ListEdgeTypesAsync();
+            _types = await Api.ListEdgeTypesAsync(_spaceId);
             if (_types is null)
                 Snackbar.Add("边类型加载失败，请检查后端服务是否可达", Severity.Warning);
         }
@@ -120,7 +159,7 @@
         if (result?.Canceled != false || result.Data is not AlterEdgeTypeRequest req)
             return;
 
-        var (ok, error) = await Api.AlterEdgeTypeAsync(item.Name, req);
+        var (ok, error) = await Api.AlterEdgeTypeAsync(item.SpaceId, item.Name, req);
         if (!ok)
         {
             Snackbar.Add($"属性变更失败：{error ?? "未知错误"}", Severity.Error);
@@ -133,6 +172,8 @@
 
     private async Task OpenCreateAsync()
     {
+        if (_spaceId is null) return;
+
         var dialog = await DialogService.ShowExAsync<EdgeTypeCreateDialog>(
             string.Empty,
             new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
@@ -140,7 +181,7 @@
         if (result?.Canceled != false || result.Data is not CreateEdgeTypeRequest req)
             return;
 
-        var (ok, error) = await Api.CreateEdgeTypeAsync(req);
+        var (ok, error) = await Api.CreateEdgeTypeAsync(_spaceId, req);
         if (!ok)
         {
             Snackbar.Add($"创建失败：{error ?? "未知错误"}", Severity.Error);
@@ -165,7 +206,7 @@
         if (result?.Canceled != false)
             return;
 
-        var (ok, error) = await Api.UpdateDisplayNameAsync(item.Name, result.Data as string);
+        var (ok, error) = await Api.UpdateDisplayNameAsync(item.SpaceId, item.Name, result.Data as string);
         if (!ok)
         {
             Snackbar.Add($"更新显示名失败：{error ?? "未知错误"}", Severity.Error);
@@ -184,7 +225,7 @@
             yesText: "删除", cancelText: "取消");
         if (confirmed != true) return;
 
-        var (ok, error) = await Api.DeleteEdgeTypeAsync(item.Name);
+        var (ok, error) = await Api.DeleteEdgeTypeAsync(item.SpaceId, item.Name);
         if (!ok)
         {
             Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);

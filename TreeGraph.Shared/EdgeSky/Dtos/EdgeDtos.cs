@@ -2,9 +2,12 @@ using System.Text.Json;
 
 namespace TreeGraph.Shared.EdgeSky.Dtos;
 
-/// <summary>边实例视图：唯一标识 = 四元组 &lt;SrcVid, EdgeType, Rank, DstVid&gt;（Nebula 对齐）。</summary>
+/// <summary>边实例视图：唯一标识 = 五元组 &lt;SpaceId, EdgeType, SrcVid, Rank, DstVid&gt;（Nebula 对齐）。</summary>
 public class EdgeDto
 {
+    /// <summary>所属图空间 Id。</summary>
+    public string SpaceId { get; set; } = string.Empty;
+
     public string EdgeType { get; set; } = string.Empty;
     public string SrcVid { get; set; } = string.Empty;
     public long Rank { get; set; }

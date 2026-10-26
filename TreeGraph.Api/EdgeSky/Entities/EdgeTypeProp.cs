@@ -10,10 +10,13 @@ namespace TreeGraph.Api.EdgeSky.Entities;
 /// </summary>
 public class EdgeTypeProp
 {
-    /// <summary>所属边类型名（FK → edge_types，Restrict）。</summary>
+    /// <summary>所属图空间 Id（与 EdgeTypeName 共同 FK → edge_types，Restrict）。</summary>
+    public string SpaceId { get; set; } = string.Empty;
+
+    /// <summary>所属边类型名（与 SpaceId 共同 FK → edge_types，Restrict）。</summary>
     public string EdgeTypeName { get; set; } = string.Empty;
 
-    /// <summary>属性名（类型内唯一，与 EdgeTypeName 组成复合主键）。</summary>
+    /// <summary>属性名（类型内唯一，与 SpaceId + EdgeTypeName 组成复合主键）。</summary>
     public string PropName { get; set; } = string.Empty;
 
     /// <summary>数据类型（STRING/INT/DOUBLE/BOOL/TIMESTAMP/DATE 大写常量）。</summary>

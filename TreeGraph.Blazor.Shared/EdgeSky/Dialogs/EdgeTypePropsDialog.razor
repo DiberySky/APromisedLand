@@ -241,7 +241,7 @@
         if (!string.Equals(edit.DisplayName, row.Src.DisplayName, StringComparison.Ordinal))
         {
             var (ok, error) = await Api.UpdatePropDisplayNameAsync(
-                TypeInfo.Name, row.Src.PropName, edit.DisplayName);
+                TypeInfo.SpaceId, TypeInfo.Name, row.Src.PropName, edit.DisplayName);
             if (!ok)
             {
                 Snackbar.Add($"更新显示名失败：{error ?? "未知错误"}", Severity.Error);

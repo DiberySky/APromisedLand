@@ -4,7 +4,10 @@
 @using TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
+@using TreeGraph.Blazor.Shared.SpaceSky
+@using TreeGraph.Blazor.Shared.SpaceSky.Services
 @inject LineManageApiClient Api
+@inject SpaceApiClient SpaceApi
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
@@ -19,6 +22,7 @@ else
     <MudTable Items="_lines ?? (IReadOnlyList<LineDto>)[]" Hover="true" Bordered="true" Dense="true">
         <HeaderContent>
             <MudTh>名称</MudTh>
+            <MudTh>空间</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">设置</MudTh>
             <MudTh>描述</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">同步刷新</MudTh>
@@ -32,6 +36,7 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd>@context.Name</MudTd>
+            <MudTd>@SpaceName(context.SpaceId)</MudTd>
             <MudTd Style="white-space: nowrap; text-align: center;">
                 @* 线路节点设置：打开该线路的 LineNode 维护对话框 *@
                 <MudIconButton Icon="@Icons.Material.Filled.Settings"
@@ -81,6 +86,7 @@ else
 
 @code {
     private IReadOnlyList<LineDto>? _lines;
+    private IReadOnlyList<SpaceDto>? _spaces;
     private bool _loading;
     private bool _initialized;
 
@@ -105,6 +111,7 @@ else
         _loading = true;
         try
         {
+            _spaces = await SpaceApi.GetAllAsync();
             _lines = await Api.GetAllAsync();
         }
         catch (Exception ex)
@@ -117,6 +124,10 @@ else
             _loading = false;
         }
     }
+
+    /// <summary>SpaceId → 空间名（未加载到空间列表时原样显示 Id）。</summary>
+    private string SpaceName(string spaceId)
+        => _spaces?.FirstOrDefault(s => s.Id == spaceId)?.Name ?? spaceId;
 
     private async Task OpenCreateAsync()
     {

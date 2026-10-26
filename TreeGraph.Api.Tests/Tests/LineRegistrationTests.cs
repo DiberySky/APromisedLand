@@ -33,7 +33,7 @@ public class LineRegistrationTests : IntegrationTestBase
     {
         var lineId = $"L_{Guid.NewGuid():N}";
         var resp = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "注册测试线路" });
+            "/api/Lines", new { id = lineId, name = "注册测试线路", spaceId = TestSpaceId });
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
 
         // nodes 注册行存在 → 结构端点可读取（线路身份已在 nodes）
@@ -57,7 +57,7 @@ public class LineRegistrationTests : IntegrationTestBase
     {
         var lineId = $"L_{Guid.NewGuid():N}";
         var create = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "旧名" });
+            "/api/Lines", new { id = lineId, name = "旧名", spaceId = TestSpaceId });
         create.EnsureSuccessStatusCode();
 
         var update = await Client.PutAsJsonAsync(
@@ -75,7 +75,7 @@ public class LineRegistrationTests : IntegrationTestBase
     {
         var lineId = $"L_{Guid.NewGuid():N}";
         var create = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "待删线路" });
+            "/api/Lines", new { id = lineId, name = "待删线路", spaceId = TestSpaceId });
         create.EnsureSuccessStatusCode();
         var nodeId = $"{Guid.NewGuid()}";
         var node = await Client.PostAsJsonAsync("/api/LineNode", new
@@ -116,7 +116,7 @@ public class LineRegistrationTests : IntegrationTestBase
         // 建链冒烟：段边直写 edges 表，结构端点可见
         var lineId = $"L_{Guid.NewGuid():N}";
         var create = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "种子可用线路" });
+            "/api/Lines", new { id = lineId, name = "种子可用线路", spaceId = TestSpaceId });
         create.EnsureSuccessStatusCode();
         var n1 = $"{Guid.NewGuid()}";
         var n2 = $"{Guid.NewGuid()}";

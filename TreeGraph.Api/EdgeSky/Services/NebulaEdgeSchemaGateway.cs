@@ -5,8 +5,9 @@ namespace TreeGraph.Api.EdgeSky.Services;
 
 /// <summary>
 /// 生产网关：经 TreeGraph.NebulaFastApi REST 执行 CREATE/ALTER/DROP EDGE。
-/// DDL 异步生效（官方建议等约两个心跳周期），执行后轮询 DESCRIBE 确认生效，
-/// 与 GraphSchemaInitializer 的轮询惯例一致；属性名/类型名由服务层按
+/// EdgeType 从属于图空间：spaceId 经 <see cref="GraphNaming.ToNebulaSpace"/> 路由到
+/// 对应 Nebula space。DDL 异步生效（官方建议等约两个心跳周期），执行后轮询 DESCRIBE
+/// 确认生效，与 GraphSchemaInitializer 的轮询惯例一致；属性名/类型名由服务层按
 /// Nebula 命名规则（字母开头，仅字母/数字/下划线）校验，无需额外转义。
 /// </summary>
 public sealed class NebulaEdgeSchemaGateway : IEdgeSchemaGateway
@@ -22,53 +23,58 @@ public sealed class NebulaEdgeSchemaGateway : IEdgeSchemaGateway
 
     public async Task CreateEdgeTypeAsync(EdgeType type, CancellationToken ct)
     {
-        await ExecuteWithRetryAsync(EdgeNgqlDdlBuilder.BuildCreateEdgeNgql(type), ct);
+        var space = GraphNaming.ToNebulaSpace(type.SpaceId);
+        await ExecuteWithRetryAsync(space, EdgeNgqlDdlBuilder.BuildCreateEdgeNgql(type), ct);
         await WaitUntilAsync(
-            async () => await DescribeColumnsAsync(type.Name, ct) is not null,
+            async () => await DescribeColumnsAsync(space, type.Name, ct) is not null,
             $"CREATE EDGE {type.Name}", ct);
     }
 
-    public async Task AlterAddPropsAsync(string edgeType, IReadOnlyList<EdgeTypeProp> props, CancellationToken ct)
+    public async Task AlterAddPropsAsync(string spaceId, string edgeType, IReadOnlyList<EdgeTypeProp> props, CancellationToken ct)
     {
         if (props.Count == 0) return;
+        var space = GraphNaming.ToNebulaSpace(spaceId);
         var cols = string.Join(", ", props.Select(EdgeNgqlDdlBuilder.BuildColumnDef));
-        await ExecuteWithRetryAsync($"ALTER EDGE `{edgeType}` ADD ({cols})", ct);
+        await ExecuteWithRetryAsync(space, $"ALTER EDGE `{edgeType}` ADD ({cols})", ct);
         await WaitUntilAsync(async () =>
         {
-            var existing = await DescribeColumnsAsync(edgeType, ct);
+            var existing = await DescribeColumnsAsync(space, edgeType, ct);
             return existing is not null && props.All(p => existing.Contains(p.PropName));
         }, $"ALTER EDGE {edgeType} ADD", ct);
     }
 
-    public async Task AlterDropPropsAsync(string edgeType, IReadOnlyList<string> propNames, CancellationToken ct)
+    public async Task AlterDropPropsAsync(string spaceId, string edgeType, IReadOnlyList<string> propNames, CancellationToken ct)
     {
         if (propNames.Count == 0) return;
+        var space = GraphNaming.ToNebulaSpace(spaceId);
         var cols = string.Join(", ", propNames.Select(n => $"`{n}`"));
-        await ExecuteWithRetryAsync($"ALTER EDGE `{edgeType}` DROP ({cols})", ct);
+        await ExecuteWithRetryAsync(space, $"ALTER EDGE `{edgeType}` DROP ({cols})", ct);
         await WaitUntilAsync(async () =>
         {
-            var existing = await DescribeColumnsAsync(edgeType, ct);
+            var existing = await DescribeColumnsAsync(space, edgeType, ct);
             return existing is not null && !propNames.Any(existing.Contains);
         }, $"ALTER EDGE {edgeType} DROP", ct);
     }
 
-    public async Task AlterChangePropTypeAsync(string edgeType, string propName, string newDataType, CancellationToken ct)
+    public async Task AlterChangePropTypeAsync(string spaceId, string edgeType, string propName, string newDataType, CancellationToken ct)
     {
-        await ExecuteWithRetryAsync($"ALTER EDGE `{edgeType}` CHANGE (`{propName}` {newDataType})", ct);
+        var space = GraphNaming.ToNebulaSpace(spaceId);
+        await ExecuteWithRetryAsync(space, $"ALTER EDGE `{edgeType}` CHANGE (`{propName}` {newDataType})", ct);
         await WaitUntilAsync(async () =>
         {
-            var types = await DescribeColumnTypesAsync(edgeType, ct);
+            var types = await DescribeColumnTypesAsync(space, edgeType, ct);
             return types is not null
                    && types.TryGetValue(propName, out var actual)
                    && actual.Contains(newDataType, StringComparison.OrdinalIgnoreCase);
         }, $"ALTER EDGE {edgeType} CHANGE {propName}", ct);
     }
 
-    public async Task DropEdgeTypeAsync(string edgeType, CancellationToken ct)
+    public async Task DropEdgeTypeAsync(string spaceId, string edgeType, CancellationToken ct)
     {
-        await ExecuteWithRetryAsync($"DROP EDGE IF EXISTS `{edgeType}`", ct);
+        var space = GraphNaming.ToNebulaSpace(spaceId);
+        await ExecuteWithRetryAsync(space, $"DROP EDGE IF EXISTS `{edgeType}`", ct);
         await WaitUntilAsync(
-            async () => await DescribeColumnsAsync(edgeType, ct) is null,
+            async () => await DescribeColumnsAsync(space, edgeType, ct) is null,
             $"DROP EDGE {edgeType}", ct);
     }
 
@@ -77,14 +83,14 @@ public sealed class NebulaEdgeSchemaGateway : IEdgeSchemaGateway
     // ------------------------------------------------------------
 
     /// <summary>DDL 幂等重试（IF NOT EXISTS / IF EXISTS 语义；space 刚重建时 metad 可能瞬时失败）。</summary>
-    private async Task ExecuteWithRetryAsync(string ngql, CancellationToken ct)
+    private async Task ExecuteWithRetryAsync(string space, string ngql, CancellationToken ct)
     {
         const int maxAttempts = 5;
         for (var attempt = 1; ; attempt++)
         {
             try
             {
-                await _client.QueryAsync(ngql, ct);
+                await _client.QueryAsync(space, ngql, ct);
                 return;
             }
             catch (Exception ex) when (attempt < maxAttempts && !ct.IsCancellationRequested)
@@ -114,18 +120,18 @@ public sealed class NebulaEdgeSchemaGateway : IEdgeSchemaGateway
     }
 
     /// <summary>DESCRIBE EDGE 取列名集；边类型不存在（含传播窗口内）返回 null。</summary>
-    private async Task<HashSet<string>?> DescribeColumnsAsync(string edgeType, CancellationToken ct)
+    private async Task<HashSet<string>?> DescribeColumnsAsync(string space, string edgeType, CancellationToken ct)
     {
-        var types = await DescribeColumnTypesAsync(edgeType, ct);
+        var types = await DescribeColumnTypesAsync(space, edgeType, ct);
         return types?.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>DESCRIBE EDGE 取列名 → 类型映射；边类型不存在（含传播窗口内）返回 null。</summary>
-    private async Task<Dictionary<string, string>?> DescribeColumnTypesAsync(string edgeType, CancellationToken ct)
+    private async Task<Dictionary<string, string>?> DescribeColumnTypesAsync(string space, string edgeType, CancellationToken ct)
     {
         try
         {
-            var result = await _client.QueryAsync($"DESCRIBE EDGE `{edgeType}`", ct);
+            var result = await _client.QueryAsync(space, $"DESCRIBE EDGE `{edgeType}`", ct);
             var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var row in result.Data ?? [])
             {

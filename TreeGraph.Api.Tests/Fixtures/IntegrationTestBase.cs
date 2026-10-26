@@ -15,6 +15,12 @@ public abstract class IntegrationTestBase
         Client = factory.CreateClient();
     }
 
+    /// <summary>种子动态空间「武汉供电段」Id（迁移 HasData）：Edge/Line 空间化测试的归属空间。</summary>
+    protected const string TestSpaceId = "7a1e3f5d-9b2c-4a8e-1f0d-3c5b7e9a1c2d";
+
+    /// <summary>空间内 EdgeSky 路由前缀（EdgeType/Edge 均为图空间级资源）。</summary>
+    protected static string EdgeBase => $"/api/spaces/{TestSpaceId}/edge";
+
     /// <summary>
     /// 把测试用整数 n 转换为一个合法 GUID 字符串。
     /// 格式：00000000-0000-0000-0000-{n:D12}

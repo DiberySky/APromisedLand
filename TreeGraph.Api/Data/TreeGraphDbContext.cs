@@ -808,8 +808,17 @@ public class TreeGraphDbContext : DbContext
                 .HasSentinel("");
             e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
             e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.SpaceId).HasColumnName("space_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            // 线路从属于图空间（结构段边 line_segment 写入该空间）；Restrict：有线路时禁止删空间
+            e.HasOne<TreeGraph.Api.SpaceSky.Entities.Space>()
+                .WithMany()
+                .HasForeignKey(x => x.SpaceId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_lines_space");
+            e.HasIndex(x => x.SpaceId).HasDatabaseName("ix_lines_space");
         });
     }
 
@@ -860,7 +869,9 @@ public class TreeGraphDbContext : DbContext
             e.ToTable("edge_types", t => t.HasCheckConstraint(
                 "ck_edge_types_ttl",
                 "(ttl_col IS NULL) = (ttl_duration_seconds IS NULL)"));
-            e.HasKey(x => x.Name);
+            // Nebula 对齐：EdgeType 是空间级对象，(space_id, name) 复合主键，同名可跨空间
+            e.HasKey(x => new { x.SpaceId, x.Name });
+            e.Property(x => x.SpaceId).HasColumnName("space_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
             e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(1000);
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200);
@@ -868,7 +879,14 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.TtlDurationSeconds).HasColumnName("ttl_duration_seconds");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-            // 内置种子（line_segment）改由 BuiltinEdgeTypeSeeder 启动时幂等播种
+
+            // 空间 Restrict：空间内仍有边类型时禁止删空间（服务层先校验）
+            e.HasOne<SpaceSky.Entities.Space>()
+                .WithMany()
+                .HasForeignKey(x => x.SpaceId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_edge_types_space");
+            // 内置种子（line_segment）改由 BuiltinEdgeTypeSeeder 启动时按空间幂等播种
         });
 
         mb.Entity<EdgeSky.Entities.EdgeTypeProp>(e =>
@@ -877,7 +895,8 @@ public class TreeGraphDbContext : DbContext
             e.ToTable("edge_type_props", t => t.HasCheckConstraint(
                 "ck_edge_type_props_notnull_default",
                 "nullable OR default_value IS NOT NULL"));
-            e.HasKey(x => new { x.EdgeTypeName, x.PropName });
+            e.HasKey(x => new { x.SpaceId, x.EdgeTypeName, x.PropName });
+            e.Property(x => x.SpaceId).HasColumnName("space_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.EdgeTypeName).HasColumnName("edge_type_name").HasMaxLength(100).IsRequired();
             e.Property(x => x.PropName).HasColumnName("prop_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
@@ -889,15 +908,16 @@ public class TreeGraphDbContext : DbContext
 
             // 属性定义是类型的内在组成：删类型前由服务层先删属性行（Restrict 兜底）
             e.HasOne(x => x.EdgeType).WithMany(t => t.Props)
-                .HasForeignKey(x => x.EdgeTypeName).OnDelete(DeleteBehavior.Restrict);
-            // 内置种子（line_segment.name）改由 BuiltinEdgeTypeSeeder 启动时幂等播种
+                .HasForeignKey(x => new { x.SpaceId, x.EdgeTypeName }).OnDelete(DeleteBehavior.Restrict);
+            // 内置种子（line_segment.name）改由 BuiltinEdgeTypeSeeder 启动时按空间幂等播种
         });
 
         mb.Entity<EdgeSky.Entities.Edge>(e =>
         {
             e.ToTable("edges");
-            // 四元组复合主键：<起点 VID, EdgeType, Rank, 终点 VID>（Nebula 边唯一标识）
-            e.HasKey(x => new { x.EdgeType, x.SrcVid, x.Rank, x.DstVid });
+            // 五元组复合主键：<SpaceId, EdgeType, 起点 VID, Rank, 终点 VID>（Nebula 边唯一标识；边从属于空间）
+            e.HasKey(x => new { x.SpaceId, x.EdgeType, x.SrcVid, x.Rank, x.DstVid });
+            e.Property(x => x.SpaceId).HasColumnName("space_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.EdgeType).HasColumnName("edge_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.SrcVid).HasColumnName("src_vid").HasMaxLength(36).IsRequired();
             e.Property(x => x.DstVid).HasColumnName("dst_vid").HasMaxLength(36).IsRequired();
@@ -923,10 +943,10 @@ public class TreeGraphDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_edges_dst_node");
 
-            // 边类型 Restrict：有实例时由服务层拒绝删类型
+            // 边类型 Restrict：有实例时由服务层拒绝删类型（复合 FK 对齐空间级主键）
             e.HasOne<EdgeSky.Entities.EdgeType>()
                 .WithMany()
-                .HasForeignKey(x => x.EdgeType)
+                .HasForeignKey(x => new { x.SpaceId, x.EdgeType })
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_edges_edge_type");
         });

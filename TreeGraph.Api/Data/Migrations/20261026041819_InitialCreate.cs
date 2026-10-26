@@ -14,6 +14,9 @@ namespace TreeGraph.Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // 手写 SQL：attribute_audit_log 按月分区父表（实体 ExcludeFromMigrations，EF 不生成 DDL）
+            migrationBuilder.CreateAuditPartitionTable();
+
             migrationBuilder.CreateTable(
                 name: "composite_type_definitions",
                 columns: table => new
@@ -51,23 +54,6 @@ namespace TreeGraph.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_custom_table_definitions", x => x.table_definition_id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "edge_types",
-                columns: table => new
-                {
-                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    comment = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    ttl_col = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
-                    ttl_duration_seconds = table.Column<long>(type: "bigint", nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_edge_types", x => x.name);
-                    table.CheckConstraint("ck_edge_types_ttl", "(ttl_col IS NULL) = (ttl_duration_seconds IS NULL)");
                 });
 
             migrationBuilder.CreateTable(
@@ -114,21 +100,6 @@ namespace TreeGraph.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_inode_entitytype", x => new { x.inode_id, x.entity_type });
-                });
-
-            migrationBuilder.CreateTable(
-                name: "lines",
-                columns: table => new
-                {
-                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_lines", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -186,30 +157,6 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "edge_type_props",
-                columns: table => new
-                {
-                    edge_type_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    prop_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    nullable = table.Column<bool>(type: "boolean", nullable: false),
-                    default_value = table.Column<JsonElement>(type: "jsonb", nullable: true),
-                    comment = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    display_order = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_edge_type_props", x => new { x.edge_type_name, x.prop_name });
-                    table.CheckConstraint("ck_edge_type_props_notnull_default", "nullable OR default_value IS NOT NULL");
-                    table.ForeignKey(
-                        name: "FK_edge_type_props_edge_types_edge_type_name",
-                        column: x => x.edge_type_name,
-                        principalTable: "edge_types",
-                        principalColumn: "name",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "category_trees",
                 columns: table => new
                 {
@@ -232,41 +179,6 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "edges",
-                columns: table => new
-                {
-                    edge_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    src_vid = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    dst_vid = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    rank = table.Column<long>(type: "bigint", nullable: false),
-                    props = table.Column<JsonElement>(type: "jsonb", nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_edges", x => new { x.edge_type, x.src_vid, x.rank, x.dst_vid });
-                    table.ForeignKey(
-                        name: "fk_edges_dst_node",
-                        column: x => x.dst_vid,
-                        principalTable: "nodes",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_edges_edge_type",
-                        column: x => x.edge_type,
-                        principalTable: "edge_types",
-                        principalColumn: "name",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_edges_src_node",
-                        column: x => x.src_vid,
-                        principalTable: "nodes",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "knowledge_trees",
                 columns: table => new
                 {
@@ -283,33 +195,6 @@ namespace TreeGraph.Api.Data.Migrations
                     table.ForeignKey(
                         name: "FK_knowledge_trees_nodes_id",
                         column: x => x.id,
-                        principalTable: "nodes",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "line_terminals",
-                columns: table => new
-                {
-                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    external_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
-                    operating_state = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_line_terminals", x => new { x.line_id, x.node_id });
-                    table.ForeignKey(
-                        name: "FK_line_terminals_lines_line_id",
-                        column: x => x.line_id,
-                        principalTable: "lines",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_lt_node",
-                        column: x => x.node_id,
                         principalTable: "nodes",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
@@ -393,6 +278,53 @@ namespace TreeGraph.Api.Data.Migrations
                         column: x => x.option_set_id,
                         principalTable: "option_sets",
                         principalColumn: "option_set_id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "edge_types",
+                columns: table => new
+                {
+                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    comment = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    ttl_col = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    ttl_duration_seconds = table.Column<long>(type: "bigint", nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_edge_types", x => new { x.space_id, x.name });
+                    table.CheckConstraint("ck_edge_types_ttl", "(ttl_col IS NULL) = (ttl_duration_seconds IS NULL)");
+                    table.ForeignKey(
+                        name: "fk_edge_types_space",
+                        column: x => x.space_id,
+                        principalTable: "spaces",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "lines",
+                columns: table => new
+                {
+                    id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
+                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_lines", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_lines_space",
+                        column: x => x.space_id,
+                        principalTable: "spaces",
+                        principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -550,6 +482,95 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "edge_type_props",
+                columns: table => new
+                {
+                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    edge_type_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    prop_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    data_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    nullable = table.Column<bool>(type: "boolean", nullable: false),
+                    default_value = table.Column<JsonElement>(type: "jsonb", nullable: true),
+                    comment = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    display_order = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_edge_type_props", x => new { x.space_id, x.edge_type_name, x.prop_name });
+                    table.CheckConstraint("ck_edge_type_props_notnull_default", "nullable OR default_value IS NOT NULL");
+                    table.ForeignKey(
+                        name: "FK_edge_type_props_edge_types_space_id_edge_type_name",
+                        columns: x => new { x.space_id, x.edge_type_name },
+                        principalTable: "edge_types",
+                        principalColumns: new[] { "space_id", "name" },
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "edges",
+                columns: table => new
+                {
+                    space_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    edge_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    src_vid = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    dst_vid = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    rank = table.Column<long>(type: "bigint", nullable: false),
+                    props = table.Column<JsonElement>(type: "jsonb", nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_edges", x => new { x.space_id, x.edge_type, x.src_vid, x.rank, x.dst_vid });
+                    table.ForeignKey(
+                        name: "fk_edges_dst_node",
+                        column: x => x.dst_vid,
+                        principalTable: "nodes",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_edges_edge_type",
+                        columns: x => new { x.space_id, x.edge_type },
+                        principalTable: "edge_types",
+                        principalColumns: new[] { "space_id", "name" },
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_edges_src_node",
+                        column: x => x.src_vid,
+                        principalTable: "nodes",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "line_terminals",
+                columns: table => new
+                {
+                    line_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
+                    role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    external_node_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: true),
+                    operating_state = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_line_terminals", x => new { x.line_id, x.node_id });
+                    table.ForeignKey(
+                        name: "FK_line_terminals_lines_line_id",
+                        column: x => x.line_id,
+                        principalTable: "lines",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_lt_node",
+                        column: x => x.node_id,
+                        principalTable: "nodes",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "attribute_values",
                 columns: table => new
                 {
@@ -690,11 +711,6 @@ namespace TreeGraph.Api.Data.Migrations
                 });
 
             migrationBuilder.InsertData(
-                table: "edge_types",
-                columns: new[] { "name", "comment", "created_at", "ttl_col", "ttl_duration_seconds", "updated_at" },
-                values: new object[] { "line_segment", "线路结构段边（内置：LineNode → LineNode 链边）", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) });
-
-            migrationBuilder.InsertData(
                 table: "nodes",
                 columns: new[] { "id", "created_at", "description", "host_type", "line_id", "name", "updated_at" },
                 values: new object[,]
@@ -794,11 +810,6 @@ namespace TreeGraph.Api.Data.Migrations
                 table: "category_trees",
                 columns: new[] { "id", "can_have_children", "description", "is_archived", "parent_id", "sort_order" },
                 values: new object[] { "d0000000-0000-4000-8000-000000000001", true, "根分类", false, null, 0 });
-
-            migrationBuilder.InsertData(
-                table: "edge_type_props",
-                columns: new[] { "edge_type_name", "prop_name", "comment", "data_type", "default_value", "display_order", "nullable" },
-                values: new object[] { "line_segment", "name", "段边展示名", "STRING", null, 0, true });
 
             migrationBuilder.InsertData(
                 table: "knowledge_trees",
@@ -1149,6 +1160,11 @@ namespace TreeGraph.Api.Data.Migrations
                 column: "node_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_lines_space",
+                table: "lines",
+                column: "space_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_lav_entity",
                 table: "location_attribute_values",
                 columns: new[] { "entity_type", "entity_id" });
@@ -1202,10 +1218,6 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "ix_unit_trees_parent",
                 table: "unit_trees",
                 column: "parent_id");
-
-            // attribute_audit_log 为 ExcludeFromMigrations 的按月分区表，DDL 手写补回
-            // （SQL 本体见 MigrationSqlExtensions；重建 Initial 迁移后此调用必须保留）
-            migrationBuilder.CreateAuditPartitionTable();
         }
 
         /// <inheritdoc />
@@ -1259,9 +1271,6 @@ namespace TreeGraph.Api.Data.Migrations
                 name: "space_trees");
 
             migrationBuilder.DropTable(
-                name: "spaces");
-
-            migrationBuilder.DropTable(
                 name: "edge_types");
 
             migrationBuilder.DropTable(
@@ -1269,6 +1278,9 @@ namespace TreeGraph.Api.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "attribute_catalog");
+
+            migrationBuilder.DropTable(
+                name: "spaces");
 
             migrationBuilder.DropTable(
                 name: "composite_type_definitions");

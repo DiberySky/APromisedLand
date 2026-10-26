@@ -25,9 +25,12 @@ public class EdgeTypePropDto
     public int DisplayOrder { get; set; }
 }
 
-/// <summary>EdgeType 完整视图（名称 + 属性 Schema + TTL + 注释 + 中文显示名）。</summary>
+/// <summary>EdgeType 完整视图（空间 + 名称 + 属性 Schema + TTL + 注释 + 中文显示名）。</summary>
 public class EdgeTypeDto
 {
+    /// <summary>所属图空间 Id。</summary>
+    public string SpaceId { get; set; } = string.Empty;
+
     public string Name { get; set; } = string.Empty;
 
     /// <summary>中文显示名称（仅 UI 展示用，Nebula 无此概念）。</summary>

@@ -10,8 +10,8 @@ namespace TreeGraph.Api.EdgeSky.Services;
 
 /// <summary>
 /// EdgeType 管理服务（镜像 NebulaGraph 边类型语义）：
-/// 名称图空间内唯一、创建后不可改名；TTL/注释仅创建时可设；
-/// 变更仅限 ALTER ADD/DROP/CHANGE 属性。PG edge_types 为唯一真源，
+/// EdgeType 从属于图空间，(SpaceId, Name) 空间内唯一、创建后不可改名；
+/// TTL/注释仅创建时可设；变更仅限 ALTER ADD/DROP/CHANGE 属性。PG edge_types 为唯一真源，
 /// Nebula DDL 经 <see cref="IEdgeSchemaGateway"/> 同步（失败记日志，
 /// 由 GraphSchemaInitializer 启动对齐 / 全量重建兜底）。
 /// </summary>
@@ -32,38 +32,42 @@ public sealed class EdgeTypeService
         _logger = logger;
     }
 
-    public async Task<List<EdgeTypeDto>> ListAsync(CancellationToken ct)
+    public async Task<List<EdgeTypeDto>> ListAsync(string spaceId, CancellationToken ct)
     {
         var types = await _db.EdgeTypes.AsNoTracking()
             .Include(t => t.Props)
+            .Where(t => t.SpaceId == spaceId)
             .OrderBy(t => t.Name)
             .ToListAsync(ct);
         return types.Select(ToDto).ToList();
     }
 
-    public async Task<EdgeTypeDto> GetAsync(string name, CancellationToken ct)
+    public async Task<EdgeTypeDto> GetAsync(string spaceId, string name, CancellationToken ct)
     {
         var type = await _db.EdgeTypes.AsNoTracking()
             .Include(t => t.Props)
-            .FirstOrDefaultAsync(t => t.Name == name, ct);
+            .FirstOrDefaultAsync(t => t.SpaceId == spaceId && t.Name == name, ct);
         return type is null
             ? throw new KeyNotFoundException($"边类型 '{name}' 不存在")
             : ToDto(type);
     }
 
-    /// <summary>创建 EdgeType（名称重复 → 409；校验失败 → 400）。</summary>
-    public async Task<EdgeTypeDto> CreateAsync(CreateEdgeTypeRequest req, CancellationToken ct)
+    /// <summary>创建 EdgeType（空间不存在 → 404；空间内名称重复 → 409；校验失败 → 400）。</summary>
+    public async Task<EdgeTypeDto> CreateAsync(string spaceId, CreateEdgeTypeRequest req, CancellationToken ct)
     {
         ValidateName(req.Name, "边类型名");
 
-        if (await _db.EdgeTypes.AnyAsync(t => t.Name == req.Name, ct))
+        if (!await _db.Spaces.AnyAsync(s => s.Id == spaceId, ct))
+            throw new KeyNotFoundException($"图空间 '{spaceId}' 不存在");
+        if (await _db.EdgeTypes.AnyAsync(t => t.SpaceId == spaceId && t.Name == req.Name, ct))
             throw new InvalidOperationException($"边类型 '{req.Name}' 已存在");
 
-        var props = BuildProps(req.Name, req.Props);
+        var props = BuildProps(spaceId, req.Name, req.Props);
         ValidateTtl(req.TtlCol, req.TtlDurationSeconds, props);
 
         var type = new EdgeType
         {
+            SpaceId = spaceId,
             Name = req.Name,
             Comment = req.Comment,
             DisplayName = req.DisplayName,
@@ -81,14 +85,14 @@ public sealed class EdgeTypeService
     /// <summary>
     /// ALTER EDGE：仅属性集变更（增/删/改类型）。名称/TTL/注释不可变更（Nebula 能力对齐）。
     /// </summary>
-    public async Task<EdgeTypeDto> AlterAsync(string name, AlterEdgeTypeRequest req, CancellationToken ct)
+    public async Task<EdgeTypeDto> AlterAsync(string spaceId, string name, AlterEdgeTypeRequest req, CancellationToken ct)
     {
         var type = await _db.EdgeTypes.Include(t => t.Props)
-            .FirstOrDefaultAsync(t => t.Name == name, ct)
+            .FirstOrDefaultAsync(t => t.SpaceId == spaceId && t.Name == name, ct)
         ?? throw new KeyNotFoundException($"边类型 '{name}' 不存在");
 
         // ── 校验阶段（全部通过才落库） ──
-        var addProps = BuildProps(name, req.AddProps);
+        var addProps = BuildProps(spaceId, name, req.AddProps);
         foreach (var p in addProps)
             if (type.Props.Any(x => x.PropName == p.PropName))
                 throw new ArgumentException($"属性 '{p.PropName}' 已存在，无法重复新增");
@@ -142,15 +146,15 @@ public sealed class EdgeTypeService
         await _db.SaveChangesAsync(ct);
 
         // ── DDL 同步阶段（失败不翻请求，由启动对齐/重建兜底） ──
-        await SyncDdlAsync(() => _gateway.AlterAddPropsAsync(name, addProps, ct), $"ALTER EDGE {name} ADD");
-        await SyncDdlAsync(() => _gateway.AlterDropPropsAsync(name, req.DropProps, ct), $"ALTER EDGE {name} DROP");
+        await SyncDdlAsync(() => _gateway.AlterAddPropsAsync(spaceId, name, addProps, ct), $"ALTER EDGE {name} ADD");
+        await SyncDdlAsync(() => _gateway.AlterDropPropsAsync(spaceId, name, req.DropProps, ct), $"ALTER EDGE {name} DROP");
         foreach (var change in req.ChangeProps)
         {
             // 仅类型变更同步 Nebula DDL；可空/默认值变更仅落 PG 元数据（写入校验依据）
             if (string.IsNullOrEmpty(change.NewDataType))
                 continue;
             await SyncDdlAsync(
-                () => _gateway.AlterChangePropTypeAsync(name, change.PropName, change.NewDataType, ct),
+                () => _gateway.AlterChangePropTypeAsync(spaceId, name, change.PropName, change.NewDataType, ct),
                 $"ALTER EDGE {name} CHANGE {change.PropName}");
         }
 
@@ -159,10 +163,10 @@ public sealed class EdgeTypeService
 
     /// <summary>更新边类型中文显示名（非 Nebula 概念，不走 DDL 同步）。</summary>
     public async Task<EdgeTypeDto> UpdateDisplayNameAsync(
-        string name, string? displayName, CancellationToken ct)
+        string spaceId, string name, string? displayName, CancellationToken ct)
     {
         var type = await _db.EdgeTypes.Include(t => t.Props)
-            .FirstOrDefaultAsync(t => t.Name == name, ct)
+            .FirstOrDefaultAsync(t => t.SpaceId == spaceId && t.Name == name, ct)
         ?? throw new KeyNotFoundException($"边类型 '{name}' 不存在");
 
         type.DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
@@ -173,10 +177,10 @@ public sealed class EdgeTypeService
 
     /// <summary>更新边属性中文显示名（非 Nebula 概念，仅 UI 展示；空白 = 清除）。</summary>
     public async Task<EdgeTypeDto> UpdatePropDisplayNameAsync(
-        string name, string propName, string? displayName, CancellationToken ct)
+        string spaceId, string name, string propName, string? displayName, CancellationToken ct)
     {
         var type = await _db.EdgeTypes.Include(t => t.Props)
-            .FirstOrDefaultAsync(t => t.Name == name, ct)
+            .FirstOrDefaultAsync(t => t.SpaceId == spaceId && t.Name == name, ct)
         ?? throw new KeyNotFoundException($"边类型 '{name}' 不存在");
 
         var prop = type.Props.FirstOrDefault(p => p.PropName == propName)
@@ -188,21 +192,21 @@ public sealed class EdgeTypeService
         return ToDto(type);
     }
 
-    /// <summary>删除 EdgeType（仍有边实例 → 409）。</summary>
-    public async Task DeleteAsync(string name, CancellationToken ct)
+    /// <summary>删除 EdgeType（空间内仍有边实例 → 409）。</summary>
+    public async Task DeleteAsync(string spaceId, string name, CancellationToken ct)
     {
         var type = await _db.EdgeTypes.Include(t => t.Props)
-            .FirstOrDefaultAsync(t => t.Name == name, ct)
+            .FirstOrDefaultAsync(t => t.SpaceId == spaceId && t.Name == name, ct)
         ?? throw new KeyNotFoundException($"边类型 '{name}' 不存在");
 
-        if (await _db.Edges.AnyAsync(e => e.EdgeType == name, ct))
+        if (await _db.Edges.AnyAsync(e => e.SpaceId == spaceId && e.EdgeType == name, ct))
             throw new InvalidOperationException($"边类型 '{name}' 仍存在边实例，无法删除（请先删除全部实例）");
 
         _db.EdgeTypeProps.RemoveRange(type.Props);
         _db.EdgeTypes.Remove(type);
         await _db.SaveChangesAsync(ct);
 
-        await SyncDdlAsync(() => _gateway.DropEdgeTypeAsync(name, ct), $"DROP EDGE {name}");
+        await SyncDdlAsync(() => _gateway.DropEdgeTypeAsync(spaceId, name, ct), $"DROP EDGE {name}");
     }
 
     // ------------------------------------------------------------
@@ -215,7 +219,7 @@ public sealed class EdgeTypeService
             throw new ArgumentException($"{what} '{name}' 不符合 Nebula 命名规则（字母开头，仅字母/数字/下划线，≤100 字符）");
     }
 
-    private static List<EdgeTypeProp> BuildProps(string edgeTypeName, List<EdgeTypePropDto> inputs)
+    private static List<EdgeTypeProp> BuildProps(string spaceId, string edgeTypeName, List<EdgeTypePropDto> inputs)
     {
         var props = new List<EdgeTypeProp>(inputs.Count);
         foreach (var input in inputs)
@@ -244,6 +248,7 @@ public sealed class EdgeTypeService
 
             props.Add(new EdgeTypeProp
             {
+                SpaceId = spaceId,
                 EdgeTypeName = edgeTypeName,
                 PropName = input.PropName,
                 DataType = input.DataType,
@@ -297,6 +302,7 @@ public sealed class EdgeTypeService
 
     private static EdgeTypeDto ToDto(EdgeType t) => new()
     {
+        SpaceId = t.SpaceId,
         Name = t.Name,
         DisplayName = t.DisplayName,
         Comment = t.Comment,

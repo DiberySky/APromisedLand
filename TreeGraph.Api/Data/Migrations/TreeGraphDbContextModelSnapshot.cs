@@ -25,6 +25,11 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.Edge", b =>
                 {
+                    b.Property<string>("SpaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("space_id");
+
                     b.Property<string>("EdgeType")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -56,7 +61,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("EdgeType", "SrcVid", "Rank", "DstVid");
+                    b.HasKey("SpaceId", "EdgeType", "SrcVid", "Rank", "DstVid");
 
                     b.HasIndex("DstVid")
                         .HasDatabaseName("ix_edges_dst");
@@ -75,6 +80,11 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeType", b =>
                 {
+                    b.Property<string>("SpaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("space_id");
+
                     b.Property<string>("Name")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -107,7 +117,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("Name");
+                    b.HasKey("SpaceId", "Name");
 
                     b.ToTable("edge_types", null, t =>
                         {
@@ -117,6 +127,11 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeTypeProp", b =>
                 {
+                    b.Property<string>("SpaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("space_id");
+
                     b.Property<string>("EdgeTypeName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -155,7 +170,7 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("nullable");
 
-                    b.HasKey("EdgeTypeName", "PropName");
+                    b.HasKey("SpaceId", "EdgeTypeName", "PropName");
 
                     b.ToTable("edge_type_props", null, t =>
                         {
@@ -1951,11 +1966,20 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("SpaceId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("space_id");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SpaceId")
+                        .HasDatabaseName("ix_lines_space");
 
                     b.ToTable("lines", (string)null);
                 });
@@ -3500,26 +3524,36 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_edges_dst_node");
 
-                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeType", null)
-                        .WithMany()
-                        .HasForeignKey("EdgeType")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_edges_edge_type");
-
                     b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
                         .WithMany()
                         .HasForeignKey("SrcVid")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_edges_src_node");
+
+                    b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeType", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "EdgeType")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_edges_edge_type");
+                });
+
+            modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeType", b =>
+                {
+                    b.HasOne("TreeGraph.Api.SpaceSky.Entities.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_edge_types_space");
                 });
 
             modelBuilder.Entity("TreeGraph.Api.EdgeSky.Entities.EdgeTypeProp", b =>
                 {
                     b.HasOne("TreeGraph.Api.EdgeSky.Entities.EdgeType", "EdgeType")
                         .WithMany("Props")
-                        .HasForeignKey("EdgeTypeName")
+                        .HasForeignKey("SpaceId", "EdgeTypeName")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -3687,6 +3721,16 @@ namespace TreeGraph.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("TreeGraph.Shared.LineSky.Entities.Line", b =>
+                {
+                    b.HasOne("TreeGraph.Api.SpaceSky.Entities.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lines_space");
                 });
 
             modelBuilder.Entity("TreeGraph.Shared.NodeSky.Entities.Node", b =>

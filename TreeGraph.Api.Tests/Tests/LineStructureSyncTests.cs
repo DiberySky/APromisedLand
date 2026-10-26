@@ -60,8 +60,7 @@ public class LineStructureSyncTests
     {
         var handler = new FakeNebulaHandler();
         await using var db = CreateDb(Guid.NewGuid().ToString());
-        db.Nodes.Add(new Node { Id = "line-1", HostType = "Line", Name = "10kV 一线" });
-        await db.SaveChangesAsync();
+        SeedLine(db, "line-1");
         var sync = CreateSynchronizer(db, handler);
 
         var written = await sync.SyncInodeAsync("line-1");
@@ -113,6 +112,7 @@ public class LineStructureSyncTests
             SeedLine(seed, "line-1", "n1", "n2");
             seed.Edges.Add(new Edge
             {
+                SpaceId = TestSpaceId,
                 EdgeType = GraphNaming.LineSegmentEdge,
                 SrcVid = "n1",
                 DstVid = "n2",
@@ -125,9 +125,9 @@ public class LineStructureSyncTests
 
         var handler = new FakeNebulaHandler();
         var initializer = await CreateReadyInitializerAsync(dbName, handler);
-        var options = Options.Create(new GraphSyncOptions { Space = "test" });
+        var options = Options.Create(new GraphSyncOptions());
         await using var db = CreateDb(dbName);
-        var sync = new GraphSynchronizer(db, CreateClient(handler, options),
+        var sync = new GraphSynchronizer(db, CreateClient(handler),
             initializer, options, NullLogger<GraphSynchronizer>.Instance);
 
         var result = await sync.RebuildAllAsync(CancellationToken.None);
@@ -152,16 +152,27 @@ public class LineStructureSyncTests
         var handler = new FakeNebulaHandler();
         await using (var seed = CreateDb(dbName))
         {
-            // 物化内置种子（EdgeType line_segment + name STRING NULL prop）：改由启动时幂等播种器写入
+            // 物化内置种子（EdgeType line_segment + name STRING NULL prop）：改由启动时幂等播种器写入；
+            // 图空间化后播种与 schema 初始化均按 spaces 行循环，先补一行空间
             seed.Database.EnsureCreated();
+            seed.Spaces.Add(new Api.SpaceSky.Entities.Space
+            {
+                Id = TestSpaceId,
+                Name = "测试空间",
+                Type = Api.SpaceSky.Entities.SpaceType.Dynamic
+            });
+            await seed.SaveChangesAsync();
             await TreeGraph.Api.Data.Seeding.BuiltinEdgeTypeSeeder.SeedAsync(seed);
         }
 
         await CreateReadyInitializerAsync(dbName, handler);
 
-        var create = Assert.Single(handler.Queries,
-            q => q.Contains($"CREATE EDGE IF NOT EXISTS `{GraphNaming.LineSegmentEdge}`"));
-        Assert.Contains("`name` STRING NULL", create);
+        // 每个空间各建一次（4 行 HasData 种子空间 + 测试空间）：按空间逐一断言 DDL 形态一致
+        var creates = handler.Queries
+            .Where(q => q.Contains($"CREATE EDGE IF NOT EXISTS `{GraphNaming.LineSegmentEdge}`"))
+            .ToList();
+        Assert.Equal(5, creates.Count);
+        Assert.All(creates, c => Assert.Contains("`name` STRING NULL", c));
 
         // line_contains 不再建边
         Assert.DoesNotContain(handler.QueryTexts,
@@ -172,9 +183,25 @@ public class LineStructureSyncTests
     // helpers
     // ============================================================
 
+    private const string TestSpaceId = "space-test";
+
     private static void SeedLine(TreeGraphDbContext db, string lineId, params string[] nodeIds)
     {
+        // 图空间化：线路/段边归属空间，spaces 行 + lines 行（SpaceId）必须齐备
+        if (!db.Spaces.Any(s => s.Id == TestSpaceId))
+            db.Spaces.Add(new Api.SpaceSky.Entities.Space
+            {
+                Id = TestSpaceId,
+                Name = "测试空间",
+                Type = Api.SpaceSky.Entities.SpaceType.Dynamic
+            });
         db.Nodes.Add(new Node { Id = lineId, HostType = "Line", Name = "测试线路" });
+        db.Lines.Add(new TreeGraph.Shared.LineSky.Entities.Line
+        {
+            Id = lineId,
+            Name = "测试线路",
+            SpaceId = TestSpaceId
+        });
         for (var i = 0; i < nodeIds.Length; i++)
         {
             db.Nodes.Add(new Node
@@ -193,34 +220,31 @@ public class LineStructureSyncTests
             .UseInMemoryDatabase(dbName)
             .Options);
 
-    private static NebulaGraphClient CreateClient(
-        FakeNebulaHandler handler, IOptions<GraphSyncOptions> options)
+    private static NebulaGraphClient CreateClient(FakeNebulaHandler handler)
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("http://nebula.test/") };
-        return new NebulaGraphClient(http, options, NullLogger<NebulaGraphClient>.Instance);
+        return new NebulaGraphClient(http, NullLogger<NebulaGraphClient>.Instance);
     }
 
     private static GraphSynchronizer CreateSynchronizer(
         TreeGraphDbContext db, FakeNebulaHandler handler)
     {
-        var options = Options.Create(new GraphSyncOptions { Space = "test" });
-        return new GraphSynchronizer(db, CreateClient(handler, options),
+        var options = Options.Create(new GraphSyncOptions());
+        return new GraphSynchronizer(db, CreateClient(handler),
             null!, options, NullLogger<GraphSynchronizer>.Instance);
     }
 
     private static async Task<GraphSchemaInitializer> CreateReadyInitializerAsync(
         string dbName, FakeNebulaHandler handler)
     {
-        var options = Options.Create(new GraphSyncOptions { Space = "test" });
         var services = new ServiceCollection();
         services.AddScoped<TreeGraphDbContext>(_ => CreateDb(dbName));
         // 生命周期覆盖整个测试：initializer 持有该 provider 的 scope factory
         var provider = services.BuildServiceProvider();
 
         var initializer = new GraphSchemaInitializer(
-            CreateClient(handler, options),
+            CreateClient(handler),
             provider.GetRequiredService<IServiceScopeFactory>(),
-            options,
             NullLogger<GraphSchemaInitializer>.Instance);
 
         await initializer.StartAsync(CancellationToken.None);

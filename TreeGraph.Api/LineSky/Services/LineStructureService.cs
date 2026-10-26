@@ -15,12 +15,13 @@ namespace TreeGraph.Api.LineSky.Services;
 /// <summary>
 /// 线路结构服务 —— R7 边集薄层：
 ///   节点集 = nodes where line_id=lineId（host_type='LineNode'）；
-///   边集 = edges 表中两端均属本线的记录（一条记录 = 一条有向边，line_segment 为链边）；
+///   边集 = 线路所属空间（lines.space_id）内、两端均属本线的 edges 记录
+///         （一条记录 = 一条有向边，line_segment 为链边）；
 ///   链序 = 沿 line_segment 链走（无入边者为起点；分叉/环按发现序）。
 ///
 /// 拓扑模式校验整体删除；只保留：禁自环、同线校验、诊断（连通/成环/度数，只报告不阻断）。
 /// 端子校验只留「投运 FeedIn ≤ 1」。段 Weight 已砍（DisplayName → props.name）。
-/// 段边直写 edges 表（EdgeSky：edge_type='line_segment'，rank 恒 0，props={"name":...}），
+/// 段边直写 edges 表（EdgeSky：space_id=线路空间，edge_type='line_segment'，rank 恒 0，props={"name":...}），
 /// 写成功后发布 EdgeChangedEvent 触发图同步。
 /// </summary>
 public class LineStructureService
@@ -56,17 +57,19 @@ public class LineStructureService
             .FirstOrDefaultAsync(n => n.Id == lineId && n.HostType == "Line", ct);
         if (line is null) return null;
 
+        var spaceId = await LineSpaceIdAsync(lineId, ct);
+
         var nodes = await _db.Nodes.AsNoTracking()
             .Where(n => n.HostType == "LineNode" && n.LineId == lineId)
             .OrderBy(n => n.Name)
             .ToListAsync(ct);
         var nodeIds = nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
 
-        // 边集 = 两端均属本线的 edges 记录（含 line_segment 与用户自定义分支边）
-        var edges = nodeIds.Count == 0
+        // 边集 = 线路所属空间内、两端均属本线的 edges 记录（含 line_segment 与用户自定义分支边）
+        var edges = nodeIds.Count == 0 || spaceId is null
             ? new List<Edge>()
             : await _db.Edges.AsNoTracking()
-                .Where(e => nodeIds.Contains(e.SrcVid) && nodeIds.Contains(e.DstVid))
+                .Where(e => e.SpaceId == spaceId && nodeIds.Contains(e.SrcVid) && nodeIds.Contains(e.DstVid))
                 .ToListAsync(ct);
 
         var terminals = await _db.LineTerminals.AsNoTracking()
@@ -148,11 +151,13 @@ public class LineStructureService
         string lineId, LineStructureRequest req, CancellationToken ct)
     {
         if (!await LineExistsAsync(lineId, ct)) return null;
+        var spaceId = await LineSpaceIdAsync(lineId, ct)
+            ?? throw new InvalidOperationException($"线路 {lineId} 缺少所属空间（lines 行缺失）");
 
         var nodeIds = await LineNodeIdsAsync(lineId, ct);
         var hasEdges = nodeIds.Count > 0
             && await _db.Edges.AnyAsync(
-                e => e.EdgeType == SegmentEdgeType
+                e => e.SpaceId == spaceId && e.EdgeType == SegmentEdgeType
                   && nodeIds.Contains(e.SrcVid) && nodeIds.Contains(e.DstVid), ct);
         if (hasEdges)
             throw new InvalidOperationException("该线路已存在结构段边，请使用替换或逐段调整");
@@ -165,6 +170,8 @@ public class LineStructureService
         string lineId, LineStructureRequest req, CancellationToken ct)
     {
         if (!await LineExistsAsync(lineId, ct)) return null;
+        var spaceId = await LineSpaceIdAsync(lineId, ct)
+            ?? throw new InvalidOperationException($"线路 {lineId} 缺少所属空间（lines 行缺失）");
 
         var nodeIds = await LineNodeIdsAsync(lineId, ct);
         var desired = ValidateSegments(req.Segments, nodeIds);
@@ -180,7 +187,7 @@ public class LineStructureService
             var existing = nodeIds.Count == 0
                 ? new List<Edge>()
                 : await _db.Edges
-                    .Where(e => e.EdgeType == SegmentEdgeType
+                    .Where(e => e.SpaceId == spaceId && e.EdgeType == SegmentEdgeType
                              && nodeIds.Contains(e.SrcVid) && nodeIds.Contains(e.DstVid))
                     .ToListAsync(ct);
 
@@ -197,7 +204,7 @@ public class LineStructureService
                 .Select(e => (e.SrcVid, e.DstVid))
                 .ToHashSet();
             foreach (var d in desired.Where(d => !existingSet.Contains((d.FromNodeId, d.ToNodeId))))
-                UpsertSegmentEdge(d.FromNodeId, d.ToNodeId, d.DisplayName, existing, events);
+                UpsertSegmentEdge(spaceId, d.FromNodeId, d.ToNodeId, d.DisplayName, existing, events);
 
             // 2. 端子全量替换（null = 清空；PUT = 全量替换语义，与「清空结构」一致）
             await ReplaceTerminalsAsync(lineId, nodeIds, req.Terminals ?? [], ct);
@@ -223,6 +230,8 @@ public class LineStructureService
     {
         if (!await LineExistsAsync(lineId, ct))
             throw new KeyNotFoundException($"线路不存在: {lineId}");
+        var spaceId = await LineSpaceIdAsync(lineId, ct)
+            ?? throw new InvalidOperationException($"线路 {lineId} 缺少所属空间（lines 行缺失）");
 
         var nodeIds = await LineNodeIdsAsync(lineId, ct);
         ValidateSegmentEndpoints(req.FromNodeId, req.ToNodeId, nodeIds);
@@ -230,15 +239,15 @@ public class LineStructureService
         var events = new List<EdgeChangedEvent>();
         // 单出边语义：同一 from 的旧 line_segment 出边先删（幂等覆盖）
         var stale = await _db.Edges
-            .Where(e => e.EdgeType == SegmentEdgeType && e.SrcVid == req.FromNodeId)
+            .Where(e => e.SpaceId == spaceId && e.EdgeType == SegmentEdgeType && e.SrcVid == req.FromNodeId)
             .ToListAsync(ct);
         foreach (var s in stale.Where(s => s.DstVid != req.ToNodeId))
             DeleteSegmentEdge(s, events);
 
         var existing = await _db.Edges
-            .Where(e => e.EdgeType == SegmentEdgeType && nodeIds.Contains(e.SrcVid))
+            .Where(e => e.SpaceId == spaceId && e.EdgeType == SegmentEdgeType && nodeIds.Contains(e.SrcVid))
             .ToListAsync(ct);
-        UpsertSegmentEdge(req.FromNodeId, req.ToNodeId, req.DisplayName, existing, events);
+        UpsertSegmentEdge(spaceId, req.FromNodeId, req.ToNodeId, req.DisplayName, existing, events);
 
         await _db.SaveChangesAsync(ct);
         foreach (var evt in events)
@@ -247,13 +256,16 @@ public class LineStructureService
         return (await GetAsync(lineId, ct))!;
     }
 
-    /// <summary>删除一段（按四元组编码 edgeId；两端均属本线才可删）。</summary>
+    /// <summary>删除一段（按四元组编码 edgeId；空间由线路解析；两端均属本线才可删）。</summary>
     public async Task<LineStructureDto> DeleteSegmentAsync(
         string lineId, string edgeId, CancellationToken ct)
     {
         var (edgeType, srcVid, rank, dstVid) = DecodeEdgeId(edgeId);
+        var spaceId = await LineSpaceIdAsync(lineId, ct);
 
-        var edge = await _db.Edges.FindAsync([edgeType, srcVid, rank, dstVid], ct);
+        var edge = spaceId is null
+            ? null
+            : await _db.Edges.FindAsync([spaceId, edgeType, srcVid, rank, dstVid], ct);
         if (edge is null)
             throw new KeyNotFoundException($"段边不存在: {edgeId}");
 
@@ -350,6 +362,13 @@ public class LineStructureService
     private async Task<bool> LineExistsAsync(string lineId, CancellationToken ct)
         => await _db.Nodes.AnyAsync(n => n.Id == lineId && n.HostType == "Line", ct);
 
+    /// <summary>解析线路所属空间（lines.space_id）；lines 行缺失返回 null（调用方按上下文处置）。</summary>
+    private async Task<string?> LineSpaceIdAsync(string lineId, CancellationToken ct)
+        => await _db.Lines.AsNoTracking()
+            .Where(l => l.Id == lineId)
+            .Select(l => (string?)l.SpaceId)
+            .FirstOrDefaultAsync(ct);
+
     private async Task<HashSet<string>> LineNodeIdsAsync(string lineId, CancellationToken ct)
         => (await _db.Nodes.AsNoTracking()
                 .Where(n => n.HostType == "LineNode" && n.LineId == lineId)
@@ -361,17 +380,17 @@ public class LineStructureService
     // 段边读写（edges 表，直写；事件收集后由调用方在提交后发布）
     // ------------------------------------------------------------
 
-    /// <summary>upsert 一条 line_segment 段边（覆盖语义：props={"name":displayName}）。</summary>
+    /// <summary>upsert 一条 line_segment 段边（覆盖语义：props={"name":displayName}；spaceId = 线路所属空间）。</summary>
     private void UpsertSegmentEdge(
-        string fromId, string toId, string? displayName,
+        string spaceId, string fromId, string toId, string? displayName,
         List<Edge> tracked, List<EdgeChangedEvent> events)
     {
         var edge = tracked.FirstOrDefault(
-            e => e.EdgeType == SegmentEdgeType && e.SrcVid == fromId
+            e => e.SpaceId == spaceId && e.EdgeType == SegmentEdgeType && e.SrcVid == fromId
                  && e.Rank == 0 && e.DstVid == toId);
         if (edge is null)
         {
-            edge = new Edge { EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId };
+            edge = new Edge { SpaceId = spaceId, EdgeType = SegmentEdgeType, SrcVid = fromId, Rank = 0, DstVid = toId };
             _db.Edges.Add(edge);
             tracked.Add(edge);
         }
@@ -384,6 +403,7 @@ public class LineStructureService
 
         events.Add(new EdgeChangedEvent
         {
+            SpaceId = edge.SpaceId,
             EdgeType = edge.EdgeType, SrcVid = edge.SrcVid,
             Rank = edge.Rank, DstVid = edge.DstVid,
             Kind = EdgeChangeKind.Upsert
@@ -396,6 +416,7 @@ public class LineStructureService
         _db.Edges.Remove(edge);
         events.Add(new EdgeChangedEvent
         {
+            SpaceId = edge.SpaceId,
             EdgeType = edge.EdgeType, SrcVid = edge.SrcVid,
             Rank = edge.Rank, DstVid = edge.DstVid,
             Kind = EdgeChangeKind.Delete

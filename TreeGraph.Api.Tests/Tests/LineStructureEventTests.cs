@@ -14,6 +14,9 @@ namespace TreeGraph.Api.Tests.Tests;
 [Collection("LineStructureEvents")]
 public class LineStructureEventTests
 {
+    /// <summary>种子动态空间「武汉供电段」Id（迁移 HasData）：线路归属空间。</summary>
+    private const string TestSpaceId = "7a1e3f5d-9b2c-4a8e-1f0d-3c5b7e9a1c2d";
+
     private readonly RecordingApiFactory _factory;
     private readonly HttpClient _client;
 
@@ -153,7 +156,7 @@ public class LineStructureEventTests
     {
         var lineId = $"L_{Guid.NewGuid():N}";
         var resp = await _client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "事件测试线路" });
+            "/api/Lines", new { id = lineId, name = "事件测试线路", spaceId = TestSpaceId });
         Assert.True(resp.IsSuccessStatusCode,
             $"创建线路失败: {(int)resp.StatusCode} {await resp.Content.ReadAsStringAsync()}");
         return lineId;

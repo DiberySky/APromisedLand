@@ -72,8 +72,8 @@ public sealed class EdgeGraphSyncConsumer
 
     public async Task Consume(EdgeChangedEvent msg, CancellationToken ct)
     {
-        // 去重键 = 四元组 + kind 组（upsert/delete），避免同边连续变更被窗口吞掉
-        var dedupKey = $"graph-sync-edge:{msg.EdgeType}:{msg.SrcVid}:{msg.Rank}:{msg.DstVid}" +
+        // 去重键 = 五元组 + kind 组（upsert/delete），避免同边连续变更被窗口吞掉
+        var dedupKey = $"graph-sync-edge:{msg.SpaceId}:{msg.EdgeType}:{msg.SrcVid}:{msg.Rank}:{msg.DstVid}" +
                        $":{(msg.Kind == EdgeChangeKind.Delete ? "del" : "upsert")}";
         if (_dedupCache.TryGetValue(dedupKey, out _))
         {

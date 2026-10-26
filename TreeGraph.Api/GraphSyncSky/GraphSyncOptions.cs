@@ -10,9 +10,6 @@ public sealed class GraphSyncOptions
     /// <summary>TreeGraph.NebulaFastApi REST 端点（Aspire 注入 NebulaFastApi:Endpoint 优先）。</summary>
     public string NebulaApiEndpoint { get; set; } = "http://localhost:9393/";
 
-    /// <summary>NebulaGraph 图空间名。</summary>
-    public string Space { get; set; } = "treegraph";
-
     /// <summary>滑动去重窗口（秒）：同一对象在窗口内重复事件合并为一次刷新。</summary>
     public int DedupWindowSeconds { get; set; } = 5;
 
@@ -33,6 +30,12 @@ public static class GraphNaming
     /// 存储 = edges 表（EdgeSky 内置 seed EdgeType，prop: name STRING NULL），rank 恒 0。
     /// </summary>
     public const string LineSegmentEdge = "line_segment";
+
+    /// <summary>
+    /// PG 空间 Id → Nebula 图空间名映射（确定性计算，不落库）：
+    /// Nebula 标识符不允许 '-'，取 "tg_" + 去横线 GUID（如 tg_7a1e3f5d9b2c4a8e...）。
+    /// </summary>
+    public static string ToNebulaSpace(string spaceId) => $"tg_{spaceId.Replace("-", "")}";
 
     public const string SpaceTreeTag = "space_tree";
     public const string UnitTreeTag = "unit_tree";
@@ -67,4 +70,17 @@ public static class GraphNaming
             [NodeTag] = ["name", "node_type", "is_archived"],
             [LineTag] = ["name", "node_type", "is_archived"]
         };
+}
+
+/// <summary>内置种子空间 Id（与 Space.SeedData 对齐）：树 → 图空间路由锚点。</summary>
+internal static class SeedSpaceIds
+{
+    /// <summary>「类型」空间：分类树（CategoryTree）路由目标。</summary>
+    public const string Type = "8b2f4a6e-0c3d-5b9f-2a1e-4d6c8f0b2d3e";
+
+    /// <summary>「单位」空间：单位树（UnitTree）路由目标。</summary>
+    public const string Unit = "9c3a5b7f-1d4e-6c0a-3b2f-5e7d9a1c3e4f";
+
+    /// <summary>「知识库」空间：知识树（KnowledgeTree）路由目标。</summary>
+    public const string Knowledge = "ad5e6c8f-2b3d-4a7e-9c0f-1d2b3e4f5a6b";
 }

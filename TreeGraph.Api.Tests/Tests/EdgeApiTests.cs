@@ -25,7 +25,7 @@ public class EdgeApiTests : IntegrationTestBase
     public async Task EdgeType_CreateThenGet_Roundtrip()
     {
         var name = $"et_{Guid.NewGuid():N}";
-        var create = await Client.PostAsJsonAsync("/api/edge/types", new
+        var create = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name,
             comment = "测试边类型",
@@ -38,7 +38,7 @@ public class EdgeApiTests : IntegrationTestBase
         });
         Assert.True(create.IsSuccessStatusCode, await create.Content.ReadAsStringAsync());
 
-        var dto = await Client.GetEavAsync<EdgeTypeDto>($"/api/edge/types/{name}");
+        var dto = await Client.GetEavAsync<EdgeTypeDto>($"{EdgeBase}/types/{name}");
         Assert.NotNull(dto);
         Assert.Equal(name, dto!.Name);
         Assert.Equal("测试边类型", dto.Comment);
@@ -52,10 +52,10 @@ public class EdgeApiTests : IntegrationTestBase
     public async Task EdgeType_DuplicateName_Returns409()
     {
         var name = $"et_{Guid.NewGuid():N}";
-        var first = await Client.PostAsJsonAsync("/api/edge/types", new { name });
+        var first = await Client.PostAsJsonAsync($"{EdgeBase}/types", new { name });
         first.EnsureSuccessStatusCode();
 
-        var dup = await Client.PostAsJsonAsync("/api/edge/types", new { name });
+        var dup = await Client.PostAsJsonAsync($"{EdgeBase}/types", new { name });
         Assert.Equal(HttpStatusCode.Conflict, dup.StatusCode);
     }
 
@@ -65,14 +65,14 @@ public class EdgeApiTests : IntegrationTestBase
     [InlineData("中文名")]    // 非 ASCII
     public async Task EdgeType_InvalidName_Returns400(string badName)
     {
-        var resp = await Client.PostAsJsonAsync("/api/edge/types", new { name = badName });
+        var resp = await Client.PostAsJsonAsync($"{EdgeBase}/types", new { name = badName });
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
 
     [Fact]
     public async Task EdgeType_NotNullWithoutDefault_Returns400()
     {
-        var resp = await Client.PostAsJsonAsync("/api/edge/types", new
+        var resp = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name = $"et_{Guid.NewGuid():N}",
             props = new[] { new { propName = "weight", dataType = "INT", nullable = false } }
@@ -85,7 +85,7 @@ public class EdgeApiTests : IntegrationTestBase
     public async Task EdgeType_TtlMustPair_AndColumnTypeRestricted()
     {
         // 只有 TTL 列没有时长 → 400
-        var half = await Client.PostAsJsonAsync("/api/edge/types", new
+        var half = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name = $"et_{Guid.NewGuid():N}",
             ttlCol = "created",
@@ -94,7 +94,7 @@ public class EdgeApiTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, half.StatusCode);
 
         // TTL 列类型为 STRING → 400
-        var badType = await Client.PostAsJsonAsync("/api/edge/types", new
+        var badType = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name = $"et_{Guid.NewGuid():N}",
             ttlCol = "name",
@@ -109,7 +109,7 @@ public class EdgeApiTests : IntegrationTestBase
     public async Task EdgeType_Alter_AddAndDropProp()
     {
         var name = $"et_{Guid.NewGuid():N}";
-        var create = await Client.PostAsJsonAsync("/api/edge/types", new
+        var create = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name,
             props = new[] { new { propName = "a", dataType = "STRING", nullable = true } }
@@ -117,19 +117,19 @@ public class EdgeApiTests : IntegrationTestBase
         create.EnsureSuccessStatusCode();
 
         // ADD 新属性 + DROP 旧属性
-        var alter = await Client.PutAsJsonAsync($"/api/edge/types/{name}", new
+        var alter = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}", new
         {
             addProps = new[] { new { propName = "b", dataType = "DOUBLE", nullable = true } },
             dropProps = new[] { "a" }
         });
         Assert.True(alter.IsSuccessStatusCode, await alter.Content.ReadAsStringAsync());
 
-        var dto = await Client.GetEavAsync<EdgeTypeDto>($"/api/edge/types/{name}");
+        var dto = await Client.GetEavAsync<EdgeTypeDto>($"{EdgeBase}/types/{name}");
         var prop = Assert.Single(dto!.Props);
         Assert.Equal("b", prop.PropName);
 
         // DROP 不存在的属性 → 400
-        var bad = await Client.PutAsJsonAsync($"/api/edge/types/{name}",
+        var bad = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}",
             new { dropProps = new[] { "not_exist" } });
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
     }
@@ -138,7 +138,7 @@ public class EdgeApiTests : IntegrationTestBase
     public async Task EdgeProp_DisplayName_PatchAndClear()
     {
         var name = $"et_{Guid.NewGuid():N}";
-        var create = await Client.PostAsJsonAsync("/api/edge/types", new
+        var create = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name,
             props = new[] { new { propName = "a", dataType = "STRING", nullable = true } }
@@ -147,21 +147,21 @@ public class EdgeApiTests : IntegrationTestBase
 
         // 设置属性中文显示名
         var patch = await Client.PatchAsJsonAsync(
-            $"/api/edge/types/{name}/props/a/display-name", new { displayName = "限速" });
+            $"{EdgeBase}/types/{name}/props/a/display-name", new { displayName = "限速" });
         patch.EnsureSuccessStatusCode();
-        var dto = await Client.GetEavAsync<EdgeTypeDto>($"/api/edge/types/{name}");
+        var dto = await Client.GetEavAsync<EdgeTypeDto>($"{EdgeBase}/types/{name}");
         Assert.Equal("限速", dto!.Props.Single().DisplayName);
 
         // 空白 = 清除
         var clear = await Client.PatchAsJsonAsync(
-            $"/api/edge/types/{name}/props/a/display-name", new { displayName = " " });
+            $"{EdgeBase}/types/{name}/props/a/display-name", new { displayName = " " });
         clear.EnsureSuccessStatusCode();
-        dto = await Client.GetEavAsync<EdgeTypeDto>($"/api/edge/types/{name}");
+        dto = await Client.GetEavAsync<EdgeTypeDto>($"{EdgeBase}/types/{name}");
         Assert.Null(dto!.Props.Single().DisplayName);
 
         // 不存在的属性 → 404
         var missing = await Client.PatchAsJsonAsync(
-            $"/api/edge/types/{name}/props/nope/display-name", new { displayName = "x" });
+            $"{EdgeBase}/types/{name}/props/nope/display-name", new { displayName = "x" });
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
@@ -169,7 +169,7 @@ public class EdgeApiTests : IntegrationTestBase
     public async Task EdgeType_AlterChange_NonWhitelist_Returns400()
     {
         var name = $"et_{Guid.NewGuid():N}";
-        var create = await Client.PostAsJsonAsync("/api/edge/types", new
+        var create = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name,
             props = new[] { new { propName = "a", dataType = "STRING", nullable = true } }
@@ -177,7 +177,7 @@ public class EdgeApiTests : IntegrationTestBase
         create.EnsureSuccessStatusCode();
 
         // STRING → INT 不在当前白名单 → 400
-        var resp = await Client.PutAsJsonAsync($"/api/edge/types/{name}", new
+        var resp = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}", new
         {
             changeProps = new[] { new { propName = "a", newDataType = "INT" } }
         });
@@ -188,7 +188,7 @@ public class EdgeApiTests : IntegrationTestBase
     public async Task EdgeType_AlterChange_NullableAndDefault()
     {
         var name = $"et_{Guid.NewGuid():N}";
-        var create = await Client.PostAsJsonAsync("/api/edge/types", new
+        var create = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name,
             props = new[]
@@ -200,7 +200,7 @@ public class EdgeApiTests : IntegrationTestBase
         create.EnsureSuccessStatusCode();
 
         // a: NULL → NOT NULL（配默认值 0）；b: 设置默认值
-        var alter = await Client.PutAsJsonAsync($"/api/edge/types/{name}", new
+        var alter = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}", new
         {
             changeProps = new object[]
             {
@@ -210,7 +210,7 @@ public class EdgeApiTests : IntegrationTestBase
         });
         alter.EnsureSuccessStatusCode();
 
-        var dto = await Client.GetEavAsync<EdgeTypeDto>($"/api/edge/types/{name}");
+        var dto = await Client.GetEavAsync<EdgeTypeDto>($"{EdgeBase}/types/{name}");
         var a = dto!.Props.Single(p => p.PropName == "a");
         Assert.False(a.Nullable);
         Assert.Equal(0L, a.DefaultValue!.Value.GetInt64());
@@ -219,7 +219,7 @@ public class EdgeApiTests : IntegrationTestBase
         Assert.Equal("x", b.DefaultValue!.Value.GetString());
 
         // NOT NULL 不配置默认值 → 400（Nebula 约束）
-        var bad = await Client.PutAsJsonAsync($"/api/edge/types/{name}", new
+        var bad = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}", new
         {
             changeProps = new[]
             {
@@ -229,7 +229,7 @@ public class EdgeApiTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
 
         // b: 清除默认值（可空属性允许）
-        var clear = await Client.PutAsJsonAsync($"/api/edge/types/{name}", new
+        var clear = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}", new
         {
             changeProps = new[]
             {
@@ -237,7 +237,7 @@ public class EdgeApiTests : IntegrationTestBase
             }
         });
         clear.EnsureSuccessStatusCode();
-        dto = await Client.GetEavAsync<EdgeTypeDto>($"/api/edge/types/{name}");
+        dto = await Client.GetEavAsync<EdgeTypeDto>($"{EdgeBase}/types/{name}");
         Assert.Null(dto!.Props.Single(p => p.PropName == "b").DefaultValue);
     }
 
@@ -245,25 +245,25 @@ public class EdgeApiTests : IntegrationTestBase
     public async Task EdgeType_Delete_WithInstances_Returns409_ThenDelete()
     {
         var name = $"et_{Guid.NewGuid():N}";
-        var create = await Client.PostAsJsonAsync("/api/edge/types", new { name });
+        var create = await Client.PostAsJsonAsync($"{EdgeBase}/types", new { name });
         create.EnsureSuccessStatusCode();
 
         var (src, dst) = await CreateNodePairAsync();
         var put = await Client.PutAsJsonAsync(
-            $"/api/edge/edges/{name}/{src}/0/{dst}", new { });
+            $"{EdgeBase}/edges/{name}/{src}/0/{dst}", new { });
         put.EnsureSuccessStatusCode();
 
         // 仍有实例 → 409
         Assert.Equal(HttpStatusCode.Conflict,
-            (await Client.DeleteAsync($"/api/edge/types/{name}")).StatusCode);
+            (await Client.DeleteAsync($"{EdgeBase}/types/{name}")).StatusCode);
 
         // 删实例后 → 可删；再 GET → 404
         Assert.Equal(HttpStatusCode.OK,
-            (await Client.DeleteAsync($"/api/edge/edges/{name}/{src}/0/{dst}")).StatusCode);
+            (await Client.DeleteAsync($"{EdgeBase}/edges/{name}/{src}/0/{dst}")).StatusCode);
         Assert.Equal(HttpStatusCode.OK,
-            (await Client.DeleteAsync($"/api/edge/types/{name}")).StatusCode);
+            (await Client.DeleteAsync($"{EdgeBase}/types/{name}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
-            (await Client.GetAsync($"/api/edge/types/{name}")).StatusCode);
+            (await Client.GetAsync($"{EdgeBase}/types/{name}")).StatusCode);
     }
 
     // ============================================================
@@ -278,18 +278,18 @@ public class EdgeApiTests : IntegrationTestBase
 
         // 第一次写入两个属性
         var first = await Client.PutAsJsonAsync(
-            $"/api/edge/edges/{name}/{src}/0/{dst}",
+            $"{EdgeBase}/edges/{name}/{src}/0/{dst}",
             new { props = new Dictionary<string, object?> { ["name"] = "一段", ["weight"] = 3 } });
         first.EnsureSuccessStatusCode();
 
         // 第二次只写 weight → name 落 NULL（覆盖语义，对齐 INSERT EDGE）
         var second = await Client.PutAsJsonAsync(
-            $"/api/edge/edges/{name}/{src}/0/{dst}",
+            $"{EdgeBase}/edges/{name}/{src}/0/{dst}",
             new { props = new Dictionary<string, object?> { ["weight"] = 5 } });
         second.EnsureSuccessStatusCode();
 
         var dto = await Client.GetEavAsync<EdgeDto>(
-            $"/api/edge/edges/{name}/{src}/0/{dst}");
+            $"{EdgeBase}/edges/{name}/{src}/0/{dst}");
         Assert.NotNull(dto);
         Assert.Equal(5, dto!.Props!["weight"].GetInt32());
         Assert.False(dto.Props!.ContainsKey("name"));
@@ -301,13 +301,13 @@ public class EdgeApiTests : IntegrationTestBase
         var name = await CreateEdgeTypeWithPropsAsync();
         var (src, dst) = await CreateNodePairAsync();
         var put = await Client.PutAsJsonAsync(
-            $"/api/edge/edges/{name}/{src}/0/{dst}",
+            $"{EdgeBase}/edges/{name}/{src}/0/{dst}",
             new { props = new Dictionary<string, object?> { ["name"] = "一段", ["weight"] = 3 } });
         put.EnsureSuccessStatusCode();
 
         // PATCH 只改 weight；再 PATCH name=null 清除该属性
         var patch = await Client.SendAsync(new HttpRequestMessage(
-            HttpMethod.Patch, $"/api/edge/edges/{name}/{src}/0/{dst}")
+            HttpMethod.Patch, $"{EdgeBase}/edges/{name}/{src}/0/{dst}")
         {
             Content = JsonContent.Create(
                 new { props = new Dictionary<string, object?> { ["weight"] = 9 } })
@@ -315,19 +315,19 @@ public class EdgeApiTests : IntegrationTestBase
         patch.EnsureSuccessStatusCode();
 
         var dto = await Client.GetEavAsync<EdgeDto>(
-            $"/api/edge/edges/{name}/{src}/0/{dst}");
+            $"{EdgeBase}/edges/{name}/{src}/0/{dst}");
         Assert.Equal(9, dto!.Props!["weight"].GetInt32());
         Assert.Equal("一段", dto.Props!["name"].GetString());
 
         var clear = await Client.SendAsync(new HttpRequestMessage(
-            HttpMethod.Patch, $"/api/edge/edges/{name}/{src}/0/{dst}")
+            HttpMethod.Patch, $"{EdgeBase}/edges/{name}/{src}/0/{dst}")
         {
             Content = JsonContent.Create(
                 new { props = new Dictionary<string, object?> { ["name"] = null } })
         });
         clear.EnsureSuccessStatusCode();
         var after = await Client.GetEavAsync<EdgeDto>(
-            $"/api/edge/edges/{name}/{src}/0/{dst}");
+            $"{EdgeBase}/edges/{name}/{src}/0/{dst}");
         Assert.False(after!.Props!.ContainsKey("name"));
         Assert.Equal(9, after.Props!["weight"].GetInt32());
     }
@@ -341,13 +341,13 @@ public class EdgeApiTests : IntegrationTestBase
         foreach (var rank in new[] { 0L, 1L })
         {
             var resp = await Client.PutAsJsonAsync(
-                $"/api/edge/edges/{name}/{src}/{rank}/{dst}",
+                $"{EdgeBase}/edges/{name}/{src}/{rank}/{dst}",
                 new { props = new Dictionary<string, object?> { ["weight"] = rank } });
             resp.EnsureSuccessStatusCode();
         }
 
         var list = await Client.GetEavAsync<List<EdgeDto>>(
-            $"/api/edge/edges?edgeType={name}&srcVid={src}");
+            $"{EdgeBase}/edges?edgeType={name}&srcVid={src}");
         Assert.Equal(2, list!.Count);
         Assert.Equal([0L, 1L], list.Select(e => e.Rank).ToArray());
     }
@@ -360,13 +360,13 @@ public class EdgeApiTests : IntegrationTestBase
 
         // 未定义属性键 → 400
         var unknown = await Client.PutAsJsonAsync(
-            $"/api/edge/edges/{name}/{src}/0/{dst}",
+            $"{EdgeBase}/edges/{name}/{src}/0/{dst}",
             new { props = new Dictionary<string, object?> { ["nope"] = 1 } });
         Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
 
         // 类型不符（INT 列给字符串）→ 400
         var badType = await Client.PutAsJsonAsync(
-            $"/api/edge/edges/{name}/{src}/0/{dst}",
+            $"{EdgeBase}/edges/{name}/{src}/0/{dst}",
             new { props = new Dictionary<string, object?> { ["weight"] = "abc" } });
         Assert.Equal(HttpStatusCode.BadRequest, badType.StatusCode);
     }
@@ -378,13 +378,13 @@ public class EdgeApiTests : IntegrationTestBase
         var (src, _) = await CreateNodePairAsync();
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/edge/edges/{name}/{src}/0/{Guid.NewGuid()}", new { });
+            $"{EdgeBase}/edges/{name}/{src}/0/{Guid.NewGuid()}", new { });
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         Assert.Contains("不存在于 nodes", await resp.Content.ReadAsStringAsync());
 
         // 未知边类型 → 404
         var noType = await Client.PutAsJsonAsync(
-            $"/api/edge/edges/et_missing_{Guid.NewGuid():N}/{src}/0/{src}", new { });
+            $"{EdgeBase}/edges/et_missing_{Guid.NewGuid():N}/{src}/0/{src}", new { });
         Assert.Equal(HttpStatusCode.NotFound, noType.StatusCode);
     }
 
@@ -395,9 +395,9 @@ public class EdgeApiTests : IntegrationTestBase
         var (src, dst) = await CreateNodePairAsync();
 
         Assert.Equal(HttpStatusCode.NotFound,
-            (await Client.GetAsync($"/api/edge/edges/{name}/{src}/0/{dst}")).StatusCode);
+            (await Client.GetAsync($"{EdgeBase}/edges/{name}/{src}/0/{dst}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
-            (await Client.DeleteAsync($"/api/edge/edges/{name}/{src}/0/{dst}")).StatusCode);
+            (await Client.DeleteAsync($"{EdgeBase}/edges/{name}/{src}/0/{dst}")).StatusCode);
     }
 
     // ============================================================
@@ -408,7 +408,7 @@ public class EdgeApiTests : IntegrationTestBase
     private async Task<string> CreateEdgeTypeWithPropsAsync()
     {
         var name = $"et_{Guid.NewGuid():N}";
-        var resp = await Client.PostAsJsonAsync("/api/edge/types", new
+        var resp = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
         {
             name,
             props = new[]
@@ -426,7 +426,7 @@ public class EdgeApiTests : IntegrationTestBase
     {
         var lineId = $"L_{Guid.NewGuid():N}";
         var line = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "边测试线路" });
+            "/api/Lines", new { id = lineId, name = "边测试线路", spaceId = TestSpaceId });
         line.EnsureSuccessStatusCode();
 
         var src = $"{Guid.NewGuid()}";

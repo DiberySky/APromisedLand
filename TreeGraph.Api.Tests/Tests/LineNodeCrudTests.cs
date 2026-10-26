@@ -418,7 +418,7 @@ public class LineNodeCrudTests : IntegrationTestBase
     private async Task<string> CreateLineAsync()
     {
         var lineId = $"L_{Guid.NewGuid():N}";
-        var resp = await Client.PostAsJsonAsync("/api/Lines", new { id = lineId, name = "测试线路" });
+        var resp = await Client.PostAsJsonAsync("/api/Lines", new { id = lineId, name = "测试线路", spaceId = TestSpaceId });
         Assert.True(resp.IsSuccessStatusCode,
             $"创建线路失败: {(int)resp.StatusCode} {await resp.Content.ReadAsStringAsync()}");
         return lineId;

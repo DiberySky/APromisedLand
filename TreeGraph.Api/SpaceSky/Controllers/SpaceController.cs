@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TreeGraph.Api.Data;
+using TreeGraph.Api.GraphSyncSky;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.SpaceSky.Entities;
 using TreeGraph.Shared.Messaging;
@@ -13,7 +14,9 @@ namespace TreeGraph.Api.SpaceSky.Controllers;
 /// </summary>
 [ApiController]
 [Route("[controller]")]
-public class SpaceController(TreeGraphDbContext db, IEventPublisher publisher) : ControllerBase
+public class SpaceController(
+    TreeGraphDbContext db, IEventPublisher publisher,
+    GraphSchemaInitializer graphSchema) : ControllerBase
 {
     // GET /Space
     [HttpGet]
@@ -62,6 +65,12 @@ public class SpaceController(TreeGraphDbContext db, IEventPublisher publisher) :
         });
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // 新空间即时补种内置边类型（line_segment 等；EdgeType 空间级，幂等）
+        await TreeGraph.Api.Data.Seeding.BuiltinEdgeTypeSeeder.SeedForSpaceAsync(db, space.Id, cancellationToken);
+
+        // 新空间即时补图 schema（CREATE SPACE + tag + 边类型；best-effort，失败由启动对齐兜底）
+        await graphSchema.EnsureSpaceSchemaAsync(space.Id, cancellationToken);
 
         // ★ 语义搜索：空间根节点新增 → 即时同步向量（消费端幂等；根节点 isSpaceNode 无节点向量，仅占位）
         await publisher.Publish(new InodeChangedEvent
@@ -136,6 +145,14 @@ public class SpaceController(TreeGraphDbContext db, IEventPublisher publisher) :
         if (space == null)
             return NotFound(new { error = $"空间 '{id}' 不存在" });
 
+        // 先清空自身数据才允许删本项：空间内仍有边类型 / 边实例 / 线路时拒绝（不采用级联删除）
+        if (await db.Lines.AnyAsync(l => l.SpaceId == id, cancellationToken))
+            return Conflict(new { error = "空间内仍有线路，无法删除。请先删除该空间全部线路。" });
+        if (await db.Edges.AnyAsync(e => e.SpaceId == id, cancellationToken))
+            return Conflict(new { error = "空间内仍有边实例，无法删除。请先删除该空间全部边。" });
+        if (await db.EdgeTypes.AnyAsync(t => t.SpaceId == id, cancellationToken))
+            return Conflict(new { error = "空间内仍有边类型，无法删除。请先删除该空间全部边类型。" });
+
         // 级联规则：空间树根节点有子节点时禁止删除；无子节点则连同根节点一并删除
         var root = await db.SpaceTrees.FindAsync([id], cancellationToken);
         if (root != null)
@@ -171,6 +188,9 @@ public class SpaceController(TreeGraphDbContext db, IEventPublisher publisher) :
 
         db.Spaces.Remove(space);
         await db.SaveChangesAsync(cancellationToken);
+
+        // 图空间同步删除（DROP SPACE；best-effort，失败仅记日志）
+        await graphSchema.DropSpaceSchemaAsync(id, cancellationToken);
 
         // ★ 语义搜索：空间根节点已删除 → 消费端据 InodeId 清除残留向量
         await publisher.Publish(new InodeChangedEvent

@@ -7,7 +7,7 @@ using TreeGraph.Shared.NodeEavSky.Dtos;
 namespace TreeGraph.Blazor.Shared.EdgeSky.Services;
 
 /// <summary>
-/// EdgeSky 客户端（api/edge/types）：边类型 CRUD。
+/// EdgeSky 客户端（api/spaces/{spaceId}/edge/types）：边类型 CRUD（空间级，对齐 Nebula Space 语义）。
 /// 返回体为统一 ApiResponse 信封，内部解包 data；失败返回错误文案供 Snackbar 展示。
 /// </summary>
 public class EdgeApiClient
@@ -23,100 +23,104 @@ public class EdgeApiClient
         _logger = logger;
     }
 
-    /// <summary>列出全部边类型（含 Props）。</summary>
-    public async Task<List<EdgeTypeDto>?> ListEdgeTypesAsync(CancellationToken ct = default)
-        => await GetAsync<List<EdgeTypeDto>>("api/edge/types", ct);
+    private static string Base(string spaceId)
+        => $"api/spaces/{Uri.EscapeDataString(spaceId)}/edge/types";
+
+    /// <summary>列出指定空间全部边类型（含 Props）。</summary>
+    public async Task<List<EdgeTypeDto>?> ListEdgeTypesAsync(string spaceId, CancellationToken ct = default)
+        => await GetAsync<List<EdgeTypeDto>>(Base(spaceId), ct);
 
     /// <summary>按名取边类型详情；不存在返回 null。</summary>
-    public async Task<EdgeTypeDto?> GetEdgeTypeAsync(string name, CancellationToken ct = default)
-        => await GetAsync<EdgeTypeDto>($"api/edge/types/{Uri.EscapeDataString(name)}", ct);
+    public async Task<EdgeTypeDto?> GetEdgeTypeAsync(string spaceId, string name, CancellationToken ct = default)
+        => await GetAsync<EdgeTypeDto>($"{Base(spaceId)}/{Uri.EscapeDataString(name)}", ct);
 
     /// <summary>创建边类型；成功返回 (true, null)，失败返回 (false, 错误文案)。</summary>
     public async Task<(bool Ok, string? Error)> CreateEdgeTypeAsync(
-        CreateEdgeTypeRequest req, CancellationToken ct = default)
+        string spaceId, CreateEdgeTypeRequest req, CancellationToken ct = default)
     {
         try
         {
-            var resp = await _http.PostAsJsonAsync("api/edge/types", req, JsonOptions, ct);
+            var resp = await _http.PostAsJsonAsync(Base(spaceId), req, JsonOptions, ct);
             if (resp.IsSuccessStatusCode) return (true, null);
             return (false, await ExtractErrorAsync(resp, ct));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "POST api/edge/types 失败");
+            _logger.LogError(ex, "POST {Url} 失败", Base(spaceId));
             return (false, ex.Message);
         }
     }
 
     /// <summary>更新边类型中文显示名。</summary>
     public async Task<(bool Ok, string? Error)> UpdateDisplayNameAsync(
-        string name, string? displayName, CancellationToken ct = default)
+        string spaceId, string name, string? displayName, CancellationToken ct = default)
     {
         try
         {
             var resp = await _http.PatchAsJsonAsync(
-                $"api/edge/types/{Uri.EscapeDataString(name)}/display-name",
+                $"{Base(spaceId)}/{Uri.EscapeDataString(name)}/display-name",
                 new UpdateEdgeTypeDisplayNameRequest { DisplayName = displayName }, JsonOptions, ct);
             if (resp.IsSuccessStatusCode) return (true, null);
             return (false, await ExtractErrorAsync(resp, ct));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "PATCH api/edge/types/{Name}/display-name 失败", name);
+            _logger.LogError(ex, "PATCH api/spaces/{SpaceId}/edge/types/{Name}/display-name 失败", spaceId, name);
             return (false, ex.Message);
         }
     }
 
     /// <summary>删除边类型（有实例时服务端 409）。</summary>
     public async Task<(bool Ok, string? Error)> DeleteEdgeTypeAsync(
-        string name, CancellationToken ct = default)
+        string spaceId, string name, CancellationToken ct = default)
     {
         try
         {
-            var resp = await _http.DeleteAsync($"api/edge/types/{Uri.EscapeDataString(name)}", ct);
+            var resp = await _http.DeleteAsync($"{Base(spaceId)}/{Uri.EscapeDataString(name)}", ct);
             if (resp.IsSuccessStatusCode) return (true, null);
             return (false, await ExtractErrorAsync(resp, ct));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "DELETE api/edge/types/{Name} 失败", name);
+            _logger.LogError(ex, "DELETE api/spaces/{SpaceId}/edge/types/{Name} 失败", spaceId, name);
             return (false, ex.Message);
         }
     }
 
     /// <summary>更新边属性中文显示名。</summary>
     public async Task<(bool Ok, string? Error)> UpdatePropDisplayNameAsync(
-        string typeName, string propName, string? displayName, CancellationToken ct = default)
+        string spaceId, string typeName, string propName, string? displayName, CancellationToken ct = default)
     {
         try
         {
             var resp = await _http.PatchAsJsonAsync(
-                $"api/edge/types/{Uri.EscapeDataString(typeName)}/props/{Uri.EscapeDataString(propName)}/display-name",
+                $"{Base(spaceId)}/{Uri.EscapeDataString(typeName)}/props/{Uri.EscapeDataString(propName)}/display-name",
                 new UpdateEdgePropDisplayNameRequest { DisplayName = displayName }, JsonOptions, ct);
             if (resp.IsSuccessStatusCode) return (true, null);
             return (false, await ExtractErrorAsync(resp, ct));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "PATCH api/edge/types/{Name}/props/{Prop}/display-name 失败", typeName, propName);
+            _logger.LogError(ex, "PATCH api/spaces/{SpaceId}/edge/types/{Name}/props/{Prop}/display-name 失败",
+                spaceId, typeName, propName);
             return (false, ex.Message);
         }
     }
 
     /// <summary>ALTER 边类型：属性集增/删/改类型（对齐 Nebula ALTER EDGE）。</summary>
     public async Task<(bool Ok, string? Error)> AlterEdgeTypeAsync(
-        string name, AlterEdgeTypeRequest req, CancellationToken ct = default)
+        string spaceId, string name, AlterEdgeTypeRequest req, CancellationToken ct = default)
     {
         try
         {
             var resp = await _http.PutAsJsonAsync(
-                $"api/edge/types/{Uri.EscapeDataString(name)}", req, JsonOptions, ct);
+                $"{Base(spaceId)}/{Uri.EscapeDataString(name)}", req, JsonOptions, ct);
             if (resp.IsSuccessStatusCode) return (true, null);
             return (false, await ExtractErrorAsync(resp, ct));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "PUT api/edge/types/{Name} 失败", name);
+            _logger.LogError(ex, "PUT api/spaces/{SpaceId}/edge/types/{Name} 失败", spaceId, name);
             return (false, ex.Message);
         }
     }

@@ -350,7 +350,7 @@ public class DeletePrincipleTests : IntegrationTestBase
         // 线路 + 线路节点
         var lineId = $"L_{Guid.NewGuid():N}";
         var lineResp = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "删除原则线路" });
+            "/api/Lines", new { id = lineId, name = "删除原则线路", spaceId = TestSpaceId });
         lineResp.EnsureSuccessStatusCode();
         var nodeId = $"{Guid.NewGuid()}";
         var nodeResp = await Client.PostAsJsonAsync(
@@ -399,7 +399,7 @@ public class DeletePrincipleTests : IntegrationTestBase
 
         var lineId = $"L_{Guid.NewGuid():N}";
         var lineResp = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "删除原则线路" });
+            "/api/Lines", new { id = lineId, name = "删除原则线路", spaceId = TestSpaceId });
         lineResp.EnsureSuccessStatusCode();
 
         // 线路上直接挂载实体
@@ -434,7 +434,7 @@ public class DeletePrincipleTests : IntegrationTestBase
     {
         var lineId = $"L_{Guid.NewGuid():N}";
         var lineResp = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "删除原则线路" });
+            "/api/Lines", new { id = lineId, name = "删除原则线路", spaceId = TestSpaceId });
         lineResp.EnsureSuccessStatusCode();
 
         var fromId = $"{Guid.NewGuid()}";
@@ -472,7 +472,7 @@ public class DeletePrincipleTests : IntegrationTestBase
     {
         var lineId = $"L_{Guid.NewGuid():N}";
         var lineResp = await Client.PostAsJsonAsync(
-            "/api/Lines", new { id = lineId, name = "删除原则线路" });
+            "/api/Lines", new { id = lineId, name = "删除原则线路", spaceId = TestSpaceId });
         lineResp.EnsureSuccessStatusCode();
 
         var nodeId = $"{Guid.NewGuid()}";
