@@ -135,12 +135,11 @@ public class TreeNodeDialogService<TItem>(
     {
         var parameters = new DialogParameters
         {
-            { "NodeTemplate", nodeTemplate },
-            { "IsCreate", true }
+            { "NodeTemplate", nodeTemplate }
         };
 
         var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
-        var dialog = await dialogService.ShowAsync<TreeNodeEditDialog<TItem>>("创建节点", parameters, options);
+        var dialog = await dialogService.ShowAsync<TreeNodeCreateDialog<TItem>>("创建节点", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not TItem formModel)
@@ -155,8 +154,7 @@ public class TreeNodeDialogService<TItem>(
     {
         var parameters = new DialogParameters
         {
-            { "NodeTemplate", nodeTemplate },
-            { "IsCreate", false }
+            { "NodeTemplate", nodeTemplate }
         };
 
         var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
@@ -454,36 +452,5 @@ public class TreeNodeDialogService<TItem>(
 
     #region 节点属性管理
 
-    /// <summary>
-    /// 显示节点属性管理对话框（查看/添加/删除属性）
-    /// </summary>
-    /// <param name="nodeId">节点 ID</param>
-    /// <param name="config">对话框配置</param>
-    /// <returns>是否进行了修改（关闭时返回 true，取消返回 false）</returns>
-    public async Task<bool> ShowNodeAttributesDialogAsync(
-        string nodeId,
-        DialogConfig? config = null)
-    {
-        var parameters = new DialogParameters<NodeAttributesDialog<TItem>>
-        {
-            { x => x.NodeId, nodeId }
-        };
-
-        var options = (config ?? new DialogConfig
-        {
-            FullWidth = true,
-        }).ToDialogOptions();
-
-        var dialog = await dialogService.ShowAsync<NodeAttributesDialog<TItem>>(
-            "节点属性", parameters, options);
-
-        var result = await dialog.Result;
-        // 只要不是取消就返回 true（表示可能已修改）
-        return result is not { Canceled: true };
-    }
-    
-    
-
-    
     #endregion
 }

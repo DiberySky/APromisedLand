@@ -8,7 +8,7 @@
               Clearable="!ReadOnly"
               ClearIcon="@Icons.Material.Filled.Close"
               Variant="Variant.Outlined"
-              HelperText="@Attr.DisplayName" />
+              Dense="true" />
 
 @code {
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;

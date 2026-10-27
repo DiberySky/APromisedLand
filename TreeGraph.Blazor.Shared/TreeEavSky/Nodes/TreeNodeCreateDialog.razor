@@ -1,0 +1,68 @@
+@* TreeNodeCreateDialog.razor — 创建节点专用对话框。
+   只有基础字段表单（EditTemplate 注入），零 EAV/Edge 依赖——
+   因为节点尚未落库，没有 nodeId 挂任何实体属性。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+<DialogTreeSky TItem="@TItem"
+               Item="@_node"
+               Title="@_title"
+               SubmitButtonVisible="true"
+               OnSubmitClick="@SubmitAsync"
+               OnCanceledClick="@Close">
+    @* ToolBarContent：显示父节点名（上下文锚点），靠左显示 *@
+    <ToolBarContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            父节点：@_node.Parent!.Name
+        </MudText>
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer Class="py-4">
+            <MudForm @ref="_form" Model="@_node">
+                @if (NodeTemplate.EditTemplate is null)
+                {
+                    <MudStack Spacing="3">
+                        <MudText Color="Color.Secondary">未提供编辑模板（EditTemplate）。</MudText>
+                    </MudStack>
+                }
+                else
+                {
+                    @NodeTemplate.EditTemplate(_node)
+                }
+            </MudForm>
+        </MudContainer>
+    </DialogContent>
+</DialogTreeSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
+
+    private MudForm _form = null!;
+    private TItem _node = null!;
+    private string _title = null!;
+
+    protected override void OnInitialized()
+    {
+        _node = NodeTemplate.Node.Value!;
+        _title = "创建子节点";
+
+        base.OnInitialized();
+    }
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        // 只校验并返回节点，基础字段 + 节点创建由调用方 TreeNodeActionOrchestrator 负责。
+        // 这里有意不碰 EAV：没有 nodeId 时挂属性属于生命周期越界。
+        MudDialog?.Close(DialogResult.Ok(_node));
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+}

@@ -332,7 +332,6 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         Assert.Contains("移动", html);
         Assert.Contains("子项排序", html);
         Assert.Contains("设置修改", html);
-        Assert.Contains("属性", html);
         Assert.Contains("创建子项", html);
         Assert.Contains("删除", html);
     }

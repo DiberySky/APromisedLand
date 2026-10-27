@@ -1,9 +1,10 @@
-@* TreeNodeEditDialog.razor *@
+@* TreeNodeEditDialog.razor — 编辑节点专用对话框。
+   已重写：去掉 IsCreate 参数与所有条件分支，无条件渲染 MudTabs + 属性绑定 Tab +
+   管理属性定义工具栏按钮 + 属性保存逻辑。EAV/Edge 模块挂入只在编辑阶段。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject IDialogService DialogService
-@implements IDisposable
 
 <DialogTreeSky TItem="@TItem"
                Item="@_node"
@@ -12,19 +13,18 @@
                OnSubmitClick="@SubmitAsync"
                OnCanceledClick="@Close">
     <ToolBarContent>
-        @if (!IsCreate)
-        {
-            <MudButton Variant="Variant.Text"
-                       Color="Color.Info"
-                       Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Settings"
-                       OnClick="@OpenAttributesManageAsync">
-                管理属性定义
-            </MudButton>
-        }
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@_node.Name</MudText>
+        <MudSpacer/>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Info"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Settings"
+                   OnClick="@OpenAttributesManageAsync">
+            管理属性定义
+        </MudButton>
     </ToolBarContent>
     <DialogContent>
-        <MudContainer Class="py-8">
+        <MudContainer Class="pt-0 pb-4">
             @* KeepPanelsAlive：非激活页也保持渲染，属性区组件引用（提交时保存属性）不因切页丢失 *@
             <MudTabs Elevation="0" Rounded="true" KeepPanelsAlive="true">
                 <MudTabPanel Text="基本信息" Icon="@Icons.Material.Filled.Info">
@@ -43,22 +43,11 @@
                 </MudTabPanel>
 
                 <MudTabPanel Text="属性绑定" Icon="@Icons.Material.Filled.Link">
-                    @* 属性区：节点保存后（编辑模式）才可关注类型与填写属性 *@
-                    @if (IsCreate)
-                    {
-                        <MudText Typo="Typo.caption"
-                                 Class="d-block text-center py-4"
-                                 Style="color: var(--mud-palette-text-secondary)">
-                            节点创建保存后，可通过节点操作中的「属性」按钮关注实体类型并填写属性。
-                        </MudText>
-                    }
-                    else
-                    {
-                        <NodeAttributeItemsSky @ref="_attrItems"
-                                               NodeId="@_node.Id"
-                                               ReadOnly="false"
-                                               AllowManage="true" />
-                    }
+                    @* 编辑阶段必有 nodeId，直接渲染属性区（EAV 模块挂入点） *@
+                    <NodeAttributeItemsSky @ref="_attrItems"
+                                           NodeId="@_node.Id"
+                                           ReadOnly="false"
+                                           AllowManage="true" />
                 </MudTabPanel>
             </MudTabs>
         </MudContainer>
@@ -67,8 +56,6 @@
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
-
-    [Parameter] public bool IsCreate { get; set; }
 
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
 
@@ -81,7 +68,7 @@
     protected override void OnInitialized()
     {
         _node = NodeTemplate.Node.Value!;
-        _title = IsCreate ? $"创建【{_node.Parent!.Name}】子节点" : _node.Name;
+        _title = "设置修改";
 
         base.OnInitialized();
     }
@@ -91,14 +78,14 @@
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
 
-        // 编辑模式：先保存属性（任一类型失败时不关闭对话框，用户可重试）
-        if (!IsCreate && _attrItems != null)
+        // 保存属性（任一类型失败时不关闭对话框，用户可重试）
+        if (_attrItems != null)
         {
             var ok = await _attrItems.SubmitUpdateNodeAttributesAsync();
             if (!ok) return;
         }
 
-        // 再关闭对话框返回节点（基础字段由调用方保存）
+        // 关闭对话框返回节点（基础字段由调用方保存）
         MudDialog?.Close(DialogResult.Ok(_node));
     }
 
@@ -135,9 +122,5 @@
         {
             await _attrItems.ReloadAsync();
         }
-    }
-
-    public void Dispose()
-    {
     }
 }

@@ -22,6 +22,7 @@
                       Error="@Error"
                       Margin="@Margin"
                       InputMode="@InputMode"
+                      Dense="@Dense"
                       Class="numinput-field"/>
         <div class="numinput-stepper">
             <NumberStepper T="decimal" Embedded="true" Label="" Suffix="@Suffix"
@@ -79,6 +80,7 @@
     [Parameter] public string? ErrorText { get; set; }
     [Parameter] public Margin Margin { get; set; } = Margin.None;
     [Parameter] public InputMode InputMode { get; set; } = InputMode.none;
+    [Parameter] public bool Dense { get; set; }
 
     private string _text = string.Empty;
 

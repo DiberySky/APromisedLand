@@ -16,7 +16,5 @@ public enum NodeAction
     /// <summary>移动节点</summary>
     Move,
     /// <summary>排序节点</summary>
-    Sort,
-    /// <summary>属性</summary>
-    Attribute
+    Sort
 }

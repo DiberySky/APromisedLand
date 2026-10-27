@@ -1,0 +1,69 @@
+@typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
+
+@implements IDisposable
+
+@inject IDialogService DialogService
+
+<DialogTreeSky TItem="@TItem"
+               Item="@_node"
+               Title="@_title"
+               SubmitButtonVisible="true"
+               OnSubmitClick="@SubmitAsync"
+               OnCanceledClick="@Close">
+    @* 工具栏显示父节点名（上下文锚点），附件入口已在壳层移除 *@
+    <ToolBarContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            父节点：@_node.Parent!.Text()
+        </MudText>
+    </ToolBarContent>
+    <DialogContent>
+        <MudContainer Class="py-4">
+            <MudForm @ref="_form" Model="@_node">
+                @if (NodeTemplate.EditTemplate is null)
+                {
+                    <MudStack Spacing="3">
+                    </MudStack>
+                }
+                else
+                {
+                    @NodeTemplate.EditTemplate(_node)
+                }
+            </MudForm>
+        </MudContainer>
+    </DialogContent>
+</DialogTreeSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
+
+    private MudForm _form = null!;
+    private TItem _node = null!;
+    private string _title = null!;
+
+    protected override void OnInitialized()
+    {
+        _node = NodeTemplate.Node.Value!;
+        _title = "创建子节点";
+
+        base.OnInitialized();
+    }
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        MudDialog?.Close(DialogResult.Ok(_node));
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    public void Dispose()
+    {
+    }
+}

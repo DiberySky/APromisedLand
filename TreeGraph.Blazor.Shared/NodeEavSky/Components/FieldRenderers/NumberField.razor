@@ -8,6 +8,7 @@
                   Value="_value" ValueChanged="OnValueChanged"
                   Required="@Attr.IsRequired"
                   ReadOnly="@ReadOnly"
+                  Dense="true"
                   InputMode="@(Platform.IsMobile ? InputMode.numeric : InputMode.none)" />
 
 @code {

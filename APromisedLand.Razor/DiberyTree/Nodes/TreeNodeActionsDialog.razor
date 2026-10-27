@@ -25,7 +25,7 @@
         }
     </ToolBarContent>
     <DialogContent>
-        <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
+        <MudContainer Class="pt-0 pb-4" MaxWidth="MaxWidth.Medium">
             <MudStack Spacing="2">
 
                 <MudTextField T="string"
@@ -103,13 +103,6 @@
                 创建子项
             </MudButton>
         }
-        
-        @* <MudButton OnClick="@OnAttribute" *@
-        @*            Variant="Variant.Text" *@
-        @*            Color="Color.Info" *@
-        @*            StartIcon="@Icons.Material.Outlined.EditAttributes"> *@
-        @*     属性 *@
-        @* </MudButton> *@
 
     </DialogRightActions>
 </DialogSky>
@@ -120,12 +113,7 @@
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
-    
-    private void OnAttribute()
-    {
-        CloseWithAction(NodeAction.Attribute);
-    }
-    
+
     private void OnAddChild()
     {
         CloseWithAction(NodeAction.AddChild);

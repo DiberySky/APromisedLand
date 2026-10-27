@@ -95,7 +95,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowCreateDialogAsync_Canceled_ReturnsNull()
     {
-        SetupExDialogResult<TreeNodeEditDialog<UnitTree>>(DialogResult.Cancel());
+        SetupExDialogResult<TreeNodeCreateDialog<UnitTree>>(DialogResult.Cancel());
 
         var result = await _sut.ShowCreateDialogAsync();
 
@@ -105,7 +105,7 @@ public class TreeNodeDialogServiceTests
     [Fact]
     public async Task ShowCreateDialogAsync_ReturnsNode()
     {
-        SetupExDialogResult<TreeNodeEditDialog<UnitTree>>(
+        SetupExDialogResult<TreeNodeCreateDialog<UnitTree>>(
             DialogResult.Ok(MakeNode("new-1")));
 
         var result = await _sut.ShowCreateDialogAsync();

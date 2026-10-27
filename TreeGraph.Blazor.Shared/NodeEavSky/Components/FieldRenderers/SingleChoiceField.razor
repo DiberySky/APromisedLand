@@ -5,7 +5,8 @@
            Value="Value" ValueChanged="ValueChanged"
            Required="@Attr.IsRequired"
            ReadOnly="@ReadOnly"
-           Variant="Variant.Outlined">
+           Variant="Variant.Outlined"
+           Dense="true">
     @if (!Attr.IsRequired)
     {
         <MudSelectItem T="string" Value="@((string?)null)">（未选择）</MudSelectItem>

@@ -120,12 +120,11 @@ public class TreeNodeDialogService<TItem>(
     {
         var parameters = new DialogParameters
         {
-            { "NodeTemplate", nodeTemplate },
-            { "IsCreate", true }
+            { "NodeTemplate", nodeTemplate }
         };
 
         var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
-        var dialog = await dialogService.ShowExAsync<TreeNodeEditDialog<TItem>>("创建节点", parameters, options);
+        var dialog = await dialogService.ShowExAsync<TreeNodeCreateDialog<TItem>>("创建节点", parameters, options);
 
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not TItem formModel)
@@ -140,8 +139,7 @@ public class TreeNodeDialogService<TItem>(
     {
         var parameters = new DialogParameters
         {
-            { "NodeTemplate", nodeTemplate },
-            { "IsCreate", false }
+            { "NodeTemplate", nodeTemplate }
         };
 
         var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
@@ -259,36 +257,6 @@ public class TreeNodeDialogService<TItem>(
     #endregion
 
     #region 节点属性管理对话框
-
-    /// <summary>
-    /// 显示节点属性管理对话框（查看/编辑属性值、管理属性定义），
-    /// 内部桥接 NodeEavSky 动态表单，与节点基础字段编辑解耦。
-    /// </summary>
-    /// <param name="nodeId">节点 ID（作为 EAV 实体 ID）</param>
-    /// <param name="config">对话框配置</param>
-    /// <returns>是否进行了修改（保存返回 true，取消返回 false）</returns>
-    public async Task<bool> ShowNodeAttributesDialogAsync(
-        string nodeId,
-        DialogConfig? config = null)
-    {
-        var parameters = new DialogParameters
-        {
-            { "NodeId", nodeId }
-        };
-
-        var options = (config ?? new DialogConfig
-        {
-            MaxWidth = MaxWidth.Medium,
-            FullWidth = true,
-        }).ToDialogOptions();
-
-        var dialog = await dialogService.ShowExAsync<NodeAttributesDialog>(
-            "节点属性", parameters, options);
-
-        var result = await dialog.Result;
-        // 只要不是取消就返回 true（表示可能已修改）
-        return result is not { Canceled: true };
-    }
 
     #endregion
 

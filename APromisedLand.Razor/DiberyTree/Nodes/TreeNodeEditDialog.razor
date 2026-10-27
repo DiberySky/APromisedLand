@@ -13,6 +13,8 @@
                OnSubmitClick="@SubmitAsync"
                OnCanceledClick="@Close">
     <ToolBarContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@_node.Text()</MudText>
+        <MudSpacer/>
         <MudButton Variant="Variant.Text"
                    Color="Color.Info"
                    Size="Size.Small"
@@ -22,41 +24,11 @@
         </MudButton>
     </ToolBarContent>
     <DialogContent>
-        <MudContainer Class="py-8">
+        <MudContainer Class="pt-0 pb-4">
             <MudForm @ref="_form" Model="@_node">
                 @if (NodeTemplate.EditTemplate is null)
                 {
                     <MudStack Spacing="3">
-                        @* <MudTextField T="string" *@
-                        @*               @bind-Value="_model.Name" *@
-                        @*               Label="名称" *@
-                        @*               Variant="Variant.Outlined" *@
-                        @*               Required="true" *@
-                        @*               RequiredError="名称不能为空" *@
-                        @*               MaxLength="100" *@
-                        @*               Counter="100" *@
-                        @*               Immediate="true"/> *@
-                        @* *@
-                        @* <MudTextField T="string" *@
-                        @*               @bind-Value="_model.Description" *@
-                        @*               Label="描述" *@
-                        @*               Variant="Variant.Outlined" *@
-                        @*               Lines="3" *@
-                        @*               MaxLength="500" *@
-                        @*               Counter="500" *@
-                        @*               Immediate="true"/> *@
-                        @* *@
-                        @* <MudNumericField T="int" *@
-                        @*                  @bind-Value="_model.SortOrder" *@
-                        @*                  Label="排序" *@
-                        @*                  Variant="Variant.Outlined" *@
-                        @*                  Min="0" *@
-                        @*                  Max="9999"/> *@
-                        @* *@
-                        @* <MudSwitch T="bool" *@
-                        @*            @bind-Value="_model.IsActive" *@
-                        @*            Label="启用状态" *@
-                        @*            Color="Color.Primary"/> *@
                     </MudStack>
                 }
                 else
@@ -64,8 +36,6 @@
                     @NodeTemplate.EditTemplate(_node)
                 }
 
-                @* <NodeAttributesSky @ref="_nodeAttributesSky" NodeId="@_node.Id"/> *@
-                
                 <NodeAttributeItemsSky @ref="@_itemsSky" 
                                        NodeId="@_node.Id" 
                                        @bind-DefItemDtos="@AttributeItems"
@@ -81,35 +51,25 @@
     NodeAttributeItemsSky _itemsSky = null!;
     
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
-    
-    [Parameter] public bool IsCreate { get; set; }
 
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
 
-    // private NodeAttributesSky _nodeAttributesSky = null!;
     private MudForm _form = null!;
 
     private List<AttributeItemDto> AttributeItems { get; set; } = new();
     
-    // private TreeNodeFormModel _model = new();
-    // private bool _isSubmitting = false;
     private TItem _node = null!;
 
-    private string _title = null!; //=> IsCreate ? "创建节点" : "编辑节点";
+    private string _title = null!;
 
     protected override void OnInitialized()
     {
         _node = NodeTemplate.Node.Value!;
 
-        _title = IsCreate ? $"创建【{_node.Parent!.Text()}】子节点" : _node.Text();
+        _title = "设置修改";
 
         base.OnInitialized();
     }
-
-    // private async Task ParentSelectAsync()
-    // {
-    //     var parent = await TreeNodeDialogService.ShowParentSelectDialogAsync();
-    // }
 
     private async Task SubmitAsync()
     {
@@ -118,7 +78,6 @@
 
         await _itemsSky.SubmitUpdateNodeAttributesAsync();
         
-        // _isSubmitting = true;
         MudDialog?.Close(DialogResult.Ok(_node));
     }
 
@@ -147,15 +106,9 @@
         var result = await dialog.Result;
         if (result?.Canceled == false)
         {
-            // await _nodeAttributesSky.LoadAttributes();
             await _itemsSky.LoadAttributes();
         }
     }
-
-    // private async Task ValueChanged(AttributeDefinition? definition)
-    // {
-    //     await _nodeAttributesSky.LoadAttributes();
-    // }
     
     public void Dispose()
     {

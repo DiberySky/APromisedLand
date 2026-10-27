@@ -60,9 +60,6 @@ public partial class TreeSky<TItem>
             case NodeAction.Move:
                 await HandleMoveNodeAsync(node);
                 break;
-            case NodeAction.Attribute:
-                await HandleAttributeAsync(node);
-                break;
             case NodeAction.Sort:
                  await HandleSortAsync(node);
                 break;
@@ -236,11 +233,6 @@ public partial class TreeSky<TItem>
         // await ExecuteTreeOperationAsync(
         //     () => TreeClient.MoveNodeAsync(node.Value.Id, newParentId),
         //     $"已移动到: {selectResult.SelectedParent?.Text() ?? "根节点"}");
-    }
-
-    private async Task HandleAttributeAsync(ITreeItemData<TItem> node)
-    {
-        var formModel = await NodeDialogSvc.ShowNodeAttributesDialogAsync(node.Value!.Id);
     }
 
     private async Task HandleSortAsync(ITreeItemData<TItem> node)

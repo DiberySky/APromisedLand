@@ -9,6 +9,7 @@
                ReadOnly="@ReadOnly"
                Clearable="!ReadOnly && !Attr.IsRequired"
                Variant="Variant.Outlined"
+               Dense="true"
                PickerVariant="@(Platform.IsMobile ? PickerVariant.Dialog : PickerVariant.Inline)" />
 
 @code {

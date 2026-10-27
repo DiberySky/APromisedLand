@@ -11,50 +11,60 @@
 @inject EavApiClient EavApi
 @inject MessageService Message
 
-<MudPaper Elevation="0" Outlined="true" Class="mb-3 pa-3">
-    <MudStack Row AlignItems="AlignItems.Center" Class="mb-2">
-        <MudIcon Icon="@Icons.Material.Filled.Category"
-                 Color="@(_hasEntity ? Color.Success : Color.Default)"
-                 Size="Size.Small" />
-        <MudText Typo="Typo.subtitle2">@(string.IsNullOrWhiteSpace(DisplayName) ? EntityType : DisplayName)</MudText>
-        <MudChip T="string" Size="Size.Small"
-                 Color="@(_hasEntity ? Color.Success : Color.Warning)">
-            @(_hasEntity ? "已填写" : "未填写")
-        </MudChip>
-        <MudSpacer />
-        @if (AllowDetach)
+<MudExpansionPanel Elevation="0" Outlined="true" Class="mb-2"
+                   Expanded="false" HideExpandIcon="false"
+                   ExpandIcon="@Icons.Material.Filled.ExpandMore"
+                   CollapseIcon="@Icons.Material.Filled.ExpandLess"
+                   ExpandedChanged="OnExpandedChanged">
+    <TitleContent>
+        <MudStack Row AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.Category"
+                     Color="@(_hasEntity ? Color.Success : Color.Default)"
+                     Size="Size.Small" />
+            <MudText Typo="Typo.subtitle2">@(string.IsNullOrWhiteSpace(DisplayName) ? EntityType : DisplayName)</MudText>
+            <MudChip T="string" Size="Size.Small"
+                     Color="@(_hasEntity ? Color.Success : Color.Warning)">
+                @(_hasEntity ? "已填写" : "未填写")
+            </MudChip>
+            <MudSpacer />
+            @if (AllowDetach)
+            {
+                <MudTooltip Text="取消关注（该类型已有数据时需先清空）">
+                    <MudIconButton Icon="@Icons.Material.Filled.LinkOff"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   Disabled="_hasEntity"
+                                   OnClick="@(() => OnDetachRequested.InvokeAsync())"
+                                   OnClickStopPropagation="true" />
+                </MudTooltip>
+            }
+        </MudStack>
+    </TitleContent>
+    <ChildContent>
+        @if (_loading)
         {
-            <MudTooltip Text="取消关注（该类型已有数据时需先清空）">
-                <MudIconButton Icon="@Icons.Material.Filled.LinkOff"
-                               Size="Size.Small"
-                               Color="Color.Error"
-                               Disabled="_hasEntity"
-                               OnClick="@(() => OnDetachRequested.InvokeAsync())" />
-            </MudTooltip>
+            <MudProgressLinear Indeterminate="true" />
         }
-    </MudStack>
-
-    @if (_loading)
-    {
-        <MudProgressLinear Indeterminate="true" />
-    }
-    else if (_schema is null || _schema.Count == 0)
-    {
-        <MudText Typo="Typo.caption" Color="Color.Secondary">
-            该实体类型暂无属性定义，可通过「管理属性定义」创建。
-        </MudText>
-    }
-    else
-    {
-        <DynamicForm @ref="_form"
-                     EntityType="@EntityType"
-                     EntityId="@(_entity?.EntityId ?? "")"
-                     Schema="@_schema"
-                     CompactLayout="true"
-                     ReadOnly="@ReadOnly"
-                     OnSubmit="HandleSubmitAsync" />
-    }
-</MudPaper>
+        else if (_schema is null || _schema.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                该实体类型暂无属性定义，可通过「管理属性定义」创建。
+            </MudText>
+        }
+        else
+        {
+            <div class="pb-3">
+                <DynamicForm @ref="_form"
+                             EntityType="@EntityType"
+                             EntityId="@(_entity?.EntityId ?? "")"
+                             Schema="@_schema"
+                             CompactLayout="true"
+                             ReadOnly="@ReadOnly"
+                             OnSubmit="HandleSubmitAsync" />
+            </div>
+        }
+    </ChildContent>
+</MudExpansionPanel>
 
 @code {
     /// <summary>宿主节点 ID（iNode Id）。</summary>
@@ -80,14 +90,24 @@
     private DynamicEntityDto? _entity;
     private DateTimeOffset? _updatedAt;
     private bool _loading;
+    private bool _loaded;
     private bool _hasEntity;
     private bool _lastSubmitOk = true;
 
     // 已取到实体值、等待表单渲染完成后灌入（@ref 要到渲染后才可用）
     private bool _pendingLoad;
 
-    protected override async Task OnInitializedAsync()
-        => await ReloadAsync();
+    protected override Task OnInitializedAsync()
+    {
+        // 初始折叠，首次展开才加载（见 OnExpandedChanged）
+        return Task.CompletedTask;
+    }
+
+    private async Task OnExpandedChanged(bool expanded)
+    {
+        if (expanded && !_loaded)
+            await ReloadAsync();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -118,6 +138,7 @@
             _hasEntity = _entity is not null;
             _updatedAt = _entity?.UpdatedAt;
             _pendingLoad = _entity is not null && _schema.Count > 0;
+            _loaded = true;
         }
         catch (Exception ex)
         {

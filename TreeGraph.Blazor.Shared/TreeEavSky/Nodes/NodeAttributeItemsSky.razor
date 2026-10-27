@@ -33,33 +33,49 @@ else
         }
         else
         {
-            <MudTable Items="_rows" Dense="true" Hover="true" Bordered="true"
-                      Elevation="0" Class="mb-3">
-                <HeaderContent>
-                    <MudTh>实体类型</MudTh>
-                    <MudTh Style="width: 96px;">绑定</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="实体类型">@context.DisplayName</MudTd>
-                    <MudTd DataLabel="绑定">
-                        @* 已产生实体实例的类型禁止取消绑定（后端亦会拒绝） *@
-                        @if (IsBound(context.EntityType) && context.HasEntity)
-                        {
-                            <MudTooltip Text="该类型下已有实体实例，无法取消绑定">
-                                <MudCheckBox T="bool" Dense="true" Value="true" Disabled="true" />
-                            </MudTooltip>
-                        }
-                        else
-                        {
-                            <MudCheckBox T="bool"
-                                         Dense="true"
-                                         Color="Color.Primary"
-                                         Value="@IsBound(context.EntityType)"
-                                         ValueChanged="@(v => ToggleBindAsync(context.EntityType, v))" />
-                        }
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
+            <MudExpansionPanel Elevation="0" Outlined="true" Class="mb-3"
+                               Expanded="true" HideExpandIcon="false">
+                <TitleContent>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" />
+                        <MudText Typo="Typo.subtitle2">实体类型绑定</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default">
+                            已绑定 @_cards.Count / @_rows.Count
+                        </MudChip>
+                    </MudStack>
+                </TitleContent>
+                <ChildContent>
+                    <div class="pb-3">
+                        <MudTable Items="_rows" Dense="true" Hover="true" Bordered="true"
+                                  Elevation="0">
+                        <HeaderContent>
+                            <MudTh>实体类型</MudTh>
+                            <MudTh Style="width: 96px;">绑定</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="实体类型">@context.DisplayName</MudTd>
+                            <MudTd DataLabel="绑定">
+                                @* 已产生实体实例的类型禁止取消绑定（后端亦会拒绝） *@
+                                @if (IsBound(context.EntityType) && context.HasEntity)
+                                {
+                                    <MudTooltip Text="该类型下已有实体实例，无法取消绑定">
+                                        <MudCheckBox T="bool" Dense="true" Value="true" Disabled="true" />
+                                    </MudTooltip>
+                                }
+                                else
+                                {
+                                    <MudCheckBox T="bool"
+                                                 Dense="true"
+                                                 Color="Color.Primary"
+                                                 Value="@IsBound(context.EntityType)"
+                                                 ValueChanged="@(v => ToggleBindAsync(context.EntityType, v))" />
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                    </div>
+                </ChildContent>
+            </MudExpansionPanel>
         }
     }
 

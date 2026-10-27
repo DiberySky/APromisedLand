@@ -107,7 +107,6 @@ public sealed class TreeNodeActionOrchestrator<TItem>(
 
             if (result.Action is not (NodeAction.View
                 or NodeAction.Edit
-                or NodeAction.Attribute
                 or NodeAction.Sort))
             {
                 return changed ? TreeNodeHostOutcome.Changed : TreeNodeHostOutcome.Canceled;
@@ -135,8 +134,6 @@ public sealed class TreeNodeActionOrchestrator<TItem>(
                 return await HandleDeleteAsync(node, ui, ct);
             case NodeAction.Move:
                 return await HandleMoveNodeAsync(node, ui, ct);
-            case NodeAction.Attribute:
-                return await HandleAttributeAsync(node);
             case NodeAction.Sort:
                 return await HandleSortAsync(node, ui, ct);
             default:
@@ -313,17 +310,6 @@ public sealed class TreeNodeActionOrchestrator<TItem>(
             message.Details("转移失败", e.Message);
         }
 
-        return TreeNodeActionExecResult.None;
-    }
-
-    /// <summary>
-    /// 节点属性：打开独立属性管理对话框（与节点基础字段编辑解耦），
-    /// 内部桥接 NodeEavSky 动态表单实现属性值的查看/编辑/定义管理。
-    /// </summary>
-    private async Task<TreeNodeActionExecResult> HandleAttributeAsync(TreeNodeItem<TItem> node)
-    {
-        if (node.Value == null) return TreeNodeActionExecResult.None;
-        await nodeDialogSvc.ShowNodeAttributesDialogAsync(node.Value!.Id);
         return TreeNodeActionExecResult.None;
     }
 

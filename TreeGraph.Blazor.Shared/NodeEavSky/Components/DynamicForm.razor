@@ -7,7 +7,7 @@
    值存于内部字典 _values，保存时由 BuildSubmitValues 转换为 PUT 提交格式。 *@
 
 <MudForm @ref="_form">
-    <MudGrid>
+    <MudGrid Spacing="2">
         @foreach (var attr in SortedAttributes)
         {
             <MudItem xs="12" sm="@(CompactLayout ? 12 : 6)" md="@(CompactLayout ? 12 : 4)">

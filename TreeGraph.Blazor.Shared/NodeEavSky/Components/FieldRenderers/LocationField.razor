@@ -23,20 +23,22 @@
                               Value="_lat" ValueChanged="OnLatChanged"
                               Min="-90" Max="90"
                               Step="0.000001m"
+                              Dense="true"
                               HelperText="范围 -90 ~ 90" Class="flex-grow-1" />
             <NumberInputField T="double?" Label="经度"
                               Value="_lng" ValueChanged="OnLngChanged"
                               Min="-180" Max="180"
                               Step="0.000001m"
+                              Dense="true"
                               HelperText="范围 -180 ~ 180" Class="flex-grow-1" />
         </MudStack>
 
         <MudTextField T="string" Label="地点名称（可选，导航终点名）"
                       Value="_label" ValueChanged="OnLabelChanged"
-                      Variant="Variant.Outlined" />
+                      Variant="Variant.Outlined" Dense="true" />
         <MudTextField T="string" Label="地址（可选）"
                       Value="_address" ValueChanged="OnAddressChanged"
-                      Variant="Variant.Outlined" />
+                      Variant="Variant.Outlined" Dense="true" />
 
         @if (_lat is not null || _lng is not null)
         {
