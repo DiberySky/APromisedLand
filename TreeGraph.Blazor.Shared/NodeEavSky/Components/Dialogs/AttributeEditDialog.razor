@@ -29,26 +29,28 @@
                       Class="mt-3"
                       HelperText="系统内部标识，不可修改" />
 
-        @* 数据类型行：与「新建属性」一致，小数精度/计量单位按类型并入同一行 *@
-        <div class="d-flex align-start gap-2 mt-3 mb-3">
-            <MudTextField Value="@DataTypeLabel"
-                          Label="数据类型"
-                          Variant="Variant.Outlined"
-                          Margin="Margin.Dense"
-                          ReadOnly="true"
-                          Style="flex: 1 1 0;" />
+        @* 数据类型行：显式 Grid 定比分配（每个控件独立一层，避免 MudBlazor 内部结构干扰宽度） *@
+        <div style="@DataTypeRowStyle" class="mt-3 mb-3">
+            <div>
+                <MudTextField Value="@DataTypeLabel"
+                              Label="数据类型"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              ReadOnly="true" />
+            </div>
             @if (Attribute?.DataType == "decimal")
             {
-                <NumberInputField T="int?"
-                                  @bind-Value="_editForm.Precision"
-                                  Label="小数精度（可选）"
-                                  Min="0" Max="10" Step="1"
-                                  Margin="Margin.Dense"
-                                  Style="flex: 1 1 0;" />
+                <div>
+                    <NumberInputField T="int?"
+                                      @bind-Value="_editForm.Precision"
+                                      Label="小数精度（可选）"
+                                      Min="0" Max="10" Step="1"
+                                      Margin="Margin.Dense" />
+                </div>
             }
             @if (Attribute?.DataType is "decimal" or "int")
             {
-                <div style="flex: 1 1 0;">
+                <div>
                     <UnitTreeField @bind-UnitId="_editForm.UnitId"
                                    @bind-UnitName="_editForm.UnitName"
                                    Margin="Margin.Dense" />
@@ -228,6 +230,19 @@
     /// <summary>数据类型中文标签（只读展示）。</summary>
     private string DataTypeLabel
         => Attribute is null ? "" : EavDataTypeLabels.GetLabel(Attribute.DataType);
+
+    /// <summary>
+    /// 数据类型行布局：decimal 三等分、int 两列（数据类型稍宽）、其它单列。
+    /// 用 Grid + minmax(0, fr) 固定分配，避免宽度被控件固有内容撑开。
+    /// </summary>
+    private string DataTypeRowStyle => Attribute?.DataType switch
+    {
+        "decimal" => "display:grid; gap:8px; align-items:start; "
+                   + "grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);",
+        "int" => "display:grid; gap:8px; align-items:start; "
+               + "grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);",
+        _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
+    };
 
     /// <summary>实体类型展示名（优先中文显示名，缺失回退内部标识）。</summary>
     private string EntityTypeDisplay
