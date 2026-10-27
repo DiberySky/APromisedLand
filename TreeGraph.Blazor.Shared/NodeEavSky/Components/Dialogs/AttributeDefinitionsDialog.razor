@@ -7,11 +7,15 @@
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
 
-<DialogSky Title="@_title"
+<DialogSky Title="属性定义"
            SubmitButtonVisible="false"
            CancelButtonVisible="true"
            CancelButtonText="关闭"
            OnCanceledClick="@Close">
+    @* 与「新建属性」一致：实体类型展示在标题栏下方工具栏（对话框内不变） *@
+    <ToolBarContent>
+        <MudText Typo="Typo.body2">实体类型：@EntityTypeDisplay</MudText>
+    </ToolBarContent>
     <DialogContent>
         <Attributes EntityType="@EntityType"
                     OnAttributesChanged="@OnAttributesChanged" />
@@ -24,15 +28,15 @@
     /// <summary>锁定的实体类型（et_xxx 标识）。</summary>
     [Parameter, EditorRequired] public string EntityType { get; set; } = string.Empty;
 
-    /// <summary>实体类型显示名（用于标题，避免暴露 et_xxx 内部标识）。</summary>
+    /// <summary>实体类型显示名（用于工具栏，避免暴露 et_xxx 内部标识）。</summary>
     [Parameter] public string? DisplayName { get; set; }
 
     /// <summary>属性变更回调。</summary>
     [Parameter] public EventCallback OnAttributesChanged { get; set; }
 
-    private string _title => string.IsNullOrEmpty(DisplayName)
-        ? "属性定义"
-        : $"属性定义 · {DisplayName}";
+    private string EntityTypeDisplay => string.IsNullOrEmpty(DisplayName)
+        ? EntityType
+        : DisplayName;
 
     private void Close()
     {

@@ -24,7 +24,7 @@
         <NamingTextField @bind-Value="_fieldForm.FieldName"
                          SourceText="@_fieldForm.DisplayName"
                          NameCase="snake"
-                         Label="字段名（小写英文+下划线）"
+                         Label="内部标识"
                          Placeholder="小写英文+下划线，如 street_name"
                          Disabled="@(EditingField is not null)"
                          Class="mb-3" />

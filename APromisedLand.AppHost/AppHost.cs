@@ -41,7 +41,8 @@ void TreeGraph()
     builder.AddTreeGraphFileStorageApi(context);
 
     // ★ vLLM Chat/Embedding 容器（MAF 依赖；语义搜索向量化依赖 vllm-embed:5719）
-    builder.AddVllm(context);
+    //   研发期暂不需要 vLLM，暂停编排以节省内存（依赖方均有 null 保护）
+    // builder.AddVllm(context);
 
     // ★ TreeGraph.MafWfApi:MAF + Workflow 服务 API(vLLM 版,固定端口 5323,
     //   替代已停用的旧 MAFWorkFlowApi)

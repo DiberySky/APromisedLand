@@ -8,7 +8,8 @@ namespace TreeGraph.Api.GraphSyncSky;
 
 /// <summary>
 /// NebulaGraph schema 初始化器：启动时（后台重试）按 PG spaces 逐空间确保
-/// Nebula space/节点 tag/parent_of + connects_to + 该空间全部边类型存在（幂等 IF NOT EXISTS）。
+/// Nebula space/节点 tag/parent_of + connects_to + 该空间全部边类型存在（幂等 IF NOT EXISTS），
+/// 并 DROP 掉 PG 中已删除的残留边类型（对齐删除）。
 /// PG 空间 ↔ Nebula 空间 1:1（<see cref="GraphNaming.ToNebulaSpace"/> 映射）。
 /// 消费者处理首条消息前调用 <see cref="EnsureReadyAsync"/> 等待就绪；
 /// 全量重建后调用 <see cref="RecreateSchemaAsync"/> 重建全部空间 schema；
@@ -165,6 +166,46 @@ public sealed class GraphSchemaInitializer : IHostedService, IDisposable
             // 存量图空间：旧边类型缺新列不会因 IF NOT EXISTS 自动补，DESCRIBE 后 ALTER。
             await EnsureEdgeColumnsAsync(space, type, ct);
         }
+
+        // ★ 对齐删除：PG 已物理删除的边类型在 Nebula 侧是残留
+        //   （EdgeTypeService.DeleteAsync 的 DROP EDGE 失败只记日志、不回滚 PG，此处补偿）。
+        await DropStaleEdgeTypesAsync(space, edgeTypes.Select(t => t.Name), ct);
+    }
+
+    /// <summary>
+    /// 结构派生边类型：由 GraphSynchronizer 写入、不从属于 PG edge_types，
+    /// 启动对齐时必须保留，不能当作残留清理。
+    /// </summary>
+    private static readonly string[] StructuralEdgeTypes =
+        [GraphNaming.ParentOfEdge, GraphNaming.ConnectsToEdge];
+
+    /// <summary>
+    /// 对齐删除：SHOW EDGES 列出图空间内全部边类型，DROP 掉 PG 中已不存在、且非结构派生的残留。
+    /// DROP EDGE 会连带删除该类型下的全部残余边，与「PG 为唯一真源」一致。
+    /// 任一 DROP 失败即抛异常，由 <see cref="CreateSchemaWithRetryAsync"/> 整体重试（CREATE 幂等）。
+    /// </summary>
+    private async Task DropStaleEdgeTypesAsync(
+        string space, IEnumerable<string> pgEdgeTypeNames, CancellationToken ct)
+    {
+        var keep = pgEdgeTypeNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        keep.UnionWith(StructuralEdgeTypes);
+
+        var shown = await _client.QueryAsync(space, "SHOW EDGES", ct);
+        var stale = shown.Data?
+            .Select(row => row.TryGetValue("Name", out var name) ? name.GetString() : null)
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Cast<string>()
+            .Where(name => !keep.Contains(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? [];
+
+        foreach (var name in stale)
+            await _client.QueryAsync(space, $"DROP EDGE IF EXISTS `{name}`", ct);
+
+        if (stale.Count > 0)
+            _logger.LogInformation(
+                "NebulaGraph 空间 {Space} 清理 PG 已删除的边类型：{Edges}",
+                space, string.Join(",", stale));
     }
 
     /// <summary>DESCRIBE TAG 后补齐缺失列（新增列类型统一 string NULL）。</summary>

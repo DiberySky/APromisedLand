@@ -9,39 +9,52 @@
            SubmitButtonDisabled="@_submitting"
            ActionsMaxWidth="MaxWidth.False"
            OnSubmitClick="UpdateAsync">
+    @* 与「新建属性」一致：实体类型固定展示在标题栏下方工具栏（编辑期间不变） *@
+    <ToolBarContent>
+        <MudText Typo="Typo.body2">实体类型：@EntityTypeDisplay</MudText>
+    </ToolBarContent>
     <DialogContent>
-        @if (Attribute is not null)
-        {
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
-                @Attribute.EntityType / @Attribute.AttributeName
-                （类型: @EavDataTypeLabels.GetLabel(Attribute.DataType)，不可修改）
-            </MudText>
-        }
-
         <MudTextField @bind-Value="_editForm.DisplayName"
                       Label="显示名"
                       Variant="Variant.Outlined"
-                      Class="mb-3" />
+                      Margin="Margin.Dense"
+                      HelperText="用户在界面上看到的名字" />
 
-        @if (Attribute?.DataType is "decimal" or "int")
-        {
-            <UnitTreeField @bind-UnitId="_editForm.UnitId"
-                           @bind-UnitName="_editForm.UnitName" />
-            <MudAlert Severity="Severity.Warning" Class="mb-3">
-                修改单位不会自动转换已有数据。如需变更，请先规划数据迁移。
-            </MudAlert>
-        }
+        @* 内部标识：创建后不可修改，只读展示完整值 *@
+        <MudTextField Value="@Attribute?.AttributeName"
+                      Label="内部标识"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      ReadOnly="true"
+                      Class="mt-3"
+                      HelperText="系统内部标识，不可修改" />
 
-        @* decimal：小数精度（ValidationRule.precision） *@
-        @if (Attribute?.DataType == "decimal")
-        {
-            <NumberInputField T="int?"
-                              @bind-Value="_editForm.Precision"
-                              Label="小数精度（可选）"
-                              Min="0" Max="10" Step="1"
-                              Class="mb-3"
-                              HelperText="显示与保存的小数位上限（0–10），留空不限制" />
-        }
+        @* 数据类型行：与「新建属性」一致，小数精度/计量单位按类型并入同一行 *@
+        <div class="d-flex align-start gap-2 mt-3 mb-3">
+            <MudTextField Value="@DataTypeLabel"
+                          Label="数据类型"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          ReadOnly="true"
+                          Style="flex: 1 1 0;" />
+            @if (Attribute?.DataType == "decimal")
+            {
+                <NumberInputField T="int?"
+                                  @bind-Value="_editForm.Precision"
+                                  Label="小数精度（可选）"
+                                  Min="0" Max="10" Step="1"
+                                  Margin="Margin.Dense"
+                                  Style="flex: 1 1 0;" />
+            }
+            @if (Attribute?.DataType is "decimal" or "int")
+            {
+                <div style="flex: 1 1 0;">
+                    <UnitTreeField @bind-UnitId="_editForm.UnitId"
+                                   @bind-UnitName="_editForm.UnitName"
+                                   Margin="Margin.Dense" />
+                </div>
+            }
+        </div>
 
         @if (Attribute?.DataType == "composite")
         {
@@ -51,6 +64,7 @@
                            ValueChanged="@(v => _editForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
                            Label="组合类型"
                            Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Style="flex: 1;">
                     @foreach (var t in _compositeTypes)
                     {
@@ -80,6 +94,7 @@
                            ValueChanged="@(v => _editForm.RefTableDefinitionId = string.IsNullOrEmpty(v) ? null : v)"
                            Label="自定义表"
                            Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Style="flex: 1;">
                     @foreach (var t in _customTables)
                     {
@@ -123,6 +138,7 @@
                            ValueChanged="@(v => _editForm.RefOptionSetId = string.IsNullOrEmpty(v) ? null : v)"
                            Label="选项集"
                            Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Style="flex: 1;">
                     @foreach (var s in _optionSets)
                     {
@@ -144,25 +160,12 @@
             }
         }
 
-        <NumberInputField T="int"
-                          @bind-Value="_editForm.DisplayOrder"
-                          Label="显示顺序"
-                          Class="mb-3" />
-
-        <MudGrid>
-            <MudItem xs="6" md="3">
-                <MudSwitch T="bool" @bind-Value="_editForm.IsRequired"
-                           Label="必填" Color="Color.Primary" />
-            </MudItem>
-            <MudItem xs="6" md="3">
-                <MudSwitch T="bool" @bind-Value="_editForm.IsSearchable"
-                           Label="可搜索" Color="Color.Primary" />
-            </MudItem>
-            <MudItem xs="6" md="3">
-                <MudSwitch T="bool" @bind-Value="_editForm.IsSortable"
-                           Label="可排序" Color="Color.Primary" />
-            </MudItem>
-        </MudGrid>
+        <div class="d-flex justify-center gap-4 flex-wrap">
+            <MudSwitch T="bool" @bind-Value="_editForm.IsRequired"
+                       Label="必填" Color="Color.Primary" />
+            <MudSwitch T="bool" @bind-Value="_editForm.IsSearchable"
+                       Label="可搜索" Color="Color.Primary" />
+        </div>
 
         @* 单选：选中选项集后底部内嵌选项编辑面板 *@
         @if (Attribute?.DataType == "single_choice")
@@ -191,6 +194,8 @@
 
     /// <summary>编辑目标（页面已通过 GetAttributeAsync 取详情）。</summary>
     [Parameter] public AttributeDetailDto? Attribute { get; set; }
+    /// <summary>实体类型列表（用于工具栏展示中文显示名，缺失时回退内部标识）。</summary>
+    [Parameter] public IReadOnlyList<EntityTypeSummaryDto>? EntityTypes { get; set; }
     [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
     [Parameter] public IReadOnlyList<CustomTableDetailDto>? CustomTables { get; set; }
     [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
@@ -219,6 +224,27 @@
     /// <summary>当前选中的选项集（未选择/已删除时为 null，面板不渲染）。</summary>
     private OptionSetSummaryDto? _selectedOptionSet
         => _optionSets.FirstOrDefault(s => s.OptionSetId == _editForm.RefOptionSetId);
+
+    /// <summary>数据类型中文标签（只读展示）。</summary>
+    private string DataTypeLabel
+        => Attribute is null ? "" : EavDataTypeLabels.GetLabel(Attribute.DataType);
+
+    /// <summary>实体类型展示名（优先中文显示名，缺失回退内部标识）。</summary>
+    private string EntityTypeDisplay
+    {
+        get
+        {
+            var entityType = Attribute?.EntityType;
+            var match = (EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
+                .FirstOrDefault(et => et.EntityType == entityType);
+            if (!string.IsNullOrWhiteSpace(match?.DisplayName))
+            {
+                return match.DisplayName;
+            }
+
+            return entityType ?? string.Empty;
+        }
+    }
 
     protected override void OnParametersSet()
     {

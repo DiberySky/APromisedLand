@@ -6,9 +6,9 @@
 @inject EntityTypeDisplayService EntityTypeDisplay
 
 @* 过滤器栏（无 MudPaper 包裹）；锁定模式下不渲染实体类型选择器 *@
-<MudGrid Class="mb-4">
-    @if (!_locked)
-    {
+@if (!_locked)
+{
+    <MudGrid Class="mb-4">
         <MudItem xs="12" md="4" Class="d-flex align-center">
             <MudSelect T="string"
                        Value="_entityType"
@@ -40,85 +40,67 @@
                 }
             </MudSelect>
         </MudItem>
-    }
-    <MudItem xs="6" md="@(_locked ? 6 : 5)" Class="d-flex justify-end align-center">
-        <MudButton Variant="Variant.Filled" Color="Color.Success"
-                   Size="Size.Small"
-                   OnClick="OpenCreateAsync"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   Disabled="@(string.IsNullOrEmpty(_entityType))">
-            新建属性
-        </MudButton>
-    </MudItem>
-</MudGrid>
+    </MudGrid>
+}
 
 <MudTable Items="_attributes" Hover="true" Bordered="true"
           Dense="true"
           Breakpoint="Breakpoint.Sm"
           Loading="@_loading"
-          LoadingProgressColor="Color.Primary"
-          Filter="new Func<AttributeDetailDto, bool>(FilterFunc)">
-    <ToolBarContent>
-        <MudText Typo="Typo.h6">
-            共 @(_attributes?.Count ?? 0) 个属性
-        </MudText>
-        <MudSpacer />
-        <MudTextField @bind-Value="_searchString"
-                      Placeholder="搜索属性名 / 显示名"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      IconSize="Size.Medium"
-                      Class="mt-0"
-                      Immediate="true" />
-    </ToolBarContent>
+          LoadingProgressColor="Color.Primary">
     <HeaderContent>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">排序</MudTh>
         <MudTh>属性名</MudTh>
-        <MudTh>类型</MudTh>
-        <MudTh>必填</MudTh>
-        <MudTh>操作</MudTh>
+        <MudTh Style="text-align: center;">类型</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                           Size="Size.Small"
+                           Color="Color.Success"
+                           OnClick="OpenCreateAsync"
+                           Disabled="@(string.IsNullOrEmpty(_entityType))"
+                           title="新建属性" />
+        </MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd DataLabel="属性名">
-            @* 主显中文，副显内部标识（小字） *@
-            <MudText Typo="Typo.body2">@context.DisplayName</MudText>
-            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                <code>@context.AttributeName</code>
-            </MudText>
+        <MudTd DataLabel="排序" Style="text-align: right;">
+            <div class="d-flex flex-nowrap justify-end gap-2 align-center">
+                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                               Size="Size.Small"
+                               OnClick="@(async () => await MoveAsync(context, -1))"
+                               Disabled="@(_moving || !CanMove(context, -1))"
+                               title="上移" />
+                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                               Size="Size.Small"
+                               OnClick="@(async () => await MoveAsync(context, 1))"
+                               Disabled="@(_moving || !CanMove(context, 1))"
+                               title="下移" />
+            </div>
         </MudTd>
-        <MudTd DataLabel="类型">
+        <MudTd DataLabel="属性名">
+            @* 中文（英文内部标识），统一默认色 *@
+            <MudText Typo="Typo.body2">@context.DisplayName (@context.AttributeName)</MudText>
+        </MudTd>
+        <MudTd DataLabel="类型" Style="text-align: center;">
             <MudChip T="string" Size="Size.Small"
                      Color="@GetDataTypeColor(context.DataType)">
                 @EavDataTypeLabels.GetLabel(context.DataType)
             </MudChip>
         </MudTd>
-        <MudTd DataLabel="必填">
-            @if (context.IsRequired)
-            {
-                <MudIcon Icon="@Icons.Material.Filled.Check"
-                         Color="Color.Success" Size="Size.Small" />
-            }
-        </MudTd>
-        <MudTd DataLabel="操作">
-            <MudIconButton Icon="@Icons.Material.Filled.Info"
-                           Size="Size.Medium"
-                           Color="Color.Info"
-                           OnClick="@(async () => await OpenDetailAsync(context))"
-                           title="详情" />
-            <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                           Size="Size.Medium"
-                           Color="Color.Primary"
-                           OnClick="@(async () => await OpenEditAsync(context))"
-                           title="编辑" />
-            <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                           Size="Size.Medium"
-                           Color="Color.Error"
-                           OnClick="@(async () => await DeleteAsync(context))"
-                           title="删除" />
+        <MudTd DataLabel="操作" Style="text-align: right;">
+            <div class="d-flex flex-nowrap justify-end">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="@(async () => await DeleteAsync(context))"
+                               title="删除" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               OnClick="@(async () => await OpenEditAsync(context))"
+                               title="编辑" />
+            </div>
         </MudTd>
     </RowTemplate>
-    <PagerContent>
-        <MudTablePager PageSizeOptions="new[] { 20, 50, 100 }" />
-    </PagerContent>
     <NoRecordsContent>
         <EmptyStateSky Icon="@Icons.Material.Filled.ListAlt"
                        Title="暂无属性定义">
@@ -129,7 +111,7 @@
                 }
                 else
                 {
-                    <text>点击"新建属性"为该实体类型添加第一个属性</text>
+                    <text>点击表头「＋」为该实体类型添加第一个属性</text>
                 }
             </Description>
         </EmptyStateSky>
@@ -147,19 +129,19 @@
     private bool _locked => !string.IsNullOrEmpty(EntityType);
 
     private string? _entityType;
-    private string? _searchString;
     private IReadOnlyList<AttributeDetailDto>? _attributes;
     private bool _loading;
+    private bool _moving;
 
     private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
     private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
     private IReadOnlyList<CustomTableDetailDto>? _customTables;
     private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
 
-    /// <summary>二级弹窗选项：与父弹窗一致，带最大化按钮；层叠于属性定义管理弹窗之上。</summary>
-    private static readonly DialogOptionsEx DialogOptions = new()
+    /// <summary>新建/编辑属性弹窗选项：窄版，带最大化按钮。</summary>
+    private static readonly DialogOptionsEx CreateDialogOptions = new()
     {
-        MaxWidth = MaxWidth.Medium,
+        MaxWidth = MaxWidth.Small,
         FullWidth = true,
         MaximizeButton = true
     };
@@ -221,7 +203,6 @@
     private async Task OnEntityTypeChanged(string? value)
     {
         _entityType = value;
-        _searchString = null;
         await LoadAsync();
     }
 
@@ -266,7 +247,7 @@
         };
 
         var dialog = await DialogService.ShowExAsync<AttributeCreateDialog>(
-            string.Empty, parameters, DialogOptions);
+            string.Empty, parameters, CreateDialogOptions);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -274,19 +255,6 @@
             await LoadAsync();
             await OnAttributesChanged.InvokeAsync();
         }
-    }
-
-    // ---------- 详情 ----------
-
-    private async Task OpenDetailAsync(AttributeDetailDto attr)
-    {
-        var parameters = new DialogParameters<AttributeDetailDialog>
-        {
-            { x => x.AttributeId, attr.AttributeId }
-        };
-
-        await DialogService.ShowExAsync<AttributeDetailDialog>(
-            string.Empty, parameters, DialogOptions);
     }
 
     // ---------- 编辑 ----------
@@ -303,13 +271,14 @@
         var parameters = new DialogParameters<AttributeEditDialog>
         {
             { x => x.Attribute, detail },
+            { x => x.EntityTypes, _entityTypes },
             { x => x.CompositeTypes, _compositeTypes },
             { x => x.CustomTables, _customTables },
             { x => x.OptionSets, _optionSets }
         };
 
         var dialog = await DialogService.ShowExAsync<AttributeEditDialog>(
-            string.Empty, parameters, DialogOptions);
+            string.Empty, parameters, CreateDialogOptions);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -344,16 +313,79 @@
         }
     }
 
-    // ---------- 辅助 ----------
+    // ---------- 排序 ----------
 
-    private bool FilterFunc(AttributeDetailDto a)
+    private bool CanMove(AttributeDetailDto attr, int delta)
     {
-        if (string.IsNullOrWhiteSpace(_searchString)) return true;
-        var s = _searchString;
-        return a.AttributeName.Contains(s, StringComparison.OrdinalIgnoreCase)
-            || a.DisplayName.Contains(s, StringComparison.OrdinalIgnoreCase)
-            || a.EntityType.Contains(s, StringComparison.OrdinalIgnoreCase);
+        if (_attributes is null) return false;
+        var i = IndexOf(attr);
+        var j = i + delta;
+        return i >= 0 && j >= 0 && j < _attributes.Count;
     }
+
+    private int IndexOf(AttributeDetailDto attr)
+    {
+        if (_attributes is null) return -1;
+        for (var i = 0; i < _attributes.Count; i++)
+        {
+            if (_attributes[i].AttributeId == attr.AttributeId) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// 与相邻行交换显示顺序：正常情况互换两行的 DisplayOrder；
+    /// 两行顺序值相同（历史数据重复）时按当前展示位置重排 1..N 兜底。
+    /// </summary>
+    private async Task MoveAsync(AttributeDetailDto attr, int delta)
+    {
+        if (_attributes is null || _moving) return;
+
+        var list = _attributes.ToList();
+        var i = IndexOf(attr);
+        var j = i + delta;
+        if (i < 0 || j < 0 || j >= list.Count) return;
+
+        var moves = new List<(string Id, int Order)>();
+        if (list[i].DisplayOrder == list[j].DisplayOrder)
+        {
+            for (var k = 0; k < list.Count; k++)
+            {
+                var target = k == i ? j + 1 : k == j ? i + 1 : k + 1;
+                if (list[k].DisplayOrder != target)
+                    moves.Add((list[k].AttributeId, target));
+            }
+        }
+        else
+        {
+            moves.Add((list[i].AttributeId, list[j].DisplayOrder));
+            moves.Add((list[j].AttributeId, list[i].DisplayOrder));
+        }
+
+        _moving = true;
+        try
+        {
+            foreach (var (id, order) in moves)
+            {
+                var (ok, error) = await Api.UpdateAttributeAsync(
+                    id, new UpdateAttributeRequest { DisplayOrder = order });
+                if (!ok)
+                {
+                    Snackbar.Add($"调整顺序失败：{error ?? "未知错误"}", Severity.Error);
+                    return;
+                }
+            }
+
+            await LoadAsync();
+            await OnAttributesChanged.InvokeAsync();
+        }
+        finally
+        {
+            _moving = false;
+        }
+    }
+
+    // ---------- 辅助 ----------
 
     private static Color GetDataTypeColor(string dataType) => dataType switch
     {

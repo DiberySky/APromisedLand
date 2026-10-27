@@ -496,7 +496,7 @@ public class EavMetadataController : ControllerBase
         CancellationToken ct = default)
     {
         var query = _db.CustomTables
-            .Include(t => t.Columns).ThenInclude(c => c.Unit)
+            .Include(t => t.Columns).ThenInclude(c => c.Unit).ThenInclude(u => u.Node)
             .AsQueryable();
         if (!includeDeleted) query = query.Where(t => !t.IsDeleted);
         if (!string.IsNullOrEmpty(entityType))
@@ -515,7 +515,8 @@ public class EavMetadataController : ControllerBase
     {
         // ★ 不再检查 IsDeleted：ID 唯一标识资源，允许按 ID 查询已删除的表
         //   （恢复流程需要）。是否过滤由调用方决定。
-        var table = await _db.CustomTables.Include(t => t.Columns)
+        var table = await _db.CustomTables
+            .Include(t => t.Columns).ThenInclude(c => c.Unit).ThenInclude(u => u.Node)
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.TableDefinitionId == id, ct);
         if (table is null) return NotFound();
@@ -540,7 +541,7 @@ public class EavMetadataController : ControllerBase
     public async Task<IActionResult> DeleteCustomTable(string id, CancellationToken ct)
     {
         var table = await _db.CustomTables
-            .Include(t => t.Columns).ThenInclude(c => c.Unit)
+            .Include(t => t.Columns).ThenInclude(c => c.Unit).ThenInclude(u => u.Node)
             .FirstOrDefaultAsync(t => t.TableDefinitionId == id, ct);
         if (table is null) return NotFound();
 
@@ -670,7 +671,7 @@ public class EavMetadataController : ControllerBase
     {
         var query = _db.CompositeTypes
             .Include(t => t.Fields).ThenInclude(f => f.RefOptionSet)
-            .Include(t => t.Fields).ThenInclude(f => f.Unit)
+            .Include(t => t.Fields).ThenInclude(f => f.Unit).ThenInclude(u => u.Node)
             .AsQueryable();
 
         if (!includeDeleted) query = query.Where(t => !t.IsDeleted);
@@ -694,7 +695,7 @@ public class EavMetadataController : ControllerBase
     {
         var type = await _db.CompositeTypes
             .Include(t => t.Fields).ThenInclude(f => f.RefOptionSet)
-            .Include(t => t.Fields).ThenInclude(f => f.Unit)
+            .Include(t => t.Fields).ThenInclude(f => f.Unit).ThenInclude(u => u.Node)
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.CompositeTypeId == id, ct);
         if (type is null) return NotFound();
@@ -833,7 +834,8 @@ public class EavMetadataController : ControllerBase
         CancellationToken ct = default)
     {
         var query = _db.AttributeCatalog
-            .Include(a => a.Unit).Include(a => a.RefCompositeType)
+            .Include(a => a.Unit).ThenInclude(u => u.Node)
+            .Include(a => a.RefCompositeType)
             .Include(a => a.RefTableDefinition).Include(a => a.RefOptionSet)
             .AsQueryable();
 
@@ -851,7 +853,8 @@ public class EavMetadataController : ControllerBase
     public async Task<IActionResult> GetAttribute(string id, CancellationToken ct)
     {
         var def = await _db.AttributeCatalog
-            .Include(a => a.Unit).Include(a => a.RefCompositeType)
+            .Include(a => a.Unit).ThenInclude(u => u.Node)
+            .Include(a => a.RefCompositeType)
             .Include(a => a.RefTableDefinition).Include(a => a.RefOptionSet)
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.AttributeId == id, ct);

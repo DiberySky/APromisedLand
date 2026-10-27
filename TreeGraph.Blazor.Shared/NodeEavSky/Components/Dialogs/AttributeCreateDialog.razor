@@ -1,4 +1,4 @@
-@* AttributeCreateDialog.razor — 新建属性（DialogSky 外壳，与树节点对话框风格一致） *@
+﻿@* AttributeCreateDialog.razor — 新建属性（DialogSky 外壳，与树节点对话框风格一致） *@
 @using TreeGraph.Blazor.Shared.MafWfSky.Components
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
@@ -9,62 +9,92 @@
            SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="CreateAsync">
+    @* 锁定模式下把实体类型固定展示在标题栏下方工具栏（静态值，创建时确定） *@
+    <ToolBarContent>
+        @if (IsEntityTypeLocked)
+        {
+            <MudText Typo="Typo.body2">实体类型：@EntityTypeDisplay</MudText>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">可在下方切换实体类型</MudText>
+        }
+    </ToolBarContent>
     <DialogContent>
-        @* 实体类型（下拉）；锁定模式下禁用，强制使用父级传入的实体类型 *@
-        <MudSelect T="string"
-                   Value="_createForm.EntityType"
-                   ValueChanged="@(v => _createForm.EntityType = v)"
-                   Label="实体类型"
-                   Variant="Variant.Outlined"
-                   Class="mb-3"
-                   Disabled="@IsEntityTypeLocked"
-                   HelperText="@(IsEntityTypeLocked ? "当前已锁定实体类型" : "如需新类型，请先到「实体类型管理」创建")">
-            @foreach (var et in EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
-            {
-                <MudSelectItem T="string" Value="@et.EntityType">
-                    @GetDisplayName(et)
-                </MudSelectItem>
-            }
-        </MudSelect>
+        @* 未锁定实体类型时才能在表单内切换；锁定后仅工具栏展示 *@
+        @if (!IsEntityTypeLocked)
+        {
+            <MudSelect T="string"
+                       Value="_createForm.EntityType"
+                       ValueChanged="@(v => _createForm.EntityType = v)"
+                       Label="实体类型"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Class="mb-3"
+                       HelperText="如需新类型，请先到「实体类型管理」创建">
+                @foreach (var et in EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
+                {
+                    <MudSelectItem T="string" Value="@et.EntityType">
+                        @GetDisplayName(et)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
 
         @* 显示名（必填，中文） *@
         <MudTextField @bind-Value="_createForm.DisplayName"
                       Label="显示名"
                       Placeholder="如：名称、长度、价格"
                       Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
                       Class="mb-3"
                       HelperText="用户在界面上看到的名字" />
 
-        @* 数据类型 *@
-        <MudSelect T="string"
-                   Value="_createForm.DataType"
-                   ValueChanged="OnCreateDataTypeChanged"
-                   Label="数据类型"
-                   Variant="Variant.Outlined"
-                   Class="mb-3">
-            @foreach (var dt in DataTypeOptions)
+        @* 内部标识（AttributeName，可空：留空由服务端自动生成） *@
+        <NamingTextField @bind-Value="_createForm.AttributeName"
+                         SourceText="@_createForm.DisplayName"
+                         NameCase="snake"
+                         Label="内部标识"
+                         Placeholder="英文"
+                         Margin="Margin.Dense"
+                         HelperText="命名规则：字母开头，仅字母/数字/下划线；点尾部魔棒按显示名称生成建议" />
+
+        @* 数据类型 + 小数精度 + 计量单位：同行排列（单位仅 int/decimal，精度仅 decimal） *@
+        <div class="d-flex align-start gap-2 mb-3">
+            <MudSelect T="string"
+                       Value="_createForm.DataType"
+                       ValueChanged="OnCreateDataTypeChanged"
+                       Label="数据类型"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Style="flex: 1 1 0;">
+                @foreach (var dt in DataTypeOptions)
+                {
+                    <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+                }
+            </MudSelect>
+
+            @* decimal：小数精度（ValidationRule.precision） *@
+            @if (_createForm.DataType == "decimal")
             {
-                <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+                <NumberInputField T="int?"
+                                  @bind-Value="_createForm.Precision"
+                                  Label="小数精度（可选）"
+                                  Margin="Margin.Dense"
+                                  Min="0" Max="10" Step="1"
+                                  Style="flex: 1 1 0;" />
             }
-        </MudSelect>
 
-        @* int / decimal：单位（复制原系统 UintTreeField 调用方式：只读文本 + 单位树选择对话框） *@
-        @if (_createForm.DataType is "decimal" or "int")
-        {
-            <UnitTreeField @bind-UnitId="_createForm.UnitId"
-                           @bind-UnitName="_createForm.UnitName" />
-        }
-
-        @* decimal：小数精度（ValidationRule.precision） *@
-        @if (_createForm.DataType == "decimal")
-        {
-            <NumberInputField T="int?"
-                              @bind-Value="_createForm.Precision"
-                              Label="小数精度（可选）"
-                              Min="0" Max="10" Step="1"
-                              Class="mb-3"
-                              HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
-        }
+            @* int / decimal：单位（只读文本 + 单位树选择对话框） *@
+            @if (_createForm.DataType is "decimal" or "int")
+            {
+                <div style="flex: 1 1 0;">
+                    <UnitTreeField @bind-UnitId="_createForm.UnitId"
+                                   Margin="Margin.Dense"
+                                   @bind-UnitName="_createForm.UnitName" />
+                </div>
+            }
+        </div>
 
         @* composite：下拉 + 右侧新建入口（无可选类型时可就地创建） *@
         @if (_createForm.DataType == "composite")
@@ -75,6 +105,7 @@
                            ValueChanged="@(v => _createForm.RefCompositeTypeId = string.IsNullOrEmpty(v) ? null : v)"
                            Label="组合类型"
                            Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Style="flex: 1;">
                     @foreach (var t in _compositeTypes ?? new List<CompositeTypeDetailDto>())
                     {
@@ -105,6 +136,7 @@
                            ValueChanged="@(v => _createForm.RefTableDefinitionId = string.IsNullOrEmpty(v) ? null : v)"
                            Label="自定义表"
                            Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Style="flex: 1;">
                     @foreach (var t in _customTables ?? new List<CustomTableDetailDto>())
                     {
@@ -135,6 +167,7 @@
                            ValueChanged="@(v => _createForm.RefOptionSetId = string.IsNullOrEmpty(v) ? null : v)"
                            Label="选项集"
                            Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Style="flex: 1;">
                     @foreach (var s in _optionSets ?? new List<OptionSetSummaryDto>())
                     {
@@ -156,45 +189,12 @@
             }
         }
 
-        <NumberInputField T="int"
-                          @bind-Value="_createForm.DisplayOrder"
-                          Label="显示顺序"
-                          Class="mb-3" />
-
-        <MudGrid>
-            <MudItem xs="6" md="3">
-                <MudSwitch T="bool" @bind-Value="_createForm.IsRequired"
-                           Label="必填" Color="Color.Primary" />
-            </MudItem>
-            <MudItem xs="6" md="3">
-                <MudSwitch T="bool" @bind-Value="_createForm.IsSearchable"
-                           Label="可搜索" Color="Color.Primary" />
-            </MudItem>
-            <MudItem xs="6" md="3">
-                <MudSwitch T="bool" @bind-Value="_createForm.IsSortable"
-                           Label="可排序" Color="Color.Primary" />
-            </MudItem>
-        </MudGrid>
-
-        @* 高级选项：AttributeName 可选覆盖 *@
-        <MudExpansionPanels Class="mt-3">
-            <MudExpansionPanel Text="高级选项（内部标识）">
-                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
-                    <MudText Typo="Typo.caption">
-                        内部标识（AttributeName）会出现在 <b>JSON key</b>、
-                        查询过滤、审计日志、导出列名里。
-                        留空则系统自动生成（如 <code>attr_3f9a2b1c8d4e</code>）。
-                        如需与外部系统对接，建议手动指定可读的英文标识。
-                    </MudText>
-                </MudAlert>
-                <NamingTextField @bind-Value="_createForm.AttributeName"
-                                 SourceText="@_createForm.DisplayName"
-                                 NameCase="snake"
-                                 Label="内部标识（可选）"
-                                 Placeholder="如：name、length"
-                                 HelperText="留空自动生成；填了则：字母开头，只含字母/数字/下划线" />
-            </MudExpansionPanel>
-        </MudExpansionPanels>
+        <div class="d-flex justify-center gap-4 flex-wrap">
+            <MudSwitch T="bool" @bind-Value="_createForm.IsRequired"
+                       Label="必填" Color="Color.Primary" />
+            <MudSwitch T="bool" @bind-Value="_createForm.IsSearchable"
+                       Label="可搜索" Color="Color.Primary" />
+        </div>
     </DialogContent>
 </DialogSky>
 
@@ -244,7 +244,8 @@
         {
             EntityType = EntityType ?? "",
             DisplayOrder = InitialDisplayOrder,
-            IsSearchable = true
+            IsSearchable = true,
+            IsSortable = true
         };
         _compositeTypes = CompositeTypes;
         _customTables = CustomTables;
@@ -291,6 +292,13 @@
         => string.IsNullOrWhiteSpace(et.DisplayName)
             ? et.EntityType
             : et.DisplayName;
+
+    /// <summary>锁定实体类型的展示名（优先中文显示名，缺失回退内部标识）。</summary>
+    private string EntityTypeDisplay =>
+        (EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
+            .FirstOrDefault(et => et.EntityType == EntityType) is { } match
+            ? GetDisplayName(match)
+            : EntityType ?? string.Empty;
 
     private void OnCreateDataTypeChanged(string dt)
     {

@@ -1,10 +1,29 @@
-/* 容器：相对定位，承载输入框与右侧聚拢的 −/+ 按钮。
-   display:flex 使对话框内整行占满（与其他字段一致）；
+/* 容器：纵向排列输入框与辅助说明；输入框区自身为步进器定位上下文。
    语义搜索页等场景由 Style 传入固定宽度。 */
 .numinput {
     position: relative;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+}
+
+/* 只包输入框：−/+ 相对此盒垂直居中，不受辅助/错误文案高度影响 */
+.numinput-box {
+    position: relative;
+    width: 100%;
+}
+
+/* 辅助/错误文案：与 MudBlazor 助手文本样式对齐 */
+.numinput-helper {
+    font-size: 0.75rem;
+    line-height: 1.33;
+    margin-top: 3px;
+    padding: 0 12px;
+    color: var(--mud-palette-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.numinput-helper-error {
+    color: var(--mud-palette-error);
 }
 
 /* 输入框占满容器 */

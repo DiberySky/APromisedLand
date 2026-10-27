@@ -8,6 +8,7 @@
 <MudTextField @bind-Value="@_fullName"
               Label="计量单位"
               Variant="Variant.Outlined" ReadOnly="true"
+              Margin="@Margin"
               InputType="@InputType.Text" Adornment="Adornment.End"
               AdornmentIcon="@Icons.Material.Outlined.EditNote"
               AdornmentColor="Color.Info"
@@ -22,6 +23,9 @@
     /// <summary>单位显示名（编辑场景由详情 DTO 提供，选择后由选中节点覆盖）。</summary>
     [Parameter] public string? UnitName { get; set; }
     [Parameter] public EventCallback<string?> UnitNameChanged { get; set; }
+
+    /// <summary>输入框间距（默认非 dense，保持既有调用方外观）。</summary>
+    [Parameter] public Margin Margin { get; set; } = Margin.None;
 
     string? _fullName;
 

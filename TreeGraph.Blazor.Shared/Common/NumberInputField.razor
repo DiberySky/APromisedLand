@@ -1,33 +1,43 @@
 @* 数字输入框：Outlined 可键入 + 右侧内嵌 NumberStepper（−/+）。
    MudBlazor 9 的 MudTextField 无自定义 adornment 通道，
    故用容器相对定位 + 步进器绝对定位叠进输入框内。
+   辅助/错误文案由本组件在外层渲染（不交给 MudTextField），
+   使步进器的定位上下文只含输入框本体，−/+ 始终相对输入框垂直居中。
    T 支持 int/long/decimal/double 及可空形式：可空时清空输入框即提交 null。 *@
 @typeparam T
 
 <div class="numinput @Class" style="@Style">
-    <MudTextField T="string"
-                  Value="_text"
-                  ValueChanged="OnTextChangedAsync"
-                  Label="@Label"
-                  Variant="Variant.Outlined"
-                  Immediate="true"
-                  HideSpinButtons="true"
-                  Disabled="@Disabled"
-                  ReadOnly="@ReadOnly"
-                  Placeholder="@Placeholder"
-                  Required="@Required"
-                  Error="@Error"
-                  ErrorText="@ErrorText"
-                  Margin="@Margin"
-                  InputMode="@InputMode"
-                  HelperText="@HelperText"
-                  Class="numinput-field"/>
-    <div class="numinput-stepper">
-        <NumberStepper T="decimal" Embedded="true" Label="" Suffix="@Suffix"
-                       Disabled="@(Disabled || ReadOnly)"
-                       Value="CurrentDecimal" ValueChanged="StepToAsync"
-                       Min="@Min" Max="@Max" Step="@Step"/>
+    <div class="numinput-box">
+        <MudTextField T="string"
+                      Value="_text"
+                      ValueChanged="OnTextChangedAsync"
+                      Label="@Label"
+                      Variant="Variant.Outlined"
+                      Immediate="true"
+                      HideSpinButtons="true"
+                      Disabled="@Disabled"
+                      ReadOnly="@ReadOnly"
+                      Placeholder="@Placeholder"
+                      Required="@Required"
+                      Error="@Error"
+                      Margin="@Margin"
+                      InputMode="@InputMode"
+                      Class="numinput-field"/>
+        <div class="numinput-stepper">
+            <NumberStepper T="decimal" Embedded="true" Label="" Suffix="@Suffix"
+                           Disabled="@(Disabled || ReadOnly)"
+                           Value="CurrentDecimal" ValueChanged="StepToAsync"
+                           Min="@Min" Max="@Max" Step="@Step"/>
+        </div>
     </div>
+    @if (Error && !string.IsNullOrEmpty(ErrorText))
+    {
+        <div class="numinput-helper numinput-helper-error">@ErrorText</div>
+    }
+    else if (!string.IsNullOrEmpty(HelperText))
+    {
+        <div class="numinput-helper">@HelperText</div>
+    }
 </div>
 
 @code {

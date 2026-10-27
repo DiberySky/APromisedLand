@@ -16,7 +16,10 @@ public class UnitTree : ITreeNodeBase<UnitTree>
 
     private string? _seedName;
 
-    /// <summary>名称（非映射列）：运行时读穿 Node.Name；种子数据通过 setter 暂存（EF HasData 忽略 [NotMapped]，仅 SeedNodes 消费）。</summary>
+    /// <summary>
+    /// 名称（非映射列）：运行时读穿 Node.Name；种子数据通过 setter 暂存（EF HasData 忽略 [NotMapped]，仅 SeedNodes 消费）。
+    /// ★ 查询投影前必须 <c>.Include(u => u.Node)</c>（或投影 <c>u.Node!.Name</c>），否则取到的恒为 null。
+    /// </summary>
     [NotMapped]
     public string? Name
     {

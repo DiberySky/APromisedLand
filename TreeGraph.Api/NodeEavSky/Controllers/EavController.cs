@@ -79,11 +79,16 @@ public class EavController : ControllerBase
             CollectFieldUnitIds(d.RefCompositeTypeId!, unitIds);
 
         unitIds = unitIds.Distinct().ToList();
+        // ★ Name 是 UnitTree 的 [NotMapped] 读穿透属性（Node.Name），必须投影 Node，
+        //   否则字典值恒为 null（实体录入界面的单位后缀会丢失）。
         var unitNames = unitIds.Count == 0
             ? new Dictionary<string, string>()
-            : await _db.UnitTrees
+            : (await _db.UnitTrees
                 .Where(u => unitIds.Contains(u.Id))
-                .ToDictionaryAsync(u => u.Id, u => u.Name, ct);
+                .Select(u => new { u.Id, u.Node!.Name })
+                .AsNoTracking()
+                .ToListAsync(ct))
+              .ToDictionary(x => x.Id, x => x.Name ?? string.Empty);
 
         var schema = defs.Select(d => ToSchemaDto(d, unitNames)).ToList();
         return Ok(new { EntityType = entityType, Attributes = schema });

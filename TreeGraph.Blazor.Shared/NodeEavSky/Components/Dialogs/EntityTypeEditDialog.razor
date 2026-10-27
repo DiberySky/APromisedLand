@@ -10,16 +10,6 @@
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="SaveAsync">
     <DialogContent>
-        @* 编辑时展示内部标识（供调试，用户平时看不到） *@
-        @if (Editing is not null)
-        {
-            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                <MudText Typo="Typo.caption">
-                    内部标识：<code>@Editing.EntityType</code>
-                </MudText>
-            </MudAlert>
-        }
-
         <MudTextField @bind-Value="_form.DisplayName"
                       Label="实体类型名称"
                       Placeholder="请输入中文名称"
@@ -29,8 +19,18 @@
                           ? "界面上显示的名称，例如：分类树、单位树、订单"
                           : "实体类型在界面上显示的名称")" />
 
-        @* 内部标识（仅新建时可填，用于与树类型名等外部系统对齐）；魔棒按名称生成 PascalCase 建议 *@
-        @if (Editing is null)
+        @* 内部标识：编辑时只读展示完整值，新建时用 NamingTextField（魔棒按名称生成 PascalCase 建议） *@
+        @if (Editing is not null)
+        {
+            <MudTextField @bind-Value="_form.EntityType"
+                          Label="内部标识"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          ReadOnly="true"
+                          Class="mt-3"
+                          HelperText="系统内部标识，不可修改" />
+        }
+        else
         {
             <NamingTextField @bind-Value="_form.EntityType"
                              SourceText="@_form.DisplayName"
@@ -71,6 +71,7 @@
             ? new FormModel { DisplayOrder = InitialDisplayOrder }
             : new FormModel
             {
+                EntityType = Editing.EntityType,
                 DisplayName = Editing.DisplayName,
                 Description = Editing.Description ?? "",
                 DisplayOrder = Editing.DisplayOrder

@@ -44,7 +44,7 @@ else
           LoadingProgressColor="Color.Primary">
     <HeaderContent>
         <MudTh>名称</MudTh>
-        <MudTh>设置</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">设置</MudTh>
         <MudTh>说明</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             @if (IsDialogMode)
@@ -66,19 +66,17 @@ else
             @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
             <MudText Typo="Typo.body1">@context.DisplayName</MudText>
         </MudTd>
-        <MudTd DataLabel="设置">
-            @* 图标入口（左）：点击打开独立属性定义对话框并锁定该类型；
-               数量胶囊靠右展示 *@
-            <div class="d-flex align-center justify-space-between">
+        <MudTd DataLabel="设置" Style="white-space: nowrap; text-align: center;">
+            @* 图标入口：点击打开独立属性定义对话框并锁定该类型；
+               属性数量以徽标叠加在图标右上角 *@
+            <MudBadge Content="@context.AttributeCount" Color="Color.Info"
+                      Overlap="true" Bordered="true" Max="99">
                 <MudIconButton Icon="@Icons.Material.Filled.Settings"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenAttributesAsync(context))"
                                title="管理属性定义" />
-                <MudChip T="string" Size="Size.Small" Color="Color.Info">
-                    @context.AttributeCount
-                </MudChip>
-            </div>
+            </MudBadge>
         </MudTd>
         <MudTd DataLabel="说明">
             <MudText Typo="Typo.caption" Color="Color.Secondary">
@@ -215,7 +213,7 @@ else
         var options = new DialogOptionsEx
         {
             Position = DialogPosition.TopCenter,
-            MaxWidth = MaxWidth.Large,
+            MaxWidth = MaxWidth.Small,
             FullWidth = true,
             MaximizeButton = true
         };
