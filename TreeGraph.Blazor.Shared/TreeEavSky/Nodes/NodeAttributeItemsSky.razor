@@ -90,7 +90,9 @@ else
                                ReadOnly="@ReadOnly"
                                AllowDetach="@AllowManage"
                                @ref="_sections[idx]"
-                               OnDetachRequested="@(() => DetachAsync(card))" />
+                               OnDetachRequested="@(() => DetachAsync(card))"
+                               OnDataDeleted="@OnEntityDataDeletedAsync"
+                               OnDataSaved="@OnEntityDataSavedAsync" />
     }
 }
 
@@ -257,5 +259,31 @@ else
 
         Message.Success("已取消关注");
         await ReloadAsync();
+    }
+
+    /// <summary>子区块删除实体数据后，同步更新绑定表中的 HasEntity 状态。</summary>
+    private Task OnEntityDataDeletedAsync(string entityType)
+    {
+        _rows = _rows.Select(r => r.EntityType == entityType && r.HasEntity
+            ? r with { HasEntity = false }
+            : r).ToList();
+        _cards = _cards.Select(c => c.EntityType == entityType && c.HasEntity
+            ? c with { HasEntity = false }
+            : c).ToList();
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>子区块首次创建实体后，同步更新绑定表中的 HasEntity 状态。</summary>
+    private Task OnEntityDataSavedAsync(string entityType)
+    {
+        _rows = _rows.Select(r => r.EntityType == entityType && !r.HasEntity
+            ? r with { HasEntity = true }
+            : r).ToList();
+        _cards = _cards.Select(c => c.EntityType == entityType && !c.HasEntity
+            ? c with { HasEntity = true }
+            : c).ToList();
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 }

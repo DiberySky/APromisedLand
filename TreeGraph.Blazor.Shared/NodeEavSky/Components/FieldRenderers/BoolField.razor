@@ -1,22 +1,44 @@
 @* BoolField.razor *@
-@* 布尔字段渲染器：outlined 下拉选择「是/否」（null 表示未选择）。 *@
+@* 布尔字段渲染器：MudRadioGroup 圆点选择「是/否」（对齐 BoolFieldSky 风格）。 *@
 
-<MudSelect T="bool?" Label="@Attr.DisplayName"
-           Value="Value" ValueChanged="ValueChanged"
-           Required="@Attr.IsRequired"
-           ReadOnly="@ReadOnly"
-           Variant="Variant.Outlined"
-           Dense="true"
-           AnchorOrigin="Origin.BottomRight"
-           TransformOrigin="Origin.TopRight"
-           Clearable="!Attr.IsRequired">
-    <MudSelectItem T="bool?" Value="true">是</MudSelectItem>
-    <MudSelectItem T="bool?" Value="false">否</MudSelectItem>
-</MudSelect>
+<MudField Label="@Attr.DisplayName"
+          Variant="Variant.Outlined" InnerPadding="false"
+          Dense="true">
+    <MudRadioGroup T="bool" Value="@(_bridgeValue)"
+                   Class="d-flex align-end pr-4"
+                   ReadOnly="@ReadOnly"
+                   ValueChanged="OnValueChanged">
+        <MudRadio Value="true" Label="是" Color="@_trueColor"/>
+        <MudRadio Value="false" Label="否" Color="@_falseColor"/>
+    </MudRadioGroup>
+</MudField>
 
 @code {
     [Parameter, EditorRequired] public AttributeSchemaDto Attr { get; set; } = null!;
     [Parameter] public bool? Value { get; set; }
     [Parameter] public EventCallback<bool?> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+
+    Color _trueColor = Color.Default;
+    Color _falseColor = Color.Default;
+
+    bool _bridgeValue => Value ?? false;
+
+    protected override void OnInitialized()
+    {
+        UpdateColors(Value);
+    }
+
+    private void OnValueChanged(bool value)
+    {
+        UpdateColors(value);
+        Value = value;
+        _ = ValueChanged.InvokeAsync((bool?)value);
+    }
+
+    private void UpdateColors(bool? value)
+    {
+        _trueColor = value == true ? Color.Success : Color.Default;
+        _falseColor = value == false ? Color.Error : Color.Default;
+    }
 }

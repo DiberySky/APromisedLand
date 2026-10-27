@@ -7,6 +7,7 @@
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
 @using TreeGraph.Shared.NodeEavSky.Dtos
+@using System.Text.Json
 
 @inject EavApiClient EavApi
 @inject MessageService Message
@@ -60,8 +61,27 @@
                              Schema="@_schema"
                              CompactLayout="true"
                              ReadOnly="@ReadOnly"
+                             HideSubmitButton="true"
                              OnSubmit="HandleSubmitAsync" />
             </div>
+            @if (!ReadOnly)
+            {
+                <MudStack Row Class="pb-3" Justify="Justify.SpaceBetween">
+                    <MudTooltip Text="删除该实体数据">
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteForever"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       Disabled="!_hasEntity"
+                                       OnClick="@OnDeleteEntityAsync" />
+                    </MudTooltip>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               OnClick="@SubmitAsync">
+                        保存
+                    </MudButton>
+                </MudStack>
+            }
         }
     </ChildContent>
 </MudExpansionPanel>
@@ -84,6 +104,12 @@
 
     /// <summary>请求取消关注（由父组件弹确认框并调 API）。</summary>
     [Parameter] public EventCallback OnDetachRequested { get; set; }
+
+    /// <summary>实体数据删除后通知父组件（用于同步绑定表状态）。</summary>
+    [Parameter] public EventCallback<string> OnDataDeleted { get; set; }
+
+    /// <summary>首次创建实体后通知父组件（用于同步绑定表 HasEntity=true）。</summary>
+    [Parameter] public EventCallback<string> OnDataSaved { get; set; }
 
     private DynamicForm? _form;
     private IReadOnlyList<AttributeSchemaDto>? _schema;
@@ -167,6 +193,7 @@
 
     private async Task HandleSubmitAsync(Dictionary<string, object?> values)
     {
+        var hadEntity = _hasEntity;
         try
         {
             var (ok, error, current) = await EavApi.SaveInodeEntityAsync(
@@ -178,6 +205,9 @@
                 Message.Success($"【{DisplayName ?? EntityType}】属性已保存");
                 // 重新加载：首次保存后拿到真实 EntityId / UpdatedAt
                 await ReloadAsync();
+                // 首次创建 → 通知父组件同步绑定表 HasEntity
+                if (!hadEntity && _hasEntity && OnDataSaved.HasDelegate)
+                    await OnDataSaved.InvokeAsync(EntityType);
             }
             else
             {
@@ -188,6 +218,40 @@
         catch (Exception ex)
         {
             Message.Details("属性保存失败", ex.Message);
+        }
+    }
+
+    private async Task OnDeleteEntityAsync()
+    {
+        var confirm = await Message.DeleteBox(
+            $"确定删除【{DisplayName ?? EntityType}】的所有属性数据？此操作不可恢复。",
+            "删除实体数据");
+        if (!confirm) return;
+
+        try
+        {
+            var (ok, error) = await EavApi.DeleteInodeEntityAsync(InodeId, EntityType);
+            if (ok)
+            {
+                Message.Success("实体数据已删除");
+                // 重置本地状态：清空表单 + 标记未填写
+                _entity = null;
+                _hasEntity = false;
+                _updatedAt = null;
+                _form?.LoadFrom(new Dictionary<string, JsonElement>());
+                StateHasChanged();
+                // 通知父组件同步绑定表状态（HasEntity / 已绑定计数）
+                if (OnDataDeleted.HasDelegate)
+                    await OnDataDeleted.InvokeAsync(EntityType);
+            }
+            else
+            {
+                Message.Details("删除失败", error ?? "未知错误");
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Details("删除失败", ex.Message);
         }
     }
 }
