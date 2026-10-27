@@ -17,9 +17,12 @@ public class LineManageApiClient(HttpClient httpClient)
     private const string BasePath = "api/Lines";
 
     // GET api/Lines
-    public async Task<IReadOnlyList<LineDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<LineDto>> GetAllAsync(string? spaceId = null, CancellationToken cancellationToken = default)
     {
-        var response = await httpClient.GetAsync(BasePath, cancellationToken);
+        var url = string.IsNullOrWhiteSpace(spaceId)
+            ? BasePath
+            : $"{BasePath}?spaceId={Uri.EscapeDataString(spaceId)}";
+        var response = await httpClient.GetAsync(url, cancellationToken);
         await EnsureSuccessWithApiResponseAsync(response);
         var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<List<LineDto>>>(cancellationToken);
         return apiResponse?.Success != true || apiResponse.Data == null ? [] : apiResponse.Data;

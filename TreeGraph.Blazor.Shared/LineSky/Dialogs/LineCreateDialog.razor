@@ -1,5 +1,6 @@
 @* LineCreateDialog.razor — 新建线路（DialogSky 外壳，与 SpaceCreateDialog 风格一致）。
-   线路为图空间级资源：创建时必须选择所属空间（创建后不可变更）。 *@
+   线路为图空间级资源：创建时必须指定所属空间（创建后不可变更）。
+   打开参数 SpaceId/SpaceName：传入则空间固定、只读展示；未传则下拉选择。 *@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.SpaceSky
@@ -14,20 +15,28 @@
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="CreateAsync">
     <DialogContent>
-        <MudSelect @bind-Value="_form.SpaceId"
-                   Label="所属空间"
-                   Variant="Variant.Outlined"
-                   Margin="Margin.Dense"
-                   Dense="true"
-                   Class="mb-3">
-            @if (_spaces is not null)
-            {
-                @foreach (var s in _spaces)
+        @if (SpaceFixed)
+        {
+            <MudTextField Value="@(SpaceName ?? SpaceId)" Label="所属空间" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Class="mb-3" ReadOnly="true" />
+        }
+        else
+        {
+            <MudSelect @bind-Value="_form.SpaceId"
+                       Label="所属空间"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Dense="true"
+                       Class="mb-3">
+                @if (_spaces is not null)
                 {
-                    <MudSelectItem T="string" Value="@s.Id">@s.Name</MudSelectItem>
+                    @foreach (var s in _spaces)
+                    {
+                        <MudSelectItem T="string" Value="@s.Id">@s.Name</MudSelectItem>
+                    }
                 }
-            }
-        </MudSelect>
+            </MudSelect>
+        }
         <MudTextField @bind-Value="_form.Name"
                       Label="名称"
                       Variant="Variant.Outlined"
@@ -42,12 +51,27 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
+    /// <summary>打开参数：目标图空间 Id（传入则空间固定、只读展示）。</summary>
+    [Parameter] public string? SpaceId { get; set; }
+
+    /// <summary>打开参数：目标图空间显示名（仅展示用；缺省回退显示 Id）。</summary>
+    [Parameter] public string? SpaceName { get; set; }
+
+    /// <summary>空间是否由打开参数固定。</summary>
+    private bool SpaceFixed => !string.IsNullOrWhiteSpace(SpaceId);
+
     private readonly LineDto _form = new();
     private IReadOnlyList<SpaceDto>? _spaces;
     private bool _submitting;
 
     protected override async Task OnInitializedAsync()
     {
+        if (SpaceFixed)
+        {
+            _form.SpaceId = SpaceId!;
+            return;
+        }
+
         _spaces = await SpaceApi.GetAllAsync();
         if (_spaces.Count > 0)
             _form.SpaceId = _spaces[0].Id;

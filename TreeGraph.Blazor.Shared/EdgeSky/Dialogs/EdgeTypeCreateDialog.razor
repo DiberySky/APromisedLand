@@ -1,6 +1,7 @@
 @* EdgeTypeCreateDialog.razor — 新建边类型（对齐 Nebula CREATE EDGE）：
    DialogSky 外壳承载；名称（Nebula 命名规则）+ 中文显示名 + 注释；
    属性 Schema 创建后统一在 ⚙ 属性 Schema 对话框维护。
+   打开参数 SpaceId/SpaceName：边类型为图空间级资源，对话框内只读展示所属空间。
    名称框用 NamingTextField（尾部魔棒 → MafWf 命名服务 AI 建议 snake_case）。 *@
 @inject ISnackbar Snackbar
 @using TreeGraph.Blazor.Shared.Common
@@ -12,8 +13,10 @@
            SubmitButtonText="创建"
            OnSubmitClick="Submit">
     <DialogContent>
+        <MudTextField Value="@(SpaceName ?? SpaceId)" Label="所属空间" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" ReadOnly="true" />
         <MudTextField @bind-Value="_displayName" Label="显示名称" Variant="Variant.Outlined"
-                      Margin="Margin.Dense" Placeholder="中文" />
+                      Margin="Margin.Dense" Class="mt-3" Placeholder="中文" />
         <NamingTextField @bind-Value="_name"
                          SourceText="@_displayName"
                          NameCase="snake"
@@ -28,6 +31,12 @@
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>打开参数：目标图空间 Id（创建作用于该空间，由调用方在提交时使用）。</summary>
+    [Parameter] public string SpaceId { get; set; } = string.Empty;
+
+    /// <summary>打开参数：目标图空间显示名（仅展示用；缺省回退显示 Id）。</summary>
+    [Parameter] public string? SpaceName { get; set; }
 
     private string _name = string.Empty;
     private string? _displayName;

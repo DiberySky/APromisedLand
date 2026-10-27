@@ -1,6 +1,8 @@
-@* EntityTypeEditDialog.razor — 新建 / 编辑实体类型（DialogSky 外壳，与树节点对话框风格一致） *@
+@* EntityTypeEditDialog.razor — 新建 / 编辑实体类型（DialogSky 外壳，紧凑风格对齐 EdgeTypeCreateDialog）。
+   新建时「内部标识」用 NamingTextField（尾部魔棒 → MafWf 命名服务 AI 建议 PascalCase）。 *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
+@using TreeGraph.Blazor.Shared.MafWfSky.Components
 
 <DialogSky Title="@(Editing is null ? "新建实体类型" : "编辑实体类型")"
                SubmitButtonVisible="true"
@@ -22,27 +24,29 @@
                       Label="实体类型名称"
                       Placeholder="请输入中文名称"
                       Variant="Variant.Outlined"
-                      Class="mb-3"
+                      Margin="Margin.Dense"
                       HelperText="@(Editing is null
                           ? "界面上显示的名称，例如：分类树、单位树、订单"
                           : "实体类型在界面上显示的名称")" />
 
-        @* 内部标识（仅新建时可填，用于与树类型名等外部系统对齐） *@
+        @* 内部标识（仅新建时可填，用于与树类型名等外部系统对齐）；魔棒按名称生成 PascalCase 建议 *@
         @if (Editing is null)
         {
-            <MudTextField @bind-Value="_form.EntityType"
-                          Label="内部标识（可选）"
-                          Placeholder="普通使用请留空"
-                          Variant="Variant.Outlined"
-                          Class="mb-3"
-                          HelperText="系统内部使用的英文标识。一般留空即可（自动生成 et_xxx）；仅当要在树节点上挂此类型属性时才需填写：分类树填 CategoryTree，单位树填 UnitTree，知识树填 KnowledgeTree。" />
+            <NamingTextField @bind-Value="_form.EntityType"
+                             SourceText="@_form.DisplayName"
+                             NameCase="pascal"
+                             Label="内部标识"
+                             Placeholder="请输入英文"
+                             Class="mt-3"
+                             HelperText="系统内部使用的英文标识" />
         }
 
         <MudTextField @bind-Value="_form.Description"
                       Label="说明（可选）"
                       Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
                       Lines="2"
-                      Class="mb-3" />
+                      Class="mt-3" />
 
         <NumberInputField T="int"
                           @bind-Value="_form.DisplayOrder"
@@ -81,16 +85,22 @@
             return;
         }
 
+        // 新建时内部标识必填（不再自动生成 et_xxx）
+        if (Editing is null && string.IsNullOrWhiteSpace(_form.EntityType))
+        {
+            Snackbar.Add("内部标识不可为空", Severity.Warning);
+            return;
+        }
+
         _submitting = true;
         try
         {
             if (Editing is null)
             {
-                // 新建：EntityType 为空时服务端自动生成 et_xxxx，否则使用用户指定值
+                // 新建：内部标识必填（对话框已守护），直接 Trim 提交
                 var id = await Api.CreateEntityTypeAsync(new CreateEntityTypeRequest
                 {
-                    EntityType = string.IsNullOrWhiteSpace(_form.EntityType)
-                        ? null : _form.EntityType.Trim(),
+                    EntityType = _form.EntityType.Trim(),
                     DisplayName = _form.DisplayName.Trim(),
                     Description = string.IsNullOrWhiteSpace(_form.Description)
                         ? null : _form.Description,

@@ -11,8 +11,6 @@
 @using TreeGraph.Blazor.Shared.TreeEavSky.Trees.Category
 @using TreeGraph.Blazor.Shared.TreeEavSky.Services
 @using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs
-@using TreeGraph.Blazor.Shared.LineSky.Components
-@using TreeGraph.Blazor.Shared.EdgeSky.Pages
 @using TreeGraph.Shared.TreeEavSky.Entities
 @using TreeGraph.Shared.TreeEavSky.Models
 @inject SpaceApiClient Api
@@ -29,6 +27,11 @@
         font-size: 12px;
         width: 12px;
         height: 12px;
+    }
+
+    /* 仅内嵌 tabs（动态属性 → 实体类型）：选中 tab 的文字用 Info 色 */
+    .spaces-tabs .spaces-tabs .mud-tab.mud-tab-active {
+        color: var(--mud-palette-info) !important;
     }
 </style>
 
@@ -77,17 +80,14 @@
             <MudTabPanel Text="空间维护" Icon="@Icons.Material.Filled.Settings">
                 <SpaceManagePanel OnChanged="LoadAsync" />
             </MudTabPanel>
-            @* 线路：内嵌线路实体维护（列表 + 新建/编辑/删除） *@
-            <MudTabPanel Text="线路" Icon="@Icons.Material.Outlined.LinearScale">
-                <LineManagePanel />
-            </MudTabPanel>
-            @* 动态属性：内嵌实体类型管理（IsDialogMode 隐藏页头，工具栏置于内容顶部） *@
+            @* 动态属性：内嵌实体类型管理（IsDialogMode 隐藏页头，工具栏置于内容顶部）。
+               线路/关系已改为 per-space 入口（空间维护 → 线路设置/关系设置），不再保留全局 tab *@
             <MudTabPanel Text="动态属性" Icon="@Icons.Material.Filled.Category">
-                <EntityTypes IsDialogMode="true" />
-            </MudTabPanel>
-            @* 关系：内嵌边类型管理（IsDialogMode 隐藏页头） *@
-            <MudTabPanel Text="关系" Icon="@Icons.Material.Filled.Hub">
-                <EdgeTypes IsDialogMode="true" />
+                <MudTabs Elevation="0" ApplyEffectsToContainer="true" Class="spaces-tabs mt-2">
+                    <MudTabPanel Text="实体类型" Icon="@Icons.Material.Filled.Category">
+                        <EntityTypes IsDialogMode="true" />
+                    </MudTabPanel>
+                </MudTabs>
             </MudTabPanel>
         </MudTabs>
     </PageContent>

@@ -1,0 +1,286 @@
+@* EdgeTypesDialog.razor — 边类型管理对话框（EdgeSky，对齐 Nebula EdgeType CRUD，图空间级资源）。
+   打开参数 SpaceId/SpaceName：整个维护作用于该空间，不再有空间下拉框。
+   列表 + 新建（对话框）+ 属性 Schema 管理 + 删除（有实例时服务端 409）。 *@
+@inject EdgeApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.EdgeSky.Dialogs
+@using TreeGraph.Blazor.Shared.EdgeSky.Services
+@using TreeGraph.Shared.EdgeSky.Dtos
+
+<DialogSky Title="@($"边类型管理：{SpaceName ?? SpaceId}")"
+           SubmitButtonVisible="false">
+    <DialogContent>
+        @* MudSimpleTable 手动渲染行：支持展开时插入 colspan=4 的通栏属性详情行 *@
+        <MudSimpleTable Hover="true" Bordered="true" Dense="true">
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>注释</th>
+                    <th>属性</th>
+                    <th style="width: 1%; white-space: nowrap; text-align: right;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                       Size="Size.Small" Color="Color.Default"
+                                       OnClick="LoadAsync" Disabled="@_loading"
+                                       title="刷新" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                       Size="Size.Small" Color="Color.Success"
+                                       OnClick="OpenCreateAsync"
+                                       title="新建边类型" />
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (_loading && _types is null)
+                {
+                    <tr>
+                        <td colspan="4" style="text-align: center;">
+                            <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
+                        </td>
+                    </tr>
+                }
+                else if (_types is null || _types.Count == 0)
+                {
+                    <tr>
+                        <td colspan="4" style="text-align: center;">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                当前空间暂无边类型，点击右上角「新建边类型」创建。
+                            </MudText>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var t in _types)
+                    {
+                        <tr>
+                            <td>
+                                <MudText Typo="Typo.body1" Style="white-space: nowrap;">
+                                    @if (string.IsNullOrEmpty(t.DisplayName))
+                                    {
+                                        <code style="color: inherit;">@t.Name</code>
+                                    }
+                                    else
+                                    {
+                                        @t.DisplayName@(" (")<code style="color: inherit;">@t.Name</code>@(")")
+                                    }
+                                </MudText>
+                            </td>
+                            <td>
+                                <MudText Typo="Typo.caption" Color="Color.Default">
+                                    @(string.IsNullOrEmpty(t.Comment) ? "—" : t.Comment)
+                                </MudText>
+                            </td>
+                            <td>
+                                <MudBadge Content="@t.Props.Count" Color="Color.Info"
+                                          Overlap="true" Bordered="true" Max="99">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                                                   Size="Size.Small" Color="Color.Primary"
+                                                   OnClick="@(async () => await OpenPropsAsync(t))"
+                                                   title="管理属性 Schema" />
+                                </MudBadge>
+                            </td>
+                            <td style="white-space: nowrap; text-align: right;">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(async () => await DeleteAsync(t))"
+                                               title="删除" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Size="Size.Small" Color="Color.Primary"
+                                               OnClick="@(async () => await OpenEditDisplayNameAsync(t))"
+                                               title="编辑中文显示名" />
+                                @* 查看：行下方通栏展开/折叠属性详情（只读） *@
+                                <MudIconButton Icon="@(_expanded.Contains(t.Name) ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                               Size="Size.Small" Color="Color.Info"
+                                               OnClick="@(() => ToggleExpand(t.Name))"
+                                               title="@(_expanded.Contains(t.Name) ? "折叠属性详情" : "查看属性详情")" />
+                            </td>
+                        </tr>
+                        @if (_expanded.Contains(t.Name))
+                        {
+                            <tr>
+                                <td colspan="4" style="background: #101010;">
+                                    @if (t.Props.Count == 0)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">（无属性）</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudSimpleTable Dense="true" Style="background: transparent;">
+                                            <thead>
+                                                <tr>
+                                                    <th>属性名</th>
+                                                    <th>类型</th>
+                                                    <th>可空</th>
+                                                    <th>默认值</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var p in t.Props)
+                                                {
+                                                    <tr>
+                                                        <td>
+                                                            @if (string.IsNullOrEmpty(p.DisplayName))
+                                                            {
+                                                                <code style="color: inherit;">@p.PropName</code>
+                                                            }
+                                                            else
+                                                            {
+                                                                @p.DisplayName@(" (")<code style="color: inherit;">@p.PropName</code>@(")")
+                                                            }
+                                                        </td>
+                                                        <td>@EdgePropDataTypeLabels.Of(p.DataType)</td>
+                                                        <td>@(p.Nullable ? "是" : "否")</td>
+                                                        <td>@(p.DefaultValue?.ToString() ?? "—")</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </MudSimpleTable>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                }
+            </tbody>
+        </MudSimpleTable>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>打开参数：目标图空间 Id（整个维护作用于该空间）。</summary>
+    [Parameter] public string SpaceId { get; set; } = string.Empty;
+
+    /// <summary>打开参数：目标图空间显示名（仅标题展示用；缺省回退显示 Id）。</summary>
+    [Parameter] public string? SpaceName { get; set; }
+
+    private List<EdgeTypeDto>? _types;
+    private bool _loading;
+    /// <summary>已展开属性详情的边类型名（查看图标切换，纯 UI 状态）。</summary>
+    private readonly HashSet<string> _expanded = [];
+
+    private void ToggleExpand(string name)
+    {
+        if (!_expanded.Remove(name))
+            _expanded.Add(name);
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _types = await Api.ListEdgeTypesAsync(SpaceId);
+            if (_types is null)
+                Snackbar.Add("边类型加载失败，请检查后端服务是否可达", Severity.Warning);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenPropsAsync(EdgeTypeDto item)
+    {
+        var parameters = new DialogParameters<EdgeTypePropsDialog>
+        {
+            { x => x.TypeInfo, item }
+        };
+        var dialog = await DialogService.ShowExAsync<EdgeTypePropsDialog>(
+            string.Empty, parameters,
+            new DialogOptionsEx
+            {
+                MaxWidth = MaxWidth.Small, FullWidth = true,
+                Position = DialogPosition.TopCenter,
+                MaximizeButton = true
+            });
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not AlterEdgeTypeRequest req)
+            return;
+
+        var (ok, error) = await Api.AlterEdgeTypeAsync(SpaceId, item.Name, req);
+        if (!ok)
+        {
+            Snackbar.Add($"属性变更失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"边类型 '{item.Name}' 属性 Schema 已更新", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        // 打开参数 space 透传：新建作用于当前对话框所在空间
+        var parameters = new DialogParameters<EdgeTypeCreateDialog>
+        {
+            { x => x.SpaceId, SpaceId },
+            { x => x.SpaceName, SpaceName }
+        };
+        var dialog = await DialogService.ShowExAsync<EdgeTypeCreateDialog>(
+            string.Empty, parameters,
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not CreateEdgeTypeRequest req)
+            return;
+
+        var (ok, error) = await Api.CreateEdgeTypeAsync(SpaceId, req);
+        if (!ok)
+        {
+            Snackbar.Add($"创建失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"边类型 '{req.Name}' 创建成功", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task OpenEditDisplayNameAsync(EdgeTypeDto item)
+    {
+        var parameters = new DialogParameters<EdgeTypeDisplayNameDialog>
+        {
+            { x => x.Name, item.Name },
+            { x => x.DisplayName, item.DisplayName }
+        };
+        var dialog = await DialogService.ShowExAsync<EdgeTypeDisplayNameDialog>(
+            string.Empty, parameters,
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+        var result = await dialog.Result;
+        if (result?.Canceled != false)
+            return;
+
+        var (ok, error) = await Api.UpdateDisplayNameAsync(SpaceId, item.Name, result.Data as string);
+        if (!ok)
+        {
+            Snackbar.Add($"更新显示名失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"边类型 '{item.Name}' 显示名已更新", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(EdgeTypeDto item)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "删除边类型",
+            $"确定删除边类型 '{item.Name}' 吗？存在边实例时将被拒绝。",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteEdgeTypeAsync(SpaceId, item.Name);
+        if (!ok)
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"边类型 '{item.Name}' 已删除", Severity.Success);
+        await LoadAsync();
+    }
+}

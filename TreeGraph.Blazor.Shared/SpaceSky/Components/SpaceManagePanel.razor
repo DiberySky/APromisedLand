@@ -6,10 +6,8 @@
 @inject SpaceApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
-@using TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
-@using TreeGraph.Blazor.Shared.NodeEavSky.Services
-@inject EavApiClient EavApi
+@using TreeGraph.Blazor.Shared.EdgeSky.Dialogs
+@using TreeGraph.Blazor.Shared.LineSky.Dialogs
 
 @if (_loading)
 {
@@ -23,7 +21,8 @@ else
         <HeaderContent>
             <MudTh>名称</MudTh>
             <MudTh>类型</MudTh>
-            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">属性设置</MudTh>
+            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">关系设置</MudTh>
+            <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">线路设置</MudTh>
             <MudTh>描述</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">同步刷新</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
@@ -43,13 +42,21 @@ else
         <RowTemplate>
             <MudTd>@context.Name</MudTd>
             <MudTd>@SpaceTypeLabel(context.Type)</MudTd>
-            <MudTd DataLabel="属性设置" Style="white-space: nowrap; text-align: center;">
-                @* 设置图标：打开该空间的实体类型定义对话框（共享 ∪ 本空间独占） *@
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
-                               Color="Color.Success"
+            <MudTd DataLabel="关系设置" Style="white-space: nowrap; text-align: center;">
+                @* 关系图标：打开该空间的边类型维护对话框（EdgeType 为图空间级资源） *@
+                <MudIconButton Icon="@Icons.Material.Filled.Hub"
+                               Color="Color.Warning"
                                Size="Size.Small"
-                               OnClick="@(async () => await OpenEntityTypeDefsAsync(context))"
-                               title="属性设置" />
+                               OnClick="@(async () => await OpenEdgeTypesAsync(context))"
+                               title="关系设置" />
+            </MudTd>
+            <MudTd DataLabel="线路设置" Style="white-space: nowrap; text-align: center;">
+                @* 线路图标：打开该空间的线路维护对话框（Line 为图空间级资源） *@
+                <MudIconButton Icon="@Icons.Material.Outlined.LinearScale"
+                               Color="Color.Tertiary"
+                               Size="Size.Small"
+                               OnClick="@(async () => await OpenLinesAsync(context))"
+                               title="线路设置" />
             </MudTd>
             <MudTd>@context.Description</MudTd>
             <MudTd Style="white-space: nowrap; text-align: center;">
@@ -112,10 +119,14 @@ else
         FullWidth = true
     };
 
-    /// <summary>打开实体类型定义对话框（动态属性入口）。</summary>
-    private async Task OpenEntityTypeDefsAsync(SpaceDto space)
+    /// <summary>打开该空间的边类型维护对话框（关系设置入口：EdgeType 归属于图空间）。</summary>
+    private async Task OpenEdgeTypesAsync(SpaceDto space)
     {
-        var parameters = new DialogParameters<EntityTypeDefinitionsDialog>();
+        var parameters = new DialogParameters<EdgeTypesDialog>
+        {
+            { x => x.SpaceId, space.Id },
+            { x => x.SpaceName, space.Name }
+        };
         var options = new DialogOptionsEx
         {
             Position = DialogPosition.TopCenter,
@@ -123,8 +134,27 @@ else
             FullWidth = true,
             MaximizeButton = true
         };
-        await DialogService.ShowExAsync<EntityTypeDefinitionsDialog>(
-            "实体类型定义", parameters, options);
+        await DialogService.ShowExAsync<EdgeTypesDialog>(
+            string.Empty, parameters, options);
+    }
+
+    /// <summary>打开该空间的线路维护对话框（线路设置入口：Line 归属于图空间）。</summary>
+    private async Task OpenLinesAsync(SpaceDto space)
+    {
+        var parameters = new DialogParameters<LinesDialog>
+        {
+            { x => x.SpaceId, space.Id },
+            { x => x.SpaceName, space.Name }
+        };
+        var options = new DialogOptionsEx
+        {
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true
+        };
+        await DialogService.ShowExAsync<LinesDialog>(
+            string.Empty, parameters, options);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

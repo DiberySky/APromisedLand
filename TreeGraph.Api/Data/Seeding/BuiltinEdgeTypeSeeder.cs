@@ -38,10 +38,14 @@ public static class BuiltinEdgeTypeSeeder
             ])
     ];
 
-    /// <summary>启动时播种：对所有现存空间逐空间幂等播种内置边类型。</summary>
+    /// <summary>启动时播种：对所有 Dynamic 类型空间逐空间幂等播种内置边类型。</summary>
     public static async Task SeedAsync(TreeGraphDbContext db, CancellationToken ct = default)
     {
-        var spaceIds = await db.Spaces.AsNoTracking().Select(s => s.Id).ToListAsync(ct);
+        // line_segment 仅 LineNode 链边使用，只 Dynamic 空间有线路；类型/单位/知识库空间不播种
+        var spaceIds = await db.Spaces.AsNoTracking()
+            .Where(s => s.Type == TreeGraph.Api.SpaceSky.Entities.SpaceType.Dynamic)
+            .Select(s => s.Id)
+            .ToListAsync(ct);
         foreach (var spaceId in spaceIds)
             await SeedForSpaceAsync(db, spaceId, ct);
     }

@@ -174,8 +174,13 @@
     {
         if (_spaceId is null) return;
 
+        var parameters = new DialogParameters<EdgeTypeCreateDialog>
+        {
+            { x => x.SpaceId, _spaceId },
+            { x => x.SpaceName, _spaces?.FirstOrDefault(s => s.Id == _spaceId)?.Name }
+        };
         var dialog = await DialogService.ShowExAsync<EdgeTypeCreateDialog>(
-            string.Empty,
+            string.Empty, parameters,
             new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not CreateEdgeTypeRequest req)

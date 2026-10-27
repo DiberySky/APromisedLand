@@ -187,11 +187,12 @@ public class EavEntityTypesController : ControllerBase
             entityType = GenerateEntityTypeId();
         }
 
-        // 唯一性检查（自动生成时最多重试 3 次防碰撞）
+        // 唯一性检查（自动生成时最多重试 3 次防碰撞）；
+        // 与 DB partial unique 索引 uq_entity_type（is_deleted = false）对齐：软删行不占名
         for (int attempt = 0; attempt < 3; attempt++)
         {
             var exists = await _db.EntityTypes
-                .AnyAsync(t => t.EntityType == entityType, ct);
+                .AnyAsync(t => t.EntityType == entityType && !t.IsDeleted, ct);
             if (!exists) break;
 
             // 客户端显式指定的冲突 → 直接报错，不重试
@@ -210,7 +211,15 @@ public class EavEntityTypesController : ControllerBase
             DisplayOrder = req.DisplayOrder
         };
         _db.EntityTypes.Add(entity);
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // 并发兜底：uq_entity_type 唯一索引冲突（检查与写入之间存在竞态窗口）
+            return Conflict(new { error = $"实体类型已存在: {entityType}" });
+        }
 
         return Ok(new { entity.EntityTypeId, entity.EntityType });
     }
