@@ -3,7 +3,7 @@ using TreeGraph.Shared.NodeEavSky.Dtos;
 namespace TreeGraph.Blazor.Shared.NodeEavSky.Services;
 
 /// <summary>
-/// 实体类型"显示名"解析器。
+/// 属性定义"显示名"解析器。
 ///
 /// 缓存 EntityType → DisplayName 映射。
 /// UI 中只显示 DisplayName（中文），EntityType（英文标识）仅用于 URL / API。

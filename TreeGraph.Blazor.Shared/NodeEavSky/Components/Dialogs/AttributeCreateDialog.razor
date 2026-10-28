@@ -9,29 +9,29 @@
            SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="CreateAsync">
-    @* 锁定模式下把实体类型固定展示在标题栏下方工具栏（静态值，创建时确定） *@
+    @* 锁定模式下把属性定义固定展示在标题栏下方工具栏（静态值，创建时确定） *@
     <ToolBarContent>
         @if (IsEntityTypeLocked)
         {
-            <MudText Typo="Typo.body2">实体类型：@EntityTypeDisplay</MudText>
+            <MudText Typo="Typo.body2">属性定义：@EntityTypeDisplay</MudText>
         }
         else
         {
-            <MudText Typo="Typo.body2" Class="mud-text-secondary">可在下方切换实体类型</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">可在下方切换属性定义</MudText>
         }
     </ToolBarContent>
     <DialogContent>
-        @* 未锁定实体类型时才能在表单内切换；锁定后仅工具栏展示 *@
+        @* 未锁定属性定义时才能在表单内切换；锁定后仅工具栏展示 *@
         @if (!IsEntityTypeLocked)
         {
             <MudSelect T="string"
                        Value="_createForm.EntityType"
                        ValueChanged="@(v => _createForm.EntityType = v)"
-                       Label="实体类型"
+                       Label="属性定义"
                        Variant="Variant.Outlined"
                        Margin="Margin.Dense"
                        Class="mb-3"
-                       HelperText="如需新类型，请先到「实体类型管理」创建">
+                       HelperText="如需新类型，请先到「属性定义管理」创建">
                 @foreach (var et in EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
                 {
                     <MudSelectItem T="string" Value="@et.EntityType">
@@ -201,9 +201,9 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    /// <summary>初始实体类型（页面当前选中项）。</summary>
+    /// <summary>初始属性定义（页面当前选中项）。</summary>
     [Parameter] public string? EntityType { get; set; }
-    /// <summary>是否锁定实体类型（锁定时禁止切换，强制使用 EntityType）。</summary>
+    /// <summary>是否锁定属性定义（锁定时禁止切换，强制使用 EntityType）。</summary>
     [Parameter] public bool IsEntityTypeLocked { get; set; }
     /// <summary>新建模式下的初始显示顺序（现有属性数 + 1）。</summary>
     [Parameter] public int InitialDisplayOrder { get; set; }
@@ -293,7 +293,7 @@
             ? et.EntityType
             : et.DisplayName;
 
-    /// <summary>锁定实体类型的展示名（优先中文显示名，缺失回退内部标识）。</summary>
+    /// <summary>锁定属性定义的展示名（优先中文显示名，缺失回退内部标识）。</summary>
     private string EntityTypeDisplay =>
         (EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
             .FirstOrDefault(et => et.EntityType == EntityType) is { } match
@@ -320,7 +320,7 @@
         if (string.IsNullOrWhiteSpace(f.EntityType) ||
             string.IsNullOrWhiteSpace(f.DisplayName))
         {
-            Snackbar.Add("请填写实体类型、显示名", Severity.Warning);
+            Snackbar.Add("请填写属性定义、显示名", Severity.Warning);
             return;
         }
         if (f.DataType == "composite" && f.RefCompositeTypeId is null)

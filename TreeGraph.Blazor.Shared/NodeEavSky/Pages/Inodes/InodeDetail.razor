@@ -56,7 +56,7 @@ else if (_cards is null || _cards.Count == 0)
     <EmptyStateSky Icon="@Icons.Material.Filled.Inbox"
                    Title="该 iNode 尚未声明任何类型">
         <Description>
-            <text>点击下方按钮，为该 iNode 声明它会使用的实体类型</text>
+            <text>点击下方按钮，为该 iNode 声明它会使用的属性定义</text>
         </Description>
         <Action>
             <MudButton Variant="Variant.Filled" Color="Color.Success"
@@ -234,7 +234,7 @@ else
             <EmptyStateSky Icon="@Icons.Material.Filled.DataObject"
                            Title="暂无数据">
                 <Description>
-                    <text>可能 iNode 下没有任何实体。</text>
+                    <text>可能 iNode 下没有任何属性数据。</text>
                 </Description>
             </EmptyStateSky>
         }
@@ -432,7 +432,7 @@ else
     {
         if (card.HasEntity)
         {
-            Snackbar.Add("该类型下已有实体，请先删除实体", Severity.Warning);
+            Snackbar.Add("该类型下已有属性数据，请先删除属性数据", Severity.Warning);
             return;
         }
 
@@ -460,7 +460,7 @@ else
         StateHasChanged();
     }
 
-    /// <summary>实体转移（换宿主）：语义搜索选目标宿主 → 调用转移端点 → 刷新。</summary>
+    /// <summary>属性数据转移（换宿主）：语义搜索选目标宿主 → 调用转移端点 → 刷新。</summary>
     private async Task TransferAsync(InodeTypeCardDto card)
     {
         if (!card.HasEntity) return;

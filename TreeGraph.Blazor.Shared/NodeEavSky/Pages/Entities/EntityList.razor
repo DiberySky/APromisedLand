@@ -10,9 +10,9 @@
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
 
-<PageTitle>@GetDisplayTitle() 实体列表</PageTitle>
+<PageTitle>@GetDisplayTitle() 属性数据列表</PageTitle>
 
-<PageHeaderSky Title="@($"{GetDisplayTitle()} 实体")"
+<PageHeaderSky Title="@($"{GetDisplayTitle()} 属性数据")"
                ArrowBackVisible="true"
                OnArrowBackClick="BackToHome">
     <Actions>
@@ -27,7 +27,7 @@
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="CreateNew"
                    Disabled="@_loading">
-            新建实体
+            新建属性数据
         </MudButton>
     </Actions>
 </PageHeaderSky>
@@ -43,7 +43,7 @@
 @if (_result is not null)
 {
     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-        共 <b>@_result.Total</b> 个实体，第 @_result.Page / @TotalPages 页
+        共 <b>@_result.Total</b> 个属性数据，第 @_result.Page / @TotalPages 页
     </MudText>
 }
 
@@ -83,7 +83,7 @@
     </RowTemplate>
     <NoRecordsContent>
         <EmptyStateSky Icon="@Icons.Material.Filled.Inbox"
-                       Title="@(_result is null ? "加载失败" : "未找到实体")">
+                       Title="@(_result is null ? "加载失败" : "未找到属性数据")">
             @if (_result is not null && _result.Items.Count == 0)
             {
                 @if (_filters.Count > 0)
@@ -92,7 +92,7 @@
                 }
                 else
                 {
-                    <text>点击"新建实体"创建第一个</text>
+                    <text>点击"新建属性数据"创建第一个</text>
                 }
             }
             else
@@ -220,7 +220,7 @@
     }
 
     /// <summary>
-    /// 行 MoreHoriz → 打开 EntityRowActionsDialog，聚合该实体的全部操作。
+    /// 行 MoreHoriz → 打开 EntityRowActionsDialog，聚合该属性数据的全部操作。
     /// 对齐 DiberyTree TreeNodeActionsDialog 模式。
     /// </summary>
     private async Task ShowRowActionsAsync(DynamicEntityDto item)
@@ -265,7 +265,7 @@
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除实体 {EntityType}/{entityId} 及其所有属性值和子表数据吗？\n\n" +
+            $"确定删除属性数据 {EntityType}/{entityId} 及其所有属性值和子表数据吗？\n\n" +
             "此操作不可撤销。",
             yesText: "永久删除", cancelText: "取消");
 

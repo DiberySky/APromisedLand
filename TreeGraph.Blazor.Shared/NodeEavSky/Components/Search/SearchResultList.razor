@@ -31,7 +31,7 @@
                                     @if (item.MatchKind == "Entity")
                                     {
                                         <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled">
-                                            实体命中@(string.IsNullOrEmpty(item.EntityType) ? "" : $"：{item.EntityType}")
+                                            属性数据命中@(string.IsNullOrEmpty(item.EntityType) ? "" : $"：{item.EntityType}")
                                         </MudChip>
                                     }
                                     else

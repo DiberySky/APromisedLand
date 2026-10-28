@@ -8,7 +8,7 @@
 @inject EavApiClient EavApi
 
 <VectorReconcileDialog Title="@($"向量刷新 · {Space.Name}")"
-                       RunningText="@($"正在整理「{Space.Name}」空间范围的节点与实体数据，使语义搜索能立即检索到它们…")"
+                       RunningText="@($"正在整理「{Space.Name}」空间范围的节点与属性数据，使语义搜索能立即检索到它们…")"
                        RunAsync="@((onEvent, ct) => EavApi.StreamReconcileAsync(spaceId: Space.Id, onEvent: onEvent, ct: ct))" />
 
 @code {

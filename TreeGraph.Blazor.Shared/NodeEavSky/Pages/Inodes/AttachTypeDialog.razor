@@ -1,4 +1,4 @@
-@* AttachTypeDialog.razor — 为 iNode 声明新实体类型（DialogSky 外壳） *@
+@* AttachTypeDialog.razor — 为 iNode 声明新属性定义（DialogSky 外壳） *@
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @namespace TreeGraph.Blazor.Shared.NodeEavSky.Pages.Inodes
@@ -14,13 +14,13 @@
         }
         else if (AvailableTypes.Count == 0)
         {
-            <MudAlert Severity="Severity.Info">所有实体类型均已声明</MudAlert>
+            <MudAlert Severity="Severity.Info">所有属性定义均已声明</MudAlert>
         }
         else
         {
             <MudSelect T="string"
                        @bind-Value="_selected"
-                       Label="实体类型"
+                       Label="属性定义"
                        Variant="Variant.Outlined">
                 @foreach (var t in AvailableTypes)
                 {
@@ -38,7 +38,7 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    /// <summary>可选实体类型；null 表示仍在加载。</summary>
+    /// <summary>可选属性定义；null 表示仍在加载。</summary>
     [Parameter] public IReadOnlyList<EntityTypeSummaryDto>? AvailableTypes { get; set; }
 
     private string? _selected;

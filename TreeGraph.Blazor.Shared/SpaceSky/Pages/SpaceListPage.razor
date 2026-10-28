@@ -29,7 +29,7 @@
         height: 12px;
     }
 
-    /* 仅内嵌 tabs（动态属性 → 实体类型）：选中 tab 的文字用 Info 色 */
+    /* 仅内嵌 tabs（节点属性 → 属性定义）：选中 tab 的文字用 Info 色 */
     .spaces-tabs .spaces-tabs .mud-tab.mud-tab-active {
         color: var(--mud-palette-info) !important;
     }
@@ -80,11 +80,11 @@
             <MudTabPanel Text="空间维护" Icon="@Icons.Material.Filled.Settings">
                 <SpaceManagePanel OnChanged="LoadAsync" />
             </MudTabPanel>
-            @* 动态属性：内嵌实体类型管理（IsDialogMode 隐藏页头，工具栏置于内容顶部）。
+            @* 节点属性：内嵌属性定义管理（IsDialogMode 隐藏页头，工具栏置于内容顶部）。
                线路/关系已改为 per-space 入口（空间维护 → 线路设置/关系设置），不再保留全局 tab *@
-            <MudTabPanel Text="动态属性" Icon="@Icons.Material.Filled.Category">
+            <MudTabPanel Text="节点属性" Icon="@Icons.Material.Filled.Category">
                 <MudTabs Elevation="0" ApplyEffectsToContainer="true" Class="spaces-tabs mt-2">
-                    <MudTabPanel Text="实体类型" Icon="@Icons.Material.Filled.Category">
+                    <MudTabPanel Text="属性定义" Icon="@Icons.Material.Filled.Category">
                         <EntityTypes IsDialogMode="true" />
                     </MudTabPanel>
                     <MudTabPanel Text="组合定义" Icon="@Icons.Material.Filled.AccountTree">

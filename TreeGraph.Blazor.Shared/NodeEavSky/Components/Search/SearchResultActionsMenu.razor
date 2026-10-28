@@ -1,7 +1,7 @@
 @* SearchResultActionsMenu.razor — 语义搜索结果行的节点操作入口（行内图标直开宿主操作对话框）。
    维护图标（⋯）：按 HostType 直开对应宿主操作对话框——树宿主 → 物化节点后开 TreeNodeActionsDialog
    + 共享编排循环（TreeNodeActionOrchestrator）；LineNode → LineNodeActionsDialog 连续操作循环；
-   裸节点/实体命中 → 属性对话框。
+   裸节点/属性数据命中 → 属性对话框。
    树定位/AI 综合为独立行内图标（页面级能力，由页面回调处理）。 *@
 @namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Search
 @using Microsoft.Extensions.DependencyInjection
@@ -75,7 +75,7 @@
             }
         }
 
-        // 裸节点（TreeNode）/ 实体命中：属性对话框直开
+        // 裸节点（TreeNode）/ 属性数据命中：属性对话框直开
         return AttributesAsync();
     }
 

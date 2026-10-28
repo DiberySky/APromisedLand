@@ -1,10 +1,10 @@
-@* EntityRowActionsDialog.razor — 实体行操作对话框（对齐 DiberyTree TreeNodeActionsDialog 模式）
-   DialogSky 外壳 + 只读实体摘要 + 左侧删除 + 右侧编辑/复制ID/历史。
+@* EntityRowActionsDialog.razor — 属性数据行操作对话框（对齐 DiberyTree TreeNodeActionsDialog 模式）
+   DialogSky 外壳 + 只读属性数据摘要 + 左侧删除 + 右侧编辑/复制ID/历史。
    关闭时回传 EntityRowAction 枚举。 *@
 @namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 @using TreeGraph.Shared.NodeEavSky.Dtos
 
-<DialogSky Title="实体操作"
+<DialogSky Title="属性数据操作"
                SubmitButtonVisible="false" CancelButtonVisible="true">
     <ToolBarContent>
         <MudText Color="Color.Info">@EntityTypeDisplayName</MudText>

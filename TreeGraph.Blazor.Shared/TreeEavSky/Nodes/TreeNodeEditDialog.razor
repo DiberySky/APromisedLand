@@ -94,7 +94,7 @@
         MudDialog?.Close(DialogResult.Cancel());
     }
 
-    /// <summary>打开元数据维护对话框（通用模式，不锁定实体类型）。</summary>
+    /// <summary>打开元数据维护对话框（通用模式，不锁定属性定义）。</summary>
     private async Task OpenAttributesManageAsync()
     {
         var parameters = new DialogParameters<AttributesManageDialog>

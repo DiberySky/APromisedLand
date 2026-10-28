@@ -1,23 +1,23 @@
-@* EntityTypeEditDialog.razor — 新建 / 编辑实体类型（DialogSky 外壳，紧凑风格对齐 EdgeTypeCreateDialog）。
+@* EntityTypeEditDialog.razor — 新建 / 编辑属性定义（DialogSky 外壳，紧凑风格对齐 EdgeTypeCreateDialog）。
    新建时「内部标识」用 NamingTextField（尾部魔棒 → MafWf 命名服务 AI 建议 PascalCase）。 *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @using TreeGraph.Blazor.Shared.MafWfSky.Components
 
-<DialogSky Title="@(Editing is null ? "新建实体类型" : "编辑实体类型")"
+<DialogSky Title="@(Editing is null ? "新建属性定义" : "编辑属性定义")"
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="SaveAsync">
     <DialogContent>
         <MudTextField @bind-Value="_form.DisplayName"
-                      Label="实体类型名称"
+                      Label="属性定义名称"
                       Placeholder="请输入中文名称"
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
                       HelperText="@(Editing is null
                           ? "界面上显示的名称，例如：分类树、单位树、订单"
-                          : "实体类型在界面上显示的名称")" />
+                          : "属性定义在界面上显示的名称")" />
 
         @* 内部标识：编辑时只读展示完整值，新建时用 NamingTextField（魔棒按名称生成 PascalCase 建议） *@
         @if (Editing is not null)

@@ -1,6 +1,6 @@
 @* NodeEntityTypeSection.razor
-   节点已关注的单个实体类型属性区块。
-   读写走 iNode 实体端点 /api/inode/{inodeId}/entities/{entityType}，
+   节点已关注的单个属性定义属性区块。
+   读写走 iNode 属性数据端点 /api/inode/{inodeId}/entities/{entityType}，
    EntityId 由服务端首次保存时生成并映射，组件不关心其具体值。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 
@@ -49,7 +49,7 @@
         else if (_schema is null || _schema.Count == 0)
         {
             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                该实体类型暂无属性定义，可通过「管理属性定义」创建。
+                该属性定义暂无属性定义，可通过「管理属性定义」创建。
             </MudText>
         }
         else
@@ -67,7 +67,7 @@
             @if (!ReadOnly)
             {
                 <MudStack Row Class="pb-3" Justify="Justify.SpaceBetween">
-                    <MudTooltip Text="删除该实体数据">
+                    <MudTooltip Text="删除该属性数据">
                         <MudIconButton Icon="@Icons.Material.Filled.DeleteForever"
                                        Size="Size.Small"
                                        Color="Color.Error"
@@ -90,10 +90,10 @@
     /// <summary>宿主节点 ID（iNode Id）。</summary>
     [Parameter, EditorRequired] public string InodeId { get; set; } = default!;
 
-    /// <summary>本区块对应的实体类型名。</summary>
+    /// <summary>本区块对应的属性定义名。</summary>
     [Parameter, EditorRequired] public string EntityType { get; set; } = default!;
 
-    /// <summary>实体类型显示名。</summary>
+    /// <summary>属性定义显示名。</summary>
     [Parameter] public string? DisplayName { get; set; }
 
     /// <summary>只读模式（节点操作对话框用）。</summary>
@@ -105,10 +105,10 @@
     /// <summary>请求取消关注（由父组件弹确认框并调 API）。</summary>
     [Parameter] public EventCallback OnDetachRequested { get; set; }
 
-    /// <summary>实体数据删除后通知父组件（用于同步绑定表状态）。</summary>
+    /// <summary>属性数据删除后通知父组件（用于同步绑定表状态）。</summary>
     [Parameter] public EventCallback<string> OnDataDeleted { get; set; }
 
-    /// <summary>首次创建实体后通知父组件（用于同步绑定表 HasEntity=true）。</summary>
+    /// <summary>首次创建属性数据后通知父组件（用于同步绑定表 HasEntity=true）。</summary>
     [Parameter] public EventCallback<string> OnDataSaved { get; set; }
 
     private DynamicForm? _form;
@@ -120,7 +120,7 @@
     private bool _hasEntity;
     private bool _lastSubmitOk = true;
 
-    // 已取到实体值、等待表单渲染完成后灌入（@ref 要到渲染后才可用）
+    // 已取到属性数据、等待表单渲染完成后灌入（@ref 要到渲染后才可用）
     private bool _pendingLoad;
 
     protected override Task OnInitializedAsync()
@@ -148,7 +148,7 @@
         await Task.CompletedTask;
     }
 
-    /// <summary>重新加载本类型的 Schema 与实体值。</summary>
+    /// <summary>重新加载本类型的 Schema 与属性数据。</summary>
     public async Task ReloadAsync()
     {
         try
@@ -225,7 +225,7 @@
     {
         var confirm = await Message.DeleteBox(
             $"确定删除【{DisplayName ?? EntityType}】的所有属性数据？此操作不可恢复。",
-            "删除实体数据");
+            "删除属性数据");
         if (!confirm) return;
 
         try
@@ -233,7 +233,7 @@
             var (ok, error) = await EavApi.DeleteInodeEntityAsync(InodeId, EntityType);
             if (ok)
             {
-                Message.Success("实体数据已删除");
+                Message.Success("属性数据已删除");
                 // 重置本地状态：清空表单 + 标记未填写
                 _entity = null;
                 _hasEntity = false;

@@ -30,7 +30,7 @@
     @if (string.IsNullOrEmpty(EntityId))
     {
         <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
-            请先保存实体，然后再维护 @Attr.DisplayName 数据
+            请先保存属性数据，然后再维护 @Attr.DisplayName 数据
         </MudAlert>
     }
     else if (Attr.RefTableDefinitionId is null)

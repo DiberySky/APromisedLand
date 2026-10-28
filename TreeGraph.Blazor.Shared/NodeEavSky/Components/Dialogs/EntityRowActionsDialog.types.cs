@@ -1,6 +1,6 @@
 namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs;
 
-/// <summary>实体行操作类型。调用方根据返回值决定后续行为。</summary>
+/// <summary>属性数据行操作类型。调用方根据返回值决定后续行为。</summary>
 public enum EntityRowAction
 {
     Edit,

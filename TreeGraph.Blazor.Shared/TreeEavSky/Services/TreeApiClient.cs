@@ -18,14 +18,14 @@ public class TreeApiClient<T>(HttpClient httpClient)
     /// <summary>
     /// URL 前缀。优先读类型上的 <see cref="TreeRouteAttribute"/>；
     /// 未标注则回退到 typeof(T).Name（与后端 [Route("[controller]")] 约定一致）。
-    /// 同时作为 EAV 实体类型名。
+    /// 同时作为 EAV 属性定义名。
     /// </summary>
     // 例如标注 [TreeRoute("UnitTree")] 或未标注时回退 "UnitTree"
     private readonly string _basePath =
         typeof(T).GetCustomAttribute<TreeRouteAttribute>()?.Route
         ?? typeof(T).Name;
 
-    /// <summary>EAV 实体类型名（与 _basePath 同源）。</summary>
+    /// <summary>EAV 属性定义名（与 _basePath 同源）。</summary>
     public string EntityType => _basePath;
 
     // ==================== 辅助方法 ====================

@@ -1,4 +1,4 @@
-@* EntityTypes.razor — 实体类型管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/EntityTypeEditDialog.razor）
+@* EntityTypes.razor — 属性定义管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/EntityTypeEditDialog.razor）
    支持对话框模式：IsDialogMode=true 时隐藏 PageHeaderSky，新建按钮移至内容区顶部。 *@
 @page "/metadata/entity-types"
 @inject EavApiClient Api
@@ -11,9 +11,9 @@
 
 @if (!IsDialogMode)
 {
-    <PageTitle>实体类型管理</PageTitle>
+    <PageTitle>属性定义管理</PageTitle>
 
-    <PageHeaderSky Title="实体类型管理">
+    <PageHeaderSky Title="属性定义管理">
         <Actions>
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Small"
@@ -26,7 +26,7 @@
                        OnClick="OpenCreateAsync"
                        StartIcon="@Icons.Material.Filled.Add"
                        Class="ml-2">
-                新建实体类型
+                新建属性定义
             </MudButton>
         </Actions>
     </PageHeaderSky>
@@ -54,7 +54,7 @@ else
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="OpenCreateAsync"
-                               title="新建实体类型" />
+                               title="新建属性定义" />
             }
             else
             {
@@ -133,7 +133,7 @@ else
                             var attrs = GetAttrs(context.EntityTypeId);
                             if (attrs.Count == 0)
                             {
-                                <MudAlert Severity="Severity.Info" Dense="true">该实体类型暂无属性</MudAlert>
+                                <MudAlert Severity="Severity.Info" Dense="true">该属性定义暂无属性</MudAlert>
                             }
                             else
                             {
@@ -188,7 +188,7 @@ else
     </ChildRowContent>
     <NoRecordsContent>
         <EmptyStateSky Icon="@Icons.Material.Filled.Category"
-                       Title="暂无实体类型">
+                       Title="暂无属性定义">
             <Description>
                 <text>点击右上角 + 创建第一个</text>
             </Description>
@@ -206,10 +206,10 @@ else
     /// <summary>排序提交中：期间禁用全部箭头，避免并发交换。</summary>
     private bool _moving;
 
-    /// <summary>已展开行的实体类型 ID（key 用持久 ID 而非可变 EntityType 标识）。</summary>
+    /// <summary>已展开行的属性定义 ID（key 用持久 ID 而非可变 EntityType 标识）。</summary>
     private readonly HashSet<string> _expandedIds = new();
 
-    /// <summary>实体类型 ID → 该类型的属性列表（惰性加载缓存）。</summary>
+    /// <summary>属性定义 ID → 该类型的属性列表（惰性加载缓存）。</summary>
     private readonly Dictionary<string, IReadOnlyList<AttributeDetailDto>> _attrsCache = new();
 
     /// <summary>属性列表拉取中（展开行显示 loading）。</summary>
@@ -366,7 +366,7 @@ else
         await LoadAsync();
     }
 
-    /// <summary>打开独立属性定义对话框并锁定该实体类型。</summary>
+    /// <summary>打开独立属性定义对话框并锁定该属性定义。</summary>
     private async Task OpenAttributesAsync(EntityTypeDetailDto dto)
     {
         var parameters = new DialogParameters<AttributeDefinitionsDialog>
@@ -396,7 +396,7 @@ else
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除实体类型「{dto.DisplayName}」？删除后不可恢复。\n\n" +
+            $"确定删除属性定义「{dto.DisplayName}」？删除后不可恢复。\n\n" +
             "· 仍有活动属性时将被拒绝。",
             yesText: "删除", cancelText: "取消");
 

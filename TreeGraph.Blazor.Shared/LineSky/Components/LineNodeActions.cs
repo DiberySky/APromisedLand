@@ -126,7 +126,7 @@ public static class LineNodeActions
         return result is { Canceled: false };
     }
 
-    /// <summary>删除（守卫链：段边/端子/属性/实体引用 → 409 透出）。</summary>
+    /// <summary>删除（守卫链：段边/端子/属性/属性数据引用 → 409 透出）。</summary>
     public static async Task<bool> DeleteAsync(IDialogService dialogService, LineNodeDto node)
     {
         var parameters = new DialogParameters<LineNodeDeleteDialog>

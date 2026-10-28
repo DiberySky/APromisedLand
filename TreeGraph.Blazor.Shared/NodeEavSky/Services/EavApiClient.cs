@@ -8,7 +8,7 @@ namespace TreeGraph.Blazor.Shared.NodeEavSky.Services;
 /// <summary>
 /// TreeGraphEavApi 客户端。
 ///
-/// ★ 所有实体 ID / 元数据 ID 均为 GUID 字符串（36 字符）。
+/// ★ 所有属性数据 ID / 元数据 ID 均为 GUID 字符串（36 字符）。
 /// </summary>
 public class EavApiClient
 {
@@ -96,7 +96,7 @@ public class EavApiClient
                 }
 
                 return (false,
-                    "并发冲突：实体已被其他用户修改，请刷新后重试",
+                    "并发冲突：数据已被其他用户修改，请刷新后重试",
                     currentUpdatedAt);
             }
 
@@ -149,7 +149,7 @@ public class EavApiClient
                 catch { }
 
                 return (false,
-                    "并发冲突：实体已被其他用户修改，请刷新后重试",
+                    "并发冲突：数据已被其他用户修改，请刷新后重试",
                     currentUpdatedAt);
             }
 
@@ -377,14 +377,14 @@ public class EavApiClient
         string id, CancellationToken ct = default)
         => GetAsync<AttributeDetailDto>($"api/eav/metadata/attributes/{id}", ct);
 
-    /// <summary>实体类型摘要列表（全局共享）。</summary>
+    /// <summary>属性定义摘要列表（全局共享）。</summary>
     public async Task<IReadOnlyList<EntityTypeSummaryDto>?> ListEntityTypesAsync(
         CancellationToken ct = default)
         => await GetAsync<IReadOnlyList<EntityTypeSummaryDto>>(
             "api/eav/entity-types", ct);
 
     /// <summary>
-    /// 一次拉取所有实体类型详情（含属性计数）。
+    /// 一次拉取所有属性定义详情（含属性计数）。
     /// 替代"ListEntityTypesAsync + N 次 GetEntityTypeAsync"的 N+1 模式。
     /// </summary>
     public async Task<IReadOnlyList<EntityTypeDetailDto>?> ListEntityTypeDetailsAsync(
@@ -396,7 +396,7 @@ public class EavApiClient
     }
 
     // ============================================================
-    // 实体类型 CRUD
+    // 属性定义 CRUD
     // ============================================================
 
     public Task<string?> CreateEntityTypeAsync(
@@ -931,7 +931,7 @@ public class EavApiClient
             $"{Uri.EscapeDataString(entityType)}", ct);
 
     // ============================================================
-    // ★ iNode 实体 CRUD
+    // ★ iNode 属性数据 CRUD
     // ============================================================
 
     public async Task<IReadOnlyList<DynamicEntityDto>?> ListInodeEntitiesAsync(
@@ -980,7 +980,7 @@ public class EavApiClient
             $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
             $"{Uri.EscapeDataString(entityType)}", ct);
 
-    /// <summary>实体转移（换宿主）：把该 iNode 下指定类型的实体改挂到目标宿主。</summary>
+    /// <summary>属性数据转移（换宿主）：把该 iNode 下指定类型的属性数据改挂到目标宿主。</summary>
     public async Task<(bool Ok, string? Error)> TransferInodeEntityAsync(
         string inodeId, string entityType, string targetInodeId,
         CancellationToken ct = default)
@@ -1030,7 +1030,7 @@ public class EavApiClient
     // ============================================================
 
     /// <summary>
-    /// 拉取该 iNode 下所有实体的全景 JSON（字符串形式）。
+    /// 拉取该 iNode 下所有属性数据的全景 JSON（字符串形式）。
     ///
     /// 用途：外部应用 / 缓存 / 转发第三方。
     ///
@@ -1158,7 +1158,7 @@ public class EavApiClient
                 }
                 catch { }
 
-                return (false, "并发冲突：实体已被其他用户修改，请刷新后重试", current);
+                return (false, "并发冲突：数据已被其他用户修改，请刷新后重试", current);
             }
 
             var msg = await ExtractErrorAsync(resp, ct);
@@ -1206,7 +1206,7 @@ public class EavApiClient
                 }
                 catch { }
 
-                return (false, "并发冲突：实体已被其他用户修改，请刷新后重试", current);
+                return (false, "并发冲突：数据已被其他用户修改，请刷新后重试", current);
             }
 
             var msg = await ExtractErrorAsync(resp, ct);

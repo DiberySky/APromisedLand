@@ -28,7 +28,7 @@
                               Value="@(Node.CreatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")"
                               Label="创建时间" Variant="Variant.Outlined" ReadOnly="true" />
 
-                @* 属性区：仅展示本节点已关注实体类型的属性（只读） *@
+                @* 属性区：仅展示本节点已关注属性定义的属性（只读） *@
                 <NodeAttributeItemsSky NodeId="@Node.Id" ReadOnly="true" />
             </MudStack>
         </MudContainer>

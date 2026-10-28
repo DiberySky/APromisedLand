@@ -37,7 +37,7 @@
                 </MudText>
                 <MudSimpleTable Hover="false" Dense="true" Bordered="true">
                     <tbody>
-                        <tr><td>期望集合（PG 活跃节点 + 实体）</td><td align="right">@_result.Active</td></tr>
+                        <tr><td>期望集合（PG 活跃节点 + 属性数据）</td><td align="right">@_result.Active</td></tr>
                         <tr><td>已存向量（Qdrant）</td><td align="right">@_result.Existing</td></tr>
                         <tr><td>缺失（本轮补算）</td><td align="right">@_result.Missing</td></tr>
                         <tr><td>孤儿（本轮清理）</td><td align="right">@_result.Orphaned</td></tr>

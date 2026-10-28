@@ -9,9 +9,9 @@
            SubmitButtonDisabled="@_submitting"
            ActionsMaxWidth="MaxWidth.False"
            OnSubmitClick="UpdateAsync">
-    @* 与「新建属性」一致：实体类型固定展示在标题栏下方工具栏（编辑期间不变） *@
+    @* 与「新建属性」一致：属性定义固定展示在标题栏下方工具栏（编辑期间不变） *@
     <ToolBarContent>
-        <MudText Typo="Typo.body2">实体类型：@EntityTypeDisplay</MudText>
+        <MudText Typo="Typo.body2">属性定义：@EntityTypeDisplay</MudText>
     </ToolBarContent>
     <DialogContent>
         <MudTextField @bind-Value="_editForm.DisplayName"
@@ -196,7 +196,7 @@
 
     /// <summary>编辑目标（页面已通过 GetAttributeAsync 取详情）。</summary>
     [Parameter] public AttributeDetailDto? Attribute { get; set; }
-    /// <summary>实体类型列表（用于工具栏展示中文显示名，缺失时回退内部标识）。</summary>
+    /// <summary>属性定义列表（用于工具栏展示中文显示名，缺失时回退内部标识）。</summary>
     [Parameter] public IReadOnlyList<EntityTypeSummaryDto>? EntityTypes { get; set; }
     [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
     [Parameter] public IReadOnlyList<CustomTableDetailDto>? CustomTables { get; set; }
@@ -244,7 +244,7 @@
         _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
     };
 
-    /// <summary>实体类型展示名（优先中文显示名，缺失回退内部标识）。</summary>
+    /// <summary>属性定义展示名（优先中文显示名，缺失回退内部标识）。</summary>
     private string EntityTypeDisplay
     {
         get

@@ -19,7 +19,7 @@
                 <Attributes EntityType="@EntityType"
                             OnAttributesChanged="@OnAttributesChanged" />
             </MudTabPanel>
-            <MudTabPanel Text="实体类型" Icon="@Icons.Material.Filled.Category">
+            <MudTabPanel Text="属性定义" Icon="@Icons.Material.Filled.Category">
                 <EntityTypes IsDialogMode="true" />
             </MudTabPanel>
             <MudTabPanel Text="组合类型" Icon="@Icons.Material.Filled.ViewModule">
@@ -38,7 +38,7 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    /// <summary>锁定的实体类型；为空时对话框内可切换实体类型（通用模式）。</summary>
+    /// <summary>锁定的属性定义；为空时对话框内可切换属性定义（通用模式）。</summary>
     [Parameter] public string? EntityType { get; set; }
 
     /// <summary>属性变更回调。</summary>

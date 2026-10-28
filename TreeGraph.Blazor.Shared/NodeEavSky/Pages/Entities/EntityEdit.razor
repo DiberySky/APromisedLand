@@ -33,7 +33,7 @@
 else if (_schema is null || _schema.Count == 0)
 {
     <MudAlert Severity="Severity.Warning">
-        实体类型 @EntityType 没有属性定义。请先打开「属性定义管理」为该类型配置属性。
+        属性定义 @EntityType 没有属性定义。请先打开「属性定义管理」为该类型配置属性。
     </MudAlert>
 }
 else
@@ -105,7 +105,7 @@ else
                 <MudMenuItem Icon="@Icons.Material.Filled.DeleteForever"
                              OnClick="DeleteEntityAsync"
                              Disabled="@_saving">
-                    删除实体
+                    删除属性数据
                 </MudMenuItem>
             </MudMenu>
         }
@@ -125,7 +125,7 @@ else
                        OnClick="DeleteEntityAsync"
                        StartIcon="@Icons.Material.Filled.DeleteForever"
                        Disabled="@_saving">
-                删除实体
+                删除属性数据
             </MudButton>
         }
     </MudToolBar>
@@ -330,7 +330,7 @@ else
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认清空",
-            $"确定清空实体 {EntityType}/{EntityId} 的所有属性吗？此操作不可撤销。",
+            $"确定清空属性数据 {EntityType}/{EntityId} 的所有属性吗？此操作不可撤销。",
             yesText: "清空", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -538,13 +538,13 @@ else
         };
     }
 
-    // ---------- 删除实体 ----------
+    // ---------- 删除属性数据 ----------
 
     private async Task DeleteEntityAsync()
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
-            "确认删除实体",
-            $"确定删除实体 {EntityType}/{EntityId} 及其所有属性值和子表数据吗？\n\n" +
+            "确认删除属性数据",
+            $"确定删除属性数据 {EntityType}/{EntityId} 及其所有属性值和子表数据吗？\n\n" +
             "此操作不可撤销。审计历史保留。",
             yesText: "永久删除", cancelText: "取消");
 
@@ -560,7 +560,7 @@ else
                 return;
             }
 
-            Snackbar.Add("实体已删除", Severity.Success);
+            Snackbar.Add("属性数据已删除", Severity.Success);
             Nav.NavigateTo($"/entities/{EntityType}");
         }
         finally

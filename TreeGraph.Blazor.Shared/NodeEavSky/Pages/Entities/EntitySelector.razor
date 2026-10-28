@@ -8,9 +8,9 @@
 @inject EntityTypeDisplayService EntityTypeDisplay
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
 
-<PageTitle>选择实体</PageTitle>
+<PageTitle>选择属性数据</PageTitle>
 
-<PageHeaderSky Title="选择实体"
+<PageHeaderSky Title="选择属性数据"
                ArrowBackVisible="true"
                OnArrowBackClick="BackToHome">
     <Actions>
@@ -39,12 +39,12 @@
 </PageHeaderSky>
 
 @* ============================================================ *@
-@* 步骤 1：选择实体类型                                           *@
+@* 步骤 1：选择属性定义                                           *@
 @* ============================================================ *@
 @if (_selectedEntityType is null)
 {
     <MudText Typo="Typo.subtitle1" Color="Color.Secondary" Class="mb-3">
-        第 1 步 · 选择一个实体类型
+        第 1 步 · 选择一个属性定义
     </MudText>
 
     @if (_loading)
@@ -53,9 +53,9 @@
     }
     else if (_entityTypes is null || _entityTypes.Count == 0)
     {
-        <EmptyStateSky Icon="@Icons.Material.Filled.Inbox" Title="暂无实体类型">
+        <EmptyStateSky Icon="@Icons.Material.Filled.Inbox" Title="暂无属性定义">
             <Description>
-                <text>请先在「实体类型管理」中创建实体类型，再通过「属性定义管理」添加属性</text>
+                <text>请先在「属性定义管理」中创建属性定义，再通过「属性定义管理」添加属性</text>
             </Description>
         </EmptyStateSky>
     }
@@ -118,7 +118,7 @@
 else
 {
     @* ============================================================ *@
-    @* 步骤 2：选择具体实体                                         *@
+    @* 步骤 2：选择具体属性数据                                         *@
     @* ============================================================ *@
     <MudBreadcrumbs Items="Step2Crumbs" Class="mb-3">
         <ItemTemplate>
@@ -138,7 +138,7 @@ else
     </MudBreadcrumbs>
 
     <MudText Typo="Typo.subtitle1" Color="Color.Secondary" Class="mb-3">
-        第 2 步 · 选择 @EntityTypeDisplay.GetDisplayName(_selectedEntityType) 下的一个实体
+        第 2 步 · 选择 @EntityTypeDisplay.GetDisplayName(_selectedEntityType) 下的一个属性数据
     </MudText>
 
     @if (_loading)
@@ -147,7 +147,7 @@ else
     }
     else if (_entities is null)
     {
-        <EmptyStateSky Icon="@Icons.Material.Filled.CloudOff" Title="实体加载失败">
+        <EmptyStateSky Icon="@Icons.Material.Filled.CloudOff" Title="属性数据加载失败">
             <Description>
                 <text>请检查后端服务是否正常</text>
             </Description>
@@ -156,7 +156,7 @@ else
     else if (_entities.Items.Count == 0)
     {
         <EmptyStateSky Icon="@Icons.Material.Filled.Inbox"
-                       Title="@($"{_selectedEntityType} 下暂无实体")">
+                       Title="@($"{_selectedEntityType} 下暂无属性数据")">
             <Action>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary"
                            Href="@($"/entities/{_selectedEntityType}")"
@@ -170,7 +170,7 @@ else
     {
         <MudPaper Class="pa-4">
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                共 <b>@_entities.Total</b> 个实体，第 @_page / @TotalPages 页
+                共 <b>@_entities.Total</b> 个属性数据，第 @_page / @TotalPages 页
             </MudText>
 
             <MudTable Items="_entities.Items" Hover="true" Bordered="true"
@@ -224,7 +224,7 @@ else
                     </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
-                    <EmptyStateSky Icon="@Icons.Material.Filled.Inbox" Title="无实体" />
+                    <EmptyStateSky Icon="@Icons.Material.Filled.Inbox" Title="无属性数据" />
                 </NoRecordsContent>
                 <PagerContent>
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
@@ -273,7 +273,7 @@ else
     // MudBlazor 9：MudBreadcrumbs 只接受 Items + ItemTemplate，首项可点击返回第 1 步
     private List<BreadcrumbItem> Step2Crumbs =>
     [
-        new BreadcrumbItem("实体类型", null, false, Icons.Material.Filled.Storage),
+        new BreadcrumbItem("属性定义", null, false, Icons.Material.Filled.Storage),
         new BreadcrumbItem(EntityTypeDisplay.GetDisplayName(_selectedEntityType), null, true, null),
     ];
 
@@ -292,7 +292,7 @@ else
         {
             _entityTypes = await Api.ListEntityTypesAsync();
             if (_entityTypes is null)
-                Snackbar.Add("实体类型加载失败，请检查后端服务", Severity.Warning);
+                Snackbar.Add("属性定义加载失败，请检查后端服务", Severity.Warning);
         }
         finally
         {
@@ -334,7 +334,7 @@ else
                 _selectedEntityType, _page, _pageSize);
 
             if (_entities is null)
-                Snackbar.Add("实体加载失败，请检查后端服务", Severity.Error);
+                Snackbar.Add("属性数据加载失败，请检查后端服务", Severity.Error);
         }
         finally
         {

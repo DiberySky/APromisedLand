@@ -8,7 +8,7 @@
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
 @* AttributesList.razor *@
-@* 全局属性列表（跨实体类型）：只读浏览 + 快速过滤 + 分页；维护操作统一走属性定义管理对话框。 *@
+@* 全局属性列表（跨属性定义）：只读浏览 + 快速过滤 + 分页；维护操作统一走属性定义管理对话框。 *@
 
 <PageTitle>属性列表</PageTitle>
 
@@ -33,7 +33,7 @@
 <MudGrid Class="mb-4">
     <MudItem xs="6" md="3">
         <MudPaper Class="pa-3" Outlined="true">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">实体类型</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">属性定义</MudText>
             <MudText Typo="Typo.h5">@_entityTypeCount</MudText>
         </MudPaper>
     </MudItem>
@@ -68,7 +68,7 @@
             <MudSelect T="string?"
                        Value="_filterEntityType"
                        ValueChanged="OnFilterEntityTypeChanged"
-                       Label="实体类型"
+                       Label="属性定义"
                        Variant="Variant.Outlined"
                        Margin="Margin.Dense"
                        Clearable="true"
@@ -121,7 +121,7 @@ else
 
         <MudTable Items="_pagedItems" Hover="true" Bordered="true" Dense="true">
             <HeaderContent>
-                <MudTh>实体类型</MudTh>
+                <MudTh>属性定义</MudTh>
                 <MudTh>属性名</MudTh>
                 <MudTh>显示名</MudTh>
                 <MudTh>类型</MudTh>
@@ -287,7 +287,7 @@ else
         _loading = true;
         try
         {
-            // 并行加载实体类型 + 全部属性
+            // 并行加载属性定义 + 全部属性
             var entityTypesTask = Api.ListEntityTypesAsync();
             var attributesTask = Api.ListAttributesAsync();
 
@@ -297,7 +297,7 @@ else
             _all = attributesTask.Result ?? Array.Empty<AttributeDetailDto>();
 
             if (_entityTypes is null)
-                Snackbar.Add("实体类型加载失败", Severity.Warning);
+                Snackbar.Add("属性定义加载失败", Severity.Warning);
 
             _page = 1;
         }

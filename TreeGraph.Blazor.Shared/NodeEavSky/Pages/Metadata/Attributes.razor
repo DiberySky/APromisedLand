@@ -1,11 +1,11 @@
 @* Attributes.razor — 属性定义管理（对话框内容组件，由 AttributesManageDialog 承载）
-   传入 EntityType 时锁定实体类型并隐藏选择器；不传时为通用模式，可在对话框内切换实体类型。 *@
+   传入 EntityType 时锁定属性定义并隐藏选择器；不传时为通用模式，可在对话框内切换属性定义。 *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject EntityTypeDisplayService EntityTypeDisplay
 
-@* 过滤器栏（无 MudPaper 包裹）；锁定模式下不渲染实体类型选择器 *@
+@* 过滤器栏（无 MudPaper 包裹）；锁定模式下不渲染属性定义选择器 *@
 @if (!_locked)
 {
     <MudGrid Class="mb-4">
@@ -13,7 +13,7 @@
             <MudSelect T="string"
                        Value="_entityType"
                        ValueChanged="OnEntityTypeChanged"
-                       Label="实体类型"
+                       Label="属性定义"
                        Variant="Variant.Outlined"
                        Margin="Margin.Dense"
                        FullWidth="true">
@@ -26,7 +26,7 @@
                 else if (_entityTypes.Count == 0)
                 {
                     <MudSelectItem T="string" Value="@("")" Disabled="true">
-                        （暂无实体类型）
+                        （暂无属性定义）
                     </MudSelectItem>
                 }
                 else
@@ -107,11 +107,11 @@
             <Description>
                 @if (string.IsNullOrEmpty(_entityType))
                 {
-                    <text>请先在上方选择一个实体类型</text>
+                    <text>请先在上方选择一个属性定义</text>
                 }
                 else
                 {
-                    <text>点击表头「＋」为该实体类型添加第一个属性</text>
+                    <text>点击表头「＋」为该属性定义添加第一个属性</text>
                 }
             </Description>
         </EmptyStateSky>
@@ -119,13 +119,13 @@
 </MudTable>
 
 @code {
-    /// <summary>锁定的实体类型：提供时隐藏类型选择器；为空时为通用模式（可切换类型）。</summary>
+    /// <summary>锁定的属性定义：提供时隐藏类型选择器；为空时为通用模式（可切换类型）。</summary>
     [Parameter] public string? EntityType { get; set; }
 
     /// <summary>属性变更后回调（通知父对话框/宿主刷新）。</summary>
     [Parameter] public EventCallback OnAttributesChanged { get; set; }
 
-    /// <summary>是否锁定单一实体类型。</summary>
+    /// <summary>是否锁定单一属性定义。</summary>
     private bool _locked => !string.IsNullOrEmpty(EntityType);
 
     private string? _entityType;
@@ -148,7 +148,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // 锁定模式：固定为传入的实体类型；通用模式由 LoadEntityTypesAsync 默认选第一个
+        // 锁定模式：固定为传入的属性定义；通用模式由 LoadEntityTypesAsync 默认选第一个
         if (_locked)
         {
             _entityType = EntityType;
@@ -184,7 +184,7 @@
 
         if (_entityTypes is null)
         {
-            Snackbar.Add("实体类型加载失败，请检查后端服务", Severity.Warning);
+            Snackbar.Add("属性定义加载失败，请检查后端服务", Severity.Warning);
             _entityTypes = Array.Empty<EntityTypeSummaryDto>();
             return;
         }
@@ -231,7 +231,7 @@
     {
         if (string.IsNullOrWhiteSpace(_entityType))
         {
-            Snackbar.Add("请先选择实体类型", Severity.Warning);
+            Snackbar.Add("请先选择属性定义", Severity.Warning);
             return;
         }
 

@@ -1,8 +1,8 @@
 @* NodeAttributeItemsSky.razor
-   节点属性宿主适配器：宿主（iNode = 树节点 / 线路 / 线路节点 Id）需先「关注」（绑定）某个实体类型，
+   节点属性宿主适配器：宿主（iNode = 树节点 / 线路 / 线路节点 Id）需先「关注」（绑定）某个属性定义，
    该类型的属性表单才会出现在宿主上。
      - 只读模式：仅渲染已关注类型的属性区块
-     - 管理模式：额外渲染「实体类型 / 绑定」表格，勾选 = 关注、取消勾选 = 取消关注
+     - 管理模式：额外渲染「属性定义 / 绑定」表格，勾选 = 关注、取消勾选 = 取消关注
    数据读写走 iNode 端点 /api/inode/{nodeId}/entities/{type}。
    非泛型：仅依赖 NodeId，可用于树节点与线路/线路节点等任意 iNode 宿主。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
@@ -22,13 +22,13 @@
 }
 else
 {
-    @* 实体类型绑定表：勾选 = 关注（绑定）该实体类型，取消勾选 = 取消关注 *@
+    @* 属性定义绑定表：勾选 = 关注（绑定）该属性定义，取消勾选 = 取消关注 *@
     @if (AllowManage)
     {
         @if (_rows.Count == 0)
         {
             <MudAlert Severity="Severity.Info" Dense="true" Class="my-2">
-                暂无可用实体类型，请先在「管理属性定义 → 实体类型」中创建
+                暂无可用属性定义，请先在「管理属性定义 → 属性定义」中创建
             </MudAlert>
         }
         else
@@ -38,7 +38,7 @@ else
                 <TitleContent>
                     <MudStack Row AlignItems="AlignItems.Center">
                         <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" />
-                        <MudText Typo="Typo.subtitle2">实体类型绑定</MudText>
+                        <MudText Typo="Typo.subtitle2">属性定义绑定</MudText>
                         <MudChip T="string" Size="Size.Small" Color="Color.Default">
                             已绑定 @_cards.Count / @_rows.Count
                         </MudChip>
@@ -49,16 +49,16 @@ else
                         <MudTable Items="_rows" Dense="true" Hover="true" Bordered="true"
                                   Elevation="0">
                         <HeaderContent>
-                            <MudTh>实体类型</MudTh>
+                            <MudTh>属性定义</MudTh>
                             <MudTh Style="width: 96px;">绑定</MudTh>
                         </HeaderContent>
                         <RowTemplate>
-                            <MudTd DataLabel="实体类型">@context.DisplayName</MudTd>
+                            <MudTd DataLabel="属性定义">@context.DisplayName</MudTd>
                             <MudTd DataLabel="绑定">
-                                @* 已产生实体实例的类型禁止取消绑定（后端亦会拒绝） *@
+                                @* 已产生属性数据的类型禁止取消绑定（后端亦会拒绝） *@
                                 @if (IsBound(context.EntityType) && context.HasEntity)
                                 {
-                                    <MudTooltip Text="该类型下已有实体实例，无法取消绑定">
+                                    <MudTooltip Text="该类型下已有属性数据，无法取消绑定">
                                         <MudCheckBox T="bool" Dense="true" Value="true" Disabled="true" />
                                     </MudTooltip>
                                 }
@@ -106,12 +106,12 @@ else
     /// <summary>是否允许管理关注关系（关注/取消关注）；仅属性管理对话框开启。</summary>
     [Parameter] public bool AllowManage { get; set; }
 
-    /// <summary>绑定表格行：实体类型标识 + 展示名 + 是否已产生实体实例。</summary>
+    /// <summary>绑定表格行：属性定义标识 + 展示名 + 是否已产生属性数据。</summary>
     private sealed record TypeBindRow(string EntityType, string DisplayName, bool HasEntity);
 
     private IReadOnlyList<InodeTypeCardDto> _cards = [];
 
-    /// <summary>实体类型绑定表格行（共享类型 ∪ 已关注类型），仅管理模式使用。</summary>
+    /// <summary>属性定义绑定表格行（共享类型 ∪ 已关注类型），仅管理模式使用。</summary>
     private IReadOnlyList<TypeBindRow> _rows = [];
 
     /// <summary>与 _cards 同序的区块引用槽位（Razor @ref 索引器赋值）。</summary>
@@ -149,7 +149,7 @@ else
                 var rows = new List<TypeBindRow>();
                 var seen = new HashSet<string>();
 
-                // 已关注类型的实体数据状态来自 _cards（共享类型列表不含该信息）
+                // 已关注类型的属性数据状态来自 _cards（共享类型列表不含该信息）
                 foreach (var t in allTypes ?? [])
                 {
                     if (seen.Add(t.EntityType))
@@ -190,13 +190,13 @@ else
         return true;
     }
 
-    /// <summary>该实体类型是否已被本节点关注（绑定）。</summary>
+    /// <summary>该属性定义是否已被本节点关注（绑定）。</summary>
     private bool IsBound(string entityType)
         => _cards.Any(c => c.EntityType == entityType);
 
     /// <summary>
-    /// 勾选 = 关注（绑定）实体类型；取消勾选 = 取消关注。
-    /// 已产生实体实例的类型不可取消绑定（表格中复选框禁用，此处为兜底）。
+    /// 勾选 = 关注（绑定）属性定义；取消勾选 = 取消关注。
+    /// 已产生属性数据的类型不可取消绑定（表格中复选框禁用，此处为兜底）。
     /// </summary>
     private async Task ToggleBindAsync(string entityType, bool bound)
     {
@@ -237,7 +237,7 @@ else
         }
     }
 
-    /// <summary>取消关注（后端在该类型已有实体数据时会拒绝）。</summary>
+    /// <summary>取消关注（后端在该类型已有属性数据时会拒绝）。</summary>
     private async Task DetachAsync(InodeTypeCardDto card)
     {
         if (card.HasEntity)
@@ -247,7 +247,7 @@ else
         }
 
         var ok2 = await Message.BoolBoxAsync(
-            $"确定取消关注实体类型「{card.DisplayName}」吗？", "取消关注");
+            $"确定取消关注属性定义「{card.DisplayName}」吗？", "取消关注");
         if (!ok2) return;
 
         var (ok, error) = await EavApi.DetachInodeTypeAsync(NodeId, card.EntityType);
@@ -261,7 +261,7 @@ else
         await ReloadAsync();
     }
 
-    /// <summary>子区块删除实体数据后，同步更新绑定表中的 HasEntity 状态。</summary>
+    /// <summary>子区块删除属性数据后，同步更新绑定表中的 HasEntity 状态。</summary>
     private Task OnEntityDataDeletedAsync(string entityType)
     {
         _rows = _rows.Select(r => r.EntityType == entityType && r.HasEntity
@@ -274,7 +274,7 @@ else
         return Task.CompletedTask;
     }
 
-    /// <summary>子区块首次创建实体后，同步更新绑定表中的 HasEntity 状态。</summary>
+    /// <summary>子区块首次创建属性数据后，同步更新绑定表中的 HasEntity 状态。</summary>
     private Task OnEntityDataSavedAsync(string entityType)
     {
         _rows = _rows.Select(r => r.EntityType == entityType && !r.HasEntity
