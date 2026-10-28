@@ -37,7 +37,7 @@ public class EavMetadataController : ControllerBase
     ///
     /// AttributeName 可选：
     ///   - null / 空：自动生成 `attr_` + 12 位 hex
-    ///   - 非空：必须字母开头，字母/数字/下划线，且同一 EntityType 下唯一
+    ///   - 非空：必须字母开头，字母/数字/下划线，全局唯一
     ///
     /// int / decimal 均可绑定单位（原 int 拒绝逻辑已移除）。
     /// </summary>
@@ -46,23 +46,10 @@ public class EavMetadataController : ControllerBase
         [FromBody] CreateAttributeRequest req, CancellationToken ct)
     {
         // ---- 基础校验 ----
-        if (string.IsNullOrWhiteSpace(req.EntityType))
-            return BadRequest(new { error = "EntityType 必填" });
         if (string.IsNullOrWhiteSpace(req.DisplayName))
             return BadRequest(new { error = "DisplayName 必填" });
         if (!EavDataTypes.All.Contains(req.DataType))
             return BadRequest(new { error = $"未知的 dataType: {req.DataType}" });
-
-        // ---- 实体类型登记 ----
-        // 用户自建类型须已登记在 entity_type_catalog；内置宿主类型（四棵树 + 通用节点）免登记。
-        var entityTypeExists = HostTypeCatalog.Contains(req.EntityType)
-            || await _db.EntityTypes
-                .AnyAsync(t => t.EntityType == req.EntityType && !t.IsDeleted, ct);
-        if (!entityTypeExists)
-            return BadRequest(new
-            {
-                error = $"实体类型不存在: {req.EntityType}。请先在「实体类型管理」中创建"
-            });
 
         // ---- 引用互斥 ----
         var refCount = new[] {
@@ -130,8 +117,7 @@ public class EavMetadataController : ControllerBase
         for (int attempt = 0; attempt < 3; attempt++)
         {
             var conflict = await _db.AttributeCatalog.AnyAsync(
-                a => a.EntityType == req.EntityType
-                  && a.AttributeName == attributeName,
+                a => a.AttributeName == attributeName,
                 ct);
 
             if (!conflict) break;
@@ -139,7 +125,7 @@ public class EavMetadataController : ControllerBase
             if (userSpecified)
                 return Conflict(new
                 {
-                    error = $"属性名已存在: {req.EntityType}.{attributeName}"
+                    error = $"属性名已存在: {attributeName}"
                 });
 
             // 自动生成的碰撞：重新生成
@@ -149,7 +135,6 @@ public class EavMetadataController : ControllerBase
         // ---- 创建 ----
         var def = new AttributeDefinition
         {
-            EntityType = req.EntityType,
             AttributeName = attributeName,
             DisplayName = req.DisplayName.Trim(),
             DataType = req.DataType,
@@ -171,14 +156,14 @@ public class EavMetadataController : ControllerBase
 
         _db.AttributeCatalog.Add(def);
         await _db.SaveChangesAsync(ct);
-        _attrCache.Invalidate(req.EntityType);
+        _attrCache.Invalidate();
 
         return Ok(new { def.AttributeId, def.AttributeName });
     }
 
     /// <summary>
     /// 生成属性内部标识：`attr_` + 12 位随机 hex（如 attr_3f9a2b1c8d4e）。
-    /// 48 bit 随机，同 EntityType 下碰撞概率可忽略；有重试保护。
+    /// 48 bit 随机，全局碰撞概率可忽略；有重试保护。
     /// </summary>
     private static string GenerateAttributeName()
         => "attr_" + Guid.NewGuid().ToString("N")[..12];
@@ -833,21 +818,13 @@ public class EavMetadataController : ControllerBase
     // ============================================================
 
     [HttpGet("attributes")]
-    public async Task<IActionResult> ListAttributes(
-        [FromQuery] string? entityType,
-        CancellationToken ct = default)
+    public async Task<IActionResult> ListAttributes(CancellationToken ct)
     {
-        var query = _db.AttributeCatalog
+        var list = await _db.AttributeCatalog
             .Include(a => a.Unit).ThenInclude(u => u.Node)
             .Include(a => a.RefCompositeType)
             .Include(a => a.RefTableDefinition).Include(a => a.RefOptionSet)
-            .AsQueryable();
-
-        if (!string.IsNullOrEmpty(entityType))
-            query = query.Where(a => a.EntityType == entityType);
-
-        var list = await query
-            .OrderBy(a => a.EntityType).ThenBy(a => a.DisplayOrder).ThenBy(a => a.AttributeId)
+            .OrderBy(a => a.DisplayOrder).ThenBy(a => a.AttributeId)
             .AsNoTracking().ToListAsync(ct);
 
         return Ok(list.Select(ToAttributeDetailDto));
@@ -870,7 +847,7 @@ public class EavMetadataController : ControllerBase
     /// 更新属性定义。
     ///
     /// ★ int / decimal 均可绑定单位。
-    /// 不可修改：EntityType、AttributeName、DataType。
+    /// 不可修改：AttributeName、DataType。
     /// </summary>
     [HttpPut("attributes/{id}")]
     public async Task<IActionResult> UpdateAttribute(
@@ -960,7 +937,7 @@ public class EavMetadataController : ControllerBase
 
         def.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
-        _attrCache.Invalidate(def.EntityType);
+        _attrCache.Invalidate();
         return NoContent();
     }
 
@@ -979,7 +956,7 @@ public class EavMetadataController : ControllerBase
 
         _db.AttributeCatalog.Remove(def);
         await _db.SaveChangesAsync(ct);
-        _attrCache.Invalidate(def.EntityType);
+        _attrCache.Invalidate();
         return NoContent();
     }
 
@@ -988,7 +965,7 @@ public class EavMetadataController : ControllerBase
     // ============================================================
 
     private static AttributeDetailDto ToAttributeDetailDto(AttributeDefinition a) => new(
-        a.AttributeId, a.EntityType, a.AttributeName, a.DisplayName, a.DataType,
+        a.AttributeId, a.AttributeName, a.DisplayName, a.DataType,
         a.IsRequired, a.IsSearchable, a.IsSortable,
         a.Version, a.DisplayOrder, a.DefaultValue, a.CreatedAt, a.UpdatedAt,
         a.AllowedValues != null ? a.AllowedValues.RootElement.Clone() : (JsonElement?)null,

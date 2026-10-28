@@ -31,7 +31,7 @@ public class EavQueryService
     public async Task<PagedResult<string>> FilterEntityIdsAsync(
         EavQueryRequest request, CancellationToken ct = default)
     {
-        var definitions = _attrCache.GetDefinitions(request.EntityType)
+        var definitions = _attrCache.GetDefinitions()
             .ToDictionary(d => d.AttributeName);
 
         IQueryable<string>? entityQuery = null;
@@ -43,12 +43,11 @@ public class EavQueryService
             if (!def.IsSearchable)
                 throw new ArgumentException($"属性不可搜索: {filter.AttributeName}");
 
-            var subQuery = BuildSingleFilterQuery(request.EntityType, def, filter);
+            var subQuery = BuildSingleFilterQuery(def, filter);
             entityQuery = entityQuery is null ? subQuery : entityQuery.Intersect(subQuery);
         }
 
         entityQuery ??= _db.AttributeValues
-            .Where(v => v.EntityType == request.EntityType)
             .Select(v => v.EntityId)
             .Distinct();
 
@@ -85,8 +84,7 @@ public class EavQueryService
                 throw new ArgumentException($"属性不可排序: {request.OrderByAttribute}");
 
             var keyRows = _db.AttributeValues
-                .Where(v => v.EntityType == request.EntityType
-                         && v.AttributeId == orderDef.AttributeId);
+                .Where(v => v.AttributeId == orderDef.AttributeId);
 
             var sorted = SortByKey(entityQuery, keyRows, orderDef, request.OrderDescending);
             ids = await sorted
@@ -231,8 +229,7 @@ public class EavQueryService
         EavQueryRequest request, CancellationToken ct = default)
     {
         var idResult = await FilterEntityIdsAsync(request, ct);
-        var entities = await _readService.LoadBatchAsync(
-            idResult.Items, request.EntityType, ct);
+        var entities = await _readService.LoadBatchAsync(idResult.Items, ct);
 
         return new PagedResult<DynamicEntity>
         {
@@ -244,16 +241,16 @@ public class EavQueryService
     }
 
     private IQueryable<string> BuildSingleFilterQuery(
-        string entityType, AttributeDefinition def, AttributeFilter filter)
+        AttributeDefinition def, AttributeFilter filter)
     {
         if (def.DataType == EavDataTypes.Composite)
-            return BuildCompositeFilterQuery(entityType, def, filter);
+            return BuildCompositeFilterQuery(def, filter);
 
         if (def.DataType == EavDataTypes.Json)
-            return BuildJsonFilterQuery(entityType, def, filter);
+            return BuildJsonFilterQuery(def, filter);
 
         var baseQuery = _db.AttributeValues
-            .Where(v => v.EntityType == entityType && v.AttributeId == def.AttributeId);
+            .Where(v => v.AttributeId == def.AttributeId);
 
         if (filter.Operator == "unit_eq")
         {
@@ -297,10 +294,10 @@ public class EavQueryService
     /// 路径语法：用 "." 分隔，如 "address.city"；最多支持 2 层
     /// </summary>
     private IQueryable<string> BuildJsonFilterQuery(
-        string entityType, AttributeDefinition def, AttributeFilter filter)
+        AttributeDefinition def, AttributeFilter filter)
     {
         var baseQuery = _db.AttributeValues
-            .Where(v => v.EntityType == entityType && v.AttributeId == def.AttributeId
+            .Where(v => v.AttributeId == def.AttributeId
                      && v.ValueJsonb != null);
 
         // 无 FieldPath → 整体匹配
@@ -700,7 +697,7 @@ public class EavQueryService
     // ============================================================
 
     private IQueryable<string> BuildCompositeFilterQuery(
-        string entityType, AttributeDefinition def, AttributeFilter filter)
+        AttributeDefinition def, AttributeFilter filter)
     {
         if (string.IsNullOrEmpty(filter.FieldPath))
             throw new ArgumentException("组合类型查询必须指定 FieldPath");
@@ -716,7 +713,7 @@ public class EavQueryService
             throw new NotSupportedException("组合类型查询最多支持两层字段路径");
 
         var query = _db.AttributeValues
-            .Where(v => v.EntityType == entityType && v.AttributeId == def.AttributeId);
+            .Where(v => v.AttributeId == def.AttributeId);
 
         var fieldName = fieldPath[0];
 
@@ -1077,7 +1074,6 @@ public class EavQueryService
     ///   3. 内存分页 + 批量加载
     /// </summary>
     public async Task<PagedResult<DynamicEntity>> QueryWithAllowedIdsAsync(
-        string entityType,
         IReadOnlyCollection<string>? allowedEntityIds,
         EavQueryRequest request,
         CancellationToken ct = default)
@@ -1101,7 +1097,6 @@ public class EavQueryService
         var filtered = await FilterEntityIdsAsync(
             new EavQueryRequest
             {
-                EntityType = entityType,
                 Filters = request.Filters,
                 OrderByAttribute = request.OrderByAttribute,
                 OrderDescending = request.OrderDescending,
@@ -1133,8 +1128,7 @@ public class EavQueryService
         }
 
         // 4. 批量加载实体
-        var entities = await _readService.LoadBatchAsync(
-            pageIds, entityType, ct);
+        var entities = await _readService.LoadBatchAsync(pageIds, ct);
 
         // 5. 保持 pageIds 的顺序
         var inputOrder = pageIds

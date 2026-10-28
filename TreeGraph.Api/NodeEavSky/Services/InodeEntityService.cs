@@ -21,6 +21,10 @@ public interface IInodeEntityService
     Task<IReadOnlyList<InodeEntity>> ListByInodeAsync(
         string inodeId, CancellationToken ct = default);
 
+    /// <summary>列出某类型名下所有归属映射（跨 iNode 查询限定候选集用）。</summary>
+    Task<IReadOnlyList<InodeEntity>> ListByTypeAsync(
+        string entityType, CancellationToken ct = default);
+
     /// <summary>按类型名反查 iNode（entity 只属于一个 iNode）。</summary>
     Task<InodeEntity?> GetByEntityAsync(
         string entityType, string entityId, CancellationToken ct = default);
@@ -135,6 +139,15 @@ public class InodeEntityService : IInodeEntityService
         return await _db.InodeEntities
             .Where(x => x.InodeId == inodeId)
             .OrderBy(x => x.EntityType)
+            .AsNoTracking()
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<InodeEntity>> ListByTypeAsync(
+        string entityType, CancellationToken ct = default)
+    {
+        return await _db.InodeEntities
+            .Where(x => x.EntityType == entityType)
             .AsNoTracking()
             .ToListAsync(ct);
     }

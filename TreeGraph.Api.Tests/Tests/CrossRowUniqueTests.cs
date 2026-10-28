@@ -75,7 +75,6 @@ public class CrossRowUniqueTests : IntegrationTestBase
                 "/api/eav/metadata/attributes",
                 new
                 {
-                    entityType = EntityType,
                     attributeName = "unique_certs",
                     displayName = "认证",
                     dataType = "table",

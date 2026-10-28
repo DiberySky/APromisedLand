@@ -167,11 +167,11 @@ public class LineStructureSyncTests
 
         await CreateReadyInitializerAsync(dbName, handler);
 
-        // 每个空间各建一次（4 行 HasData 种子空间 + 测试空间）：按空间逐一断言 DDL 形态一致
+        // 每个 Dynamic 空间各建一次（HasData 种子仅「武汉供电段」为 Dynamic + 测试空间 = 2）
         var creates = handler.Queries
             .Where(q => q.Contains($"CREATE EDGE IF NOT EXISTS `{GraphNaming.LineSegmentEdge}`"))
             .ToList();
-        Assert.Equal(5, creates.Count);
+        Assert.Equal(2, creates.Count);
         Assert.All(creates, c => Assert.Contains("`name` STRING NULL", c));
 
         // line_contains 不再建边

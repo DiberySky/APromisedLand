@@ -20,7 +20,7 @@ namespace TreeGraph.Api.NodeEavSky.Controllers;
 ///   - 实体：/api/inode/{inodeId}/entities/{entityType}
 ///
 /// URL 里没有 entityId —— 由服务端首次 PUT 时自动生成。
-/// 转发到现有 EAV 管道（EavWriteService.SaveAsync(entityId, entityType, ...)）。
+/// 转发到现有 EAV 管道（EavWriteService.SaveAsync(entityId, ...)）。
 /// </summary>
 [ApiController]
 [Route("api/inode/{inodeId}")]
@@ -152,7 +152,6 @@ public class InodeController : ControllerBase
 
         var result = all.Values.Select(e => new DynamicEntityDto(
             e.EntityId,
-            e.EntityType,
             ToJsonDict(e),
             e.UpdatedAt)).ToList();
 
@@ -173,7 +172,6 @@ public class InodeController : ControllerBase
 
         return Ok(new DynamicEntityDto(
             entity.EntityId,
-            entity.EntityType,
             ToJsonDict(entity),
             entity.UpdatedAt));
     }
@@ -192,7 +190,7 @@ public class InodeController : ControllerBase
 
         try
         {
-            var typed = ConvertBody(entityType, values);
+            var typed = ConvertBody(values);
             await _facade.SaveAsync(inodeId, entityType, typed,
                 User.Identity?.Name ?? "system",
                 HttpContext.TraceIdentifier,
@@ -236,7 +234,7 @@ public class InodeController : ControllerBase
 
         try
         {
-            var typed = ConvertBody(entityType, values);
+            var typed = ConvertBody(values);
             await _facade.PatchAsync(inodeId, entityType, typed,
                 User.Identity?.Name ?? "system",
                 HttpContext.TraceIdentifier,
@@ -338,7 +336,6 @@ public class InodeController : ControllerBase
         var result = history.Select(a => new EntityHistoryDto(
             a.AuditId,
             a.EntityId,
-            a.EntityType,
             a.AttributeId,
             a.AttributeName,
             a.OldValue,
@@ -373,9 +370,9 @@ public class InodeController : ControllerBase
     }
 
     private Dictionary<string, object?> ConvertBody(
-        string entityType, Dictionary<string, JsonElement> values)
+        Dictionary<string, JsonElement> values)
     {
-        var defs = _attrCache.GetDefinitions(entityType)
+        var defs = _attrCache.GetDefinitions()
             .ToDictionary(d => d.AttributeName);
 
         return EavRequestBodyConverter.Convert(values, defs, _compositeService);
@@ -442,7 +439,7 @@ public class InodeController : ControllerBase
         foreach (var (entityType, entity) in all)
         {
             // 属性定义（用于 displayName 映射）
-            var defs = _attrCache.GetDefinitions(entityType)
+            var defs = _attrCache.GetDefinitions()
                 .ToDictionary(d => d.AttributeName, StringComparer.Ordinal);
 
             var props = new Dictionary<string, object?>(StringComparer.Ordinal);
@@ -470,7 +467,7 @@ public class InodeController : ControllerBase
             //   仅靠上面 rawValue is null 分支无法补齐。）
             if (includeNull)
             {
-                foreach (var def in _attrCache.GetDefinitions(entityType))
+                foreach (var def in _attrCache.GetDefinitions())
                 {
                     var defKey = (displayName
                             && !string.IsNullOrWhiteSpace(def.DisplayName))

@@ -12,7 +12,6 @@ public class LocationAttributeValue
     /// <summary>值 Id（空字符串触发 DB DEFAULT gen_random_uuid()，HasSentinel 语义）。</summary>
     public string ValueId { get; set; } = "";
     public string EntityId { get; set; } = "";
-    public string EntityType { get; set; } = "";
     public string AttributeId { get; set; } = "";
 
     /// <summary>纬度（GCJ-02）。</summary>

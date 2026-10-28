@@ -49,7 +49,6 @@ public class RecordTableTests : IntegrationTestBase
             "/api/eav/metadata/attributes",
             new
             {
-                entityType = EntityType,
                 attributeName,
                 displayName = attributeName,
                 dataType = "table",
@@ -62,7 +61,7 @@ public class RecordTableTests : IntegrationTestBase
     private async Task<AttributeDetailDto> GetAttributeAsync(string attributeId)
     {
         var resp = await Client.GetAsync(
-            $"/api/eav/metadata/attributes?entityType={EntityType}");
+            "/api/eav/metadata/attributes");
         var attrs = await resp.Content.ReadEavAsync<List<AttributeDetailDto>>();
         return attrs!.Single(a => a.AttributeId == attributeId);
     }

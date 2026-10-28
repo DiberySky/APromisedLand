@@ -31,8 +31,9 @@ public static class TestData
         await EnsureEntityTypeAsync(EntityType, "测试商品");
 
         // ---- 属性：int / decimal / string / bool ----
+        // 属性目录已全局化：required 会对全库所有实体生效，测试数据一律非必填
         await CreateAttributeAsync("amount", "amount", "int",
-            isRequired: true, isSearchable: true, isSortable: true);
+            isRequired: false, isSearchable: true, isSortable: true);
         await CreateAttributeAsync("price", "price", "decimal",
             isRequired: false, isSearchable: true, isSortable: true);
         await CreateAttributeAsync("label", "label", "string",
@@ -58,7 +59,6 @@ public static class TestData
     {
         var body = new
         {
-            entityType = EntityType,
             attributeName = name,
             displayName,
             dataType,

@@ -49,7 +49,7 @@ public class InodeEavFacade
             inodeId, entityType, ct);
         if (entityId is null) return null;
 
-        return await _read.LoadAsync(entityId, entityType, ct);
+        return await _read.LoadAsync(entityId, ct);
     }
 
     /// <summary>审计历史。</summary>
@@ -62,7 +62,7 @@ public class InodeEavFacade
             inodeId, entityType, ct);
         if (entityId is null) return new List<AttributeAuditLog>();
 
-        return await _read.GetHistoryAsync(entityId, entityType, from, ct);
+        return await _read.GetHistoryAsync(entityId, from, ct);
     }
 
     // ============================================================
@@ -79,7 +79,7 @@ public class InodeEavFacade
         var entityId = await _inodeEntities.GetOrCreateEntityIdAsync(
             inodeId, entityType, ct);
 
-        await _write.SaveAsync(entityId, entityType, values,
+        await _write.SaveAsync(entityId, values,
             changedBy, correlationId, ct, expectedUpdatedAt);
 
         // ★ 语义搜索：发布宿主变更事件（at-least-once，消费端幂等）
@@ -100,7 +100,7 @@ public class InodeEavFacade
         var entityId = await _inodeEntities.GetOrCreateEntityIdAsync(
             inodeId, entityType, ct);
 
-        await _write.PatchAsync(entityId, entityType, values,
+        await _write.PatchAsync(entityId, values,
             changedBy, correlationId, ct, expectedUpdatedAt);
 
         // ★ 语义搜索：发布宿主变更事件
@@ -125,7 +125,7 @@ public class InodeEavFacade
 
         // 1. 删 EAV 数据（属性值 + 审计 + 子表行）
         await _write.DeleteEntityAsync(
-            entityId, entityType, changedBy, correlationId, ct);
+            entityId, changedBy, correlationId, ct);
 
         // 2. 删归属映射
         await _inodeEntities.DeleteMappingAsync(inodeId, entityType, ct);
@@ -160,7 +160,7 @@ public class InodeEavFacade
         foreach (var m in mappings)
         {
             var entity = await _read.LoadAsync(
-                m.EntityId, m.EntityType, ct);
+                m.EntityId, ct);
             result[m.EntityType] = entity;
         }
         return result;

@@ -184,7 +184,7 @@ else
         {
             _displayTitle = EntityType;
 
-            var schema = await Api.GetSchemaAsync(EntityType);
+            var schema = await Api.GetSchemaAsync();
             _schema = schema ?? Array.Empty<AttributeSchemaDto>();
 
             _regularAttributes = _schema.Where(a => a.DataType != "table").ToList();

@@ -14,7 +14,7 @@ using TreeGraph.Shared.NodeEavSky.Dtos;
 namespace TreeGraph.Api.NodeEavSky.Controllers;
 
 [ApiController]
-[Route("api/eav/{entityType}")]
+[Route("api/eav")]
 public class EavController : ControllerBase
 {
     private readonly EavWriteService _write;
@@ -62,13 +62,13 @@ public class EavController : ControllerBase
                 : JsonSerializer.SerializeToElement(v, v.GetType(), _jsonOptions);
         }
         return new DynamicEntityDto(
-            entity.EntityId, entity.EntityType, dict, entity.UpdatedAt);
+            entity.EntityId, dict, entity.UpdatedAt);
     }
 
     [HttpGet("schema")]
-    public async Task<IActionResult> GetSchema(string entityType, CancellationToken ct)
+    public async Task<IActionResult> GetSchema(CancellationToken ct)
     {
-        var defs = _attrCache.GetDefinitions(entityType);
+        var defs = _attrCache.GetDefinitions();
 
         // 单位名称投影（unit_trees 节点，仅作展示；含组合内字段的单位）
         var unitIds = defs.Select(d => d.UnitId)
@@ -91,15 +91,15 @@ public class EavController : ControllerBase
               .ToDictionary(x => x.Id, x => x.Name ?? string.Empty);
 
         var schema = defs.Select(d => ToSchemaDto(d, unitNames)).ToList();
-        return Ok(new { EntityType = entityType, Attributes = schema });
+        return Ok(new { Attributes = schema });
     }
 
     [HttpGet("entities/{id}")]
     public async Task<IActionResult> Get(
-        string id, string entityType,
+        string id,
         CancellationToken ct)
     {
-        var entity = await _read.LoadAsync(id, entityType, ct);
+        var entity = await _read.LoadAsync(id, ct);
         return Ok(ToDto(entity));
     }
 
@@ -121,7 +121,7 @@ public class EavController : ControllerBase
     [HttpPut("entities/{id}")]
     [IdempotentWrite]
     public async Task<IActionResult> Put(
-        string id, string entityType,
+        string id,
         [FromBody] Dictionary<string, JsonElement> values,
         CancellationToken ct)
     {
@@ -141,8 +141,8 @@ public class EavController : ControllerBase
 
         try
         {
-            var typedValues = ConvertJsonValues(entityType, values);
-            await _write.SaveAsync(id, entityType, typedValues,
+            var typedValues = ConvertJsonValues(values);
+            await _write.SaveAsync(id, typedValues,
                 User.Identity?.Name ?? "system",
                 HttpContext.TraceIdentifier,
                 ct,
@@ -151,7 +151,7 @@ public class EavController : ControllerBase
             // ★ 语义搜索：独立实体向量刷新（at-least-once，消费端幂等）
             await _publisher.Publish(new EntityChangedEvent
             {
-                EntityType = entityType, EntityId = id, Kind = InodeChangeKind.Saved
+                EntityId = id, Kind = InodeChangeKind.Saved
             }, ct);
             return NoContent();
         }
@@ -181,10 +181,9 @@ public class EavController : ControllerBase
 
     [HttpPost("entities/query")]
     public async Task<IActionResult> Query(
-        string entityType, [FromBody] EavQueryRequest request,
+        [FromBody] EavQueryRequest request,
         CancellationToken ct)
     {
-        request.EntityType = entityType;
         try
         {
             var result = await _query.QueryAsync(request, ct);
@@ -209,31 +208,30 @@ public class EavController : ControllerBase
 
     [HttpPost("entities/query-by-table")]
     public async Task<IActionResult> QueryByTable(
-        string entityType, [FromBody] QueryByTableRequest req,
+        [FromBody] QueryByTableRequest req,
         CancellationToken ct)
     {
-        var def = _attrCache.GetDefinition(entityType, req.AttributeName);
+        var def = _attrCache.GetDefinition(req.AttributeName);
         if (def?.RefTableDefinitionId is null) return NotFound();
 
         var ids = await _tableQuery.FindByMultipleRowConditionsAsync(
-            entityType, def.AttributeId, req.RowConditions, ct);
+            def.AttributeId, req.RowConditions, ct);
 
         return Ok(new { EntityIds = ids });
     }
 
     [HttpGet("entities/{id}/history")]
     public async Task<IActionResult> History(
-        string id, string entityType,
+        string id,
         [FromQuery] DateTimeOffset? from,
         CancellationToken ct)
     {
-        var history = await _read.GetHistoryAsync(id, entityType, from, ct);
+        var history = await _read.GetHistoryAsync(id, from, ct);
 
         // ★ 显式映射为公开 DTO，避免泄漏实体内部结构
         var result = history.Select(a => new EntityHistoryDto(
             a.AuditId,
             a.EntityId,
-            a.EntityType,
             a.AttributeId,
             a.AttributeName,
             a.OldValue,
@@ -254,11 +252,11 @@ public class EavController : ControllerBase
     [HttpDelete("entities/{id}")]
     [IdempotentWrite]
     public async Task<IActionResult> Delete(
-        string id, string entityType,
+        string id,
         CancellationToken ct)
     {
         var deleted = await _write.DeleteEntityAsync(
-            id, entityType,
+            id,
             User.Identity?.Name ?? "system",
             HttpContext.TraceIdentifier,
             ct);
@@ -268,7 +266,7 @@ public class EavController : ControllerBase
         // ★ 语义搜索：实体点删除（消费端发现无内容 → 删点）
         await _publisher.Publish(new EntityChangedEvent
         {
-            EntityType = entityType, EntityId = id, Kind = InodeChangeKind.Deleted
+            EntityId = id, Kind = InodeChangeKind.Deleted
         }, ct);
         return NoContent();
     }
@@ -285,7 +283,7 @@ public class EavController : ControllerBase
     [HttpPatch("entities/{id}")]
     [IdempotentWrite]
     public async Task<IActionResult> Patch(
-        string id, string entityType,
+        string id,
         [FromBody] Dictionary<string, JsonElement> values,
         CancellationToken ct)
     {
@@ -303,8 +301,8 @@ public class EavController : ControllerBase
 
         try
         {
-            var typedValues = ConvertJsonValues(entityType, values);
-            await _write.PatchAsync(id, entityType, typedValues,
+            var typedValues = ConvertJsonValues(values);
+            await _write.PatchAsync(id, typedValues,
                 User.Identity?.Name ?? "system",
                 HttpContext.TraceIdentifier,
                 ct,
@@ -313,7 +311,7 @@ public class EavController : ControllerBase
             // ★ 语义搜索：独立实体向量刷新
             await _publisher.Publish(new EntityChangedEvent
             {
-                EntityType = entityType, EntityId = id, Kind = InodeChangeKind.Patched
+                EntityId = id, Kind = InodeChangeKind.Patched
             }, ct);
             return NoContent();
         }
@@ -351,7 +349,7 @@ public class EavController : ControllerBase
     /// </summary>
     [HttpPost("entities/batch-delete")]
     public async Task<IActionResult> BatchDelete(
-        string entityType, [FromBody] BatchDeleteRequest req,
+        [FromBody] BatchDeleteRequest req,
         CancellationToken ct)
     {
         if (req.EntityIds.Count == 0)
@@ -361,7 +359,7 @@ public class EavController : ControllerBase
         }
 
         var result = await _write.DeleteEntitiesAsync(
-            req.EntityIds, entityType,
+            req.EntityIds,
             User.Identity?.Name ?? "system",
             HttpContext.TraceIdentifier,
             ct);
@@ -371,7 +369,7 @@ public class EavController : ControllerBase
         {
             await _publisher.Publish(new EntityChangedEvent
             {
-                EntityType = entityType, EntityId = deletedId, Kind = InodeChangeKind.Deleted
+                EntityId = deletedId, Kind = InodeChangeKind.Deleted
             }, ct);
         }
 
@@ -488,9 +486,9 @@ public class EavController : ControllerBase
     // ---------- 请求体 JsonElement -> 强类型值 ----------
 
     private Dictionary<string, object?> ConvertJsonValues(
-        string entityType, Dictionary<string, JsonElement> values)
+        Dictionary<string, JsonElement> values)
     {
-        var defs = _attrCache.GetDefinitions(entityType).ToDictionary(d => d.AttributeName);
+        var defs = _attrCache.GetDefinitions().ToDictionary(d => d.AttributeName);
         var result = new Dictionary<string, object?>();
         var tableAttrs = new List<string>();
 

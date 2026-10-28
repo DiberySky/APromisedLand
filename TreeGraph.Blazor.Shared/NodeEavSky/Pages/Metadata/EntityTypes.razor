@@ -391,13 +391,11 @@ else
         await LoadAsync();
     }
 
-    /// <summary>打开独立属性定义对话框并锁定该实体类型。</summary>
+    /// <summary>打开独立属性定义对话框（属性已全局化，不再按类型锁定）。</summary>
     private async Task OpenAttributesAsync(EntityTypeDetailDto dto)
     {
         var parameters = new DialogParameters<AttributeDefinitionsDialog>
         {
-            { x => x.EntityType, dto.EntityType },
-            { x => x.DisplayName, dto.DisplayName },
             { x => x.OnAttributesChanged, EventCallback.Factory.Create(this, LoadAsync) }
         };
 
@@ -450,7 +448,7 @@ else
             ? list
             : Array.Empty<AttributeDetailDto>();
 
-    /// <summary>切换展开；首次展开时按 EntityType 拉取该类型的属性列表。</summary>
+    /// <summary>切换展开；首次展开时拉取属性列表（属性已全局化）。</summary>
     private async Task ToggleExpandAsync(EntityTypeDetailDto dto)
     {
         if (!_expandedIds.Add(dto.EntityTypeId))
@@ -464,7 +462,7 @@ else
         _attrsLoading = true;
         try
         {
-            var list = await Api.ListAttributesAsync(dto.EntityType);
+            var list = await Api.ListAttributesAsync();
             _attrsCache[dto.EntityTypeId] =
                 (list ?? Array.Empty<AttributeDetailDto>())
                 .OrderBy(a => a.DisplayOrder).ToList();

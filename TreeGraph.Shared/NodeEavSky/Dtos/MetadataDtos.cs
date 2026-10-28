@@ -4,8 +4,6 @@ namespace TreeGraph.Shared.NodeEavSky.Dtos;
 
 public class CreateAttributeRequest
 {
-    public string EntityType { get; set; } = "";
-
     /// <summary>
     /// 内部标识（JSON key）。可选：
     ///   - null / 空：服务端自动生成 `attr_` + 12 位 hex（如 attr_3f9a2b1c8d4e）
@@ -198,7 +196,6 @@ public class UpdateTableColumnRequest
 
 public record AttributeDetailDto(
     string AttributeId,
-    string EntityType,
     string AttributeName,
     string DisplayName,
     string DataType,

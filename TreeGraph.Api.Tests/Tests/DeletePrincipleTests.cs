@@ -59,7 +59,6 @@ public class DeletePrincipleTests : IntegrationTestBase
             "/api/eav/metadata/attributes",
             new
             {
-                entityType = EntityType,
                 attributeName,
                 displayName = attributeName,
                 dataType = "table",
@@ -75,7 +74,6 @@ public class DeletePrincipleTests : IntegrationTestBase
             "/api/eav/metadata/attributes",
             new
             {
-                entityType = EntityType,
                 attributeName,
                 displayName = attributeName,
                 dataType = "string"
@@ -212,7 +210,7 @@ public class DeletePrincipleTests : IntegrationTestBase
         const string attributeName = "del_attr_val";
         var attrId = await CreateStringAttributeAsync(attributeName);
 
-        await PutEntityAsync(EntityType, GuidFromInt(97402),
+        await PutEntityAsync(GuidFromInt(97402),
             new Dictionary<string, object?> { [attributeName] = "v" });
 
         var resp = await Client.DeleteAsync(
@@ -222,7 +220,7 @@ public class DeletePrincipleTests : IntegrationTestBase
 
         // 属性仍可用（未被删除）
         var listResp = await Client.GetAsync(
-            $"/api/eav/metadata/attributes?entityType={EntityType}");
+            "/api/eav/metadata/attributes");
         listResp.EnsureSuccessStatusCode();
         var attrs = await listResp.Content.ReadEavAsync<List<AttributeDetailDto>>();
         var attr = attrs!.Single(a => a.AttributeId == attrId);

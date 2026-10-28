@@ -317,7 +317,7 @@ else
         if (refs is not null && refs.Count > 0)
         {
             var refList = string.Join("\n",
-                refs.Select(r => $"  · {r.EntityType}.{r.AttributeName} ({r.DisplayName})"));
+                refs.Select(r => $"  · {r.AttributeName} ({r.DisplayName})"));
             await DialogService.ShowMessageBoxAsync(
                 "无法删除",
                 $"选项集「{set.DisplayName}」仍被以下属性引用：\n{refList}\n\n请先解除引用。",

@@ -15,20 +15,17 @@ public class CustomTableWriteService
     private readonly ICustomTableCache _tableCache;
     private readonly CustomTableValidationService _validator;
     private readonly CompositeValueService _composite;
-    private readonly EntityOwnerGuardRegistry _ownerGuards;
 
     public CustomTableWriteService(
         TreeGraphDbContext db,
         ICustomTableCache tableCache,
         CustomTableValidationService validator,
-        CompositeValueService composite,
-        EntityOwnerGuardRegistry ownerGuards)
+        CompositeValueService composite)
     {
         _db = db;
         _tableCache = tableCache;
         _validator = validator;
         _composite = composite;
-        _ownerGuards = ownerGuards;
     }
 
     /// <summary>整表替换：删除旧行，写入新行</summary>
@@ -37,9 +34,6 @@ public class CustomTableWriteService
         string attributeId, string tableDefinitionId,
         CustomTableValue value, CancellationToken ct = default)
     {
-        // 子表行必须附属于已存在的宿主实体
-        await _ownerGuards.EnsureOwnerExistsAsync(parentEntityType, parentEntityId, ct);
-
         var table = _tableCache.GetTable(tableDefinitionId);
 
         foreach (var row in value.Rows)
@@ -87,9 +81,6 @@ public class CustomTableWriteService
         string attributeId, string tableDefinitionId,
         CustomTableRowValue rowValue, CancellationToken ct = default)
     {
-        // 子表行必须附属于已存在的宿主实体
-        await _ownerGuards.EnsureOwnerExistsAsync(parentEntityType, parentEntityId, ct);
-
         var table = _tableCache.GetTable(tableDefinitionId);
         NormalizeRow(rowValue, table);
 

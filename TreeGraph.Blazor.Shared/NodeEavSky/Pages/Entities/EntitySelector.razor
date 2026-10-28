@@ -330,8 +330,7 @@ else
         _loading = true;
         try
         {
-            _entities = await Api.ListEntitiesAsync(
-                _selectedEntityType, _page, _pageSize);
+            _entities = await Api.ListEntitiesAsync(_page, _pageSize);
 
             if (_entities is null)
                 Snackbar.Add("实体加载失败，请检查后端服务", Severity.Error);

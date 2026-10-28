@@ -25,7 +25,7 @@ public class ValidationTests : IntegrationTestBase
         };
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/{TestData.EntityType}/entities/{id}", payload);
+            $"/api/eav/entities/{id}", payload);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();
@@ -45,7 +45,7 @@ public class ValidationTests : IntegrationTestBase
         };
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/{TestData.EntityType}/entities/{id}", payload);
+            $"/api/eav/entities/{id}", payload);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();
@@ -96,7 +96,6 @@ public class ValidationTests : IntegrationTestBase
 
         var attrResp = await Client.PostAsJsonAsync("/api/eav/metadata/attributes", new
         {
-            entityType = TestData.EntityType,
             attributeName = "certifications",
             displayName = "认证资质",
             dataType = "table",
@@ -116,7 +115,7 @@ public class ValidationTests : IntegrationTestBase
         };
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/{TestData.EntityType}/entities/{GuidFromInt(92001)}", payload);
+            $"/api/eav/entities/{GuidFromInt(92001)}", payload);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();

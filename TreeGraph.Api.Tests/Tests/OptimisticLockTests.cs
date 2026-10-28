@@ -20,12 +20,12 @@ public class OptimisticLockTests : IntegrationTestBase
         await TestData.EnsureSchemaAsync(Client);
 
         var id = GuidFromInt(90001);
-        await PutEntityAsync(TestData.EntityType, id,
+        await PutEntityAsync(id,
             new Dictionary<string, object?> { ["amount"] = 10L });
 
         // 拿 UpdatedAt
         var getResp = await Client.GetAsync(
-            $"/api/eav/{TestData.EntityType}/entities/{id}");
+            $"/api/eav/entities/{id}");
         var entity = await getResp.Content.ReadEavAsync<DynamicEntityDto>();
         Assert.NotNull(entity?.UpdatedAt);
 
@@ -35,7 +35,7 @@ public class OptimisticLockTests : IntegrationTestBase
 
         using var req = new HttpRequestMessage(
             HttpMethod.Put,
-            $"/api/eav/{TestData.EntityType}/entities/{id}")
+            $"/api/eav/entities/{id}")
         {
             Content = JsonContent.Create(new Dictionary<string, object?>
             {
@@ -59,7 +59,7 @@ public class OptimisticLockTests : IntegrationTestBase
         await TestData.EnsureSchemaAsync(Client);
 
         var id = GuidFromInt(90002);
-        await PutEntityAsync(TestData.EntityType, id,
+        await PutEntityAsync(id,
             new Dictionary<string, object?> { ["amount"] = 20L });
 
         // 用错误的期望时间（比真实时间早 1 天）
@@ -67,7 +67,7 @@ public class OptimisticLockTests : IntegrationTestBase
 
         using var req = new HttpRequestMessage(
             HttpMethod.Put,
-            $"/api/eav/{TestData.EntityType}/entities/{id}")
+            $"/api/eav/entities/{id}")
         {
             Content = JsonContent.Create(new Dictionary<string, object?>
             {

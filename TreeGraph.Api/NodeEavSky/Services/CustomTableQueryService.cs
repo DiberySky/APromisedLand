@@ -42,7 +42,7 @@ public class CustomTableQueryService
     /// 组合多条件查询：每个条件匹配某一行，多条件间取交集（AND 语义）
     /// </summary>
     public async Task<List<string>> FindByMultipleRowConditionsAsync(
-        string parentEntityType, string attributeId,
+        string attributeId,
         List<Dictionary<string, object?>> rowConditions,
         CancellationToken ct = default)
     {
@@ -53,9 +53,9 @@ public class CustomTableQueryService
             var filterDoc = JsonDocument.Parse(JsonSerializer.Serialize(condition));
             var filter = filterDoc;
 
+            // attributeId 全局唯一（GUID），无需再按 ParentEntityType 过滤
             var sub = _db.CustomTableRows
-                .Where(r => r.ParentEntityType == parentEntityType
-                         && r.AttributeId == attributeId
+                .Where(r => r.AttributeId == attributeId
                          && EF.Functions.JsonContains(r.RowData, filter))
                 .Select(r => r.ParentEntityId)
                 .Distinct();

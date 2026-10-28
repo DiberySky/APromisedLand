@@ -21,8 +21,8 @@ public class EntityListResponsiveTests : BunitTestBase {
         _platform = NodeEavTestSetup.RegisterServices(Services, (path, method) =>
             (path, method.Method) switch
             {
-                ("/api/eav/item/schema", "GET") => NodeEavTestSetup.Json.Schema(),
-                ("/api/eav/item/entities/query", "POST") => NodeEavTestSetup.Json.Paged(),
+                ("/api/eav/schema", "GET") => NodeEavTestSetup.Json.Schema(),
+                ("/api/eav/entities/query", "POST") => NodeEavTestSetup.Json.Paged(),
                 _ => null
             });
     }

@@ -18,7 +18,6 @@ public class EavWriteService
     private readonly EavValidationService _validator;
     private readonly CompositeValueService _composite;
     private readonly IOptionSetCache _optionSetCache;
-    private readonly EntityOwnerGuardRegistry _ownerGuards;
     private readonly IFileStorageDeleter _fileDeleter;
     private readonly IEventPublisher _publisher;
     private readonly ILogger<EavWriteService> _logger;
@@ -29,7 +28,6 @@ public class EavWriteService
         EavValidationService validator,
         CompositeValueService composite,
         IOptionSetCache optionSetCache,
-        EntityOwnerGuardRegistry ownerGuards,
         IFileStorageDeleter fileDeleter,
         IEventPublisher publisher,
         ILogger<EavWriteService> logger)
@@ -39,7 +37,6 @@ public class EavWriteService
         _validator = validator;
         _composite = composite;
         _optionSetCache = optionSetCache;
-        _ownerGuards = ownerGuards;
         _fileDeleter = fileDeleter;
         _publisher = publisher;
         _logger = logger;
@@ -61,12 +58,12 @@ public class EavWriteService
     ///   而非静默丢弃（防客户端拼写错误导致数据丢失）。
     /// </summary>
     public Task SaveAsync(
-        string entityId, string entityType,
+        string entityId,
         Dictionary<string, object?> values,
         string changedBy, string? correlationId = null,
         CancellationToken ct = default,
         DateTimeOffset? expectedUpdatedAt = null)
-        => SaveCoreAsync(entityId, entityType, values,
+        => SaveCoreAsync(entityId, values,
             changedBy, correlationId, ct, expectedUpdatedAt,
             fullReplace: true);
 
@@ -82,12 +79,12 @@ public class EavWriteService
     /// 乐观锁、未知属性检查、验证流程与 SaveAsync 完全一致。
     /// </summary>
     public Task PatchAsync(
-        string entityId, string entityType,
+        string entityId,
         Dictionary<string, object?> values,
         string changedBy, string? correlationId = null,
         CancellationToken ct = default,
         DateTimeOffset? expectedUpdatedAt = null)
-        => SaveCoreAsync(entityId, entityType, values,
+        => SaveCoreAsync(entityId, values,
             changedBy, correlationId, ct, expectedUpdatedAt,
             fullReplace: false);
 
@@ -98,7 +95,7 @@ public class EavWriteService
     /// - fullReplace = false → 未提供的键保持不动（PATCH 语义）
     /// </summary>
     private async Task SaveCoreAsync(
-        string entityId, string entityType,
+        string entityId,
         Dictionary<string, object?> values,
         string changedBy, string? correlationId,
         CancellationToken ct,
@@ -110,11 +107,7 @@ public class EavWriteService
             throw new EavValidationException(new List<ValidationError>
                 { new("id", "Entity Id 必须是 GUID 格式") });
 
-        // ---- -1b. 归属校验：受外部主表约束的类型，entityId 必须指向已存在的宿主 ----
-        //   防止属性值脱离宿主实体凭空生成（孤儿数据）。
-        await _ownerGuards.EnsureOwnerExistsAsync(entityType, entityId, ct);
-
-        var definitions = _attrCache.GetDefinitions(entityType)
+        var definitions = _attrCache.GetDefinitions()
             .ToDictionary(d => d.AttributeName);
 
         // ---- 0. 未知属性检查 ----
@@ -133,10 +126,10 @@ public class EavWriteService
         {
             // ★ 位置值存独立表 location_attribute_values，UpdatedAt 上界需合并两表。
             var currentMaxValues = await _db.AttributeValues
-                .Where(v => v.EntityType == entityType && v.EntityId == entityId)
+                .Where(v => v.EntityId == entityId)
                 .MaxAsync(v => (DateTimeOffset?)v.UpdatedAt, ct);
             var currentMaxLocations = await _db.LocationAttributeValues
-                .Where(l => l.EntityType == entityType && l.EntityId == entityId)
+                .Where(l => l.EntityId == entityId)
                 .MaxAsync(l => (DateTimeOffset?)l.UpdatedAt, ct);
             DateTimeOffset? currentMax = null;
             foreach (var m in new[] { currentMaxValues, currentMaxLocations })
@@ -192,13 +185,13 @@ public class EavWriteService
             throw new EavValidationException(validationErrors);
 
         var existing = await _db.AttributeValues
-            .Where(v => v.EntityType == entityType && v.EntityId == entityId)
+            .Where(v => v.EntityId == entityId)
             .ToListAsync(ct);
         var existingMap = existing.ToDictionary(v => v.AttributeId);
 
         // location 类型值存独立表，单独加载已存在的坐标点
         var existingLocations = await _db.LocationAttributeValues
-            .Where(l => l.EntityType == entityType && l.EntityId == entityId)
+            .Where(l => l.EntityId == entityId)
             .ToListAsync(ct);
         var existingLocationMap = existingLocations.ToDictionary(l => l.AttributeId);
 
@@ -227,7 +220,7 @@ public class EavWriteService
             // location 走独立坐标表，显式 null 同样表示删除该坐标点
             if (def.DataType == EavDataTypes.Location)
             {
-                ApplyLocation(entityId, entityType, def, valueToWrite,
+                ApplyLocation(entityId, def, valueToWrite,
                     existingLocationMap, audits, changedBy, correlationId, now);
                 continue;
             }
@@ -245,7 +238,7 @@ public class EavWriteService
                         pendingFileDeletes.Add((docIdA, verA));
 
                     _db.AttributeValues.Remove(existingValue);
-                    audits.Add(CreateAudit(entityId, entityType, def,
+                    audits.Add(CreateAudit(entityId, def,
                         SerializeForAudit(existingValue, def), null, "Delete",
                         changedBy, correlationId, now));
                 }
@@ -258,14 +251,13 @@ public class EavWriteService
                 {
                     // ValueId 为空字符串 → 触发 DB DEFAULT gen_random_uuid()（HasSentinel 语义）
                     EntityId = entityId,
-                    EntityType = entityType,
                     AttributeId = def.AttributeId,
                     CreatedAt = now,
                     UpdatedAt = now
                 };
                 SetTypedValue(existingValue, def, valueToWrite);
                 _db.AttributeValues.Add(existingValue);
-                audits.Add(CreateAudit(entityId, entityType, def,
+                audits.Add(CreateAudit(entityId, def,
                     null, SerializeForAudit(existingValue, def),
                     "Insert", changedBy, correlationId, now));
             }
@@ -288,7 +280,7 @@ public class EavWriteService
                             out var docIdC, out var verC))
                         pendingFileDeletes.Add((docIdC, verC));
 
-                    audits.Add(CreateAudit(entityId, entityType, def,
+                    audits.Add(CreateAudit(entityId, def,
                         oldSerialized, newSerialized, "Update",
                         changedBy, correlationId, now));
                 }
@@ -307,7 +299,7 @@ public class EavWriteService
                 {
                     if (existingLocationMap.ContainsKey(def.AttributeId))
                     {
-                        ApplyLocation(entityId, entityType, def, null,
+                        ApplyLocation(entityId, def, null,
                             existingLocationMap, audits, changedBy, correlationId, now);
                     }
                     continue;
@@ -321,7 +313,7 @@ public class EavWriteService
                         pendingFileDeletes.Add((docIdB, verB));
 
                     _db.AttributeValues.Remove(oldVal);
-                    audits.Add(CreateAudit(entityId, entityType, def,
+                    audits.Add(CreateAudit(entityId, def,
                         SerializeForAudit(oldVal, def), null, "Delete",
                         changedBy, correlationId, now));
                 }
@@ -343,8 +335,8 @@ public class EavWriteService
                     .ToList();
 
                 _logger.LogInformation(
-                    "EAV SaveCore 级联删除 {Count} 个文件对象：entityId={EntityId}, entityType={EntityType}",
-                    distinct.Count, entityId, entityType);
+                    "EAV SaveCore 级联删除 {Count} 个文件对象：entityId={EntityId}",
+                    distinct.Count, entityId);
 
                 await _fileDeleter.DeleteBatchAsync(distinct, ct);
             }
@@ -405,7 +397,7 @@ public class EavWriteService
     /// value 为 null 表示删除坐标点；与 AttributeValue 写入在同一 SaveChanges 事务提交。
     /// </summary>
     private void ApplyLocation(
-        string entityId, string entityType, AttributeDefinition def, object? value,
+        string entityId, AttributeDefinition def, object? value,
         Dictionary<string, LocationAttributeValue> existingMap,
         List<AttributeAuditLog> audits,
         string changedBy, string? correlationId, DateTimeOffset now)
@@ -418,7 +410,7 @@ public class EavWriteService
             {
                 _db.LocationAttributeValues.Remove(oldLoc);
                 existingMap.Remove(def.AttributeId);
-                audits.Add(CreateAudit(entityId, entityType, def,
+                audits.Add(CreateAudit(entityId, def,
                     SerializeLocation(oldLoc), null, "Delete",
                     changedBy, correlationId, now));
             }
@@ -436,7 +428,6 @@ public class EavWriteService
             var row = new LocationAttributeValue
             {
                 EntityId = entityId,
-                EntityType = entityType,
                 AttributeId = def.AttributeId,
                 Latitude = loc.Latitude,
                 Longitude = loc.Longitude,
@@ -448,7 +439,7 @@ public class EavWriteService
             };
             _db.LocationAttributeValues.Add(row);
             existingMap[def.AttributeId] = row;
-            audits.Add(CreateAudit(entityId, entityType, def,
+            audits.Add(CreateAudit(entityId, def,
                 null, SerializeLocation(row), "Insert",
                 changedBy, correlationId, now));
         }
@@ -465,7 +456,7 @@ public class EavWriteService
             var newJson = SerializeLocation(oldLoc);
             if (oldJson != newJson)
             {
-                audits.Add(CreateAudit(entityId, entityType, def,
+                audits.Add(CreateAudit(entityId, def,
                     oldJson, newJson, "Update",
                     changedBy, correlationId, now));
             }
@@ -628,7 +619,7 @@ public class EavWriteService
     }
 
     private static AttributeAuditLog CreateAudit(
-        string entityId, string entityType, AttributeDefinition def,
+        string entityId, AttributeDefinition def,
         string? oldValue, string? newValue, string changeType,
         string changedBy, string? correlationId, DateTimeOffset now)
     {
@@ -636,7 +627,6 @@ public class EavWriteService
         {
             // AuditId 为空字符串 → 触发 DB DEFAULT gen_random_uuid()（HasSentinel 语义）
             EntityId = entityId,
-            EntityType = entityType,
             AttributeId = def.AttributeId,
             AttributeName = def.AttributeName,
             OldValue = oldValue,
@@ -650,19 +640,18 @@ public class EavWriteService
 
     /// <summary>删除实体（物理删除所有属性值 + 自定义表行，写审计）。</summary>
     public async Task<bool> DeleteEntityAsync(
-        string entityId, string entityType,
+        string entityId,
         string changedBy, string? correlationId = null,
         CancellationToken ct = default)
     {
         var hasValues = await _db.AttributeValues
-            .AnyAsync(v => v.EntityType == entityType && v.EntityId == entityId, ct);
+            .AnyAsync(v => v.EntityId == entityId, ct);
 
         var hasLocations = await _db.LocationAttributeValues
-            .AnyAsync(l => l.EntityType == entityType && l.EntityId == entityId, ct);
+            .AnyAsync(l => l.EntityId == entityId, ct);
 
         var hasRows = await _db.CustomTableRows
-            .AnyAsync(r => r.ParentEntityType == entityType
-                        && r.ParentEntityId == entityId, ct);
+            .AnyAsync(r => r.ParentEntityId == entityId, ct);
 
         if (!hasValues && !hasLocations && !hasRows)
             return false;
@@ -678,12 +667,12 @@ public class EavWriteService
             var now = DateTimeOffset.UtcNow;
 
             var values = await _db.AttributeValues
-                .Where(v => v.EntityType == entityType && v.EntityId == entityId)
+                .Where(v => v.EntityId == entityId)
                 .ToListAsync(ct);
 
             if (values.Count > 0)
             {
-                var definitions = _attrCache.GetDefinitions(entityType)
+                var definitions = _attrCache.GetDefinitions()
                     .ToDictionary(d => d.AttributeId);
 
                 // ★ 收集待级联删除的 file 对象（RemoveRange 前从旧值提取）
@@ -703,7 +692,6 @@ public class EavWriteService
                     audits.Add(new AttributeAuditLog
                     {
                         EntityId = entityId,
-                        EntityType = entityType,
                         AttributeId = def.AttributeId,
                         AttributeName = def.AttributeName,
                         OldValue = SerializeForAudit(v, def),
@@ -721,11 +709,11 @@ public class EavWriteService
 
             // 删除位置坐标点（独立表）并写审计
             var locations = await _db.LocationAttributeValues
-                .Where(l => l.EntityType == entityType && l.EntityId == entityId)
+                .Where(l => l.EntityId == entityId)
                 .ToListAsync(ct);
             if (locations.Count > 0)
             {
-                var locDefs = _attrCache.GetDefinitions(entityType)
+                var locDefs = _attrCache.GetDefinitions()
                     .ToDictionary(d => d.AttributeId);
                 var locAudits = new List<AttributeAuditLog>(locations.Count);
                 foreach (var l in locations)
@@ -734,7 +722,6 @@ public class EavWriteService
                     locAudits.Add(new AttributeAuditLog
                     {
                         EntityId = entityId,
-                        EntityType = entityType,
                         AttributeId = def.AttributeId,
                         AttributeName = def.AttributeName,
                         OldValue = SerializeLocation(l),
@@ -750,8 +737,7 @@ public class EavWriteService
             _db.LocationAttributeValues.RemoveRange(locations);
 
             var rows = await _db.CustomTableRows
-                .Where(r => r.ParentEntityType == entityType
-                         && r.ParentEntityId == entityId)
+                .Where(r => r.ParentEntityId == entityId)
                 .ToListAsync(ct);
             _db.CustomTableRows.RemoveRange(rows);
 
@@ -769,8 +755,8 @@ public class EavWriteService
                     .Select(g => g.Key)
                     .ToList();
                 _logger.LogInformation(
-                    "DeleteEntity 级联删除 {Count} 个文件对象：entityId={EntityId}, entityType={EntityType}",
-                    distinct.Count, entityId, entityType);
+                    "DeleteEntity 级联删除 {Count} 个文件对象：entityId={EntityId}",
+                    distinct.Count, entityId);
                 await _fileDeleter.DeleteBatchAsync(distinct, ct);
             }
             catch (Exception ex)
@@ -794,7 +780,6 @@ public class EavWriteService
     /// </summary>
     public async Task<BatchDeleteResult> DeleteEntitiesAsync(
         IReadOnlyList<string> entityIds,
-        string entityType,
         string changedBy,
         string? correlationId = null,
         CancellationToken ct = default)
@@ -807,21 +792,19 @@ public class EavWriteService
 
         // 存在性：任一表命中即认为存在
         var hasValues = await _db.AttributeValues
-            .Where(v => v.EntityType == entityType && requested.Contains(v.EntityId))
+            .Where(v => requested.Contains(v.EntityId))
             .Select(v => v.EntityId)
             .Distinct()
             .ToListAsync(ct);
 
         var hasRows = await _db.CustomTableRows
-            .Where(r => r.ParentEntityType == entityType
-                     && requested.Contains(r.ParentEntityId))
+            .Where(r => requested.Contains(r.ParentEntityId))
             .Select(r => r.ParentEntityId)
             .Distinct()
             .ToListAsync(ct);
 
         var hasLocations = await _db.LocationAttributeValues
-            .Where(l => l.EntityType == entityType
-                     && requested.Contains(l.EntityId))
+            .Where(l => requested.Contains(l.EntityId))
             .Select(l => l.EntityId)
             .Distinct()
             .ToListAsync(ct);
@@ -846,14 +829,13 @@ public class EavWriteService
 
             // 1. 加载待删属性值（用于审计 + 计数）
             var values = await _db.AttributeValues
-                .Where(v => v.EntityType == entityType
-                         && toDelete.Contains(v.EntityId))
+                .Where(v => toDelete.Contains(v.EntityId))
                 .ToListAsync(ct);
 
             // 2. 写审计
             if (values.Count > 0)
             {
-                var definitions = _attrCache.GetDefinitions(entityType)
+                var definitions = _attrCache.GetDefinitions()
                     .ToDictionary(d => d.AttributeId);
 
                 // ★ 批量收集待级联删除的 file 对象
@@ -872,7 +854,6 @@ public class EavWriteService
                     audits.Add(new AttributeAuditLog
                     {
                         EntityId = v.EntityId,
-                        EntityType = entityType,
                         AttributeId = def.AttributeId,
                         AttributeName = def.AttributeName,
                         OldValue = SerializeForAudit(v, def),
@@ -893,12 +874,11 @@ public class EavWriteService
 
             // 3b. 删除位置坐标点（独立表）并写审计
             var locations = await _db.LocationAttributeValues
-                .Where(l => l.EntityType == entityType
-                         && toDelete.Contains(l.EntityId))
+                .Where(l => toDelete.Contains(l.EntityId))
                 .ToListAsync(ct);
             if (locations.Count > 0)
             {
-                var locDefs = _attrCache.GetDefinitions(entityType)
+                var locDefs = _attrCache.GetDefinitions()
                     .ToDictionary(d => d.AttributeId);
                 var locAudits = new List<AttributeAuditLog>(locations.Count);
                 foreach (var l in locations)
@@ -907,7 +887,6 @@ public class EavWriteService
                     locAudits.Add(new AttributeAuditLog
                     {
                         EntityId = l.EntityId,
-                        EntityType = entityType,
                         AttributeId = def.AttributeId,
                         AttributeName = def.AttributeName,
                         OldValue = SerializeLocation(l),
@@ -924,8 +903,7 @@ public class EavWriteService
 
             // 4. 删除自定义表行
             var rows = await _db.CustomTableRows
-                .Where(r => r.ParentEntityType == entityType
-                         && toDelete.Contains(r.ParentEntityId))
+                .Where(r => toDelete.Contains(r.ParentEntityId))
                 .ToListAsync(ct);
             _db.CustomTableRows.RemoveRange(rows);
 
@@ -943,14 +921,14 @@ public class EavWriteService
                     .Select(g => g.Key)
                     .ToList();
                 _logger.LogInformation(
-                    "DeleteEntities 级联删除 {Count} 个文件对象：entityType={EntityType}, entityCount={EntityCount}",
-                    distinct.Count, entityType, toDelete.Count);
+                    "DeleteEntities 级联删除 {Count} 个文件对象：entityCount={EntityCount}",
+                    distinct.Count, toDelete.Count);
                 await _fileDeleter.DeleteBatchAsync(distinct, ct);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex,
-                    "DeleteEntities 级联删除失败，将留后台补偿：entityType={EntityType}", entityType);
+                    "DeleteEntities 级联删除失败，将留后台补偿");
             }
         }
 

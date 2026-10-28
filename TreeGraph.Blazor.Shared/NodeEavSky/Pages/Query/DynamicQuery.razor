@@ -14,10 +14,6 @@
 <MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-4 mb-4")">
     <MudGrid>
         <MudItem xs="12" md="4">
-            <MudTextField @bind-Value="_entityType" Label="实体类型"
-                          Variant="Variant.Outlined" />
-        </MudItem>
-        <MudItem xs="12" md="4">
             <MudSelect @bind-Value="_queryMode" Label="查询方式"
                        Variant="Variant.Outlined">
                 <MudSelectItem Value="@("filter")">属性过滤</MudSelectItem>
@@ -125,7 +121,6 @@ else if (_entities is not null)
 }
 
 @code {
-    private string _entityType = "";
     private string _queryMode = "filter";
     private string _tableAttributeName = "specs";
     private string _rowConditionsJson = "[]";
@@ -142,7 +137,7 @@ else if (_entities is not null)
     // 端点 ①：加载 Schema
     private async Task LoadSchemaAsync()
     {
-        var schema = await Api.GetSchemaAsync(_entityType);
+        var schema = await Api.GetSchemaAsync();
         _schema = schema ?? Array.Empty<AttributeSchemaDto>();
 
         // ★ 用 FilterOperatorCatalog 筛可搜索属性（与后端能力对齐）
@@ -170,7 +165,7 @@ else if (_entities is not null)
                     .Deserialize<List<Dictionary<string, object?>>>(_rowConditionsJson)
                     ?? new();
 
-                _ids = await Api.QueryByTableAsync(_entityType, new QueryByTableRequest
+                _ids = await Api.QueryByTableAsync(new QueryByTableRequest
                 {
                     AttributeName = _tableAttributeName,
                     RowConditions = conditions
@@ -178,9 +173,8 @@ else if (_entities is not null)
             }
             else
             {
-                _entities = await Api.QueryAsync(_entityType, new EavQueryRequest
+                _entities = await Api.QueryAsync(new EavQueryRequest
                 {
-                    EntityType = _entityType,
                     Filters = _filters,
                     Page = 1,
                     PageSize = 50

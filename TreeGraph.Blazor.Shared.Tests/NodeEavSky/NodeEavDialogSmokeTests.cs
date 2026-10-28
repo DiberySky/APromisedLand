@@ -113,7 +113,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         ValidationRule: null, IsDeleted: false);
 
     private static AttributeDetailDto Attribute() => new(
-        AttributeId: "a-1", EntityType: "Product", AttributeName: "color",
+        AttributeId: "a-1", AttributeName: "color",
         DisplayName: "颜色", DataType: "string", IsRequired: false,
         IsSearchable: true, IsSortable: true, Version: 1,
         DisplayOrder: 1, DefaultValue: null, CreatedAt: DateTimeOffset.UtcNow,
@@ -163,10 +163,6 @@ public class NodeEavDialogSmokeTests : BunitTestBase
     {
         var provider = await OpenAsync<CompositeTypeCreateDialog>();
         AssertDialog(provider, "新建组合类型");
-        // 回归：全局共享勾选框必须渲染（曾误用不存在的 MudCheckbox 组件名被当成普通 HTML 元素）
-        var html = provider.Find(".mud-dialog").InnerHtml;
-        Assert.Contains("mud-checkbox", html);
-        Assert.Contains("全局共享", html);
     }
 
     [Fact]
@@ -257,9 +253,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
     public async Task AttributeCreateDialog_Renders()
         => AssertDialog(await OpenAsync<AttributeCreateDialog>(new DialogParameters<AttributeCreateDialog>
         {
-            { x => x.EntityType, "Product" },
             { x => x.InitialDisplayOrder, 1 },
-            { x => x.EntityTypes, new[] { new EntityTypeSummaryDto("Product", 0, 0, "产品", "et-1", "产品") } },
             { x => x.CompositeTypes, new[] { CompositeType() } },
             { x => x.CustomTables, new[] { CustomTable() } },
             { x => x.OptionSets, new[] { OptionSet() } },

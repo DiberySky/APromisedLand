@@ -155,7 +155,7 @@
         {
             _loading = true;
 
-            var schemaTask = EavApi.GetSchemaAsync(EntityType);
+            var schemaTask = EavApi.GetSchemaAsync();
             var entityTask = EavApi.GetInodeEntityAsync(InodeId, EntityType);
             await Task.WhenAll(schemaTask, entityTask);
 

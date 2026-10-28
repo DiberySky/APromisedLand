@@ -342,20 +342,23 @@ public sealed class SourceTextBuilder
         var lines = new List<string>();
         if (!string.IsNullOrWhiteSpace(hostNodeText))
             lines.Add(hostNodeText);
-        lines.Add($"类型{EavSeparator}{entityType}");
+        // 类型行：entityType 由挂载关系/事件携带；对账反查不到时传空，省略该行
+        if (!string.IsNullOrWhiteSpace(entityType))
+            lines.Add($"类型{EavSeparator}{entityType}");
         var contentCount = 0;
 
-        var attrs = _db.AttributeCatalog
-            .Where(a => a.EntityType == entityType)
-            .ToList();
-        var defs = attrs
+        // 属性目录已去 entityType 维度：全量定义按展示顺序参与拼装（无值属性跳过）
+        // Ordinal 比较器无法翻译为 SQL：先物化再内存排序，保证确定性
+        var defs = (await _db.AttributeCatalog
+                .AsNoTracking()
+                .ToListAsync(ct))
             .OrderBy(a => a.DisplayOrder)
             .ThenBy(a => a.AttributeId, StringComparer.Ordinal)
             .ToList();
 
         var values = await _db.AttributeValues
             .AsNoTracking()
-            .Where(v => v.EntityType == entityType && v.EntityId == entityId)
+            .Where(v => v.EntityId == entityId)
             .ToListAsync(ct);
 
         var byAttrId = values.ToDictionary(v => v.AttributeId, v => v);

@@ -33,10 +33,10 @@ public abstract class IntegrationTestBase
     /// PUT 实体（全量替换语义）。返回 entityId（GUID 字符串）。
     /// </summary>
     protected async Task<string> PutEntityAsync(
-        string entityType, string entityId, object payload)
+        string entityId, object payload)
     {
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/{entityType}/entities/{entityId}", payload);
+            $"/api/eav/entities/{entityId}", payload);
         resp.EnsureSuccessStatusCode();
         return entityId;
     }

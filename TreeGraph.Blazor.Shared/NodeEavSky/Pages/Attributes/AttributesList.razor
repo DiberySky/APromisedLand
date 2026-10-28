@@ -4,9 +4,7 @@
 @using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @inject EavApiClient Api
-@inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@inject EntityTypeDisplayService EntityTypeDisplay
 @* AttributesList.razor *@
 @* 全局属性列表（跨实体类型）：只读浏览 + 快速过滤 + 分页；维护操作统一走属性定义管理对话框。 *@
 
@@ -24,19 +22,13 @@
     </MudButton>
     <MudButton Variant="Variant.Filled" Color="Color.Primary"
                StartIcon="@Icons.Material.Filled.Settings"
-               OnClick="@(() => OpenManageAsync(null))">
+               OnClick="OpenManageAsync">
         属性定义管理
     </MudButton>
 </div>
 
 @* ---------- 统计卡 ---------- *@
 <MudGrid Class="mb-4">
-    <MudItem xs="6" md="3">
-        <MudPaper Class="pa-3" Outlined="true">
-            <MudText Typo="Typo.caption" Color="Color.Secondary">实体类型</MudText>
-            <MudText Typo="Typo.h5">@_entityTypeCount</MudText>
-        </MudPaper>
-    </MudItem>
     <MudItem xs="6" md="3">
         <MudPaper Class="pa-3" Outlined="true">
             <MudText Typo="Typo.caption" Color="Color.Secondary">属性总数</MudText>
@@ -64,23 +56,6 @@
 @* ---------- 过滤区 ---------- *@
 <MudPaper Class="pa-4 mb-4">
     <MudGrid>
-        <MudItem xs="12" md="4">
-            <MudSelect T="string?"
-                       Value="_filterEntityType"
-                       ValueChanged="OnFilterEntityTypeChanged"
-                       Label="实体类型"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Clearable="true"
-                       FullWidth="true">
-                @foreach (var et in _entityTypes ?? Array.Empty<EntityTypeSummaryDto>())
-                {
-                    <MudSelectItem T="string?" Value="@et.EntityType">
-                        @GetDisplayName(et) (@et.AttributeCount)
-                    </MudSelectItem>
-                }
-            </MudSelect>
-        </MudItem>
         <MudItem xs="12" md="4">
             <MudTextField T="string"
                           Value="_searchText"
@@ -121,7 +96,6 @@ else
 
         <MudTable Items="_pagedItems" Hover="true" Bordered="true" Dense="true">
             <HeaderContent>
-                <MudTh>实体类型</MudTh>
                 <MudTh>属性名</MudTh>
                 <MudTh>显示名</MudTh>
                 <MudTh>类型</MudTh>
@@ -133,11 +107,6 @@ else
                 <MudTh>操作</MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd>
-                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
-                        @GetDisplayName(context.EntityType)
-                    </MudChip>
-                </MudTd>
                 <MudTd>
                     <code>@context.AttributeName</code>
                 </MudTd>
@@ -203,8 +172,8 @@ else
                     <MudIconButton Icon="@Icons.Material.Filled.Settings"
                                    Size="Size.Medium"
                                    Color="Color.Primary"
-                                   OnClick="@(() => OpenManageAsync(context.EntityType))"
-                                   title="管理该类型的属性" />
+                                   OnClick="OpenManageAsync"
+                                   title="属性定义管理" />
                 </MudTd>
             </RowTemplate>
             <PagerContent>
@@ -240,9 +209,7 @@ else
 
 @code {
     private IReadOnlyList<AttributeDetailDto> _all = Array.Empty<AttributeDetailDto>();
-    private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
 
-    private string? _filterEntityType;
     private string? _searchText;
 
     private int _page = 1;
@@ -250,17 +217,12 @@ else
     private bool _loading;
     private bool _initialized;
 
-    private int _entityTypeCount => _entityTypes?.Count ?? 0;
-
     /// <summary>应用过滤后的全量列表（用于统计 + 分页）。</summary>
     private List<AttributeDetailDto> _filteredAll => _all
-        .Where(a => string.IsNullOrEmpty(_filterEntityType)
-                 || a.EntityType == _filterEntityType)
         .Where(a => string.IsNullOrWhiteSpace(_searchText)
                  || a.AttributeName.Contains(_searchText, StringComparison.OrdinalIgnoreCase)
                  || a.DisplayName.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
-        .OrderBy(a => a.EntityType)
-        .ThenBy(a => a.DisplayOrder)
+        .OrderBy(a => a.DisplayOrder)
         .ThenBy(a => a.AttributeId)
         .ToList();
 
@@ -287,17 +249,8 @@ else
         _loading = true;
         try
         {
-            // 并行加载实体类型 + 全部属性
-            var entityTypesTask = Api.ListEntityTypesAsync();
-            var attributesTask = Api.ListAttributesAsync();
-
-            await Task.WhenAll(entityTypesTask, attributesTask);
-
-            _entityTypes = entityTypesTask.Result;
-            _all = attributesTask.Result ?? Array.Empty<AttributeDetailDto>();
-
-            if (_entityTypes is null)
-                Snackbar.Add("实体类型加载失败", Severity.Warning);
+            _all = await Api.ListAttributesAsync()
+                   ?? Array.Empty<AttributeDetailDto>();
 
             _page = 1;
         }
@@ -305,12 +258,6 @@ else
         {
             _loading = false;
         }
-    }
-
-    private void OnFilterEntityTypeChanged(string? value)
-    {
-        _filterEntityType = value;
-        _page = 1;
     }
 
     private void OnSearchChanged(string? value)
@@ -331,18 +278,14 @@ else
         _page = page;
     }
 
-    /// <summary>打开属性定义管理对话框：entityType 为 null 时通用模式（对话框内可切换类型）。
+    /// <summary>打开属性定义管理对话框。
     /// 属性增删改后经 OnAttributesChanged 回调刷新本列表与统计卡。</summary>
-    private async Task OpenManageAsync(string? entityType)
+    private async Task OpenManageAsync()
     {
         var parameters = new DialogParameters<AttributesManageDialog>
         {
             { x => x.OnAttributesChanged, EventCallback.Factory.Create(this, LoadAsync) }
         };
-        if (!string.IsNullOrEmpty(entityType))
-        {
-            parameters.Add(x => x.EntityType, entityType);
-        }
 
         var options = new DialogOptionsEx
         {
@@ -368,10 +311,4 @@ else
         "file" => Color.Default,
         _ => Color.Default
     };
-
-    private string GetDisplayName(string entityType)
-        => EntityTypeDisplay.GetDisplayName(entityType);
-
-    private static string GetDisplayName(EntityTypeSummaryDto et)
-        => EntityTypeDisplayService.GetDisplayName(et);
 }

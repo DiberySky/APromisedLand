@@ -7,7 +7,6 @@ namespace TreeGraph.Api.NodeEavSky.Entities;
 public class AttributeDefinition
 {
     public string AttributeId { get; set; } = "";
-    public string EntityType { get; set; } = "";
     public string AttributeName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string DataType { get; set; } = "string";

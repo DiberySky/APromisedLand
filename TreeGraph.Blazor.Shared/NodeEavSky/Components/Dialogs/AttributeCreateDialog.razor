@@ -9,38 +9,7 @@
            SubmitButtonText="@(_submitting ? "创建中..." : "创建")"
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="CreateAsync">
-    @* 锁定模式下把实体类型固定展示在标题栏下方工具栏（静态值，创建时确定） *@
-    <ToolBarContent>
-        @if (IsEntityTypeLocked)
-        {
-            <MudText Typo="Typo.body2">实体类型：@EntityTypeDisplay</MudText>
-        }
-        else
-        {
-            <MudText Typo="Typo.body2" Class="mud-text-secondary">可在下方切换实体类型</MudText>
-        }
-    </ToolBarContent>
     <DialogContent>
-        @* 未锁定实体类型时才能在表单内切换；锁定后仅工具栏展示 *@
-        @if (!IsEntityTypeLocked)
-        {
-            <MudSelect T="string"
-                       Value="_createForm.EntityType"
-                       ValueChanged="@(v => _createForm.EntityType = v)"
-                       Label="实体类型"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Class="mb-3"
-                       HelperText="如需新类型，请先到「实体类型管理」创建">
-                @foreach (var et in EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
-                {
-                    <MudSelectItem T="string" Value="@et.EntityType">
-                        @GetDisplayName(et)
-                    </MudSelectItem>
-                }
-            </MudSelect>
-        }
-
         @* 显示名（必填，中文） *@
         <MudTextField @bind-Value="_createForm.DisplayName"
                       Label="显示名"
@@ -201,13 +170,8 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    /// <summary>初始实体类型（页面当前选中项）。</summary>
-    [Parameter] public string? EntityType { get; set; }
-    /// <summary>是否锁定实体类型（锁定时禁止切换，强制使用 EntityType）。</summary>
-    [Parameter] public bool IsEntityTypeLocked { get; set; }
     /// <summary>新建模式下的初始显示顺序（现有属性数 + 1）。</summary>
     [Parameter] public int InitialDisplayOrder { get; set; }
-    [Parameter] public IReadOnlyList<EntityTypeSummaryDto>? EntityTypes { get; set; }
     [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
     [Parameter] public IReadOnlyList<CustomTableDetailDto>? CustomTables { get; set; }
     [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
@@ -242,7 +206,6 @@
     {
         _createForm = new CreateAttributeForm
         {
-            EntityType = EntityType ?? "",
             DisplayOrder = InitialDisplayOrder,
             IsSearchable = true,
             IsSortable = true
@@ -288,18 +251,6 @@
         _optionSets = await Api.ListOptionSetsAsync();
     }
 
-    private static string GetDisplayName(EntityTypeSummaryDto et)
-        => string.IsNullOrWhiteSpace(et.DisplayName)
-            ? et.EntityType
-            : et.DisplayName;
-
-    /// <summary>锁定实体类型的展示名（优先中文显示名，缺失回退内部标识）。</summary>
-    private string EntityTypeDisplay =>
-        (EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
-            .FirstOrDefault(et => et.EntityType == EntityType) is { } match
-            ? GetDisplayName(match)
-            : EntityType ?? string.Empty;
-
     private void OnCreateDataTypeChanged(string dt)
     {
         _createForm.DataType = dt;
@@ -317,10 +268,9 @@
     private async Task CreateAsync()
     {
         var f = _createForm;
-        if (string.IsNullOrWhiteSpace(f.EntityType) ||
-            string.IsNullOrWhiteSpace(f.DisplayName))
+        if (string.IsNullOrWhiteSpace(f.DisplayName))
         {
-            Snackbar.Add("请填写实体类型、显示名", Severity.Warning);
+            Snackbar.Add("请填写显示名", Severity.Warning);
             return;
         }
         if (f.DataType == "composite" && f.RefCompositeTypeId is null)
@@ -358,7 +308,6 @@
         {
             var id = await Api.CreateAttributeAsync(new CreateAttributeRequest
             {
-                EntityType = f.EntityType,
                 // null / 空 → 服务端自动生成
                 AttributeName = string.IsNullOrWhiteSpace(f.AttributeName)
                     ? null
@@ -396,7 +345,6 @@
 
     private class CreateAttributeForm
     {
-        public string EntityType { get; set; } = "";
         public string? AttributeName { get; set; }    // 可空
         public string DisplayName { get; set; } = "";
         public string DataType { get; set; } = "string";

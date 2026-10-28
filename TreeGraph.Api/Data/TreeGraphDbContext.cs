@@ -305,7 +305,6 @@ public class TreeGraphDbContext : DbContext
                 .HasMaxLength(36).IsRequired()
                 .HasDefaultValueSql("gen_random_uuid()::text")
                 .HasSentinel("");
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
@@ -325,12 +324,10 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
-            e.HasIndex(x => new { x.EntityType, x.AttributeName })
+            // 属性全局唯一（不再按实体类型分组）
+            e.HasIndex(x => x.AttributeName)
                 .IsUnique()
                 .HasDatabaseName("uq_attr_catalog");
-
-            e.HasIndex(x => x.EntityType)
-                .HasDatabaseName("ix_attr_catalog_entity");
 
             e.HasOne(x => x.RefCompositeType)
                 .WithMany().HasForeignKey(x => x.RefCompositeTypeId)
@@ -359,7 +356,6 @@ public class TreeGraphDbContext : DbContext
                 .HasDefaultValueSql("gen_random_uuid()::text")
                 .HasSentinel("");
             e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.ValueString).HasColumnName("value_string").HasMaxLength(2000);
             e.Property(x => x.ValueInt).HasColumnName("value_int");
@@ -378,16 +374,16 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.Property(x => x.UnitId).HasColumnName("unit_id").HasMaxLength(36);
 
-            e.HasIndex(x => new { x.EntityId, x.EntityType, x.AttributeId })
+            e.HasIndex(x => new { x.EntityId, x.AttributeId })
                 .IsUnique().HasDatabaseName("uq_av_entity_attr");
 
-            e.HasIndex(x => new { x.EntityType, x.EntityId })
+            e.HasIndex(x => x.EntityId)
                 .HasDatabaseName("ix_av_entity");
 
             // ★ #3 冲突检测：加速 max(UpdatedAt) 查询
-            e.HasIndex(x => new { x.EntityType, x.EntityId, x.UpdatedAt })
+            e.HasIndex(x => new { x.EntityId, x.UpdatedAt })
                 .HasDatabaseName("ix_av_entity_updated")
-                .IsDescending(false, false, true);
+                .IsDescending(false, true);
 
             e.HasIndex(x => new { x.AttributeId, x.ValueInt })
                 .HasDatabaseName("ix_av_attr_int").HasFilter("value_int IS NOT NULL");
@@ -430,7 +426,6 @@ public class TreeGraphDbContext : DbContext
                 .HasDefaultValueSql("gen_random_uuid()::text")
                 .HasSentinel("");
             e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
 
             e.Property(x => x.Latitude).HasColumnName("latitude");
@@ -444,16 +439,16 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
             // 一个实体的一个位置属性最多一个坐标点
-            e.HasIndex(x => new { x.EntityId, x.EntityType, x.AttributeId })
+            e.HasIndex(x => new { x.EntityId, x.AttributeId })
                 .IsUnique().HasDatabaseName("uq_lav_entity_attr");
 
-            e.HasIndex(x => new { x.EntityType, x.EntityId })
+            e.HasIndex(x => x.EntityId)
                 .HasDatabaseName("ix_lav_entity");
 
             // 冲突检测：加速 max(UpdatedAt)（与 attribute_values 对齐）
-            e.HasIndex(x => new { x.EntityType, x.EntityId, x.UpdatedAt })
+            e.HasIndex(x => new { x.EntityId, x.UpdatedAt })
                 .HasDatabaseName("ix_lav_entity_updated")
-                .IsDescending(false, false, true);
+                .IsDescending(false, true);
 
             e.HasOne(x => x.Attribute).WithMany()
                 .HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Restrict);
@@ -712,7 +707,6 @@ public class TreeGraphDbContext : DbContext
                 .HasDefaultValueSql("gen_random_uuid()::text")
                 .HasSentinel("");
             e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(36).IsRequired();
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.AttributeId).HasColumnName("attribute_id").HasMaxLength(36).IsRequired();
             e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.OldValue).HasColumnName("old_value");
@@ -723,9 +717,9 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.CorrelationId).HasColumnName("correlation_id").HasMaxLength(100);
             e.Property(x => x.ClientIp).HasColumnName("client_ip").HasMaxLength(50);
 
-            e.HasIndex(x => new { x.EntityType, x.EntityId, x.ChangedAt })
+            e.HasIndex(x => new { x.EntityId, x.ChangedAt })
                 .HasDatabaseName("ix_audit_entity")
-                .IsDescending(false, false, true);
+                .IsDescending(false, true);
             e.HasIndex(x => x.ChangedAt).HasDatabaseName("ix_audit_time");
         });
     }

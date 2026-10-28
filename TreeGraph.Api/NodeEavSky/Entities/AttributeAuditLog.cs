@@ -5,7 +5,6 @@ public class AttributeAuditLog
 {
     public string AuditId { get; set; } = "";
     public string EntityId { get; set; } = "";
-    public string EntityType { get; set; } = "";
     public string AttributeId { get; set; } = "";
     public string AttributeName { get; set; } = "";
     public string? OldValue { get; set; }

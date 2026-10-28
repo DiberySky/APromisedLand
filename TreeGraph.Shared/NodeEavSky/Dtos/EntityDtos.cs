@@ -10,7 +10,6 @@ namespace TreeGraph.Shared.NodeEavSky.Dtos;
 /// </summary>
 public record DynamicEntityDto(
     string EntityId,
-    string EntityType,
     Dictionary<string, JsonElement> Properties,
     DateTimeOffset? UpdatedAt = null);
 
@@ -18,7 +17,6 @@ public record DynamicEntityDto(
 public record EntityHistoryDto(
     string AuditId,
     string EntityId,
-    string EntityType,
     string AttributeId,
     string AttributeName,
     string? OldValue,

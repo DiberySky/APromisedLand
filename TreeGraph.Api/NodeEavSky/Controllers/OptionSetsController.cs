@@ -111,10 +111,11 @@ public class OptionSetsController : ControllerBase
     [HttpGet("{setId}/references")]
     public async Task<IActionResult> GetReferences(string setId, CancellationToken ct)
     {
+        // ★ 属性已全局化（AttributeDefinition 不再有 EntityType）
         var refs = await _db.AttributeCatalog
             .Where(a => a.RefOptionSetId == setId)
             .Select(a => new OptionSetReferenceDto(
-                a.AttributeId, a.EntityType, a.AttributeName, a.DisplayName))
+                a.AttributeId, a.AttributeName, a.DisplayName))
             .AsNoTracking()
             .ToListAsync(ct);
 

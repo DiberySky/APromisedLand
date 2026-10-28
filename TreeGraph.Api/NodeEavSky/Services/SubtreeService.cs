@@ -222,7 +222,7 @@ public sealed class SubtreeService
     private async Task<List<string>> RenderEntityAsync(
         string entityId, string entityType, CancellationToken ct)
     {
-        var defs = _attrCache.GetDefinitions(entityType)
+        var defs = _attrCache.GetDefinitions()
             .OrderBy(d => d.DisplayOrder)
             .ThenBy(d => d.AttributeName, StringComparer.Ordinal)
             .ToList();
@@ -230,12 +230,12 @@ public sealed class SubtreeService
         if (defs.Count == 0) return new List<string>();
 
         var values = await _db.AttributeValues
-            .Where(v => v.EntityId == entityId && v.EntityType == entityType)
+            .Where(v => v.EntityId == entityId)
             .AsNoTracking()
             .ToDictionaryAsync(v => v.AttributeId, ct);
 
         var locations = await _db.LocationAttributeValues
-            .Where(l => l.EntityId == entityId && l.EntityType == entityType)
+            .Where(l => l.EntityId == entityId)
             .AsNoTracking()
             .ToDictionaryAsync(l => l.AttributeId, ct);
 

@@ -28,17 +28,17 @@ public class EavApiClient
     // ============================================================
 
     public async Task<IReadOnlyList<AttributeSchemaDto>?> GetSchemaAsync(
-        string entityType, CancellationToken ct = default)
+        CancellationToken ct = default)
     {
-        var resp = await GetAsync<SchemaResponse>($"api/eav/{entityType}/schema", ct);
+        var resp = await GetAsync<SchemaResponse>("api/eav/schema", ct);
         return resp?.Attributes;
     }
 
     public async Task<DynamicEntityDto?> GetEntityAsync(
-        string entityType, string entityId,
+        string entityId,
         CancellationToken ct = default)
     {
-        var url = $"api/eav/{entityType}/entities/{entityId}";
+        var url = $"api/eav/entities/{entityId}";
         return await GetAsync<DynamicEntityDto>(url, ct);
     }
 
@@ -57,14 +57,14 @@ public class EavApiClient
 
     public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
         SaveEntityAsync(
-        string entityType, string entityId,
+        string entityId,
         Dictionary<string, object?> values,
         DateTimeOffset? expectedUpdatedAt = null,
         CancellationToken ct = default)
     {
         try
         {
-            var url = $"api/eav/{entityType}/entities/{entityId}";
+            var url = $"api/eav/entities/{entityId}";
             using var req = new HttpRequestMessage(HttpMethod.Put, url)
             {
                 Content = JsonContent.Create(values, options: JsonOptions)
@@ -113,14 +113,14 @@ public class EavApiClient
 
     public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
         PatchEntityAsync(
-        string entityType, string entityId,
+        string entityId,
         Dictionary<string, object?> values,
         DateTimeOffset? expectedUpdatedAt = null,
         CancellationToken ct = default)
     {
         try
         {
-            var url = $"api/eav/{entityType}/entities/{entityId}";
+            var url = $"api/eav/entities/{entityId}";
             using var req = new HttpRequestMessage(HttpMethod.Patch, url)
             {
                 Content = JsonContent.Create(values, options: JsonOptions)
@@ -165,38 +165,37 @@ public class EavApiClient
     }
 
     public async Task<(bool Ok, string? Error)> DeleteEntityAsync(
-        string entityType, string entityId, CancellationToken ct = default)
+        string entityId, CancellationToken ct = default)
         => await DeleteWithErrorAsync(
-            $"api/eav/{entityType}/entities/{entityId}", ct);
+            $"api/eav/entities/{entityId}", ct);
 
     public async Task<BatchDeleteResultDto?> BatchDeleteEntitiesAsync(
-        string entityType,
         IReadOnlyList<string> entityIds,
         CancellationToken ct = default)
     {
         var body = new BatchDeleteRequest { EntityIds = entityIds.ToList() };
         return await PostAsync<BatchDeleteResultDto>(
-            $"api/eav/{entityType}/entities/batch-delete", body, ct);
+            "api/eav/entities/batch-delete", body, ct);
     }
 
     public async Task<PagedResult<DynamicEntityDto>?> QueryAsync(
-        string entityType, EavQueryRequest request, CancellationToken ct = default)
+        EavQueryRequest request, CancellationToken ct = default)
         => await PostAsync<PagedResult<DynamicEntityDto>>(
-            $"api/eav/{entityType}/entities/query", request, ct);
+            "api/eav/entities/query", request, ct);
 
     public async Task<IReadOnlyList<string>?> QueryByTableAsync(
-        string entityType, QueryByTableRequest request, CancellationToken ct = default)
+        QueryByTableRequest request, CancellationToken ct = default)
     {
         var resp = await PostAsync<QueryByTableResponse>(
-            $"api/eav/{entityType}/entities/query-by-table", request, ct);
+            "api/eav/entities/query-by-table", request, ct);
         return resp?.EntityIds;
     }
 
     public async Task<IReadOnlyList<EntityHistoryDto>?> GetHistoryAsync(
-        string entityType, string entityId,
+        string entityId,
         DateTimeOffset? from = null, CancellationToken ct = default)
     {
-        var url = $"api/eav/{entityType}/entities/{entityId}/history";
+        var url = $"api/eav/entities/{entityId}/history";
         if (from.HasValue)
             url += $"?from={Uri.EscapeDataString(from.Value.ToString("O"))}";
         return await GetAsync<IReadOnlyList<EntityHistoryDto>>(url, ct);
@@ -367,17 +366,9 @@ public class EavApiClient
     // ============================================================
 
     public async Task<IReadOnlyList<AttributeDetailDto>?> ListAttributesAsync(
-        string? entityType = null, CancellationToken ct = default)
-    {
-        var query = new List<string>();
-        if (!string.IsNullOrEmpty(entityType))
-            query.Add($"entityType={Uri.EscapeDataString(entityType)}");
-
-        var url = "api/eav/metadata/attributes";
-        if (query.Count > 0) url += "?" + string.Join("&", query);
-
-        return await GetAsync<IReadOnlyList<AttributeDetailDto>>(url, ct);
-    }
+        CancellationToken ct = default)
+        => await GetAsync<IReadOnlyList<AttributeDetailDto>>(
+            "api/eav/metadata/attributes", ct);
 
     public Task<AttributeDetailDto?> GetAttributeAsync(
         string id, CancellationToken ct = default)
@@ -422,18 +413,17 @@ public class EavApiClient
         => DeleteWithErrorAsync($"api/eav/entity-types/{id}", ct);
 
     public async Task<PagedResult<DynamicEntityDto>?> ListEntitiesAsync(
-        string entityType, int page = 1, int pageSize = 20,
+        int page = 1, int pageSize = 20,
         CancellationToken ct = default)
     {
         var request = new EavQueryRequest
         {
-            EntityType = entityType,
             Filters = new List<AttributeFilter>(),
             Page = page,
             PageSize = pageSize
         };
         return await PostAsync<PagedResult<DynamicEntityDto>>(
-            $"api/eav/{entityType}/entities/query", request, ct);
+            "api/eav/entities/query", request, ct);
     }
 
     public Task<(bool Ok, string? Error)> UpdateAttributeAsync(
@@ -1229,8 +1219,7 @@ public class EavApiClient
     // 私有 record
     // ============================================================
 
-    private sealed record SchemaResponse(
-        string EntityType, IReadOnlyList<AttributeSchemaDto> Attributes);
+    private sealed record SchemaResponse(IReadOnlyList<AttributeSchemaDto> Attributes);
 
     private sealed record QueryByTableResponse(List<string> EntityIds);
 

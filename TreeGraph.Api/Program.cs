@@ -39,8 +39,6 @@ builder.Services.AddProblemDetails();
 builder.AddNpgsqlDbContext<TreeGraphDbContext>("TreeGraphDb");
 
 builder.Services.AddMemoryCache();
-// 实体归属守卫聚合器（具体 guard 由各业务模块注册；无守卫时安全放行）
-builder.Services.AddScoped<EntityOwnerGuardRegistry>();
 // iNode 宿主守卫聚合器：inode 写链路（关注类型/首次写实体）校验宿主节点存在
 builder.Services.AddScoped<InodeOwnerGuardRegistry>();
 builder.Services.AddScoped<EavWriteService>();

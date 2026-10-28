@@ -56,7 +56,6 @@ public record OptionItemDetailDto(
 
 public record OptionSetReferenceDto(
     string AttributeId,
-    string EntityType,
     string AttributeName,
     string DisplayName);
 

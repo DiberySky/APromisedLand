@@ -7,7 +7,6 @@ public class AttributeValue
 {
     public string ValueId { get; set; } = "";
     public string EntityId { get; set; } = "";
-    public string EntityType { get; set; } = "";
     public string AttributeId { get; set; } = "";
 
     // 类型化值列

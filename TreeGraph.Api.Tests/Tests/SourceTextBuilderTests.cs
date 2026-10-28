@@ -61,13 +61,13 @@ public class SourceTextBuilderTests
             });
             db.AttributeCatalog.Add(new AttributeDefinition
             {
-                AttributeId = "attr-name", EntityType = "Equipment",
+                AttributeId = "attr-name",
                 AttributeName = "name", DisplayName = "名称",
                 DataType = "string", DisplayOrder = 1
             });
             db.AttributeValues.Add(new AttributeValue
             {
-                ValueId = "v-1", EntityType = "Equipment", EntityId = "e-1",
+                ValueId = "v-1", EntityId = "e-1",
                 AttributeId = "attr-name", ValueString = "消防水泵"
             });
             db.SaveChanges();

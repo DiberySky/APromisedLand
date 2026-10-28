@@ -25,23 +25,23 @@ public class EavReadService
     }
 
     public async Task<DynamicEntity> LoadAsync(
-        string entityId, string entityType,
+        string entityId,
         CancellationToken ct = default)
     {
-        var definitions = _attrCache.GetDefinitions(entityType);
+        var definitions = _attrCache.GetDefinitions();
         var defMap = definitions.ToDictionary(d => d.AttributeId);
 
         var rows = await _db.AttributeValues
-            .Where(v => v.EntityType == entityType && v.EntityId == entityId)
+            .Where(v => v.EntityId == entityId)
             .AsNoTracking()
             .ToListAsync(ct);
 
         var locRows = await _db.LocationAttributeValues
-            .Where(l => l.EntityType == entityType && l.EntityId == entityId)
+            .Where(l => l.EntityId == entityId)
             .AsNoTracking()
             .ToListAsync(ct);
 
-        var result = new DynamicEntity(entityId, entityType);
+        var result = new DynamicEntity(entityId);
 
         // ★ #3：填充 UpdatedAt（供乐观锁使用），需合并类型化值表与位置表
         var valuesMax = rows.Count > 0 ? rows.Max(r => r.UpdatedAt) : (DateTimeOffset?)null;
@@ -73,20 +73,20 @@ public class EavReadService
     }
 
     public async Task<List<DynamicEntity>> LoadBatchAsync(
-        IEnumerable<string> entityIds, string entityType,
+        IEnumerable<string> entityIds,
         CancellationToken ct = default)
     {
         var ids = entityIds.ToList();
-        var definitions = _attrCache.GetDefinitions(entityType);
+        var definitions = _attrCache.GetDefinitions();
         var defMap = definitions.ToDictionary(d => d.AttributeId);
 
         var allRows = await _db.AttributeValues
-            .Where(v => v.EntityType == entityType && ids.Contains(v.EntityId))
+            .Where(v => ids.Contains(v.EntityId))
             .AsNoTracking()
             .ToListAsync(ct);
 
         var allLocRows = await _db.LocationAttributeValues
-            .Where(l => l.EntityType == entityType && ids.Contains(l.EntityId))
+            .Where(l => ids.Contains(l.EntityId))
             .AsNoTracking()
             .ToListAsync(ct);
 
@@ -107,7 +107,7 @@ public class EavReadService
 
         return allEntityIds.Select(entityId =>
         {
-            var entity = new DynamicEntity(entityId, entityType);
+            var entity = new DynamicEntity(entityId);
 
             DateTimeOffset? maxUpdated = null;
 
@@ -222,11 +222,11 @@ public class EavReadService
     }
 
     public async Task<List<AttributeAuditLog>> GetHistoryAsync(
-        string entityId, string entityType, DateTimeOffset? from = null,
+        string entityId, DateTimeOffset? from = null,
         CancellationToken ct = default)
     {
         var query = _db.AttributeAuditLogs
-            .Where(a => a.EntityId == entityId && a.EntityType == entityType);
+            .Where(a => a.EntityId == entityId);
 
         if (from.HasValue)
             query = query.Where(a => a.ChangedAt >= from.Value);
@@ -245,7 +245,6 @@ public class DynamicEntity
 
     /// <summary>实体 ID（GUID 字符串）。</summary>
     public string EntityId { get; }
-    public string EntityType { get; }
 
     /// <summary>
     /// ★ #3：实体所有 AttributeValue 行的最大 UpdatedAt。
@@ -253,7 +252,7 @@ public class DynamicEntity
     /// </summary>
     public DateTimeOffset? UpdatedAt { get; set; }
 
-    public DynamicEntity(string id, string type) { EntityId = id; EntityType = type; }
+    public DynamicEntity(string id) { EntityId = id; }
 
     public void SetProperty(string name, object? value) => _props[name] = value;
     public object? GetProperty(string name) => _props.TryGetValue(name, out var v) ? v : null;

@@ -70,11 +70,19 @@ public class InodeQueryController : ControllerBase
                 });
             }
         }
+        else
+        {
+            // EAV 已去 entityType 维度：跨 iNode 查询按归属映射表的
+            // EntityType 限定候选集，否则会扫到全库实体
+            allowedEntityIds = (await _inodeEntities.ListByTypeAsync(
+                    request.EntityType, ct))
+                .Select(m => m.EntityId)
+                .ToList();
+        }
 
         // 2. 走查询
         var internalReq = new Shared.NodeEavSky.Dtos.EavQueryRequest
         {
-            EntityType = request.EntityType,
             Filters = request.Filters,
             OrderByAttribute = request.OrderByAttribute,
             OrderDescending = request.OrderDescending,
@@ -85,7 +93,7 @@ public class InodeQueryController : ControllerBase
         try
         {
             var result = await _query.QueryWithAllowedIdsAsync(
-                request.EntityType, allowedEntityIds, internalReq, ct);
+                allowedEntityIds, internalReq, ct);
 
             // 3. 反查 inode_id（若跨 iNode 查询，需要给每个结果填充）
             var entityIds = result.Items.Select(e => e.EntityId).ToList();
@@ -97,7 +105,7 @@ public class InodeQueryController : ControllerBase
                 Items = result.Items.Select(e => new InodeEntityDto(
                     inodeMap.GetValueOrDefault(e.EntityId, ""),
                     e.EntityId,
-                    e.EntityType,
+                    request.EntityType,
                     ToJsonDict(e),
                     e.UpdatedAt)).ToList(),
                 Total = result.Total,
