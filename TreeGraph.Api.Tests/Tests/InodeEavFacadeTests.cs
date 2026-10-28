@@ -46,7 +46,7 @@ public class InodeEavFacadeTests : IntegrationTestBase
 
         // 用旧 EAV API 读
         var viaEav = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/eav/entities/{viaInode!.EntityId}");
+            $"/api/eav/{EntityType}/entities/{viaInode!.EntityId}");
 
         Assert.NotNull(viaEav);
         Assert.Equal(viaInode.EntityId, viaEav!.EntityId);
@@ -76,7 +76,7 @@ public class InodeEavFacadeTests : IntegrationTestBase
 
         // 用旧 EAV API 改
         await Client.PutAsJsonAsync(
-            $"/api/eav/entities/{entityId}",
+            $"/api/eav/{EntityType}/entities/{entityId}",
             new Dictionary<string, object?>
             {
                 ["name"] = "via-eav",
@@ -158,7 +158,7 @@ public class InodeEavFacadeTests : IntegrationTestBase
 
         // 旧 EAV API 契约：不存在的实体返回 200 + 空 Properties（无 404 分支）
         var viaEav = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/eav/entities/{entityId}");
+            $"/api/eav/{EntityType}/entities/{entityId}");
         Assert.NotNull(viaEav);
         Assert.False(viaEav!.Properties.ContainsKey("name"));
     }

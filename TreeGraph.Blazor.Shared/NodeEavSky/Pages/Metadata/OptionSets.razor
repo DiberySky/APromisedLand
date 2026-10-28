@@ -1,5 +1,5 @@
-@* OptionSets.razor — 选项集管理（对话框已抽取为 DialogService 组件，见 Components/Dialogs/OptionSet*Dialog.razor）
-   支持对话框模式：IsDialogMode=true 时隐藏 PageHeaderSky。 *@
+@* OptionSets.razor — 选项集定义管理（平铺表格，对齐组合定义模式；选项定义在独立对话框中管理）
+   支持对话框模式：IsDialogMode=true 时隐藏 PageHeaderSky，新建按钮置于表头操作列。 *@
 @page "/metadata/option-sets"
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
@@ -7,9 +7,9 @@
 
 @if (!IsDialogMode)
 {
-    <PageTitle>选项集管理</PageTitle>
+    <PageTitle>选项集定义管理</PageTitle>
 
-    <PageHeaderSky Title="选项集管理">
+    <PageHeaderSky Title="选项集定义管理">
         <Actions>
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Small"
@@ -28,186 +28,134 @@
     </PageHeaderSky>
 }
 
-@* 过滤器栏（无 MudPaper 包裹）；对话框模式下追加新建按钮 *@
-<MudGrid Class="mb-4">
-    <MudItem xs="12" md="4" Class="d-flex align-center">
-        <MudTextField @bind-Value="_entityType" Label="实体类型（可选）"
-                      Variant="Variant.Outlined" Margin="Margin.Dense"
-                      Placeholder="留空显示全部" />
-    </MudItem>
-    @if (IsDialogMode)
-    {
-        <MudItem xs="12" md="8" Class="d-flex justify-end align-center">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       Size="Size.Small"
-                       OnClick="LoadAsync" Disabled="@_loading"
-                       StartIcon="@Icons.Material.Filled.Refresh"
-                       Class="mr-2">
-                刷新
-            </MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Success"
-                       Size="Size.Small"
-                       OnClick="OpenCreateSetAsync"
-                       StartIcon="@Icons.Material.Filled.Add">
-                新建选项集
-            </MudButton>
-        </MudItem>
-    }
-</MudGrid>
-
-@if (_loading)
-{
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-}
-else if (_sets is null || _sets.Count == 0)
-{
-    <EmptyStateSky Icon="@Icons.Material.Filled.Checklist"
-                   Title="暂无选项集">
-        <Description>
-            <text>点击"新建选项集"创建第一个</text>
-        </Description>
-    </EmptyStateSky>
-}
-else
-{
-    <MudExpansionPanels MultiExpansion="true">
-        @foreach (var set in _sets)
+<MudTable T="OptionSetSummaryDto" Items="_sets" Hover="true" Bordered="true"
+          Dense="true"
+          Breakpoint="Breakpoint.Sm"
+          Loading="@_loading"
+          LoadingProgressColor="Color.Primary">
+    <HeaderContent>
+        <MudTh>名称</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">选项定义</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+            @if (IsDialogMode)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="OpenCreateSetAsync"
+                               title="新建选项集" />
+            }
+            else
+            {
+                <text>操作</text>
+            }
+        </MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="名称">
+            <div class="d-flex align-center flex-nowrap">
+                <MudText Typo="Typo.body1">@context.DisplayName</MudText>
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">
+                    @context.SetName
+                </MudChip>
+                @if (!string.IsNullOrWhiteSpace(context.EntityType))
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Class="ml-2">
+                        @context.EntityType
+                    </MudChip>
+                }
+            </div>
+        </MudTd>
+        <MudTd DataLabel="选项定义" Style="white-space: nowrap; text-align: center;">
+            @* 图标入口：点击打开选项定义对话框并锁定该选项集；
+               选项数量以徽标叠加在图标右上角 *@
+            <MudBadge Content="@ItemCount(context.OptionSetId)" Color="Color.Info"
+                      Overlap="true" Bordered="true" Max="99">
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="@(async () => await OpenItemsAsync(context))"
+                               title="管理选项定义" />
+            </MudBadge>
+        </MudTd>
+        <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Small"
+                           Color="Color.Error"
+                           OnClick="@(async () => await DeleteSetAsync(context))"
+                           title="删除" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                           Size="Size.Small"
+                           Color="Color.Primary"
+                           OnClick="@(() => OpenEditSetAsync(context))"
+                           title="编辑" />
+            <MudIconButton Icon="@(IsExpanded(context.OptionSetId) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                           Size="Size.Small"
+                           Color="Color.Info"
+                           OnClick="@(() => ToggleExpand(context.OptionSetId))"
+                           title="查看选项" />
+        </MudTd>
+    </RowTemplate>
+    <ChildRowContent>
+        @if (IsExpanded(context.OptionSetId))
         {
-            var currentSet = set;
-            var items = _itemsCache.TryGetValue(currentSet.OptionSetId, out var list)
-                ? list
-                : new List<OptionItemDetailDto>();
-
-            <MudExpansionPanel @key="currentSet.OptionSetId">
-                <TitleContent>
-                    <div class="d-flex align-center" style="width: 100%; min-width: 0;">
-                        <div class="d-flex align-center" style="flex: 1 1 auto; min-width: 0; overflow: hidden;">
-                        <MudIcon Icon="@Icons.Material.Filled.Checklist"
-                                 Color="Color.Primary"
-                                 Class="mr-2" />
-                        <MudText Typo="Typo.subtitle1"
-                                 Style="flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                            @currentSet.DisplayName
-                        </MudText>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Info"
-                                 Class="ml-2">
-                            @currentSet.SetName
-                        </MudChip>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary"
-                                 Class="ml-2">
-                            @currentSet.EntityType
-                        </MudChip>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Warning"
-                                 Class="ml-2">
-                            @items.Count 项
-                        </MudChip>
-                        </div>
-                        <div class="d-flex align-center" style="flex: 0 0 auto;">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                       Color="Color.Primary"
-                                       Size="Size.Medium"
-                                       OnClick="@(async () => await OpenEditSetAsync(currentSet))"
-                                       title="编辑选项集" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Color="Color.Error"
-                                       Size="Size.Medium"
-                                       OnClick="@(async () => await DeleteSetAsync(currentSet))"
-                                       title="删除选项集" />
-                        </div>
-                    </div>
-                </TitleContent>
-
-                <ChildContent>
-                    <div class="d-flex mb-3 justify-end">
-                        <MudButton Size="Size.Medium"
-                                   Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.Add"
-                                   OnClick="@(async () => await OpenAddItemAsync(currentSet))">
-                            添加选项
-                        </MudButton>
-                    </div>
-
-                    @if (items.Count == 0)
-                    {
-                        <MudAlert Severity="Severity.Info">
-                            该选项集暂无选项
-                        </MudAlert>
-                    }
-                    else
-                    {
-                        <MudTable Items="items" Bordered="true"
-                                  Hover="true">
-                            <HeaderContent>
-                                <MudTh>Value</MudTh>
-                                <MudTh>Label</MudTh>
-                                <MudTh>顺序</MudTh>
-                                <MudTh>默认</MudTh>
-                                <MudTh>状态</MudTh>
-                                <MudTh>操作</MudTh>
-                            </HeaderContent>
-                            <RowTemplate>
-                                <MudTd>
-                                    <code>@context.Value</code>
-                                </MudTd>
-                                <MudTd>@context.Label</MudTd>
-                                <MudTd>@context.DisplayOrder</MudTd>
-                                <MudTd>
-                                    @if (context.IsDefault)
+            var items = ItemsOf(context.OptionSetId);
+            <MudTr>
+                <td colspan="3" style="padding: 0;">
+                    <MudPaper Elevation="0" Class="pa-3"
+                              Style="background: var(--mud-palette-background-grey);">
+                        @if (items.Count == 0)
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true">该选项集暂无选项</MudAlert>
+                        }
+                        else
+                        {
+                            <MudSimpleTable Dense="true" Bordered="true" Hover="true"
+                                            Style="overflow-x: auto;">
+                                <thead>
+                                    <tr>
+                                        <th>显示名</th>
+                                        <th>值</th>
+                                        <th style="text-align: center;">默认</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in items)
                                     {
-                                        <MudIcon Icon="@Icons.Material.Filled.Star"
-                                                 Color="Color.Warning"
-                                                 Size="Size.Small" />
+                                        <tr>
+                                            <td>@item.Label</td>
+                                            <td><code>@item.Value</code></td>
+                                            <td style="text-align: center;">
+                                                @if (item.IsDefault)
+                                                {
+                                                    <MudIcon Icon="@Icons.Material.Filled.Star"
+                                                             Color="Color.Warning" Size="Size.Small" />
+                                                }
+                                            </td>
+                                        </tr>
                                     }
-                                </MudTd>
-                                <MudTd>
-                                    <MudChip T="string" Size="Size.Small"
-                                             Color="Color.Success">
-                                        启用
-                                    </MudChip>
-                                </MudTd>
-                                <MudTd>
-                                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
-                                                   Size="Size.Medium"
-                                                   OnClick="@(async () => await MoveUpAsync(currentSet, context))"
-                                                   title="上移" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
-                                                   Size="Size.Medium"
-                                                   OnClick="@(async () => await MoveDownAsync(currentSet, context))"
-                                                   title="下移" />
-                                    @if (!context.IsDefault)
-                                    {
-                                        <MudIconButton Icon="@Icons.Material.Filled.StarBorder"
-                                                       Size="Size.Medium"
-                                                       Color="Color.Warning"
-                                                       OnClick="@(async () => await SetDefaultAsync(currentSet, context))"
-                                                       title="设为默认" />
-                                    }
-                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                                   Size="Size.Medium"
-                                                   Color="Color.Primary"
-                                                   OnClick="@(async () => await OpenEditItemAsync(currentSet, context))"
-                                                   title="编辑" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                   Size="Size.Medium"
-                                                   Color="Color.Error"
-                                                   OnClick="@(async () => await DeleteItemAsync(currentSet, context))"
-                                                   title="删除" />
-                                </MudTd>
-                            </RowTemplate>
-                        </MudTable>
-                    }
-                </ChildContent>
-            </MudExpansionPanel>
+                                </tbody>
+                            </MudSimpleTable>
+                        }
+                    </MudPaper>
+                </td>
+            </MudTr>
         }
-    </MudExpansionPanels>
-}
+    </ChildRowContent>
+    <NoRecordsContent>
+        <EmptyStateSky Icon="@Icons.Material.Filled.Checklist"
+                       Title="暂无选项集">
+            <Description>
+                <text>点击右上角 + 创建第一个</text>
+            </Description>
+        </EmptyStateSky>
+    </NoRecordsContent>
+</MudTable>
 
 @code {
-    /// <summary>对话框模式：隐藏页头，刷新/新建按钮移至过滤器栏右侧。</summary>
+    /// <summary>嵌入模式（对话框/选项卡）：隐藏页头与工具栏，新建按钮置于表头操作列。</summary>
     [Parameter] public bool IsDialogMode { get; set; }
 
-    private string? _entityType;
     private IReadOnlyList<OptionSetSummaryDto>? _sets;
     private readonly Dictionary<string, List<OptionItemDetailDto>> _itemsCache = new();
     private bool _loading;
@@ -234,7 +182,7 @@ else
         _loading = true;
         try
         {
-            _sets = await Api.ListOptionSetsAsync(_entityType);
+            _sets = await Api.ListOptionSetsAsync();
             if (_sets is null)
             {
                 Snackbar.Add("加载失败，请检查后端服务", Severity.Error);
@@ -243,18 +191,9 @@ else
                 return;
             }
 
-            if (_sets.Count == 0)
-            {
-                _itemsCache.Clear();
-                return;
-            }
-
+            // 批量加载各选项集的选项（徽标计数 + 展开视图共用）
             var tasks = _sets.Select(async set =>
-            {
-                var items = await Api.ListOptionItemsAsync(set.OptionSetId);
-                return (set.OptionSetId, Items: items);
-            });
-
+                (set.OptionSetId, Items: await Api.ListOptionItemsAsync(set.OptionSetId)));
             var results = await Task.WhenAll(tasks);
 
             _itemsCache.Clear();
@@ -262,7 +201,12 @@ else
             foreach (var (setId, items) in results)
             {
                 if (items is null) failedCount++;
-                _itemsCache[setId] = items?.ToList() ?? new List<OptionItemDetailDto>();
+                _itemsCache[setId] = items?
+                    .Where(i => !i.IsDeleted)
+                    .OrderBy(i => i.DisplayOrder)
+                    .ThenBy(i => i.OptionItemId)
+                    .ToList()
+                    ?? [];
             }
 
             if (failedCount > 0)
@@ -272,12 +216,6 @@ else
         {
             _loading = false;
         }
-    }
-
-    private async Task ReloadItemsAsync(string optionSetId)
-    {
-        var items = await Api.ListOptionItemsAsync(optionSetId);
-        _itemsCache[optionSetId] = items?.ToList() ?? new List<OptionItemDetailDto>();
     }
 
     // ---------- 选项集 CRUD ----------
@@ -302,7 +240,7 @@ else
         };
 
         var dialog = await DialogService.ShowAsync<OptionSetEditDialog>(
-            null, parameters, DialogOptions);
+            string.Empty, parameters, DialogOptions);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -317,7 +255,7 @@ else
         if (refs is not null && refs.Count > 0)
         {
             var refList = string.Join("\n",
-                refs.Select(r => $"  · {r.AttributeName} ({r.DisplayName})"));
+                refs.Select(r => $"  · {r.EntityType}.{r.AttributeName} ({r.DisplayName})"));
             await DialogService.ShowMessageBoxAsync(
                 "无法删除",
                 $"选项集「{set.DisplayName}」仍被以下属性引用：\n{refList}\n\n请先解除引用。",
@@ -345,141 +283,52 @@ else
         }
     }
 
-    // ---------- 选项 CRUD ----------
+    // ---------- 选项定义对话框 ----------
 
-    private async Task OpenAddItemAsync(OptionSetSummaryDto set)
+    /// <summary>打开独立选项定义对话框并锁定该选项集。</summary>
+    private async Task OpenItemsAsync(OptionSetSummaryDto set)
     {
-        var existingCount = _itemsCache.TryGetValue(set.OptionSetId, out var items)
-            ? items.Count(i => !i.IsDeleted)
-            : 0;
-
-        var parameters = new DialogParameters<OptionSetItemDialog>
+        var parameters = new DialogParameters<OptionSetItemsDialog>
         {
             { x => x.Set, set },
-            { x => x.InitialDisplayOrder, existingCount + 1 }
+            { x => x.OnChanged, EventCallback.Factory.Create(this, LoadAsync) }
         };
 
-        var dialog = await DialogService.ShowAsync<OptionSetItemDialog>(
-            null, parameters, DialogOptions);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
+        var options = new DialogOptionsEx
         {
-            await ReloadItemsAsync(set.OptionSetId);
-        }
-    }
-
-    private async Task OpenEditItemAsync(
-        OptionSetSummaryDto set, OptionItemDetailDto item)
-    {
-        var parameters = new DialogParameters<OptionSetItemDialog>
-        {
-            { x => x.Set, set },
-            { x => x.EditingItem, item }
+            Position = DialogPosition.TopCenter,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            MaximizeButton = true
         };
 
-        var dialog = await DialogService.ShowAsync<OptionSetItemDialog>(
-            null, parameters, DialogOptions);
-        var result = await dialog.Result;
+        var dialog = await DialogService.ShowExAsync<OptionSetItemsDialog>(
+            string.Empty, parameters, options);
+        await dialog.Result;
 
-        if (result is { Canceled: false })
-        {
-            await ReloadItemsAsync(set.OptionSetId);
-        }
+        // 选项可能增删，关闭后刷新徽标计数
+        await LoadAsync();
     }
 
-    private async Task DeleteItemAsync(
-        OptionSetSummaryDto set, OptionItemDetailDto item)
+    // ---------- 行内展开：选项二级列表（只读） ----------
+
+    /// <summary>已展开行的选项集 ID。</summary>
+    private readonly HashSet<string> _expandedIds = new();
+
+    private bool IsExpanded(string optionSetId) => _expandedIds.Contains(optionSetId);
+
+    /// <summary>切换展开（选项数据已批量加载，无需请求）。</summary>
+    private void ToggleExpand(string optionSetId)
     {
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "确认删除",
-            $"确定删除选项「{item.Label}」({item.Value})？" +
-            "已有数据中引用的该值仍会保留，读取时降级显示。",
-            yesText: "删除", cancelText: "取消");
-
-        if (confirmed != true) return;
-
-        var (ok, error) = await Api.DeleteOptionItemAsync(set.OptionSetId, item.OptionItemId);
-        if (ok)
-        {
-            Snackbar.Add("删除成功", Severity.Success);
-            await ReloadItemsAsync(set.OptionSetId);
-        }
-        else
-        {
-            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
-        }
+        if (!_expandedIds.Add(optionSetId))
+            _expandedIds.Remove(optionSetId);
     }
 
-    // ---------- 设为默认 ----------
+    /// <summary>选项集的活动选项数（徽标）。</summary>
+    private int ItemCount(string optionSetId)
+        => _itemsCache.TryGetValue(optionSetId, out var items) ? items.Count : 0;
 
-    private async Task SetDefaultAsync(
-        OptionSetSummaryDto set, OptionItemDetailDto item)
-    {
-        var (ok, error) = await Api.UpdateOptionItemAsync(
-            set.OptionSetId, item.OptionItemId,
-            new UpdateOptionItemRequest { IsDefault = true });
-
-        if (!ok)
-        {
-            Snackbar.Add($"设置默认失败：{error ?? "未知错误"}", Severity.Error);
-            return;
-        }
-
-        Snackbar.Add($"已将「{item.Label}」设为默认", Severity.Success);
-        await ReloadItemsAsync(set.OptionSetId);
-    }
-
-    // ---------- 重排序（上移 / 下移） ----------
-
-    private async Task MoveUpAsync(
-        OptionSetSummaryDto set, OptionItemDetailDto item)
-    {
-        var items = _itemsCache[set.OptionSetId]
-            .Where(i => !i.IsDeleted)
-            .OrderBy(i => i.DisplayOrder)
-            .ThenBy(i => i.OptionItemId)
-            .ToList();
-
-        var idx = items.FindIndex(i => i.OptionItemId == item.OptionItemId);
-        if (idx <= 0) return;
-
-        (items[idx - 1], items[idx]) = (items[idx], items[idx - 1]);
-        await ApplyReorderAsync(set.OptionSetId, items);
-    }
-
-    private async Task MoveDownAsync(
-        OptionSetSummaryDto set, OptionItemDetailDto item)
-    {
-        var items = _itemsCache[set.OptionSetId]
-            .Where(i => !i.IsDeleted)
-            .OrderBy(i => i.DisplayOrder)
-            .ThenBy(i => i.OptionItemId)
-            .ToList();
-
-        var idx = items.FindIndex(i => i.OptionItemId == item.OptionItemId);
-        if (idx < 0 || idx >= items.Count - 1) return;
-
-        (items[idx + 1], items[idx]) = (items[idx], items[idx + 1]);
-        await ApplyReorderAsync(set.OptionSetId, items);
-    }
-
-    private async Task ApplyReorderAsync(
-        string optionSetId, List<OptionItemDetailDto> orderedItems)
-    {
-        var orders = orderedItems
-            .Select((it, i) => new ReorderOptionItem
-            {
-                OptionItemId = it.OptionItemId,
-                DisplayOrder = i + 1
-            })
-            .ToList();
-
-        var (ok, error) = await Api.ReorderOptionItemsAsync(optionSetId, orders);
-
-        if (!ok)
-            Snackbar.Add($"重排序失败：{error ?? "未知错误"}", Severity.Error);
-
-        await ReloadItemsAsync(optionSetId);
-    }
+    /// <summary>选项集的活动选项列表（已按顺序排好）。</summary>
+    private List<OptionItemDetailDto> ItemsOf(string optionSetId)
+        => _itemsCache.TryGetValue(optionSetId, out var items) ? items : [];
 }

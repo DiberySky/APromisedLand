@@ -4,10 +4,11 @@ namespace TreeGraph.Api.NodeEavSky.Entities;
 public class CompositeTypeDefinition
 {
     public string CompositeTypeId { get; set; } = "";
-    public string EntityType { get; set; } = "";
     public string TypeName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int Version { get; set; } = 1;
+    /// <summary>管理页排序号（越小越靠前）。</summary>
+    public int DisplayOrder { get; set; }
     public bool IsDeleted { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

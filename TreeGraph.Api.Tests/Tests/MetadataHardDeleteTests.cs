@@ -32,7 +32,7 @@ public class MetadataHardDeleteTests : IntegrationTestBase
 
         // 删除后列表不再包含
         var listResp = await Client.GetAsync(
-            "/api/eav/metadata/attributes");
+            $"/api/eav/metadata/attributes?entityType={EntityType}");
         var list = await listResp.Content
             .ReadEavAsync<List<AttributeDetailDto>>();
         Assert.NotNull(list);
@@ -50,6 +50,7 @@ public class MetadataHardDeleteTests : IntegrationTestBase
             "/api/eav/metadata/attributes",
             new
             {
+                entityType = EntityType,
                 attributeName,
                 displayName = attributeName,
                 dataType = "string",

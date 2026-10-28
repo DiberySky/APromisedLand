@@ -1,8 +1,47 @@
 @* Attributes.razor — 属性定义管理（对话框内容组件，由 AttributesManageDialog 承载）
-   属性已全局化，不再按实体类型过滤。 *@
+   传入 EntityType 时锁定实体类型并隐藏选择器；不传时为通用模式，可在对话框内切换实体类型。 *@
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject EntityTypeDisplayService EntityTypeDisplay
+
+@* 过滤器栏（无 MudPaper 包裹）；锁定模式下不渲染实体类型选择器 *@
+@if (!_locked)
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudSelect T="string"
+                       Value="_entityType"
+                       ValueChanged="OnEntityTypeChanged"
+                       Label="实体类型"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       FullWidth="true">
+                @if (_entityTypes is null)
+                {
+                    <MudSelectItem T="string" Value="@("")" Disabled="true">
+                        加载中...
+                    </MudSelectItem>
+                }
+                else if (_entityTypes.Count == 0)
+                {
+                    <MudSelectItem T="string" Value="@("")" Disabled="true">
+                        （暂无实体类型）
+                    </MudSelectItem>
+                }
+                else
+                {
+                    @foreach (var et in _entityTypes)
+                    {
+                        <MudSelectItem T="string" Value="@et.EntityType">
+                            @GetDisplayName(et) (@et.AttributeCount)
+                        </MudSelectItem>
+                    }
+                }
+            </MudSelect>
+        </MudItem>
+    </MudGrid>
+}
 
 <MudTable Items="_attributes" Hover="true" Bordered="true"
           Dense="true"
@@ -18,6 +57,7 @@
                            Size="Size.Small"
                            Color="Color.Success"
                            OnClick="OpenCreateAsync"
+                           Disabled="@(string.IsNullOrEmpty(_entityType))"
                            title="新建属性" />
         </MudTh>
     </HeaderContent>
@@ -65,20 +105,35 @@
         <EmptyStateSky Icon="@Icons.Material.Filled.ListAlt"
                        Title="暂无属性定义">
             <Description>
-                <text>点击表头「＋」添加第一个属性</text>
+                @if (string.IsNullOrEmpty(_entityType))
+                {
+                    <text>请先在上方选择一个实体类型</text>
+                }
+                else
+                {
+                    <text>点击表头「＋」为该实体类型添加第一个属性</text>
+                }
             </Description>
         </EmptyStateSky>
     </NoRecordsContent>
 </MudTable>
 
 @code {
+    /// <summary>锁定的实体类型：提供时隐藏类型选择器；为空时为通用模式（可切换类型）。</summary>
+    [Parameter] public string? EntityType { get; set; }
+
     /// <summary>属性变更后回调（通知父对话框/宿主刷新）。</summary>
     [Parameter] public EventCallback OnAttributesChanged { get; set; }
 
+    /// <summary>是否锁定单一实体类型。</summary>
+    private bool _locked => !string.IsNullOrEmpty(EntityType);
+
+    private string? _entityType;
     private IReadOnlyList<AttributeDetailDto>? _attributes;
     private bool _loading;
     private bool _moving;
 
+    private IReadOnlyList<EntityTypeSummaryDto>? _entityTypes;
     private IReadOnlyList<CompositeTypeDetailDto>? _compositeTypes;
     private IReadOnlyList<CustomTableDetailDto>? _customTables;
     private IReadOnlyList<OptionSetSummaryDto>? _optionSets;
@@ -93,7 +148,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // 锁定模式：固定为传入的实体类型；通用模式由 LoadEntityTypesAsync 默认选第一个
+        if (_locked)
+        {
+            _entityType = EntityType;
+        }
+
         await LoadReferencesAsync();
+        await LoadEntityTypesAsync();
         await LoadAsync();
     }
 
@@ -116,12 +178,46 @@
             Snackbar.Add($"引用加载失败：{string.Join("、", failed)}", Severity.Warning);
     }
 
+    private async Task LoadEntityTypesAsync()
+    {
+        _entityTypes = await Api.ListEntityTypesAsync();
+
+        if (_entityTypes is null)
+        {
+            Snackbar.Add("实体类型加载失败，请检查后端服务", Severity.Warning);
+            _entityTypes = Array.Empty<EntityTypeSummaryDto>();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_entityType) && _entityTypes.Count > 0)
+        {
+            _entityType = _entityTypes[0].EntityType;
+        }
+    }
+
+    private static string GetDisplayName(EntityTypeSummaryDto et)
+        => string.IsNullOrWhiteSpace(et.DisplayName)
+            ? et.EntityType
+            : et.DisplayName;
+
+    private async Task OnEntityTypeChanged(string? value)
+    {
+        _entityType = value;
+        await LoadAsync();
+    }
+
     private async Task LoadAsync()
     {
+        if (string.IsNullOrWhiteSpace(_entityType))
+        {
+            _attributes = Array.Empty<AttributeDetailDto>();
+            return;
+        }
+
         _loading = true;
         try
         {
-            _attributes = await Api.ListAttributesAsync();
+            _attributes = await Api.ListAttributesAsync(_entityType);
         }
         finally
         {
@@ -133,9 +229,18 @@
 
     private async Task OpenCreateAsync()
     {
+        if (string.IsNullOrWhiteSpace(_entityType))
+        {
+            Snackbar.Add("请先选择实体类型", Severity.Warning);
+            return;
+        }
+
         var parameters = new DialogParameters<AttributeCreateDialog>
         {
+            { x => x.EntityType, _entityType },
+            { x => x.IsEntityTypeLocked, _locked },
             { x => x.InitialDisplayOrder, (_attributes?.Count ?? 0) + 1 },
+            { x => x.EntityTypes, _entityTypes },
             { x => x.CompositeTypes, _compositeTypes },
             { x => x.CustomTables, _customTables },
             { x => x.OptionSets, _optionSets }
@@ -166,6 +271,7 @@
         var parameters = new DialogParameters<AttributeEditDialog>
         {
             { x => x.Attribute, detail },
+            { x => x.EntityTypes, _entityTypes },
             { x => x.CompositeTypes, _compositeTypes },
             { x => x.CustomTables, _customTables },
             { x => x.OptionSets, _optionSets }

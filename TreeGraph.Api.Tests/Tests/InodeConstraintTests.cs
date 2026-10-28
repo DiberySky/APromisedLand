@@ -106,6 +106,7 @@ public class InodeConstraintTests : IntegrationTestBase
             $"/api/inode/{inodeId}/entities/{EntityType}B");
 
         Assert.NotEqual(dtoA!.EntityId, dtoB!.EntityId);
+        Assert.NotEqual(dtoA.EntityType, dtoB.EntityType);
     }
 
     // ============================================================

@@ -16,7 +16,7 @@ public class InodeEntityEditResponsiveTests : BunitTestBase {
         Services.AddMudServices();
         _platform = NodeEavTestSetup.RegisterServices(Services, (path, _) => path switch
         {
-            "/api/eav/schema" => NodeEavTestSetup.Json.Schema(),
+            "/api/eav/item/schema" => NodeEavTestSetup.Json.Schema(),
             "/api/inode/test-inode/entities/item" => NodeEavTestSetup.Json.Entity(),
             _ => null
         });

@@ -8,14 +8,16 @@
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="SaveFieldAsync">
-    <DialogContent>
+    <ToolBarContent>
+        @* 静态内容：所属组合类型（ToolBarContent 不支持动态更新） *@
         @if (Type is not null)
         {
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+            <MudText Typo="Typo.body2" Color="Color.Info">
                 @Type.DisplayName (@Type.TypeName)
             </MudText>
         }
-
+    </ToolBarContent>
+    <DialogContent>
         <MudTextField @bind-Value="_fieldForm.DisplayName"
                       Label="显示名"
                       Placeholder="界面上展示的中文名称"
@@ -29,36 +31,43 @@
                          Disabled="@(EditingField is not null)"
                          Class="mb-3" />
 
-        <MudSelect T="string"
-                   Value="_fieldForm.DataType"
-                   ValueChanged="OnFieldDataTypeChanged"
-                   Label="数据类型"
-                   Variant="Variant.Outlined"
-                   Disabled="@(EditingField is not null)"
-                   Class="mb-3">
-            @foreach (var dt in DataTypeOptions)
+        @* 数据类型行：参照 AttributeEditDialog 的 Grid 定比布局，
+           int / decimal 时「单位」「小数精度」与数据类型合并到同一行 *@
+        <div style="@DataTypeRowStyle" class="mb-3">
+            <div>
+                <MudSelect T="string"
+                           Value="_fieldForm.DataType"
+                           ValueChanged="OnFieldDataTypeChanged"
+                           Label="数据类型"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Disabled="@(EditingField is not null)">
+                    @foreach (var dt in DataTypeOptions)
+                    {
+                        <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+            @if (_fieldForm.DataType == "decimal")
             {
-                <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+                <div>
+                    <NumberInputField T="int?"
+                                      @bind-Value="_fieldForm.Precision"
+                                      Label="小数精度（可选）"
+                                      Min="0" Max="10" Step="1"
+                                      Margin="Margin.Dense"
+                                      HelperText="0–10 位，留空不限制" />
+                </div>
             }
-        </MudSelect>
-
-        @* int / decimal 的单位（只读文本 + 单位树选择对话框） *@
-        @if (_fieldForm.DataType is "int" or "decimal")
-        {
-            <UnitTreeField @bind-UnitId="_fieldForm.UnitId"
-                           @bind-UnitName="_fieldForm.UnitName" />
-        }
-
-        @* decimal：小数精度（ValidationRule.precision） *@
-        @if (_fieldForm.DataType == "decimal")
-        {
-            <NumberInputField T="int?"
-                              @bind-Value="_fieldForm.Precision"
-                              Label="小数精度（可选）"
-                              Min="0" Max="10" Step="1"
-                              Class="mb-3"
-                              HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
-        }
+            @if (_fieldForm.DataType is "int" or "decimal")
+            {
+                <div>
+                    <UnitTreeField @bind-UnitId="_fieldForm.UnitId"
+                                   @bind-UnitName="_fieldForm.UnitName"
+                                   Margin="Margin.Dense" />
+                </div>
+            }
+        </div>
 
         @* single_choice 的选项集 *@
         @if (_fieldForm.DataType == "single_choice")
@@ -102,41 +111,23 @@
             </MudSelect>
         }
 
-        <MudGrid Class="mb-3">
-            <MudItem xs="6">
-                <NumberInputField T="int"
-                                  @bind-Value="_fieldForm.DisplayOrder"
-                                  Label="显示顺序" />
+        <MudGrid Justify="Justify.Center" Class="mb-3">
+            <MudItem xs="12" sm="3" Class="d-flex align-center justify-center">
+                <MudSwitch T="bool"
+                           @bind-Value="_fieldForm.IsArray"
+                           Label="可多行"
+                           Color="Color.Primary" />
             </MudItem>
-            <MudItem xs="6" Class="d-flex align-center">
-                <MudCheckBox T="bool"
-                             @bind-Value="_fieldForm.IsArray"
-                             Label="数组（可填写多行）"
-                             Color="Color.Primary" />
-                <MudText Typo="Typo.caption" Class="ml-2"
-                         Style="color: var(--mud-palette-text-secondary)">
-                    开启后该字段支持填写多条记录
-                </MudText>
-            </MudItem>
-        </MudGrid>
-
-        <MudGrid>
-            <MudItem xs="12" md="4">
+            <MudItem xs="12" sm="3" Class="d-flex align-center justify-center">
                 <MudSwitch T="bool"
                            @bind-Value="_fieldForm.IsRequired"
                            Label="必填"
                            Color="Color.Primary" />
             </MudItem>
-            <MudItem xs="12" md="4">
+            <MudItem xs="12" sm="3" Class="d-flex align-center justify-center">
                 <MudSwitch T="bool"
                            @bind-Value="_fieldForm.IsSearchable"
                            Label="可搜索"
-                           Color="Color.Primary" />
-            </MudItem>
-            <MudItem xs="12" md="4">
-                <MudSwitch T="bool"
-                           @bind-Value="_fieldForm.IsSortable"
-                           Label="可排序"
                            Color="Color.Primary" />
             </MudItem>
         </MudGrid>
@@ -155,11 +146,24 @@
     /// <summary>选项集候选（single_choice 类型用）。</summary>
     [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
     /// <summary>嵌套组合类型候选（已排除自身与已删除类型）。</summary>
-    [Parameter] public IEnumerable<CompositeTypeDetailDto> NestedTypes { get; set; }
-        = Enumerable.Empty<CompositeTypeDetailDto>();
+    [Parameter] public IEnumerable<CompositeTypeDetailDto> NestedTypes { get; set; } = Enumerable.Empty<CompositeTypeDetailDto>();
 
     private FieldForm _fieldForm = new();
     private bool _submitting;
+
+    /// <summary>
+    /// 数据类型行布局（与 AttributeEditDialog 一致）：
+    /// decimal 三等分、int 两列（数据类型稍宽）、其它单列。
+    /// 用 Grid + minmax(0, fr) 固定分配，避免宽度被控件固有内容撑开。
+    /// </summary>
+    private string DataTypeRowStyle => _fieldForm.DataType switch
+    {
+        "decimal" => "display:grid; gap:8px; align-items:start; "
+                   + "grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);",
+        "int" => "display:grid; gap:8px; align-items:start; "
+               + "grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);",
+        _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
+    };
 
     private static readonly (string Value, string Label)[] DataTypeOptions =
     {

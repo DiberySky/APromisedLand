@@ -36,8 +36,6 @@
     <HeaderContent>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">排序</MudTh>
         <MudTh>名称</MudTh>
-        <MudTh>TableName</MudTh>
-        <MudTh>实体类型</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">列定义</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             @if (IsDialogMode)
@@ -83,14 +81,6 @@
                 }
             </div>
         </MudTd>
-        <MudTd DataLabel="TableName">
-            <code>@context.TableName</code>
-        </MudTd>
-        <MudTd DataLabel="实体类型">
-            <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
-                @context.EntityType
-            </MudChip>
-        </MudTd>
         <MudTd DataLabel="列定义" Style="white-space: nowrap; text-align: center;">
             @* 图标入口：点击打开列定义对话框并锁定该表；
                列数量以徽标叠加在图标右上角 *@
@@ -127,7 +117,7 @@
             var columns = context.Columns.Where(c => !c.IsDeleted)
                 .OrderBy(c => c.DisplayOrder).ToList();
             <MudTr>
-                <td colspan="6" style="padding: 0;">
+                <td colspan="4" style="padding: 0;">
                     <MudPaper Elevation="0" Class="pa-3"
                               Style="background: var(--mud-palette-background-grey);">
                         @if (columns.Count == 0)
@@ -140,15 +130,13 @@
                                             Style="overflow-x: auto;">
                                 <thead>
                                     <tr>
-                                        <th>列名</th>
                                         <th>显示名</th>
+                                        <th>列名</th>
                                         <th>类型</th>
                                         <th>引用</th>
                                         <th>必填</th>
                                         <th>可搜索</th>
-                                        <th>可排序</th>
                                         <th>唯一</th>
-                                        <th style="text-align: right;">顺序</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -157,6 +145,7 @@
                                         var c = columns[i];
                                         var locked = IsLockedTimeColumn(context, i);
                                         <tr>
+                                            <td>@c.DisplayName</td>
                                             <td>
                                                 <code>@c.ColumnName</code>
                                                 @if (locked)
@@ -166,7 +155,6 @@
                                                              Class="ml-1" />
                                                 }
                                             </td>
-                                            <td>@c.DisplayName</td>
                                             <td>
                                                 <MudChip T="string" Size="Size.Small"
                                                          Color="@GetDataTypeColor(c.DataType)">
@@ -196,18 +184,11 @@
                                                 }
                                             </td>
                                             <td>
-                                                @if (c.IsSortable)
-                                                {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
-                                                }
-                                            </td>
-                                            <td>
                                                 @if (c.IsUnique)
                                                 {
                                                     <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
                                                 }
                                             </td>
-                                            <td style="text-align: right;">@c.DisplayOrder</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -239,10 +220,17 @@
     /// <summary>排序提交中：期间禁用全部箭头，避免并发交换。</summary>
     private bool _moving;
 
-    /// <summary>桌面端对话框选项：DialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
-    private static readonly DialogOptions DialogOptions = new()
+    /// <summary>新建自定义表对话框：字段较少，用窄宽度（Small）。</summary>
+    private static readonly DialogOptions CreateTableDialogOptions = new()
     {
-        MaxWidth = MaxWidth.Medium,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true
+    };
+
+    /// <summary>编辑自定义表对话框：仅显示名，用窄宽度（Small）。</summary>
+    private static readonly DialogOptions EditTableDialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
         FullWidth = true
     };
 
@@ -287,7 +275,7 @@
     private async Task OpenCreateTableAsync()
     {
         var dialog = await DialogService.ShowAsync<CustomTableCreateDialog>(
-            string.Empty, DialogOptions);
+            string.Empty, CreateTableDialogOptions);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -306,7 +294,7 @@
         };
 
         var dialog = await DialogService.ShowAsync<CustomTableEditDialog>(
-            string.Empty, parameters, DialogOptions);
+            string.Empty, parameters, EditTableDialogOptions);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })

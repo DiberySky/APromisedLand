@@ -305,6 +305,7 @@ public class TreeGraphDbContext : DbContext
                 .HasMaxLength(36).IsRequired()
                 .HasDefaultValueSql("gen_random_uuid()::text")
                 .HasSentinel("");
+            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.AttributeName).HasColumnName("attribute_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DataType).HasColumnName("data_type").HasMaxLength(20).IsRequired();
@@ -324,10 +325,13 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
-            // 属性全局唯一（不再按实体类型分组）
-            e.HasIndex(x => x.AttributeName)
+            // 属性为实体类型私有：同一类型内属性名唯一，不同类型可有同名属性
+            e.HasIndex(x => new { x.EntityType, x.AttributeName })
                 .IsUnique()
                 .HasDatabaseName("uq_attr_catalog");
+
+            e.HasIndex(x => x.EntityType)
+                .HasDatabaseName("ix_attr_catalog_entity");
 
             e.HasOne(x => x.RefCompositeType)
                 .WithMany().HasForeignKey(x => x.RefCompositeTypeId)
@@ -466,26 +470,27 @@ public class TreeGraphDbContext : DbContext
                 .HasMaxLength(36).IsRequired()
                 .HasDefaultValueSql("gen_random_uuid()::text")
                 .HasSentinel("");
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.Version).HasColumnName("version");
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
             e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
-            e.HasIndex(x => new { x.EntityType, x.TypeName, x.Version })
+            // 组合类型全局化：唯一键不再含实体类型维度
+            e.HasIndex(x => new { x.TypeName, x.Version })
                 .IsUnique().HasDatabaseName("uq_composite_type");
         });
 
         mb.Entity<CompositeFieldDefinition>(e =>
         {
-            // CHECK：decimal 才能绑单位；single_choice 才能绑选项集
+            // CHECK：int / decimal 才能绑单位；single_choice 才能绑选项集
             e.ToTable("composite_field_definitions", t =>
             {
                 t.HasCheckConstraint(
                     "ck_composite_field_decimal_unit",
-                    "data_type = 'decimal' OR unit_id IS NULL");
+                    "data_type IN ('int', 'decimal') OR unit_id IS NULL");
 
                 // ★ #8：single_choice 才能绑选项集
                 t.HasCheckConstraint(
@@ -602,7 +607,6 @@ public class TreeGraphDbContext : DbContext
                 .HasMaxLength(36).IsRequired()
                 .HasDefaultValueSql("gen_random_uuid()::text")
                 .HasSentinel("");
-            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired();
             e.Property(x => x.TableName).HasColumnName("table_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200).IsRequired();
             e.Property(x => x.Version).HasColumnName("version");
@@ -613,7 +617,7 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
-            e.HasIndex(x => new { x.EntityType, x.TableName, x.Version })
+            e.HasIndex(x => new { x.TableName, x.Version })
                 .IsUnique().HasDatabaseName("uq_custom_table");
         });
 

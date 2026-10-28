@@ -61,7 +61,7 @@ public class SourceTextBuilderTests
             });
             db.AttributeCatalog.Add(new AttributeDefinition
             {
-                AttributeId = "attr-name",
+                AttributeId = "attr-name", EntityType = "Equipment",
                 AttributeName = "name", DisplayName = "名称",
                 DataType = "string", DisplayOrder = 1
             });

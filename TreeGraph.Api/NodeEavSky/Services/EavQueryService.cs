@@ -31,7 +31,7 @@ public class EavQueryService
     public async Task<PagedResult<string>> FilterEntityIdsAsync(
         EavQueryRequest request, CancellationToken ct = default)
     {
-        var definitions = _attrCache.GetDefinitions()
+        var definitions = _attrCache.GetDefinitions(request.EntityType)
             .ToDictionary(d => d.AttributeName);
 
         IQueryable<string>? entityQuery = null;
@@ -47,7 +47,10 @@ public class EavQueryService
             entityQuery = entityQuery is null ? subQuery : entityQuery.Intersect(subQuery);
         }
 
+        // 属性为实体类型私有：用本类型属性 Id 集合限定候选实体
+        var defIds = definitions.Values.Select(d => d.AttributeId).ToList();
         entityQuery ??= _db.AttributeValues
+            .Where(v => defIds.Contains(v.AttributeId))
             .Select(v => v.EntityId)
             .Distinct();
 
@@ -229,7 +232,8 @@ public class EavQueryService
         EavQueryRequest request, CancellationToken ct = default)
     {
         var idResult = await FilterEntityIdsAsync(request, ct);
-        var entities = await _readService.LoadBatchAsync(idResult.Items, ct);
+        var entities = await _readService.LoadBatchAsync(
+            idResult.Items, request.EntityType, ct);
 
         return new PagedResult<DynamicEntity>
         {
@@ -1074,6 +1078,7 @@ public class EavQueryService
     ///   3. 内存分页 + 批量加载
     /// </summary>
     public async Task<PagedResult<DynamicEntity>> QueryWithAllowedIdsAsync(
+        string entityType,
         IReadOnlyCollection<string>? allowedEntityIds,
         EavQueryRequest request,
         CancellationToken ct = default)
@@ -1097,6 +1102,7 @@ public class EavQueryService
         var filtered = await FilterEntityIdsAsync(
             new EavQueryRequest
             {
+                EntityType = entityType,
                 Filters = request.Filters,
                 OrderByAttribute = request.OrderByAttribute,
                 OrderDescending = request.OrderDescending,
@@ -1128,7 +1134,8 @@ public class EavQueryService
         }
 
         // 4. 批量加载实体
-        var entities = await _readService.LoadBatchAsync(pageIds, ct);
+        var entities = await _readService.LoadBatchAsync(
+            pageIds, entityType, ct);
 
         // 5. 保持 pageIds 的顺序
         var inputOrder = pageIds

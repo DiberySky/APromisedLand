@@ -87,7 +87,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         AttributeCount: 0);
 
     private static CompositeTypeDetailDto CompositeType() => new(
-        CompositeTypeId: "ct-1", EntityType: "Product", TypeName: "address",
+        CompositeTypeId: "ct-1", TypeName: "address",
         DisplayName: "地址", Version: 1,
         Fields: Array.Empty<CompositeFieldDetailDto>(), IsDeleted: false);
 
@@ -101,7 +101,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         OptionSetName: null, OptionSetDisplayName: null, IsDeleted: false);
 
     private static CustomTableDetailDto CustomTable() => new(
-        TableDefinitionId: "t-1", EntityType: "Product", TableName: "specs",
+        TableDefinitionId: "t-1", TableName: "specs",
         DisplayName: "规格", Version: 1, DisplayOrder: 1,
         Columns: Array.Empty<CustomTableColumnDto>(), IsDeleted: false);
 
@@ -113,7 +113,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         ValidationRule: null, IsDeleted: false);
 
     private static AttributeDetailDto Attribute() => new(
-        AttributeId: "a-1", AttributeName: "color",
+        AttributeId: "a-1", EntityType: "Product", AttributeName: "color",
         DisplayName: "颜色", DataType: "string", IsRequired: false,
         IsSearchable: true, IsSortable: true, Version: 1,
         DisplayOrder: 1, DefaultValue: null, CreatedAt: DateTimeOffset.UtcNow,
@@ -243,7 +243,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         }), "编辑行");
 
     private static CustomTableDetailDto CustomTableWithColumn() => new(
-        TableDefinitionId: "t-1", EntityType: "Product", TableName: "specs",
+        TableDefinitionId: "t-1", TableName: "specs",
         DisplayName: "规格", Version: 1, DisplayOrder: 1,
         Columns: new[] { CustomColumn() }, IsDeleted: false);
 

@@ -8,14 +8,15 @@
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="SaveColumnAsync">
-    <DialogContent>
+    <ToolBarContent>
         @if (Table is not null)
         {
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+            <MudText>
                 @Table.DisplayName (@Table.TableName)
             </MudText>
         }
-
+    </ToolBarContent>
+    <DialogContent>
         <MudTextField @bind-Value="_columnForm.DisplayName"
                       Label="显示名"
                       Placeholder="界面上展示的中文名称"
@@ -29,18 +30,43 @@
                          Disabled="@(EditingColumn is not null)"
                          Class="mb-3" />
 
-        <MudSelect T="string"
-                   Value="_columnForm.DataType"
-                   ValueChanged="OnColumnDataTypeChanged"
-                   Label="数据类型"
-                   Variant="Variant.Outlined"
-                   Disabled="@(EditingColumn is not null)"
-                   Class="mb-3">
-            @foreach (var dt in DataTypeOptions)
+        @* 数据类型行：参照 CompositeTypeFieldDialog 的 Grid 定比布局，
+           int / decimal 时「小数精度」「单位」与数据类型合并到同一行 *@
+        <div style="@DataTypeRowStyle" class="mb-3">
+            <div>
+                <MudSelect T="string"
+                           Value="_columnForm.DataType"
+                           ValueChanged="OnColumnDataTypeChanged"
+                           Label="数据类型"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Disabled="@(EditingColumn is not null)">
+                    @foreach (var dt in DataTypeOptions)
+                    {
+                        <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+            @if (_columnForm.DataType == "decimal")
             {
-                <MudSelectItem T="string" Value="@dt.Value">@dt.Label</MudSelectItem>
+                <div>
+                    <NumberInputField T="int?"
+                                      @bind-Value="_columnForm.Precision"
+                                      Label="小数精度（可选）"
+                                      Min="0" Max="10" Step="1"
+                                      Margin="Margin.Dense"
+                                      HelperText="0–10 位，留空不限制" />
+                </div>
             }
-        </MudSelect>
+            @if (_columnForm.DataType is "int" or "decimal")
+            {
+                <div>
+                    <UnitTreeField @bind-UnitId="_columnForm.UnitId"
+                                   @bind-UnitName="_columnForm.UnitName"
+                                   Margin="Margin.Dense" />
+                </div>
+            }
+        </div>
 
         @if (_columnForm.DataType == "composite")
         {
@@ -59,37 +85,7 @@
             </MudSelect>
         }
 
-        @* int / decimal：单位（只读文本 + 单位树选择对话框） *@
-        @if (_columnForm.DataType is "int" or "decimal")
-        {
-            <UnitTreeField @bind-UnitId="_columnForm.UnitId"
-                           @bind-UnitName="_columnForm.UnitName" />
-        }
-
-        @* decimal：小数精度（ValidationRule.precision） *@
-        @if (_columnForm.DataType == "decimal")
-        {
-            <NumberInputField T="int?"
-                              @bind-Value="_columnForm.Precision"
-                              Label="小数精度（可选）"
-                              Min="0" Max="10" Step="1"
-                              Class="mb-3"
-                              HelperText="显示与保存的小数位上限（0–10），如填 2 则 111.123 会被拒绝，留空不限制" />
-        }
-
-        <NumberInputField T="int"
-                          @bind-Value="_columnForm.DisplayOrder"
-                          Label="显示顺序"
-                          Class="mb-3"
-                          Min="@(IsRecordTable && !_isEditingLockedColumn ? LockedColumnCount : int.MinValue)"
-                          Disabled="@_isEditingLockedColumn"
-                          HelperText="@(IsRecordTable
-                              ? (_isEditingLockedColumn
-                                  ? "时间维度列已锁定，不可调整顺序"
-                                  : $"时序表前 {LockedColumnCount} 列为时间维度列（锁定），业务列顺序须 ≥ {LockedColumnCount}")
-                              : null)" />
-
-        <MudGrid>
+        <MudGrid Justify="Justify.Center">
             <MudItem xs="12" md="3">
                 <MudSwitch T="bool"
                            @bind-Value="_columnForm.IsRequired"
@@ -100,12 +96,6 @@
                 <MudSwitch T="bool"
                            @bind-Value="_columnForm.IsSearchable"
                            Label="可搜索"
-                           Color="Color.Primary" />
-            </MudItem>
-            <MudItem xs="12" md="3">
-                <MudSwitch T="bool"
-                           @bind-Value="_columnForm.IsSortable"
-                           Label="可排序"
                            Color="Color.Primary" />
             </MudItem>
             <MudItem xs="12" md="3">
@@ -133,25 +123,15 @@
     private ColumnForm _columnForm = new();
     private bool _submitting;
 
-    /// <summary>所属表是否为 record 时序专属表。</summary>
-    private bool IsRecordTable => Table?.IsRecordTable == true;
-
-    /// <summary>record 表锁定时间维度列数（第 1 列日期 + 可选第 2 列时间）。</summary>
-    private int LockedColumnCount => IsRecordTable ? (Table!.HasTimeColumn ? 2 : 1) : 0;
-
-    /// <summary>编辑目标是否为 record 表的锁定时间维度列（活动列按 DisplayOrder 前 N 列）。</summary>
-    private bool _isEditingLockedColumn
+    /// <summary>数据类型行布局：decimal 三列（类型/精度/单位）、int 两列（类型/单位）、其余单列。</summary>
+    private string DataTypeRowStyle => _columnForm.DataType switch
     {
-        get
-        {
-            if (!IsRecordTable || EditingColumn is null || EditingColumn.IsDeleted) return false;
-            return Table!.Columns
-                .Where(c => !c.IsDeleted)
-                .OrderBy(c => c.DisplayOrder)
-                .Take(LockedColumnCount)
-                .Any(c => c.ColumnId == EditingColumn.ColumnId);
-        }
-    }
+        "decimal" => "display:grid; gap:8px; align-items:start; "
+                   + "grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);",
+        "int" => "display:grid; gap:8px; align-items:start; "
+               + "grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);",
+        _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
+    };
 
     private static readonly (string Value, string Label)[] DataTypeOptions =
     {

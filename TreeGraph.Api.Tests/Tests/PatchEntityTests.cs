@@ -31,7 +31,7 @@ public class PatchEntityTests : IntegrationTestBase
 
         var id = GuidFromInt(95001);
         // 初始：amount=1, price=100, label="original"
-        await PutEntityAsync(id, new Dictionary<string, object?>
+        await PutEntityAsync(TestData.EntityType, id, new Dictionary<string, object?>
         {
             ["amount"] = 1L,
             ["price"] = 100m,
@@ -44,12 +44,12 @@ public class PatchEntityTests : IntegrationTestBase
             ["price"] = 200m
         };
         var resp = await Client.PatchAsJsonAsync(
-            $"/api/eav/entities/{id}", patch);
+            $"/api/eav/{TestData.EntityType}/entities/{id}", patch);
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
         // 核对：price=200，其它未变
         var after = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/eav/entities/{id}");
+            $"/api/eav/{TestData.EntityType}/entities/{id}");
         Assert.NotNull(after);
         Assert.Equal(1L, after!.Properties["amount"].GetInt64());
         Assert.Equal(200m, after.Properties["price"].GetDecimal());
@@ -66,7 +66,7 @@ public class PatchEntityTests : IntegrationTestBase
         await TestData.EnsureSchemaAsync(Client);
 
         var id = GuidFromInt(95002);
-        await PutEntityAsync(id, new Dictionary<string, object?>
+        await PutEntityAsync(TestData.EntityType, id, new Dictionary<string, object?>
         {
             ["amount"] = 1L,
             ["label"] = "to-be-removed"
@@ -78,11 +78,11 @@ public class PatchEntityTests : IntegrationTestBase
             ["label"] = null
         };
         var resp = await Client.PatchAsJsonAsync(
-            $"/api/eav/entities/{id}", patch);
+            $"/api/eav/{TestData.EntityType}/entities/{id}", patch);
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
         var after = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/eav/entities/{id}");
+            $"/api/eav/{TestData.EntityType}/entities/{id}");
         Assert.NotNull(after);
         Assert.False(after!.Properties.ContainsKey("label"));   // 已删除
         Assert.Equal(1L, after.Properties["amount"].GetInt64()); // 未动
@@ -103,7 +103,7 @@ public class PatchEntityTests : IntegrationTestBase
             ["amoutn"] = 2L   // typo
         };
         var resp = await Client.PatchAsJsonAsync(
-            $"/api/eav/entities/{id}", patch);
+            $"/api/eav/{TestData.EntityType}/entities/{id}", patch);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();
@@ -120,7 +120,7 @@ public class PatchEntityTests : IntegrationTestBase
         await TestData.EnsureSchemaAsync(Client);
 
         var id = GuidFromInt(95004);
-        await PutEntityAsync(id, new Dictionary<string, object?>
+        await PutEntityAsync(TestData.EntityType, id, new Dictionary<string, object?>
         {
             ["amount"] = 1L
         });
@@ -130,7 +130,7 @@ public class PatchEntityTests : IntegrationTestBase
 
         using var req = new HttpRequestMessage(
             HttpMethod.Patch,
-            $"/api/eav/entities/{id}")
+            $"/api/eav/{TestData.EntityType}/entities/{id}")
         {
             Content = JsonContent.Create(new Dictionary<string, object?>
             {
@@ -153,18 +153,18 @@ public class PatchEntityTests : IntegrationTestBase
         await TestData.EnsureSchemaAsync(Client);
 
         var id = GuidFromInt(95005);
-        await PutEntityAsync(id, new Dictionary<string, object?>
+        await PutEntityAsync(TestData.EntityType, id, new Dictionary<string, object?>
         {
             ["amount"] = 42L
         });
 
         var patch = new Dictionary<string, object?>();
         var resp = await Client.PatchAsJsonAsync(
-            $"/api/eav/entities/{id}", patch);
+            $"/api/eav/{TestData.EntityType}/entities/{id}", patch);
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
         var after = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/eav/entities/{id}");
+            $"/api/eav/{TestData.EntityType}/entities/{id}");
         Assert.NotNull(after);
         Assert.Equal(42L, after!.Properties["amount"].GetInt64());
     }
@@ -180,25 +180,25 @@ public class PatchEntityTests : IntegrationTestBase
 
         // === 场景 A：PUT 只提供 amount → label 被删除 ===
         var idA = GuidFromInt(95006);
-        await PutEntityAsync(idA, new Dictionary<string, object?>
+        await PutEntityAsync(TestData.EntityType, idA, new Dictionary<string, object?>
         {
             ["amount"] = 1L,
             ["label"] = "will-be-deleted-by-put"
         });
 
-        await PutEntityAsync(idA, new Dictionary<string, object?>
+        await PutEntityAsync(TestData.EntityType, idA, new Dictionary<string, object?>
         {
             ["amount"] = 2L   // 没提供 label
         });
 
         var afterA = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/eav/entities/{idA}");
+            $"/api/eav/{TestData.EntityType}/entities/{idA}");
         Assert.NotNull(afterA);
         Assert.False(afterA!.Properties.ContainsKey("label"));   // PUT 删除了
 
         // === 场景 B：PATCH 只提供 amount → label 保留 ===
         var idB = GuidFromInt(95007);
-        await PutEntityAsync(idB, new Dictionary<string, object?>
+        await PutEntityAsync(TestData.EntityType, idB, new Dictionary<string, object?>
         {
             ["amount"] = 1L,
             ["label"] = "will-be-kept-by-patch"
@@ -209,11 +209,11 @@ public class PatchEntityTests : IntegrationTestBase
             ["amount"] = 2L
         };
         var patchResp = await Client.PatchAsJsonAsync(
-            $"/api/eav/entities/{idB}", patch);
+            $"/api/eav/{TestData.EntityType}/entities/{idB}", patch);
         Assert.Equal(HttpStatusCode.NoContent, patchResp.StatusCode);
 
         var afterB = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/eav/entities/{idB}");
+            $"/api/eav/{TestData.EntityType}/entities/{idB}");
         Assert.NotNull(afterB);
         Assert.Equal("will-be-kept-by-patch", afterB!.Properties["label"].GetString());
     }

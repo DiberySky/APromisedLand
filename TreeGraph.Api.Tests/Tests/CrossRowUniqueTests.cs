@@ -47,7 +47,6 @@ public class CrossRowUniqueTests : IntegrationTestBase
                 "/api/eav/metadata/custom-tables",
                 new
                 {
-                    entityType = EntityType,
                     tableName = "unique_certs",
                     displayName = "认证",
                     displayOrder = 1
@@ -75,6 +74,7 @@ public class CrossRowUniqueTests : IntegrationTestBase
                 "/api/eav/metadata/attributes",
                 new
                 {
+                    entityType = EntityType,
                     attributeName = "unique_certs",
                     displayName = "认证",
                     dataType = "table",

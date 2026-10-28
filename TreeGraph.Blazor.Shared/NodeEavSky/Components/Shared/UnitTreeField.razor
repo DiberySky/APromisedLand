@@ -5,7 +5,7 @@
 
 @inject TreeNodeDialogService<UnitTree> TreeNodeDialogService
 
-<MudTextField @bind-Value="@_fullName"
+<MudTextField Value="@UnitName"
               Label="计量单位"
               Variant="Variant.Outlined" ReadOnly="true"
               Margin="@Margin"
@@ -27,24 +27,15 @@
     /// <summary>输入框间距（默认非 dense，保持既有调用方外观）。</summary>
     [Parameter] public Margin Margin { get; set; } = Margin.None;
 
-    string? _fullName;
-
-    protected override void OnParametersSet()
-    {
-        _fullName = UnitName;
-    }
-
     private async Task EditClick()
     {
         var result = await TreeNodeDialogService.ShowTreeSelectDialogAsync();
 
         if (result == null) return;
 
-        UnitId = result.Id;
-        UnitName = result.Name;
-        _fullName = UnitName;
-
-        await UnitIdChanged.InvokeAsync(UnitId);
-        await UnitNameChanged.InvokeAsync(UnitName);
+        // 只读文本框直接绑定 UnitName 参数（无 _fullName 中间状态），
+        // 两个回调均完成后父组件以最终值重渲染，避免旧参数覆盖导致首次选择显示为空。
+        await UnitIdChanged.InvokeAsync(result.Id);
+        await UnitNameChanged.InvokeAsync(result.Name);
     }
 }

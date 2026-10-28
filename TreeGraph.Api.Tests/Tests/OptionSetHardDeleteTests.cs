@@ -218,7 +218,8 @@ public class OptionSetHardDeleteTests : IntegrationTestBase
             "/api/eav/metadata/attributes",
             new
             {
-                attributeName = "choice_hardrefs",
+                entityType = "OptHardRefsEntity",
+                attributeName = "choice",
                 displayName = "选择",
                 dataType = "single_choice",
                 refOptionSetId = setId,
@@ -235,7 +236,7 @@ public class OptionSetHardDeleteTests : IntegrationTestBase
             .ReadEavAsync<List<OptionSetReferenceDto>>();
         Assert.NotNull(refs);
         Assert.Single(refs!);
-        Assert.Equal("choice_hardrefs", refs![0].AttributeName);
+        Assert.Equal("choice", refs![0].AttributeName);
     }
 
     // ============================================================
@@ -254,7 +255,8 @@ public class OptionSetHardDeleteTests : IntegrationTestBase
             "/api/eav/metadata/attributes",
             new
             {
-                attributeName = "choice_hardguard",
+                entityType = "OptHardRefGuardEntity",
+                attributeName = "choice",
                 displayName = "选择",
                 dataType = "single_choice",
                 refOptionSetId = setId,

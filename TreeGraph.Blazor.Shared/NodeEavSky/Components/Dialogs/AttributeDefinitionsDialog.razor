@@ -1,6 +1,7 @@
 @* AttributeDefinitionsDialog.razor — 独立属性定义对话框（单一用途）
-   嵌入 Attributes 页面组件（属性已全局化，不再锁定实体类型）。
-   区别于 AttributesManageDialog（5 标签全量元数据维护），本对话框只做属性定义。 *@
+   嵌入 Attributes 页面组件并锁定实体类型（选择器自动隐藏）。
+   区别于 AttributesManageDialog（5 标签全量元数据维护），本对话框只做属性定义，
+   适用于"属性类型"列表的属性数入口等只需管理单一类型属性的场景。 *@
 @namespace TreeGraph.Blazor.Shared.NodeEavSky.Components.Dialogs
 
 @using TreeGraph.Blazor.Shared.Common
@@ -11,16 +12,31 @@
            CancelButtonVisible="true"
            CancelButtonText="关闭"
            OnCanceledClick="@Close">
+    @* 与「新建属性」一致：实体类型展示在标题栏下方工具栏（对话框内不变） *@
+    <ToolBarContent>
+        <MudText Typo="Typo.body2">实体类型：@EntityTypeDisplay</MudText>
+    </ToolBarContent>
     <DialogContent>
-        <Attributes OnAttributesChanged="@OnAttributesChanged" />
+        <Attributes EntityType="@EntityType"
+                    OnAttributesChanged="@OnAttributesChanged" />
     </DialogContent>
 </DialogSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
+    /// <summary>锁定的实体类型（et_xxx 标识）。</summary>
+    [Parameter, EditorRequired] public string EntityType { get; set; } = string.Empty;
+
+    /// <summary>实体类型显示名（用于工具栏，避免暴露 et_xxx 内部标识）。</summary>
+    [Parameter] public string? DisplayName { get; set; }
+
     /// <summary>属性变更回调。</summary>
     [Parameter] public EventCallback OnAttributesChanged { get; set; }
+
+    private string EntityTypeDisplay => string.IsNullOrEmpty(DisplayName)
+        ? EntityType
+        : DisplayName;
 
     private void Close()
     {

@@ -25,7 +25,7 @@ public class ValidationTests : IntegrationTestBase
         };
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/entities/{id}", payload);
+            $"/api/eav/{TestData.EntityType}/entities/{id}", payload);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();
@@ -45,7 +45,7 @@ public class ValidationTests : IntegrationTestBase
         };
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/entities/{id}", payload);
+            $"/api/eav/{TestData.EntityType}/entities/{id}", payload);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();
@@ -60,7 +60,7 @@ public class ValidationTests : IntegrationTestBase
 
         // 先查询已有 custom table，避免重复创建（响应被 ApiEnvelope 包装）
         var listHttpResp = await Client.GetAsync(
-            $"/api/eav/metadata/custom-tables?entityType={TestData.EntityType}");
+            "/api/eav/metadata/custom-tables");
         listHttpResp.EnsureSuccessStatusCode();
         var listJson = await listHttpResp.Content.ReadAsStringAsync();
         using var listDoc = JsonDocument.Parse(listJson);
@@ -82,7 +82,6 @@ public class ValidationTests : IntegrationTestBase
         {
             var tableResp = await Client.PostAsJsonAsync("/api/eav/metadata/custom-tables", new
             {
-                entityType = TestData.EntityType,
                 tableName = "certifications",
                 displayName = "认证资质",
                 displayOrder = 1
@@ -96,6 +95,7 @@ public class ValidationTests : IntegrationTestBase
 
         var attrResp = await Client.PostAsJsonAsync("/api/eav/metadata/attributes", new
         {
+            entityType = TestData.EntityType,
             attributeName = "certifications",
             displayName = "认证资质",
             dataType = "table",
@@ -115,7 +115,7 @@ public class ValidationTests : IntegrationTestBase
         };
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/entities/{GuidFromInt(92001)}", payload);
+            $"/api/eav/{TestData.EntityType}/entities/{GuidFromInt(92001)}", payload);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();

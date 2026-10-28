@@ -4,6 +4,8 @@ namespace TreeGraph.Shared.NodeEavSky.Dtos;
 
 public class CreateAttributeRequest
 {
+    public string EntityType { get; set; } = "";
+
     /// <summary>
     /// 内部标识（JSON key）。可选：
     ///   - null / 空：服务端自动生成 `attr_` + 12 位 hex（如 attr_3f9a2b1c8d4e）
@@ -33,7 +35,6 @@ public class CreateAttributeRequest
 
 public class CreateCompositeTypeRequest
 {
-    public string EntityType { get; set; } = "";
     public string TypeName { get; set; } = "";
     public string DisplayName { get; set; } = "";
 }
@@ -58,7 +59,6 @@ public class CreateCompositeFieldRequest
 
 public class CreateCustomTableRequest
 {
-    public string EntityType { get; set; } = "";
     public string TableName { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public int DisplayOrder { get; set; }
@@ -89,12 +89,12 @@ public class CreateTableColumnRequest
 
 public record CompositeTypeDetailDto(
     string CompositeTypeId,
-    string EntityType,
     string TypeName,
     string DisplayName,
     int Version,
     IReadOnlyList<CompositeFieldDetailDto> Fields,
-    bool IsDeleted = false);
+    bool IsDeleted = false,
+    int DisplayOrder = 0);
 
 public record CompositeFieldDetailDto(
     string FieldId,
@@ -121,6 +121,7 @@ public record CompositeFieldDetailDto(
 public class UpdateCompositeTypeRequest
 {
     public string? DisplayName { get; set; }
+    public int? DisplayOrder { get; set; }
 }
 
 public class UpdateCompositeFieldRequest
@@ -143,7 +144,6 @@ public class UpdateCompositeFieldRequest
 
 public record CustomTableDetailDto(
     string TableDefinitionId,
-    string EntityType,
     string TableName,
     string DisplayName,
     int Version,
@@ -196,6 +196,7 @@ public class UpdateTableColumnRequest
 
 public record AttributeDetailDto(
     string AttributeId,
+    string EntityType,
     string AttributeName,
     string DisplayName,
     string DataType,

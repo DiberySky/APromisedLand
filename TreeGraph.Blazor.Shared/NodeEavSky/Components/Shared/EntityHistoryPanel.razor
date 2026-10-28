@@ -103,6 +103,7 @@
 </MudExpansionPanel>
 
 @code {
+    [Parameter, EditorRequired] public string EntityType { get; set; } = "";
     [Parameter, EditorRequired] public string EntityId { get; set; } = "";
 
     /// <summary>
@@ -158,7 +159,7 @@
         _loaded = true;
         try
         {
-            _items = await Api.GetHistoryAsync(EntityId);
+            _items = await Api.GetHistoryAsync(EntityType, EntityId);
         }
         finally
         {

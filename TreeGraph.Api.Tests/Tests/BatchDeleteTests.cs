@@ -19,7 +19,7 @@ public class BatchDeleteTests : IntegrationTestBase
         var existing = new[] { GuidFromInt(94001), GuidFromInt(94002), GuidFromInt(94003) };
         foreach (var id in existing)
         {
-            await PutEntityAsync(id,
+            await PutEntityAsync(TestData.EntityType, id,
                 new Dictionary<string, object?> { ["amount"] = 1L });
         }
 
@@ -30,7 +30,7 @@ public class BatchDeleteTests : IntegrationTestBase
         };
 
         var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/entities/batch-delete", req);
+            $"/api/eav/{TestData.EntityType}/entities/batch-delete", req);
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content.ReadEavAsync<BatchDeleteResultDto>();
@@ -44,7 +44,7 @@ public class BatchDeleteTests : IntegrationTestBase
     public async Task BatchDelete_EmptyList_ReturnsEmpty()
     {
         var resp = await Client.PostAsJsonAsync(
-            $"/api/eav/entities/batch-delete",
+            $"/api/eav/{TestData.EntityType}/entities/batch-delete",
             new BatchDeleteRequest { EntityIds = new List<string>() });
         resp.EnsureSuccessStatusCode();
 

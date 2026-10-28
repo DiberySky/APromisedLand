@@ -9,6 +9,10 @@
            SubmitButtonDisabled="@_submitting"
            ActionsMaxWidth="MaxWidth.False"
            OnSubmitClick="UpdateAsync">
+    @* 与「新建属性」一致：实体类型固定展示在标题栏下方工具栏（编辑期间不变） *@
+    <ToolBarContent>
+        <MudText Typo="Typo.body2">实体类型：@EntityTypeDisplay</MudText>
+    </ToolBarContent>
     <DialogContent>
         <MudTextField @bind-Value="_editForm.DisplayName"
                       Label="显示名"
@@ -192,6 +196,8 @@
 
     /// <summary>编辑目标（页面已通过 GetAttributeAsync 取详情）。</summary>
     [Parameter] public AttributeDetailDto? Attribute { get; set; }
+    /// <summary>实体类型列表（用于工具栏展示中文显示名，缺失时回退内部标识）。</summary>
+    [Parameter] public IReadOnlyList<EntityTypeSummaryDto>? EntityTypes { get; set; }
     [Parameter] public IReadOnlyList<CompositeTypeDetailDto>? CompositeTypes { get; set; }
     [Parameter] public IReadOnlyList<CustomTableDetailDto>? CustomTables { get; set; }
     [Parameter] public IReadOnlyList<OptionSetSummaryDto>? OptionSets { get; set; }
@@ -237,6 +243,23 @@
                + "grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);",
         _ => "display:grid; gap:8px; align-items:start; grid-template-columns:minmax(0,1fr);"
     };
+
+    /// <summary>实体类型展示名（优先中文显示名，缺失回退内部标识）。</summary>
+    private string EntityTypeDisplay
+    {
+        get
+        {
+            var entityType = Attribute?.EntityType;
+            var match = (EntityTypes ?? Array.Empty<EntityTypeSummaryDto>())
+                .FirstOrDefault(et => et.EntityType == entityType);
+            if (!string.IsNullOrWhiteSpace(match?.DisplayName))
+            {
+                return match.DisplayName;
+            }
+
+            return entityType ?? string.Empty;
+        }
+    }
 
     protected override void OnParametersSet()
     {

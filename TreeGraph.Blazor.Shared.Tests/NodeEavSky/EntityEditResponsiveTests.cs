@@ -17,8 +17,8 @@ public class EntityEditResponsiveTests : BunitTestBase {
         Services.AddMudServices();
         _platform = NodeEavTestSetup.RegisterServices(Services, (path, method) => path switch
         {
-            "/api/eav/schema" => NodeEavTestSetup.Json.Schema(),
-            "/api/eav/entities/e1" => NodeEavTestSetup.Json.Entity(),
+            "/api/eav/item/schema" => NodeEavTestSetup.Json.Schema(),
+            "/api/eav/item/entities/e1" => NodeEavTestSetup.Json.Entity(),
             _ => null
         });
     }

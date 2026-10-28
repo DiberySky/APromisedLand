@@ -153,7 +153,7 @@
         if (!firstRender || _initialized) return;
         _initialized = true;
 
-        var schema = await Api.GetSchemaAsync();
+        var schema = await Api.GetSchemaAsync(EntityType);
         if (schema is not null)
         {
             _schema = schema;
@@ -182,12 +182,13 @@
         {
             var request = new EavQueryRequest
             {
+                EntityType = EntityType,
                 Filters = _filters,
                 Page = _page,
                 PageSize = _pageSize
             };
 
-            _result = await Api.QueryAsync(request);
+            _result = await Api.QueryAsync(EntityType, request);
             if (_result is null)
                 Snackbar.Add("加载失败", Severity.Error);
         }
@@ -270,7 +271,7 @@
 
         if (confirmed != true) return;
 
-        var (ok, error) = await Api.DeleteEntityAsync(entityId);
+        var (ok, error) = await Api.DeleteEntityAsync(EntityType, entityId);
         if (!ok)
         {
             Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);

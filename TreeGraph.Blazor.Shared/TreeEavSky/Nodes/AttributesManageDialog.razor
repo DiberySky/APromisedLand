@@ -1,13 +1,14 @@
 @* AttributesManageDialog.razor — NodeEavSky 全量元数据维护入口（二级弹窗）
    一级弹窗：本对话框以 DialogSky 外壳承载 5 个维护标签页；
    二级弹窗：各列表内"新建/编辑/详情"操作通过 DialogService 打开子对话框，
-            全部子对话框均使用 DialogSky，与本对话框视觉风格一致。 *@
+            全部子对话框均使用 DialogSky，与本对话框视觉风格一致。
+   传入 EntityType 时锁定该类型（仅属性定义页生效）；不传时为通用模式。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Metadata
 
-<DialogSky Title="元数据维护"
+<DialogSky Title="@_title"
            SubmitButtonVisible="false"
            CancelButtonVisible="true"
            CancelButtonText="关闭"
@@ -15,7 +16,8 @@
     <DialogContent>
         <MudTabs Elevation="0" Rounded="true" Outlined="true">
             <MudTabPanel Text="属性定义" Icon="@Icons.Material.Filled.EditAttributes">
-                <Attributes OnAttributesChanged="@OnAttributesChanged" />
+                <Attributes EntityType="@EntityType"
+                            OnAttributesChanged="@OnAttributesChanged" />
             </MudTabPanel>
             <MudTabPanel Text="实体类型" Icon="@Icons.Material.Filled.Category">
                 <EntityTypes IsDialogMode="true" />
@@ -36,8 +38,15 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
+    /// <summary>锁定的实体类型；为空时对话框内可切换实体类型（通用模式）。</summary>
+    [Parameter] public string? EntityType { get; set; }
+
     /// <summary>属性变更回调。</summary>
     [Parameter] public EventCallback OnAttributesChanged { get; set; }
+
+    private string _title => string.IsNullOrEmpty(EntityType)
+        ? "元数据维护"
+        : $"元数据维护 · {EntityType}";
 
     private void Close()
     {

@@ -38,7 +38,7 @@ public class DeletePrincipleTests : IntegrationTestBase
     {
         var resp = await Client.PostAsJsonAsync(
             "/api/eav/metadata/custom-tables",
-            new { entityType = EntityType, tableName, displayName = tableName });
+            new { tableName, displayName = tableName });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         return (await resp.Content.ReadEavAsync<TableIdResponse>())!.TableDefinitionId;
     }
@@ -59,6 +59,7 @@ public class DeletePrincipleTests : IntegrationTestBase
             "/api/eav/metadata/attributes",
             new
             {
+                entityType = EntityType,
                 attributeName,
                 displayName = attributeName,
                 dataType = "table",
@@ -74,6 +75,7 @@ public class DeletePrincipleTests : IntegrationTestBase
             "/api/eav/metadata/attributes",
             new
             {
+                entityType = EntityType,
                 attributeName,
                 displayName = attributeName,
                 dataType = "string"
@@ -86,7 +88,7 @@ public class DeletePrincipleTests : IntegrationTestBase
     {
         var resp = await Client.PostAsJsonAsync(
             "/api/eav/metadata/composite-types",
-            new { entityType = EntityType, typeName, displayName = typeName });
+            new { typeName, displayName = typeName });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         return (await resp.Content.ReadEavAsync<CompositeTypeIdResponse>())!.CompositeTypeId;
     }
@@ -210,7 +212,7 @@ public class DeletePrincipleTests : IntegrationTestBase
         const string attributeName = "del_attr_val";
         var attrId = await CreateStringAttributeAsync(attributeName);
 
-        await PutEntityAsync(GuidFromInt(97402),
+        await PutEntityAsync(EntityType, GuidFromInt(97402),
             new Dictionary<string, object?> { [attributeName] = "v" });
 
         var resp = await Client.DeleteAsync(
@@ -220,7 +222,7 @@ public class DeletePrincipleTests : IntegrationTestBase
 
         // 属性仍可用（未被删除）
         var listResp = await Client.GetAsync(
-            "/api/eav/metadata/attributes");
+            $"/api/eav/metadata/attributes?entityType={EntityType}");
         listResp.EnsureSuccessStatusCode();
         var attrs = await listResp.Content.ReadEavAsync<List<AttributeDetailDto>>();
         var attr = attrs!.Single(a => a.AttributeId == attrId);

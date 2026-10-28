@@ -8,25 +8,9 @@
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="UpdateAsync">
     <DialogContent>
-        @if (Table is not null)
-        {
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
-                @Table.EntityType / @Table.TableName
-                （表名与实体类型不可修改）
-            </MudText>
-        }
-
         <MudTextField @bind-Value="_editTableForm.DisplayName"
                       Label="显示名"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
-        <NumberInputField T="int?"
-                          @bind-Value="_editTableForm.DisplayOrder"
-                          Label="显示顺序"
-                          Class="mb-3" />
-        <MudAlert Severity="Severity.Info">
-            TableName 与 EntityType 是引用标识，不可修改。如需更名，请新建并迁移引用。
-        </MudAlert>
+                      Variant="Variant.Outlined" />
     </DialogContent>
 </DialogSky>
 
@@ -44,8 +28,7 @@
         {
             _editTableForm = new UpdateCustomTableRequest
             {
-                DisplayName = Table.DisplayName,
-                DisplayOrder = Table.DisplayOrder
+                DisplayName = Table.DisplayName
             };
         }
     }
@@ -61,9 +44,7 @@
         }
 
         // 未变更则直接关闭，避免无谓请求（后端 null 语义为"不修改"）
-        var unchanged =
-            _editTableForm.DisplayName == Table.DisplayName &&
-            _editTableForm.DisplayOrder == Table.DisplayOrder;
+        var unchanged = _editTableForm.DisplayName == Table.DisplayName;
 
         if (unchanged)
         {

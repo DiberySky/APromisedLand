@@ -141,21 +141,15 @@ else
                                                 Style="overflow-x: auto;">
                                     <thead>
                                         <tr>
-                                            <th>属性名</th>
                                             <th>显示名</th>
                                             <th>类型</th>
                                             <th>引用</th>
-                                            <th>必填</th>
-                                            <th>可搜索</th>
-                                            <th>可排序</th>
-                                            <th style="text-align: right;">顺序</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var a in attrs)
                                         {
                                             <tr>
-                                                <td><code>@a.AttributeName</code></td>
                                                 <td>@a.DisplayName</td>
                                                 <td>
                                                     <MudChip T="string" Size="Size.Small"
@@ -181,25 +175,6 @@ else
                                                         <MudChip T="string" Size="Size.Small" Color="Color.Info">表: @(a.TableDisplayName ?? a.TableName)</MudChip>
                                                     }
                                                 </td>
-                                                <td>
-                                                    @if (a.IsRequired)
-                                                    {
-                                                        <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
-                                                    }
-                                                </td>
-                                                <td>
-                                                    @if (a.IsSearchable)
-                                                    {
-                                                        <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
-                                                    }
-                                                </td>
-                                                <td>
-                                                    @if (a.IsSortable)
-                                                    {
-                                                        <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
-                                                    }
-                                                </td>
-                                                <td style="text-align: right;">@a.DisplayOrder</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -391,11 +366,13 @@ else
         await LoadAsync();
     }
 
-    /// <summary>打开独立属性定义对话框（属性已全局化，不再按类型锁定）。</summary>
+    /// <summary>打开独立属性定义对话框并锁定该实体类型。</summary>
     private async Task OpenAttributesAsync(EntityTypeDetailDto dto)
     {
         var parameters = new DialogParameters<AttributeDefinitionsDialog>
         {
+            { x => x.EntityType, dto.EntityType },
+            { x => x.DisplayName, dto.DisplayName },
             { x => x.OnAttributesChanged, EventCallback.Factory.Create(this, LoadAsync) }
         };
 
@@ -448,7 +425,7 @@ else
             ? list
             : Array.Empty<AttributeDetailDto>();
 
-    /// <summary>切换展开；首次展开时拉取属性列表（属性已全局化）。</summary>
+    /// <summary>切换展开；首次展开时按 EntityType 拉取该类型的属性列表。</summary>
     private async Task ToggleExpandAsync(EntityTypeDetailDto dto)
     {
         if (!_expandedIds.Add(dto.EntityTypeId))
@@ -462,7 +439,7 @@ else
         _attrsLoading = true;
         try
         {
-            var list = await Api.ListAttributesAsync();
+            var list = await Api.ListAttributesAsync(dto.EntityType);
             _attrsCache[dto.EntityTypeId] =
                 (list ?? Array.Empty<AttributeDetailDto>())
                 .OrderBy(a => a.DisplayOrder).ToList();

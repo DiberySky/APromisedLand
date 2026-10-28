@@ -13,8 +13,8 @@ using TreeGraph.Api.Data;
 namespace TreeGraph.Api.Data.Migrations
 {
     [DbContext(typeof(TreeGraphDbContext))]
-    [Migration("20261028013006_RemoveEavEntityType")]
-    partial class RemoveEavEntityType
+    [Migration("20261028075426_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -337,6 +337,12 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("display_order");
 
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
                     b.Property<bool>("IsRecordMode")
                         .HasColumnType("boolean");
 
@@ -386,9 +392,8 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasKey("AttributeId");
 
-                    b.HasIndex("AttributeName")
-                        .IsUnique()
-                        .HasDatabaseName("uq_attr_catalog");
+                    b.HasIndex("EntityType")
+                        .HasDatabaseName("ix_attr_catalog_entity");
 
                     b.HasIndex("RefCompositeTypeId");
 
@@ -397,6 +402,10 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasIndex("RefTableDefinitionId");
 
                     b.HasIndex("UnitId");
+
+                    b.HasIndex("EntityType", "AttributeName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attr_catalog");
 
                     b.ToTable("attribute_catalog", (string)null);
                 });
@@ -630,7 +639,7 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.ToTable("composite_field_definitions", null, t =>
                         {
-                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
+                            t.HasCheckConstraint("ck_composite_field_decimal_unit", "data_type IN ('int', 'decimal') OR unit_id IS NULL");
 
                             t.HasCheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
                         });
@@ -655,11 +664,9 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("display_name");
 
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
@@ -681,7 +688,7 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasKey("CompositeTypeId");
 
-                    b.HasIndex("EntityType", "TypeName", "Version")
+                    b.HasIndex("TypeName", "Version")
                         .IsUnique()
                         .HasDatabaseName("uq_composite_type");
 
@@ -807,12 +814,6 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("display_order");
 
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
                     b.Property<bool>("HasTimeColumn")
                         .HasColumnType("boolean")
                         .HasColumnName("has_time_column");
@@ -841,7 +842,7 @@ namespace TreeGraph.Api.Data.Migrations
 
                     b.HasKey("TableDefinitionId");
 
-                    b.HasIndex("EntityType", "TableName", "Version")
+                    b.HasIndex("TableName", "Version")
                         .IsUnique()
                         .HasDatabaseName("uq_custom_table");
 

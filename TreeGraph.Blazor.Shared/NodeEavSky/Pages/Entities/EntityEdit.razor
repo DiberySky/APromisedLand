@@ -71,7 +71,8 @@ else
     }
 
     @* ★ 审计历史面板 *@
-    <EntityHistoryPanel EntityId="@EntityId"
+    <EntityHistoryPanel EntityType="@EntityType"
+                        EntityId="@EntityId"
                         RefreshToken="_historyRefreshToken" />
 
     <MudToolBar Class="mud-theme-dark mt-4">
@@ -178,14 +179,14 @@ else
         _loading = true;
         try
         {
-            var schema = await Api.GetSchemaAsync();
+            var schema = await Api.GetSchemaAsync(EntityType);
             _schema = schema ?? Array.Empty<AttributeSchemaDto>();
 
             _regularAttributes = _schema.Where(a => a.DataType != "table").ToList();
             _tableAttributes = _schema.Where(a => a.DataType == "table").ToList();
 
             _values.Clear();
-            var entity = await Api.GetEntityAsync(EntityId);
+            var entity = await Api.GetEntityAsync(EntityType, EntityId);
             if (entity is not null)
             {
                 _loadedUpdatedAt = entity.UpdatedAt;
@@ -288,7 +289,7 @@ else
             }
 
             var (ok, error, currentUpdatedAt) = await Api.PatchEntityAsync(
-                EntityId, submitValues,
+                EntityType, EntityId, submitValues,
                 expectedUpdatedAt: _loadedUpdatedAt);
 
             if (!ok)
@@ -348,7 +349,7 @@ else
         try
         {
             var (ok, error, currentUpdatedAt) = await Api.PatchEntityAsync(
-                EntityId, toClear,
+                EntityType, EntityId, toClear,
                 expectedUpdatedAt: _loadedUpdatedAt);
 
             if (!ok)
@@ -552,7 +553,7 @@ else
         _saving = true;
         try
         {
-            var (ok, error) = await Api.DeleteEntityAsync(EntityId);
+            var (ok, error) = await Api.DeleteEntityAsync(EntityType, EntityId);
             if (!ok)
             {
                 Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);

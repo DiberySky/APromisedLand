@@ -42,6 +42,7 @@ public class InodeEntityTests : IntegrationTestBase
 
         Assert.NotNull(dto);
         Assert.False(string.IsNullOrEmpty(dto!.EntityId));
+        Assert.Equal(EntityType, dto.EntityType);
         Assert.Equal("first", dto.Properties["name"].GetString());
         Assert.Equal(42L, dto.Properties["amount"].GetInt64());
     }

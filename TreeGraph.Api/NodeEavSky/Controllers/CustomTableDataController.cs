@@ -31,7 +31,7 @@ public class CustomTableDataController : ControllerBase
         string entityType, string entityId, string tableName,
         CancellationToken ct)
     {
-        var def = _attrCache.GetDefinition(tableName);
+        var def = _attrCache.GetDefinition(entityType, tableName);
         if (def?.RefTableDefinitionId is null) return NotFound();
 
         var result = await _read.LoadAsync(
@@ -46,7 +46,7 @@ public class CustomTableDataController : ControllerBase
         string entityType, string entityId, string tableName,
         [FromBody] CustomTableValue value, CancellationToken ct)
     {
-        var def = _attrCache.GetDefinition(tableName);
+        var def = _attrCache.GetDefinition(entityType, tableName);
         if (def?.RefTableDefinitionId is null) return NotFound();
 
         try
@@ -58,7 +58,7 @@ public class CustomTableDataController : ControllerBase
             // ★ 语义搜索：行变更随实体向量刷新（整表替换）
             await _publisher.Publish(new EntityChangedEvent
             {
-                EntityId = entityId, Kind = InodeChangeKind.Saved
+                EntityType = entityType, EntityId = entityId, Kind = InodeChangeKind.Saved
             }, ct);
             return NoContent();
         }
@@ -74,7 +74,7 @@ public class CustomTableDataController : ControllerBase
         string entityType, string entityId, string tableName,
         [FromBody] CustomTableRowValue rowValue, CancellationToken ct)
     {
-        var def = _attrCache.GetDefinition(tableName);
+        var def = _attrCache.GetDefinition(entityType, tableName);
         if (def?.RefTableDefinitionId is null) return NotFound();
 
         try
@@ -87,7 +87,7 @@ public class CustomTableDataController : ControllerBase
             // ★ 语义搜索：行变更随实体向量刷新（单行新增/更新）
             await _publisher.Publish(new EntityChangedEvent
             {
-                EntityId = entityId, Kind = InodeChangeKind.Patched
+                EntityType = entityType, EntityId = entityId, Kind = InodeChangeKind.Patched
             }, ct);
             return NoContent();
         }
@@ -108,7 +108,7 @@ public class CustomTableDataController : ControllerBase
         string entityType, string entityId, string tableName,
         string rowId, CancellationToken ct)
     {
-        var def = _attrCache.GetDefinition(tableName);
+        var def = _attrCache.GetDefinition(entityType, tableName);
         if (def?.RefTableDefinitionId is null) return NotFound();
 
         await _write.DeleteRowAsync(
@@ -117,7 +117,7 @@ public class CustomTableDataController : ControllerBase
         // ★ 语义搜索：行变更随实体向量刷新（单行删除）
         await _publisher.Publish(new EntityChangedEvent
         {
-            EntityId = entityId, Kind = InodeChangeKind.Deleted
+            EntityType = entityType, EntityId = entityId, Kind = InodeChangeKind.Deleted
         }, ct);
         return NoContent();
     }

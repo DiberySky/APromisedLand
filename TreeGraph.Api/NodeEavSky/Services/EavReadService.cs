@@ -25,10 +25,10 @@ public class EavReadService
     }
 
     public async Task<DynamicEntity> LoadAsync(
-        string entityId,
+        string entityId, string entityType,
         CancellationToken ct = default)
     {
-        var definitions = _attrCache.GetDefinitions();
+        var definitions = _attrCache.GetDefinitions(entityType);
         var defMap = definitions.ToDictionary(d => d.AttributeId);
 
         var rows = await _db.AttributeValues
@@ -41,7 +41,7 @@ public class EavReadService
             .AsNoTracking()
             .ToListAsync(ct);
 
-        var result = new DynamicEntity(entityId);
+        var result = new DynamicEntity(entityId, entityType);
 
         // ★ #3：填充 UpdatedAt（供乐观锁使用），需合并类型化值表与位置表
         var valuesMax = rows.Count > 0 ? rows.Max(r => r.UpdatedAt) : (DateTimeOffset?)null;
@@ -73,11 +73,11 @@ public class EavReadService
     }
 
     public async Task<List<DynamicEntity>> LoadBatchAsync(
-        IEnumerable<string> entityIds,
+        IEnumerable<string> entityIds, string entityType,
         CancellationToken ct = default)
     {
         var ids = entityIds.ToList();
-        var definitions = _attrCache.GetDefinitions();
+        var definitions = _attrCache.GetDefinitions(entityType);
         var defMap = definitions.ToDictionary(d => d.AttributeId);
 
         var allRows = await _db.AttributeValues
@@ -107,7 +107,7 @@ public class EavReadService
 
         return allEntityIds.Select(entityId =>
         {
-            var entity = new DynamicEntity(entityId);
+            var entity = new DynamicEntity(entityId, entityType);
 
             DateTimeOffset? maxUpdated = null;
 
@@ -245,6 +245,7 @@ public class DynamicEntity
 
     /// <summary>实体 ID（GUID 字符串）。</summary>
     public string EntityId { get; }
+    public string EntityType { get; }
 
     /// <summary>
     /// ★ #3：实体所有 AttributeValue 行的最大 UpdatedAt。
@@ -252,7 +253,7 @@ public class DynamicEntity
     /// </summary>
     public DateTimeOffset? UpdatedAt { get; set; }
 
-    public DynamicEntity(string id) { EntityId = id; }
+    public DynamicEntity(string id, string type) { EntityId = id; EntityType = type; }
 
     public void SetProperty(string name, object? value) => _props[name] = value;
     public object? GetProperty(string name) => _props.TryGetValue(name, out var v) ? v : null;

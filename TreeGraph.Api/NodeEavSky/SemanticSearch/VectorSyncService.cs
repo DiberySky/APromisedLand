@@ -72,7 +72,7 @@ public sealed class VectorSynchronizer
                 inodeId, entity.EntityId, entity.EntityType, entityVector,
                 source.SpaceId, entity.Hash, entity.Text, entity.Attrs, entity.AttrNums, ct);
             await SyncRowsForEntityAsync(
-                entity.EntityId,
+                entity.EntityType, entity.EntityId,
                 source.EntityPrefix, inodeId, source.SpaceId, ct);
         }
 
@@ -90,17 +90,13 @@ public sealed class VectorSynchronizer
     /// v4：同时重建该实体全部自定义表行点（先删后写；实体无内容/已删除时行点仍按 PG 维护）。
     /// </summary>
     public async Task<bool> SyncEntityAsync(
-        string entityId, CancellationToken ct = default)
+        string entityType, string entityId, CancellationToken ct = default)
     {
-        // 挂载关系现查；类型仅作 payload/日志展示——挂载实体取挂载关系中的类型，
-        // 独立实体无从反查（去 entityType 维度），用空串（文本省略类型行）。
-        var mount = await _db.InodeEntities
+        var mountInodeId = await _db.InodeEntities
             .AsNoTracking()
-            .Where(m => m.EntityId == entityId)
-            .Select(m => new { m.InodeId, m.EntityType })
+            .Where(m => m.EntityType == entityType && m.EntityId == entityId)
+            .Select(m => m.InodeId)
             .FirstOrDefaultAsync(ct);
-        var mountInodeId = mount?.InodeId;
-        var entityType = mount?.EntityType ?? "";
 
         string? hostNodeText = null;
         var spaceId = "default";
@@ -135,7 +131,7 @@ public sealed class VectorSynchronizer
 
         // 行独立向量：实体已删除时 PG 行已被级联清空，此处仅清残留点
         await SyncRowsForEntityAsync(
-            entityId, hostNodeText, mountInodeId ?? "", spaceId, ct);
+            entityType, entityId, hostNodeText, mountInodeId ?? "", spaceId, ct);
 
         return source is not null;
     }
@@ -146,16 +142,15 @@ public sealed class VectorSynchronizer
     /// 已删行的残留点由 DeleteRowsByEntityAsync 统一清理。
     /// </summary>
     private async Task SyncRowsForEntityAsync(
-        string entityId,
+        string entityType, string entityId,
         string? hostNodeText, string inodeId, string spaceId,
         CancellationToken ct)
     {
         await _store.DeleteRowsByEntityAsync(entityId, ct);
 
-        // EntityId 全局唯一，行按 ParentEntityId 过滤即可（类型取自行自身，写入 payload）
         var rows = await _db.CustomTableRows
             .AsNoTracking()
-            .Where(r => r.ParentEntityId == entityId)
+            .Where(r => r.ParentEntityType == entityType && r.ParentEntityId == entityId)
             .OrderBy(r => r.AttributeId)
             .ThenBy(r => r.RowOrder)
             .ToListAsync(ct);
@@ -167,14 +162,14 @@ public sealed class VectorSynchronizer
 
             var rowVector = await _embedding.EmbedAsync(rowSource.Text, ct);
             await _store.UpsertRowAsync(
-                row.RowId, entityId, row.ParentEntityType, row.AttributeId,
+                row.RowId, entityId, entityType, row.AttributeId,
                 rowVector, inodeId, spaceId,
                 rowSource.Hash, rowSource.Text, ct);
         }
 
         if (rows.Count > 0)
-            _logger.LogInformation("实体行向量已同步：{EntityId} 行数={Count}",
-                entityId, rows.Count);
+            _logger.LogInformation("实体行向量已同步：{EntityType}/{EntityId} 行数={Count}",
+                entityType, entityId, rows.Count);
     }
 
     /// <summary>全量对账（不限定空间）。</summary>
@@ -277,18 +272,20 @@ public sealed class VectorSynchronizer
 
         // 独立实体（含未挂载）：仅全量对账纳入期望集合
         // （无归属空间/线路，范围对账的 existing 过滤不含 inode_id="" 的点，纳入会误报缺失）
-        // attribute_values 已去 entityType 维度，此处仅收集 entityId；
-        // 类型由 SyncEntityAsync 按挂载关系解析，未挂载时文本省略类型行
-        HashSet<string>? standaloneEntityIds = null;
+        Dictionary<string, string>? standaloneEntityTypes = null;
         if (scope is null)
         {
-            standaloneEntityIds = (await _db.AttributeValues
+            // 属性值为类型私有：由值所属属性反查实体类型（实体只应用本类型属性）
+            standaloneEntityTypes = (await _db.AttributeValues
                     .AsNoTracking()
-                    .Select(v => v.EntityId)
+                    .Join(_db.AttributeCatalog,
+                        v => v.AttributeId, a => a.AttributeId,
+                        (v, a) => new { v.EntityId, a.EntityType })
                     .Distinct()
                     .ToListAsync(ct))
-                .ToHashSet(StringComparer.Ordinal);
-            foreach (var id in standaloneEntityIds)
+                .GroupBy(v => v.EntityId)
+                .ToDictionary(g => g.Key, g => g.First().EntityType, StringComparer.Ordinal);
+            foreach (var id in standaloneEntityTypes.Keys)
                 expectedKeys.Add("entity:" + id);
         }
 
@@ -359,7 +356,7 @@ public sealed class VectorSynchronizer
             }
             else if (entityToInode.TryGetValue(rest, out var inodeId))
                 affectedInodes.Add(inodeId);
-            else if (standaloneEntityIds is not null && standaloneEntityIds.Contains(rest))
+            else if (standaloneEntityTypes is not null && standaloneEntityTypes.ContainsKey(rest))
                 missingStandaloneEntities.Add(rest);
         }
 
@@ -428,23 +425,24 @@ public sealed class VectorSynchronizer
             }
         }
 
-        // 补缺：独立实体（无挂载 inode，不在节点循环内）。
+        // 补缺：独立实体（无挂载 inode，不在节点循环内）
         foreach (var entityId in missingStandaloneEntities)
         {
+            var entityType = standaloneEntityTypes![entityId];
             try
             {
-                await SyncEntityAsync(entityId, ct);
+                await SyncEntityAsync(entityType, entityId, ct);
                 fixedCount++;
                 if (onProgress is not null)
                 {
-                    var src = await _builder.BuildEntityTextAsync("", entityId, null, ct);
+                    var src = await _builder.BuildEntityTextAsync(entityType, entityId, null, ct);
                     await onProgress(new ReconcileProgress("fix", entityId, "", src?.Text ?? ""));
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 failedCount++;
-                _logger.LogWarning(ex, "向量对账独立实体失败：{EntityId}", entityId);
+                _logger.LogWarning(ex, "向量对账独立实体失败：{EntityType}/{EntityId}", entityType, entityId);
                 if (onProgress is not null)
                     await onProgress(new ReconcileProgress(
                         "error", entityId, "", ErrorDetail(ex)));
@@ -457,7 +455,7 @@ public sealed class VectorSynchronizer
         {
             try
             {
-                await SyncEntityAsync(owner.EntityId, ct);
+                await SyncEntityAsync(owner.EntityType, owner.EntityId, ct);
                 fixedCount++;
                 if (onProgress is not null)
                     await onProgress(new ReconcileProgress(
@@ -838,6 +836,6 @@ public sealed class EntityChangedConsumer
             .GetRequiredService<VectorSynchronizer>();
 
         await initializer.EnsureReadyAsync(ct);
-        await synchronizer.SyncEntityAsync(msg.EntityId, ct);
+        await synchronizer.SyncEntityAsync(msg.EntityType, msg.EntityId, ct);
     }
 }

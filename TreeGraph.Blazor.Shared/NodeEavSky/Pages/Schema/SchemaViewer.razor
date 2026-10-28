@@ -19,6 +19,13 @@
     </Actions>
 </PageHeaderSky>
 
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="6">
+        <MudTextField @bind-Value="_entityType" Label="实体类型"
+                      Variant="Variant.Outlined" />
+    </MudItem>
+</MudGrid>
+
 <MudTable Items="_schema" Hover="true" Bordered="true"
           Dense="true"
           Breakpoint="Breakpoint.Sm"
@@ -87,18 +94,19 @@
 </MudTable>
 
 @code {
+    private string _entityType = "";
     private IReadOnlyList<AttributeSchemaDto>? _schema;
     private bool _loading;
     private bool _loaded;
 
-    // 调用端点 ①：GET api/eav/schema
+    // 调用端点 ①：GET api/eav/{entityType}/schema
     private async Task LoadAsync()
     {
         _loading = true;
         _loaded = false;
         try
         {
-            _schema = await Api.GetSchemaAsync();
+            _schema = await Api.GetSchemaAsync(_entityType);
         }
         finally
         {

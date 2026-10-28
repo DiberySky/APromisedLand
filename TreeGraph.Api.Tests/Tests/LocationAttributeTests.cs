@@ -37,6 +37,7 @@ public class LocationAttributeTests : IntegrationTestBase
 
         var attrResp = await Client.PostAsJsonAsync("/api/eav/metadata/attributes", new
         {
+            entityType = Type,
             attributeName = Attr,
             displayName = "位置",
             dataType = "location",
@@ -55,7 +56,7 @@ public class LocationAttributeTests : IntegrationTestBase
         var id = GuidFromInt(92001);
 
         var put = await Client.PutAsJsonAsync(
-            $"/api/eav/entities/{id}",
+            $"/api/eav/{Type}/entities/{id}",
             new Dictionary<string, object?>
             {
                 [Attr] = new
@@ -69,7 +70,7 @@ public class LocationAttributeTests : IntegrationTestBase
             });
         put.EnsureSuccessStatusCode();
 
-        var get = await Client.GetAsync($"/api/eav/entities/{id}");
+        var get = await Client.GetAsync($"/api/eav/{Type}/entities/{id}");
         get.EnsureSuccessStatusCode();
 
         using var doc = JsonDocument.Parse(await get.Content.ReadAsStringAsync());
@@ -91,7 +92,7 @@ public class LocationAttributeTests : IntegrationTestBase
         var id = GuidFromInt(92002);
 
         var resp = await Client.PutAsJsonAsync(
-            $"/api/eav/entities/{id}",
+            $"/api/eav/{Type}/entities/{id}",
             new Dictionary<string, object?>
             {
                 [Attr] = new { latitude = 200.0, longitude = 121.4737 }
@@ -109,7 +110,7 @@ public class LocationAttributeTests : IntegrationTestBase
         var id = GuidFromInt(92003);
 
         (await Client.PutAsJsonAsync(
-            $"/api/eav/entities/{id}",
+            $"/api/eav/{Type}/entities/{id}",
             new Dictionary<string, object?>
             {
                 [Attr] = new { latitude = 39.9042, longitude = 116.4074, label = "天安门" }
@@ -117,10 +118,10 @@ public class LocationAttributeTests : IntegrationTestBase
 
         // 显式置 null → 删除坐标点
         (await Client.PutAsJsonAsync(
-            $"/api/eav/entities/{id}",
+            $"/api/eav/{Type}/entities/{id}",
             new Dictionary<string, object?> { [Attr] = null })).EnsureSuccessStatusCode();
 
-        var get = await Client.GetAsync($"/api/eav/entities/{id}");
+        var get = await Client.GetAsync($"/api/eav/{Type}/entities/{id}");
         get.EnsureSuccessStatusCode();
         using var doc = JsonDocument.Parse(await get.Content.ReadAsStringAsync());
         var props = doc.RootElement.GetProperty("data").GetProperty("properties");

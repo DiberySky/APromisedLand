@@ -1,4 +1,5 @@
-@* OptionSetItemDialog.razor — 添加 / 编辑选项（DialogSky 外壳，与树节点对话框风格一致） *@
+@* OptionSetItemDialog.razor — 添加 / 编辑选项（DialogSky 外壳，与新建选项集风格一致） *@
+@using TreeGraph.Blazor.Shared.MafWfSky.Components
 @inject EavApiClient Api
 @inject ISnackbar Snackbar
 
@@ -6,41 +7,35 @@
                SubmitButtonVisible="true"
                SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
                SubmitButtonDisabled="@_submitting"
+               ActionsMaxWidth="MaxWidth.False"
                OnSubmitClick="SaveAsync">
-    <DialogContent>
+    <ToolBarContent>
         @if (Set is not null)
         {
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
-                @Set.DisplayName (@Set.SetName)
-            </MudText>
+            <MudText>选项集：@Set.DisplayName (@Set.SetName)</MudText>
         }
-
-        <MudTextField @bind-Value="_form.Value"
-                      Label="Value（存储值，如 male）"
-                      Variant="Variant.Outlined"
-                      Disabled="@(EditingItem is not null)"
-                      Class="mb-3" />
-        @if (EditingItem is not null)
-        {
-            <MudAlert Severity="Severity.Info" Class="mb-3">
-                Value 是存储的稳定标识，不可修改。如需变更，请新建选项并迁移数据。
-            </MudAlert>
-        }
-
-        <MudTextField @bind-Value="_form.Label"
-                      Label="Label（显示名，如 男）"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
-
-        <NumberInputField T="int"
-                          @bind-Value="_form.DisplayOrder"
-                          Label="显示顺序"
-                          Class="mb-3" />
-
-        <MudSwitch T="bool"
-                   @bind-Value="_form.IsDefault"
-                   Label="设为默认选项"
-                   Color="Color.Primary" />
+    </ToolBarContent>
+    <DialogContent>
+        @* 显示名 + 默认开关同一行：显示名占剩余宽度，开关靠右垂直居中 *@
+        <div class="d-flex align-center mb-3" style="gap: 12px;">
+            <MudTextField @bind-Value="_form.Label"
+                          Label="显示名"
+                          Placeholder="请输入中文"
+                          Variant="Variant.Outlined"
+                          Style="flex: 1 1 auto;" />
+            <MudSwitch T="bool"
+                       @bind-Value="_form.IsDefault"
+                       Label="设为默认选项"
+                       Color="Color.Primary"
+                       Style="flex: 0 0 auto;" />
+        </div>
+        <NamingTextField @bind-Value="_form.Value"
+                         SourceText="@_form.Label"
+                         NameCase="snake"
+                         Label="内部标识"
+                         Placeholder="使用下划线分隔的小写英文单词"
+                         Disabled="@(EditingItem is not null)"
+                         HelperText="@(EditingItem is not null ? "存储的稳定标识，不可修改；如需变更请新建选项" : null)" />
     </DialogContent>
 </DialogSky>
 
@@ -77,7 +72,7 @@
         if (string.IsNullOrWhiteSpace(_form.Value) ||
             string.IsNullOrWhiteSpace(_form.Label))
         {
-            Snackbar.Add("请填写 Value 和 Label", Severity.Warning);
+            Snackbar.Add("请填写显示名和内部标识", Severity.Warning);
             return;
         }
 
@@ -98,7 +93,7 @@
 
                 if (id is null)
                 {
-                    Snackbar.Add("添加失败（Value 可能已存在）", Severity.Error);
+                    Snackbar.Add("添加失败（内部标识可能已存在）", Severity.Error);
                     return;
                 }
                 Snackbar.Add($"添加成功：Id={id}", Severity.Success);

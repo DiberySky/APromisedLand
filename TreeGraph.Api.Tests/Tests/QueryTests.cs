@@ -21,7 +21,7 @@ public class QueryTests : IntegrationTestBase
         var prices = new[] { 10.5m, 99.9m, 5.0m };
         for (int i = 0; i < ids.Length; i++)
         {
-            await PutEntityAsync(ids[i],
+            await PutEntityAsync(TestData.EntityType, ids[i],
                 new Dictionary<string, object?>
                 {
                     ["amount"] = 1L,
@@ -31,6 +31,7 @@ public class QueryTests : IntegrationTestBase
 
         var req = new EavQueryRequest
         {
+            EntityType = TestData.EntityType,
             OrderByAttribute = "price",
             OrderDescending = true,
             Page = 1,
@@ -38,7 +39,7 @@ public class QueryTests : IntegrationTestBase
         };
 
         var resp = await Client.PostAsJsonAsync(
-            "/api/eav/entities/query", req);
+            $"/api/eav/{TestData.EntityType}/entities/query", req);
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content
@@ -63,13 +64,14 @@ public class QueryTests : IntegrationTestBase
     {
         await TestData.EnsureSchemaAsync(Client);
 
-        await PutEntityAsync(GuidFromInt(93010),
+        await PutEntityAsync(TestData.EntityType, GuidFromInt(93010),
             new Dictionary<string, object?> { ["amount"] = 1L, ["price"] = 42m });
-        await PutEntityAsync(GuidFromInt(93011),
+        await PutEntityAsync(TestData.EntityType, GuidFromInt(93011),
             new Dictionary<string, object?> { ["amount"] = 1L, ["price"] = 43m });
 
         var req = new EavQueryRequest
         {
+            EntityType = TestData.EntityType,
             Filters = new List<AttributeFilter>
             {
                 new()
@@ -84,7 +86,7 @@ public class QueryTests : IntegrationTestBase
         };
 
         var resp = await Client.PostAsJsonAsync(
-            "/api/eav/entities/query", req);
+            $"/api/eav/{TestData.EntityType}/entities/query", req);
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
 
@@ -96,13 +98,14 @@ public class QueryTests : IntegrationTestBase
 
         var req = new EavQueryRequest
         {
+            EntityType = TestData.EntityType,
             OrderByAttribute = "label",   // IsSortable = false
             Page = 1,
             PageSize = 10
         };
 
         var resp = await Client.PostAsJsonAsync(
-            "/api/eav/entities/query", req);
+            $"/api/eav/{TestData.EntityType}/entities/query", req);
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
 
@@ -117,11 +120,11 @@ public class QueryTests : IntegrationTestBase
 
         var noPriceId = GuidFromInt(93020);
         var (lowId, highId) = (GuidFromInt(93021), GuidFromInt(93022));
-        await PutEntityAsync(noPriceId,
+        await PutEntityAsync(TestData.EntityType, noPriceId,
             new Dictionary<string, object?> { ["amount"] = 1L });   // 无 price
-        await PutEntityAsync(lowId,
+        await PutEntityAsync(TestData.EntityType, lowId,
             new Dictionary<string, object?> { ["amount"] = 1L, ["price"] = 5.0m });
-        await PutEntityAsync(highId,
+        await PutEntityAsync(TestData.EntityType, highId,
             new Dictionary<string, object?> { ["amount"] = 1L, ["price"] = 99.9m });
 
         var result = await QueryIdsAsync(orderDescending: false);
@@ -140,11 +143,11 @@ public class QueryTests : IntegrationTestBase
 
         var noPriceId = GuidFromInt(93023);
         var (lowId, highId) = (GuidFromInt(93024), GuidFromInt(93025));
-        await PutEntityAsync(noPriceId,
+        await PutEntityAsync(TestData.EntityType, noPriceId,
             new Dictionary<string, object?> { ["amount"] = 1L });   // 无 price
-        await PutEntityAsync(lowId,
+        await PutEntityAsync(TestData.EntityType, lowId,
             new Dictionary<string, object?> { ["amount"] = 1L, ["price"] = 5.0m });
-        await PutEntityAsync(highId,
+        await PutEntityAsync(TestData.EntityType, highId,
             new Dictionary<string, object?> { ["amount"] = 1L, ["price"] = 99.9m });
 
         var result = await QueryIdsAsync(orderDescending: true);
@@ -157,6 +160,7 @@ public class QueryTests : IntegrationTestBase
     {
         var req = new EavQueryRequest
         {
+            EntityType = TestData.EntityType,
             OrderByAttribute = "price",
             OrderDescending = orderDescending,
             Page = 1,
@@ -164,7 +168,7 @@ public class QueryTests : IntegrationTestBase
         };
 
         var resp = await Client.PostAsJsonAsync(
-            "/api/eav/entities/query", req);
+            $"/api/eav/{TestData.EntityType}/entities/query", req);
         resp.EnsureSuccessStatusCode();
 
         var result = await resp.Content

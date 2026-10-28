@@ -73,6 +73,7 @@ public static class InodeTestData
     {
         var body = new
         {
+            entityType,
             attributeName = attrName,
             displayName = attrName,
             dataType,

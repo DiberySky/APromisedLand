@@ -125,6 +125,35 @@
     /// <summary>关闭流程已开始：阻断取消的重入触发。</summary>
     private bool _closing;
 
+    /// <summary>
+    /// 统一交互约定：DialogSky 对话框点击背景遮罩不关闭，避免误触丢失未保存内容。
+    /// MudBlazor 9 的 BackdropClick 为 init-only 且默认 true，无法原地修改，
+    /// 故克隆打开方传入的 DialogOptions（含 DialogOptionsEx 扩展属性）后重新注入。
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        if (MudDialog is null || MudDialog.Options.BackdropClick == false)
+            return;
+
+        await MudDialog.SetOptionsAsync(CloneWithBackdropClickDisabled(MudDialog.Options));
+    }
+
+    /// <summary>反射复制全部可读写属性，仅将 BackdropClick 置为 false。</summary>
+    private static DialogOptions CloneWithBackdropClickDisabled(DialogOptions source)
+    {
+        var clone = (DialogOptions)Activator.CreateInstance(source.GetType())!;
+        foreach (var prop in source.GetType()
+                     .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (prop.Name != nameof(DialogOptions.BackdropClick) && prop.CanRead && prop.CanWrite)
+                prop.SetValue(clone, prop.GetValue(source));
+        }
+
+        typeof(DialogOptions).GetProperty(nameof(DialogOptions.BackdropClick))!
+            .SetValue(clone, false);
+        return clone;
+    }
+
     private async Task CancelAsync()
     {
         if (_closing)

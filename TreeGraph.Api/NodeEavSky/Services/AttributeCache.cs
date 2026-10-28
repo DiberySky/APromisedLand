@@ -7,18 +7,17 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 
 public interface IAttributeCache
 {
-    IReadOnlyList<AttributeDefinition> GetDefinitions();
-    AttributeDefinition? GetDefinition(string attributeName);
-    void Invalidate();
+    IReadOnlyList<AttributeDefinition> GetDefinitions(string entityType);
+    AttributeDefinition? GetDefinition(string entityType, string attributeName);
+    void Invalidate(string entityType);
 }
 
-/// <summary>属性元数据缓存（单例，读取频率极高）。属性全局共享，整库一份目录。</summary>
+/// <summary>属性元数据缓存（单例，读取频率极高）</summary>
 public class AttributeCache : IAttributeCache
 {
     private readonly IMemoryCache _cache;
     private readonly IServiceScopeFactory _scopeFactory;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30);
-    private const string CacheKey = "eav:defs:global";
 
     public AttributeCache(IMemoryCache cache, IServiceScopeFactory scopeFactory)
     {
@@ -26,9 +25,9 @@ public class AttributeCache : IAttributeCache
         _scopeFactory = scopeFactory;
     }
 
-    public IReadOnlyList<AttributeDefinition> GetDefinitions()
+    public IReadOnlyList<AttributeDefinition> GetDefinitions(string entityType)
     {
-        return _cache.GetOrCreate(CacheKey, entry =>
+        return _cache.GetOrCreate($"eav:defs:{entityType}", entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
             entry.SlidingExpiration = TimeSpan.FromMinutes(10);
@@ -36,15 +35,16 @@ public class AttributeCache : IAttributeCache
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
             return db.AttributeCatalog
+                .Where(a => a.EntityType == entityType)
                 .OrderBy(a => a.DisplayOrder)
                 .AsNoTracking()
                 .ToList();
         })!;
     }
 
-    public AttributeDefinition? GetDefinition(string attributeName)
-        => GetDefinitions().FirstOrDefault(d => d.AttributeName == attributeName);
+    public AttributeDefinition? GetDefinition(string entityType, string attributeName)
+        => GetDefinitions(entityType).FirstOrDefault(d => d.AttributeName == attributeName);
 
-    public void Invalidate()
-        => _cache.Remove(CacheKey);
+    public void Invalidate(string entityType)
+        => _cache.Remove($"eav:defs:{entityType}");
 }

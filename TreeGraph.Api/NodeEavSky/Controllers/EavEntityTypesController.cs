@@ -10,9 +10,9 @@ namespace TreeGraph.Api.NodeEavSky.Controllers;
 /// <summary>
 /// 实体类型元数据端点。
 ///
-/// 数据源为 EntityTypeCatalog 表（DisplayName / Description / DisplayOrder）。
-/// ★ 属性已全局化（attribute_catalog 不再有 entity_type 维度），
-///   类型不再拥有属性，摘要/详情中的属性计数固定为 0。
+/// 数据源已从 AttributeCatalog 聚合改为 EntityTypeCatalog 表。
+/// AttributeCatalog 提供统计（属性数 / 可搜索数），
+/// EntityTypeCatalog 提供类型本身（DisplayName / Description）。
 /// </summary>
 [ApiController]
 [Route("api/eav/entity-types")]
@@ -35,21 +35,47 @@ public class EavEntityTypesController : ControllerBase
     public async Task<IActionResult> List(CancellationToken ct)
     {
         // 从 EntityTypeCatalog 拿活动类型（纯全局共享，无空间归属）
-        var types = await _db.EntityTypes
-            .Where(t => !t.IsDeleted)
+        var query = _db.EntityTypes.Where(t => !t.IsDeleted);
+
+        var types = await query
             .OrderBy(t => t.DisplayOrder)
             .ThenBy(t => t.EntityType)
             .AsNoTracking()
             .ToListAsync(ct);
 
-        // 属性全局化后不再归属类型，计数固定为 0
-        var result = types.Select(t => new EntityTypeSummaryDto(
-            t.EntityType,
-            0,
-            0,
-            null,
-            t.EntityTypeId,
-            t.DisplayName));
+        // 从 AttributeCatalog 聚合属性统计（属性为实体类型私有）
+        if (types.Count == 0)
+            return Ok(Array.Empty<EntityTypeSummaryDto>());
+
+        var typeNames = types.Select(t => t.EntityType).ToList();
+        var stats = await _db.AttributeCatalog
+            .Where(a => typeNames.Contains(a.EntityType))
+            .GroupBy(a => a.EntityType)
+            .Select(g => new
+            {
+                EntityType = g.Key,
+                Total = g.Count(),
+                Searchable = g.Count(a => a.IsSearchable),
+                FirstDisplay = g.OrderBy(a => a.DisplayOrder)
+                                .Select(a => a.DisplayName)
+                                .FirstOrDefault()
+            })
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var statsMap = stats.ToDictionary(s => s.EntityType);
+
+        var result = types.Select(t =>
+        {
+            statsMap.TryGetValue(t.EntityType, out var s);
+            return new EntityTypeSummaryDto(
+                t.EntityType,
+                s?.Total ?? 0,
+                s?.Searchable ?? 0,
+                s?.FirstDisplay,
+                t.EntityTypeId,
+                t.DisplayName);
+        });
 
         return Ok(result);
     }
@@ -67,21 +93,38 @@ public class EavEntityTypesController : ControllerBase
     ///   需逐个 GET /{id}，N 个类型 = 1+N 次 HTTP。
     ///   N=145 时前端 LoadAsync 严重卡顿（>15s）。
     ///
-    /// 本端点：1 次 HTTP 返回全量详情。
-    /// ★ 属性全局化后类型不再拥有属性，AttributeCount 固定为 0。
+    /// 本端点：1 次 HTTP 返回全量详情 + 属性计数（GroupBy 聚合，1 次 DB 查询）。
     /// </summary>
     [HttpGet("details")]
     public async Task<IActionResult> ListDetails(
         [FromQuery] bool includeDeleted = false,
         CancellationToken ct = default)
     {
-        var types = await _db.EntityTypes
-            .Where(t => includeDeleted || !t.IsDeleted)
+        // 1. 全量类型（1 次 DB）
+        var query = _db.EntityTypes
+            .Where(t => includeDeleted || !t.IsDeleted);
+
+        var types = await query
             .OrderBy(t => t.DisplayOrder)
             .ThenBy(t => t.EntityType)
             .AsNoTracking()
             .ToListAsync(ct);
 
+        if (types.Count == 0)
+            return Ok(Array.Empty<EntityTypeDetailDto>());
+
+        // 2. 属性计数（1 次 DB，GroupBy 聚合）
+        var typeNames = types.Select(t => t.EntityType).ToList();
+        var stats = await _db.AttributeCatalog
+            .Where(a => typeNames.Contains(a.EntityType))
+            .GroupBy(a => a.EntityType)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var statsMap = stats.ToDictionary(x => x.Type, x => x.Count);
+
+        // 3. 组装
         var result = types.Select(t => new EntityTypeDetailDto(
             t.EntityTypeId,
             t.EntityType,
@@ -91,7 +134,7 @@ public class EavEntityTypesController : ControllerBase
             t.IsDeleted,
             t.CreatedAt,
             t.UpdatedAt,
-            0));
+            statsMap.GetValueOrDefault(t.EntityType, 0)));
 
         return Ok(result);
     }
@@ -108,10 +151,12 @@ public class EavEntityTypesController : ControllerBase
             .FirstOrDefaultAsync(x => x.EntityTypeId == id, ct);
         if (t is null) return NotFound();
 
-        // 属性全局化后不再归属类型，AttributeCount 固定为 0
+        var attrCount = await _db.AttributeCatalog
+            .CountAsync(a => a.EntityType == t.EntityType, ct);
+
         return Ok(new EntityTypeDetailDto(
             t.EntityTypeId, t.EntityType, t.DisplayName, t.Description,
-            t.DisplayOrder, t.IsDeleted, t.CreatedAt, t.UpdatedAt, 0));
+            t.DisplayOrder, t.IsDeleted, t.CreatedAt, t.UpdatedAt, attrCount));
     }
 
     // ============================================================
@@ -215,12 +260,21 @@ public class EavEntityTypesController : ControllerBase
         var e = await _db.EntityTypes.FindAsync(new object[] { id }, ct);
         if (e is null || e.IsDeleted) return NotFound();
 
-        // ★ 属性/属性值已全局化（不再携带 entity_type 维度），不再拦截删除；
-        //   实例归属由宿主 Id 全局唯一 GUID 表达。
+        // 仍有属性时拒绝
+        var hasAttrs = await _db.AttributeCatalog
+            .AnyAsync(a => a.EntityType == e.EntityType, ct);
+        if (hasAttrs)
+            return BadRequest(new
+            {
+                error = $"该实体类型仍有属性（{e.EntityType}），请先删除其属性"
+            });
 
         // 子项为空方可删除本项（不采用级联删除）：该类型已产生实体实例时拒绝
-        var hasEntities = await _db.CustomTableRows
-            .AnyAsync(r => r.ParentEntityType == e.EntityType, ct);
+        // 属性值/审计已无类型列，实例归属以 inode_entity 映射与自定义表行为准
+        var hasEntities = await _db.InodeEntities
+                .AnyAsync(m => m.EntityType == e.EntityType, ct)
+            || await _db.CustomTableRows
+                .AnyAsync(r => r.ParentEntityType == e.EntityType, ct);
         if (hasEntities)
             return BadRequest(new
             {

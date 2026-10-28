@@ -6,7 +6,6 @@ namespace TreeGraph.Api.NodeEavSky.Entities;
 public class CustomTableDefinition
 {
     public string TableDefinitionId { get; set; } = "";
-    public string EntityType { get; set; } = "";
     public string TableName { get; set; } = "";       // "certifications"、"education"
     public string DisplayName { get; set; } = "";     // "认证证书"、"教育经历"
     public int Version { get; set; } = 1;

@@ -222,7 +222,7 @@ public sealed class SubtreeService
     private async Task<List<string>> RenderEntityAsync(
         string entityId, string entityType, CancellationToken ct)
     {
-        var defs = _attrCache.GetDefinitions()
+        var defs = _attrCache.GetDefinitions(entityType)
             .OrderBy(d => d.DisplayOrder)
             .ThenBy(d => d.AttributeName, StringComparer.Ordinal)
             .ToList();

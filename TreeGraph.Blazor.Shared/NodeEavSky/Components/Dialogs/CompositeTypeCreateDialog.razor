@@ -11,32 +11,6 @@
                ActionsMaxWidth="MaxWidth.False"
                OnSubmitClick="CreateAsync">
     <DialogContent>
-        <div Class="d-flex align-center mb-3">
-            <MudSelect T="string"
-                       Value="_newType.EntityType"
-                       ValueChanged="OnEntityTypeChanged"
-                       Label="实体类型"
-                       Variant="Variant.Outlined"
-                       Class="flex-grow-1"
-                       HelperText="选择该组合类型归属的实体类型"
-                       AnchorOrigin="Origin.BottomLeft"
-                       TransformOrigin="Origin.TopLeft">
-                @foreach (var et in _entityTypes)
-                {
-                    <MudSelectItem T="string" Value="@et.EntityType">
-                        @(string.IsNullOrWhiteSpace(et.DisplayName) ? et.EntityType : $"{et.DisplayName}（{et.EntityType}）")
-                    </MudSelectItem>
-                }
-            </MudSelect>
-        </div>
-
-        @if (_entityTypes.Count == 0)
-        {
-            <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true">
-                暂无实体类型，请先到「实体类型管理」创建。
-            </MudAlert>
-        }
-
         <MudTextField @bind-Value="_newType.DisplayName"
                       Label="显示名"
                       Placeholder="中文名称"
@@ -55,35 +29,10 @@
 
     private CreateCompositeTypeRequest _newType = new();
     private bool _submitting;
-    private IReadOnlyList<EntityTypeSummaryDto> _entityTypes = [];
-
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            _entityTypes = (await Api.ListEntityTypesAsync()) ?? [];
-            // 归属不再区分全局共享：默认选第一个实体类型
-            if (string.IsNullOrWhiteSpace(_newType.EntityType))
-            {
-                _newType.EntityType = _entityTypes.FirstOrDefault()?.EntityType ?? "";
-            }
-        }
-        catch
-        {
-            _entityTypes = [];
-        }
-    }
-
-    private Task OnEntityTypeChanged(string? value)
-    {
-        _newType.EntityType = value ?? "";
-        return Task.CompletedTask;
-    }
 
     private async Task CreateAsync()
     {
-        if (string.IsNullOrWhiteSpace(_newType.EntityType) ||
-            string.IsNullOrWhiteSpace(_newType.TypeName) ||
+        if (string.IsNullOrWhiteSpace(_newType.TypeName) ||
             string.IsNullOrWhiteSpace(_newType.DisplayName))
         {
             Snackbar.Add("请填写所有字段", Severity.Warning);

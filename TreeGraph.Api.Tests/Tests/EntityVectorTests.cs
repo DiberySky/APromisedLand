@@ -84,7 +84,7 @@ public class EntityVectorTests
         var db = CreateDb();
         db.AttributeCatalog.Add(new AttributeDefinition
         {
-            AttributeId = "attr-1",
+            AttributeId = "attr-1", EntityType = EntityType,
             AttributeName = "model", DisplayName = "型号", DisplayOrder = 1
         });
         db.AttributeValues.Add(new AttributeValue
@@ -129,7 +129,7 @@ public class EntityVectorTests
         await using var db = await CreateDbWithValueAsync();
         db.AttributeCatalog.Add(new AttributeDefinition
         {
-            AttributeId = "tbl-defect",
+            AttributeId = "tbl-defect", EntityType = EntityType,
             AttributeName = "defects", DisplayName = "缺陷记录", DisplayOrder = 2
         });
         db.CustomTableRows.Add(MakeRow("row-1", "tbl-defect"));
@@ -174,7 +174,7 @@ public class EntityVectorTests
         await using var db = await CreateDbWithValueAsync();
         db.AttributeCatalog.Add(new AttributeDefinition
         {
-            AttributeId = "tbl-defect",
+            AttributeId = "tbl-defect", EntityType = EntityType,
             AttributeName = "defects", DisplayName = "缺陷记录", DisplayOrder = 2
         });
         await db.SaveChangesAsync();

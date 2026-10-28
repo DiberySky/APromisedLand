@@ -8,21 +8,9 @@
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="UpdateAsync">
     <DialogContent>
-        @if (Type is not null)
-        {
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
-                @Type.EntityType / @Type.TypeName
-                （类型标识不可修改）
-            </MudText>
-        }
-
         <MudTextField @bind-Value="_editTypeForm.DisplayName"
                       Label="显示名"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
-        <MudAlert Severity="Severity.Info" Dense="true">
-            TypeName 与 EntityType 是引用标识，不可修改。如需更名，请新建并迁移引用。
-        </MudAlert>
+                      Variant="Variant.Outlined" />
     </DialogContent>
 </DialogSky>
 

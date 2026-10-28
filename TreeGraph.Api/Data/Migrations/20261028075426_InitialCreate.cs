@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -20,7 +20,6 @@ namespace TreeGraph.Api.Data.Migrations
                 {
                     audit_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
                     entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     attribute_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     old_value = table.Column<string>(type: "text", nullable: true),
@@ -41,10 +40,10 @@ namespace TreeGraph.Api.Data.Migrations
                 columns: table => new
                 {
                     composite_type_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     type_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     version = table.Column<int>(type: "integer", nullable: false),
+                    display_order = table.Column<int>(type: "integer", nullable: false),
                     is_deleted = table.Column<bool>(type: "boolean", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
@@ -59,7 +58,6 @@ namespace TreeGraph.Api.Data.Migrations
                 columns: table => new
                 {
                     table_definition_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     table_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     display_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     version = table.Column<int>(type: "integer", nullable: false),
@@ -425,7 +423,7 @@ namespace TreeGraph.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_composite_field_definitions", x => x.field_id);
-                    table.CheckConstraint("ck_composite_field_decimal_unit", "data_type = 'decimal' OR unit_id IS NULL");
+                    table.CheckConstraint("ck_composite_field_decimal_unit", "data_type IN ('int', 'decimal') OR unit_id IS NULL");
                     table.CheckConstraint("ck_composite_field_single_choice_optionset", "data_type = 'single_choice' OR ref_option_set_id IS NULL");
                     table.ForeignKey(
                         name: "FK_composite_field_definitions_composite_type_definitions_comp~",
@@ -593,7 +591,6 @@ namespace TreeGraph.Api.Data.Migrations
                 {
                     value_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
                     entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     value_string = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     value_int = table.Column<long>(type: "bigint", nullable: true),
@@ -662,7 +659,6 @@ namespace TreeGraph.Api.Data.Migrations
                 {
                     value_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false, defaultValueSql: "gen_random_uuid()::text"),
                     entity_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
-                    entity_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     attribute_id = table.Column<string>(type: "character varying(36)", maxLength: 36, nullable: false),
                     latitude = table.Column<double>(type: "double precision", nullable: false),
                     longitude = table.Column<double>(type: "double precision", nullable: false),
@@ -875,8 +871,8 @@ namespace TreeGraph.Api.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_audit_entity",
                 table: "attribute_audit_log",
-                columns: new[] { "entity_type", "entity_id", "changed_at" },
-                descending: new[] { false, false, true });
+                columns: new[] { "entity_id", "changed_at" },
+                descending: new[] { false, true });
 
             migrationBuilder.CreateIndex(
                 name: "ix_audit_time",
@@ -964,13 +960,13 @@ namespace TreeGraph.Api.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_av_entity",
                 table: "attribute_values",
-                columns: new[] { "entity_type", "entity_id" });
+                column: "entity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_av_entity_updated",
                 table: "attribute_values",
-                columns: new[] { "entity_type", "entity_id", "updated_at" },
-                descending: new[] { false, false, true });
+                columns: new[] { "entity_id", "updated_at" },
+                descending: new[] { false, true });
 
             migrationBuilder.CreateIndex(
                 name: "ix_av_file_meta",
@@ -989,7 +985,7 @@ namespace TreeGraph.Api.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "uq_av_entity_attr",
                 table: "attribute_values",
-                columns: new[] { "entity_id", "entity_type", "attribute_id" },
+                columns: new[] { "entity_id", "attribute_id" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1021,7 +1017,7 @@ namespace TreeGraph.Api.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "uq_composite_type",
                 table: "composite_type_definitions",
-                columns: new[] { "entity_type", "type_name", "version" },
+                columns: new[] { "type_name", "version" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1043,7 +1039,7 @@ namespace TreeGraph.Api.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "uq_custom_table",
                 table: "custom_table_definitions",
-                columns: new[] { "entity_type", "table_name", "version" },
+                columns: new[] { "table_name", "version" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1145,13 +1141,13 @@ namespace TreeGraph.Api.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_lav_entity",
                 table: "location_attribute_values",
-                columns: new[] { "entity_type", "entity_id" });
+                column: "entity_id");
 
             migrationBuilder.CreateIndex(
                 name: "ix_lav_entity_updated",
                 table: "location_attribute_values",
-                columns: new[] { "entity_type", "entity_id", "updated_at" },
-                descending: new[] { false, false, true });
+                columns: new[] { "entity_id", "updated_at" },
+                descending: new[] { false, true });
 
             migrationBuilder.CreateIndex(
                 name: "IX_location_attribute_values_attribute_id",
@@ -1161,7 +1157,7 @@ namespace TreeGraph.Api.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "uq_lav_entity_attr",
                 table: "location_attribute_values",
-                columns: new[] { "entity_id", "entity_type", "attribute_id" },
+                columns: new[] { "entity_id", "attribute_id" },
                 unique: true);
 
             migrationBuilder.CreateIndex(

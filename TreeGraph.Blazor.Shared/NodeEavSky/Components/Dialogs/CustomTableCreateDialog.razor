@@ -9,55 +9,30 @@
                SubmitButtonDisabled="@_submitting"
                OnSubmitClick="CreateAsync">
     <DialogContent>
-        <div Class="d-flex align-center mb-3">
-            <MudSelect T="string"
-                       Value="_newTable.EntityType"
-                       ValueChanged="OnEntityTypeChanged"
-                       Label="实体类型"
-                       Variant="Variant.Outlined"
-                       Class="flex-grow-1"
-                       HelperText="选择该自定义表归属的实体类型"
-                       AnchorOrigin="Origin.BottomLeft"
-                       TransformOrigin="Origin.TopLeft">
-                @foreach (var et in _entityTypes)
-                {
-                    <MudSelectItem T="string" Value="@et.EntityType">
-                        @(string.IsNullOrWhiteSpace(et.DisplayName) ? et.EntityType : $"{et.DisplayName}（{et.EntityType}）")
-                    </MudSelectItem>
-                }
-            </MudSelect>
+        @* 显示名与时序记录同一行：Grid 两列，开关垂直居中 *@
+        <div style="display:grid; gap:8px; align-items:center; grid-template-columns:minmax(0,1fr) auto;" class="mb-3">
+            <div>
+                <MudTextField @bind-Value="_newTable.DisplayName"
+                              Label="显示名"
+                              Placeholder="请输入中文"
+                              Variant="Variant.Outlined" />
+            </div>
+            <div>
+                @* 时序记录表：创建时服务端预置时间维度列（第 1 列日期、可选第 2 列时间），此后锁定 *@
+                <MudSwitch T="bool"
+                           @bind-Value="_newTable.IsRecordTable"
+                           Color="Color.Primary">
+                    时序记录
+                </MudSwitch>
+            </div>
         </div>
-
-        @if (_entityTypes.Count == 0)
-        {
-            <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true">
-                暂无实体类型，请先到「实体类型管理」创建。
-            </MudAlert>
-        }
-
-        <MudTextField @bind-Value="_newTable.DisplayName"
-                      Label="显示名"
-                      Placeholder="规格参数"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
         <NamingTextField @bind-Value="_newTable.TableName"
                          SourceText="@_newTable.DisplayName"
                          NameCase="snake"
                          Label="内部标识"
-                         Placeholder="specs"
+                         Placeholder="使用下划线分隔的小写英文单词"
                          Class="mb-3" />
-        <NumberInputField T="int"
-                          @bind-Value="_newTable.DisplayOrder"
-                          Label="显示顺序"
-                          Class="mb-3" />
 
-        @* 时序记录表：创建时服务端预置时间维度列（第 1 列日期、可选第 2 列时间），此后锁定 *@
-        <MudSwitch T="bool"
-                   @bind-Value="_newTable.IsRecordTable"
-                   Color="Color.Primary"
-                   Class="mb-2">
-            时序记录
-        </MudSwitch>
         @if (_newTable.IsRecordTable)
         {
             <MudSwitch T="bool"
@@ -80,35 +55,10 @@
 
     private CreateCustomTableRequest _newTable = new();
     private bool _submitting;
-    private IReadOnlyList<EntityTypeSummaryDto> _entityTypes = [];
-
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            _entityTypes = (await Api.ListEntityTypesAsync()) ?? [];
-            // 归属不再区分全局共享：默认选第一个实体类型
-            if (string.IsNullOrWhiteSpace(_newTable.EntityType))
-            {
-                _newTable.EntityType = _entityTypes.FirstOrDefault()?.EntityType ?? "";
-            }
-        }
-        catch
-        {
-            _entityTypes = [];
-        }
-    }
-
-    private Task OnEntityTypeChanged(string? value)
-    {
-        _newTable.EntityType = value ?? "";
-        return Task.CompletedTask;
-    }
 
     private async Task CreateAsync()
     {
-        if (string.IsNullOrWhiteSpace(_newTable.EntityType) ||
-            string.IsNullOrWhiteSpace(_newTable.TableName) ||
+        if (string.IsNullOrWhiteSpace(_newTable.TableName) ||
             string.IsNullOrWhiteSpace(_newTable.DisplayName))
         {
             Snackbar.Add("请填写所有字段", Severity.Warning);
