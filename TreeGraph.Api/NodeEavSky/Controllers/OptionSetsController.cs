@@ -53,7 +53,7 @@ public class OptionSetsController : ControllerBase
         var query = db.OptionSets.AsQueryable();
         if (!includeDeleted) query = query.Where(s => !s.IsDeleted);
         if (entityType is not null)
-            query = query.Where(s => s.EntityType == entityType || s.EntityType == "Shared");
+            query = query.Where(s => s.EntityType == entityType);
 
         var list = await query
             .OrderBy(s => s.OptionSetId)
@@ -122,19 +122,18 @@ public class OptionSetsController : ControllerBase
     }
 
     /// <summary>
-    /// ★ 软删除选项集。
+    /// ★ 硬删除选项集（物理移除）。
     ///
     /// 语义：
     ///   - 被属性引用时拒绝删除（保守策略）。
     ///   - 子项为空方可删除本项：仍有活动选项时拒绝（不采用级联删除）。
-    ///   - 读取端 `OptionSetCache.GetSet` 不过滤 IsDeleted，历史数据仍可拿到 Label。
-    ///   - 唯一索引（entity_type, set_name）改为 partial（仅 is_deleted = false），
-    ///     软删后同名集合可被重新创建。
     /// </summary>
     [HttpDelete("{setId}")]
     public async Task<IActionResult> DeleteSet(string setId, CancellationToken ct)
     {
-        var set = await _db.OptionSets.FindAsync(new object[] { setId }, ct);
+        var set = await _db.OptionSets
+            .Include(s => s.Items)
+            .FirstOrDefaultAsync(s => s.OptionSetId == setId, ct);
         if (set is null || set.IsDeleted) return NotFound();
 
         // 检查是否被属性引用（保持保守策略）
@@ -149,77 +148,9 @@ public class OptionSetsController : ControllerBase
         if (hasItems)
             return BadRequest(new { error = "该选项集仍有选项，无法删除。请先删除全部选项。" });
 
-        // ★ 软删集合本身
-        set.IsDeleted = true;
-        set.UpdatedAt = DateTimeOffset.UtcNow;
-
-        await _db.SaveChangesAsync(ct);
-        _optionSetCache.Invalidate(setId);
-        return NoContent();
-    }
-
-    /// <summary>
-    /// ★ 恢复软删除的选项集（同时恢复全部选项）。
-    ///
-    /// 冲突：
-    ///   - 若已存在同名活动集合 → 409（partial unique index 拒绝）
-    ///   - 若某选项 Value 与活动项冲突 → 409，返回冲突列表
-    /// 恢复后 IsDefault 一律清空（需显式重设）。
-    /// </summary>
-    [HttpPost("{setId}/undelete")]
-    public async Task<IActionResult> UndeleteSet(string setId, CancellationToken ct)
-    {
-        var set = await _db.OptionSets.FindAsync(new object[] { setId }, ct);
-        if (set is null) return NotFound();
-        if (!set.IsDeleted) return NoContent();   // 幂等
-
-        // 同名活动集合冲突
-        var conflictSet = await _db.OptionSets.AnyAsync(
-            s => s.OptionSetId != setId
-              && s.EntityType == set.EntityType
-              && s.SetName == set.SetName
-              && !s.IsDeleted, ct);
-        if (conflictSet)
-            return Conflict(new
-            {
-                error = $"同名活动选项集已存在（{set.EntityType}/{set.SetName}），" +
-                        "请先删除或改名后再恢复"
-            });
-
-        // 恢复集合本身
-        set.IsDeleted = false;
-        set.UpdatedAt = DateTimeOffset.UtcNow;
-
-        // 恢复所有软删选项（清空 IsDefault）
-        var deletedItems = await _db.OptionItems
-            .Where(i => i.OptionSetId == setId && i.IsDeleted)
-            .ToListAsync(ct);
-
-        if (deletedItems.Count > 0)
-        {
-            // 冲突检查：Value 与活动项是否重复
-            var restoredValues = deletedItems.Select(i => i.Value).ToList();
-            var conflicts = await _db.OptionItems
-                .Where(i => i.OptionSetId == setId
-                         && !i.IsDeleted
-                         && restoredValues.Contains(i.Value))
-                .Select(i => i.Value)
-                .ToListAsync(ct);
-
-            if (conflicts.Count > 0)
-                return Conflict(new
-                {
-                    error = $"以下选项的 Value 已存在活动记录，无法恢复: " +
-                            string.Join(", ", conflicts),
-                    conflictingValues = conflicts
-                });
-
-            foreach (var item in deletedItems)
-            {
-                item.IsDeleted = false;
-                item.IsDefault = false;
-            }
-        }
+        // 硬删除：物理移除（遗留的软删除选项行一并清掉）
+        _db.OptionItems.RemoveRange(set.Items);
+        _db.OptionSets.Remove(set);
 
         await _db.SaveChangesAsync(ct);
         _optionSetCache.Invalidate(setId);

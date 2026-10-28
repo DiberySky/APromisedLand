@@ -37,7 +37,7 @@ else
        新建按钮置于表头操作列，行操作为右对齐小号图标 *@
 }
 
-<MudTable Items="_types" Hover="true" Bordered="true"
+<MudTable T="EntityTypeDetailDto" Items="_types" Hover="true" Bordered="true"
           Dense="true"
           Breakpoint="Breakpoint.Sm"
           Loading="@_loading"
@@ -45,7 +45,7 @@ else
     <HeaderContent>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">排序</MudTh>
         <MudTh>名称</MudTh>
-        <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">设置</MudTh>
+        <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">属性定义</MudTh>
         <MudTh>说明</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             @if (IsDialogMode)
@@ -82,7 +82,7 @@ else
             @* 只显示 DisplayName（中文），不显示 et_xxx 内部标识 *@
             <MudText Typo="Typo.body1">@context.DisplayName</MudText>
         </MudTd>
-        <MudTd DataLabel="设置" Style="white-space: nowrap; text-align: center;">
+        <MudTd DataLabel="属性定义" Style="white-space: nowrap; text-align: center;">
             @* 图标入口：点击打开独立属性定义对话框并锁定该类型；
                属性数量以徽标叠加在图标右上角 *@
             <MudBadge Content="@context.AttributeCount" Color="Color.Info"
@@ -100,29 +100,117 @@ else
             </MudText>
         </MudTd>
         <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-            @if (!context.IsDeleted)
-            {
-                <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                               Size="Size.Small"
-                               Color="Color.Error"
-                               OnClick="@(async () => await DeleteAsync(context))"
-                               title="删除" />
-                <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                               Size="Size.Small"
-                               Color="Color.Primary"
-                               OnClick="@(async () => await OpenEditAsync(context))"
-                               title="编辑" />
-            }
-            else
-            {
-                <MudIconButton Icon="@Icons.Material.Filled.RestoreFromTrash"
-                               Size="Size.Small"
-                               Color="Color.Success"
-                               OnClick="@(async () => await UndeleteAsync(context))"
-                               title="恢复" />
-            }
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Small"
+                           Color="Color.Error"
+                           OnClick="@(async () => await DeleteAsync(context))"
+                           title="删除" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                           Size="Size.Small"
+                           Color="Color.Primary"
+                           OnClick="@(async () => await OpenEditAsync(context))"
+                           title="编辑" />
+            <MudIconButton Icon="@(IsExpanded(context.EntityTypeId) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                           Size="Size.Small"
+                           Color="Color.Info"
+                           OnClick="@(async () => await ToggleExpandAsync(context))"
+                           title="查看属性" />
         </MudTd>
     </RowTemplate>
+    <ChildRowContent>
+        @if (IsExpanded(context.EntityTypeId))
+        {
+            <MudTr>
+                <td colspan="5" style="padding: 0;">
+                    <MudPaper Elevation="0" Class="pa-3"
+                              Style="background: var(--mud-palette-background-grey);">
+                        @if (_attrsLoading)
+                        {
+                            <MudProgressLinear Indeterminate="true" Color="Color.Info" />
+                        }
+                        else
+                        {
+                            var attrs = GetAttrs(context.EntityTypeId);
+                            if (attrs.Count == 0)
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true">该实体类型暂无属性</MudAlert>
+                            }
+                            else
+                            {
+                                <MudSimpleTable Dense="true" Bordered="true" Hover="true"
+                                                Style="overflow-x: auto;">
+                                    <thead>
+                                        <tr>
+                                            <th>属性名</th>
+                                            <th>显示名</th>
+                                            <th>类型</th>
+                                            <th>引用</th>
+                                            <th>必填</th>
+                                            <th>可搜索</th>
+                                            <th>可排序</th>
+                                            <th style="text-align: right;">顺序</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var a in attrs)
+                                        {
+                                            <tr>
+                                                <td><code>@a.AttributeName</code></td>
+                                                <td>@a.DisplayName</td>
+                                                <td>
+                                                    <MudChip T="string" Size="Size.Small"
+                                                             Color="@GetDataTypeColor(a.DataType)">
+                                                        @EavDataTypeLabels.GetLabel(a.DataType)
+                                                    </MudChip>
+                                                </td>
+                                                <td>
+                                                    @if (a.UnitId is not null)
+                                                    {
+                                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="mr-1">单位</MudChip>
+                                                    }
+                                                    @if (a.RefOptionSetId is not null)
+                                                    {
+                                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Class="mr-1">选项: @(a.OptionSetDisplayName ?? a.OptionSetName)</MudChip>
+                                                    }
+                                                    @if (a.RefCompositeTypeId is not null)
+                                                    {
+                                                        <MudChip T="string" Size="Size.Small" Color="Color.Dark" Class="mr-1">组合: @(a.CompositeTypeDisplayName ?? a.CompositeTypeName)</MudChip>
+                                                    }
+                                                    @if (a.RefTableDefinitionId is not null)
+                                                    {
+                                                        <MudChip T="string" Size="Size.Small" Color="Color.Info">表: @(a.TableDisplayName ?? a.TableName)</MudChip>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (a.IsRequired)
+                                                    {
+                                                        <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (a.IsSearchable)
+                                                    {
+                                                        <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (a.IsSortable)
+                                                    {
+                                                        <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    }
+                                                </td>
+                                                <td style="text-align: right;">@a.DisplayOrder</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                            }
+                        }
+                    </MudPaper>
+                </td>
+            </MudTr>
+        }
+    </ChildRowContent>
     <NoRecordsContent>
         <EmptyStateSky Icon="@Icons.Material.Filled.Category"
                        Title="暂无实体类型">
@@ -142,6 +230,15 @@ else
     private bool _initialized;
     /// <summary>排序提交中：期间禁用全部箭头，避免并发交换。</summary>
     private bool _moving;
+
+    /// <summary>已展开行的实体类型 ID（key 用持久 ID 而非可变 EntityType 标识）。</summary>
+    private readonly HashSet<string> _expandedIds = new();
+
+    /// <summary>实体类型 ID → 该类型的属性列表（惰性加载缓存）。</summary>
+    private readonly Dictionary<string, IReadOnlyList<AttributeDetailDto>> _attrsCache = new();
+
+    /// <summary>属性列表拉取中（展开行显示 loading）。</summary>
+    private bool _attrsLoading;
 
     /// <summary>桌面端对话框选项：DialogSky 全默认时不触碰，此处显式指定保持原外观。</summary>
     private static readonly DialogOptions DialogOptions = new()
@@ -324,9 +421,8 @@ else
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "确认删除",
-            $"确定删除实体类型「{dto.DisplayName}」？\n\n" +
-            "· 仍有活动属性时将被拒绝。\n" +
-            "· 删除后可通过恢复按钮还原。",
+            $"确定删除实体类型「{dto.DisplayName}」？删除后不可恢复。\n\n" +
+            "· 仍有活动属性时将被拒绝。",
             yesText: "删除", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -345,26 +441,53 @@ else
         }
     }
 
-    private async Task UndeleteAsync(EntityTypeDetailDto dto)
+    // ---------- 行内展开：属性二级列表 ----------
+
+    private bool IsExpanded(string entityTypeId) => _expandedIds.Contains(entityTypeId);
+
+    private IReadOnlyList<AttributeDetailDto> GetAttrs(string entityTypeId)
+        => _attrsCache.TryGetValue(entityTypeId, out var list)
+            ? list
+            : Array.Empty<AttributeDetailDto>();
+
+    /// <summary>切换展开；首次展开时按 EntityType 拉取该类型的属性列表。</summary>
+    private async Task ToggleExpandAsync(EntityTypeDetailDto dto)
     {
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "确认恢复",
-            $"确定恢复实体类型「{dto.DisplayName}」？",
-            yesText: "恢复", cancelText: "取消");
-
-        if (confirmed != true) return;
-
-        var (ok, error) = await Api.UndeleteEntityTypeAsync(dto.EntityTypeId);
-        if (ok)
+        if (!_expandedIds.Add(dto.EntityTypeId))
         {
-            Snackbar.Add("恢复成功", Severity.Success);
-            await LoadAsync();
-            EntityTypeDisplay.Invalidate();
-            await EntityTypeDisplay.EnsureLoadedAsync();
+            _expandedIds.Remove(dto.EntityTypeId);
+            return;
         }
-        else
+
+        if (_attrsCache.ContainsKey(dto.EntityTypeId)) return;
+
+        _attrsLoading = true;
+        try
         {
-            Snackbar.Add($"恢复失败：{error ?? "未知错误"}", Severity.Error);
+            var list = await Api.ListAttributesAsync(dto.EntityType);
+            _attrsCache[dto.EntityTypeId] =
+                (list ?? Array.Empty<AttributeDetailDto>())
+                .OrderBy(a => a.DisplayOrder).ToList();
+        }
+        catch
+        {
+            Snackbar.Add("属性加载失败", Severity.Warning);
+            _attrsCache[dto.EntityTypeId] = Array.Empty<AttributeDetailDto>();
+        }
+        finally
+        {
+            _attrsLoading = false;
         }
     }
+
+    private static Color GetDataTypeColor(string dataType) => dataType switch
+    {
+        "string" => Color.Info,
+        "int" or "decimal" => Color.Primary,
+        "bool" => Color.Success,
+        "datetime" or "date" or "time" => Color.Warning,
+        "single_choice" => Color.Tertiary,
+        "composite" => Color.Dark,
+        _ => Color.Default
+    };
 }

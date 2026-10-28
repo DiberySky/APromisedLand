@@ -500,7 +500,7 @@ public class EavMetadataController : ControllerBase
             .AsQueryable();
         if (!includeDeleted) query = query.Where(t => !t.IsDeleted);
         if (!string.IsNullOrEmpty(entityType))
-            query = query.Where(t => t.EntityType == entityType || t.EntityType == "Shared");
+            query = query.Where(t => t.EntityType == entityType);
 
         var list = await query
             .OrderBy(t => t.EntityType).ThenBy(t => t.DisplayOrder)
@@ -557,8 +557,9 @@ public class EavMetadataController : ControllerBase
         if (await _db.CustomTableRows.AnyAsync(r => r.TableDefinitionId == id, ct))
             return BadRequest(new { error = "该自定义表仍有行数据，无法删除。请先清空全部行。" });
 
-        table.IsDeleted = true;
-        table.UpdatedAt = DateTimeOffset.UtcNow;
+        // 硬删除：物理移除（遗留的软删除列行一并清掉）
+        _db.CustomTableColumns.RemoveRange(table.Columns);
+        _db.CustomTables.Remove(table);
 
         await _db.SaveChangesAsync(ct);
         _customTableCache.Invalidate(id);
@@ -649,7 +650,8 @@ public class EavMetadataController : ControllerBase
         if (hasData)
             return BadRequest(new { error = $"列「{col.DisplayName}」已有行数据，无法删除。请先清空该列数据。" });
 
-        col.IsDeleted = true;
+        // 硬删除：物理移除
+        _db.CustomTableColumns.Remove(col);
         await _db.SaveChangesAsync(ct);
         _customTableCache.Invalidate(id);
         return NoContent();
@@ -676,7 +678,7 @@ public class EavMetadataController : ControllerBase
 
         if (!includeDeleted) query = query.Where(t => !t.IsDeleted);
         if (!string.IsNullOrEmpty(entityType))
-            query = query.Where(t => t.EntityType == entityType || t.EntityType == "Shared");
+            query = query.Where(t => t.EntityType == entityType);
 
         var list = await query
             .OrderBy(t => t.EntityType).ThenBy(t => t.CompositeTypeId)
@@ -738,8 +740,9 @@ public class EavMetadataController : ControllerBase
         if (type.Fields.Any(f => !f.IsDeleted))
             return BadRequest(new { error = "该组合类型仍有字段，无法删除。请先删除全部字段。" });
 
-        type.IsDeleted = true;
-        type.UpdatedAt = DateTimeOffset.UtcNow;
+        // 硬删除：物理移除（遗留的软删除字段行一并清掉）
+        _db.CompositeFields.RemoveRange(type.Fields);
+        _db.CompositeTypes.Remove(type);
 
         await _db.SaveChangesAsync(ct);
         _compositeCache.Invalidate(id);
@@ -818,7 +821,8 @@ public class EavMetadataController : ControllerBase
             .FirstOrDefaultAsync(f => f.FieldId == fieldId && f.CompositeTypeId == id, ct);
         if (field is null) return NotFound();
 
-        field.IsDeleted = true;
+        // 硬删除：物理移除
+        _db.CompositeFields.Remove(field);
         await _db.SaveChangesAsync(ct);
         _compositeCache.Invalidate(id);
         return NoContent();
@@ -1033,145 +1037,4 @@ public class EavMetadataController : ControllerBase
                 f.IsDeleted))                    // ★ 透出字段删除状态
             .ToList(),
         t.IsDeleted);                            // ★ 透出类型删除状态
-
-    // ---------- 软删除恢复（undelete） ----------
-
-    /// <summary>
-    /// ★ 恢复被软删除的组合类型（同时恢复其字段）。
-    /// 唯一约束（entity_type, type_name, version）不区分 IsDeleted。
-    /// </summary>
-    [HttpPost("composite-types/{id}/undelete")]
-    public async Task<IActionResult> UndeleteCompositeType(string id, CancellationToken ct)
-    {
-        var type = await _db.CompositeTypes
-            .Include(t => t.Fields)
-            .FirstOrDefaultAsync(t => t.CompositeTypeId == id, ct);
-        if (type is null) return NotFound();
-        if (!type.IsDeleted) return NoContent();   // 幂等
-
-        var conflict = await _db.CompositeTypes.AnyAsync(
-            t => t.CompositeTypeId != id
-              && t.EntityType == type.EntityType
-              && t.TypeName == type.TypeName
-              && t.Version == type.Version
-              && !t.IsDeleted, ct);
-
-        if (conflict)
-            return Conflict(new
-            {
-                error = $"同名的活动组合类型已存在" +
-                        $"（{type.EntityType}/{type.TypeName}/v{type.Version}）"
-            });
-
-        type.IsDeleted = false;
-        type.UpdatedAt = DateTimeOffset.UtcNow;
-        foreach (var f in type.Fields) f.IsDeleted = false;
-
-        await _db.SaveChangesAsync(ct);
-        _compositeCache.Invalidate(id);
-        return NoContent();
-    }
-
-    /// <summary>
-    /// ★ 恢复被软删除的组合字段。
-    /// 唯一约束（composite_type_id, field_name）不区分 IsDeleted。
-    /// </summary>
-    [HttpPost("composite-types/{id}/fields/{fieldId}/undelete")]
-    public async Task<IActionResult> UndeleteCompositeField(
-        string id, string fieldId, CancellationToken ct)
-    {
-        var field = await _db.CompositeFields
-            .FirstOrDefaultAsync(f => f.FieldId == fieldId && f.CompositeTypeId == id, ct);
-        if (field is null) return NotFound();
-        if (!field.IsDeleted) return NoContent();
-
-        var conflict = await _db.CompositeFields.AnyAsync(
-            f => f.FieldId != fieldId
-              && f.CompositeTypeId == id
-              && f.FieldName == field.FieldName
-              && !f.IsDeleted, ct);
-
-        if (conflict)
-            return Conflict(new
-            {
-                error = $"同名的活动字段已存在（{field.FieldName}）"
-            });
-
-        field.IsDeleted = false;
-        await _db.SaveChangesAsync(ct);
-        _compositeCache.Invalidate(id);
-        return NoContent();
-    }
-
-    /// <summary>
-    /// ★ 恢复被软删除的自定义表（同时恢复其列）。
-    /// 唯一约束（entity_type, table_name, version）不区分 IsDeleted。
-    /// </summary>
-    [HttpPost("custom-tables/{id}/undelete")]
-    public async Task<IActionResult> UndeleteCustomTable(string id, CancellationToken ct)
-    {
-        var table = await _db.CustomTables
-            .Include(t => t.Columns)
-            .FirstOrDefaultAsync(t => t.TableDefinitionId == id, ct);
-        if (table is null) return NotFound();
-        if (!table.IsDeleted) return NoContent();
-
-        var conflict = await _db.CustomTables.AnyAsync(
-            t => t.TableDefinitionId != id
-              && t.EntityType == table.EntityType
-              && t.TableName == table.TableName
-              && t.Version == table.Version
-              && !t.IsDeleted, ct);
-
-        if (conflict)
-            return Conflict(new
-            {
-                error = $"同名的活动自定义表已存在" +
-                        $"（{table.EntityType}/{table.TableName}/v{table.Version}）"
-            });
-
-        table.IsDeleted = false;
-        table.UpdatedAt = DateTimeOffset.UtcNow;
-        foreach (var c in table.Columns) c.IsDeleted = false;
-
-        await _db.SaveChangesAsync(ct);
-
-        // ★ 缓存一致性：实体 + name→id 两级都要清
-        _customTableCache.Invalidate(id);
-        _customTableCache.InvalidateByName(table.EntityType, table.TableName);
-
-        return NoContent();
-    }
-
-    /// <summary>
-    /// ★ 恢复被软删除的自定义表列。
-    /// 唯一约束（table_definition_id, column_name）不区分 IsDeleted。
-    /// </summary>
-    [HttpPost("custom-tables/{id}/columns/{columnId}/undelete")]
-    public async Task<IActionResult> UndeleteTableColumn(
-        string id, string columnId, CancellationToken ct)
-    {
-        var col = await _db.CustomTableColumns
-            .FirstOrDefaultAsync(c => c.ColumnId == columnId
-                                   && c.TableDefinitionId == id, ct);
-        if (col is null) return NotFound();
-        if (!col.IsDeleted) return NoContent();
-
-        var conflict = await _db.CustomTableColumns.AnyAsync(
-            c => c.ColumnId != columnId
-              && c.TableDefinitionId == id
-              && c.ColumnName == col.ColumnName
-              && !c.IsDeleted, ct);
-
-        if (conflict)
-            return Conflict(new
-            {
-                error = $"同名的活动列已存在（{col.ColumnName}）"
-            });
-
-        col.IsDeleted = false;
-        await _db.SaveChangesAsync(ct);
-        _customTableCache.Invalidate(id);
-        return NoContent();
-    }
 }

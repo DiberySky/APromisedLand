@@ -421,10 +421,6 @@ public class EavApiClient
         string id, CancellationToken ct = default)
         => DeleteWithErrorAsync($"api/eav/entity-types/{id}", ct);
 
-    public Task<(bool Ok, string? Error)> UndeleteEntityTypeAsync(
-        string id, CancellationToken ct = default)
-        => PostNoBodyAsync($"api/eav/entity-types/{id}/undelete", ct);
-
     public async Task<PagedResult<DynamicEntityDto>?> ListEntitiesAsync(
         string entityType, int page = 1, int pageSize = 20,
         CancellationToken ct = default)
@@ -525,40 +521,6 @@ public class EavApiClient
         => PutAsync(
             $"api/eav/metadata/option-sets/{optionSetId}/items/reorder",
             orders, ct);
-
-    // ============================================================
-    // undelete 端点
-    // ============================================================
-
-    public Task<(bool Ok, string? Error)> UndeleteCompositeTypeAsync(
-        string compositeTypeId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/composite-types/{compositeTypeId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteCompositeFieldAsync(
-        string compositeTypeId, string fieldId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/composite-types/{compositeTypeId}/fields/{fieldId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteCustomTableAsync(
-        string tableId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/custom-tables/{tableId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteTableColumnAsync(
-        string tableId, string columnId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/custom-tables/{tableId}/columns/{columnId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteOptionSetAsync(
-        string optionSetId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/option-sets/{optionSetId}/undelete", ct);
-
-    public Task<(bool Ok, string? Error)> UndeleteOptionItemAsync(
-        string optionSetId, string itemId, CancellationToken ct = default)
-        => PostNoBodyAsync(
-            $"api/eav/metadata/option-sets/{optionSetId}/items/{itemId}/undelete", ct);
 
     // ============================================================
     // 语义搜索（直接调用 TreeGraphEavApi）

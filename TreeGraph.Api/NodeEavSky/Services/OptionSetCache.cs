@@ -60,7 +60,7 @@ public class OptionSetCache : IOptionSetCache
         var query = db.OptionSets.AsQueryable();
         if (!includeDeleted) query = query.Where(s => !s.IsDeleted);
         if (entityType is not null)
-            query = query.Where(s => s.EntityType == entityType || s.EntityType == "Shared");
+            query = query.Where(s => s.EntityType == entityType);
 
         var ids = query.OrderBy(s => s.OptionSetId)
             .AsNoTracking()

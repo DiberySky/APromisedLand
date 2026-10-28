@@ -7,27 +7,21 @@ using Xunit;
 namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
-/// OptionSet 软删除 / 恢复的集成测试。
+/// OptionSet 硬删除的集成测试（软删除已废除）。
 ///
 /// 覆盖：
-///   - 软删后默认 GET 404 / includeDeleted=true 返回 isDeleted=true
-///   - 软删后默认 List 排除 / includeDeleted=true 包含
-///   - partial unique index：软删后同名可重建；恢复撞同名 → 409
-///   - 恢复：集合 + 选项一并恢复
-///   - 幂等：未删的恢复是 No-Op 204
+///   - 删除后 GET 404 / 默认 List 排除
+///   - 删除后同名可重建（行已物理移除，唯一索引不再拦截）
+///   - 同名活动集合冲突 → 409
 ///   - 子项为空方可删除：仍有活动选项时 DeleteSet 返回 400（不采用级联删除）
-///   - GetReferences 不受 IsDeleted 影响
+///   - GetReferences 正常返回
+///   - DeleteSet 拒绝被引用的集合（保守策略）
 ///
-/// 边界（通过 API 不可构造，不测）：
-///   - 已引用集合被软删（DeleteSet 拒绝被引用的集合）
-///   - 软删后同名活动集合与已删集合共存（partial unique 允许，但恢复会 409）
-///
-/// 隔离策略：本类所有 entityType 以 "OptSoftTest*" 开头，与其它测试类的
-/// "TestProduct" / "Product" 等互不干扰。
+/// 隔离策略：本类所有 entityType 以 "OptHardTest*" 开头，与其它测试类互不干扰。
 /// </summary>
-public class OptionSetSoftDeleteTests : IntegrationTestBase
+public class OptionSetHardDeleteTests : IntegrationTestBase
 {
-    public OptionSetSoftDeleteTests(EavApiFactory factory) : base(factory) { }
+    public OptionSetHardDeleteTests(EavApiFactory factory) : base(factory) { }
 
     private sealed record IdResponse(string OptionSetId);
 
@@ -96,18 +90,14 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
         }
     }
 
-    private async Task<HttpResponseMessage> UndeleteSetRawAsync(string setId)
-        => await Client.PostAsync(
-            $"/api/eav/metadata/option-sets/{setId}/undelete", content: null);
-
     // ============================================================
-    // 软删基础语义
+    // 硬删基础语义
     // ============================================================
 
     [Fact]
-    public async Task SoftDelete_DefaultGet_Returns404()
+    public async Task HardDelete_DefaultGet_Returns404()
     {
-        var setId = await CreateSetAsync("OptSoftGet404", "s", ("a", "A"));
+        var setId = await CreateSetAsync("OptHardGet404", "s", ("a", "A"));
         await DeleteSetAsync(setId);
 
         var resp = await Client.GetAsync($"/api/eav/metadata/option-sets/{setId}");
@@ -115,29 +105,25 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task SoftDelete_IncludeDeletedGet_Returns200WithIsDeletedTrue()
+    public async Task HardDelete_IncludeDeletedGet_AlsoReturns404()
     {
-        var setId = await CreateSetAsync("OptSoftGetInc", "s", ("a", "A"));
+        var setId = await CreateSetAsync("OptHardGetInc", "s", ("a", "A"));
         await DeleteSetAsync(setId);
 
+        // 行已物理移除，includeDeleted=true 也查不到
         var resp = await Client.GetAsync(
             $"/api/eav/metadata/option-sets/{setId}?includeDeleted=true");
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-
-        var detail = await resp.Content.ReadEavAsync<OptionSetDetailDto>();
-        Assert.NotNull(detail);
-        Assert.True(detail!.IsDeleted);
-        Assert.Equal(setId, detail.OptionSetId);
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 
     [Fact]
-    public async Task SoftDelete_DefaultList_ExcludesDeleted()
+    public async Task HardDelete_DefaultList_ExcludesDeleted()
     {
-        var setId = await CreateSetAsync("OptSoftListExc", "s", ("a", "A"));
+        var setId = await CreateSetAsync("OptHardListExc", "s", ("a", "A"));
         await DeleteSetAsync(setId);
 
         var resp = await Client.GetAsync(
-            "/api/eav/metadata/option-sets?entityType=OptSoftListExc");
+            "/api/eav/metadata/option-sets?entityType=OptHardListExc");
         resp.EnsureSuccessStatusCode();
 
         var list = await resp.Content.ReadEavAsync<List<OptionSetSummaryDto>>();
@@ -145,103 +131,32 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
         Assert.DoesNotContain(list!, s => s.OptionSetId == setId);
     }
 
-    [Fact]
-    public async Task SoftDelete_IncludeDeletedList_ContainsDeleted()
-    {
-        var setId = await CreateSetAsync("OptSoftListInc", "s", ("a", "A"));
-        await DeleteSetAsync(setId);
-
-        var resp = await Client.GetAsync(
-            "/api/eav/metadata/option-sets?entityType=OptSoftListInc&includeDeleted=true");
-        resp.EnsureSuccessStatusCode();
-
-        var list = await resp.Content.ReadEavAsync<List<OptionSetSummaryDto>>();
-        Assert.NotNull(list);
-        var found = list!.FirstOrDefault(s => s.OptionSetId == setId);
-        Assert.NotNull(found);
-        Assert.True(found!.IsDeleted);
-    }
-
     // ============================================================
-    // Partial unique index 语义
+    // 唯一索引语义
     // ============================================================
 
     [Fact]
     public async Task Create_WhenActiveNameExists_ReturnsConflict()
     {
-        await CreateSetAsync("OptSoftDupActive", "dup", ("a", "A"));
+        await CreateSetAsync("OptHardDupActive", "dup", ("a", "A"));
 
         // 同名活动集合 → 唯一索引拒绝
         var resp = await Client.PostAsJsonAsync(
             "/api/eav/metadata/option-sets",
-            new { entityType = "OptSoftDupActive", setName = "dup", displayName = "dup2" });
+            new { entityType = "OptHardDupActive", setName = "dup", displayName = "dup2" });
 
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
     }
 
     [Fact]
-    public async Task Create_AfterSoftDelete_SameName_AllowedByPartialIndex()
+    public async Task Create_AfterHardDelete_SameName_Allowed()
     {
-        var setId1 = await CreateSetAsync("OptSoftDupAfterDel", "dup", ("a", "A"));
+        var setId1 = await CreateSetAsync("OptHardDupAfterDel", "dup", ("a", "A"));
         await DeleteSetAsync(setId1);
 
-        // 软删后同名可重建（partial unique index: WHERE is_deleted = false）
-        var setId2 = await CreateSetAsync("OptSoftDupAfterDel", "dup", ("b", "B"));
+        // 硬删后同名可重建（行已物理移除）
+        var setId2 = await CreateSetAsync("OptHardDupAfterDel", "dup", ("b", "B"));
         Assert.NotEqual(setId1, setId2);
-    }
-
-    [Fact]
-    public async Task Undelete_WhenActiveDuplicateExists_ReturnsConflict()
-    {
-        var setId1 = await CreateSetAsync("OptSoftUndupConflict", "dup", ("a", "A"));
-        await DeleteSetAsync(setId1);
-
-        // 重建同名活动集合
-        await CreateSetAsync("OptSoftUndupConflict", "dup", ("b", "B"));
-
-        // 恢复 setId1 → 409
-        var resp = await UndeleteSetRawAsync(setId1);
-        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-
-        var body = await resp.Content.ReadAsStringAsync();
-        Assert.Contains("同名", body);
-    }
-
-    // ============================================================
-    // 恢复语义
-    // ============================================================
-
-    [Fact]
-    public async Task Undelete_RestoresSetAndAllItems()
-    {
-        var setId = await CreateSetAsync("OptSoftRestoreAll", "s",
-            ("a", "A"), ("b", "B"), ("c", "C"));
-
-        await DeleteSetAsync(setId);
-
-        var resp = await UndeleteSetRawAsync(setId);
-        Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
-
-        // 默认 GET 应 200
-        var getResp = await Client.GetAsync(
-            $"/api/eav/metadata/option-sets/{setId}");
-        getResp.EnsureSuccessStatusCode();
-
-        var detail = await getResp.Content.ReadEavAsync<OptionSetDetailDto>();
-        Assert.NotNull(detail);
-        Assert.False(detail!.IsDeleted);
-        Assert.Equal(3, detail.Items.Count);
-        Assert.All(detail.Items, i => Assert.False(i.IsDeleted));
-    }
-
-    [Fact]
-    public async Task Undelete_OnActiveSet_Idempotent_204()
-    {
-        var setId = await CreateSetAsync("OptSoftIdempotent", "s", ("a", "A"));
-
-        // 未删除 → 幂等 204
-        var resp = await UndeleteSetRawAsync(setId);
-        Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
     }
 
     // ============================================================
@@ -251,7 +166,7 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
     [Fact]
     public async Task DeleteSet_WhenItemsRemain_Returns400_WithoutCascade()
     {
-        var setId = await CreateSetAsync("OptSoftNoCascade", "s",
+        var setId = await CreateSetAsync("OptHardNoCascade", "s",
             ("a", "A"), ("b", "B"));
 
         var resp = await Client.DeleteAsync(
@@ -259,12 +174,11 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         Assert.Contains("选项", await resp.Content.ReadAsStringAsync());
 
-        // 集合仍存在，选项未被级联软删
+        // 集合仍存在，选项未被级联删除
         var setResp = await Client.GetAsync(
             $"/api/eav/metadata/option-sets/{setId}");
         Assert.Equal(HttpStatusCode.OK, setResp.StatusCode);
 
-        // ListOptionItems 不按 IsDeleted 过滤（管理页需要看到已删项）
         var listResp = await Client.GetAsync(
             $"/api/eav/metadata/option-sets/{setId}/items");
         listResp.EnsureSuccessStatusCode();
@@ -273,13 +187,12 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
             .ReadEavAsync<List<OptionItemDetailDto>>();
         Assert.NotNull(items);
         Assert.Equal(2, items!.Count);
-        Assert.All(items, i => Assert.False(i.IsDeleted));
     }
 
     [Fact]
     public async Task DeleteSet_AfterItemsRemoved_Succeeds()
     {
-        var setId = await CreateSetAsync("OptSoftEmptyThenDel", "s", ("a", "A"));
+        var setId = await CreateSetAsync("OptHardEmptyThenDel", "s", ("a", "A"));
 
         await DeleteAllItemsAsync(setId);
 
@@ -289,23 +202,23 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
     }
 
     // ============================================================
-    // GetReferences 不受 IsDeleted 影响
+    // GetReferences 正常返回
     // ============================================================
 
     [Fact]
     public async Task GetReferences_ReturnsActiveReferences_OnActiveSet()
     {
-        var setId = await CreateSetAsync("OptSoftRefs", "s", ("a", "A"));
+        var setId = await CreateSetAsync("OptHardRefs", "s", ("a", "A"));
 
         // 确保属性引用的实体类型也存在
-        await TestData.EnsureEntityTypeAsync("OptSoftRefsEntity", "引用测试");
+        await TestData.EnsureEntityTypeAsync("OptHardRefsEntity", "引用测试");
 
         // 建属性引用
         var attrResp = await Client.PostAsJsonAsync(
             "/api/eav/metadata/attributes",
             new
             {
-                entityType = "OptSoftRefsEntity",
+                entityType = "OptHardRefsEntity",
                 attributeName = "choice",
                 displayName = "选择",
                 dataType = "single_choice",
@@ -333,16 +246,16 @@ public class OptionSetSoftDeleteTests : IntegrationTestBase
     [Fact]
     public async Task DeleteSet_WhenReferencedByActiveAttribute_Returns400()
     {
-        var setId = await CreateSetAsync("OptSoftRefGuard", "s", ("a", "A"));
+        var setId = await CreateSetAsync("OptHardRefGuard", "s", ("a", "A"));
 
         // 确保属性引用的实体类型也存在
-        await TestData.EnsureEntityTypeAsync("OptSoftRefGuardEntity", "引用守卫");
+        await TestData.EnsureEntityTypeAsync("OptHardRefGuardEntity", "引用守卫");
 
         await Client.PostAsJsonAsync(
             "/api/eav/metadata/attributes",
             new
             {
-                entityType = "OptSoftRefGuardEntity",
+                entityType = "OptHardRefGuardEntity",
                 attributeName = "choice",
                 displayName = "选择",
                 dataType = "single_choice",

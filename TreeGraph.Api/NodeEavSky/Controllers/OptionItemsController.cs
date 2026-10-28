@@ -106,7 +106,7 @@ public class OptionItemsController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>删除选项（软删除：历史数据仍存有旧 Value，读取端降级显示）</summary>
+    /// <summary>删除选项（硬删除：物理移除）</summary>
     [HttpDelete("{itemId}")]
     public async Task<IActionResult> DeleteOption(
         string setId, string itemId, CancellationToken ct)
@@ -115,8 +115,7 @@ public class OptionItemsController : ControllerBase
             .FirstOrDefaultAsync(i => i.OptionItemId == itemId && i.OptionSetId == setId, ct);
         if (item is null) return NotFound();
 
-        item.IsDeleted = true;
-        item.IsDefault = false;
+        _db.OptionItems.Remove(item);
         await _db.SaveChangesAsync(ct);
         _optionSetCache.Invalidate(setId);
 
@@ -141,39 +140,6 @@ public class OptionItemsController : ControllerBase
         await _db.SaveChangesAsync(ct);
         _optionSetCache.Invalidate(setId);
 
-        return NoContent();
-    }
-
-    /// <summary>
-    /// ★ 恢复被软删除的选项项。
-    /// 唯一约束（option_set_id, value）不区分 IsDeleted。
-    /// </summary>
-    [HttpPost("{itemId}/undelete")]
-    public async Task<IActionResult> UndeleteOption(
-        string setId, string itemId, CancellationToken ct)
-    {
-        var item = await _db.OptionItems
-            .FirstOrDefaultAsync(i => i.OptionItemId == itemId
-                                   && i.OptionSetId == setId, ct);
-        if (item is null) return NotFound();
-        if (!item.IsDeleted) return NoContent();
-
-        var conflict = await _db.OptionItems.AnyAsync(
-            i => i.OptionItemId != itemId
-              && i.OptionSetId == setId
-              && i.Value == item.Value
-              && !i.IsDeleted, ct);
-
-        if (conflict)
-            return Conflict(new
-            {
-                error = $"同 Value 的活动选项已存在（{item.Value}）"
-            });
-
-        item.IsDeleted = false;
-        item.IsDefault = false;
-        await _db.SaveChangesAsync(ct);
-        _optionSetCache.Invalidate(setId);
         return NoContent();
     }
 }

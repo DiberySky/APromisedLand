@@ -4,7 +4,7 @@ namespace TreeGraph.Api.NodeEavSky.Entities;
 public class OptionSet
 {
     public string OptionSetId { get; set; } = "";
-    public string EntityType { get; set; } = "";      // "Shared" 表示全局共享
+    public string EntityType { get; set; } = "";
     public string SetName { get; set; } = "";         // "gender"、"status"
     public string DisplayName { get; set; } = "";     // "性别"
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

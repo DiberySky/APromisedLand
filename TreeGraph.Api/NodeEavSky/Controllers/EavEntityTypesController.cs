@@ -291,35 +291,8 @@ public class EavEntityTypesController : ControllerBase
                 error = $"该实体类型已被节点声明引用（{e.EntityType}），请先解除节点上的类型声明"
             });
 
-        e.IsDeleted = true;
-        e.UpdatedAt = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(ct);
-        return NoContent();
-    }
-
-    // ============================================================
-    // 恢复
-    // ============================================================
-
-    [HttpPost("{id}/undelete")]
-    public async Task<IActionResult> Undelete(string id, CancellationToken ct)
-    {
-        var e = await _db.EntityTypes.FindAsync(new object[] { id }, ct);
-        if (e is null) return NotFound();
-        if (!e.IsDeleted) return NoContent();   // 幂等
-
-        var conflict = await _db.EntityTypes.AnyAsync(
-            t => t.EntityTypeId != id
-              && t.EntityType == e.EntityType
-              && !t.IsDeleted, ct);
-        if (conflict)
-            return Conflict(new
-            {
-                error = $"同名的活动实体类型已存在（{e.EntityType}）"
-            });
-
-        e.IsDeleted = false;
-        e.UpdatedAt = DateTimeOffset.UtcNow;
+        // 硬删除：物理移除
+        _db.EntityTypes.Remove(e);
         await _db.SaveChangesAsync(ct);
         return NoContent();
     }

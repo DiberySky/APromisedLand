@@ -17,12 +17,10 @@
                        ValueChanged="OnEntityTypeChanged"
                        Label="实体类型"
                        Variant="Variant.Outlined"
-                       Class="flex-grow-1 mr-3"
-                       Disabled="_isShared"
-                       HelperText="@(_isShared ? "已勾选全局共享，将归属全局共享" : "选择该组合类型归属的实体类型")"
+                       Class="flex-grow-1"
+                       HelperText="选择该组合类型归属的实体类型"
                        AnchorOrigin="Origin.BottomLeft"
                        TransformOrigin="Origin.TopLeft">
-                <MudSelectItem T="string" Value="@("Shared")">全局共享</MudSelectItem>
                 @foreach (var et in _entityTypes)
                 {
                     <MudSelectItem T="string" Value="@et.EntityType">
@@ -30,18 +28,12 @@
                     </MudSelectItem>
                 }
             </MudSelect>
-            <MudCheckBox T="bool"
-                         Value="_isShared"
-                         ValueChanged="OnSharedChanged"
-                         Label="全局共享（Shared）"
-                         Color="Color.Primary"
-                         Dense="true" />
         </div>
 
-        @if (!_isShared && _entityTypes.Count == 0)
+        @if (_entityTypes.Count == 0)
         {
             <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true">
-                暂无实体类型，请先到「实体类型管理」创建，或直接勾选上方「全局共享」。
+                暂无实体类型，请先到「实体类型管理」创建。
             </MudAlert>
         }
 
@@ -61,8 +53,7 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    private CreateCompositeTypeRequest _newType = new() { EntityType = "Shared" };
-    private bool _isShared = true;
+    private CreateCompositeTypeRequest _newType = new();
     private bool _submitting;
     private IReadOnlyList<EntityTypeSummaryDto> _entityTypes = [];
 
@@ -70,9 +61,12 @@
     {
         try
         {
-            _entityTypes = (await Api.ListEntityTypesAsync())
-                ?.Where(t => !string.Equals(t.EntityType, "Shared", StringComparison.OrdinalIgnoreCase))
-                .ToList() ?? [];
+            _entityTypes = (await Api.ListEntityTypesAsync()) ?? [];
+            // 归属不再区分全局共享：默认选第一个实体类型
+            if (string.IsNullOrWhiteSpace(_newType.EntityType))
+            {
+                _newType.EntityType = _entityTypes.FirstOrDefault()?.EntityType ?? "";
+            }
         }
         catch
         {
@@ -83,16 +77,6 @@
     private Task OnEntityTypeChanged(string? value)
     {
         _newType.EntityType = value ?? "";
-        return Task.CompletedTask;
-    }
-
-    private Task OnSharedChanged(bool shared)
-    {
-        _isShared = shared;
-        // 勾选：归属固定为全局共享；取消勾选：回落到第一个实体类型，等待用户选择
-        _newType.EntityType = shared
-            ? "Shared"
-            : (_entityTypes.FirstOrDefault()?.EntityType ?? "");
         return Task.CompletedTask;
     }
 

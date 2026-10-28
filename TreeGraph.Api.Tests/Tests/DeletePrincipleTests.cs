@@ -12,7 +12,7 @@ namespace TreeGraph.Api.Tests.Tests;
 ///   - 自定义表列：行数据中已有该列的值 → 400
 ///   - 组合类型：仍有字段 → 400
 ///   - 属性：已产生实例数据 → 400
-///   - 选项集：仍有活动选项 → 400（见 OptionSetSoftDeleteTests）
+///   - 选项集：仍有活动选项 → 400（见 OptionSetHardDeleteTests）
 ///   - 关系值：仍作为起点 / 终点被引用 → 409
 ///   - 树节点：仍有子节点 / 被关系引用 / 仍有挂载实体数据 → 409
 ///   - 线路节点：被关系引用 / 仍有挂载实体数据 → 409
@@ -131,7 +131,7 @@ public class DeletePrincipleTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         Assert.Contains("列", await resp.Content.ReadAsStringAsync());
 
-        // 表与列都还在（未级联软删）
+        // 表与列都还在（未级联删除）
         var table = await GetTableAsync(tableId);
         var col = table.Columns.Single(c => !c.IsDeleted);
         Assert.Equal("note", col.ColumnName);
@@ -168,7 +168,7 @@ public class DeletePrincipleTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         Assert.Contains("行数据", await resp.Content.ReadAsStringAsync());
 
-        // 列未被软删
+        // 列未被删除
         var table = await GetTableAsync(tableId);
         Assert.Contains(table.Columns, c => c.ColumnId == colId && !c.IsDeleted);
     }
