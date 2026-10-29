@@ -169,8 +169,12 @@ if (!EF.IsDesignTime)
     var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
     await db.Database.MigrateAsync();
     await EavSeeder.SeedAsync(db);
-    // 内置边类型（line_segment）：LineSky 写路径硬依赖（幂等 upsert；须在 GraphSchemaInitializer 启动前）
+    // 内置边类型（parent_of 全空间、line_segment 仅 Dynamic）：幂等 upsert；须在 GraphSchemaInitializer 启动前
     await BuiltinEdgeTypeSeeder.SeedAsync(db);
+    // 存量树节点 parent_of 派生边回填（幂等补插缺失行；依赖内置边类型已播种）
+    var backfilled = await ParentEdgeBackfill.BackfillAsync(db);
+    if (backfilled > 0)
+        app.Logger.LogInformation("parent_of 派生边回填完成：补插 {Count} 条", backfilled);
 
     // E2E 基线（item/user/project + 固定 EntityId 示例值）仅开发/测试环境注入
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))

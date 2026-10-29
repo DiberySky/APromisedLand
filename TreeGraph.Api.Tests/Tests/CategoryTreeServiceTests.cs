@@ -67,6 +67,7 @@ public class CategoryTreeServiceTests
                          .Where(t => t.ClrType != typeof(CategoryTree)
                                   && t.ClrType != typeof(Node)
                                   && t.ClrType != typeof(Edge)
+                                  && t.ClrType != typeof(EdgeType)
                                   && t.ClrType != typeof(InodeEntity)
                                   && t.ClrType != typeof(InodeEntityType))
                          .ToList())
@@ -92,6 +93,8 @@ public class CategoryTreeServiceTests
 
             // 节点删除守卫依赖：被边引用 / 仍有挂载实体数据 / 类型声明随宿主清理
             mb.Entity<Edge>(e => e.HasKey(x => new { x.EdgeType, x.SrcVid, x.Rank, x.DstVid }));
+            // parent_of 派生边写入器依赖：边类型存在性检查（TreeParentEdgeWriter）
+            mb.Entity<EdgeType>(e => e.HasKey(x => new { x.SpaceId, x.Name }));
             mb.Entity<InodeEntity>(e => e.HasKey(x => new { x.InodeId, x.EntityType }));
             mb.Entity<InodeEntityType>(e => e.HasKey(x => new { x.InodeId, x.EntityType }));
         }

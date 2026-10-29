@@ -8,6 +8,5 @@ public sealed class NoopEdgeSchemaGateway : IEdgeSchemaGateway
     public Task CreateEdgeTypeAsync(EdgeType type, CancellationToken ct) => Task.CompletedTask;
     public Task AlterAddPropsAsync(string spaceId, string edgeType, IReadOnlyList<EdgeTypeProp> props, CancellationToken ct) => Task.CompletedTask;
     public Task AlterDropPropsAsync(string spaceId, string edgeType, IReadOnlyList<string> propNames, CancellationToken ct) => Task.CompletedTask;
-    public Task AlterChangePropTypeAsync(string spaceId, string edgeType, string propName, string newDataType, CancellationToken ct) => Task.CompletedTask;
     public Task DropEdgeTypeAsync(string spaceId, string edgeType, CancellationToken ct) => Task.CompletedTask;
 }

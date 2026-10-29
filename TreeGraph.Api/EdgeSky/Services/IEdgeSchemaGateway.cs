@@ -20,9 +20,6 @@ public interface IEdgeSchemaGateway
     /// <summary>ALTER EDGE DROP（删除属性列），并等待列消失。</summary>
     Task AlterDropPropsAsync(string spaceId, string edgeType, IReadOnlyList<string> propNames, CancellationToken ct);
 
-    /// <summary>ALTER EDGE CHANGE（属性类型变更，仅限 Nebula 白名单转换）。</summary>
-    Task AlterChangePropTypeAsync(string spaceId, string edgeType, string propName, string newDataType, CancellationToken ct);
-
     /// <summary>DROP EDGE（IF EXISTS），并等待 DESCRIBE 不再可见。</summary>
     Task DropEdgeTypeAsync(string spaceId, string edgeType, CancellationToken ct);
 }

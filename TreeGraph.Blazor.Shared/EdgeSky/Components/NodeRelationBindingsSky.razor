@@ -1,0 +1,239 @@
+@* NodeRelationBindingsSky.razor — 节点关系（边实例）维护区。
+   打开参数 NodeId：按宿主类型解析节点所属图空间（api/edge/node-space/{id}），
+   再以出边/入边两张表格列示该节点在图空间中的边实例（EdgeSky 顶级实体，五元组定位）。
+   工具栏「新建关系」打开 EdgeInstanceCreateDialog（按边类型 Schema 动态渲染属性），
+   提交后走 PUT 覆盖式 UPSERT（对齐 INSERT EDGE）；行内删除按五元组 DELETE。 *@
+@namespace TreeGraph.Blazor.Shared.EdgeSky.Components
+
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.EdgeSky.Dialogs
+@using TreeGraph.Blazor.Shared.EdgeSky.Services
+@using TreeGraph.Shared.EdgeSky.Dtos
+
+@inject EdgeApiClient Api
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="my-1" Style="@(_loading ? null : "visibility: hidden;")" />
+
+@if (!_loading && _space is null)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+        该节点不属于任何图空间（或空间尚未建立），无法维护关系。
+    </MudAlert>
+}
+else if (!_loading && _space is not null)
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2 flex-wrap">
+        <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Workspaces">
+            @_space.SpaceName
+        </MudChip>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                       Size="Size.Small" Color="Color.Default"
+                       Disabled="@_loading"
+                       OnClick="@(async () => await ReloadAsync())"
+                       title="刷新" />
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.AddLink"
+                   Disabled="@(_loading || _types.Count == 0)"
+                   OnClick="OpenCreateAsync">
+            新建关系
+        </MudButton>
+    </MudStack>
+
+    @if (_types.Count == 0)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-2">
+            当前空间尚未定义边类型，请先在「边类型管理」创建。
+        </MudAlert>
+    }
+
+    <MudTabs Elevation="0" Rounded="true" PanelClass="pt-2">
+        <MudTabPanel Text="@($"出边 {_out.Count}")" Icon="@Icons.Material.Filled.CallMade">
+            @EdgeTable(_out, true)
+        </MudTabPanel>
+        <MudTabPanel Text="@($"入边 {_in.Count}")" Icon="@Icons.Material.Filled.CallReceived">
+            @EdgeTable(_in, false)
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    /// <summary>宿主节点 Id（= nodes.id）。</summary>
+    [Parameter, EditorRequired] public string NodeId { get; set; } = default!;
+
+    private NodeSpaceDto? _space;
+    private List<EdgeTypeDto> _types = [];
+    private List<EdgeDto> _out = [];
+    private List<EdgeDto> _in = [];
+    private bool _loading;
+    private string? _loadedNodeId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // KeepPanelsAlive 下父对话框重渲染会重复触发，按 NodeId 去重避免无谓请求
+        if (NodeId == _loadedNodeId) return;
+        _loadedNodeId = NodeId;
+        await ReloadAsync();
+    }
+
+    /// <summary>解析空间 → 并行加载边类型与出/入边。</summary>
+    private async Task ReloadAsync()
+    {
+        if (string.IsNullOrEmpty(NodeId)) return;
+
+        _loading = true;
+        try
+        {
+            _space = await Api.GetNodeSpaceAsync(NodeId);
+            if (_space is null)
+            {
+                _types = [];
+                _out = [];
+                _in = [];
+                return;
+            }
+
+            var typesTask = Api.ListEdgeTypesAsync(_space.SpaceId);
+            var outTask = Api.QueryEdgesAsync(_space.SpaceId, nodeId: NodeId, direction: "out");
+            var inTask = Api.QueryEdgesAsync(_space.SpaceId, nodeId: NodeId, direction: "in");
+            await Task.WhenAll(typesTask, outTask, inTask);
+
+            _types = typesTask.Result ?? [];
+            _out = outTask.Result ?? [];
+            _in = inTask.Result ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载节点关系失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        if (_space is null) return;
+
+        var parameters = new DialogParameters<EdgeInstanceCreateDialog>
+        {
+            { x => x.SpaceId, _space.SpaceId },
+            { x => x.SpaceName, _space.SpaceName },
+            { x => x.SpaceType, _space.SpaceType },
+            { x => x.NodeId, NodeId },
+            { x => x.Types, _types }
+        };
+
+        var dialog = await DialogService.ShowExAsync<EdgeInstanceCreateDialog>(
+            string.Empty, parameters,
+            new DialogOptionsEx
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                MaximizeButton = true,
+                Position = DialogPosition.TopCenter
+            });
+        var result = await dialog.Result;
+        if (result?.Canceled != false
+            || result.Data is not EdgeInstanceCreateDialog.CreatedEdgeInstance created)
+        {
+            return;
+        }
+
+        var (ok, error) = await Api.UpsertEdgeAsync(
+            _space.SpaceId, created.EdgeType, created.SrcVid, created.Rank, created.DstVid,
+            new UpsertEdgeRequest { Props = created.Props });
+        if (!ok)
+        {
+            Snackbar.Add($"新建关系失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("关系已创建", Severity.Success);
+        await ReloadAsync();
+    }
+
+    private async Task DeleteAsync(EdgeDto edge)
+    {
+        if (_space is null) return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "删除关系",
+            $"确定删除关系【{TypeLabel(edge.EdgeType)}：{NameOf(edge.SrcVid, edge.SrcName)} → {NameOf(edge.DstVid, edge.DstName)} @{edge.Rank}】吗？",
+            yesText: "删除", cancelText: "取消");
+        if (confirmed != true) return;
+
+        var (ok, error) = await Api.DeleteEdgeAsync(
+            _space.SpaceId, edge.EdgeType, edge.SrcVid, edge.Rank, edge.DstVid);
+        if (!ok)
+        {
+            Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("关系已删除", Severity.Success);
+        await ReloadAsync();
+    }
+
+    /// <summary>单张边表格（出边/入边共用）：类型 / 起止 / rank / 属性摘要 / 删除。</summary>
+    private RenderFragment EdgeTable(IReadOnlyList<EdgeDto> items, bool outgoing) => @<MudTable T="EdgeDto" Items="@items"
+                                                                                              Hover="true" Bordered="true" Dense="true"
+                                                                                              Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>类型</MudTh>
+            <MudTh>起止</MudTh>
+            <MudTh Style="width: 1%; white-space: nowrap;">rank</MudTh>
+            <MudTh>属性</MudTh>
+            <MudTh Style="width: 1%; white-space: nowrap;"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="类型">
+                <MudText Typo="Typo.body2">@TypeLabel(context.EdgeType)</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Default">@context.EdgeType</MudText>
+            </MudTd>
+            <MudTd DataLabel="起止">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="flex-wrap">
+                    <MudText Typo="Typo.body2">@NameOf(context.SrcVid, context.SrcName)</MudText>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" />
+                    <MudText Typo="Typo.body2">@NameOf(context.DstVid, context.DstName)</MudText>
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="rank">
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">@context.Rank</MudChip>
+            </MudTd>
+            <MudTd DataLabel="属性">
+                <MudText Typo="Typo.caption" Color="Color.Default">
+                    @(PropsSummary(context) ?? "—")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="操作" Style="text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small" Color="Color.Error"
+                               Disabled="@_loading"
+                               OnClick="@(async () => await DeleteAsync(context))"
+                               title="删除该关系" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.caption" Color="Color.Default" Class="py-2">
+                @(outgoing ? "该节点暂无出边" : "该节点暂无入边")
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>;
+
+    private string TypeLabel(string name)
+        => _types.FirstOrDefault(t => t.Name == name) is { } t && !string.IsNullOrWhiteSpace(t.DisplayName)
+            ? t.DisplayName!
+            : name;
+
+    private static string NameOf(string id, string? name)
+        => string.IsNullOrWhiteSpace(name) ? id : name!;
+
+    private static string? PropsSummary(EdgeDto edge)
+        => edge.Props is { Count: > 0 } props
+            ? string.Join("，", props.Select(kv => $"{kv.Key}={kv.Value}"))
+            : null;
+}

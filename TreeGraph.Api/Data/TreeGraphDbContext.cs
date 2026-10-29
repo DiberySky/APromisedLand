@@ -917,16 +917,17 @@ public class TreeGraphDbContext : DbContext
             e.HasIndex(x => x.Props).HasDatabaseName("ix_edges_props").HasMethod("GIN")
                 .HasFilter("props IS NOT NULL");
 
-            // 两端必须是 nodes 中的真实节点（Restrict：被边引用时禁止删除）
+            // 两端必须是 nodes 中的真实节点；删节点时级联删边（含结构派生 parent_of），
+            // 避免 FK 阻塞树节点删除（图侧由 GraphSynchronizer 删顶点后自动移除关联边）
             e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
                 .WithMany()
                 .HasForeignKey(x => x.SrcVid)
-                .OnDelete(DeleteBehavior.Restrict)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("fk_edges_src_node");
             e.HasOne<TreeGraph.Shared.NodeSky.Entities.Node>()
                 .WithMany()
                 .HasForeignKey(x => x.DstVid)
-                .OnDelete(DeleteBehavior.Restrict)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("fk_edges_dst_node");
 
             // 边类型 Restrict：有实例时由服务层拒绝删类型（复合 FK 对齐空间级主键）

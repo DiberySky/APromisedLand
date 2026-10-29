@@ -166,7 +166,7 @@ public class EdgeApiTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task EdgeType_AlterChange_NonWhitelist_Returns400()
+    public async Task EdgeType_AlterUpdateProps_NotNullWithoutDefault_Returns400()
     {
         var name = $"et_{Guid.NewGuid():N}";
         var create = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
@@ -176,16 +176,16 @@ public class EdgeApiTests : IntegrationTestBase
         });
         create.EnsureSuccessStatusCode();
 
-        // STRING → INT 不在当前白名单 → 400
+        // 改 NOT NULL 但未配默认值 → 400（Nebula 约束）；类型不可变更（无对应请求字段）
         var resp = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}", new
         {
-            changeProps = new[] { new { propName = "a", newDataType = "INT" } }
+            updateProps = new[] { new { propName = "a", nullable = false } }
         });
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
 
     [Fact]
-    public async Task EdgeType_AlterChange_NullableAndDefault()
+    public async Task EdgeType_AlterUpdateProps_NullableAndDefault()
     {
         var name = $"et_{Guid.NewGuid():N}";
         var create = await Client.PostAsJsonAsync($"{EdgeBase}/types", new
@@ -202,7 +202,7 @@ public class EdgeApiTests : IntegrationTestBase
         // a: NULL → NOT NULL（配默认值 0）；b: 设置默认值
         var alter = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}", new
         {
-            changeProps = new object[]
+            updateProps = new object[]
             {
                 new { propName = "a", nullable = false, defaultValueSet = true, defaultValue = 0L },
                 new { propName = "b", defaultValueSet = true, defaultValue = "x" }
@@ -221,7 +221,7 @@ public class EdgeApiTests : IntegrationTestBase
         // NOT NULL 不配置默认值 → 400（Nebula 约束）
         var bad = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}", new
         {
-            changeProps = new[]
+            updateProps = new[]
             {
                 new { propName = "b", nullable = false, defaultValueSet = true, defaultValue = (string?)null }
             }
@@ -231,7 +231,7 @@ public class EdgeApiTests : IntegrationTestBase
         // b: 清除默认值（可空属性允许）
         var clear = await Client.PutAsJsonAsync($"{EdgeBase}/types/{name}", new
         {
-            changeProps = new[]
+            updateProps = new[]
             {
                 new { propName = "b", defaultValueSet = true, defaultValue = (string?)null }
             }
@@ -398,6 +398,117 @@ public class EdgeApiTests : IntegrationTestBase
             (await Client.GetAsync($"{EdgeBase}/edges/{name}/{src}/0/{dst}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
             (await Client.DeleteAsync($"{EdgeBase}/edges/{name}/{src}/0/{dst}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Edge_Query_ByNodeDirection_FiltersAndFillsNodeNames()
+    {
+        var name = await CreateEdgeTypeWithPropsAsync();
+        var (a, b) = await CreateNodePairAsync();
+        var (_, c) = await CreateNodePairAsync();
+
+        // 关系只依赖 nodes 表存在性：a→b（用 b 作为中间节点）、b→c
+        var ab = await Client.PutAsJsonAsync($"{EdgeBase}/edges/{name}/{a}/0/{b}", new { });
+        ab.EnsureSuccessStatusCode();
+        var bc = await Client.PutAsJsonAsync($"{EdgeBase}/edges/{name}/{b}/0/{c}", new { });
+        bc.EnsureSuccessStatusCode();
+
+        var outEdges = await Client.GetEavAsync<List<EdgeDto>>(
+            $"{EdgeBase}/edges?nodeId={b}&direction=out");
+        Assert.Single(outEdges!);
+        Assert.Equal(c, outEdges![0].DstVid);
+
+        var inEdges = await Client.GetEavAsync<List<EdgeDto>>(
+            $"{EdgeBase}/edges?nodeId={b}&direction=in");
+        Assert.Single(inEdges!);
+        Assert.Equal(a, inEdges![0].SrcVid);
+
+        var either = await Client.GetEavAsync<List<EdgeDto>>(
+            $"{EdgeBase}/edges?nodeId={b}&direction=either");
+        Assert.Equal(2, either!.Count);
+
+        // 对端名称由 join nodes 补充
+        Assert.Equal($"节点{a[..4]}", either!.Single(e => e.SrcVid == a).SrcName);
+        Assert.Equal($"节点{c[..4]}", either!.Single(e => e.DstVid == c).DstName);
+
+        // 分页
+        var page1 = await Client.GetEavAsync<List<EdgeDto>>(
+            $"{EdgeBase}/edges?nodeId={b}&direction=either&limit=1&offset=0");
+        var page2 = await Client.GetEavAsync<List<EdgeDto>>(
+            $"{EdgeBase}/edges?nodeId={b}&direction=either&limit=1&offset=1");
+        Assert.Single(page1!);
+        Assert.Single(page2!);
+        Assert.NotEqual(page1![0].SrcVid, page2![0].SrcVid);
+    }
+
+    [Fact]
+    public async Task Node_Space_LineNode_ResolvesToLineSpace()
+    {
+        var (src, _) = await CreateNodePairAsync();
+
+        var raw = await Client.GetAsync($"/api/edge/node-space/{src}");
+        var body = await raw.Content.ReadAsStringAsync();
+        Assert.True(raw.IsSuccessStatusCode, $"{(int)raw.StatusCode}: {body}");
+
+        var dto = await Client.GetEavAsync<NodeSpaceDto>($"/api/edge/node-space/{src}");
+        Assert.NotNull(dto);
+        Assert.Equal(TestSpaceId, dto!.SpaceId);
+        Assert.False(string.IsNullOrEmpty(dto.SpaceType));
+
+        // 未注册的节点 id → 404
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Client.GetAsync($"/api/edge/node-space/{Guid.NewGuid()}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task UnitTree_ParentChild_SyncsParentOfEdge_AndCascadesOnDelete()
+    {
+        const string unitSpaceId = "9c3a5b7f-1d4e-6c0a-3b2f-5e7d9a1c3e4f";
+        var unitEdgeBase = $"/api/spaces/{unitSpaceId}/edge";
+
+        var parentId = $"P_{Guid.NewGuid():N}";
+        var newParentId = $"N_{Guid.NewGuid():N}";
+        var childId = $"C_{Guid.NewGuid():N}";
+
+        async Task CreateNodeAsync(string id, string? parentId)
+        {
+            var resp = await Client.PostAsJsonAsync("/UnitTree", new
+            {
+                id, text = "节点", parentId, sortOrder = 0, canHaveChildren = true
+            });
+            resp.EnsureSuccessStatusCode();
+        }
+
+        await CreateNodeAsync(parentId, null);
+        await CreateNodeAsync(childId, parentId);
+
+        // 树服务写路径直接落 parent_of 边（不经事件/GraphSync 管道），创建后立即可查
+        var inEdges = await Client.GetEavAsync<List<EdgeDto>>(
+            $"{unitEdgeBase}/edges?nodeId={childId}&direction=in");
+        Assert.Single(inEdges!);
+        Assert.Equal("parent_of", inEdges![0].EdgeType);
+        Assert.Equal(parentId, inEdges[0].SrcVid);
+        Assert.Equal(0L, inEdges[0].Rank);
+
+        // 换父：旧父边删除、新父边写入
+        await CreateNodeAsync(newParentId, null);
+        var move = await Client.PostAsync(
+            $"/UnitTree/move?nodeId={childId}&newParentId={newParentId}", null);
+        Assert.True(move.IsSuccessStatusCode, await move.Content.ReadAsStringAsync());
+
+        var moved = await Client.GetEavAsync<List<EdgeDto>>(
+            $"{unitEdgeBase}/edges?nodeId={childId}&direction=in");
+        Assert.Single(moved!);
+        Assert.Equal(newParentId, moved![0].SrcVid);
+
+        // 删除节点：边随节点级联删除，删除本身不被 FK 阻塞
+        Assert.Equal(HttpStatusCode.OK, (await Client.DeleteAsync($"/UnitTree/{childId}")).StatusCode);
+        var afterDelete = await Client.GetEavAsync<List<EdgeDto>>(
+            $"{unitEdgeBase}/edges?nodeId={childId}&direction=either");
+        Assert.Empty(afterDelete!);
+
+        await Client.DeleteAsync($"/UnitTree/{newParentId}");
+        await Client.DeleteAsync($"/UnitTree/{parentId}");
     }
 
     // ============================================================

@@ -154,7 +154,7 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         {
             { x => x.Editing, EntityType() },
             { x => x.InitialDisplayOrder, 1 },
-        }), "编辑实体类型");
+        }), "编辑属性定义");
 
     // ─── CompositeTypes ───
 
@@ -322,12 +322,11 @@ public class NodeEavDialogSmokeTests : BunitTestBase
         var html = provider.Find(".mud-dialog").InnerHtml;
         Assert.Contains("测试单位", html);
         Assert.Contains("上级单位", html);
-        // 全量按钮集：非根 + 允许子节点 + 无子节点 → 六个操作全部可见
-        Assert.Contains("移动", html);
-        Assert.Contains("子项排序", html);
+        Assert.Contains("是否允许添加子节点", html);
+        // 只读对话框：移动/创建子项/子项排序/删除已迁至「设置修改」页，非根节点仅保留该入口
         Assert.Contains("设置修改", html);
-        Assert.Contains("创建子项", html);
-        Assert.Contains("删除", html);
+        Assert.DoesNotContain("创建子项", html);
+        Assert.DoesNotContain("子项排序", html);
     }
 
     // ─── NodePickerDialog（语义搜索节点选择器） ───

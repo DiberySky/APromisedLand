@@ -11,25 +11,22 @@ namespace TreeGraph.Api.EdgeSky.Services;
 /// <summary>
 /// EdgeType 管理服务（镜像 NebulaGraph 边类型语义）：
 /// EdgeType 从属于图空间，(SpaceId, Name) 空间内唯一、创建后不可改名；
-/// TTL/注释仅创建时可设；变更仅限 ALTER ADD/DROP/CHANGE 属性。PG edge_types 为唯一真源，
-/// Nebula DDL 经 <see cref="IEdgeSchemaGateway"/> 同步（失败记日志，
-/// 由 GraphSchemaInitializer 启动对齐 / 全量重建兜底）。
+/// TTL/注释仅创建时可设；变更仅限 ALTER ADD/DROP 属性与可空/默认值元数据（数据类型不可变更）。
+/// PG edge_types 为唯一真源，Nebula DDL 经 <see cref="IEdgeSchemaGateway"/> 先行执行：
+/// DDL 失败即返回、PG 不落库；DDL 成功而 PG 提交失败时残留由 GraphSchemaInitializer 启动对齐补偿。
 /// </summary>
 public sealed class EdgeTypeService
 {
     private readonly TreeGraphDbContext _db;
     private readonly IEdgeSchemaGateway _gateway;
-    private readonly ILogger<EdgeTypeService> _logger;
 
     /// <summary>Nebula 命名规则：ASCII 字母开头，仅字母/数字/下划线（长度受 DB 列约束）。</summary>
     private static readonly Regex NameRegex = new("^[A-Za-z][A-Za-z0-9_]*$", RegexOptions.Compiled);
 
-    public EdgeTypeService(
-        TreeGraphDbContext db, IEdgeSchemaGateway gateway, ILogger<EdgeTypeService> logger)
+    public EdgeTypeService(TreeGraphDbContext db, IEdgeSchemaGateway gateway)
     {
         _db = db;
         _gateway = gateway;
-        _logger = logger;
     }
 
     public async Task<List<EdgeTypeDto>> ListAsync(string spaceId, CancellationToken ct)
@@ -75,15 +72,17 @@ public sealed class EdgeTypeService
             TtlDurationSeconds = req.TtlDurationSeconds,
             Props = props
         };
+        // ── DDL 先行：图库建边类型失败即返回，PG 不落库 ──
+        await _gateway.CreateEdgeTypeAsync(type, ct);
+
         _db.EdgeTypes.Add(type);
         await _db.SaveChangesAsync(ct);
-
-        await SyncDdlAsync(() => _gateway.CreateEdgeTypeAsync(type, ct), $"CREATE EDGE {type.Name}");
         return ToDto(type);
     }
 
     /// <summary>
-    /// ALTER EDGE：仅属性集变更（增/删/改类型）。名称/TTL/注释不可变更（Nebula 能力对齐）。
+    /// ALTER EDGE：仅属性集变更（增/删/元数据）。名称/TTL/注释/数据类型不可变更（Nebula 能力对齐）。
+    /// DDL 先行（先 ADD 后 DROP），失败即返回、PG 不落库。
     /// </summary>
     public async Task<EdgeTypeDto> AlterAsync(string spaceId, string name, AlterEdgeTypeRequest req, CancellationToken ct)
     {
@@ -105,59 +104,40 @@ public sealed class EdgeTypeService
                 throw new ArgumentException($"属性 '{propName}' 是 TTL 列，不可删除（Nebula 约束）");
         }
 
-        foreach (var change in req.ChangeProps)
+        foreach (var update in req.UpdateProps)
         {
-            var existing = type.Props.FirstOrDefault(x => x.PropName == change.PropName)
-                ?? throw new ArgumentException($"属性 '{change.PropName}' 不存在，无法变更");
-            if (!string.IsNullOrEmpty(change.NewDataType))
-            {
-                if (!EdgePropDataTypes.IsValid(change.NewDataType))
-                    throw new ArgumentException($"属性 '{change.PropName}' 目标类型 '{change.NewDataType}' 无效");
-                if (!IsAllowedTypeChange(existing.DataType, change.NewDataType))
-                    throw new ArgumentException(
-                        $"属性 '{change.PropName}' 不支持 {existing.DataType} → {change.NewDataType} 转换" +
-                        "（Nebula ALTER CHANGE 白名单仅含 fixed_string→string、float→double、int 变宽、定长字符串加长）");
-            }
+            var existing = type.Props.FirstOrDefault(x => x.PropName == update.PropName)
+                ?? throw new ArgumentException($"属性 '{update.PropName}' 不存在，无法变更");
 
             // 可空/默认值（PG 元数据，Nebula 无对应 ALTER 语义）：改 NOT NULL 须保证生效默认值非空
-            var effectiveNullable = change.Nullable ?? existing.Nullable;
-            var effectiveDefault = change.DefaultValueSet ? change.DefaultValue : existing.DefaultValue;
+            var effectiveNullable = update.Nullable ?? existing.Nullable;
+            var effectiveDefault = update.DefaultValueSet ? update.DefaultValue : existing.DefaultValue;
             if (!effectiveNullable && effectiveDefault is null)
                 throw new ArgumentException(
-                    $"属性 '{change.PropName}' 为 NOT NULL，必须配置默认值（Nebula 约束）");
+                    $"属性 '{update.PropName}' 为 NOT NULL，必须配置默认值（Nebula 约束）");
         }
+
+        // ── DDL 先行：先 ADD 后 DROP，失败即返回、PG 不落库 ──
+        if (addProps.Count > 0)
+            await _gateway.AlterAddPropsAsync(spaceId, name, addProps, ct);
+        if (req.DropProps.Count > 0)
+            await _gateway.AlterDropPropsAsync(spaceId, name, req.DropProps, ct);
 
         // ── 落库阶段 ──
         foreach (var p in addProps)
             type.Props.Add(p);
         foreach (var propName in req.DropProps)
             type.Props.Remove(type.Props.First(x => x.PropName == propName));
-        foreach (var change in req.ChangeProps)
+        foreach (var update in req.UpdateProps)
         {
-            var prop = type.Props.First(x => x.PropName == change.PropName);
-            if (!string.IsNullOrEmpty(change.NewDataType))
-                prop.DataType = change.NewDataType;
-            if (change.Nullable is { } nullable)
+            var prop = type.Props.First(x => x.PropName == update.PropName);
+            if (update.Nullable is { } nullable)
                 prop.Nullable = nullable;
-            if (change.DefaultValueSet)
-                prop.DefaultValue = change.DefaultValue;
+            if (update.DefaultValueSet)
+                prop.DefaultValue = update.DefaultValue;
         }
         type.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
-
-        // ── DDL 同步阶段（失败不翻请求，由启动对齐/重建兜底） ──
-        await SyncDdlAsync(() => _gateway.AlterAddPropsAsync(spaceId, name, addProps, ct), $"ALTER EDGE {name} ADD");
-        await SyncDdlAsync(() => _gateway.AlterDropPropsAsync(spaceId, name, req.DropProps, ct), $"ALTER EDGE {name} DROP");
-        foreach (var change in req.ChangeProps)
-        {
-            // 仅类型变更同步 Nebula DDL；可空/默认值变更仅落 PG 元数据（写入校验依据）
-            if (string.IsNullOrEmpty(change.NewDataType))
-                continue;
-            await SyncDdlAsync(
-                () => _gateway.AlterChangePropTypeAsync(spaceId, name, change.PropName, change.NewDataType, ct),
-                $"ALTER EDGE {name} CHANGE {change.PropName}");
-        }
-
         return ToDto(type);
     }
 
@@ -202,11 +182,12 @@ public sealed class EdgeTypeService
         if (await _db.Edges.AnyAsync(e => e.SpaceId == spaceId && e.EdgeType == name, ct))
             throw new InvalidOperationException($"边类型 '{name}' 仍存在边实例，无法删除（请先删除全部实例）");
 
+        // ── DDL 先行：图库删边类型失败即返回，PG 不落库 ──
+        await _gateway.DropEdgeTypeAsync(spaceId, name, ct);
+
         _db.EdgeTypeProps.RemoveRange(type.Props);
         _db.EdgeTypes.Remove(type);
         await _db.SaveChangesAsync(ct);
-
-        await SyncDdlAsync(() => _gateway.DropEdgeTypeAsync(spaceId, name, ct), $"DROP EDGE {name}");
     }
 
     // ------------------------------------------------------------
@@ -275,29 +256,6 @@ public sealed class EdgeTypeService
             ?? throw new ArgumentException($"TTL 列 '{ttlCol}' 必须是本类型已定义的属性");
         if (!EdgePropDataTypes.IsTtlCompatible(col.DataType))
             throw new ArgumentException($"TTL 列 '{ttlCol}' 类型须为 INT/TIMESTAMP（当前 {col.DataType}）");
-    }
-
-    /// <summary>
-    /// Nebula ALTER CHANGE 类型转换白名单：fixed_string→string、float→double、int 变宽、
-    /// 定长字符串加长。当前类型子集（STRING/INT/DOUBLE/BOOL/TIMESTAMP/DATE）不在白名单覆盖面内，
-    /// 暂无合法转换。
-    /// </summary>
-    private static bool IsAllowedTypeChange(string from, string to) => false;
-
-    // ------------------------------------------------------------
-    // DDL 同步（失败不翻请求；PG 为唯一真源，图库由启动对齐/重建兜底）
-    // ------------------------------------------------------------
-
-    private async Task SyncDdlAsync(Func<Task> ddl, string what)
-    {
-        try
-        {
-            await ddl();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "NebulaGraph DDL 同步失败（{What}），PG 已提交，图库 schema 由启动对齐/全量重建兜底", what);
-        }
     }
 
     private static EdgeTypeDto ToDto(EdgeType t) => new()

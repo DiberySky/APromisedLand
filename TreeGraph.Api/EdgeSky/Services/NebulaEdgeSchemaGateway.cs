@@ -56,19 +56,6 @@ public sealed class NebulaEdgeSchemaGateway : IEdgeSchemaGateway
         }, $"ALTER EDGE {edgeType} DROP", ct);
     }
 
-    public async Task AlterChangePropTypeAsync(string spaceId, string edgeType, string propName, string newDataType, CancellationToken ct)
-    {
-        var space = GraphNaming.ToNebulaSpace(spaceId);
-        await ExecuteWithRetryAsync(space, $"ALTER EDGE `{edgeType}` CHANGE (`{propName}` {newDataType})", ct);
-        await WaitUntilAsync(async () =>
-        {
-            var types = await DescribeColumnTypesAsync(space, edgeType, ct);
-            return types is not null
-                   && types.TryGetValue(propName, out var actual)
-                   && actual.Contains(newDataType, StringComparison.OrdinalIgnoreCase);
-        }, $"ALTER EDGE {edgeType} CHANGE {propName}", ct);
-    }
-
     public async Task DropEdgeTypeAsync(string spaceId, string edgeType, CancellationToken ct)
     {
         var space = GraphNaming.ToNebulaSpace(spaceId);

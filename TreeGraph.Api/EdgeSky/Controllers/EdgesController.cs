@@ -15,13 +15,16 @@ namespace TreeGraph.Api.EdgeSky.Controllers;
 [Route("api/spaces/{spaceId}/edge/edges")]
 public class EdgesController(EdgeService svc) : ControllerBase
 {
-    // GET /api/spaces/{spaceId}/edge/edges?edgeType=&srcVid=&dstVid=
+    // GET /api/spaces/{spaceId}/edge/edges?edgeType=&srcVid=&dstVid=&nodeId=&direction=&limit=&offset=
+    // direction=out|in|either（配合 nodeId 按起点/终点/双向过滤）
     [HttpGet]
     public async Task<IActionResult> Query(
         string spaceId,
         [FromQuery] string? edgeType, [FromQuery] string? srcVid, [FromQuery] string? dstVid,
+        [FromQuery] string? nodeId, [FromQuery] string? direction,
+        [FromQuery] int? limit, [FromQuery] int? offset,
         CancellationToken ct)
-        => Ok(await svc.QueryAsync(spaceId, edgeType, srcVid, dstVid, ct));
+        => Ok(await svc.QueryAsync(spaceId, edgeType, srcVid, dstVid, nodeId, direction, limit, offset, ct));
 
     // GET /api/spaces/{spaceId}/edge/edges/{edgeType}/{srcVid}/{rank}/{dstVid}
     [HttpGet("{edgeType}/{srcVid}/{rank:long}/{dstVid}")]
@@ -51,4 +54,30 @@ public class EdgesController(EdgeService svc) : ControllerBase
         await svc.DeleteAsync(spaceId, edgeType, srcVid, rank, dstVid, ct);
         return Ok(true);
     }
+}
+
+/// <summary>
+/// 节点 → 所属图空间解析（节点关系维护用）：GET /api/edge/node-space/{nodeId}。
+/// 单独成控制器是因为 EdgesController 路由以 spaceId 为前缀，而此处入口尚不知空间。
+/// </summary>
+[ApiController]
+[Route("api/edge/node-space")]
+public class EdgeNodeSpaceController(EdgeService svc) : ControllerBase
+{
+    [HttpGet("{nodeId}")]
+    public async Task<IActionResult> Get(string nodeId, CancellationToken ct)
+    {
+        var dto = await svc.GetNodeSpaceAsync(nodeId, ct);
+        return dto is null ? NotFound() : Ok(dto);
+    }
+}
+
+/// <summary>对端节点候选搜索：GET /api/edge/nodes?search=。</summary>
+[ApiController]
+[Route("api/edge/nodes")]
+public class EdgeNodeSearchController(EdgeService svc) : ControllerBase
+{
+    [HttpGet]
+    public async Task<IActionResult> Search([FromQuery] string? search, CancellationToken ct)
+        => Ok(await svc.SearchNodesAsync(search, ct));
 }

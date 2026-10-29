@@ -2865,14 +2865,14 @@ namespace TreeGraph.Api.Data.Migrations
                     b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
                         .WithMany()
                         .HasForeignKey("DstVid")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_edges_dst_node");
 
                     b.HasOne("TreeGraph.Shared.NodeSky.Entities.Node", null)
                         .WithMany()
                         .HasForeignKey("SrcVid")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_edges_src_node");
 

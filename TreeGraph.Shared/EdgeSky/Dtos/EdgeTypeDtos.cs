@@ -66,8 +66,8 @@ public class CreateEdgeTypeRequest
 }
 
 /// <summary>
-/// ALTER EDGE 请求：仅支持属性集变更（增/删/改类型），与 Nebula 能力对齐。
-/// 名称 / TTL / 注释不可变更。
+/// ALTER EDGE 请求：仅支持属性集变更（增/删/元数据更新），与 Nebula 能力对齐。
+/// 数据类型不可变更（当前类型子集不在 ALTER CHANGE 白名单内）；名称 / TTL / 注释不可变更。
 /// </summary>
 public class AlterEdgeTypeRequest
 {
@@ -77,17 +77,14 @@ public class AlterEdgeTypeRequest
     /// <summary>删除属性名（ALTER DROP；TTL 列不可删）。</summary>
     public List<string> DropProps { get; set; } = [];
 
-    /// <summary>类型变更（ALTER CHANGE；仅 Nebula 白名单转换）。</summary>
-    public List<EdgeTypePropTypeChange> ChangeProps { get; set; } = [];
+    /// <summary>属性元数据更新（可空性/默认值；仅落 PG，不同步 DDL）。</summary>
+    public List<EdgeTypePropUpdate> UpdateProps { get; set; } = [];
 }
 
-/// <summary>属性变更项（类型走 Nebula ALTER CHANGE；可空/默认值为 PG 元数据变更，不同步 DDL）。</summary>
-public class EdgeTypePropTypeChange
+/// <summary>属性元数据变更项（可空性/默认值为 PG 元数据，不同步 DDL；类型不可变更）。</summary>
+public class EdgeTypePropUpdate
 {
     public string PropName { get; set; } = string.Empty;
-
-    /// <summary>目标类型；空 = 不变更类型（仅 Nebula 白名单转换）。</summary>
-    public string NewDataType { get; set; } = string.Empty;
 
     /// <summary>目标可空性；null = 不变更（改 NOT NULL 须保证生效默认值非空）。</summary>
     public bool? Nullable { get; set; }

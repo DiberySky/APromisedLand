@@ -16,8 +16,24 @@ public class EdgeDto
     /// <summary>属性值包（仅含 Schema 内键；null/空 = 无属性）。</summary>
     public Dictionary<string, JsonElement>? Props { get; set; }
 
+    /// <summary>起点节点名称（查询时 join nodes 补充，仅展示用）。</summary>
+    public string? SrcName { get; set; }
+
+    /// <summary>终点节点名称（查询时 join nodes 补充，仅展示用）。</summary>
+    public string? DstName { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary>节点所属图空间解析结果（节点关系维护用：边从属于图空间）。</summary>
+public class NodeSpaceDto
+{
+    public string SpaceId { get; set; } = string.Empty;
+    public string SpaceName { get; set; } = string.Empty;
+
+    /// <summary>空间类型（Dynamic/Type/Unit/Knowledge，与后端 SpaceType 枚举同名）。</summary>
+    public string SpaceType { get; set; } = string.Empty;
 }
 
 /// <summary>

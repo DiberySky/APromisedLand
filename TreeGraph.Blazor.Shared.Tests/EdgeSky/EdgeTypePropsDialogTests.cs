@@ -18,7 +18,7 @@ namespace TreeGraph.Blazor.Shared.Tests.EdgeSky;
 /// <summary>
 /// EdgeTypePropsDialog 组件测试（ALTER EDGE 属性 Schema 管理）。
 ///
-/// 覆盖：已有属性渲染、无变更取消、删除标记（TTL 列禁删）、类型变更汇总、
+/// 覆盖：已有属性渲染、无变更取消、删除标记（TTL 列禁删）、可空/默认值变更汇总、
 /// 新增属性校验（NOT NULL 必配默认值 / 重名拒绝）与 AddProps 汇总。
 /// 模式对齐其它对话框冒烟测试：真实 MudDialogProvider + 反射操作私有行状态。
 /// </summary>
@@ -177,7 +177,7 @@ public class EdgeTypePropsDialogTests : BunitTestBase
         var req = Assert.IsType<AlterEdgeTypeRequest>(result.Data);
         Assert.Equal(["name"], req.DropProps);
         Assert.Empty(req.AddProps);
-        Assert.Empty(req.ChangeProps);
+        Assert.Empty(req.UpdateProps);
     }
 
     [Fact]
@@ -200,24 +200,23 @@ public class EdgeTypePropsDialogTests : BunitTestBase
     }
 
     [Fact]
-    public async Task TypeChange_ViaEditDialog_SubmitsChangeProps()
+    public async Task NullableChange_ViaEditDialog_SubmitsUpdateProps()
     {
-        // 类型修改经名称列 ✏ 编辑对话框暂存到行.SelectedType，提交时汇总进 ChangeProps
+        // 可空性变更经 ✏ 编辑对话框暂存到行.SelectedNullable，提交时汇总进 UpdateProps（类型不可变更）
         var (provider, reference) = await OpenAsync(LineSegment());
         var dialog = DialogOf(provider).Instance;
 
-        // 模拟编辑对话框回传：degree: INT → DOUBLE（直接写暂存字段）
         var degreeRow = ExistingRows(dialog).Cast<object>()
             .Single(r => (string)GetProp(GetProp(r, "Src"), "PropName") == "degree");
-        SetProp(degreeRow, "SelectedType", EdgePropDataTypes.Double);
+        SetProp(degreeRow, "SelectedNullable", true);
         provider.Render();
         ClickSubmit(provider);
 
         var result = await reference.Result;
         var req = Assert.IsType<AlterEdgeTypeRequest>(result.Data);
-        var change = Assert.Single(req.ChangeProps);
-        Assert.Equal("degree", change.PropName);
-        Assert.Equal(EdgePropDataTypes.Double, change.NewDataType);
+        var update = Assert.Single(req.UpdateProps);
+        Assert.Equal("degree", update.PropName);
+        Assert.True(update.Nullable);
         Assert.Empty(req.DropProps);
     }
 

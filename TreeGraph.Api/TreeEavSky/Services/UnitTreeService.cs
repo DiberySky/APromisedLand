@@ -1,4 +1,5 @@
 using TreeGraph.Api.Data;
+using TreeGraph.Api.GraphSyncSky;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.NodeSky.Entities;
@@ -236,6 +237,9 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
         await dbContext.UnitTrees.AddAsync(entity, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        // 结构派生边 parent_of 落 PG：EdgeSky 独立事实源，树写路径直写，不经 Nebula 同步管道
+        await TreeParentEdgeWriter.SyncAsync(dbContext, SeedSpaceIds.Unit, entity.Id, entity.ParentId, cancellationToken);
+
         await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: false, cancellationToken);
 
         return entity.ToNodeDto(name);
@@ -260,6 +264,9 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
 
         dbContext.Update(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // 结构派生边 parent_of 落 PG：EdgeSky 独立事实源，树写路径直写，不经 Nebula 同步管道
+        await TreeParentEdgeWriter.SyncAsync(dbContext, SeedSpaceIds.Unit, entity.Id, entity.ParentId, cancellationToken);
 
         await PublishAsync(entity.Id, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 
@@ -299,9 +306,12 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
         if (hasChildren)
             throw new InvalidOperationException("该节点仍有子节点，无法删除。请先删除全部子节点。");
 
-        // 引用为空方可删除本项：仍有边（edges）引用该节点时拒绝（不采用级联删除）
+        // 引用为空方可删除本项：仍有边（edges）引用该节点时拒绝（不采用级联删除）；
+        // 结构派生边 parent_of 随节点级联删除，不计入引用（否则任何子节点都无法删除）
         var hasEdges = await dbContext.Edges
-            .AnyAsync(e => e.SrcVid == nodeId || e.DstVid == nodeId, cancellationToken);
+            .AnyAsync(e => (e.SrcVid == nodeId || e.DstVid == nodeId)
+                        && e.EdgeType != TreeGraph.Api.GraphSyncSky.GraphNaming.ParentOfEdge,
+                cancellationToken);
         if (hasEdges)
             throw new InvalidOperationException("该节点仍被边引用，无法删除。请先删除引用该节点的边。");
 
@@ -380,6 +390,9 @@ public class UnitTreeService(TreeGraphDbContext dbContext, IEventPublisher publi
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // 结构派生边 parent_of 落 PG：EdgeSky 独立事实源，树写路径直写，不经 Nebula 同步管道
+        await TreeParentEdgeWriter.SyncAsync(dbContext, SeedSpaceIds.Unit, nodeId, newParentId, cancellationToken);
 
         await PublishAsync(nodeId, InodeChangeKind.Saved, pathAffected: true, cancellationToken);
 

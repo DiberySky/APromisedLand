@@ -4,6 +4,7 @@
    点击关闭并返回动作，由 TreeNodeActionOrchestrator.HandleEditAsync 识别分发。
    EAV/Edge 模块挂入只在编辑阶段。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@using TreeGraph.Blazor.Shared.EdgeSky.Components
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 <DialogTreeSky TItem="@TItem"
@@ -50,6 +51,20 @@
                                            NodeId="@_node.Id"
                                            ReadOnly="false"
                                            AllowManage="true" />
+                </MudTabPanel>
+
+                <MudTabPanel Text="关系绑定" Icon="@Icons.Material.Filled.Share">
+                    @* 编辑阶段必有 nodeId：节点所属图空间由后端按宿主类型解析，组件自行拉取出/入边 *@
+                    @if (string.IsNullOrEmpty(_node.Id))
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            新建节点保存后方可维护关系。
+                        </MudText>
+                    }
+                    else
+                    {
+                        <NodeRelationBindingsSky NodeId="@_node.Id" />
+                    }
                 </MudTabPanel>
             </MudTabs>
         </MudContainer>

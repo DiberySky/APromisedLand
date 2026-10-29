@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.NodeEavSky.Dtos;
+using TreeGraph.Shared.NodeSky.Entities;
 
 namespace TreeGraph.Blazor.Shared.EdgeSky.Services;
 
@@ -124,6 +125,114 @@ public class EdgeApiClient
             return (false, ex.Message);
         }
     }
+
+    // ============================================================
+    // 边实例（api/spaces/{spaceId}/edge/edges）
+    // ============================================================
+
+    private static string EdgesBase(string spaceId)
+        => $"api/spaces/{Uri.EscapeDataString(spaceId)}/edge/edges";
+
+    /// <summary>查询边实例；可按边类型、两端节点、节点方向（out/in/either）过滤并分页。</summary>
+    public async Task<List<EdgeDto>?> QueryEdgesAsync(
+        string spaceId,
+        string? edgeType = null,
+        string? nodeId = null,
+        string? direction = null,
+        int? limit = null,
+        int? offset = null,
+        CancellationToken ct = default)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrEmpty(edgeType)) query.Add($"edgeType={Uri.EscapeDataString(edgeType)}");
+        if (!string.IsNullOrEmpty(nodeId)) query.Add($"nodeId={Uri.EscapeDataString(nodeId)}");
+        if (!string.IsNullOrEmpty(direction)) query.Add($"direction={Uri.EscapeDataString(direction)}");
+        if (limit is > 0) query.Add($"limit={limit}");
+        if (offset is > 0) query.Add($"offset={offset}");
+
+        var url = EdgesBase(spaceId);
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+        return await GetAsync<List<EdgeDto>>(url, ct);
+    }
+
+    /// <summary>按五元组取单条边；不存在返回 null。</summary>
+    public async Task<EdgeDto?> GetEdgeAsync(
+        string spaceId, string edgeType, string srcVid, long rank, string dstVid,
+        CancellationToken ct = default)
+        => await GetAsync<EdgeDto>(EdgeUrl(spaceId, edgeType, srcVid, rank, dstVid), ct);
+
+    /// <summary>覆盖式 UPSERT（对齐 INSERT EDGE）；返回 (ok, 错误文案)。</summary>
+    public async Task<(bool Ok, string? Error)> UpsertEdgeAsync(
+        string spaceId, string edgeType, string srcVid, long rank, string dstVid,
+        UpsertEdgeRequest req, CancellationToken ct = default)
+    {
+        var url = EdgeUrl(spaceId, edgeType, srcVid, rank, dstVid);
+        try
+        {
+            var resp = await _http.PutAsJsonAsync(url, req, JsonOptions, ct);
+            if (resp.IsSuccessStatusCode) return (true, null);
+            return (false, await ExtractErrorAsync(resp, ct));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PUT {Url} 失败", url);
+            return (false, ex.Message);
+        }
+    }
+
+    /// <summary>部分更新（对齐 UPDATE EDGE SET）；返回 (ok, 错误文案)。</summary>
+    public async Task<(bool Ok, string? Error)> PatchEdgeAsync(
+        string spaceId, string edgeType, string srcVid, long rank, string dstVid,
+        PatchEdgeRequest req, CancellationToken ct = default)
+    {
+        var url = EdgeUrl(spaceId, edgeType, srcVid, rank, dstVid);
+        try
+        {
+            var resp = await _http.PatchAsJsonAsync(url, req, JsonOptions, ct);
+            if (resp.IsSuccessStatusCode) return (true, null);
+            return (false, await ExtractErrorAsync(resp, ct));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PATCH {Url} 失败", url);
+            return (false, ex.Message);
+        }
+    }
+
+    /// <summary>按五元组删除边（对齐 DELETE EDGE）。</summary>
+    public async Task<(bool Ok, string? Error)> DeleteEdgeAsync(
+        string spaceId, string edgeType, string srcVid, long rank, string dstVid,
+        CancellationToken ct = default)
+    {
+        var url = EdgeUrl(spaceId, edgeType, srcVid, rank, dstVid);
+        try
+        {
+            var resp = await _http.DeleteAsync(url, ct);
+            if (resp.IsSuccessStatusCode) return (true, null);
+            return (false, await ExtractErrorAsync(resp, ct));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "DELETE {Url} 失败", url);
+            return (false, ex.Message);
+        }
+    }
+
+    /// <summary>解析节点所属图空间（api/edge/node-space/{nodeId}）；无归属节点返回 null。</summary>
+    public async Task<NodeSpaceDto?> GetNodeSpaceAsync(string nodeId, CancellationToken ct = default)
+        => await GetAsync<NodeSpaceDto>($"api/edge/node-space/{Uri.EscapeDataString(nodeId)}", ct);
+
+    /// <summary>按名称搜索节点（api/edge/nodes?search=），用于选择对端节点。</summary>
+    public async Task<List<Node>> SearchNodesAsync(string? search, CancellationToken ct = default)
+    {
+        var url = "api/edge/nodes";
+        if (!string.IsNullOrWhiteSpace(search)) url += $"?search={Uri.EscapeDataString(search)}";
+        return await GetAsync<List<Node>>(url, ct) ?? [];
+    }
+
+    private static string EdgeUrl(string spaceId, string edgeType, string srcVid, long rank, string dstVid)
+        => $"{EdgesBase(spaceId)}/{Uri.EscapeDataString(edgeType)}/{Uri.EscapeDataString(srcVid)}"
+           + $"/{rank}/{Uri.EscapeDataString(dstVid)}";
 
     // ============================================================
 

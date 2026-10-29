@@ -1,6 +1,6 @@
-@* EdgePropEditDialog.razor — 编辑边属性：中文显示名（立即 PATCH）+ 类型/可空/默认值
-   （后三者暂存，随属性 Schema 对话框的「应用变更」汇总进 ALTER CHANGE；
-   类型走 Nebula CHANGE 白名单，可空/默认值为 PG 元数据变更）。 *@
+@* EdgePropEditDialog.razor — 编辑边属性：中文显示名（立即 PATCH）+ 可空/默认值
+   （暂存，随属性 Schema 对话框的「应用变更」汇总提交；类型只读：
+   当前类型子集不在 Nebula ALTER CHANGE 白名单内，不可变更）。 *@
 @inject ISnackbar Snackbar
 @using System.Text.Json
 @using TreeGraph.Blazor.Shared.Common
@@ -16,16 +16,9 @@
                           Margin="Margin.Dense" Immediate="true"
                           HelperText="留空 = 清除显示名（回退为英文属性名）"
                           Placeholder="段边展示名" />
-            <MudSelect @bind-Value="_dataType" Label="类型" Variant="Variant.Outlined"
-                       Margin="Margin.Dense" Dense="true"
-                       HelperText="变更将在「应用变更」时按 ALTER CHANGE 提交（白名单由服务端校验）">
-                @foreach (var t in EdgePropDataTypes.All)
-                {
-                    <MudSelectItem Value="@t" Text="@EdgePropDataTypeLabels.Full(t)">
-                        @EdgePropDataTypeLabels.Full(t)
-                    </MudSelectItem>
-                }
-            </MudSelect>
+            <MudTextField Value="@EdgePropDataTypeLabels.Full(DataType)" Label="类型"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" ReadOnly="true"
+                          HelperText="Nebula 不支持当前类型子集的类型转换，类型创建后不可变更" />
             <div class="d-flex gap-3 align-center">
                 <MudCheckBox @bind-Value="_nullable" Label="可空（NULL）" Dense="true" />
                 <MudTextField @bind-Value="_defaultText" Label="默认值" Variant="Variant.Outlined"
@@ -54,19 +47,17 @@
     /// <summary>当前默认值（可为 null）。</summary>
     [Parameter] public JsonElement? DefaultValue { get; set; }
 
-    /// <summary>编辑结果：显示名 + 目标类型 + 可空 + 默认值。</summary>
+    /// <summary>编辑结果：显示名 + 可空 + 默认值。</summary>
     public sealed record Result(
-        string? DisplayName, string NewDataType, bool NewNullable, JsonElement? NewDefaultValue);
+        string? DisplayName, bool NewNullable, JsonElement? NewDefaultValue);
 
     private string? _displayName;
-    private string _dataType = EdgePropDataTypes.String;
     private bool _nullable = true;
     private string? _defaultText;
 
     protected override void OnInitialized()
     {
         _displayName = DisplayName;
-        _dataType = DataType;
         _nullable = Nullable;
         _defaultText = DefaultValue is { } dv
             ? (dv.ValueKind == JsonValueKind.String ? dv.GetString() : dv.GetRawText())
@@ -78,9 +69,9 @@
         JsonElement? defaultValue = null;
         if (!string.IsNullOrWhiteSpace(_defaultText))
         {
-            if (!TryParseDefault(_dataType, _defaultText.Trim(), out var parsed))
+            if (!TryParseDefault(DataType, _defaultText.Trim(), out var parsed))
             {
-                Snackbar.Add($"默认值 '{_defaultText}' 不是合法的 {_dataType}", Severity.Warning);
+                Snackbar.Add($"默认值 '{_defaultText}' 不是合法的 {DataType}", Severity.Warning);
                 return;
             }
             defaultValue = parsed;
@@ -93,7 +84,7 @@
 
         MudDialog.Close(DialogResult.Ok(new Result(
             string.IsNullOrWhiteSpace(_displayName) ? null : _displayName.Trim(),
-            _dataType, _nullable, defaultValue)));
+            _nullable, defaultValue)));
     }
 
     /// <summary>按类型解析默认值文本（INT/TIMESTAMP 数值、DOUBLE 浮点、BOOL 布尔，STRING/DATE 原样）。</summary>

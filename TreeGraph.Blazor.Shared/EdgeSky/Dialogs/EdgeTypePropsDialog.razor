@@ -54,22 +54,8 @@
                                 @row.Src.DisplayName@(" (")<code style="color: inherit;">@row.Src.PropName</code>@(")")
                             }
                         </td>
-                        @* 类型展示当前生效值；有暂存变更时高亮提示「X → Y（待提交）」。
-                           修改入口在操作列的 ✏ 编辑对话框（ALTER CHANGE 白名单由服务端校验）。 *@
-                        <td style="white-space: nowrap;">
-                            @if (!string.Equals(row.SelectedType, row.Src.DataType, StringComparison.Ordinal))
-                            {
-                                <MudTooltip Text="@($"{EdgePropDataTypeLabels.Of(row.Src.DataType)} → {EdgePropDataTypeLabels.Of(row.SelectedType)}（应用变更后生效）")">
-                                    <MudText Typo="Typo.body2" Color="Color.Success" Style="display:inline">
-                                        @EdgePropDataTypeLabels.Of(row.SelectedType)
-                                    </MudText>
-                                </MudTooltip>
-                            }
-                            else
-                            {
-                                @EdgePropDataTypeLabels.Of(row.Src.DataType)
-                            }
-                        </td>
+                        @* 类型只读：当前类型子集不在 Nebula ALTER CHANGE 白名单内，创建后不可变更。 *@
+                        <td style="white-space: nowrap;">@EdgePropDataTypeLabels.Of(row.Src.DataType)</td>
                         <td style="white-space: nowrap; text-align: center;">
                             @if (row.SelectedNullable != row.Src.Nullable)
                             {
@@ -116,7 +102,7 @@
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                Color="Color.Primary" Size="Size.Small"
                                                OnClick="@(async () => await OpenEditPropAsync(row))"
-                                               title="编辑属性（显示名 / 类型）" />
+                                               title="编辑属性（显示名 / 可空 / 默认值）" />
                             }
                         </td>
                     </tr>
@@ -160,20 +146,18 @@
     private string TitleText =>
         string.IsNullOrEmpty(TypeInfo.DisplayName) ? TypeInfo.Name : $"{TypeInfo.DisplayName} ({TypeInfo.Name})";
 
-    /// <summary>已有属性行视图（类型/可空/默认值变更暂存 → ALTER CHANGE；Dropped → ALTER DROP）。</summary>
+    /// <summary>已有属性行视图（可空/默认值元数据变更暂存 → UpdateProps；Dropped → ALTER DROP）。</summary>
     private sealed class ExistingRow
     {
         public required EdgeTypePropDto Src { get; init; }
-        public string SelectedType { get; set; } = string.Empty;
         public bool SelectedNullable { get; set; }
         public System.Text.Json.JsonElement? NewDefaultValue { get; set; }
         public bool DefaultChanged { get; set; }
         public bool Dropped { get; set; }
 
-        /// <summary>是否存在任一暂存变更（类型/可空/默认值）。</summary>
+        /// <summary>是否存在任一暂存变更（可空/默认值）。</summary>
         public bool HasPendingChange =>
-            !string.Equals(SelectedType, Src.DataType, StringComparison.Ordinal)
-            || SelectedNullable != Src.Nullable
+            SelectedNullable != Src.Nullable
             || DefaultChanged;
     }
 
@@ -187,7 +171,6 @@
             .Select(p => new ExistingRow
             {
                 Src = p,
-                SelectedType = p.DataType,
                 SelectedNullable = p.Nullable,
                 NewDefaultValue = p.DefaultValue
             })
@@ -218,15 +201,15 @@
         _adds.Add(prop);
     }
 
-    /// <summary>编辑属性（显示名 + 类型/可空/默认值）：显示名立即 PATCH 生效；
-    /// 类型/可空/默认值暂存到行，随「应用变更」汇总进 ALTER CHANGE（白名单由服务端校验）。</summary>
+    /// <summary>编辑属性（显示名 + 可空/默认值）：显示名立即 PATCH 生效；
+    /// 可空/默认值暂存到行，随「应用变更」汇总进 UpdateProps（类型不可变更）。</summary>
     private async Task OpenEditPropAsync(ExistingRow row)
     {
         var parameters = new DialogParameters<EdgePropEditDialog>
         {
             { x => x.PropName, row.Src.PropName },
             { x => x.DisplayName, row.Src.DisplayName },
-            { x => x.DataType, row.SelectedType },
+            { x => x.DataType, row.Src.DataType },
             { x => x.Nullable, row.SelectedNullable },
             { x => x.DefaultValue, row.DefaultChanged ? row.NewDefaultValue : row.Src.DefaultValue }
         };
@@ -252,8 +235,7 @@
             Snackbar.Add($"属性 '{row.Src.PropName}' 显示名已更新", Severity.Success);
         }
 
-        // 类型/可空/默认值 → 暂存（提交时汇总 ChangeProps）
-        row.SelectedType = edit.NewDataType;
+        // 可空/默认值 → 暂存（提交时汇总 UpdateProps）
         row.SelectedNullable = edit.NewNullable;
         row.NewDefaultValue = edit.NewDefaultValue;
         row.DefaultChanged = !JsonElementEquals(edit.NewDefaultValue, row.Src.DefaultValue);
@@ -268,21 +250,18 @@
     private void Submit()
     {
         var dropProps = _existing.Where(r => r.Dropped).Select(r => r.Src.PropName).ToList();
-        var changeProps = _existing
+        var updateProps = _existing
             .Where(r => !r.Dropped && r.HasPendingChange)
-            .Select(r => new EdgeTypePropTypeChange
+            .Select(r => new EdgeTypePropUpdate
             {
                 PropName = r.Src.PropName,
-                NewDataType = string.Equals(r.SelectedType, r.Src.DataType, StringComparison.Ordinal)
-                    ? string.Empty
-                    : r.SelectedType,
                 Nullable = r.SelectedNullable != r.Src.Nullable ? r.SelectedNullable : null,
                 DefaultValueSet = r.DefaultChanged,
                 DefaultValue = r.DefaultChanged ? r.NewDefaultValue : null
             })
             .ToList();
 
-        if (dropProps.Count == 0 && changeProps.Count == 0 && _adds.Count == 0)
+        if (dropProps.Count == 0 && updateProps.Count == 0 && _adds.Count == 0)
         {
             MudDialog.Cancel();
             return;
@@ -292,7 +271,7 @@
         {
             AddProps = [.. _adds],
             DropProps = dropProps,
-            ChangeProps = changeProps
+            UpdateProps = updateProps
         }));
     }
 }

@@ -108,7 +108,7 @@ public sealed class GraphSynchronizer
         return props;
     }
 
-    /// <summary>对齐 parent_of 边：删除不再是当前父的残留边，补上缺失的当前父边。</summary>
+    /// <summary>对齐 Nebula parent_of 边：删除不再是当前父的残留边，补上缺失的当前父边。</summary>
     private async Task SyncParentEdgeAsync(string space, GraphNodeInfo node, CancellationToken ct)
     {
         var result = await _client.QueryAsync(space,
