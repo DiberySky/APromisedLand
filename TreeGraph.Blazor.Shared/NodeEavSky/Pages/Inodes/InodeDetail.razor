@@ -23,6 +23,12 @@
                    OnClick="OpenAttachDialog">
             声明新类型
         </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.AddCircleOutline"
+                   OnClick="OpenCreateBindingAsync">
+            新建绑定
+        </MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Info"
                    Size="Size.Small"
                    StartIcon="@Icons.Material.Filled.DataObject"
@@ -64,6 +70,11 @@ else if (_cards is null || _cards.Count == 0)
                        OnClick="OpenAttachDialog">
                 声明新类型
             </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AddCircleOutline"
+                       OnClick="OpenCreateBindingAsync">
+                新建绑定
+            </MudButton>
         </Action>
     </EmptyStateSky>
 }
@@ -91,7 +102,9 @@ else
                             {
                                 <MudChip T="string" Size="Size.Small"
                                          Color="Color.Success" Class="ml-2">
-                                    已填写
+                                    @(captured.BindingCount > 1
+                                        ? $"{captured.BindingCount} 条绑定"
+                                        : "已绑定")
                                 </MudChip>
                             }
                             else
@@ -128,24 +141,20 @@ else
                                    StartIcon="@(captured.HasEntity
                                        ? Icons.Material.Filled.Edit
                                        : Icons.Material.Filled.Add)"
-                                   OnClick="@(() => GoToEdit(captured.EntityType))">
-                            @(captured.HasEntity ? "编辑" : "填写")
+                                   OnClick="@(() => GoToEdit(captured))">
+                            @(captured.BindingCount > 1
+                                ? "绑定"
+                                : captured.HasEntity ? "编辑" : "填写")
                         </MudButton>
                         <MudButton Size="Size.Medium"
                                    Variant="Variant.Text"
                                    Color="Color.Default"
                                    StartIcon="@Icons.Material.Filled.History"
-                                   OnClick="@(() => GoToHistory(captured.EntityType))"
+                                   OnClick="@(() => GoToHistory(captured))"
                                    Disabled="@(!captured.HasEntity)">
                             历史
                         </MudButton>
                         <MudSpacer />
-                        <MudIconButton Icon="@Icons.Material.Filled.DriveFileMove"
-                                       Size="Size.Medium"
-                                       Color="Color.Default"
-                                       OnClick="@(async () => await TransferAsync(captured))"
-                                       Disabled="@(!captured.HasEntity)"
-                                       title="转移到其他宿主" />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                        Size="Size.Medium"
                                        Color="Color.Error"
@@ -256,6 +265,10 @@ else
     [Parameter] public string InodeId { get; set; } = "";
 
     private IReadOnlyList<InodeTypeCardDto>? _cards;
+
+    /// <summary>该 iNode 下的全部命名绑定（用于卡片跳转到编辑/历史页）。</summary>
+    private IReadOnlyList<InodeBindingDto>? _bindings;
+
     private IReadOnlyList<EntityTypeSummaryDto>? _allTypes;
     private bool _loading;
     private bool _initialized;
@@ -285,7 +298,13 @@ else
         _loading = true;
         try
         {
-            _cards = await Api.ListInodeTypeCardsAsync(InodeId);
+            var cardsTask = Api.ListInodeTypeCardsAsync(InodeId);
+            var bindingsTask = Api.ListInodeBindingsAsync(InodeId);
+            await Task.WhenAll(cardsTask, bindingsTask);
+
+            _cards = cardsTask.Result;
+            _bindings = bindingsTask.Result;
+
             _allTypes = await Api.ListEntityTypesAsync();
         }
         finally
@@ -304,15 +323,74 @@ else
 
     private void CopyId() => Snackbar.Add($"iNode ID: {InodeId}", Severity.Info);
 
-    private void GoToEdit(string entityType)
-        => Nav.NavigateTo(
-            $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
-            $"{Uri.EscapeDataString(entityType)}");
+    /// <summary>
+    /// 进入该类型的绑定编辑页：已有绑定则进第一条，
+    /// 尚无绑定时先让用户输入绑定名并新建。
+    /// </summary>
+    private async Task GoToEdit(InodeTypeCardDto card)
+    {
+        var binding = _bindings?
+            .FirstOrDefault(b => b.EntityType == card.EntityType);
 
-    private void GoToHistory(string entityType)
+        if (binding is null)
+        {
+            var name = await PromptBindingNameAsync(
+                $"为「{card.DisplayName}」新建绑定", "新建");
+            if (name is null) return;
+
+            var (bindingId, error) = await Api.CreateInodeBindingAsync(
+                InodeId, card.EntityType, name);
+            if (bindingId is null)
+            {
+                Snackbar.Add($"新建绑定失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            await LoadAsync();
+            NavigateBinding(bindingId);
+            return;
+        }
+
+        NavigateBinding(binding.BindingId);
+    }
+
+    private async Task GoToHistory(InodeTypeCardDto card)
+    {
+        var binding = _bindings?
+            .FirstOrDefault(b => b.EntityType == card.EntityType);
+        if (binding is null)
+        {
+            Snackbar.Add("该类型下尚无绑定", Severity.Warning);
+            return;
+        }
+
+        Nav.NavigateTo(
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/bindings/" +
+            $"{Uri.EscapeDataString(binding.BindingId)}/history");
+    }
+
+    private void NavigateBinding(string bindingId)
         => Nav.NavigateTo(
-            $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
-            $"{Uri.EscapeDataString(entityType)}/history");
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/bindings/" +
+            $"{Uri.EscapeDataString(bindingId)}");
+
+    private async Task<string?> PromptBindingNameAsync(string title, string submitText)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(BindingNameDialog.Title), title },
+            { nameof(BindingNameDialog.SubmitText), submitText },
+            { nameof(BindingNameDialog.HelperText), "同一类型下绑定名不可重复" }
+        };
+
+        var dialog = await DialogService.ShowAsync<BindingNameDialog>(title, parameters);
+        var result = await dialog.Result;
+
+        if (result?.Canceled != false || result.Data is not string name)
+            return null;
+
+        return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+    }
 
     // ============================================================
     // ★ JSON 预览
@@ -393,6 +471,37 @@ else
     // 声明类型
     // ============================================================
 
+    // ============================================================
+    // 新建绑定（选类型 + 输绑定名，一步完成）
+    // ============================================================
+
+    private async Task OpenCreateBindingAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(BindingCreateDialog.NodeId), InodeId },
+            { nameof(BindingCreateDialog.DialogContext),
+              "为该 iNode 新建命名绑定：同一类型可建多条绑定，每条绑定拥有独立的属性数据。" }
+        };
+
+        var dialog = await DialogService.ShowAsync<BindingCreateDialog>(
+            "新建绑定", parameters);
+        var result = await dialog.Result;
+
+        if (result?.Canceled != false
+            || result.Data is not BindingCreateDialog.CreatedBinding)
+        {
+            return;
+        }
+
+        await LoadAsync();
+
+        // 抽屉开着时也刷新 JSON
+        if (_jsonDrawerOpen) await LoadJsonAsync();
+
+        StateHasChanged();
+    }
+
     private async Task OpenAttachDialog()
     {
         var declared = _cards?.Select(c => c.EntityType).ToHashSet()
@@ -432,7 +541,7 @@ else
     {
         if (card.HasEntity)
         {
-            Snackbar.Add("该类型下已有属性数据，请先删除属性数据", Severity.Warning);
+            Snackbar.Add("该类型下仍有绑定，请先删除全部绑定", Severity.Warning);
             return;
         }
 
@@ -460,47 +569,4 @@ else
         StateHasChanged();
     }
 
-    /// <summary>属性数据转移（换宿主）：语义搜索选目标宿主 → 调用转移端点 → 刷新。</summary>
-    private async Task TransferAsync(InodeTypeCardDto card)
-    {
-        if (!card.HasEntity) return;
-
-        var selection = await NodePicker.PickAsync(
-            DialogService,
-            topK: 5,
-            minScore: 0.5f,
-            title: $"转移「{card.DisplayName}」到宿主",
-            excludeTreeNode: true);
-
-        if (selection is null) return;
-
-        if (selection.InodeId == InodeId)
-        {
-            Snackbar.Add("目标宿主与当前宿主相同，无需转移", Severity.Warning);
-            return;
-        }
-
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "确认转移",
-            $"确定把「{card.DisplayName}」转移到「{selection.NodeName ?? selection.InodeId}」？属性数据不变，仅变更归属。",
-            yesText: "转移", cancelText: "取消");
-
-        if (confirmed != true) return;
-
-        var (ok, error) = await Api.TransferInodeEntityAsync(
-            InodeId, card.EntityType, selection.InodeId);
-        if (!ok)
-        {
-            Snackbar.Add($"转移失败：{error ?? "未知错误"}", Severity.Error);
-            return;
-        }
-
-        Snackbar.Add("已转移", Severity.Success);
-        await LoadAsync();
-
-        // 抽屉开着时也刷新 JSON
-        if (_jsonDrawerOpen) await LoadJsonAsync();
-
-        StateHasChanged();
-    }
 }

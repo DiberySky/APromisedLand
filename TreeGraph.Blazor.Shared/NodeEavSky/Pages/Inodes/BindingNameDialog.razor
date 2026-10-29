@@ -1,0 +1,44 @@
+@* BindingNameDialog.razor — 输入绑定名（新建 / 重命名共用） *@
+@using TreeGraph.Blazor.Shared.Common
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Pages.Inodes
+
+<DialogSky Title="@Title"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@SubmitText"
+           OnSubmitClick="Submit">
+    <DialogContent>
+        <MudTextField T="string"
+                      @bind-Value="_name"
+                      Label="绑定名"
+                      Variant="Variant.Outlined"
+                      Immediate="true"
+                      MaxLength="200"
+                      HelperText="@HelperText" />
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>对话框标题。</summary>
+    [Parameter] public string Title { get; set; } = "新建绑定";
+
+    /// <summary>提交按钮文字。</summary>
+    [Parameter] public string SubmitText { get; set; } = "确定";
+
+    /// <summary>初始值（重命名时传入当前名字）。</summary>
+    [Parameter] public string? InitialName { get; set; }
+
+    /// <summary>输入框下方的说明文字。</summary>
+    [Parameter] public string? HelperText { get; set; }
+
+    private string? _name;
+
+    protected override void OnInitialized() => _name = InitialName;
+
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) return;
+        MudDialog?.Close(DialogResult.Ok(_name.Trim()));
+    }
+}

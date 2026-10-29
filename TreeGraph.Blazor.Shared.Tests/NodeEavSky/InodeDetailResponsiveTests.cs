@@ -17,6 +17,7 @@ public class InodeDetailResponsiveTests : BunitTestBase {
         _platform = NodeEavTestSetup.RegisterServices(Services, (path, _) => path switch
         {
             "/api/inode/test-inode/types" => NodeEavTestSetup.Json.EmptyArray(),
+            "/api/inode/test-inode/bindings" => NodeEavTestSetup.Json.EmptyArray(),
             "/api/eav/entity-types" => NodeEavTestSetup.Json.EmptyArray(),
             _ => null
         });

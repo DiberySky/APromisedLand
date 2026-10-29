@@ -931,90 +931,157 @@ public class EavApiClient
             $"{Uri.EscapeDataString(entityType)}", ct);
 
     // ============================================================
-    // ★ iNode 属性数据 CRUD
+    // ★ iNode 命名绑定 CRUD（bindingId 定位一条绑定）
     // ============================================================
 
-    public async Task<IReadOnlyList<DynamicEntityDto>?> ListInodeEntitiesAsync(
+    public async Task<IReadOnlyList<InodeBindingDto>?> ListInodeBindingsAsync(
         string inodeId, CancellationToken ct = default)
-    {
-        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities";
-        return await GetAsync<IReadOnlyList<DynamicEntityDto>>(url, ct);
-    }
+        => await GetAsync<IReadOnlyList<InodeBindingDto>>(
+            $"api/inode/{Uri.EscapeDataString(inodeId)}/bindings", ct);
 
-    public async Task<DynamicEntityDto?> GetInodeEntityAsync(
-        string inodeId, string entityType,
+    /// <summary>
+    /// 为该 iNode 新建一条命名绑定（同类型可建多条，绑定名在该类型下唯一）。
+    /// 成功时返回 bindingId，失败时返回可展示的原因。
+    /// </summary>
+    public async Task<(string? BindingId, string? Error)> CreateInodeBindingAsync(
+        string inodeId, string entityType, string name,
         CancellationToken ct = default)
     {
-        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
-                  $"{Uri.EscapeDataString(entityType)}";
-        return await GetAsync<DynamicEntityDto>(url, ct);
-    }
-
-    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
-        SaveInodeEntityAsync(
-        string inodeId, string entityType,
-        Dictionary<string, object?> values,
-        DateTimeOffset? expectedUpdatedAt = null,
-        CancellationToken ct = default)
-    {
-        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
-                  $"{Uri.EscapeDataString(entityType)}";
-        return await PutWithConflictAsync(url, values, expectedUpdatedAt, ct);
-    }
-
-    public async Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
-        PatchInodeEntityAsync(
-        string inodeId, string entityType,
-        Dictionary<string, object?> values,
-        DateTimeOffset? expectedUpdatedAt = null,
-        CancellationToken ct = default)
-    {
-        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
-                  $"{Uri.EscapeDataString(entityType)}";
-        return await PatchWithConflictAsync(url, values, expectedUpdatedAt, ct);
-    }
-
-    public Task<(bool Ok, string? Error)> DeleteInodeEntityAsync(
-        string inodeId, string entityType, CancellationToken ct = default)
-        => DeleteWithErrorAsync(
-            $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
-            $"{Uri.EscapeDataString(entityType)}", ct);
-
-    /// <summary>属性数据转移（换宿主）：把该 iNode 下指定类型的属性数据改挂到目标宿主。</summary>
-    public async Task<(bool Ok, string? Error)> TransferInodeEntityAsync(
-        string inodeId, string entityType, string targetInodeId,
-        CancellationToken ct = default)
-    {
-        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
-                  $"{Uri.EscapeDataString(entityType)}/transfer";
+        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/bindings";
         try
         {
             var resp = await _http.PostAsJsonAsync(
-                url, new InodeTransferRequest { TargetInodeId = targetInodeId }, ct);
+                url, new CreateBindingRequest { EntityType = entityType, Name = name }, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var msg = await ExtractErrorAsync(resp, ct);
+                _logger.LogWarning("POST {Url} → {Status}: {Error}",
+                    url, resp.StatusCode, msg);
+                return (null, msg);
+            }
+
+            var envelope = await resp.Content
+                .ReadFromJsonAsync<ApiResponse<JsonElement>>(JsonOptions, ct);
+            if (envelope?.Data.ValueKind == JsonValueKind.Object
+                && envelope.Data.TryGetProperty("bindingId", out var p)
+                && p.ValueKind == JsonValueKind.String)
+            {
+                return (p.GetString(), null);
+            }
+
+            return (null, "服务端未返回 bindingId");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "POST {Url} 失败", url);
+            return (null, ex.Message);
+        }
+    }
+
+    public async Task<InodeBindingDetailDto?> GetInodeBindingAsync(
+        string inodeId, string bindingId,
+        CancellationToken ct = default)
+        => await GetAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, bindingId), ct);
+
+    public Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        SaveInodeBindingAsync(
+        string inodeId, string bindingId,
+        Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt = null,
+        CancellationToken ct = default)
+        => PutWithConflictAsync(
+            InodeBindingUrl(inodeId, bindingId),
+            values, expectedUpdatedAt, ct);
+
+    public Task<(bool Ok, string? Error, DateTimeOffset? CurrentUpdatedAt)>
+        PatchInodeBindingAsync(
+        string inodeId, string bindingId,
+        Dictionary<string, object?> values,
+        DateTimeOffset? expectedUpdatedAt = null,
+        CancellationToken ct = default)
+        => PatchWithConflictAsync(
+            InodeBindingUrl(inodeId, bindingId),
+            values, expectedUpdatedAt, ct);
+
+    /// <summary>删除绑定：连同该绑定私有的属性数据一并删除。</summary>
+    public Task<(bool Ok, string? Error)> DeleteInodeBindingAsync(
+        string inodeId, string bindingId,
+        CancellationToken ct = default)
+        => DeleteWithErrorAsync(InodeBindingUrl(inodeId, bindingId), ct);
+
+    /// <summary>重命名绑定。</summary>
+    public async Task<(bool Ok, string? Error)> RenameInodeBindingAsync(
+        string inodeId, string bindingId, string name,
+        CancellationToken ct = default)
+    {
+        var url = InodeBindingUrl(inodeId, bindingId) + "/name";
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Patch, url)
+            {
+                Content = JsonContent.Create(
+                    new RenameBindingRequest { Name = name }, options: JsonOptions)
+            };
+
+            var resp = await _http.SendAsync(req, ct);
             if (resp.IsSuccessStatusCode) return (true, null);
 
             var msg = await ExtractErrorAsync(resp, ct);
-            _logger.LogWarning("POST {Url} → {Status}: {Error}",
+            _logger.LogWarning("PATCH {Url} → {Status}: {Error}",
                 url, resp.StatusCode, msg);
             return (false, msg);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "POST {Url} 失败", url);
+            _logger.LogError(ex, "PATCH {Url} 失败", url);
             return (false, ex.Message);
         }
     }
 
-    public async Task<IReadOnlyList<EntityHistoryDto>?> GetInodeEntityHistoryAsync(
-        string inodeId, string entityType,
+    /// <summary>更新绑定显示顺序（相邻行互换时逐条提交）。</summary>
+    public async Task<(bool Ok, string? Error)> ReorderInodeBindingAsync(
+        string inodeId, string bindingId, int displayOrder,
+        CancellationToken ct = default)
+    {
+        var url = InodeBindingUrl(inodeId, bindingId) + "/order";
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Patch, url)
+            {
+                Content = JsonContent.Create(
+                    new ReorderBindingRequest { DisplayOrder = displayOrder },
+                    options: JsonOptions)
+            };
+
+            var resp = await _http.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return (true, null);
+
+            var msg = await ExtractErrorAsync(resp, ct);
+            _logger.LogWarning("PATCH {Url} → {Status}: {Error}",
+                url, resp.StatusCode, msg);
+            return (false, msg);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PATCH {Url} 失败", url);
+            return (false, ex.Message);
+        }
+    }
+
+    public async Task<IReadOnlyList<EntityHistoryDto>?> GetInodeBindingHistoryAsync(
+        string inodeId, string bindingId,
         DateTimeOffset? from = null, CancellationToken ct = default)
     {
-        var url = $"api/inode/{Uri.EscapeDataString(inodeId)}/entities/" +
-                  $"{Uri.EscapeDataString(entityType)}/history";
+        var url = InodeBindingUrl(inodeId, bindingId) + "/history";
         if (from.HasValue)
             url += $"?from={Uri.EscapeDataString(from.Value.ToString("O"))}";
         return await GetAsync<IReadOnlyList<EntityHistoryDto>>(url, ct);
     }
+
+    private static string InodeBindingUrl(string inodeId, string bindingId)
+        => $"api/inode/{Uri.EscapeDataString(inodeId)}/bindings/" +
+           $"{Uri.EscapeDataString(bindingId)}";
 
     // ============================================================
     // ★ 跨 iNode 查询

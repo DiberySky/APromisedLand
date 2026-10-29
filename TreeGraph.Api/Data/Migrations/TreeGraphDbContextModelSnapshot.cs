@@ -971,19 +971,18 @@ namespace TreeGraph.Api.Data.Migrations
 
             modelBuilder.Entity("TreeGraph.Api.NodeEavSky.Entities.InodeEntity", b =>
                 {
-                    b.Property<string>("InodeId")
+                    b.Property<string>("BindingId")
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)")
-                        .HasColumnName("inode_id");
-
-                    b.Property<string>("EntityType")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
+                        .HasColumnName("binding_id");
 
                     b.Property<DateTimeOffset>("AttachedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("attached_at");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
 
                     b.Property<string>("EntityId")
                         .IsRequired()
@@ -991,17 +990,36 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(36)")
                         .HasColumnName("entity_id");
 
-                    b.HasKey("InodeId", "EntityType");
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
 
-                    b.HasIndex("EntityId")
-                        .HasDatabaseName("ix_inode_entity_entity");
+                    b.Property<string>("InodeId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)")
+                        .HasColumnName("inode_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("BindingId");
 
                     b.HasIndex("InodeId")
                         .HasDatabaseName("ix_inode_entity_inode");
 
                     b.HasIndex("EntityType", "EntityId")
                         .IsUnique()
-                        .HasDatabaseName("uq_inode_entity_global");
+                        .HasDatabaseName("ux_inode_entity_type_entity");
+
+                    b.HasIndex("InodeId", "EntityType", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_inode_entity_name");
 
                     b.ToTable("inode_entity", (string)null);
                 });

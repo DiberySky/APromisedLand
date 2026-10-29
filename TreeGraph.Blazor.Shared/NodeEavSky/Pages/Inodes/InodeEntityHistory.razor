@@ -1,9 +1,9 @@
-@* InodeEntityHistory.razor *@
-@page "/inodes/{InodeId}/types/{EntityType}/history"
+@* InodeEntityHistory.razor — 一条命名绑定的审计历史 *@
+@page "/inodes/{InodeId}/bindings/{BindingId}/history"
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @inject EavApiClient Api
 @inject NavigationManager Nav
-@* InodeEntityHistory.razor *@
+
 <PageTitle>审计历史</PageTitle>
 
 <div class="d-flex align-center mb-4" style="gap: 8px;">
@@ -19,8 +19,14 @@
     <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
         <MudText Typo="Typo.caption" Color="Color.Secondary">iNode</MudText>
         <code>@InodeId</code>
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-4">类型</MudText>
-        <code>@EntityType</code>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-4">绑定</MudText>
+        <code>@(_binding?.Name ?? BindingId)</code>
+        @if (_binding is not null)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Default" Class="ml-2">
+                @_binding.EntityType
+            </MudChip>
+        }
     </div>
 </MudPaper>
 
@@ -80,8 +86,11 @@ else if (_history is not null)
 
 @code {
     [Parameter] public string InodeId { get; set; } = "";
-    [Parameter] public string EntityType { get; set; } = "";
 
+    /// <summary>命名绑定的主键（路由参数）。</summary>
+    [Parameter] public string BindingId { get; set; } = "";
+
+    private InodeBindingDetailDto? _binding;
     private IReadOnlyList<EntityHistoryDto>? _history;
     private DateTime? _from;
     private bool _loading = true;
@@ -102,14 +111,21 @@ else if (_history is not null)
 
     private void BackToEdit()
         => Nav.NavigateTo(
-            $"/inodes/{Uri.EscapeDataString(InodeId)}/types/" +
-            $"{Uri.EscapeDataString(EntityType)}");
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/bindings/" +
+            $"{Uri.EscapeDataString(BindingId)}");
 
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
+            _binding = await Api.GetInodeBindingAsync(InodeId, BindingId);
+            if (_binding is null)
+            {
+                _history = null;
+                return;
+            }
+
             DateTimeOffset? from = null;
             if (_from.HasValue)
             {
@@ -118,8 +134,7 @@ else if (_history is not null)
                 from = new DateTimeOffset(local, offset);
             }
 
-            _history = await Api.GetInodeEntityHistoryAsync(
-                InodeId, EntityType, from);
+            _history = await Api.GetInodeBindingHistoryAsync(InodeId, BindingId, from);
         }
         finally
         {

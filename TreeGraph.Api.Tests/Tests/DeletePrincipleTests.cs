@@ -292,9 +292,10 @@ public class DeletePrincipleTests : IntegrationTestBase
         await TestData.EnsureEntityTypeAsync(TestData.EntityType, "测试商品");
         var nodeId = await CreateNodeAsync("/UnitTree");
 
-        // 在节点上挂载实体（自动创建映射 + 属性值）
+        // 在节点上挂载实体（创建命名绑定 + 写入属性值）
+        var binding = await CreateInodeBindingAsync(nodeId, TestData.EntityType, "挂载");
         var put = await Client.PutAsJsonAsync(
-            $"/api/inode/{nodeId}/entities/{TestData.EntityType}", new { amount = 1 });
+            InodeBindingUrl(nodeId, binding.BindingId), new { amount = 1 });
         Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
 
         // 节点自身数据非空 → 409
@@ -303,8 +304,8 @@ public class DeletePrincipleTests : IntegrationTestBase
         Assert.Contains("实体数据", await resp.Content.ReadAsStringAsync());
 
         // 先清空节点自身数据 → 即可删除本项
-        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
-            $"/api/inode/{nodeId}/entities/{TestData.EntityType}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Client.DeleteAsync(
+            InodeBindingUrl(nodeId, binding.BindingId))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Client.DeleteAsync($"/UnitTree/{nodeId}")).StatusCode);
     }
 
@@ -358,8 +359,9 @@ public class DeletePrincipleTests : IntegrationTestBase
         nodeResp.EnsureSuccessStatusCode();
 
         // 在线路节点上挂载实体
+        var binding = await CreateInodeBindingAsync(nodeId, TestData.EntityType, "挂载");
         var put = await Client.PutAsJsonAsync(
-            $"/api/inode/{nodeId}/entities/{TestData.EntityType}", new { amount = 1 });
+            InodeBindingUrl(nodeId, binding.BindingId), new { amount = 1 });
         Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
 
         // 节点自身数据非空 → 409，且不做级联删除
@@ -373,8 +375,8 @@ public class DeletePrincipleTests : IntegrationTestBase
         Assert.Single(cards!);
 
         // 先清空节点自身数据 → 即可删除本项（声明随宿主清理）
-        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
-            $"/api/inode/{nodeId}/entities/{TestData.EntityType}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Client.DeleteAsync(
+            InodeBindingUrl(nodeId, binding.BindingId))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
             $"/api/LineNode/{nodeId}")).StatusCode);
 
@@ -403,8 +405,9 @@ public class DeletePrincipleTests : IntegrationTestBase
         lineResp.EnsureSuccessStatusCode();
 
         // 线路上直接挂载实体
+        var binding = await CreateInodeBindingAsync(lineId, TestData.EntityType, "挂载");
         var put = await Client.PutAsJsonAsync(
-            $"/api/inode/{lineId}/entities/{TestData.EntityType}", new { amount = 1 });
+            InodeBindingUrl(lineId, binding.BindingId), new { amount = 1 });
         Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
 
         // 线路自身数据非空 → 409，且不做级联删除
@@ -413,8 +416,8 @@ public class DeletePrincipleTests : IntegrationTestBase
         Assert.Contains("实体数据", await resp.Content.ReadAsStringAsync());
 
         // 先清空自身数据 → 即可删除本项（声明随宿主清理）
-        Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
-            $"/api/inode/{lineId}/entities/{TestData.EntityType}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Client.DeleteAsync(
+            InodeBindingUrl(lineId, binding.BindingId))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await Client.DeleteAsync(
             $"/api/Lines/{lineId}")).StatusCode);
 

@@ -7,10 +7,10 @@ using Xunit;
 namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
-/// iNode Facade 与现有 EAV 管道互操作测试。
+/// iNode 命名绑定与现有 EAV 管道互操作测试。
 ///
-/// 核心验证："通过 iNode 写入的数据，能用旧 EAV API 读到，反之亦然"。
-/// 这保证了方案 B 的"零破坏"承诺。
+/// 核心验证："通过绑定写入的数据，能用旧 EAV API 读到，反之亦然"。
+/// 绑定只是 (binding_id → entity_type + entity_id) 的映射，底层仍是同一条 EAV 管道。
 /// </summary>
 public class InodeEavFacadeTests : IntegrationTestBase
 {
@@ -21,75 +21,63 @@ public class InodeEavFacadeTests : IntegrationTestBase
     private static string NewInodeId() => Guid.NewGuid().ToString("D");
 
     // ============================================================
-    // iNode 写 → 旧 EAV 读
+    // 绑定写 → 旧 EAV 读
     // ============================================================
 
     [Fact]
-    public async Task WriteViaInode_ReadViaOldEavApi_Works()
+    public async Task WriteViaBinding_ReadViaOldEavApi_Works()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
-        // 通过 iNode 写入
-        await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "互操作");
+        var put = await Client.PutAsJsonAsync(
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?>
             {
                 ["name"] = "via-inode",
                 ["amount"] = 77L
             });
-
-        // 从 iNode 拿到 entityId
-        var viaInode = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
-        Assert.NotNull(viaInode);
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
 
         // 用旧 EAV API 读
         var viaEav = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/eav/{EntityType}/entities/{viaInode!.EntityId}");
+            $"/api/eav/{EntityType}/entities/{binding.EntityId}");
 
         Assert.NotNull(viaEav);
-        Assert.Equal(viaInode.EntityId, viaEav!.EntityId);
+        Assert.Equal(binding.EntityId, viaEav!.EntityId);
         Assert.Equal("via-inode", viaEav.Properties["name"].GetString());
         Assert.Equal(77L, viaEav.Properties["amount"].GetInt64());
     }
 
     // ============================================================
-    // 旧 EAV 写 → iNode 读
+    // 旧 EAV 写 → 绑定读
     // ============================================================
 
     [Fact]
-    public async Task WriteViaOldEavApi_ReadViaInode_Works()
+    public async Task WriteViaOldEavApi_ReadViaBinding_Works()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
-        // 先通过 iNode 创建，拿到 entityId
-        await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
-            new Dictionary<string, object?> { ["name"] = "seed" });
-
-        var created = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
-        Assert.NotNull(created);
-        var entityId = created!.EntityId;
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "反向");
 
         // 用旧 EAV API 改
         await Client.PutAsJsonAsync(
-            $"/api/eav/{EntityType}/entities/{entityId}",
+            $"/api/eav/{EntityType}/entities/{binding.EntityId}",
             new Dictionary<string, object?>
             {
                 ["name"] = "via-eav",
                 ["amount"] = 88L
             });
 
-        // 从 iNode 读
-        var viaInode = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+        // 从绑定读
+        var viaBinding = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, binding.BindingId));
 
-        Assert.NotNull(viaInode);
-        Assert.Equal("via-eav", viaInode!.Properties["name"].GetString());
-        Assert.Equal(88L, viaInode.Properties["amount"].GetInt64());
+        Assert.NotNull(viaBinding);
+        Assert.Equal("via-eav", viaBinding!.Properties["name"].GetString());
+        Assert.Equal(88L, viaBinding.Properties["amount"].GetInt64());
     }
 
     // ============================================================
@@ -97,68 +85,65 @@ public class InodeEavFacadeTests : IntegrationTestBase
     // ============================================================
 
     [Fact]
-    public async Task History_ViaInode_ReturnsLogs()
+    public async Task History_ViaBinding_ReturnsLogs()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "历史");
+
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["name"] = "v1" });
 
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["name"] = "v2" });
 
         var history = await Client.GetEavAsync<List<EntityHistoryDto>>(
-            $"/api/inode/{inodeId}/entities/{EntityType}/history");
+            $"{InodeBindingUrl(inodeId, binding.BindingId)}/history");
 
         Assert.NotNull(history);
         Assert.NotEmpty(history!);
-        // 至少有一次 Insert 或 Update
         Assert.Contains(history, h =>
             h.ChangeType == "Insert" || h.ChangeType == "Update");
     }
 
     [Fact]
-    public async Task History_NotCreated_ReturnsEmpty()
+    public async Task History_UnknownBinding_ReturnsEmpty()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
         var history = await Client.GetEavAsync<List<EntityHistoryDto>>(
-            $"/api/inode/{inodeId}/entities/{EntityType}/history");
+            $"/api/inode/{inodeId}/bindings/{Guid.NewGuid():D}/history");
 
         Assert.NotNull(history);
         Assert.Empty(history!);
     }
 
     // ============================================================
-    // 删除后旧 EAV 也不可见
+    // 删除绑定后旧 EAV 也不可见
     // ============================================================
 
     [Fact]
-    public async Task Delete_ViaInode_OldEavApiSeesEmpty()
+    public async Task Delete_ViaBinding_OldEavApiSeesEmpty()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "待删");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["name"] = "to-delete" });
 
-        var created = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
-        var entityId = created!.EntityId;
-
-        // 通过 iNode 删除
         var del = await Client.DeleteAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
-        Assert.Equal(HttpStatusCode.NoContent, del.StatusCode);
+            InodeBindingUrl(inodeId, binding.BindingId));
+        Assert.Equal(HttpStatusCode.OK, del.StatusCode);
 
         // 旧 EAV API 契约：不存在的实体返回 200 + 空 Properties（无 404 分支）
         var viaEav = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/eav/{EntityType}/entities/{entityId}");
+            $"/api/eav/{EntityType}/entities/{binding.EntityId}");
         Assert.NotNull(viaEav);
         Assert.False(viaEav!.Properties.ContainsKey("name"));
     }

@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Text.Json;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
 
 namespace TreeGraph.Api.Tests.Fixtures;
@@ -39,5 +41,48 @@ public abstract class IntegrationTestBase
             $"/api/eav/{entityType}/entities/{entityId}", payload);
         resp.EnsureSuccessStatusCode();
         return entityId;
+    }
+
+    /// <summary>拼出 iNode 下某条命名绑定的路由。</summary>
+    protected static string InodeBindingUrl(string inodeId, string bindingId)
+        => $"/api/inode/{inodeId}/bindings/{bindingId}";
+
+    /// <summary>
+    /// POST 新建命名绑定（每条绑定自带一份私有 EAV 数据），
+    /// 返回服务端生成的 (bindingId, entityId)。
+    /// </summary>
+    protected async Task<(string BindingId, string EntityId)> CreateInodeBindingAsync(
+        string inodeId, string entityType, string name)
+    {
+        var resp = await Client.PostAsJsonAsync(
+            $"/api/inode/{inodeId}/bindings",
+            new CreateBindingRequest { EntityType = entityType, Name = name });
+        if (!resp.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"创建绑定失败 {resp.StatusCode}: " +
+                await resp.Content.ReadAsStringAsync());
+        }
+
+        using var doc = JsonDocument.Parse(
+            await resp.Content.ReadAsStringAsync());
+        var root = doc.RootElement;
+        if (!root.TryGetProperty("data", out var data)
+            || !data.TryGetProperty("bindingId", out var bindingProp)
+            || !data.TryGetProperty("entityId", out var entityProp)
+            || bindingProp.ValueKind != JsonValueKind.String
+            || entityProp.ValueKind != JsonValueKind.String)
+        {
+            throw new InvalidOperationException(
+                "创建绑定的响应缺少 data.bindingId / data.entityId：" + root.GetRawText());
+        }
+
+        var bindingId = bindingProp.GetString();
+        var entityId = entityProp.GetString();
+        if (string.IsNullOrEmpty(bindingId) || string.IsNullOrEmpty(entityId))
+            throw new InvalidOperationException(
+                "创建绑定的响应 bindingId / entityId 为空");
+
+        return (bindingId!, entityId!);
     }
 }

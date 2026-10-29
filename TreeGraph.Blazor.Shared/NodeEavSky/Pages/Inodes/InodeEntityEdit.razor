@@ -1,5 +1,5 @@
-@* InodeEntityEdit.razor *@
-@page "/inodes/{InodeId}/types/{EntityType}"
+@* InodeEntityEdit.razor — 编辑一条命名绑定的属性数据 *@
+@page "/inodes/{InodeId}/bindings/{BindingId}"
 @using System.Text.Json
 @using TreeGraph.Blazor.Shared.NodeEavSky.Components.Shared
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
@@ -10,8 +10,8 @@
 @inject IEavFieldValidator Validator
 @inject NavigationManager Nav
 @inject TreeGraph.Blazor.Shared.Platform.IPlatformContext Platform
-@* InodeEntityEdit.razor *@
-<PageTitle>编辑 @EntityType</PageTitle>
+
+<PageTitle>编辑 @_displayTitle</PageTitle>
 
 <div class="d-flex align-center mb-3" style="gap: 8px; flex-wrap: wrap;">
     <MudButton Variant="Variant.Text" Color="Color.Default"
@@ -29,121 +29,146 @@
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
 }
-else if (_schema is null || _schema.Count == 0)
+else if (_entity is null)
 {
     <MudAlert Severity="Severity.Warning">
-        该类型尚未定义任何属性，请先在元数据管理中配置。
+        未找到该绑定（可能已被删除）。请返回 iNode 重新选择。
     </MudAlert>
 }
 else
 {
-    <MudAlert Severity="Severity.Info" Class="mb-4">
-        <b>提示</b>：保存只更新您填写的属性，未填写的属性<b>保持不变</b>。
-        首次保存会自动创建属性数据。
-    </MudAlert>
-
-    @if (TotalErrorCount > 0)
-    {
-        <MudAlert Severity="Severity.Error" Dense="false" Class="mb-4">
-            <MudText Typo="Typo.body1">
-                有 <b>@TotalErrorCount</b> 项校验错误，请修正后再保存：
+    <MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-3 mb-4")" Outlined="true" Elevation="0">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-wrap">
+            <MudIcon Icon="@Icons.Material.Filled.Label" Size="Size.Small"
+                     Color="Color.Secondary" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                绑定名
             </MudText>
-            <ul style="margin: 6px 0 0 0; padding-left: 20px;">
-                @foreach (var (attrName, errs) in _errors.Where(kv => kv.Value.Count > 0))
-                {
-                    var attr = _regularAttributes.FirstOrDefault(
-                        a => a.AttributeName == attrName);
-                    var label = attr?.DisplayName ?? attrName;
-                    foreach (var e in errs)
-                    {
-                        var path = string.IsNullOrEmpty(e.Path) ? "" : $" [{e.Path}]";
-                        <li>@label@(path)：@e.Message</li>
-                    }
-                }
-            </ul>
-        </MudAlert>
-    }
-
-    <MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-4 mb-4")">
-        <MudText Typo="Typo.h6" Class="mb-3">属性值</MudText>
-
-        @foreach (var attr in _regularAttributes)
-        {
-            <div class="mb-4">
-                <DynamicFieldRenderer Attribute="attr"
-                                      Value="GetValue(attr.AttributeName)"
-                                      ValueChanged="@(v => SetValue(attr.AttributeName, v))"
-                                      Errors="GetFieldErrors(attr.AttributeName)" />
-            </div>
-        }
+            <MudText Typo="Typo.subtitle1"><b>@_entity.Name</b></MudText>
+            <MudChip T="string" Size="Size.Small" Color="Color.Default">
+                @_entity.EntityType
+            </MudChip>
+            <MudSpacer />
+            <MudTooltip Text="重命名绑定">
+                <MudIconButton Icon="@Icons.Material.Filled.DriveFileRenameOutline"
+                               Size="Size.Small" Color="Color.Info"
+                               OnClick="RenameAsync" Disabled="@_saving" />
+            </MudTooltip>
+            <MudTooltip Text="删除绑定及其属性数据">
+                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever"
+                               Size="Size.Small" Color="Color.Error"
+                               OnClick="DeleteAsync" Disabled="@_saving" />
+            </MudTooltip>
+        </MudStack>
     </MudPaper>
 
-    @if (_tableAttributes.Count > 0)
+    @if (_schema is null || _schema.Count == 0)
     {
-        <MudPaper Class="pa-4 mb-4">
-            <MudText Typo="Typo.h6" Class="mb-3">子表数据</MudText>
-            @foreach (var attr in _tableAttributes)
+        <MudAlert Severity="Severity.Warning">
+            该类型尚未定义任何属性，请先在元数据管理中配置。
+        </MudAlert>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            <b>提示</b>：保存只更新您填写的属性，未填写的属性<b>保持不变</b>。
+        </MudAlert>
+
+        @if (TotalErrorCount > 0)
+        {
+            <MudAlert Severity="Severity.Error" Dense="false" Class="mb-4">
+                <MudText Typo="Typo.body1">
+                    有 <b>@TotalErrorCount</b> 项校验错误，请修正后再保存：
+                </MudText>
+                <ul style="margin: 6px 0 0 0; padding-left: 20px;">
+                    @foreach (var (attrName, errs) in _errors.Where(kv => kv.Value.Count > 0))
+                    {
+                        var attr = _regularAttributes.FirstOrDefault(
+                            a => a.AttributeName == attrName);
+                        var label = attr?.DisplayName ?? attrName;
+                        foreach (var e in errs)
+                        {
+                            var path = string.IsNullOrEmpty(e.Path) ? "" : $" [{e.Path}]";
+                            <li>@label@(path)：@e.Message</li>
+                        }
+                    }
+                </ul>
+            </MudAlert>
+        }
+
+        <MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-4 mb-4")">
+            <MudText Typo="Typo.h6" Class="mb-3">属性值</MudText>
+
+            @foreach (var attr in _regularAttributes)
             {
-                <TableField Attr="attr"
-                            EntityType="@EntityType"
-                            EntityId="@(_entityId ?? "")"
-                            RecordMode="@attr.IsRecordMode" />
+                <div class="mb-4">
+                    <DynamicFieldRenderer Attribute="attr"
+                                          Value="GetValue(attr.AttributeName)"
+                                          ValueChanged="@(v => SetValue(attr.AttributeName, v))"
+                                          Errors="GetFieldErrors(attr.AttributeName)" />
+                </div>
             }
         </MudPaper>
-    }
 
-    <div class="d-flex align-center" style="gap: 8px;">
-        <MudButton Variant="Variant.Filled"
-                   Color="@(TotalErrorCount > 0 ? Color.Default : Color.Primary)"
-                   OnClick="SaveAsync" Disabled="@_saving"
-                   StartIcon="@Icons.Material.Filled.Save">
-            @(_saving ? "保存中..." : "保存")
-        </MudButton>
-
-        @if (Platform.IsCompact)
+        @if (_tableAttributes.Count > 0)
         {
-            @* 紧凑布局：次要操作收纳进菜单，仅保留保存主按钮 *@
-            <MudMenu Icon="@Icons.Material.Filled.MoreVert"
-                     Color="Color.Default"
-                     AriaLabel="更多操作">
-                <MudMenuItem Icon="@Icons.Material.Filled.Refresh"
-                             OnClick="ReloadAsync">
-                    重新加载
-                </MudMenuItem>
-                @if (_entityId is not null)
+            <MudPaper Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">子表数据</MudText>
+                @foreach (var attr in _tableAttributes)
                 {
-                    <MudMenuItem Icon="@Icons.Material.Filled.DeleteForever"
-                                 OnClick="DeleteAsync"
-                                 Disabled="@_saving">
-                        删除属性数据
-                    </MudMenuItem>
+                    <TableField Attr="attr"
+                                EntityType="@_entity.EntityType"
+                                EntityId="@_entity.EntityId"
+                                RecordMode="@attr.IsRecordMode" />
                 }
-            </MudMenu>
+            </MudPaper>
         }
-        else
-        {
-            <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                       OnClick="ReloadAsync"
-                       StartIcon="@Icons.Material.Filled.Refresh">
-                重新加载
+
+        <div class="d-flex align-center" style="gap: 8px;">
+            <MudButton Variant="Variant.Filled"
+                       Color="@(TotalErrorCount > 0 ? Color.Default : Color.Primary)"
+                       OnClick="SaveAsync" Disabled="@_saving"
+                       StartIcon="@Icons.Material.Filled.Save">
+                @(_saving ? "保存中..." : "保存")
             </MudButton>
-            <MudSpacer />
-            @if (_entityId is not null)
+
+            @if (Platform.IsCompact)
             {
-                <MudButton Variant="Variant.Outlined" Color="Color.Error"
-                           OnClick="DeleteAsync"
-                           StartIcon="@Icons.Material.Filled.DeleteForever"
-                           Disabled="@_saving">
-                    删除属性数据
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                         Color="Color.Default"
+                         AriaLabel="更多操作">
+                    <MudMenuItem Icon="@Icons.Material.Filled.Refresh"
+                                 OnClick="ReloadAsync">
+                        重新加载
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.History"
+                                 OnClick="GoToHistory">
+                        审计历史
+                    </MudMenuItem>
+                </MudMenu>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                           OnClick="ReloadAsync"
+                           StartIcon="@Icons.Material.Filled.Refresh">
+                    重新加载
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                           OnClick="GoToHistory"
+                           StartIcon="@Icons.Material.Filled.History">
+                    审计历史
                 </MudButton>
             }
-        }
-    </div>
+        </div>
+    }
 }
 
 @code {
     [Parameter] public string InodeId { get; set; } = "";
-    [Parameter] public string EntityType { get; set; } = "";
+
+    /// <summary>命名绑定的主键（路由参数）。</summary>
+    [Parameter] public string BindingId { get; set; } = "";
 
     private IReadOnlyList<AttributeSchemaDto>? _schema;
     private readonly Dictionary<string, object?> _values = new();
@@ -151,8 +176,8 @@ else
     private List<AttributeSchemaDto> _regularAttributes = new();
     private List<AttributeSchemaDto> _tableAttributes = new();
 
+    private InodeBindingDetailDto? _entity;
     private string _displayTitle = "";
-    private string? _entityId;
     private DateTimeOffset? _loadedUpdatedAt;
 
     private bool _loading;
@@ -177,36 +202,42 @@ else
     private void BackToInode()
         => Nav.NavigateTo($"/inodes/{Uri.EscapeDataString(InodeId)}");
 
+    private void GoToHistory()
+        => Nav.NavigateTo(
+            $"/inodes/{Uri.EscapeDataString(InodeId)}/bindings/" +
+            $"{Uri.EscapeDataString(BindingId)}/history");
+
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
-            _displayTitle = EntityType;
+            var binding = await Api.GetInodeBindingAsync(InodeId, BindingId);
+            _entity = binding;
 
-            var schema = await Api.GetSchemaAsync(EntityType);
+            if (binding is null)
+            {
+                _schema = [];
+                _regularAttributes = [];
+                _tableAttributes = [];
+                _displayTitle = "绑定不存在";
+                return;
+            }
+
+            _displayTitle = binding.Name;
+            _loadedUpdatedAt = binding.UpdatedAt;
+
+            var schema = await Api.GetSchemaAsync(binding.EntityType);
             _schema = schema ?? Array.Empty<AttributeSchemaDto>();
 
             _regularAttributes = _schema.Where(a => a.DataType != "table").ToList();
             _tableAttributes = _schema.Where(a => a.DataType == "table").ToList();
 
             _values.Clear();
-            var entity = await Api.GetInodeEntityAsync(InodeId, EntityType);
-            if (entity is not null)
+            foreach (var attr in _regularAttributes)
             {
-                _entityId = entity.EntityId;
-                _loadedUpdatedAt = entity.UpdatedAt;
-
-                foreach (var attr in _regularAttributes)
-                {
-                    if (entity.Properties.TryGetValue(attr.AttributeName, out var elem))
-                        _values[attr.AttributeName] = JsonElementToValue(elem, attr);
-                }
-            }
-            else
-            {
-                _entityId = null;
-                _loadedUpdatedAt = null;
+                if (binding.Properties.TryGetValue(attr.AttributeName, out var elem))
+                    _values[attr.AttributeName] = JsonElementToValue(elem, attr);
             }
 
             RevalidateAll();
@@ -219,6 +250,42 @@ else
 
     private async Task ReloadAsync()
     {
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task RenameAsync()
+    {
+        if (_entity is null) return;
+
+        var parameters = new DialogParameters
+        {
+            { nameof(BindingNameDialog.Title), "重命名绑定" },
+            { nameof(BindingNameDialog.SubmitText), "保存" },
+            { nameof(BindingNameDialog.InitialName), _entity.Name },
+            { nameof(BindingNameDialog.HelperText), "同一类型下绑定名不可重复" }
+        };
+
+        var dialog = await DialogService.ShowAsync<BindingNameDialog>(
+            "重命名绑定", parameters);
+        var result = await dialog.Result;
+
+        if (result?.Canceled != false || result.Data is not string name)
+            return;
+
+        var trimmed = name.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed) || trimmed == _entity.Name)
+            return;
+
+        var (ok, error) = await Api.RenameInodeBindingAsync(
+            InodeId, BindingId, trimmed);
+        if (!ok)
+        {
+            Snackbar.Add($"重命名失败：{error ?? "未知错误"}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("已重命名", Severity.Success);
         await LoadAsync();
         StateHasChanged();
     }
@@ -257,6 +324,8 @@ else
 
     private async Task SaveAsync()
     {
+        if (_entity is null) return;
+
         RevalidateAll();
         if (TotalErrorCount > 0)
         {
@@ -275,8 +344,8 @@ else
                 return;
             }
 
-            var (ok, error, current) = await Api.PatchInodeEntityAsync(
-                InodeId, EntityType, submitValues,
+            var (ok, error, current) = await Api.PatchInodeBindingAsync(
+                InodeId, BindingId, submitValues,
                 expectedUpdatedAt: _loadedUpdatedAt);
 
             if (!ok)
@@ -307,9 +376,11 @@ else
 
     private async Task DeleteAsync()
     {
+        if (_entity is null) return;
+
         var confirmed = await DialogService.ShowMessageBoxAsync(
-            "确认删除",
-            $"确定删除属性数据 {InodeId}/{EntityType} 的所有属性值？",
+            "确认删除绑定",
+            $"确定删除绑定「{_entity.Name}」及其全部属性数据？",
             yesText: "永久删除", cancelText: "取消");
 
         if (confirmed != true) return;
@@ -317,7 +388,7 @@ else
         _saving = true;
         try
         {
-            var (ok, error) = await Api.DeleteInodeEntityAsync(InodeId, EntityType);
+            var (ok, error) = await Api.DeleteInodeBindingAsync(InodeId, BindingId);
             if (!ok)
             {
                 Snackbar.Add($"删除失败：{error ?? "未知错误"}", Severity.Error);

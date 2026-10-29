@@ -17,7 +17,7 @@ public class InodeEntityEditResponsiveTests : BunitTestBase {
         _platform = NodeEavTestSetup.RegisterServices(Services, (path, _) => path switch
         {
             "/api/eav/item/schema" => NodeEavTestSetup.Json.Schema(),
-            "/api/inode/test-inode/entities/item" => NodeEavTestSetup.Json.Entity(),
+            "/api/inode/test-inode/bindings/b1" => NodeEavTestSetup.Json.Binding(),
             _ => null
         });
     }
@@ -29,7 +29,7 @@ public class InodeEntityEditResponsiveTests : BunitTestBase {
         var cut = Render<InodeEntityEdit>(p =>
         {
             p.Add(x => x.InodeId, "test-inode");
-            p.Add(x => x.EntityType, "item");
+            p.Add(x => x.BindingId, "b1");
         });
 
         cut.WaitForAssertion(() =>
@@ -48,7 +48,7 @@ public class InodeEntityEditResponsiveTests : BunitTestBase {
         var cut = Render<InodeEntityEdit>(p =>
         {
             p.Add(x => x.InodeId, "test-inode");
-            p.Add(x => x.EntityType, "item");
+            p.Add(x => x.BindingId, "b1");
         });
 
         cut.WaitForAssertion(() =>
@@ -65,7 +65,7 @@ public class InodeEntityEditResponsiveTests : BunitTestBase {
         var cut = Render<InodeEntityEdit>(p =>
         {
             p.Add(x => x.InodeId, "test-inode");
-            p.Add(x => x.EntityType, "item");
+            p.Add(x => x.BindingId, "b1");
         });
 
         cut.WaitForAssertion(() =>

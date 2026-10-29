@@ -14,15 +14,31 @@ public class InodeJsonTests : IntegrationTestBase
 
     private static string NewInodeId() => Guid.NewGuid().ToString("D");
 
+    /// <summary>
+    /// 从全景 JSON 的 entities 字典中取出该类型唯一条目
+    /// （N:N 后 key 为 "entityType/entityId"）。
+    /// </summary>
+    private static JsonElement SingleEntityForType(
+        JsonElement root, string entityType)
+    {
+        var matches = root.GetProperty("entities")
+            .EnumerateObject()
+            .Where(p => p.Name.StartsWith(entityType + "/", StringComparison.Ordinal))
+            .ToList();
+        Assert.Single(matches);
+        return matches[0].Value;
+    }
+
     [Fact]
     public async Task GetAllAsJson_BasicShape()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
-        // 写入数据
+        // 创建绑定并写入数据
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "预览");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?>
             {
                 ["name"] = "demo",
@@ -40,9 +56,9 @@ public class InodeJsonTests : IntegrationTestBase
         Assert.Equal(inodeId, root.GetProperty("inodeId").GetString());
         Assert.True(root.TryGetProperty("generatedAt", out _));
 
-        // entities.Product
-        var entity = root.GetProperty("entities")
-            .GetProperty(EntityType);
+        // entities 条目
+        var entity = SingleEntityForType(root, EntityType);
+        Assert.Equal(binding.EntityId, entity.GetProperty("entityId").GetString());
         Assert.Equal("demo", entity.GetProperty("properties")
             .GetProperty("name").GetString());
         Assert.Equal(42, entity.GetProperty("properties")
@@ -55,24 +71,25 @@ public class InodeJsonTests : IntegrationTestBase
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "空值");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["name"] = "only-name" });
 
         // 默认：amount 不出现在 properties
         var jsonDefault = await Client.GetStringAsync(
             $"/api/inode/{inodeId}/json");
         using var doc1 = JsonDocument.Parse(jsonDefault);
-        var props1 = doc1.RootElement.GetProperty("entities")
-            .GetProperty(EntityType).GetProperty("properties");
+        var props1 = SingleEntityForType(doc1.RootElement, EntityType)
+            .GetProperty("properties");
         Assert.False(props1.TryGetProperty("amount", out _));
 
         // includeNull=true：amount 出现且为 null
         var jsonInclude = await Client.GetStringAsync(
             $"/api/inode/{inodeId}/json?includeNull=true");
         using var doc2 = JsonDocument.Parse(jsonInclude);
-        var props2 = doc2.RootElement.GetProperty("entities")
-            .GetProperty(EntityType).GetProperty("properties");
+        var props2 = SingleEntityForType(doc2.RootElement, EntityType)
+            .GetProperty("properties");
         Assert.True(props2.TryGetProperty("amount", out var amount));
         Assert.Equal(JsonValueKind.Null, amount.ValueKind);
     }

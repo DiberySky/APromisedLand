@@ -1,0 +1,142 @@
+@* BindingCreateDialog.razor — 为节点新建命名绑定（选实体类型 + 输入绑定名）。
+   打开参数：NodeId / NodeName（宿主节点）、DialogContext（用途说明）。
+   提交后调用 POST /api/inode/{nodeId}/bindings 维护 node ↔ entityType 的 N:N 关系，
+   成功关闭并返回 CreatedBinding(BindingId, EntityType, Name)。 *@
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Dialogs
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@namespace TreeGraph.Blazor.Shared.NodeEavSky.Pages.Inodes
+
+<DialogSky Title="@Title"
+           SubmitButtonVisible="true"
+           SubmitButtonText="@SubmitText"
+           SubmitButtonDisabled="@_submitting"
+           OnSubmitClick="Submit">
+    <DialogContent>
+        @if (!string.IsNullOrWhiteSpace(ContextText))
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                @ContextText
+            </MudAlert>
+        }
+
+        @if (_loadingTypes)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_types.Count == 0)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true">
+                暂无可用属性定义，请先在「属性定义管理」中创建。
+            </MudAlert>
+        }
+        else
+        {
+            <MudTextField T="string"
+                          @bind-Value="_name"
+                          Label="绑定名"
+                          Variant="Variant.Outlined"
+                          Immediate="true"
+                          MaxLength="200"
+                          Class="mb-3"
+                          HelperText="同一节点同一实体类型下绑定名不可重复；不同类型可同名" />
+
+            <MudSelect T="string"
+                       @bind-Value="_entityType"
+                       Label="实体类型"
+                       Variant="Variant.Outlined">
+                @foreach (var t in _types)
+                {
+                    <MudSelectItem T="string" Value="@t.EntityType">
+                        @(string.IsNullOrWhiteSpace(t.DisplayName)
+                            ? t.EntityType
+                            : $"{t.DisplayName} ({t.EntityType})")
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    [Inject] public EavApiClient EavApi { get; set; } = default!;
+    [Inject] public MessageService Message { get; set; } = default!;
+
+    /// <summary>对话框标题。</summary>
+    [Parameter] public string Title { get; set; } = "新建绑定";
+
+    /// <summary>提交按钮文字。</summary>
+    [Parameter] public string SubmitText { get; set; } = "创建";
+
+    /// <summary>宿主节点 ID（node.Id，绑定的 N:N 关系一端）。</summary>
+    [Parameter, EditorRequired] public string NodeId { get; set; } = default!;
+
+    /// <summary>宿主节点名称（仅用于展示）。</summary>
+    [Parameter] public string? NodeName { get; set; }
+
+    /// <summary>用途说明（不传则显示默认文案）。</summary>
+    [Parameter] public string? DialogContext { get; set; }
+
+    private IReadOnlyList<EntityTypeSummaryDto> _types = [];
+    private bool _loadingTypes = true;
+    private bool _submitting;
+
+    private string? _entityType;
+    private string? _name;
+
+    private string ContextText =>
+        DialogContext ?? $"为节点「{NodeName ?? NodeId}」新建命名绑定：每条绑定拥有独立的属性数据。";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _types = await EavApi.ListEntityTypesAsync() ?? [];
+        }
+        catch (Exception ex)
+        {
+            Message.Details("加载实体类型失败", ex.Message);
+        }
+        finally
+        {
+            _loadingTypes = false;
+        }
+    }
+
+    /// <summary>创建成功后返回给调用方的结果。</summary>
+    public record CreatedBinding(string BindingId, string EntityType, string Name);
+
+    private async Task Submit()
+    {
+        if (_submitting) return;
+        if (string.IsNullOrEmpty(_entityType)) return;
+        if (string.IsNullOrWhiteSpace(_name)) return;
+
+        _submitting = true;
+        try
+        {
+            var (bindingId, error) = await EavApi.CreateInodeBindingAsync(
+                NodeId, _entityType, _name.Trim());
+            if (bindingId is null)
+            {
+                Message.Details("新建绑定失败", error ?? "服务端未返回 bindingId");
+                return;
+            }
+
+            Message.Success($"绑定「{_name.Trim()}」已创建");
+            MudDialog?.Close(DialogResult.Ok(
+                new CreatedBinding(bindingId, _entityType, _name.Trim())));
+        }
+        catch (Exception ex)
+        {
+            Message.Details("新建绑定失败", ex.Message);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

@@ -3,10 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
-using TreeGraph.Api.MessagingSky;
 using TreeGraph.Api.NodeEavSky.Infrastructure;
 using TreeGraph.Api.NodeEavSky.Services;
-using TreeGraph.Shared.Messaging;
 using TreeGraph.Shared.NodeEavSky;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 
@@ -17,9 +15,10 @@ namespace TreeGraph.Api.NodeEavSky.Controllers;
 ///
 /// 定位方式：
 ///   - 声明：/api/inode/{inodeId}/types/{entityType}
-///   - 实体：/api/inode/{inodeId}/entities/{entityType}
+///   - 绑定：/api/inode/{inodeId}/bindings/{bindingId}
 ///
-/// URL 里没有 entityId —— 由服务端首次 PUT 时自动生成。
+/// 命名绑定：每条绑定（binding_id + name）拥有自己的一条私有 EAV 数据，
+/// 因此同一 iNode 同一类型可以建立多条互不干扰的绑定。
 /// 转发到现有 EAV 管道（EavWriteService.SaveAsync(entityId, entityType, ...)）。
 /// </summary>
 [ApiController]
@@ -32,7 +31,6 @@ public class InodeController : ControllerBase
     private readonly TreeGraphDbContext _db;
     private readonly CompositeValueService _compositeService;
     private readonly JsonSerializerOptions _jsonOptions;
-    private readonly IEventPublisher _publisher;
 
     public InodeController(
         IInodeEntityService inodeEntities,
@@ -40,8 +38,7 @@ public class InodeController : ControllerBase
         IAttributeCache attrCache,
         TreeGraphDbContext db,
         CompositeValueService compositeService,
-        IOptions<JsonOptions> jsonOptions,
-        IEventPublisher publisher)
+        IOptions<JsonOptions> jsonOptions)
     {
         _inodeEntities = inodeEntities;
         _facade = facade;
@@ -49,7 +46,6 @@ public class InodeController : ControllerBase
         _db = db;
         _compositeService = compositeService;
         _jsonOptions = jsonOptions.Value.JsonSerializerOptions;
-        _publisher = publisher;
     }
 
     // ============================================================
@@ -64,8 +60,10 @@ public class InodeController : ControllerBase
         string inodeId, CancellationToken ct)
     {
         var declarations = await _inodeEntities.ListDeclarationsAsync(inodeId, ct);
-        var mappings = await _inodeEntities.ListByInodeAsync(inodeId, ct);
-        var mappingByType = mappings.ToDictionary(m => m.EntityType);
+        var bindings = await _inodeEntities.ListBindingsAsync(inodeId, ct);
+        var bindingsByType = bindings
+            .GroupBy(m => m.EntityType)
+            .ToDictionary(g => g.Key, g => g.OrderBy(m => m.AttachedAt).ToList());
 
         // 全局类型（直接查 entity_type_catalog）
         var globalTypes = await _db.EntityTypes
@@ -76,13 +74,25 @@ public class InodeController : ControllerBase
 
         foreach (var decl in declarations)
         {
-            var mapping = mappingByType.GetValueOrDefault(decl.EntityType);
+            var typeBindings = bindingsByType.GetValueOrDefault(decl.EntityType);
+            var bindingCount = typeBindings?.Count ?? 0;
             var gt = globalTypes.FirstOrDefault(t => t.EntityType == decl.EntityType);
 
-            // 实体最近更新时间（仅已创建实体的类型需要加载）
+            // 实体最近更新时间（取该类型下所有绑定实体的最大值）
             DateTimeOffset? entityUpdatedAt = null;
-            if (mapping is not null)
-                entityUpdatedAt = (await _facade.LoadAsync(inodeId, decl.EntityType, ct))?.UpdatedAt;
+            if (typeBindings is not null)
+            {
+                foreach (var binding in typeBindings)
+                {
+                    var entity = await _facade.LoadAsync(
+                        inodeId, binding.BindingId, ct);
+                    if (entity?.UpdatedAt is { } updated
+                        && (entityUpdatedAt is null || updated > entityUpdatedAt))
+                    {
+                        entityUpdatedAt = updated;
+                    }
+                }
+            }
 
             cards.Add(new InodeTypeCardDto(
                 decl.EntityType,
@@ -90,8 +100,9 @@ public class InodeController : ControllerBase
                 gt?.EntityTypeId,
                 gt?.Description,
                 Declared: true,
-                HasEntity: mapping is not null,
-                EntityUpdatedAt: entityUpdatedAt));
+                HasEntity: bindingCount > 0,
+                EntityUpdatedAt: entityUpdatedAt,
+                BindingCount: bindingCount));
         }
 
         return Ok(cards);
@@ -137,80 +148,46 @@ public class InodeController : ControllerBase
     }
 
     // ============================================================
-    // 实体 CRUD
+    // 命名绑定 CRUD
     // ============================================================
 
-    /// <summary>
-    /// 列出该 iNode 下所有已创建实体。
-    /// </summary>
-    [HttpGet("entities")]
-    public async Task<IActionResult> ListEntities(
-        string inodeId,
-        CancellationToken ct)
+    /// <summary>列出该 iNode 下所有命名绑定（含最近更新时间）。</summary>
+    [HttpGet("bindings")]
+    public async Task<IActionResult> ListBindings(
+        string inodeId, CancellationToken ct)
     {
-        var all = await _facade.LoadAllByInodeAsync(inodeId, ct);
+        var bindings = await _inodeEntities.ListBindingsAsync(inodeId, ct);
+        if (bindings.Count == 0) return Ok(Array.Empty<InodeBindingDto>());
 
-        var result = all.Values.Select(e => new DynamicEntityDto(
-            e.EntityId,
-            e.EntityType,
-            ToJsonDict(e),
-            e.UpdatedAt)).ToList();
-
+        var result = new List<InodeBindingDto>(bindings.Count);
+        foreach (var b in bindings)
+        {
+            var entity = await _facade.LoadAsync(inodeId, b.BindingId, ct);
+            result.Add(new InodeBindingDto(
+                b.BindingId, b.Name, b.EntityType, b.EntityId,
+                b.DisplayOrder, entity?.UpdatedAt));
+        }
         return Ok(result);
     }
 
     /// <summary>
-    /// 读单个实体。未创建返回 404。
+    /// 新建命名绑定（同名同类型重复会被拒绝）。
+    /// 刻意不加 [IdempotentWrite]：创建本身不幂等。
     /// </summary>
-    [HttpGet("entities/{entityType}")]
-    public async Task<IActionResult> GetEntity(
-        string inodeId, string entityType,
+    [HttpPost("bindings")]
+    public async Task<IActionResult> CreateBinding(
+        string inodeId,
+        [FromBody] CreateBindingRequest request,
         CancellationToken ct)
     {
-        var entity = await _facade.LoadAsync(
-            inodeId, entityType, ct);
-        if (entity is null) return NotFound();
-
-        return Ok(new DynamicEntityDto(
-            entity.EntityId,
-            entity.EntityType,
-            ToJsonDict(entity),
-            entity.UpdatedAt));
-    }
-
-    /// <summary>
-    /// PUT 全量替换。首次调用自动创建实体。
-    /// </summary>
-    [HttpPut("entities/{entityType}")]
-    [IdempotentWrite]
-    public async Task<IActionResult> Put(
-        string inodeId, string entityType,
-        [FromBody] Dictionary<string, JsonElement> values,
-        CancellationToken ct)
-    {
-        var expected = ParseExpectedHeader();
-
         try
         {
-            var typed = ConvertBody(entityType, values);
-            await _facade.SaveAsync(inodeId, entityType, typed,
-                User.Identity?.Name ?? "system",
-                HttpContext.TraceIdentifier,
-                ct, expected);
-            return NoContent();
-        }
-        catch (EavConcurrencyException ex)
-        {
-            return Conflict(new
-            {
-                error = "并发冲突：实体已被其他用户修改，请刷新后重试",
-                currentUpdatedAt = ex.CurrentUpdatedAt,
-                expectedUpdatedAt = ex.ExpectedUpdatedAt
-            });
-        }
-        catch (EavValidationException ex)
-        {
-            return BadRequest(new { errors = ex.Errors });
+            var (bindingId, entityId) = await _facade.CreateBindingAsync(
+                inodeId, request.EntityType, request.Name, ct);
+
+            return Created(
+                $"/api/inode/{inodeId}/bindings/{bindingId}",
+                new { bindingId, entityId });
         }
         catch (ArgumentException ex)
         {
@@ -222,39 +199,58 @@ public class InodeController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// PATCH 部分更新。
-    /// </summary>
-    [HttpPatch("entities/{entityType}")]
-    [IdempotentWrite]
-    public async Task<IActionResult> Patch(
-        string inodeId, string entityType,
-        [FromBody] Dictionary<string, JsonElement> values,
+    /// <summary>读单条绑定（含属性值）。</summary>
+    [HttpGet("bindings/{bindingId}")]
+    public async Task<IActionResult> GetBinding(
+        string inodeId, string bindingId,
         CancellationToken ct)
     {
-        var expected = ParseExpectedHeader();
+        var binding = await _inodeEntities.GetBindingAsync(inodeId, bindingId, ct);
+        if (binding is null) return NotFound();
 
+        var entity = await _facade.LoadAsync(inodeId, bindingId, ct);
+
+        return Ok(new InodeBindingDetailDto(
+            binding.BindingId,
+            binding.Name,
+            binding.EntityType,
+            binding.EntityId,
+            entity is null ? new Dictionary<string, JsonElement>() : ToJsonDict(entity),
+            entity?.UpdatedAt));
+    }
+
+    /// <summary>PUT 全量替换绑定数据。</summary>
+    [HttpPut("bindings/{bindingId}")]
+    [IdempotentWrite]
+    public Task<IActionResult> Put(
+        string inodeId, string bindingId,
+        [FromBody] Dictionary<string, JsonElement> values,
+        CancellationToken ct)
+        => WriteAsync(inodeId, bindingId, values, replaceAll: true, ct);
+
+    /// <summary>PATCH 部分更新绑定数据。</summary>
+    [HttpPatch("bindings/{bindingId}")]
+    [IdempotentWrite]
+    public Task<IActionResult> Patch(
+        string inodeId, string bindingId,
+        [FromBody] Dictionary<string, JsonElement> values,
+        CancellationToken ct)
+        => WriteAsync(inodeId, bindingId, values, replaceAll: false, ct);
+
+    /// <summary>重命名绑定（名字在该 (inode, type) 下唯一）。</summary>
+    [HttpPatch("bindings/{bindingId}/name")]
+    [IdempotentWrite]
+    public async Task<IActionResult> RenameBinding(
+        string inodeId, string bindingId,
+        [FromBody] RenameBindingRequest request,
+        CancellationToken ct)
+    {
         try
         {
-            var typed = ConvertBody(entityType, values);
-            await _facade.PatchAsync(inodeId, entityType, typed,
-                User.Identity?.Name ?? "system",
-                HttpContext.TraceIdentifier,
-                ct, expected);
+            var ok = await _facade.RenameBindingAsync(
+                inodeId, bindingId, request.Name, ct);
+            if (!ok) return NotFound();
             return NoContent();
-        }
-        catch (EavConcurrencyException ex)
-        {
-            return Conflict(new
-            {
-                error = "并发冲突：实体已被其他用户修改，请刷新后重试",
-                currentUpdatedAt = ex.CurrentUpdatedAt,
-                expectedUpdatedAt = ex.ExpectedUpdatedAt
-            });
-        }
-        catch (EavValidationException ex)
-        {
-            return BadRequest(new { errors = ex.Errors });
         }
         catch (ArgumentException ex)
         {
@@ -266,79 +262,52 @@ public class InodeController : ControllerBase
         }
     }
 
-    [HttpDelete("entities/{entityType}")]
+    /// <summary>更新绑定显示顺序（相邻行互换时逐条提交）。</summary>
+    [HttpPatch("bindings/{bindingId}/order")]
     [IdempotentWrite]
-    public async Task<IActionResult> DeleteEntity(
-        string inodeId, string entityType,
+    public async Task<IActionResult> ReorderBinding(
+        string inodeId, string bindingId,
+        [FromBody] ReorderBindingRequest request,
+        CancellationToken ct)
+    {
+        var ok = await _facade.ReorderBindingAsync(
+            inodeId, bindingId, request.DisplayOrder, ct);
+        return ok ? NoContent() : NotFound();
+    }
+
+    /// <summary>删除绑定：连同该绑定私有的属性数据一并删除。</summary>
+    [HttpDelete("bindings/{bindingId}")]
+    [IdempotentWrite]
+    public async Task<IActionResult> DeleteBinding(
+        string inodeId, string bindingId,
         CancellationToken ct)
     {
         var ok = await _facade.DeleteAsync(
-            inodeId, entityType,
+            inodeId, bindingId,
             User.Identity?.Name ?? "system",
             HttpContext.TraceIdentifier,
             ct);
+
         if (!ok) return NotFound();
-        return NoContent();
+        return Ok(new { action = "deleted" });
     }
 
-    /// <summary>
-    /// 实体转移（换宿主）：把本 iNode 下该类型的实体改挂到目标宿主。
-    /// 只改归属映射，EAV 数据不变；目标侧自动补声明。
-    /// 源映射不存在 → 404；目标宿主不存在 → 400；目标已被同类型实体占用 → 409。
-    /// </summary>
-    [HttpPost("entities/{entityType}/transfer")]
-    [IdempotentWrite]
-    public async Task<IActionResult> TransferEntity(
-        string inodeId, string entityType,
-        [FromBody] InodeTransferRequest request,
-        CancellationToken ct)
-    {
-        try
-        {
-            var mapping = await _inodeEntities.TransferAsync(
-                inodeId, entityType, request.TargetInodeId, ct);
-            if (mapping is null) return NotFound();
-
-            // ★ 语义搜索：源与目标宿主各发一次变更事件（消费端幂等重建向量）
-            await _publisher.Publish(new InodeChangedEvent
-            {
-                InodeId = inodeId,
-                Kind = InodeChangeKind.Saved
-            }, ct);
-            await _publisher.Publish(new InodeChangedEvent
-            {
-                InodeId = request.TargetInodeId,
-                Kind = InodeChangeKind.Saved
-            }, ct);
-
-            return NoContent();
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// 审计历史。
-    /// </summary>
-    [HttpGet("entities/{entityType}/history")]
+    /// <summary>绑定的审计历史。</summary>
+    [HttpGet("bindings/{bindingId}/history")]
     public async Task<IActionResult> History(
-        string inodeId, string entityType,
+        string inodeId, string bindingId,
         [FromQuery] DateTimeOffset? from,
         CancellationToken ct)
     {
-        var history = await _facade.GetHistoryAsync(
-            inodeId, entityType, from, ct);
+        var binding = await _inodeEntities.GetBindingAsync(inodeId, bindingId, ct);
+        if (binding is null) return Ok(Array.Empty<EntityHistoryDto>());
+
+        var history = await _facade.GetHistoryAsync(inodeId, bindingId, from, ct);
 
         var result = history.Select(a => new EntityHistoryDto(
             a.AuditId,
             a.EntityId,
-            entityType,
+            binding.EntityType,
             a.AttributeId,
             a.AttributeName,
             a.OldValue,
@@ -355,6 +324,60 @@ public class InodeController : ControllerBase
     // ============================================================
     // 辅助
     // ============================================================
+
+    private async Task<IActionResult> WriteAsync(
+        string inodeId, string bindingId,
+        Dictionary<string, JsonElement> values, bool replaceAll,
+        CancellationToken ct)
+    {
+        var binding = await _inodeEntities.GetBindingAsync(inodeId, bindingId, ct);
+        if (binding is null) return NotFound();
+
+        var expected = ParseExpectedHeader();
+
+        try
+        {
+            var typed = ConvertBody(binding.EntityType, values);
+
+            if (replaceAll)
+            {
+                await _facade.SaveAsync(inodeId, bindingId, typed,
+                    User.Identity?.Name ?? "system",
+                    HttpContext.TraceIdentifier,
+                    ct, expected);
+            }
+            else
+            {
+                await _facade.PatchAsync(inodeId, bindingId, typed,
+                    User.Identity?.Name ?? "system",
+                    HttpContext.TraceIdentifier,
+                    ct, expected);
+            }
+
+            return NoContent();
+        }
+        catch (EavConcurrencyException ex)
+        {
+            return Conflict(new
+            {
+                error = "并发冲突：实体已被其他用户修改，请刷新后重试",
+                currentUpdatedAt = ex.CurrentUpdatedAt,
+                expectedUpdatedAt = ex.ExpectedUpdatedAt
+            });
+        }
+        catch (EavValidationException ex)
+        {
+            return BadRequest(new { errors = ex.Errors });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 
     private DateTimeOffset? ParseExpectedHeader()
     {
@@ -398,7 +421,7 @@ public class InodeController : ControllerBase
     // ============================================================
 
     /// <summary>
-    /// 返回该 iNode 下所有实体的全部属性值（聚合 JSON）。
+    /// 返回该 iNode 下所有绑定的全部属性值（聚合 JSON）。
     ///
     /// 用途：外部应用一次性拉全景数据。
     ///
@@ -433,14 +456,15 @@ public class InodeController : ControllerBase
         // 单位不做换算：base 和 original 等价，都返回裸数字（存储值即输入值）
         var bareValue = unitsMode is "base" or "original";
 
-        // ---- 2. 加载所有实体（复用现有 Facade） ----
+        // ---- 2. 加载所有绑定实体（复用现有 Facade） ----
         var all = await _facade.LoadAllByInodeAsync(inodeId, ct);
 
-        // ---- 3. 构建 entities 字典 ----
+        // ---- 3. 构建 entities 字典（key = entityType/entityId，同类型可多条） ----
         var entitiesDict = new Dictionary<string, object>(StringComparer.Ordinal);
 
-        foreach (var (entityType, entity) in all)
+        foreach (var entity in all)
         {
+            var entityType = entity.EntityType;
             // 属性定义（用于 displayName 映射）
             var defs = _attrCache.GetDefinitions(entityType)
                 .ToDictionary(d => d.AttributeName, StringComparer.Ordinal);
@@ -480,8 +504,9 @@ public class InodeController : ControllerBase
                 }
             }
 
-            entitiesDict[entityType] = new
+            entitiesDict[$"{entityType}/{entity.EntityId}"] = new
             {
+                entityType,
                 entityId = entity.EntityId,
                 updatedAt = entity.UpdatedAt,
                 properties = props

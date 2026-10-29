@@ -31,13 +31,16 @@ public class InodeQueryTests : IntegrationTestBase
     private async Task SeedAsync(
         string entityType, string inodeId, string name, long amount)
     {
-        await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{entityType}",
+        // 命名绑定：先建绑定（自带私有 entityId），再写入数据
+        var binding = await CreateInodeBindingAsync(inodeId, entityType, name);
+        var resp = await Client.PutAsJsonAsync(
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?>
             {
                 ["name"] = name,
                 ["amount"] = amount
             });
+        resp.EnsureSuccessStatusCode();
     }
 
     // ============================================================

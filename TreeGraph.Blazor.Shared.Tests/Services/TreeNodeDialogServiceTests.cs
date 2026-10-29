@@ -137,7 +137,7 @@ public class TreeNodeDialogServiceTests
         var result = await _sut.ShowEditDialogAsync(MakeTemplate("1"));
 
         Assert.NotNull(result);
-        Assert.Equal("1", result.Id);
+        Assert.Equal("1", result.Node.Id);
     }
 
     // ============================================================

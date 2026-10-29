@@ -8,9 +8,9 @@ namespace TreeGraph.Api.NodeEavSky.Services;
 /// iNode 视角 → EAV 管道的转发层。
 ///
 /// 职责：
-///   1. 从 (inodeId, entityType) 解析/生成 entityId
+///   1. 以「命名绑定」为单位读写：binding_id → (entity_type, entity_id)
 ///   2. 调用现有 EAV 服务（签名完全不变）
-///   3. 删除时级联清理 inode_entity 映射
+///   3. 删除绑定 = 删绑定行 + 删该绑定私有的 EAV 数据
 ///
 /// 不做验证/写库逻辑，纯转发，便于维护。
 /// </summary>
@@ -38,131 +38,139 @@ public class InodeEavFacade
     // ============================================================
 
     /// <summary>
-    /// 按 (inodeId, entityType) 读实体。
-    /// iNode 下该类型尚未创建实体时返回 null。
+    /// 按 (inodeId, bindingId) 读绑定对应的实体。
+    /// 绑定不存在或不属于该 iNode 时返回 null。
     /// </summary>
     public async Task<DynamicEntity?> LoadAsync(
-        string inodeId, string entityType,
+        string inodeId, string bindingId,
         CancellationToken ct = default)
     {
-        var entityId = await _inodeEntities.GetEntityIdAsync(
-            inodeId, entityType, ct);
-        if (entityId is null) return null;
+        var binding = await _inodeEntities.GetBindingAsync(inodeId, bindingId, ct);
+        if (binding is null) return null;
 
-        return await _read.LoadAsync(entityId, entityType, ct);
+        return await _read.LoadAsync(binding.EntityId, binding.EntityType, ct);
     }
 
-    /// <summary>审计历史。</summary>
+    /// <summary>按绑定读审计历史。</summary>
     public async Task<List<AttributeAuditLog>> GetHistoryAsync(
-        string inodeId, string entityType,
+        string inodeId, string bindingId,
         DateTimeOffset? from = null,
         CancellationToken ct = default)
     {
-        var entityId = await _inodeEntities.GetEntityIdAsync(
-            inodeId, entityType, ct);
-        if (entityId is null) return new List<AttributeAuditLog>();
+        var binding = await _inodeEntities.GetBindingAsync(inodeId, bindingId, ct);
+        if (binding is null) return new List<AttributeAuditLog>();
 
-        return await _read.GetHistoryAsync(entityId, from, ct);
+        return await _read.GetHistoryAsync(binding.EntityId, from, ct);
     }
 
     // ============================================================
     // 写入
     // ============================================================
 
+    /// <summary>新建命名绑定（含该绑定私有的实体）。</summary>
+    public Task<(string BindingId, string EntityId)> CreateBindingAsync(
+        string inodeId, string entityType, string name,
+        CancellationToken ct = default)
+        => _inodeEntities.CreateBindingAsync(inodeId, entityType, name, ct);
+
+    public Task<bool> RenameBindingAsync(
+        string inodeId, string bindingId, string newName,
+        CancellationToken ct = default)
+        => _inodeEntities.RenameBindingAsync(inodeId, bindingId, newName, ct);
+
+    public Task<bool> ReorderBindingAsync(
+        string inodeId, string bindingId, int displayOrder,
+        CancellationToken ct = default)
+        => _inodeEntities.UpdateBindingOrderAsync(inodeId, bindingId, displayOrder, ct);
+
     public async Task SaveAsync(
-        string inodeId, string entityType,
+        string inodeId, string bindingId,
         Dictionary<string, object?> values,
         string changedBy, string? correlationId = null,
         CancellationToken ct = default,
         DateTimeOffset? expectedUpdatedAt = null)
     {
-        var entityId = await _inodeEntities.GetOrCreateEntityIdAsync(
-            inodeId, entityType, ct);
+        var binding = await RequireBindingAsync(inodeId, bindingId, ct);
 
-        await _write.SaveAsync(entityId, entityType, values,
+        await _write.SaveAsync(binding.EntityId, binding.EntityType, values,
             changedBy, correlationId, ct, expectedUpdatedAt);
 
-        // ★ 语义搜索：发布宿主变更事件（at-least-once，消费端幂等）
-        await _publishEndpoint.Publish(new InodeChangedEvent
-        {
-            InodeId = inodeId,
-            Kind = InodeChangeKind.Saved
-        }, ct);
+        await PublishAsync(inodeId, InodeChangeKind.Saved, ct);
     }
 
     public async Task PatchAsync(
-        string inodeId, string entityType,
+        string inodeId, string bindingId,
         Dictionary<string, object?> values,
         string changedBy, string? correlationId = null,
         CancellationToken ct = default,
         DateTimeOffset? expectedUpdatedAt = null)
     {
-        var entityId = await _inodeEntities.GetOrCreateEntityIdAsync(
-            inodeId, entityType, ct);
+        var binding = await RequireBindingAsync(inodeId, bindingId, ct);
 
-        await _write.PatchAsync(entityId, entityType, values,
+        await _write.PatchAsync(binding.EntityId, binding.EntityType, values,
             changedBy, correlationId, ct, expectedUpdatedAt);
 
-        // ★ 语义搜索：发布宿主变更事件
-        await _publishEndpoint.Publish(new InodeChangedEvent
-        {
-            InodeId = inodeId,
-            Kind = InodeChangeKind.Patched
-        }, ct);
+        await PublishAsync(inodeId, InodeChangeKind.Patched, ct);
     }
 
-    /// <summary>
-    /// 删除实体：先删 EAV 数据，再删归属映射。
-    /// </summary>
+    /// <summary>删除绑定：删该绑定私有的 EAV 数据 + 删绑定行。</summary>
     public async Task<bool> DeleteAsync(
-        string inodeId, string entityType,
+        string inodeId, string bindingId,
         string changedBy, string? correlationId = null,
         CancellationToken ct = default)
     {
-        var entityId = await _inodeEntities.GetEntityIdAsync(
-            inodeId, entityType, ct);
-        if (entityId is null) return false;
+        var binding = await _inodeEntities.GetBindingAsync(inodeId, bindingId, ct);
+        if (binding is null) return false;
 
-        // 1. 删 EAV 数据（属性值 + 审计 + 子表行）
         await _write.DeleteEntityAsync(
-            entityId, entityType, changedBy, correlationId, ct);
+            binding.EntityId, binding.EntityType, changedBy, correlationId, ct);
 
-        // 2. 删归属映射
-        await _inodeEntities.DeleteMappingAsync(inodeId, entityType, ct);
+        await _inodeEntities.DeleteBindingAsync(inodeId, bindingId, ct);
 
-        // ★ 语义搜索：发布宿主变更事件（消费端据此刷新/删除向量）
-        await _publishEndpoint.Publish(new InodeChangedEvent
-        {
-            InodeId = inodeId,
-            Kind = InodeChangeKind.Deleted
-        }, ct);
-
+        await PublishAsync(inodeId, InodeChangeKind.Deleted, ct);
         return true;
     }
 
     // ============================================================
-    // 便利方法：加载某 iNode 下所有实体
+    // 便利方法：加载某 iNode 下所有绑定的实体
     // ============================================================
 
-    /// <summary>
-    /// 加载某 iNode 下所有已创建实体，按类型名分组返回。
-    /// 未创建的类型不会出现在结果里。
-    /// </summary>
-    public async Task<Dictionary<string, DynamicEntity>> LoadAllByInodeAsync(
+    /// <summary>加载某 iNode 下所有绑定对应的实体（同类型可多条）。</summary>
+    public async Task<IReadOnlyList<DynamicEntity>> LoadAllByInodeAsync(
         string inodeId,
         CancellationToken ct = default)
     {
-        var mappings = await _inodeEntities.ListByInodeAsync(inodeId, ct);
-        if (mappings.Count == 0)
-            return new Dictionary<string, DynamicEntity>();
+        var bindings = await _inodeEntities.ListBindingsAsync(inodeId, ct);
+        if (bindings.Count == 0) return Array.Empty<DynamicEntity>();
 
-        var result = new Dictionary<string, DynamicEntity>();
-        foreach (var m in mappings)
+        var result = new List<DynamicEntity>(bindings.Count);
+        foreach (var b in bindings)
         {
-            var entity = await _read.LoadAsync(
-                m.EntityId, m.EntityType, ct);
-            result[m.EntityType] = entity;
+            var entity = await _read.LoadAsync(b.EntityId, b.EntityType, ct);
+            if (entity is not null) result.Add(entity);
         }
         return result;
     }
+
+    // ============================================================
+    // 内部
+    // ============================================================
+
+    private async Task<InodeEntity> RequireBindingAsync(
+        string inodeId, string bindingId, CancellationToken ct)
+    {
+        var binding = await _inodeEntities.GetBindingAsync(inodeId, bindingId, ct);
+        if (binding is null)
+            throw new InvalidOperationException(
+                $"节点 {inodeId} 下不存在绑定 {bindingId}");
+        return binding;
+    }
+
+    private Task PublishAsync(
+        string inodeId, InodeChangeKind kind, CancellationToken ct)
+        => _publishEndpoint.Publish(new InodeChangedEvent
+        {
+            InodeId = inodeId,
+            Kind = kind
+        }, ct);
 }

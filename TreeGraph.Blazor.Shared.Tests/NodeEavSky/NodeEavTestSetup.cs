@@ -66,6 +66,17 @@ internal static class NodeEavTestSetup
             updatedAt = (DateTimeOffset?)null
         });
 
+        /// <summary>单条命名绑定详情（InodeBindingDetailDto）。</summary>
+        public static string Binding() => Envelope(new
+        {
+            bindingId = "b1",
+            name = "工作绑定",
+            entityType = "item",
+            entityId = "e1",
+            properties = new Dictionary<string, object?>(),
+            updatedAt = (DateTimeOffset?)null
+        });
+
         public static string Paged() => Envelope(new
         {
             items = new object[]

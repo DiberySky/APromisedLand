@@ -117,9 +117,10 @@ public class InodeEntityTypeTests : IntegrationTestBase
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
-        // 首次 PUT 会自动建立声明 + 实体
+        // 创建命名绑定（自动建立声明 + 绑定行）
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "占位");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["name"] = "x" });
 
         // Detach 应被拒绝
@@ -128,7 +129,7 @@ public class InodeEntityTypeTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();
-        Assert.Contains("实体", body);
+        Assert.Contains("绑定", body);
     }
 
     // ============================================================

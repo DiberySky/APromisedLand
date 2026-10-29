@@ -66,7 +66,7 @@
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
-        @* 特例：根节点无「设置修改」入口，创建子项/子项排序留在本页（靠左，与设置修改页一致） *@
+        @* 底部动作统一靠左：根节点放创建子项/子项排序；非根节点放「设置修改」 *@
         @if (IsBoot)
         {
             <MudButton OnClick="OnAddChild"
@@ -86,11 +86,9 @@
                 </MudButton>
             }
         }
-    </DialogLeftActions>
-    <DialogRightActions>
-        @* 本对话框只读：管理功能（移动/创建子项/子项排序/删除）已迁移至「设置修改」页，便于权限控制 *@
-        @if (!IsBoot)
+        else
         {
+            @* 本对话框只读：管理功能（移动/创建子项/子项排序/删除）已迁移至「设置修改」页，便于权限控制 *@
             <MudButton OnClick="OnEdit"
                        Variant="Variant.Text"
                        Color="Color.Primary"
@@ -98,8 +96,7 @@
                 设置修改
             </MudButton>
         }
-
-    </DialogRightActions>
+    </DialogLeftActions>
 </DialogSky>
 
 @code {

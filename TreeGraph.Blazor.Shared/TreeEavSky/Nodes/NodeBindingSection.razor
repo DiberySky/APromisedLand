@@ -1,0 +1,223 @@
+@* NodeBindingSection.razor
+   单条命名绑定的属性区块（独立折叠面板，每条绑定一个面板）。
+   标题 = 绑定名 + 类型展示名；展开后懒加载 Schema 与绑定数据并渲染属性表单。
+   重命名/删除由父组件处理（OnRenameRequested / OnDeleteRequested 事件上抛）。
+   读写走 iNode 绑定端点 /api/inode/{inodeId}/bindings/{bindingId}。 *@
+@namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+
+@using TreeGraph.Blazor.Shared.NodeEavSky.Components
+@using TreeGraph.Blazor.Shared.NodeEavSky.Services
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@using System.Text.Json
+
+@inject EavApiClient EavApi
+@inject MessageService Message
+
+<MudExpansionPanel Elevation="0" Outlined="true" Class="mb-2"
+                   Expanded="false"
+                   ExpandIcon="@Icons.Material.Filled.ExpandMore"
+                   CollapseIcon="@Icons.Material.Filled.ExpandLess"
+                   ExpandedChanged="OnExpandedChanged">
+    <TitleContent>
+        <MudStack Row AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.Link"
+                     Color="@(_entity is not null ? Color.Success : Color.Default)"
+                     Size="Size.Small" />
+            <MudText Typo="Typo.subtitle2">@Binding.Name</MudText>
+        </MudStack>
+    </TitleContent>
+    <ChildContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_schema is null || _schema.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pb-3">
+                该属性定义暂无属性，可通过「管理属性定义」创建。
+            </MudText>
+        }
+        else if (_entity is null)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                绑定数据加载失败或已被删除。
+            </MudAlert>
+        }
+        else
+        {
+            <div class="pb-3">
+                <DynamicForm @ref="_form"
+                             EntityType="@Binding.EntityType"
+                             EntityId="@_entity.EntityId"
+                             Schema="@_schema"
+                             CompactLayout="true"
+                             ReadOnly="@ReadOnly"
+                             HideSubmitButton="true"
+                             OnSubmit="HandleSubmitAsync" />
+            </div>
+            @if (!ReadOnly)
+            {
+                <MudStack Row Class="pb-3" Justify="Justify.FlexEnd">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               OnClick="@SubmitAsync">
+                        保存
+                    </MudButton>
+                </MudStack>
+            }
+        }
+    </ChildContent>
+</MudExpansionPanel>
+
+@code {
+    /// <summary>宿主节点 ID（iNode Id）。</summary>
+    [Parameter, EditorRequired] public string InodeId { get; set; } = default!;
+
+    /// <summary>本区块对应的命名绑定。</summary>
+    [Parameter, EditorRequired] public InodeBindingDto Binding { get; set; } = default!;
+
+    /// <summary>只读模式（禁用编辑与操作图标）。</summary>
+    [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>绑定数据保存后通知父组件刷新清单。</summary>
+    [Parameter] public EventCallback<string> OnDataSaved { get; set; }
+
+    /// <summary>绑定删除后通知父组件刷新清单。</summary>
+    [Parameter] public EventCallback<string> OnDataDeleted { get; set; }
+
+    private DynamicForm? _form;
+    private IReadOnlyList<AttributeSchemaDto>? _schema;
+    private InodeBindingDetailDto? _entity;
+    private DateTimeOffset? _updatedAt;
+
+    private bool _loading;
+    private bool _loaded;
+
+    /// <summary>已加载过的 BindingId；变化说明绑定被删除重建，需重置状态。</summary>
+    private string? _trackedBindingId;
+
+    /// <summary>最后一次提交是否成功（供父级对话框决定是否保留）。</summary>
+    private bool _lastSubmitOk = true;
+
+    // 已取到属性数据、等待表单渲染完成后灌入（@ref 要到渲染后才可用）
+    private bool _pendingLoad;
+
+    protected override Task OnInitializedAsync()
+    {
+        // 初始折叠，首次展开才加载（见 OnExpandedChanged）
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnParametersSetAsync()
+    {
+        // 绑定被删除重建（BindingId 变化）时重置状态，等待再次展开加载
+        if (_trackedBindingId is not null && Binding.BindingId != _trackedBindingId)
+        {
+            _loaded = false;
+            _entity = null;
+            _schema = null;
+            _form = null;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task OnExpandedChanged(bool expanded)
+    {
+        if (expanded && !_loaded)
+            await ReloadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // DynamicForm 的 @ref 在本次渲染后才可用；直接调用时 _form 尚为 null，
+        // 灌值会被静默跳过导致表单空白。
+        if (_pendingLoad && _form is not null)
+        {
+            _pendingLoad = false;
+            _form.LoadFrom(_entity?.Properties ?? new Dictionary<string, JsonElement>());
+        }
+
+        await Task.CompletedTask;
+    }
+
+    /// <summary>重新加载本绑定的 Schema 与属性数据。</summary>
+    public async Task ReloadAsync()
+    {
+        try
+        {
+            _loading = true;
+
+            var schemaTask = EavApi.GetSchemaAsync(Binding.EntityType);
+            var entityTask = EavApi.GetInodeBindingAsync(InodeId, Binding.BindingId);
+            await Task.WhenAll(schemaTask, entityTask);
+
+            _schema = schemaTask.Result ?? [];
+            _entity = entityTask.Result;
+            _updatedAt = _entity?.UpdatedAt;
+            _trackedBindingId = Binding.BindingId;
+            _loaded = true;
+            _pendingLoad = true;
+        }
+        catch (Exception ex)
+        {
+            Message.Details("加载绑定属性失败", ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// 提交本绑定的属性值。返回 false 表示表单校验失败或保存失败，
+    /// 调用方应停止后续流程并保留对话框。
+    /// </summary>
+    public async Task<bool> SubmitAsync()
+    {
+        if (_form is null || _schema is null || _schema.Count == 0)
+            return true;
+        if (_entity is null) return true;
+
+        // 先置 false：DynamicForm 校验不通过时不会触发 OnSubmit，自然保持 false
+        _lastSubmitOk = false;
+        await _form.SubmitAsync();
+        return _lastSubmitOk;
+    }
+
+    private async Task HandleSubmitAsync(Dictionary<string, object?> values)
+    {
+        if (_entity is null)
+        {
+            _lastSubmitOk = false;
+            return;
+        }
+
+        try
+        {
+            var (ok, error, current) = await EavApi.PatchInodeBindingAsync(
+                InodeId, Binding.BindingId, values, _updatedAt);
+
+            if (ok)
+            {
+                _lastSubmitOk = true;
+                Message.Success($"【{Binding.Name}】属性已保存");
+
+                await ReloadAsync();
+
+                if (OnDataSaved.HasDelegate)
+                    await OnDataSaved.InvokeAsync(Binding.EntityType);
+            }
+            else
+            {
+                _updatedAt = current;
+                Message.Details("属性保存失败", error ?? "未知错误");
+            }
+        }
+        catch (Exception ex)
+        {
+            Message.Details("属性保存失败", ex.Message);
+        }
+    }
+}

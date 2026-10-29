@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Shared.NodeEavSky.Dtos;
 using Xunit;
@@ -7,8 +8,11 @@ using Xunit;
 namespace TreeGraph.Api.Tests.Tests;
 
 /// <summary>
-/// iNode 归属层（inode_entity）集成测试。
-/// 覆盖 GetOrCreate / Patch / Delete / 隔离。
+/// iNode 命名绑定（inode_entity）集成测试。
+///
+/// 契约：每条绑定 = binding_id + name + 一份私有 EAV 数据（独立 entity_id）。
+/// 同一 iNode 同一类型可建多条绑定，绑定之间数据完全隔离。
+/// 覆盖 Create / Get / Put / Patch / Delete / 列表 / 隔离 / 重名。
 /// </summary>
 public class InodeEntityTests : IntegrationTestBase
 {
@@ -19,32 +23,49 @@ public class InodeEntityTests : IntegrationTestBase
     private static string NewInodeId() => Guid.NewGuid().ToString("D");
 
     // ============================================================
-    // 首次创建
+    // 创建
     // ============================================================
 
     [Fact]
-    public async Task Put_FirstTime_CreatesEntity()
+    public async Task CreateBinding_ThenPut_ReadsBack()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
-        var resp = await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+        var (bindingId, entityId) = await CreateInodeBindingAsync(inodeId, EntityType, "首绑");
+
+        var put = await Client.PutAsJsonAsync(
+            InodeBindingUrl(inodeId, bindingId),
             new Dictionary<string, object?>
             {
                 ["name"] = "first",
                 ["amount"] = 42L
             });
-        Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
 
-        var dto = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+        var dto = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, bindingId));
 
         Assert.NotNull(dto);
-        Assert.False(string.IsNullOrEmpty(dto!.EntityId));
+        Assert.Equal(bindingId, dto!.BindingId);
+        Assert.Equal("首绑", dto.Name);
         Assert.Equal(EntityType, dto.EntityType);
+        Assert.Equal(entityId, dto.EntityId);
         Assert.Equal("first", dto.Properties["name"].GetString());
         Assert.Equal(42L, dto.Properties["amount"].GetInt64());
+    }
+
+    [Fact]
+    public async Task CreateBinding_GeneratesDistinctBindingAndEntityIds()
+    {
+        await InodeTestData.EnsureTypeAsync(Client, EntityType);
+        var inodeId = NewInodeId();
+
+        var first = await CreateInodeBindingAsync(inodeId, EntityType, "甲");
+        var second = await CreateInodeBindingAsync(inodeId, EntityType, "乙");
+
+        Assert.NotEqual(first.BindingId, second.BindingId);
+        Assert.NotEqual(first.EntityId, second.EntityId);
     }
 
     [Fact]
@@ -53,19 +74,21 @@ public class InodeEntityTests : IntegrationTestBase
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "反复写");
+
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["name"] = "first" });
 
-        var dto1 = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+        var dto1 = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, binding.BindingId));
 
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["name"] = "second" });
 
-        var dto2 = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+        var dto2 = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, binding.BindingId));
 
         Assert.Equal(dto1!.EntityId, dto2!.EntityId);
         Assert.Equal("second", dto2.Properties["name"].GetString());
@@ -76,15 +99,20 @@ public class InodeEntityTests : IntegrationTestBase
     // ============================================================
 
     [Fact]
-    public async Task Get_NotCreated_Returns404()
+    public async Task Get_UnknownBinding_Returns404()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
         var resp = await Client.GetAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+            InodeBindingUrl(inodeId, Guid.NewGuid().ToString("D")));
 
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+
+        var list = await Client.GetEavAsync<List<InodeBindingDto>>(
+            $"/api/inode/{inodeId}/bindings");
+        Assert.NotNull(list);
+        Assert.Empty(list!);
     }
 
     // ============================================================
@@ -97,13 +125,15 @@ public class InodeEntityTests : IntegrationTestBase
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "局部改");
+
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["name"] = "orig", ["amount"] = 1L });
 
         using var req = new HttpRequestMessage(
             HttpMethod.Patch,
-            $"/api/inode/{inodeId}/entities/{EntityType}")
+            InodeBindingUrl(inodeId, binding.BindingId))
         {
             Content = JsonContent.Create(new Dictionary<string, object?>
             {
@@ -113,8 +143,8 @@ public class InodeEntityTests : IntegrationTestBase
         var resp = await Client.SendAsync(req);
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
 
-        var dto = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+        var dto = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, binding.BindingId));
 
         Assert.Equal("orig", dto!.Properties["name"].GetString());
         Assert.Equal(99L, dto.Properties["amount"].GetInt64());
@@ -125,62 +155,77 @@ public class InodeEntityTests : IntegrationTestBase
     // ============================================================
 
     [Fact]
-    public async Task Delete_RemovesEntityAndMapping()
+    public async Task DeleteBinding_RemovesBindingAndItsData()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
+        var binding = await CreateInodeBindingAsync(inodeId, EntityType, "待删");
+
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["name"] = "x" });
 
         var del = await Client.DeleteAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
-        Assert.Equal(HttpStatusCode.NoContent, del.StatusCode);
+            InodeBindingUrl(inodeId, binding.BindingId));
+        Assert.Equal(HttpStatusCode.OK, del.StatusCode);
 
-        // 实体已不可读
+        using (var doc = JsonDocument.Parse(
+            await del.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal("deleted",
+                doc.RootElement.GetProperty("data").GetProperty("action").GetString());
+        }
+
+        // 绑定已不可读
         var get = await Client.GetAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+            InodeBindingUrl(inodeId, binding.BindingId));
         Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
+
+        // 该绑定私有的 EAV 数据也已删除（旧 EAV 接口读不到属性）
+        var viaEav = await Client.GetEavAsync<DynamicEntityDto>(
+            $"/api/eav/{EntityType}/entities/{binding.EntityId}");
+        Assert.NotNull(viaEav);
+        Assert.False(viaEav!.Properties.ContainsKey("name"));
     }
 
     [Fact]
-    public async Task Delete_NotCreated_Returns404()
+    public async Task Delete_UnknownBinding_Returns404()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
         var resp = await Client.DeleteAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+            InodeBindingUrl(inodeId, Guid.NewGuid().ToString("D")));
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 
     [Fact]
-    public async Task Put_ThenDelete_CanRecreateWithNewId()
+    public async Task Delete_ThenCreateAgain_GetsNewBindingId()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         var inodeId = NewInodeId();
 
+        var first = await CreateInodeBindingAsync(inodeId, EntityType, "重建");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, first.BindingId),
             new Dictionary<string, object?> { ["name"] = "v1" });
 
-        var dto1 = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+        var del = await Client.DeleteAsync(
+            InodeBindingUrl(inodeId, first.BindingId));
+        Assert.Equal(HttpStatusCode.OK, del.StatusCode);
 
-        await Client.DeleteAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
-
+        var second = await CreateInodeBindingAsync(inodeId, EntityType, "重建");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, second.BindingId),
             new Dictionary<string, object?> { ["name"] = "v2" });
 
-        var dto2 = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeId}/entities/{EntityType}");
+        var dto = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, second.BindingId));
 
-        // 新 GUID
-        Assert.NotEqual(dto1!.EntityId, dto2!.EntityId);
-        Assert.Equal("v2", dto2.Properties["name"].GetString());
+        Assert.NotEqual(first.BindingId, second.BindingId);
+        Assert.NotEqual(first.EntityId, second.EntityId);
+        Assert.Equal("v2", dto!.Properties["name"].GetString());
     }
 
     // ============================================================
@@ -188,25 +233,30 @@ public class InodeEntityTests : IntegrationTestBase
     // ============================================================
 
     [Fact]
-    public async Task List_ReturnsAllCreatedEntities()
+    public async Task List_ReturnsAllBindings()
     {
         await InodeTestData.EnsureTypeAsync(Client, EntityType);
         await InodeTestData.EnsureTypeAsync(Client, EntityType + "B");
 
         var inodeId = NewInodeId();
 
+        var a = await CreateInodeBindingAsync(inodeId, EntityType, "A");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}",
+            InodeBindingUrl(inodeId, a.BindingId),
             new Dictionary<string, object?> { ["name"] = "A" });
+
+        var b = await CreateInodeBindingAsync(inodeId, EntityType + "B", "B");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{EntityType}B",
+            InodeBindingUrl(inodeId, b.BindingId),
             new Dictionary<string, object?> { ["name"] = "B" });
 
-        var list = await Client.GetEavAsync<List<DynamicEntityDto>>(
-            $"/api/inode/{inodeId}/entities");
+        var list = await Client.GetEavAsync<List<InodeBindingDto>>(
+            $"/api/inode/{inodeId}/bindings");
 
         Assert.NotNull(list);
         Assert.Equal(2, list!.Count);
+        Assert.Contains(list, x => x.BindingId == a.BindingId && x.Name == "A");
+        Assert.Contains(list, x => x.BindingId == b.BindingId && x.Name == "B");
     }
 
     [Fact]
@@ -214,8 +264,8 @@ public class InodeEntityTests : IntegrationTestBase
     {
         var inodeId = NewInodeId();
 
-        var list = await Client.GetEavAsync<List<DynamicEntityDto>>(
-            $"/api/inode/{inodeId}/entities");
+        var list = await Client.GetEavAsync<List<InodeBindingDto>>(
+            $"/api/inode/{inodeId}/bindings");
 
         Assert.NotNull(list);
         Assert.Empty(list!);
@@ -233,32 +283,35 @@ public class InodeEntityTests : IntegrationTestBase
         var inodeA = NewInodeId();
         var inodeB = NewInodeId();
 
+        var bindingA = await CreateInodeBindingAsync(inodeA, EntityType, "同名");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeA}/entities/{EntityType}",
+            InodeBindingUrl(inodeA, bindingA.BindingId),
             new Dictionary<string, object?> { ["name"] = "A-value" });
+
+        var bindingB = await CreateInodeBindingAsync(inodeB, EntityType, "同名");
         await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeB}/entities/{EntityType}",
+            InodeBindingUrl(inodeB, bindingB.BindingId),
             new Dictionary<string, object?> { ["name"] = "B-value" });
 
-        var dtoA = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeA}/entities/{EntityType}");
-        var dtoB = await Client.GetEavAsync<DynamicEntityDto>(
-            $"/api/inode/{inodeB}/entities/{EntityType}");
+        var dtoA = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeA, bindingA.BindingId));
+        var dtoB = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeB, bindingB.BindingId));
 
-        // 两个不同 entityId
         Assert.NotEqual(dtoA!.EntityId, dtoB!.EntityId);
-
-        // 数据隔离
         Assert.Equal("A-value", dtoA.Properties["name"].GetString());
         Assert.Equal("B-value", dtoB.Properties["name"].GetString());
+
+        // 跨节点同名不被视为冲突
+        Assert.Equal("同名", dtoA.Name);
+        Assert.Equal("同名", dtoB.Name);
     }
 
     /// <summary>
-    /// 回归：声明但无属性的类型，实体可创建但无法写入。
+    /// 回归：声明但无属性的类型，绑定可创建但无法写入。
     ///
-    /// 修复前：GetOrCreateEntityIdAsync 误查 attribute_catalog，
-    ///         对无属性类型 PUT 直接 400"实体类型不存在"。
-    /// 修复后：实体创建成功，写入阶段因"未知属性"被 400 拒绝。
+    /// 实体创建（绑定）阶段不校验属性定义；
+    /// 写入阶段因"未知属性"被 400 拒绝。
     /// </summary>
     [Fact]
     public async Task Put_OnTypeWithoutAttributes_FailsValidation()
@@ -274,14 +327,83 @@ public class InodeEntityTests : IntegrationTestBase
 
         var inodeId = NewInodeId();
 
+        var binding = await CreateInodeBindingAsync(inodeId, created!.EntityType, "无属性");
+
         // PUT 会走到 EavValidationException（未知属性）
         var resp = await Client.PutAsJsonAsync(
-            $"/api/inode/{inodeId}/entities/{created!.EntityType}",
+            InodeBindingUrl(inodeId, binding.BindingId),
             new Dictionary<string, object?> { ["whatever"] = "x" });
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var body = await resp.Content.ReadAsStringAsync();
         Assert.Contains("未知属性", body);
+    }
+
+    // ============================================================
+    // 同节点同类型多条命名绑定
+    // ============================================================
+
+    [Fact]
+    public async Task SameInode_SameType_TwoBindings_HaveIndependentData()
+    {
+        await InodeTestData.EnsureTypeAsync(Client, EntityType);
+        var inodeId = NewInodeId();
+
+        var a = await CreateInodeBindingAsync(inodeId, EntityType, "工作表");
+        var b = await CreateInodeBindingAsync(inodeId, EntityType, "备用表");
+
+        await Client.PutAsJsonAsync(
+            InodeBindingUrl(inodeId, a.BindingId),
+            new Dictionary<string, object?> { ["name"] = "A", ["amount"] = 1L });
+        await Client.PutAsJsonAsync(
+            InodeBindingUrl(inodeId, b.BindingId),
+            new Dictionary<string, object?> { ["name"] = "B", ["amount"] = 2L });
+
+        var dtoA = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, a.BindingId));
+        var dtoB = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, b.BindingId));
+
+        Assert.Equal("A", dtoA!.Properties["name"].GetString());
+        Assert.Equal(1L, dtoA.Properties["amount"].GetInt64());
+        Assert.Equal("B", dtoB!.Properties["name"].GetString());
+        Assert.Equal(2L, dtoB.Properties["amount"].GetInt64());
+
+        var list = await Client.GetEavAsync<List<InodeBindingDto>>(
+            $"/api/inode/{inodeId}/bindings");
+        Assert.Equal(2, list!.Count);
+
+        var cards = await Client.GetEavAsync<List<InodeTypeCardDto>>(
+            $"/api/inode/{inodeId}/types");
+        var card = cards!.Single(c => c.EntityType == EntityType);
+        Assert.True(card.HasEntity);
+        Assert.Equal(2, card.BindingCount);
+    }
+
+    [Fact]
+    public async Task DeleteOneBinding_SiblingRemains()
+    {
+        await InodeTestData.EnsureTypeAsync(Client, EntityType);
+        var inodeId = NewInodeId();
+
+        var a = await CreateInodeBindingAsync(inodeId, EntityType, "甲");
+        var b = await CreateInodeBindingAsync(inodeId, EntityType, "乙");
+
+        await Client.PutAsJsonAsync(
+            InodeBindingUrl(inodeId, a.BindingId),
+            new Dictionary<string, object?> { ["name"] = "A" });
+        await Client.PutAsJsonAsync(
+            InodeBindingUrl(inodeId, b.BindingId),
+            new Dictionary<string, object?> { ["name"] = "B" });
+
+        var del = await Client.DeleteAsync(
+            InodeBindingUrl(inodeId, a.BindingId));
+        Assert.Equal(HttpStatusCode.OK, del.StatusCode);
+
+        var dtoB = await Client.GetEavAsync<InodeBindingDetailDto>(
+            InodeBindingUrl(inodeId, b.BindingId));
+        Assert.NotNull(dtoB);
+        Assert.Equal("B", dtoB!.Properties["name"].GetString());
     }
 
     private sealed record CreateTypeResponse(string EntityTypeId, string EntityType);

@@ -1,130 +1,237 @@
 @* NodeAttributeItemsSky.razor
-   节点属性宿主适配器：宿主（iNode = 树节点 / 线路 / 线路节点 Id）需先「关注」（绑定）某个属性定义，
-   该类型的属性表单才会出现在宿主上。
-     - 只读模式：仅渲染已关注类型的属性区块
-     - 管理模式：额外渲染「属性定义 / 绑定」表格，勾选 = 关注、取消勾选 = 取消关注
-   数据读写走 iNode 端点 /api/inode/{nodeId}/entities/{type}。
+   节点属性宿主适配器：维护宿主（iNode = 树节点 / 线路 / 线路节点 Id）的命名绑定。
+   结构（对齐 spaces「节点属性 → 属性定义」EntityTypes.razor 的表格维护方式）：
+     1. 「绑定属性」expand 包裹的 MudTable（仅管理模式显示）：
+        排序 | 绑定名 | 属性定义 | 操作（删除/重命名/展开二级列表）；
+        表头操作列「+」= 新建绑定；行内二级列表 = 该绑定属性定义的属性明细；
+     2. 下方每条绑定一个独立折叠面板（NodeBindingSection），展开编辑属性数据。
+   命名绑定模型：同一宿主同一类型可建多条绑定；每条绑定拥有独立属性数据。
+   排序列遵循项目记忆「排序列生成模式」：行首第一列、上下箭头、
+   相邻行 DisplayOrder 互换逐条提交、同值按展示位置 1..N 兜底重排。
+   读写走 iNode 绑定端点 /api/inode/{nodeId}/bindings。
    非泛型：仅依赖 NodeId，可用于树节点与线路/线路节点等任意 iNode 宿主。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 
+@using TreeGraph.Blazor.Shared.NodeEavSky
+@using TreeGraph.Blazor.Shared.NodeEavSky.Pages.Inodes
 @using TreeGraph.Blazor.Shared.NodeEavSky.Services
 @using TreeGraph.Shared.NodeEavSky.Dtos
 
 @inject EavApiClient EavApi
 @inject MessageService Message
+@inject IDialogService DialogService
 
-@if (_loading)
+@* ======== 绑定属性：expand 包裹的表格维护（对齐 EntityTypes 属性定义管理）。
+     仅管理模式显示；「节点操作」等只读查看页不显示该维护部件。 ======== *@
+@if (!ReadOnly)
 {
-    <MudStack Class="py-4" AlignItems="AlignItems.Center">
-        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-        <MudText Typo="Typo.caption" Class="mt-1">加载属性...</MudText>
-    </MudStack>
+    <MudExpansionPanel Elevation="0" Outlined="true" Class="mb-3"
+                       Expanded="true">
+        <TitleContent>
+            <MudStack Row AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" />
+                <MudText Typo="Typo.subtitle2">绑定属性</MudText>
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">
+                    @_bindings.Count 条绑定
+                </MudChip>
+            </MudStack>
+        </TitleContent>
+        <ChildContent>
+            <MudTable T="InodeBindingDto" Items="_bindings" Hover="true" Bordered="true"
+                      Dense="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Loading="@_loading"
+                      LoadingProgressColor="Color.Primary"
+                      Class="pb-2">
+                <HeaderContent>
+                    <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">排序</MudTh>
+                    <MudTh>绑定名</MudTh>
+                    <MudTh>属性定义</MudTh>
+                    <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                       Color="Color.Success"
+                                       Size="Size.Small"
+                                       OnClick="OpenCreateBindingAsync"
+                                       title="新建绑定" />
+                    </MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="排序" Style="text-align: right;">
+                        <div class="d-flex flex-nowrap justify-end gap-2 align-center">
+                            <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                           Size="Size.Small"
+                                           Disabled="@(_moving || !CanMove(context, -1))"
+                                           OnClick="@(async () => await MoveAsync(context, -1))"
+                                           title="上移" />
+                            <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                           Size="Size.Small"
+                                           Disabled="@(_moving || !CanMove(context, 1))"
+                                           OnClick="@(async () => await MoveAsync(context, 1))"
+                                           title="下移" />
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="绑定名">
+                        <MudText Typo="Typo.body2">@context.Name</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="属性定义">
+                        <MudText Typo="Typo.body2">
+                            @TypeDisplayOf(context.EntityType)
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(async () => await DeleteBindingAsync(context))"
+                                       title="删除绑定及其属性数据" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="@(async () => await RenameBindingAsync(context))"
+                                       title="重命名绑定" />
+                        <MudIconButton Icon="@(_expandedIds.Contains(context.BindingId)
+                                                ? Icons.Material.Filled.ExpandLess
+                                                : Icons.Material.Filled.ExpandMore)"
+                                       Size="Size.Small"
+                                       Color="Color.Info"
+                                       OnClick="@(async () => await ToggleExpandAsync(context))"
+                                       title="查看属性明细" />
+                    </MudTd>
+                </RowTemplate>
+                <ChildRowContent>
+                    @if (IsExpanded(context.BindingId))
+                    {
+                        <MudTr>
+                            <td colspan="4" style="padding: 0;">
+                                <MudPaper Elevation="0" Class="pa-3"
+                                          Style="background: var(--mud-palette-background-grey);">
+                                    @if (_attrsLoading)
+                                    {
+                                        <MudProgressLinear Indeterminate="true" Color="Color.Info" />
+                                    }
+                                    else
+                                    {
+                                        var attrs = GetAttrs(context.EntityType);
+                                        if (attrs.Count == 0)
+                                        {
+                                            <MudAlert Severity="Severity.Info" Dense="true">
+                                                该属性定义暂无属性
+                                            </MudAlert>
+                                        }
+                                        else
+                                        {
+                                            <MudSimpleTable Dense="true" Bordered="true" Hover="true"
+                                                            Style="overflow-x: auto;">
+                                                <thead>
+                                                    <tr>
+                                                        <th>显示名</th>
+                                                        <th>类型</th>
+                                                        <th>引用</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var a in attrs)
+                                                    {
+                                                        <tr>
+                                                            <td>@a.DisplayName</td>
+                                                            <td>
+                                                                <MudChip T="string" Size="Size.Small"
+                                                                         Color="@GetDataTypeColor(a.DataType)">
+                                                                    @EavDataTypeLabels.GetLabel(a.DataType)
+                                                                </MudChip>
+                                                            </td>
+                                                            <td>
+                                                                @if (a.UnitId is not null)
+                                                                {
+                                                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="mr-1">单位</MudChip>
+                                                                }
+                                                                @if (a.RefOptionSetId is not null)
+                                                                {
+                                                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Class="mr-1">选项: @(a.OptionSetDisplayName ?? a.OptionSetName)</MudChip>
+                                                                }
+                                                                @if (a.RefCompositeTypeId is not null)
+                                                                {
+                                                                    <MudChip T="string" Size="Size.Small" Color="Color.Dark" Class="mr-1">组合: @(a.CompositeTypeDisplayName ?? a.CompositeTypeName)</MudChip>
+                                                                }
+                                                                @if (a.RefTableDefinitionId is not null)
+                                                                {
+                                                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">表: @(a.TableDisplayName ?? a.TableName)</MudChip>
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </MudSimpleTable>
+                                        }
+                                    }
+                                </MudPaper>
+                            </td>
+                        </MudTr>
+                    }
+                </ChildRowContent>
+                <NoRecordsContent>
+                    <EmptyStateSky Icon="@Icons.Material.Filled.Link"
+                                   Title="该节点尚无属性绑定">
+                        <Description>
+                            <text>点击表头 + 创建第一条绑定</text>
+                        </Description>
+                    </EmptyStateSky>
+                </NoRecordsContent>
+            </MudTable>
+        </ChildContent>
+    </MudExpansionPanel>
 }
-else
-{
-    @* 属性定义绑定表：勾选 = 关注（绑定）该属性定义，取消勾选 = 取消关注 *@
-    @if (AllowManage)
-    {
-        @if (_rows.Count == 0)
-        {
-            <MudAlert Severity="Severity.Info" Dense="true" Class="my-2">
-                暂无可用属性定义，请先在「管理属性定义 → 属性定义」中创建
-            </MudAlert>
-        }
-        else
-        {
-            <MudExpansionPanel Elevation="0" Outlined="true" Class="mb-3"
-                               Expanded="true" HideExpandIcon="false">
-                <TitleContent>
-                    <MudStack Row AlignItems="AlignItems.Center">
-                        <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" />
-                        <MudText Typo="Typo.subtitle2">属性定义绑定</MudText>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Default">
-                            已绑定 @_cards.Count / @_rows.Count
-                        </MudChip>
-                    </MudStack>
-                </TitleContent>
-                <ChildContent>
-                    <div class="pb-3">
-                        <MudTable Items="_rows" Dense="true" Hover="true" Bordered="true"
-                                  Elevation="0">
-                        <HeaderContent>
-                            <MudTh>属性定义</MudTh>
-                            <MudTh Style="width: 96px;">绑定</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="属性定义">@context.DisplayName</MudTd>
-                            <MudTd DataLabel="绑定">
-                                @* 已产生属性数据的类型禁止取消绑定（后端亦会拒绝） *@
-                                @if (IsBound(context.EntityType) && context.HasEntity)
-                                {
-                                    <MudTooltip Text="该类型下已有属性数据，无法取消绑定">
-                                        <MudCheckBox T="bool" Dense="true" Value="true" Disabled="true" />
-                                    </MudTooltip>
-                                }
-                                else
-                                {
-                                    <MudCheckBox T="bool"
-                                                 Dense="true"
-                                                 Color="Color.Primary"
-                                                 Value="@IsBound(context.EntityType)"
-                                                 ValueChanged="@(v => ToggleBindAsync(context.EntityType, v))" />
-                                }
-                            </MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                    </div>
-                </ChildContent>
-            </MudExpansionPanel>
-        }
-    }
 
-    @* 已关注类型的属性区块 *@
-    @for (var i = 0; i < _cards.Count; i++)
-    {
-        var idx = i;
-        var card = _cards[idx];
-        <NodeEntityTypeSection InodeId="@NodeId"
-                               EntityType="@card.EntityType"
-                               DisplayName="@card.DisplayName"
-                               ReadOnly="@ReadOnly"
-                               AllowDetach="@AllowManage"
-                               @ref="_sections[idx]"
-                               OnDetachRequested="@(() => DetachAsync(card))"
-                               OnDataDeleted="@OnEntityDataDeletedAsync"
-                               OnDataSaved="@OnEntityDataSavedAsync" />
-    }
+@* ======== 每条命名绑定一个独立属性区块（保持折叠面板形态） ======== *@
+@for (var i = 0; i < _bindings.Count; i++)
+{
+    var idx = i;
+    var b = _bindings[idx];
+    <NodeBindingSection @key="@b.BindingId"
+                        InodeId="@NodeId"
+                        Binding="@b"
+                        ReadOnly="@ReadOnly"
+                        @ref="_sections[idx]"
+                        OnDataSaved="@OnEntityDataSavedAsync"
+                        OnDataDeleted="@OnEntityDataDeletedAsync" />
 }
 
 @code {
     /// <summary>宿主节点 ID（= iNode Id = 树节点 / 线路 / 线路节点 Id）。</summary>
     [Parameter, EditorRequired] public string NodeId { get; set; } = default!;
 
-    /// <summary>只读模式（禁用编辑、隐藏关注/取消关注操作）。</summary>
+    /// <summary>只读模式（表单只读、隐藏新建/行操作图标）。</summary>
     [Parameter] public bool ReadOnly { get; set; }
 
-    /// <summary>是否允许管理关注关系（关注/取消关注）；仅属性管理对话框开启。</summary>
+    /// <summary>是否允许管理绑定（新建/重命名/删除）；仅属性管理对话框开启。</summary>
     [Parameter] public bool AllowManage { get; set; }
-
-    /// <summary>绑定表格行：属性定义标识 + 展示名 + 是否已产生属性数据。</summary>
-    private sealed record TypeBindRow(string EntityType, string DisplayName, bool HasEntity);
 
     private IReadOnlyList<InodeTypeCardDto> _cards = [];
 
-    /// <summary>属性定义绑定表格行（共享类型 ∪ 已关注类型），仅管理模式使用。</summary>
-    private IReadOnlyList<TypeBindRow> _rows = [];
+    /// <summary>该节点全部命名绑定（表格与面板数据源，按 DisplayOrder 升序）。</summary>
+    private IReadOnlyList<InodeBindingDto> _bindings = [];
 
-    /// <summary>与 _cards 同序的区块引用槽位（Razor @ref 索引器赋值）。</summary>
-    private List<NodeEntityTypeSection?> _sections = [];
     private bool _loading;
 
-    /// <summary>绑定切换进行中，避免复选框重复触发。</summary>
-    private bool _binding;
+    /// <summary>排序提交中：期间禁用全部箭头，避免并发交换。</summary>
+    private bool _moving;
+
+    /// <summary>已展开行的绑定 ID（key 用持久 BindingId）。</summary>
+    private readonly HashSet<string> _expandedIds = new();
+
+    /// <summary>EntityType → 该类型的属性明细列表（惰性加载缓存）。</summary>
+    private readonly Dictionary<string, IReadOnlyList<AttributeDetailDto>> _attrsCache = new();
+
+    /// <summary>属性明细拉取中（展开行显示 loading）。</summary>
+    private bool _attrsLoading;
+
+    /// <summary>与 _bindings 同序的属性区块引用槽位（Razor @ref 索引器赋值）。</summary>
+    private List<NodeBindingSection?> _sections = [];
 
     protected override async Task OnInitializedAsync()
         => await ReloadAsync();
 
-    /// <summary>重新加载节点已关注的类型列表及其属性区块。</summary>
+    /// <summary>重新加载节点全部命名绑定（表格与属性区块）。</summary>
     public async Task ReloadAsync(bool showLoading = true)
     {
         if (string.IsNullOrEmpty(NodeId))
@@ -135,39 +242,21 @@ else
             if (showLoading)
                 _loading = true;
 
-            var cards = await EavApi.ListInodeTypeCardsAsync(NodeId);
-            // ListTypes 仅返回已声明卡片；兼容未来可能混入的未声明项
-            _cards = cards?.Where(c => c.Declared).ToList() ?? [];
-            _sections = _cards.Select(_ => (NodeEntityTypeSection?)null).ToList();
+            var cardsTask = EavApi.ListInodeTypeCardsAsync(NodeId);
+            var bindingsTask = EavApi.ListInodeBindingsAsync(NodeId);
+            await Task.WhenAll(cardsTask, bindingsTask);
 
-            // 绑定表格仅在管理模式渲染：共享类型 ∪ 已关注类型
-            //（已关注但不在共享列表中的类型仍需列出，否则无法取消绑定）
-            if (AllowManage)
-            {
-                var allTypes = await EavApi.ListEntityTypesAsync();
-                var cardMap = _cards.ToDictionary(c => c.EntityType);
-                var rows = new List<TypeBindRow>();
-                var seen = new HashSet<string>();
+            // 卡片仅用于绑定类型的展示名（TypeDisplayOf）
+            _cards = cardsTask.Result?.Where(c => c.Declared).ToList() ?? [];
+            _bindings = bindingsTask.Result ?? [];
+            _sections = _bindings.Select(_ => (NodeBindingSection?)null).ToList();
 
-                // 已关注类型的属性数据状态来自 _cards（共享类型列表不含该信息）
-                foreach (var t in allTypes ?? [])
-                {
-                    if (seen.Add(t.EntityType))
-                        rows.Add(new TypeBindRow(t.EntityType, t.DisplayName ?? t.EntityType,
-                            cardMap.TryGetValue(t.EntityType, out var bound) && bound.HasEntity));
-                }
-                foreach (var c in _cards)
-                {
-                    if (seen.Add(c.EntityType))
-                        rows.Add(new TypeBindRow(c.EntityType, c.DisplayName, c.HasEntity));
-                }
-
-                _rows = rows;
-            }
+            // 清理已消失绑定的展开状态
+            _expandedIds.RemoveWhere(id => _bindings.All(b => b.BindingId != id));
         }
         catch (Exception ex)
         {
-            Message.Details("加载节点属性类型失败", ex.Message);
+            Message.Details("加载节点属性绑定失败", ex.Message);
         }
         finally
         {
@@ -176,8 +265,8 @@ else
     }
 
     /// <summary>
-    /// 依次提交所有已关注类型的属性。
-    /// 返回 false 表示任一类型校验/保存失败，调用方应保留对话框。
+    /// 依次提交所有绑定区块的属性。
+    /// 返回 false 表示任一绑定校验/保存失败，调用方应保留对话框。
     /// </summary>
     public async Task<bool> SubmitUpdateNodeAttributesAsync()
     {
@@ -190,100 +279,211 @@ else
         return true;
     }
 
-    /// <summary>该属性定义是否已被本节点关注（绑定）。</summary>
-    private bool IsBound(string entityType)
-        => _cards.Any(c => c.EntityType == entityType);
+    // ---------- 排序（遵循项目记忆「排序列生成模式」） ----------
+
+    /// <summary>当前展示位置能否向 delta 方向移动（首行不能上移、末行不能下移）。</summary>
+    private bool CanMove(InodeBindingDto dto, int delta)
+    {
+        var list = _bindings;
+        var index = IndexOf(list, dto);
+        var target = index + delta;
+        return index >= 0 && target >= 0 && target < list.Count;
+    }
+
+    private static int IndexOf(IReadOnlyList<InodeBindingDto> list, InodeBindingDto dto)
+    {
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (list[i].BindingId == dto.BindingId) return i;
+        }
+        return -1;
+    }
 
     /// <summary>
-    /// 勾选 = 关注（绑定）属性定义；取消勾选 = 取消关注。
-    /// 已产生属性数据的类型不可取消绑定（表格中复选框禁用，此处为兜底）。
+    /// 与相邻行互换 DisplayOrder 并持久化（逐条 PATCH bindings/{id}/order）。
+    /// 两行顺序值相同（历史数据重复）时，按当前展示位置 1..N 兜底重排。
     /// </summary>
-    private async Task ToggleBindAsync(string entityType, bool bound)
+    private async Task MoveAsync(InodeBindingDto dto, int delta)
     {
-        if (_binding) return;
+        var list = _bindings;
+        if (_moving || list is null) return;
 
-        // 状态未变化（例如复选框值回滚）时直接忽略
-        if (bound == IsBound(entityType)) return;
+        var index = IndexOf(list, dto);
+        var target = index + delta;
+        if (index < 0 || target < 0 || target >= list.Count) return;
 
-        if (!bound)
-        {
-            var card = _cards.FirstOrDefault(c => c.EntityType == entityType);
-            if (card is { HasEntity: true })
-            {
-                Message.Warning("该类型下已有属性数据，请先清空后再取消关注");
-                return;
-            }
-        }
+        var other = list[target];
+        var sameOrder = dto.DisplayOrder == other.DisplayOrder;
 
-        _binding = true;
+        _moving = true;
         try
         {
-            var (ok, error) = bound
-                ? await EavApi.AttachInodeTypeAsync(NodeId, entityType)
-                : await EavApi.DetachInodeTypeAsync(NodeId, entityType);
-
+            var (ok, error) = await EavApi.ReorderInodeBindingAsync(
+                NodeId, dto.BindingId,
+                sameOrder ? target + 1 : other.DisplayOrder);
             if (!ok)
             {
-                Message.Details(bound ? "关注失败" : "取消关注失败", error ?? "未知错误");
+                Message.Details("调整顺序失败", error ?? "未知错误");
                 return;
             }
 
-            Message.Success(bound ? "已绑定" : "已取消绑定");
-            await ReloadAsync(showLoading: false);
+            var (okOther, errorOther) = await EavApi.ReorderInodeBindingAsync(
+                NodeId, other.BindingId,
+                sameOrder ? index + 1 : dto.DisplayOrder);
+            if (!okOther)
+            {
+                Message.Details("调整顺序失败", errorOther ?? "未知错误");
+                return;
+            }
         }
         finally
         {
-            _binding = false;
+            _moving = false;
         }
+
+        await ReloadAsync(showLoading: false);
     }
 
-    /// <summary>取消关注（后端在该类型已有属性数据时会拒绝）。</summary>
-    private async Task DetachAsync(InodeTypeCardDto card)
+    // ---------- 行内展开：属性定义二级列表 ----------
+
+    private bool IsExpanded(string bindingId) => _expandedIds.Contains(bindingId);
+
+    private IReadOnlyList<AttributeDetailDto> GetAttrs(string entityType)
+        => _attrsCache.TryGetValue(entityType, out var list)
+            ? list
+            : Array.Empty<AttributeDetailDto>();
+
+    /// <summary>切换展开；首次展开时按 EntityType 拉取该类型的属性明细。</summary>
+    private async Task ToggleExpandAsync(InodeBindingDto binding)
     {
-        if (card.HasEntity)
+        if (!_expandedIds.Add(binding.BindingId))
         {
-            Message.Warning("该类型下已有属性数据，请先清空后再取消关注");
+            _expandedIds.Remove(binding.BindingId);
             return;
         }
 
-        var ok2 = await Message.BoolBoxAsync(
-            $"确定取消关注属性定义「{card.DisplayName}」吗？", "取消关注");
-        if (!ok2) return;
+        if (_attrsCache.ContainsKey(binding.EntityType)) return;
 
-        var (ok, error) = await EavApi.DetachInodeTypeAsync(NodeId, card.EntityType);
+        _attrsLoading = true;
+        try
+        {
+            var list = await EavApi.ListAttributesAsync(binding.EntityType);
+            _attrsCache[binding.EntityType] =
+                (list ?? Array.Empty<AttributeDetailDto>())
+                .OrderBy(a => a.DisplayOrder).ToList();
+        }
+        catch
+        {
+            Message.Warning("属性明细加载失败");
+            _attrsCache[binding.EntityType] = Array.Empty<AttributeDetailDto>();
+        }
+        finally
+        {
+            _attrsLoading = false;
+        }
+    }
+
+    private static Color GetDataTypeColor(string dataType) => dataType switch
+    {
+        "string" => Color.Info,
+        "int" or "decimal" => Color.Primary,
+        "bool" => Color.Success,
+        "datetime" or "date" or "time" => Color.Warning,
+        "single_choice" => Color.Tertiary,
+        "composite" => Color.Dark,
+        _ => Color.Default
+    };
+
+    // ---------- 新建 / 重命名 / 删除 ----------
+
+    /// <summary>「新建绑定」入口：选实体类型 + 输入绑定名，一步完成绑定创建。</summary>
+    private async Task OpenCreateBindingAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(BindingCreateDialog.NodeId), NodeId },
+            { nameof(BindingCreateDialog.DialogContext),
+              "为该节点新建命名绑定：同一类型可建多条绑定，每条绑定拥有独立的属性数据。" }
+        };
+
+        var dialog = await DialogService.ShowAsync<BindingCreateDialog>(
+            "新建绑定", parameters);
+        var result = await dialog.Result;
+
+        if (result?.Canceled != false
+            || result.Data is not BindingCreateDialog.CreatedBinding)
+        {
+            return;
+        }
+
+        await ReloadAsync(showLoading: false);
+    }
+
+    /// <summary>绑定类型的展示名（表格「属性定义」列）。</summary>
+    private string TypeDisplayOf(string entityType)
+        => _cards.FirstOrDefault(c => c.EntityType == entityType) is { } card
+            && !string.IsNullOrWhiteSpace(card.DisplayName)
+                ? card.DisplayName
+                : entityType;
+
+    /// <summary>重命名绑定（表格行触发）。</summary>
+    private async Task RenameBindingAsync(InodeBindingDto binding)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(BindingNameDialog.Title), "重命名绑定" },
+            { nameof(BindingNameDialog.SubmitText), "保存" },
+            { nameof(BindingNameDialog.InitialName), binding.Name },
+            { nameof(BindingNameDialog.HelperText),
+              $"同一节点「{TypeDisplayOf(binding.EntityType)}」下绑定名不可重复" }
+        };
+
+        var dialog = await DialogService.ShowAsync<BindingNameDialog>(
+            "重命名绑定", parameters);
+        var result = await dialog.Result;
+
+        if (result?.Canceled != false || result.Data is not string name)
+            return;
+        if (string.IsNullOrWhiteSpace(name) || name.Trim() == binding.Name)
+            return;
+
+        var (ok, error) = await EavApi.RenameInodeBindingAsync(
+            NodeId, binding.BindingId, name.Trim());
         if (!ok)
         {
-            Message.Details("取消关注失败", error ?? "未知错误");
+            Message.Details("重命名失败", error ?? "未知错误");
             return;
         }
 
-        Message.Success("已取消关注");
-        await ReloadAsync();
+        Message.Success("已重命名");
+        await ReloadAsync(showLoading: false);
     }
 
-    /// <summary>子区块删除属性数据后，同步更新绑定表中的 HasEntity 状态。</summary>
-    private Task OnEntityDataDeletedAsync(string entityType)
+    /// <summary>删除绑定及其属性数据（表格行触发）。</summary>
+    private async Task DeleteBindingAsync(InodeBindingDto binding)
     {
-        _rows = _rows.Select(r => r.EntityType == entityType && r.HasEntity
-            ? r with { HasEntity = false }
-            : r).ToList();
-        _cards = _cards.Select(c => c.EntityType == entityType && c.HasEntity
-            ? c with { HasEntity = false }
-            : c).ToList();
-        StateHasChanged();
-        return Task.CompletedTask;
+        var confirmed = await Message.BoolBoxAsync(
+            $"确定删除绑定「{binding.Name}」及其属性数据？此操作不可恢复。",
+            "删除绑定");
+        if (!confirmed) return;
+
+        var (ok, error) = await EavApi.DeleteInodeBindingAsync(
+            NodeId, binding.BindingId);
+        if (!ok)
+        {
+            Message.Details("删除失败", error ?? "未知错误");
+            return;
+        }
+
+        Message.Success("绑定已删除");
+        await ReloadAsync(showLoading: false);
     }
 
-    /// <summary>子区块首次创建属性数据后，同步更新绑定表中的 HasEntity 状态。</summary>
-    private Task OnEntityDataSavedAsync(string entityType)
-    {
-        _rows = _rows.Select(r => r.EntityType == entityType && !r.HasEntity
-            ? r with { HasEntity = true }
-            : r).ToList();
-        _cards = _cards.Select(c => c.EntityType == entityType && !c.HasEntity
-            ? c with { HasEntity = true }
-            : c).ToList();
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
+    /// <summary>绑定区块保存数据后，重新拉取列表。</summary>
+    private async Task OnEntityDataSavedAsync(string entityType)
+        => await ReloadAsync(showLoading: false);
+
+    /// <summary>绑定区块数据删除后，重新拉取列表。</summary>
+    private async Task OnEntityDataDeletedAsync(string entityType)
+        => await ReloadAsync(showLoading: false);
 }

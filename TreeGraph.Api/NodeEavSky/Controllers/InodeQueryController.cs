@@ -52,10 +52,9 @@ public class InodeQueryController : ControllerBase
 
         if (!string.IsNullOrEmpty(request.InodeId))
         {
-            var mappings = await _inodeEntities.ListByInodeAsync(
-                request.InodeId, ct);
-            allowedEntityIds = mappings
-                .Where(m => m.EntityType == request.EntityType)
+            var bindings = await _inodeEntities.ListBindingsAsync(
+                request.InodeId, request.EntityType, ct);
+            allowedEntityIds = bindings
                 .Select(m => m.EntityId)
                 .ToList();
 
@@ -135,13 +134,15 @@ public class InodeQueryController : ControllerBase
             return map;
         }
 
-        // 跨 iNode：逐个反查
+        // 跨 iNode：一条 EAV 数据只属于一条绑定，因此 entityId → 唯一宿主
+        var bindings = await _inodeEntities.ListByTypeAsync(entityType, ct);
+        var hostByEntity = bindings
+            .GroupBy(b => b.EntityId)
+            .ToDictionary(g => g.Key, g => g.First().InodeId);
+
         foreach (var id in entityIds)
-        {
-            var mapping = await _inodeEntities.GetByEntityAsync(
-                entityType, id, ct);
-            map[id] = mapping?.InodeId ?? "";
-        }
+            map[id] = hostByEntity.GetValueOrDefault(id, "");
+
         return map;
     }
 
