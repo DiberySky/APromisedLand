@@ -105,7 +105,12 @@ public sealed class TreeNodeActionOrchestrator<TItem>(
             if (exec == TreeNodeActionExecResult.Changed)
                 changed = true;
 
-            if (result.Action is not (NodeAction.View
+            // 编辑页内嵌动作（移动/创建子项/子项排序/删除）以实际分发动作决定是否重开宿主：
+            // 创建子项/移动执行完直接回到树窗口，与宿主直达路径行为一致
+            var effectiveAction = _editDispatched ?? result.Action;
+            _editDispatched = null;
+
+            if (effectiveAction is not (NodeAction.View
                 or NodeAction.Edit
                 or NodeAction.Sort))
             {
@@ -185,6 +190,9 @@ public sealed class TreeNodeActionOrchestrator<TItem>(
         return TreeNodeActionExecResult.None;
     }
 
+    /// <summary>编辑页分发出的非 Edit 动作（OperateAsync 据此决定是否重开宿主）。</summary>
+    private NodeAction? _editDispatched;
+
     private async Task<TreeNodeActionExecResult> HandleEditAsync(
         TreeNodeItem<TItem> node, TreeNodeActionUi<TItem> ui, CancellationToken ct)
     {
@@ -194,8 +202,19 @@ public sealed class TreeNodeActionOrchestrator<TItem>(
             EditTemplate = ui.EditTemplate,
         };
 
-        var formModel = await nodeDialogSvc.ShowEditDialogAsync(nodeTemplate);
-        if (formModel == null) return TreeNodeActionExecResult.None;
+        // 懒加载时 Value.Parent 可能未装载，取父节点供编辑对话框工具栏兜底显示
+        var parentNode = node.Value?.ParentId is { } pid ? ui.GetParentNode(pid) : null;
+        var result = await nodeDialogSvc.ShowEditDialogAsync(nodeTemplate, parentNode: parentNode);
+        if (result == null) return TreeNodeActionExecResult.None;
+
+        // 编辑页内嵌节点动作（移动/创建子项/子项排序/删除）：直接分发执行
+        if (result.Action != NodeAction.Edit)
+        {
+            _editDispatched = result.Action;
+            return await ExecuteAsync(result.Action, node, ui, ct);
+        }
+
+        var formModel = result.Node;
 
         try
         {

@@ -133,23 +133,38 @@ public class TreeNodeDialogService<TItem>(
         return formModel;
     }
 
-    public async Task<TItem?> ShowEditDialogAsync(
+    /// <summary>
+    /// 编辑节点对话框。正常保存返回 Action=Edit（Node=表单模型）；
+    /// 工具栏/左侧点移动/创建子项/子项排序/删除时返回对应动作（Node=原节点），由编排器分发执行。
+    /// </summary>
+    public async Task<NodeActionResult<TItem>?> ShowEditDialogAsync(
         NodeTemplate<TItem> nodeTemplate,
-        DialogConfig? config = null)
+        DialogConfig? config = null,
+        TItem? parentNode = null)
     {
         var parameters = new DialogParameters
         {
-            { "NodeTemplate", nodeTemplate }
+            { "NodeTemplate", nodeTemplate },
+            { "ParentNode", parentNode }
         };
 
         var options = (config ?? new DialogConfig { MaxWidth = MaxWidth.Small }).ToDialogOptions();
         var dialog = await dialogService.ShowExAsync<TreeNodeEditDialog<TItem>>("编辑节点", parameters, options);
 
         var result = await dialog.Result;
-        if (result?.Canceled != false || result.Data is not TItem formModel)
+        if (result?.Canceled != false)
             return null;
 
-        return formModel;
+        return result.Data switch
+        {
+            NodeActionResult<TItem> action => action,
+            TItem formModel => new NodeActionResult<TItem>
+            {
+                Action = NodeAction.Edit,
+                Node = formModel
+            },
+            _ => null
+        };
     }
 
     #endregion

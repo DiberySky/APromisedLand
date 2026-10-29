@@ -73,6 +73,15 @@
     {
         if (node == null) return;
 
+        // 移动模式（OriginalNode 非空）：点击任意节点即选为新上级；
+        // 自身不可选，移动到后代由后端 move 路由防环校验拒绝
+        if (OriginalNode != null)
+        {
+            if (node.Value!.Id != OriginalNode.Value?.Id)
+                MudDialog?.Close(DialogResult.Ok(node.Value));
+            return;
+        }
+
         if (_selectLeaf && !node.Value!.CanHaveChildren)
             MudDialog?.Close(DialogResult.Ok(node.Value));
     }

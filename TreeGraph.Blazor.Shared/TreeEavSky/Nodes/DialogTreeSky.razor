@@ -19,6 +19,12 @@
             @DialogContent
         }
     </DialogContent>
+    <DialogLeftActions>
+        @if (DialogLeftActions != null)
+        {
+            @DialogLeftActions
+        }
+    </DialogLeftActions>
     <DialogRightActions>
         @if (DialogActions != null)
         {
@@ -39,6 +45,7 @@
     [Parameter] public RenderFragment? TitleContent { get; set; }
     [Parameter] public RenderFragment? ToolBarContent { get; set; }
     [Parameter] public RenderFragment? DialogContent { get; set; }
+    [Parameter] public RenderFragment? DialogLeftActions { get; set; }
     [Parameter] public RenderFragment? DialogActions { get; set; }
 
     [Parameter] public EventCallback OnCanceledClick { get; set; }

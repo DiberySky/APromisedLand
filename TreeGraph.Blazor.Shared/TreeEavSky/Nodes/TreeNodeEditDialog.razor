@@ -1,26 +1,28 @@
 @* TreeNodeEditDialog.razor — 编辑节点专用对话框。
-   已重写：去掉 IsCreate 参数与所有条件分支，无条件渲染 MudTabs + 属性绑定 Tab +
-   管理属性定义工具栏按钮 + 属性保存逻辑。EAV/Edge 模块挂入只在编辑阶段。 *@
+   已重写：去掉 IsCreate 参数与所有条件分支，无条件渲染 MudTabs + 属性绑定 Tab + 属性保存逻辑。
+   节点管理动作（移动/创建子项/子项排序/删除）集中在本页（宿主「节点操作」只读，便于权限控制）：
+   点击关闭并返回动作，由 TreeNodeActionOrchestrator.HandleEditAsync 识别分发。
+   EAV/Edge 模块挂入只在编辑阶段。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
-
-@inject IDialogService DialogService
 
 <DialogTreeSky TItem="@TItem"
                Item="@_node"
                Title="@_title"
-               SubmitButtonVisible="true"
-               OnSubmitClick="@SubmitAsync"
+               SubmitButtonVisible="false"
+               CancelButtonVisible="false"
                OnCanceledClick="@Close">
     <ToolBarContent>
-        <MudText Typo="Typo.body2" Class="mud-text-secondary">@_node.Name</MudText>
+        @* 显示父节点名（与只读宿主「节点操作」一致）；懒加载 Parent 可能未装载，用 ParentNode 兜底 *@
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@(_node.Parent?.Name ?? ParentNode?.Name)</MudText>
         <MudSpacer/>
+        @* 节点管理动作（自只读宿主「节点操作」迁入）：点击关闭并返回动作，由编排器分发 *@
         <MudButton Variant="Variant.Text"
-                   Color="Color.Info"
+                   StartIcon="@Icons.Material.Outlined.MoveUp"
+                   Color="Color.Warning"
                    Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Settings"
-                   OnClick="@OpenAttributesManageAsync">
-            管理属性定义
+                   OnClick="@OnMove">
+            移动
         </MudButton>
     </ToolBarContent>
     <DialogContent>
@@ -52,12 +54,62 @@
             </MudTabs>
         </MudContainer>
     </DialogContent>
+    <DialogLeftActions>
+        @* 节点管理动作靠左：创建子项/子项排序/删除 *@
+        @if (_node.CanHaveChildren)
+        {
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Outlined.Add"
+                       Color="Color.Success"
+                       OnClick="@OnAddChild">
+                创建子项
+            </MudButton>
+        }
+        @* 无子项时隐藏排序；懒加载树 Children 可能为 null，以后端 HasChildren 标志兜底 *@
+        @if (_node.HasChildren || NodeTemplate.Node.Children?.Count > 1)
+        {
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Outlined.ImportExport"
+                       Color="Color.Default"
+                       OnClick="@OnSort">
+                子项排序
+            </MudButton>
+        }
+        @* 仍有子节点时禁止删除（后端亦拒绝）；本对话框仅非根节点可达，无需 IsBoot 判定 *@
+        @if (!NodeTemplate.Node.HasChildren)
+        {
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Error"
+                       StartIcon="@Icons.Material.Outlined.Delete"
+                       OnClick="@OnDelete">
+                删除
+            </MudButton>
+        }
+    </DialogLeftActions>
+    <DialogActions>
+        @* 底栏自绘：标准按钮靠右 *@
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.SaveAs"
+                   OnClick="@SubmitAsync">
+            提交
+        </MudButton>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.Close"
+                   OnClick="@Close">
+            取消
+        </MudButton>
+    </DialogActions>
 </DialogTreeSky>
 
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
+
+    /// <summary>父节点（懒加载时 Value.Parent 未装载的兜底，由编排器注入）。</summary>
+    [Parameter] public TItem? ParentNode { get; set; }
 
     private MudForm _form = null!;
     private NodeAttributeItemsSky? _attrItems;
@@ -94,33 +146,18 @@
         MudDialog?.Close(DialogResult.Cancel());
     }
 
-    /// <summary>打开元数据维护对话框（通用模式，不锁定属性定义）。</summary>
-    private async Task OpenAttributesManageAsync()
+    private void OnMove() => CloseWithAction(NodeAction.Move);
+    private void OnAddChild() => CloseWithAction(NodeAction.AddChild);
+    private void OnSort() => CloseWithAction(NodeAction.Sort);
+    private void OnDelete() => CloseWithAction(NodeAction.Delete);
+
+    /// <summary>关闭并返回节点动作，由 TreeNodeActionOrchestrator.HandleEditAsync 识别分发。</summary>
+    private void CloseWithAction(NodeAction action)
     {
-        var parameters = new DialogParameters<AttributesManageDialog>
+        MudDialog?.Close(DialogResult.Ok(new NodeActionResult<TItem>
         {
-            { x => x.OnAttributesChanged, EventCallback.Factory.Create(this, RefreshAttributesAsync) }
-        };
-
-        var options = new DialogOptionsEx
-        {
-            Position = DialogPosition.TopCenter,
-            MaxWidth = MaxWidth.Small,
-            FullWidth = true,
-            MaximizeButton = true
-        };
-
-        var dialog = await DialogService.ShowExAsync<AttributesManageDialog>(
-            string.Empty, parameters, options);
-        await dialog.Result;
-    }
-
-    /// <summary>属性定义变更后重新加载属性区。</summary>
-    private async Task RefreshAttributesAsync()
-    {
-        if (_attrItems != null)
-        {
-            await _attrItems.ReloadAsync();
-        }
+            Action = action,
+            Node = _node
+        }));
     }
 }

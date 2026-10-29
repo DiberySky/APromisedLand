@@ -21,18 +21,10 @@
         }
         else
         {
-            <MudText Color="Color.Info">@NodeTemplate.Node.Value!.Parent?.Name</MudText>
+            @* 懒加载：Value.Parent 可能未装载，用编排器注入的 ParentNode 兜底 *@
+            <MudText Color="Color.Info">@(NodeTemplate.Node.Value!.Parent?.Name ?? ParentNode?.Name)</MudText>
         }
         <MudSpacer/>
-        @if (!IsBoot)
-        {
-            <MudButton Variant="Variant.Text"
-                       StartIcon="@Icons.Material.Outlined.MoveUp"
-                       Color="Color.Warning"
-                       OnClick="@OnMove">
-                移动
-            </MudButton>
-        }
     </ToolBarContent>
     <DialogContent>
         <MudContainer Class="pt-0 pb-4" MaxWidth="MaxWidth.Medium">
@@ -74,31 +66,29 @@
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
-        @* 根节点不可删除：根节点仅能创建子项、子项排序（与「设置修改/属性/移动」一致按 IsBoot 判定） *@
-        @if (!IsBoot && !NodeTemplate.Node.HasChildren)
+        @* 特例：根节点无「设置修改」入口，创建子项/子项排序留在本页（靠左，与设置修改页一致） *@
+        @if (IsBoot)
         {
-            <MudButton OnClick="OnDelete"
+            <MudButton OnClick="OnAddChild"
                        Variant="Variant.Text"
-                       Color="Color.Error"
-                       StartIcon="@Icons.Material.Outlined.Delete">
-                删除
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Outlined.Add">
+                创建子项
             </MudButton>
+            @* 无子项时隐藏排序；懒加载树 Children 可能为 null，以后端 HasChildren 标志兜底 *@
+            @if (NodeTemplate.Node.Value!.HasChildren || NodeTemplate.Node.Children?.Count > 1)
+            {
+                <MudButton OnClick="OnSort"
+                           Variant="Variant.Text"
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Outlined.ImportExport">
+                    子项排序
+                </MudButton>
+            }
         }
     </DialogLeftActions>
     <DialogRightActions>
-        @* 懒加载树：节点未展开时 Children 为 null，需以后端返回的 HasChildren 标志判断 *@
-        @if (NodeTemplate.Node.Value!.CanHaveChildren
-             || NodeTemplate.Node.Value!.HasChildren
-             || NodeTemplate.Node.Children?.Count > 1)
-        {
-            <MudButton OnClick="OnSort"
-                       Variant="Variant.Text"
-                       Color="Color.Default"
-                       StartIcon="@Icons.Material.Outlined.ImportExport">
-                子项排序
-            </MudButton>
-        }
-
+        @* 本对话框只读：管理功能（移动/创建子项/子项排序/删除）已迁移至「设置修改」页，便于权限控制 *@
         @if (!IsBoot)
         {
             <MudButton OnClick="OnEdit"
@@ -106,16 +96,6 @@
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Outlined.Edit">
                 设置修改
-            </MudButton>
-        }
-
-        @if (NodeTemplate.Node.Value!.CanHaveChildren)
-        {
-            <MudButton OnClick="OnAddChild"
-                       Variant="Variant.Text"
-                       Color="Color.Success"
-                       StartIcon="@Icons.Material.Outlined.Add">
-                创建子项
             </MudButton>
         }
 
@@ -129,10 +109,8 @@
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
 
-    private void OnAddChild() => CloseWithAction(NodeAction.AddChild);
     private void OnEdit() => CloseWithAction(NodeAction.Edit);
-    private void OnDelete() => CloseWithAction(NodeAction.Delete);
-    private void OnMove() => CloseWithAction(NodeAction.Move);
+    private void OnAddChild() => CloseWithAction(NodeAction.AddChild);
     private void OnSort() => CloseWithAction(NodeAction.Sort);
 
     private void CloseWithAction(NodeAction action)

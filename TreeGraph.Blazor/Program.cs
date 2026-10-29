@@ -26,7 +26,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(o => o.DetailedErrors = true); // 调试期：打开详细错误（PublishEvent 堆栈定位用）
 
 // MudBlazor
 builder.Services.AddMudServices();

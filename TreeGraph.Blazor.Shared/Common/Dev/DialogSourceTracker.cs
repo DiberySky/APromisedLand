@@ -7,6 +7,7 @@ using MudBlazor;
 using MudBlazor.Extensions.Core;
 using MudBlazor.Extensions.Options;
 using MudBlazor.Extensions.Services;
+using MudBlazor.Interop;
 
 namespace TreeGraph.Blazor.Shared.Common.Dev;
 
@@ -58,6 +59,19 @@ public sealed class DialogSourceTracker : IMudExDialogService
 
     public DialogOptionsEx GetDialogUsedDialogOptions(Guid dialogGuid)
         => InnerEx.GetDialogUsedDialogOptions(dialogGuid);
+
+    // ───────── JS 回调透传（MudBlazor.Extensions 9.11.6+） ─────────
+    // JS 模块以 DotNetObjectReference 包装「当前 IDialogService 实例」回调拖拽/非模态关闭事件；
+    // DEBUG 下该实例是本装饰器，必须暴露同名 JSInvokable 并转发 inner，否则报
+    // "does not contain a public invokable method with [JSInvokableAttribute(\"PublishEvent\")]"。
+
+    [JSInvokable]
+    public Task<object> PublishEvent(string eventName, string dialogId, DotNetObjectReference<ComponentBase> dialog, BoundingClientRect rect)
+        => ((MudExDialogService)InnerEx).PublishEvent(eventName, dialogId, dialog, rect);
+
+    [JSInvokable]
+    public Task HandleNonModalClose(string dialogId, DotNetObjectReference<ComponentBase> dialog)
+        => ((MudExDialogService)InnerEx).HandleNonModalClose(dialogId, dialog);
 
     /// <summary>装饰器是否已进入 DI 链（构造即置位）。供按钮区分「未注册」与「未命中」。</summary>
     public static bool IsActive { get; private set; }

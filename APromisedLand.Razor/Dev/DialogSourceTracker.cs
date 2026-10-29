@@ -7,6 +7,7 @@ using MudBlazor;
 using MudBlazor.Extensions.Core;
 using MudBlazor.Extensions.Options;
 using MudBlazor.Extensions.Services;
+using MudBlazor.Interop;
 
 namespace APromisedLand.Razor.Dev;
 
@@ -54,6 +55,19 @@ public sealed class DialogSourceTracker : IMudExDialogService
 
     public DialogOptionsEx GetDialogUsedDialogOptions(Guid dialogGuid)
         => InnerEx.GetDialogUsedDialogOptions(dialogGuid);
+
+    // ───────── JS 回调透传（MudBlazor.Extensions 9.11.6+） ─────────
+    // JS 模块以 DotNetObjectReference 包装「当前 IDialogService 实例」回调拖拽/非模态关闭事件；
+    // DEBUG 下该实例是本装饰器，必须暴露同名 JSInvokable 并转发 inner，否则报
+    // "does not contain a public invokable method with [JSInvokableAttribute(\"PublishEvent\")]"。
+
+    [JSInvokable]
+    public Task<object> PublishEvent(string eventName, string dialogId, DotNetObjectReference<ComponentBase> dialog, BoundingClientRect rect)
+        => ((MudExDialogService)InnerEx).PublishEvent(eventName, dialogId, dialog, rect);
+
+    [JSInvokable]
+    public Task HandleNonModalClose(string dialogId, DotNetObjectReference<ComponentBase> dialog)
+        => ((MudExDialogService)InnerEx).HandleNonModalClose(dialogId, dialog);
 
     /// <summary>inner 必须是 MudExDialogService；否则 ShowExAsync 链路本身不可用，快速失败优于静默返回 null。</summary>
     private IMudExDialogService InnerEx => _innerEx
