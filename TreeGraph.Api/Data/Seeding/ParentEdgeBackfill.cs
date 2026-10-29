@@ -8,7 +8,7 @@ namespace TreeGraph.Api.Data.Seeding;
 /// 存量树节点 parent_of 派生边回填（幂等，仅补插缺失行，不删不动既有行）。
 /// 背景：parent_of 落 PG 的能力上线前创建的历史树节点没有对应边，
 /// 「关系绑定」页签不可见；启动时对四棵宿主树（单位/分类/知识/空间树）扫描补齐。
-/// 依赖 BuiltinEdgeTypeSeeder 已播种 parent_of 边类型（先跑播种再跑本回填）。
+/// 仅对已存在 parent_of 边类型的空间生效（边类型由「预置关系」对话框按需创建，不再自动播种）。
 /// </summary>
 public static class ParentEdgeBackfill
 {

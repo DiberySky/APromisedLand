@@ -17,7 +17,9 @@ else
 {
     @* 表格始终渲染：空态走 NoRecordsContent（EmptyStateSky，与 EntityTypes 对齐），
        表头操作列的新建 + 按钮在空态时同样可用 *@
-    <MudTable Items="_spaces ?? (IReadOnlyList<SpaceDto>)[]" Hover="true" Bordered="true" Dense="true">
+    @* 表格底色纯黑，与一级「空间」列表一致 *@
+    <MudTable Items="_spaces ?? (IReadOnlyList<SpaceDto>)[]" Hover="true" Bordered="true" Dense="true"
+              Style="background-color: #000;">
         <HeaderContent>
             <MudTh>名称</MudTh>
             <MudTh>类型</MudTh>

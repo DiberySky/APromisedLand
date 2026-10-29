@@ -861,6 +861,7 @@ public class TreeGraphDbContext : DbContext
             e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
             e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(1000);
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(200);
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order");
             e.Property(x => x.TtlCol).HasColumnName("ttl_col").HasMaxLength(200);
             e.Property(x => x.TtlDurationSeconds).HasColumnName("ttl_duration_seconds");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
@@ -872,7 +873,7 @@ public class TreeGraphDbContext : DbContext
                 .HasForeignKey(x => x.SpaceId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_edge_types_space");
-            // 内置种子（line_segment）改由 BuiltinEdgeTypeSeeder 启动时按空间幂等播种
+            // 内置边类型不在迁移/启动播种：由「关系设置 → 创建默认边（预置关系）」按需创建
         });
 
         mb.Entity<EdgeSky.Entities.EdgeTypeProp>(e =>
@@ -895,7 +896,6 @@ public class TreeGraphDbContext : DbContext
             // 属性定义是类型的内在组成：删类型前由服务层先删属性行（Restrict 兜底）
             e.HasOne(x => x.EdgeType).WithMany(t => t.Props)
                 .HasForeignKey(x => new { x.SpaceId, x.EdgeTypeName }).OnDelete(DeleteBehavior.Restrict);
-            // 内置种子（line_segment.name）改由 BuiltinEdgeTypeSeeder 启动时按空间幂等播种
         });
 
         mb.Entity<EdgeSky.Entities.Edge>(e =>

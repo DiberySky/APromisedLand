@@ -1,0 +1,100 @@
+@* EdgeTypeSeedDialog.razor — 创建默认边：从内置种子目录多选批量创建边类型。
+   已存在的类型置灰不可选；确认后返回选中的 CreateEdgeTypeRequest 列表，由调用方逐个创建。 *@
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Blazor.Shared.EdgeSky
+@using TreeGraph.Shared.EdgeSky
+@using TreeGraph.Shared.EdgeSky.Dtos
+
+<DialogSky Title="预置关系"
+           SubmitButtonVisible="true"
+           SubmitButtonText="创建"
+           OnSubmitClick="Submit">
+    <ToolBarContent>
+        <MudText Color="Color.Inherit">请勾选</MudText>
+    </ToolBarContent>
+    <DialogContent>
+        @foreach (var seed in Seeds)
+        {
+            var exists = ExistingNames.Contains(seed.Name);
+            <div class="d-flex align-start gap-2 py-1">
+                <MudCheckBox T="bool" Value="@_selected[seed.Name]"
+                             ValueChanged="@(v => _selected[seed.Name] = v)"
+                             Disabled="@exists"
+                             Color="Color.Primary" Dense="true" Class="mt-n1" />
+                <div>
+                    <MudText Typo="Typo.body1">
+                        @seed.DisplayName（<code style="color: inherit;">@seed.Name</code>）
+                        @if (exists)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Class="ml-1">已存在</MudChip>
+                        }
+                    </MudText>
+                    <MudText Typo="Typo.caption" Style="opacity: 0.6;">@seed.Comment</MudText>
+                    @if (seed.Props.Count > 0)
+                    {
+                        <MudText Typo="Typo.caption" Style="opacity: 0.6;">
+                            属性：@string.Join("、", seed.Props.Select(p => $"{p.DisplayName} {p.PropName}({EdgePropDataTypeLabels.Of(p.DataType)})"))
+                        </MudText>
+                    }
+                </div>
+            </div>
+        }
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>当前空间已存在的边类型名（用于置灰跳过）。</summary>
+    [Parameter] public HashSet<string> ExistingNames { get; set; } = [];
+
+    private readonly Dictionary<string, bool> _selected = Seeds.ToDictionary(s => s.Name, _ => false);
+
+    private void Submit()
+    {
+        var picked = Seeds.Where(s => _selected[s.Name] && !ExistingNames.Contains(s.Name))
+            .Select(s => s.ToRequest()).ToList();
+        MudDialog.Close(DialogResult.Ok(picked));
+    }
+
+    /// <summary>预置边类型种子目录（创建默认边的可选清单）。</summary>
+    public static readonly IReadOnlyList<EdgeTypeSeed> Seeds =
+    [
+        new("parent_of", "父子关系",
+            "树父子结构派生边（内置：父节点 → 子节点，rank 恒 0）",
+            []),
+        new("span_length", "档距",
+            "档距段边：相邻两杆之间的线路段",
+            [
+                new("span_length", "档距", EdgePropDataTypes.Double, "档距：两杆之间的实际距离（米）"),
+                new("wire_type", "导线型号", EdgePropDataTypes.String, "导线型号/规格"),
+                new("sag", "弧垂", EdgePropDataTypes.Double, "弧垂（米）"),
+                new("install_date", "投运日期", EdgePropDataTypes.Date, "该段线路的投运/安装日期"),
+                new("phase", "相别", EdgePropDataTypes.String, "相别（如 A/B/C）")
+            ])
+    ];
+
+    /// <summary>预置边类型种子定义。</summary>
+    public sealed record EdgeTypeSeed(
+        string Name, string DisplayName, string Comment, IReadOnlyList<SeedProp> Props)
+    {
+        public CreateEdgeTypeRequest ToRequest() => new()
+        {
+            Name = Name,
+            DisplayName = DisplayName,
+            Comment = Comment,
+            Props = Props.Select((p, i) => new EdgeTypePropDto
+            {
+                PropName = p.PropName,
+                DisplayName = p.DisplayName,
+                DataType = p.DataType,
+                Nullable = true,
+                Comment = p.Comment,
+                DisplayOrder = i + 1
+            }).ToList()
+        };
+    }
+
+    /// <summary>种子属性定义（默认可空）。</summary>
+    public sealed record SeedProp(string PropName, string DisplayName, string DataType, string Comment);
+}

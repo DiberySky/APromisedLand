@@ -24,6 +24,8 @@ public class LineStructureEventTests
     {
         _factory = factory;
         _client = factory.CreateClient();
+        // 内置边类型不再随启动播种（生产改「预置关系」按需创建），测试库补种 line_segment/parent_of
+        EdgeTypeTestSeed.EnsureAsync(factory).GetAwaiter().GetResult();
     }
 
     [Fact]

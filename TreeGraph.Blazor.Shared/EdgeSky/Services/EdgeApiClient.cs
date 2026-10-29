@@ -71,6 +71,25 @@ public class EdgeApiClient
         }
     }
 
+    /// <summary>更新边类型展示序（仅 UI 排序）。</summary>
+    public async Task<(bool Ok, string? Error)> UpdateDisplayOrderAsync(
+        string spaceId, string name, int displayOrder, CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.PatchAsJsonAsync(
+                $"{Base(spaceId)}/{Uri.EscapeDataString(name)}/display-order",
+                new UpdateEdgeTypeDisplayOrderRequest { DisplayOrder = displayOrder }, JsonOptions, ct);
+            if (resp.IsSuccessStatusCode) return (true, null);
+            return (false, await ExtractErrorAsync(resp, ct));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PATCH api/spaces/{SpaceId}/edge/types/{Name}/display-order 失败", spaceId, name);
+            return (false, ex.Message);
+        }
+    }
+
     /// <summary>删除边类型（有实例时服务端 409）。</summary>
     public async Task<(bool Ok, string? Error)> DeleteEdgeTypeAsync(
         string spaceId, string name, CancellationToken ct = default)

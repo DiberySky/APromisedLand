@@ -70,6 +70,38 @@ public class EdgeApiTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task EdgeType_DisplayOrder_PatchAndListSorted()
+    {
+        var nameA = $"et_a_{Guid.NewGuid():N}";
+        var nameB = $"et_b_{Guid.NewGuid():N}";
+        (await Client.PostAsJsonAsync($"{EdgeBase}/types", new { name = nameA })).EnsureSuccessStatusCode();
+        (await Client.PostAsJsonAsync($"{EdgeBase}/types", new { name = nameB })).EnsureSuccessStatusCode();
+
+        // 新建追加到空间末尾：B 的展示序 > A
+        var a = await Client.GetEavAsync<EdgeTypeDto>($"{EdgeBase}/types/{nameA}");
+        var b = await Client.GetEavAsync<EdgeTypeDto>($"{EdgeBase}/types/{nameB}");
+        Assert.True(b!.DisplayOrder > a!.DisplayOrder);
+
+        // 交换展示序后，列表按 DisplayOrder 升序：B 排到 A 前
+        var patch = await Client.PatchAsJsonAsync(
+            $"{EdgeBase}/types/{nameB}/display-order", new { displayOrder = a.DisplayOrder });
+        patch.EnsureSuccessStatusCode();
+        await Client.PatchAsJsonAsync(
+            $"{EdgeBase}/types/{nameA}/display-order", new { displayOrder = b.DisplayOrder });
+
+        var list = await Client.GetEavAsync<List<EdgeTypeDto>>($"{EdgeBase}/types");
+        Assert.NotNull(list);
+        Assert.True(
+            list!.FindIndex(t => t.Name == nameB) < list.FindIndex(t => t.Name == nameA),
+            "交换展示序后 B 应排在 A 前");
+
+        // 不存在的类型 → 404
+        var missing = await Client.PatchAsJsonAsync(
+            $"{EdgeBase}/types/et_missing_{Guid.NewGuid():N}/display-order", new { displayOrder = 1 });
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
     public async Task EdgeType_NotNullWithoutDefault_Returns400()
     {
         var resp = await Client.PostAsJsonAsync($"{EdgeBase}/types", new

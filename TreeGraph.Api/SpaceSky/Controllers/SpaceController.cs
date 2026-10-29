@@ -66,8 +66,7 @@ public class SpaceController(
 
         await db.SaveChangesAsync(cancellationToken);
 
-        // 新空间即时补种内置边类型（parent_of 全空间、line_segment 仅 Dynamic；幂等）
-        await TreeGraph.Api.Data.Seeding.BuiltinEdgeTypeSeeder.SeedForSpaceAsync(db, space.Id, cancellationToken);
+        // 内置边类型不再随空间创建自动补种：由「关系设置 → 创建默认边（预置关系）」按需创建
 
         // 新空间即时补图 schema（CREATE SPACE + tag + 边类型；best-effort，失败由启动对齐兜底）
         await graphSchema.EnsureSpaceSchemaAsync(space.Id, cancellationToken);

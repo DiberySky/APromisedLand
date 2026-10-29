@@ -35,6 +35,9 @@ public class EdgeTypeDto
 
     /// <summary>中文显示名称（仅 UI 展示用，Nebula 无此概念）。</summary>
     public string? DisplayName { get; set; }
+
+    /// <summary>展示序（仅 UI 排序用，空间内手动调整；不参与图 Schema）。</summary>
+    public int DisplayOrder { get; set; }
     public string? Comment { get; set; }
     public string? TtlCol { get; set; }
     public long? TtlDurationSeconds { get; set; }
@@ -101,6 +104,12 @@ public class UpdateEdgeTypeDisplayNameRequest
 {
     /// <summary>中文显示名称；空/空白 = 清除。</summary>
     public string? DisplayName { get; set; }
+}
+
+/// <summary>更新边类型展示序请求（非 Nebula 概念，仅 UI 排序）。</summary>
+public class UpdateEdgeTypeDisplayOrderRequest
+{
+    public int DisplayOrder { get; set; }
 }
 
 /// <summary>更新边属性中文显示名请求（非 Nebula 概念，仅 UI 展示）。</summary>

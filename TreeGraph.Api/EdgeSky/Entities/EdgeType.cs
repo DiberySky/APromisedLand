@@ -19,6 +19,9 @@ public class EdgeType
     /// <summary>中文显示名称（仅 UI 展示用，Nebula 无此概念）。</summary>
     public string? DisplayName { get; set; }
 
+    /// <summary>展示序（仅 UI 排序用，空间内手动调整；不参与图 Schema）。</summary>
+    public int DisplayOrder { get; set; }
+
     /// <summary>TTL 列名（须为本类型的 INT/TIMESTAMP 属性；与 TtlDurationSeconds 成对出现）。</summary>
     public string? TtlCol { get; set; }
 

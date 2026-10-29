@@ -6,7 +6,7 @@ using Xunit;
 namespace TreeGraph.Api.Tests.Fixtures;
 
 [Collection("Integration")]
-public abstract class IntegrationTestBase
+public abstract class IntegrationTestBase : IAsyncLifetime
 {
     protected readonly EavApiFactory Factory;
     protected readonly HttpClient Client;
@@ -16,6 +16,11 @@ public abstract class IntegrationTestBase
         Factory = factory;
         Client = factory.CreateClient();
     }
+
+    /// <summary>内置边类型不再随启动播种（生产改「预置关系」按需创建），测试库由 fixture 补种。</summary>
+    public virtual Task InitializeAsync() => EdgeTypeTestSeed.EnsureAsync(Factory);
+
+    public virtual Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>种子动态空间「武汉供电段」Id（迁移 HasData）：Edge/Line 空间化测试的归属空间。</summary>
     protected const string TestSpaceId = "7a1e3f5d-9b2c-4a8e-1f0d-3c5b7e9a1c2d";

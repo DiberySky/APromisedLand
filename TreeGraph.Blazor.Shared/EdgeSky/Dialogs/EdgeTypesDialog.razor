@@ -9,15 +9,24 @@
 @using TreeGraph.Blazor.Shared.EdgeSky.Services
 @using TreeGraph.Shared.EdgeSky.Dtos
 
-<DialogSky Title="@($"边类型管理：{SpaceName ?? SpaceId}")"
+<DialogSky Title="边类型管理"
            SubmitButtonVisible="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.subtitle2" Color="Color.Inherit">@(SpaceName ?? SpaceId)</MudText>
+        <MudSpacer />
+        @* 创建预置关系：从预置种子目录多选批量创建 *@
+        <MudIconButton Icon="@Icons.Material.Filled.PlaylistAdd"
+                       Size="Size.Small" Color="Color.Info"
+                       OnClick="OpenSeedDialogAsync"
+                       title="创建预置关系" />
+    </ToolBarContent>
     <DialogContent>
         @* MudSimpleTable 手动渲染行：支持展开时插入 colspan=4 的通栏属性详情行 *@
         <MudSimpleTable Hover="true" Bordered="true" Dense="true">
             <thead>
                 <tr>
+                    <th style="width: 1%; white-space: nowrap; text-align: center;">排序</th>
                     <th>名称</th>
-                    <th>注释</th>
                     <th>属性</th>
                     <th style="width: 1%; white-space: nowrap; text-align: right;">
                         <MudIconButton Icon="@Icons.Material.Filled.Refresh"
@@ -55,6 +64,19 @@
                     @foreach (var t in _types)
                     {
                         <tr>
+                            <td style="white-space: nowrap; text-align: center;">
+                                @* 排序：与相邻行交换 DisplayOrder 并持久化（同 EntityTypes 模式） *@
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                               Size="Size.Small"
+                                               Disabled="@(_moving || !CanMove(t, -1))"
+                                               OnClick="@(async () => await MoveAsync(t, -1))"
+                                               title="上移" />
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                               Size="Size.Small"
+                                               Disabled="@(_moving || !CanMove(t, 1))"
+                                               OnClick="@(async () => await MoveAsync(t, 1))"
+                                               title="下移" />
+                            </td>
                             <td>
                                 <MudText Typo="Typo.body1" Style="white-space: nowrap;">
                                     @if (string.IsNullOrEmpty(t.DisplayName))
@@ -65,11 +87,6 @@
                                     {
                                         @t.DisplayName@(" (")<code style="color: inherit;">@t.Name</code>@(")")
                                     }
-                                </MudText>
-                            </td>
-                            <td>
-                                <MudText Typo="Typo.caption" Color="Color.Default">
-                                    @(string.IsNullOrEmpty(t.Comment) ? "—" : t.Comment)
                                 </MudText>
                             </td>
                             <td>
@@ -91,7 +108,7 @@
                                                OnClick="@(async () => await OpenEditDisplayNameAsync(t))"
                                                title="编辑中文显示名" />
                                 @* 查看：行下方通栏展开/折叠属性详情（只读） *@
-                                <MudIconButton Icon="@(_expanded.Contains(t.Name) ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                <MudIconButton Icon="@(_expanded.Contains(t.Name) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
                                                Size="Size.Small" Color="Color.Info"
                                                OnClick="@(() => ToggleExpand(t.Name))"
                                                title="@(_expanded.Contains(t.Name) ? "折叠属性详情" : "查看属性详情")" />
@@ -159,8 +176,65 @@
 
     private List<EdgeTypeDto>? _types;
     private bool _loading;
+    /// <summary>排序提交中：期间禁用全部箭头，避免并发交换。</summary>
+    private bool _moving;
     /// <summary>已展开属性详情的边类型名（查看图标切换，纯 UI 状态）。</summary>
     private readonly HashSet<string> _expanded = [];
+
+    // ---------- 排序 ----------
+
+    /// <summary>当前展示位置能否向 delta 方向移动（首行不能上移、末行不能下移）。</summary>
+    private bool CanMove(EdgeTypeDto dto, int delta)
+    {
+        var list = _types;
+        if (list is null) return false;
+        var index = list.FindIndex(t => t.Name == dto.Name);
+        var target = index + delta;
+        return index >= 0 && target >= 0 && target < list.Count;
+    }
+
+    /// <summary>
+    /// 与相邻行交换 DisplayOrder 并持久化（PATCH display-order）。
+    /// 两行顺序值相同（历史数据均为 0）时，按当前展示位置 1..N 兜底重排。
+    /// </summary>
+    private async Task MoveAsync(EdgeTypeDto dto, int delta)
+    {
+        var list = _types;
+        if (_moving || list is null) return;
+
+        var index = list.FindIndex(t => t.Name == dto.Name);
+        var target = index + delta;
+        if (index < 0 || target < 0 || target >= list.Count) return;
+
+        var other = list[target];
+        var sameOrder = dto.DisplayOrder == other.DisplayOrder;
+
+        _moving = true;
+        try
+        {
+            var (ok, error) = await Api.UpdateDisplayOrderAsync(
+                SpaceId, dto.Name, sameOrder ? target + 1 : other.DisplayOrder);
+            if (!ok)
+            {
+                Snackbar.Add($"调整顺序失败：{error ?? "未知错误"}", Severity.Error);
+                return;
+            }
+
+            var (okOther, errorOther) = await Api.UpdateDisplayOrderAsync(
+                SpaceId, other.Name, sameOrder ? index + 1 : dto.DisplayOrder);
+            if (!okOther)
+            {
+                Snackbar.Add($"调整顺序失败：{errorOther ?? "未知错误"}", Severity.Error);
+                return;
+            }
+        }
+        finally
+        {
+            _moving = false;
+        }
+
+        await LoadAsync();
+    }
 
     private void ToggleExpand(string name)
     {
@@ -237,6 +311,34 @@
         }
 
         Snackbar.Add($"边类型 '{req.Name}' 创建成功", Severity.Success);
+        await LoadAsync();
+    }
+
+    /// <summary>创建默认边：打开种子目录多选对话框，逐个创建选中的预置边类型。</summary>
+    private async Task OpenSeedDialogAsync()
+    {
+        var parameters = new DialogParameters<EdgeTypeSeedDialog>
+        {
+            { x => x.ExistingNames, (_types ?? []).Select(t => t.Name).ToHashSet() }
+        };
+        var dialog = await DialogService.ShowExAsync<EdgeTypeSeedDialog>(
+            string.Empty, parameters,
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+        var result = await dialog.Result;
+        if (result?.Canceled != false || result.Data is not List<CreateEdgeTypeRequest> reqs || reqs.Count == 0)
+            return;
+
+        var failed = new List<string>();
+        foreach (var req in reqs)
+        {
+            var (ok, error) = await Api.CreateEdgeTypeAsync(SpaceId, req);
+            if (!ok) failed.Add($"{req.Name}：{error ?? "未知错误"}");
+        }
+
+        if (failed.Count > 0)
+            Snackbar.Add($"部分默认边创建失败：{string.Join("；", failed)}", Severity.Error);
+        else
+            Snackbar.Add($"已创建 {reqs.Count} 个默认边类型", Severity.Success);
         await LoadAsync();
     }
 

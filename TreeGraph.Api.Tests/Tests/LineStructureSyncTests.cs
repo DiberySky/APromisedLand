@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using TreeGraph.Api.Data;
 using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.GraphSyncSky;
+using TreeGraph.Api.Tests.Fixtures;
 using TreeGraph.Shared.NodeSky.Entities;
 using Xunit;
 
@@ -152,7 +153,8 @@ public class LineStructureSyncTests
         var handler = new FakeNebulaHandler();
         await using (var seed = CreateDb(dbName))
         {
-            // 物化内置种子（EdgeType line_segment + name STRING NULL prop）：改由启动时幂等播种器写入；
+            // 物化内置边类型（EdgeType line_segment + name STRING NULL prop）：
+            // 生产已取消启动自动播种（改「预置关系」按需创建），测试由 fixture 补种；
             // 图空间化后播种与 schema 初始化均按 spaces 行循环，先补一行空间
             seed.Database.EnsureCreated();
             seed.Spaces.Add(new Api.SpaceSky.Entities.Space
@@ -162,7 +164,7 @@ public class LineStructureSyncTests
                 Type = Api.SpaceSky.Entities.SpaceType.Dynamic
             });
             await seed.SaveChangesAsync();
-            await TreeGraph.Api.Data.Seeding.BuiltinEdgeTypeSeeder.SeedAsync(seed);
+            await EdgeTypeTestSeed.SeedAsync(seed);
         }
 
         await CreateReadyInitializerAsync(dbName, handler);

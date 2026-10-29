@@ -34,7 +34,7 @@ public sealed class EdgeTypeService
         var types = await _db.EdgeTypes.AsNoTracking()
             .Include(t => t.Props)
             .Where(t => t.SpaceId == spaceId)
-            .OrderBy(t => t.Name)
+            .OrderBy(t => t.DisplayOrder).ThenBy(t => t.Name)
             .ToListAsync(ct);
         return types.Select(ToDto).ToList();
     }
@@ -62,12 +62,18 @@ public sealed class EdgeTypeService
         var props = BuildProps(spaceId, req.Name, req.Props);
         ValidateTtl(req.TtlCol, req.TtlDurationSeconds, props);
 
+        // 展示序：追加到空间末尾（仅 UI 排序用）
+        var nextOrder = (await _db.EdgeTypes
+            .Where(t => t.SpaceId == spaceId)
+            .MaxAsync(t => (int?)t.DisplayOrder, ct) ?? 0) + 1;
+
         var type = new EdgeType
         {
             SpaceId = spaceId,
             Name = req.Name,
             Comment = req.Comment,
             DisplayName = req.DisplayName,
+            DisplayOrder = nextOrder,
             TtlCol = req.TtlCol,
             TtlDurationSeconds = req.TtlDurationSeconds,
             Props = props
@@ -150,6 +156,20 @@ public sealed class EdgeTypeService
         ?? throw new KeyNotFoundException($"边类型 '{name}' 不存在");
 
         type.DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+        type.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return ToDto(type);
+    }
+
+    /// <summary>更新边类型展示序（非 Nebula 概念，仅 UI 排序，不走 DDL 同步）。</summary>
+    public async Task<EdgeTypeDto> UpdateDisplayOrderAsync(
+        string spaceId, string name, int displayOrder, CancellationToken ct)
+    {
+        var type = await _db.EdgeTypes.Include(t => t.Props)
+            .FirstOrDefaultAsync(t => t.SpaceId == spaceId && t.Name == name, ct)
+        ?? throw new KeyNotFoundException($"边类型 '{name}' 不存在");
+
+        type.DisplayOrder = displayOrder;
         type.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
         return ToDto(type);
@@ -263,6 +283,7 @@ public sealed class EdgeTypeService
         SpaceId = t.SpaceId,
         Name = t.Name,
         DisplayName = t.DisplayName,
+        DisplayOrder = t.DisplayOrder,
         Comment = t.Comment,
         TtlCol = t.TtlCol,
         TtlDurationSeconds = t.TtlDurationSeconds,

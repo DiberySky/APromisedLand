@@ -43,6 +43,12 @@ public class EdgeTypesController(EdgeTypeService svc) : ControllerBase
         string spaceId, string name, [FromBody] UpdateEdgeTypeDisplayNameRequest req, CancellationToken ct)
         => Ok(await svc.UpdateDisplayNameAsync(spaceId, name, req.DisplayName, ct));
 
+    // PATCH /api/spaces/{spaceId}/edge/types/{name}/display-order（非 Nebula 概念，仅 UI 排序）
+    [HttpPatch("{name}/display-order")]
+    public async Task<IActionResult> UpdateDisplayOrder(
+        string spaceId, string name, [FromBody] UpdateEdgeTypeDisplayOrderRequest req, CancellationToken ct)
+        => Ok(await svc.UpdateDisplayOrderAsync(spaceId, name, req.DisplayOrder, ct));
+
     // PATCH /api/spaces/{spaceId}/edge/types/{name}/props/{propName}/display-name（属性中文展示名）
     [HttpPatch("{name}/props/{propName}/display-name")]
     public async Task<IActionResult> UpdatePropDisplayName(

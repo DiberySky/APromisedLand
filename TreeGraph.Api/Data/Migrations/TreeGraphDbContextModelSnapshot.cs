@@ -104,6 +104,10 @@ namespace TreeGraph.Api.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("display_name");
 
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
                     b.Property<string>("TtlCol")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")

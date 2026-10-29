@@ -169,9 +169,8 @@ if (!EF.IsDesignTime)
     var db = scope.ServiceProvider.GetRequiredService<TreeGraphDbContext>();
     await db.Database.MigrateAsync();
     await EavSeeder.SeedAsync(db);
-    // 内置边类型（parent_of 全空间、line_segment 仅 Dynamic）：幂等 upsert；须在 GraphSchemaInitializer 启动前
-    await BuiltinEdgeTypeSeeder.SeedAsync(db);
-    // 存量树节点 parent_of 派生边回填（幂等补插缺失行；依赖内置边类型已播种）
+    // 内置边类型不再自动播种：由「空间维护 → 关系设置 → 创建默认边（预置关系）」按需创建
+    // 存量树节点 parent_of 派生边回填（幂等补插缺失行；仅对已存在 parent_of 边类型的空间生效）
     var backfilled = await ParentEdgeBackfill.BackfillAsync(db);
     if (backfilled > 0)
         app.Logger.LogInformation("parent_of 派生边回填完成：补插 {Count} 条", backfilled);
