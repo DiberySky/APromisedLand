@@ -61,10 +61,10 @@
     public static readonly IReadOnlyList<EdgeTypeSeed> Seeds =
     [
         new("parent_of", "父子关系",
-            "树父子结构派生边（内置：父节点 → 子节点，rank 恒 0）",
+            "树父子结构派生关系（内置：父节点 → 子节点，rank 恒 0）",
             []),
         new("span_length", "档距",
-            "档距段边：相邻两杆之间的线路段",
+            "档距段关系：相邻两杆之间的线路段",
             [
                 new("span_length", "档距", EdgePropDataTypes.Double, "档距：两杆之间的实际距离（米）"),
                 new("wire_type", "导线型号", EdgePropDataTypes.String, "导线型号/规格"),

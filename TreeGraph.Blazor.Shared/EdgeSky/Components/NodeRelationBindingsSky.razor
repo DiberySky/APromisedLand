@@ -45,15 +45,15 @@ else if (!_loading && _space is not null)
     @if (_types.Count == 0)
     {
         <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-2">
-            当前空间尚未定义边类型，请先在「边类型管理」创建。
+            当前空间尚未定义关系类型，请先在「关系设置」创建。
         </MudAlert>
     }
 
     <MudTabs Elevation="0" Rounded="true" PanelClass="pt-2">
-        <MudTabPanel Text="@($"出边 {_out.Count}")" Icon="@Icons.Material.Filled.CallMade">
+        <MudTabPanel Text="@($"出向 {_out.Count}")" Icon="@Icons.Material.Filled.CallMade">
             @EdgeTable(_out, true)
         </MudTabPanel>
-        <MudTabPanel Text="@($"入边 {_in.Count}")" Icon="@Icons.Material.Filled.CallReceived">
+        <MudTabPanel Text="@($"入向 {_in.Count}")" Icon="@Icons.Material.Filled.CallReceived">
             @EdgeTable(_in, false)
         </MudTabPanel>
     </MudTabs>
@@ -219,7 +219,7 @@ else if (!_loading && _space is not null)
         </RowTemplate>
         <NoRecordsContent>
             <MudText Typo="Typo.caption" Color="Color.Default" Class="py-2">
-                @(outgoing ? "该节点暂无出边" : "该节点暂无入边")
+                @(outgoing ? "该节点暂无出向关系" : "该节点暂无入向关系")
             </MudText>
         </NoRecordsContent>
     </MudTable>;

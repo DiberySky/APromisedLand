@@ -116,7 +116,7 @@ public class EdgeInstanceCreateDialogTests : BunitTestBase
     {
         var (provider, _) = await OpenAsync();
 
-        Assert.Contains("边类型", provider.Markup);
+        Assert.Contains("关系类型", provider.Markup);
         Assert.Contains("方向", provider.Markup);
         Assert.Contains("对端节点", provider.Markup);
         Assert.Contains("属性", provider.Markup);

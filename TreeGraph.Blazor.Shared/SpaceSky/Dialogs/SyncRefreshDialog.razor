@@ -80,7 +80,7 @@
 @code {
     [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
 
-    private const string VectorNAText = "—（无边向量）";
+    private const string VectorNAText = "—（无关系向量）";
 
     /// <summary>总步数 = 向量 3 步 + 图 4 步（边→向量不适用不计）。</summary>
     private const int TotalSteps = 7;
@@ -142,7 +142,7 @@
         new("space", "空间树"),
         new("tree", "单位/分类/知识树"),
         new("line", "线路"),
-        new("edge", "语义边"),
+        new("edge", "语义关系"),
     ];
 
     private CategoryRow Row(string key) => _rows.First(r => r.Key == key);
@@ -281,8 +281,8 @@
                 step.Status = StepStatus.Done;
                 step.Warn = result.Errors.Count > 0;
                 step.Detail = result.Errors.Count > 0
-                    ? $"顶点 {result.VerticesWritten}/{result.Vertices} · 边 {result.EdgesWritten}/{result.Edges} · 错误批次 {result.Errors.Count}"
-                    : $"顶点 {result.VerticesWritten} · 边 {result.EdgesWritten}";
+                    ? $"顶点 {result.VerticesWritten}/{result.Vertices} · 关系 {result.EdgesWritten}/{result.Edges} · 错误批次 {result.Errors.Count}"
+                    : $"顶点 {result.VerticesWritten} · 关系 {result.EdgesWritten}";
             }
         }
         catch (OperationCanceledException)

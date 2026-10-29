@@ -15,8 +15,8 @@
 
 @if (!IsDialogMode)
 {
-    <PageTitle>边类型管理</PageTitle>
-    <PageHeaderSky Title="边类型管理" />
+    <PageTitle>关系类型管理</PageTitle>
+    <PageHeaderSky Title="关系类型管理" />
 }
 
 @* 空间选择器：边类型为图空间级资源，所有操作作用于当前选中空间 *@
@@ -54,7 +54,7 @@
             <MudIconButton Icon="@Icons.Material.Filled.Add"
                            Size="Size.Small" Color="Color.Success"
                            OnClick="OpenCreateAsync" Disabled="@(_spaceId is null)"
-                           title="新建边类型" />
+                           title="新建关系类型" />
         </MudTh>
     </HeaderContent>
     <RowTemplate>
@@ -97,7 +97,7 @@
     </RowTemplate>
     <NoRecordsContent>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            当前空间暂无边类型，点击右上角「新建边类型」创建。
+            当前空间暂无关系类型，点击右上角「新建关系类型」创建。
         </MudText>
     </NoRecordsContent>
 </MudTable>
@@ -133,7 +133,7 @@
         {
             _types = await Api.ListEdgeTypesAsync(_spaceId);
             if (_types is null)
-                Snackbar.Add("边类型加载失败，请检查后端服务是否可达", Severity.Warning);
+                Snackbar.Add("关系类型加载失败，请检查后端服务是否可达", Severity.Warning);
         }
         finally
         {
@@ -166,7 +166,7 @@
             return;
         }
 
-        Snackbar.Add($"边类型 '{item.Name}' 属性 Schema 已更新", Severity.Success);
+        Snackbar.Add($"关系类型 '{item.Name}' 属性 Schema 已更新", Severity.Success);
         await LoadAsync();
     }
 
@@ -193,7 +193,7 @@
             return;
         }
 
-        Snackbar.Add($"边类型 '{req.Name}' 创建成功", Severity.Success);
+        Snackbar.Add($"关系类型 '{req.Name}' 创建成功", Severity.Success);
         await LoadAsync();
     }
 
@@ -218,15 +218,15 @@
             return;
         }
 
-        Snackbar.Add($"边类型 '{item.Name}' 显示名已更新", Severity.Success);
+        Snackbar.Add($"关系类型 '{item.Name}' 显示名已更新", Severity.Success);
         await LoadAsync();
     }
 
     private async Task DeleteAsync(EdgeTypeDto item)
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
-            "删除边类型",
-            $"确定删除边类型 '{item.Name}' 吗？存在边实例时将被拒绝。",
+            "删除关系类型",
+            $"确定删除关系类型 '{item.Name}' 吗？存在关系实例时将被拒绝。",
             yesText: "删除", cancelText: "取消");
         if (confirmed != true) return;
 
@@ -237,7 +237,7 @@
             return;
         }
 
-        Snackbar.Add($"边类型 '{item.Name}' 已删除", Severity.Success);
+        Snackbar.Add($"关系类型 '{item.Name}' 已删除", Severity.Success);
         await LoadAsync();
     }
 }

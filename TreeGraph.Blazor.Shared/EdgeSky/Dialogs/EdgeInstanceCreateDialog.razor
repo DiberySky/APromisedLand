@@ -28,9 +28,9 @@
 
             <MudSelect T="EdgeTypeDto" Value="_edgeType"
                        ValueChanged="OnEdgeTypeChanged"
-                       Label="边类型" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Label="关系类型" Variant="Variant.Outlined" Margin="Margin.Dense"
                        ToStringFunc="@(t => t is null ? string.Empty : TypeLabel(t))"
-                       HelperText="属性区按该边类型的 Schema 动态生成">
+                       HelperText="属性区按该关系类型的 Schema 动态生成">
                 @foreach (var t in Types)
                 {
                     <MudSelectItem T="EdgeTypeDto" Value="@t">@TypeLabel(t)</MudSelectItem>
@@ -39,9 +39,9 @@
 
             <MudSelect T="string" @bind-Value="_direction"
                        Label="方向" Variant="Variant.Outlined" Margin="Margin.Dense"
-                       HelperText="出边：本节点 → 对端；入边：对端 → 本节点">
-                <MudSelectItem T="string" Value="@("out")">出边（本节点为起点）</MudSelectItem>
-                <MudSelectItem T="string" Value="@("in")">入边（本节点为终点）</MudSelectItem>
+                       HelperText="出向：本节点 → 对端；入向：对端 → 本节点">
+                <MudSelectItem T="string" Value="@("out")">出向（本节点为起点）</MudSelectItem>
+                <MudSelectItem T="string" Value="@("in")">入向（本节点为终点）</MudSelectItem>
             </MudSelect>
 
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-nowrap">
@@ -105,18 +105,18 @@
 
             <NumberInputField T="long?" Value="_rank" ValueChanged="@(v => OnRankChanged(v))"
                               Label="等级 (rank)" Min="0" Margin="Margin.Dense"
-                              HelperText="同起点/终点/类型的多条边以 rank 区分，默认 0" />
+                              HelperText="同起点/终点/类型的多条关系以 rank 区分，默认 0" />
 
             @if (_edgeType is null)
             {
                 <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
-                    请先选择边类型，属性区将按其 Schema 生成。
+                    请先选择关系类型，属性区将按其 Schema 生成。
                 </MudAlert>
             }
             else if (_edgeType.Props.Count == 0)
             {
                 <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
-                    该边类型无属性，可直接创建。
+                    该关系类型无属性，可直接创建。
                 </MudAlert>
             }
             else
@@ -355,7 +355,7 @@
         {
             if (_edgeType is null)
             {
-                Snackbar.Add("请选择边类型", Severity.Warning);
+                Snackbar.Add("请选择关系类型", Severity.Warning);
                 return;
             }
             if (_peer is null)
