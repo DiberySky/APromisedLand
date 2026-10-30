@@ -42,10 +42,10 @@
                        Size="Size.Small"
                        HelperText="出向：本节点 → 对端；入向：对端 → 本节点">
                 <MudSelectItem T="string" Value="@("out")">
-                    出向（本节点为起点）<MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" Class="ms-2" />
+                    出向（本节点为起点）<MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" Class="ms-2" />
                 </MudSelectItem>
                 <MudSelectItem T="string" Value="@("in")">
-                    <MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" Class="me-2" />入向（本节点为终点）
+                    <MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" Class="me-2" />入向（本节点为终点）
                 </MudSelectItem>
             </MudSelect>
 
@@ -54,7 +54,7 @@
                               Margin="Margin.Dense" Immediate="true"
                               Placeholder="按名称搜索（留空列出前 50 个）"
                               Adornment="Adornment.End"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentIcon="@Icons.Material.Outlined.Search"
                               Size="Size.Small"
                               OnKeyDown="OnPeerKeyDown"
                               Class="flex-grow" />

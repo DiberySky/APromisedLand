@@ -17,7 +17,7 @@
             <MudIconButton Icon="@Icons.Material.Outlined.ClearAll"
                            Color="Color.Inherit"
                            OnClick="ClearResults"
-                           Title="清空结果"/>
+                           Title="清空结果" Size="Size.Small" />
         }
     </TopBarRightContent>
 
@@ -31,7 +31,7 @@
                       Dense="true"
                       Class="ma-3">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                    <MudIcon Icon="@Icons.Material.Filled.SmartToy"
+                    <MudIcon Icon="@Icons.Material.Outlined.SmartToy"
                              Size="Size.Small"
                              Color="Color.Primary"/>
                     <MudText Typo="Typo.body2" Style="flex:1;">
@@ -54,7 +54,7 @@
             <MudStack AlignItems="AlignItems.Center"
                       Spacing="3"
                       Class="mt-10 pa-4">
-                <MudIcon Icon="@Icons.Material.Filled.ManageSearch"
+                <MudIcon Icon="@Icons.Material.Outlined.ManageSearch"
                          Size="Size.Large"
                          Color="Color.Default"/>
                 <MudText Typo="Typo.body1"
@@ -117,7 +117,7 @@
                       OnKeyDown="OnKeyDown"
                       Style="flex:1;"
                       InputStyle="padding:8px 12px;"/>
-        <MudIconButton Icon="@Icons.Material.Filled.Send"
+        <MudIconButton Icon="@Icons.Material.Outlined.Send"
                        Color="Color.Primary"
                        Size="Size.Large"
                        Disabled="@(_streaming || string.IsNullOrWhiteSpace(_input))"

@@ -17,13 +17,13 @@
         <MudContainer MaxWidth="MaxWidth.Medium" Class="pa-4">
             <MudToolBar Dense="true" DisableGutters="true" Class="mb-3">
                 <NumberStepper @bind-Value="_depth" Label="包含子项" Suffix="层" Min="0" Max="10"/>
-                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
                                Size="Size.Small"
                                Color="Color.Primary"
                                Title="重新综合"
                                OnClick="RunAsync"/>
                 <MudSpacer/>
-                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
                                Size="Size.Small"
                                Color="Color.Success"
                                Title="复制 Markdown"

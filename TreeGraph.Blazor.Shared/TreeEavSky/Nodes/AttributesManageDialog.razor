@@ -15,20 +15,20 @@
            OnCanceledClick="@Close">
     <DialogContent>
         <MudTabs Elevation="0" Rounded="true" Outlined="true">
-            <MudTabPanel Text="属性定义" Icon="@Icons.Material.Filled.EditAttributes">
+            <MudTabPanel Text="属性定义" Icon="@Icons.Material.Outlined.EditAttributes">
                 <Attributes EntityType="@EntityType"
                             OnAttributesChanged="@OnAttributesChanged" />
             </MudTabPanel>
-            <MudTabPanel Text="属性定义" Icon="@Icons.Material.Filled.Category">
+            <MudTabPanel Text="属性定义" Icon="@Icons.Material.Outlined.Category">
                 <EntityTypes IsDialogMode="true" />
             </MudTabPanel>
-            <MudTabPanel Text="组合类型" Icon="@Icons.Material.Filled.ViewModule">
+            <MudTabPanel Text="组合类型" Icon="@Icons.Material.Outlined.ViewModule">
                 <CompositeTypes IsDialogMode="true" />
             </MudTabPanel>
-            <MudTabPanel Text="自定义表" Icon="@Icons.Material.Filled.TableChart">
+            <MudTabPanel Text="自定义表" Icon="@Icons.Material.Outlined.TableChart">
                 <CustomTables IsDialogMode="true" />
             </MudTabPanel>
-            <MudTabPanel Text="选项集" Icon="@Icons.Material.Filled.FormatListBulleted">
+            <MudTabPanel Text="选项集" Icon="@Icons.Material.Outlined.FormatListBulleted">
                 <OptionSets IsDialogMode="true" />
             </MudTabPanel>
         </MudTabs>

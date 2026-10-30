@@ -13,8 +13,8 @@
                    Class="mt-4">
     <TitleContent>
         <div class="d-flex align-center" style="width: 100%;">
-            <MudIcon Icon="@Icons.Material.Filled.History"
-                     Color="Color.Primary" Class="mr-2" />
+            <MudIcon Icon="@Icons.Material.Outlined.History"
+                     Color="Color.Primary" Class="mr-2" Size="Size.Small" />
             <MudText Typo="Typo.subtitle1">变更历史</MudText>
             @if (_items is { Count: > 0 })
             {
@@ -23,7 +23,7 @@
                 </MudChip>
             }
             <MudSpacer />
-            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
                            Size="Size.Medium"
                            OnClick="@(async () => await LoadAsync())"
                            title="刷新" />

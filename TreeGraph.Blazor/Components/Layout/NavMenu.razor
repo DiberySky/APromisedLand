@@ -8,51 +8,51 @@
 @* NavMenu.razor *@
 <MudNavMenu>
     <MudNavLink Href="/" Match="NavLinkMatch.All"
-                Icon="@Icons.Material.Filled.Home">
+                Icon="@Icons.Material.Outlined.Home">
         首页
     </MudNavLink>
 
     @* ★ iNode 入口 *@
     @* <MudNavLink Href="/inodes" *@
-    @*             Icon="@Icons.Material.Filled.Hub" *@
+    @*             Icon="@Icons.Material.Outlined.Hub" *@
     @*             Match="NavLinkMatch.Prefix"> *@
     @*     iNode 列表 *@
     @* </MudNavLink> *@
 
     @* ★ 选择实体（两步式：选类型 → 选实体） *@
     @* <MudNavLink Href="/entities" *@
-    @*             Icon="@Icons.Material.Filled.TouchApp" *@
+    @*             Icon="@Icons.Material.Outlined.TouchApp" *@
     @*             Match="NavLinkMatch.All"> *@
     @*     选择实体 *@
     @* </MudNavLink> *@
 
     @* ★ 属性列表（跨实体类型总览） *@
     @* <MudNavLink Href="/attributes" *@
-    @*             Icon="@Icons.Material.Filled.ListAlt" *@
+    @*             Icon="@Icons.Material.Outlined.ListAlt" *@
     @*             Match="NavLinkMatch.All"> *@
     @*     属性列表 *@
     @* </MudNavLink> *@
 
     @* ★ 树页面 *@
     <MudNavGroup Title="树"
-                 Icon="@Icons.Material.Filled.Forest">
+                 Icon="@Icons.Material.Outlined.Forest">
         <MudNavLink Href="/tree-eav-sky"
-                    Icon="@Icons.Material.Filled.Forest"
+                    Icon="@Icons.Material.Outlined.Forest"
                     Match="NavLinkMatch.All">
             TreeEavSky 演示
         </MudNavLink>
         <MudNavLink Href="/unit-tree"
-                    Icon="@Icons.Material.Filled.Straighten"
+                    Icon="@Icons.Material.Outlined.Straighten"
                     Match="NavLinkMatch.All">
             单位树
         </MudNavLink>
         <MudNavLink Href="/category-tree"
-                    Icon="@Icons.Material.Filled.Category"
+                    Icon="@Icons.Material.Outlined.Category"
                     Match="NavLinkMatch.All">
             分类树
         </MudNavLink>
         <MudNavLink Href="/space-tree"
-                    Icon="@Icons.Material.Filled.MeetingRoom"
+                    Icon="@Icons.Material.Outlined.MeetingRoom"
                     Match="NavLinkMatch.All">
             空间树
         </MudNavLink>
@@ -60,14 +60,14 @@
 
     @* ★ 空间（Space CRUD） *@
     <MudNavLink Href="/spaces"
-                Icon="@Icons.Material.Filled.Workspaces"
+                Icon="@Icons.Material.Outlined.Workspaces"
                 Match="NavLinkMatch.All">
         空间
     </MudNavLink>
 
     @* ★ 动态实体数据菜单 *@
     @* <MudNavGroup Title="实体数据" *@
-    @*              Icon="@Icons.Material.Filled.Storage" *@
+    @*              Icon="@Icons.Material.Outlined.Storage" *@
     @*              Expanded="_entityGroupExpanded" *@
     @*              ExpandedChanged="@(v => _entityGroupExpanded = v)"> *@
     @*     @if (_entityTypes is null) *@
@@ -86,7 +86,7 @@
     @*         { *@
     @*             var display = EntityTypeDisplayService.GetDisplayName(et); *@
     @*             <MudNavLink Href="@($"/entities/{et.EntityType}")" *@
-    @*                         Icon="@Icons.Material.Filled.List" *@
+    @*                         Icon="@Icons.Material.Outlined.List" *@
     @*                         Match="NavLinkMatch.Prefix"> *@
     @*                 @display *@
     @*                 <MudChip T="string" Size="Size.Small" Class="ml-2"> *@
@@ -99,35 +99,35 @@
 
     @* 元数据管理 *@
     <MudNavGroup Title="元数据管理"
-                 Icon="@Icons.Material.Filled.Settings">
+                 Icon="@Icons.Material.Outlined.Settings">
         @* 实体类型（最优先入口） *@
         <MudNavLink Href="/metadata/entity-types"
-                    Icon="@Icons.Material.Filled.Category"
+                    Icon="@Icons.Material.Outlined.Category"
                     Match="NavLinkMatch.Prefix">
             实体类型
         </MudNavLink>
-        <MudNavLink Icon="@Icons.Material.Filled.EditAttributes"
+        <MudNavLink Icon="@Icons.Material.Outlined.EditAttributes"
                     OnClick="OpenAttributesManage">
             属性定义
         </MudNavLink>
         <MudNavLink Href="/metadata/composite-types"
-                    Icon="@Icons.Material.Filled.AccountTree"
+                    Icon="@Icons.Material.Outlined.AccountTree"
                     Match="NavLinkMatch.Prefix">
             组合类型
         </MudNavLink>
         <MudNavLink Href="/metadata/custom-tables"
-                    Icon="@Icons.Material.Filled.TableChart"
+                    Icon="@Icons.Material.Outlined.TableChart"
                     Match="NavLinkMatch.Prefix">
             自定义表
         </MudNavLink>
         <MudNavLink Href="/metadata/option-sets"
-                    Icon="@Icons.Material.Filled.Checklist"
+                    Icon="@Icons.Material.Outlined.Checklist"
                     Match="NavLinkMatch.Prefix">
             选项集
         </MudNavLink>
         @* 边类型（EdgeSky：对齐 Nebula 顶级实体） *@
         <MudNavLink Href="/metadata/edge-types"
-                    Icon="@Icons.Material.Filled.Hub"
+                    Icon="@Icons.Material.Outlined.Hub"
                     Match="NavLinkMatch.Prefix">
             边类型
         </MudNavLink>
@@ -135,24 +135,24 @@
 
     @* ★ 智能体工作流（MafWfSky） *@
     <MudNavGroup Title="智能体工作流"
-                 Icon="@Icons.Material.Filled.AutoAwesome">
+                 Icon="@Icons.Material.Outlined.AutoAwesome">
         <MudNavLink Href="/maf-wf/graph-agent"
-                    Icon="@Icons.Material.Filled.Forum"
+                    Icon="@Icons.Material.Outlined.Forum"
                     Match="NavLinkMatch.All">
             Graph Agent 对话
         </MudNavLink>
         <MudNavLink Href="/search"
-                    Icon="@Icons.Material.Filled.ManageSearch"
+                    Icon="@Icons.Material.Outlined.ManageSearch"
                     Match="NavLinkMatch.All">
             语义搜索
         </MudNavLink>
         <MudNavLink Href="/semantic-search-direct"
-                    Icon="@Icons.Material.Filled.TravelExplore"
+                    Icon="@Icons.Material.Outlined.TravelExplore"
                     Match="NavLinkMatch.All">
             语义搜索（直连）
         </MudNavLink>
         <MudNavLink Href="/maf-wf/writer-critic"
-                    Icon="@Icons.Material.Filled.EditNote"
+                    Icon="@Icons.Material.Outlined.EditNote"
                     Match="NavLinkMatch.All">
             Writer-Critic
         </MudNavLink>
@@ -160,7 +160,7 @@
 
     @* ★ 控件演示 *@
     <MudNavLink Href="/number-field-demo"
-                Icon="@Icons.Material.Filled.Pin"
+                Icon="@Icons.Material.Outlined.Pin"
                 Match="NavLinkMatch.All">
         数字控件 Demo
     </MudNavLink>

@@ -3,7 +3,7 @@
 <MudDialog>
     <TitleContent>
         <MudText Typo="Typo.h6">
-            <MudIcon Icon="@GetModeIcon()" Class="mr-2" />
+            <MudIcon Icon="@GetModeIcon()" Class="mr-2" Size="Size.Small" />
             @Title
         </MudText>
     </TitleContent>
@@ -95,11 +95,11 @@
 
     private string GetModeIcon() => Mode switch
     {
-        NodeDialogMode.Create => Icons.Material.Filled.AddCircle,
-        NodeDialogMode.Edit => Icons.Material.Filled.Edit,
-        NodeDialogMode.View => Icons.Material.Filled.Visibility,
-        NodeDialogMode.Delete => Icons.Material.Filled.Delete,
-        _ => Icons.Material.Filled.Help
+        NodeDialogMode.Create => Icons.Material.Outlined.AddCircle,
+        NodeDialogMode.Edit => Icons.Material.Outlined.Edit,
+        NodeDialogMode.View => Icons.Material.Outlined.Visibility,
+        NodeDialogMode.Delete => Icons.Material.Outlined.Delete,
+        _ => Icons.Material.Outlined.Help
     };
 
     private void Cancel() => MudDialog.Cancel();

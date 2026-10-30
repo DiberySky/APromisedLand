@@ -190,12 +190,12 @@
         return evt.Stage switch
         {
             "fix" => (string.IsNullOrEmpty(evt.Detail) ? $"同步 · {label}" : $"同步 · {label}（{detail}）",
-                Icons.Material.Filled.Check, Color.Success),
+                Icons.Material.Outlined.Check, Color.Success),
             "ok" => (string.IsNullOrEmpty(evt.Detail) ? $"已同步 · {label}" : $"已同步 · {label}（{detail}）",
-                Icons.Material.Filled.CheckCircle, Color.Secondary),
+                Icons.Material.Outlined.CheckCircle, Color.Secondary),
             "error" => (string.IsNullOrEmpty(label) ? $"失败 · {detail}" : $"失败 · {label}（{detail}）",
-                Icons.Material.Filled.ErrorOutline, Color.Error),
-            _ => ($"清理 · {detail}", Icons.Material.Filled.DeleteOutline, Color.Warning)
+                Icons.Material.Outlined.ErrorOutline, Color.Error),
+            _ => ($"清理 · {detail}", Icons.Material.Outlined.DeleteOutline, Color.Warning)
         };
     }
 

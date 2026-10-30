@@ -29,7 +29,7 @@
                        Expanded="true">
         <TitleContent>
             <MudStack Row AlignItems="AlignItems.Center">
-                <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" />
+                <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" />
                 <MudText Typo="Typo.subtitle2">绑定属性</MudText>
                 <MudChip T="string" Size="Size.Small" Color="Color.Default">
                     @_bindings.Count 条绑定
@@ -48,7 +48,7 @@
                     <MudTh>绑定名</MudTh>
                     <MudTh>属性定义</MudTh>
                     <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
-                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                        Color="Color.Success"
                                        Size="Size.Small"
                                        OnClick="OpenCreateBindingAsync"
@@ -58,12 +58,12 @@
                 <RowTemplate>
                     <MudTd DataLabel="排序" Style="text-align: right;">
                         <div class="d-flex flex-nowrap justify-end gap-2 align-center">
-                            <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                            <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                                            Size="Size.Small"
                                            Disabled="@(_moving || !CanMove(context, -1))"
                                            OnClick="@(async () => await MoveAsync(context, -1))"
                                            title="上移" />
-                            <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                            <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                                            Size="Size.Small"
                                            Disabled="@(_moving || !CanMove(context, 1))"
                                            OnClick="@(async () => await MoveAsync(context, 1))"
@@ -79,19 +79,19 @@
                         </MudText>
                     </MudTd>
                     <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                        Size="Size.Small"
                                        Color="Color.Error"
                                        OnClick="@(async () => await DeleteBindingAsync(context))"
                                        title="删除绑定及其属性数据" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                        Size="Size.Small"
                                        Color="Color.Primary"
                                        OnClick="@(async () => await RenameBindingAsync(context))"
                                        title="重命名绑定" />
                         <MudIconButton Icon="@(_expandedIds.Contains(context.BindingId)
-                                                ? Icons.Material.Filled.ExpandLess
-                                                : Icons.Material.Filled.ExpandMore)"
+                                                ? Icons.Material.Outlined.ExpandLess
+                                                : Icons.Material.Outlined.ExpandMore)"
                                        Size="Size.Small"
                                        Color="Color.Info"
                                        OnClick="@(async () => await ToggleExpandAsync(context))"
@@ -170,7 +170,7 @@
                     }
                 </ChildRowContent>
                 <NoRecordsContent>
-                    <EmptyStateSky Icon="@Icons.Material.Filled.Link"
+                    <EmptyStateSky Icon="@Icons.Material.Outlined.Link"
                                    Title="该节点尚无属性绑定">
                         <Description>
                             <text>点击表头 + 创建第一条绑定</text>

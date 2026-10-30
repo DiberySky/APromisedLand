@@ -88,29 +88,29 @@
             </MudText>
         }
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Navigation"
+                   StartIcon="@Icons.Material.Outlined.Navigation"
                    Disabled="!HasCoord" OnClick="NavigateAmapAsync">
             导航前往
         </MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Map"
+                   StartIcon="@Icons.Material.Outlined.Map"
                    Disabled="!HasCoord" OnClick="ShowOnMapAsync">
             查看地图
         </MudButton>
         @if (!ReadOnly)
         {
             <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.MyLocation"
+                       StartIcon="@Icons.Material.Outlined.MyLocation"
                        Disabled="_locating" OnClick="GetCurrentPositionAsync">
                 @(_locating ? "定位中…" : "获取当前位置")
             </MudButton>
             <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.AddLocationAlt"
+                       StartIcon="@Icons.Material.Outlined.AddLocationAlt"
                        OnClick="PickOnMapAsync">
                 地图选点
             </MudButton>
             <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Clear"
+                       StartIcon="@Icons.Material.Outlined.Clear"
                        Disabled="@(_lat is null && _lng is null && string.IsNullOrWhiteSpace(_label) && string.IsNullOrWhiteSpace(_address))"
                        OnClick="ClearAsync">
                 清空

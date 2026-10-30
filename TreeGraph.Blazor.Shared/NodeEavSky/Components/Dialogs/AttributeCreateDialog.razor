@@ -114,10 +114,10 @@
                         </MudSelectItem>
                     }
                 </MudSelect>
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                Color="Color.Success"
                                title="管理组合类型"
-                               OnClick="OpenCompositeTypeManageAsync" />
+                               OnClick="OpenCompositeTypeManageAsync" Size="Size.Small" />
             </div>
             @if (_compositeTypes is null || _compositeTypes.Count == 0)
             {
@@ -145,10 +145,10 @@
                         </MudSelectItem>
                     }
                 </MudSelect>
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                Color="Color.Success"
                                title="管理自定义表"
-                               OnClick="OpenCustomTableManageAsync" />
+                               OnClick="OpenCustomTableManageAsync" Size="Size.Small" />
             </div>
             @if (_customTables is null || _customTables.Count == 0)
             {
@@ -176,10 +176,10 @@
                         </MudSelectItem>
                     }
                 </MudSelect>
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                Color="Color.Success"
                                title="管理选项集"
-                               OnClick="OpenOptionSetManageAsync" />
+                               OnClick="OpenOptionSetManageAsync" Size="Size.Small" />
             </div>
             @if (_optionSets is null || _optionSets.Count == 0)
             {

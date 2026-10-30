@@ -14,7 +14,7 @@
         <MudButton Size="Size.Small"
                    Variant="Variant.Outlined"
                    Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Add"
+                   StartIcon="@Icons.Material.Outlined.Add"
                    Disabled="@(_type is null)"
                    OnClick="OpenAddFieldAsync">
             添加字段
@@ -87,25 +87,25 @@
                 <MudTd DataLabel="数组">
                     @if (context.IsArray)
                     {
-                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                        <MudIcon Icon="@Icons.Material.Outlined.Check"
                                  Color="Color.Success" Size="Size.Small" />
                     }
                 </MudTd>
                 <MudTd DataLabel="必填">
                     @if (context.IsRequired)
                     {
-                        <MudIcon Icon="@Icons.Material.Filled.Check"
+                        <MudIcon Icon="@Icons.Material.Outlined.Check"
                                  Color="Color.Success" Size="Size.Small" />
                     }
                 </MudTd>
                 <MudTd DataLabel="顺序">@context.DisplayOrder</MudTd>
                 <MudTd DataLabel="操作">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                    Size="Size.Medium"
                                    Color="Color.Primary"
                                    OnClick="@(async () => await OpenEditFieldAsync(context))"
                                    title="编辑" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                    Size="Size.Medium"
                                    Color="Color.Error"
                                    OnClick="@(async () => await DeleteFieldAsync(context))"

@@ -23,7 +23,7 @@
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
                               Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentIcon="@Icons.Material.Outlined.Search"
                               Immediate="true"
                               Disabled="_searching"
                               OnKeyDown="OnKeyDown"
@@ -37,7 +37,7 @@
 
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.Search"
+                           StartIcon="@Icons.Material.Outlined.Search"
                            OnClick="DoSearchAsync"
                            Disabled="_searching || string.IsNullOrWhiteSpace(_query)">
                     搜索

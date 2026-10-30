@@ -32,7 +32,7 @@
                     <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">默认</MudTh>
                     <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                         @* 添加选项入口：置于操作列表头（与组合定义管理页一致） *@
-                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                        Color="Color.Success"
                                        Size="Size.Small"
                                        OnClick="@OpenAddItemAsync"
@@ -49,12 +49,12 @@
                         var canMoveDown = idx >= 0 && idx < _items.Count - 1;
                     }
                     <MudTd DataLabel="排序" Style="white-space: nowrap; text-align: center;">
-                        <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                        <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                                        Size="Size.Small"
                                        Disabled="@(!canMoveUp)"
                                        OnClick="@(async () => await MoveUpAsync(context))"
                                        title="@(canMoveUp ? "上移" : "已在首位")" />
-                        <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                        <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                                        Size="Size.Small"
                                        Disabled="@(!canMoveDown)"
                                        OnClick="@(async () => await MoveDownAsync(context))"
@@ -65,24 +65,24 @@
                     <MudTd DataLabel="默认" Style="text-align: center;">
                         @if (context.IsDefault)
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.Star"
+                            <MudIcon Icon="@Icons.Material.Outlined.Star"
                                      Color="Color.Warning" Size="Size.Small" />
                         }
                     </MudTd>
                     <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                        Size="Size.Small"
                                        Color="Color.Error"
                                        OnClick="@(async () => await DeleteItemAsync(context))"
                                        title="删除" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                        Size="Size.Small"
                                        Color="Color.Primary"
                                        OnClick="@(() => OpenEditItemAsync(context))"
                                        title="编辑" />
                         @if (!context.IsDefault)
                         {
-                            <MudIconButton Icon="@Icons.Material.Filled.StarBorder"
+                            <MudIconButton Icon="@Icons.Material.Outlined.StarBorder"
                                            Size="Size.Small"
                                            Color="Color.Warning"
                                            OnClick="@(async () => await SetDefaultAsync(context))"

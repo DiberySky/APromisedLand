@@ -14,7 +14,7 @@
         <MudButton Size="Size.Small"
                    Variant="Variant.Outlined"
                    Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Add"
+                   StartIcon="@Icons.Material.Outlined.Add"
                    OnClick="OpenAddItemAsync">
             添加选项
         </MudButton>
@@ -47,33 +47,33 @@
                 <MudTd>
                     @if (context.IsDefault)
                     {
-                        <MudIcon Icon="@Icons.Material.Filled.Star"
+                        <MudIcon Icon="@Icons.Material.Outlined.Star"
                                  Color="Color.Warning" Size="Size.Small" />
                     }
                 </MudTd>
                 <MudTd>
-                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                    <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                                    Size="Size.Medium"
                                    OnClick="@(async () => await MoveUpAsync(context))"
                                    title="上移" />
-                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                    <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                                    Size="Size.Medium"
                                    OnClick="@(async () => await MoveDownAsync(context))"
                                    title="下移" />
                     @if (!context.IsDefault)
                     {
-                        <MudIconButton Icon="@Icons.Material.Filled.StarBorder"
+                        <MudIconButton Icon="@Icons.Material.Outlined.StarBorder"
                                        Size="Size.Medium"
                                        Color="Color.Warning"
                                        OnClick="@(async () => await SetDefaultAsync(context))"
                                        title="设为默认" />
                     }
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                    Size="Size.Medium"
                                    Color="Color.Primary"
                                    OnClick="@(async () => await OpenEditItemAsync(context))"
                                    title="编辑" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                    Size="Size.Medium"
                                    Color="Color.Error"
                                    OnClick="@(async () => await DeleteItemAsync(context))"

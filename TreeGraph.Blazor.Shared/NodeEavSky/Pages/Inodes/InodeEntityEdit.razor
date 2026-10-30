@@ -15,7 +15,7 @@
 
 <div class="d-flex align-center mb-3" style="gap: 8px; flex-wrap: wrap;">
     <MudButton Variant="Variant.Text" Color="Color.Default"
-               StartIcon="@Icons.Material.Filled.ArrowBack"
+               StartIcon="@Icons.Material.Outlined.ArrowBack"
                OnClick="BackToInode">
         返回 iNode
     </MudButton>
@@ -39,7 +39,7 @@ else
 {
     <MudPaper Class="@(Platform.IsCompact ? "pa-2 mb-3" : "pa-3 mb-4")" Outlined="true" Elevation="0">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-wrap">
-            <MudIcon Icon="@Icons.Material.Filled.Label" Size="Size.Small"
+            <MudIcon Icon="@Icons.Material.Outlined.Label" Size="Size.Small"
                      Color="Color.Secondary" />
             <MudText Typo="Typo.caption" Color="Color.Secondary">
                 绑定名
@@ -50,12 +50,12 @@ else
             </MudChip>
             <MudSpacer />
             <MudTooltip Text="重命名绑定">
-                <MudIconButton Icon="@Icons.Material.Filled.DriveFileRenameOutline"
+                <MudIconButton Icon="@Icons.Material.Outlined.DriveFileRenameOutline"
                                Size="Size.Small" Color="Color.Info"
                                OnClick="RenameAsync" Disabled="@_saving" />
             </MudTooltip>
             <MudTooltip Text="删除绑定及其属性数据">
-                <MudIconButton Icon="@Icons.Material.Filled.DeleteForever"
+                <MudIconButton Icon="@Icons.Material.Outlined.DeleteForever"
                                Size="Size.Small" Color="Color.Error"
                                OnClick="DeleteAsync" Disabled="@_saving" />
             </MudTooltip>
@@ -128,20 +128,20 @@ else
             <MudButton Variant="Variant.Filled"
                        Color="@(TotalErrorCount > 0 ? Color.Default : Color.Primary)"
                        OnClick="SaveAsync" Disabled="@_saving"
-                       StartIcon="@Icons.Material.Filled.Save">
+                       StartIcon="@Icons.Material.Outlined.Save">
                 @(_saving ? "保存中..." : "保存")
             </MudButton>
 
             @if (Platform.IsCompact)
             {
-                <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                <MudMenu Icon="@Icons.Material.Outlined.MoreVert"
                          Color="Color.Default"
                          AriaLabel="更多操作">
-                    <MudMenuItem Icon="@Icons.Material.Filled.Refresh"
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Refresh"
                                  OnClick="ReloadAsync">
                         重新加载
                     </MudMenuItem>
-                    <MudMenuItem Icon="@Icons.Material.Filled.History"
+                    <MudMenuItem Icon="@Icons.Material.Outlined.History"
                                  OnClick="GoToHistory">
                         审计历史
                     </MudMenuItem>
@@ -151,12 +151,12 @@ else
             {
                 <MudButton Variant="Variant.Outlined" Color="Color.Default"
                            OnClick="ReloadAsync"
-                           StartIcon="@Icons.Material.Filled.Refresh">
+                           StartIcon="@Icons.Material.Outlined.Refresh">
                     重新加载
                 </MudButton>
                 <MudButton Variant="Variant.Outlined" Color="Color.Default"
                            OnClick="GoToHistory"
-                           StartIcon="@Icons.Material.Filled.History">
+                           StartIcon="@Icons.Material.Outlined.History">
                     审计历史
                 </MudButton>
             }

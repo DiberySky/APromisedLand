@@ -7,7 +7,7 @@
 
 <MudPaper Class="pa-3" Elevation="1" Outlined="true">
     <div class="d-flex align-center">
-        <MudIcon Icon="@Icons.Material.Filled.TableChart"
+        <MudIcon Icon="@Icons.Material.Outlined.TableChart"
                  Size="Size.Small" Color="Color.Primary" Class="mr-1" />
         <MudText Typo="Typo.subtitle2">@Attr.DisplayName</MudText>
         @if (_available)
@@ -20,7 +20,7 @@
         <MudButton Size="Size.Small"
                    Variant="Variant.Outlined"
                    Color="Color.Primary"
-                   StartIcon="@(ReadOnly ? Icons.Material.Filled.Visibility : Icons.Material.Filled.Settings)"
+                   StartIcon="@(ReadOnly ? Icons.Material.Outlined.Visibility : Icons.Material.Outlined.Settings)"
                    OnClick="OpenManageAsync"
                    Disabled="@(!_available || _loading)">
             @(ReadOnly ? "查看行数据" : "管理行数据")

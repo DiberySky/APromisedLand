@@ -33,13 +33,13 @@
                           Immediate="true" />
         </div>
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.ArrowForward"
+                   StartIcon="@Icons.Material.Outlined.ArrowForward"
                    OnClick="GoToQuickInode"
                    Disabled="@(!IsValidGuid(_quickInodeId))">
             访问
         </MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                   StartIcon="@Icons.Material.Filled.Casino"
+                   StartIcon="@Icons.Material.Outlined.Casino"
                    OnClick="GenerateRandom">
             随机 GUID
         </MudButton>
@@ -56,15 +56,15 @@
                 var captured = inode;
                 <MudListItem T="string" OnClick="@(() => GoToInode(captured))">
                     <div class="d-flex align-center w-100">
-                        <MudIcon Icon="@Icons.Material.Filled.Hub"
+                        <MudIcon Icon="@Icons.Material.Outlined.Hub"
                                  Size="Size.Small" Class="mr-2" />
                         <code>@inode</code>
                         <MudSpacer />
-                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
                                        Size="Size.Medium"
                                        OnClick="@(e => CopyId(inode))"
                                        title="复制" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                        Size="Size.Medium"
                                        Color="Color.Error"
                                        OnClick="@(() => RemoveRecent(inode))"

@@ -107,12 +107,12 @@
                 }
             </MudSelect>
 
-            <MudIconButton Icon="@Icons.Material.Filled.FirstPage"
+            <MudIconButton Icon="@Icons.Material.Outlined.FirstPage"
                            Size="Size.Small"
                            title="首页"
                            Disabled="@(_page <= 1)"
                            OnClick="@(() => GoTo(1))"/>
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+            <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft"
                            Size="Size.Small"
                            title="上一页"
                            Disabled="@(_page <= 1)"
@@ -120,12 +120,12 @@
             <MudText Typo="Typo.body2" Style="white-space: nowrap;">
                 @_page / @PageCount
             </MudText>
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+            <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight"
                            Size="Size.Small"
                            title="下一页"
                            Disabled="@(_page >= PageCount)"
                            OnClick="@(() => GoTo(_page + 1))"/>
-            <MudIconButton Icon="@Icons.Material.Filled.LastPage"
+            <MudIconButton Icon="@Icons.Material.Outlined.LastPage"
                            Size="Size.Small"
                            title="末页"
                            Disabled="@(_page >= PageCount)"
@@ -214,13 +214,13 @@
 
     private static string GetHostTypeIcon(string hostType) => hostType switch
     {
-        "SpaceTree" => Icons.Material.Filled.Forest,
-        "UnitTree" => Icons.Material.Filled.CorporateFare,
-        "CategoryTree" => Icons.Material.Filled.Category,
-        "KnowledgeTree" => Icons.Material.Filled.MenuBook,
-        "LineNode" => Icons.Material.Filled.AccountTree,
-        "TreeNode" => Icons.Material.Filled.AccountTree,
-        _ => Icons.Material.Filled.HelpOutline
+        "SpaceTree" => Icons.Material.Outlined.Forest,
+        "UnitTree" => Icons.Material.Outlined.CorporateFare,
+        "CategoryTree" => Icons.Material.Outlined.Category,
+        "KnowledgeTree" => Icons.Material.Outlined.MenuBook,
+        "LineNode" => Icons.Material.Outlined.AccountTree,
+        "TreeNode" => Icons.Material.Outlined.AccountTree,
+        _ => Icons.Material.Outlined.HelpOutline
     };
 
     private static Color GetScoreColor(float score) => score switch

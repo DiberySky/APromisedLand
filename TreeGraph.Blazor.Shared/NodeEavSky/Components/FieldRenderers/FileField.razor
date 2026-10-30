@@ -50,16 +50,16 @@ else
             @if (CanPreview)
             {
                 <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Inherit"
-                           StartIcon="@Icons.Material.Filled.Visibility"
+                           StartIcon="@Icons.Material.Outlined.Visibility"
                            OnClick="OnPreviewAsync">预览</MudButton>
             }
             <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Download"
+                       StartIcon="@Icons.Material.Outlined.Download"
                        OnClick="OnDownloadAsync">下载</MudButton>
             @if (!ReadOnly)
             {
                 <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error"
-                           StartIcon="@Icons.Material.Filled.Delete"
+                           StartIcon="@Icons.Material.Outlined.Delete"
                            OnClick="OnDeleteAsync">删除</MudButton>
             }
         </div>

@@ -10,7 +10,7 @@
         <span class="numstep-seg numstep-btn @(Disabled || Current <= Min ? "disabled" : "")"
               title="减少"
               @onclick="@(() => ChangeAsync(-Step))">
-            <MudIcon Icon="@Icons.Material.Filled.RemoveCircle" Size="Size.Small"/>
+            <MudIcon Icon="@Icons.Material.Outlined.RemoveCircle" Size="Size.Small"/>
         </span>
         @if (!Embedded)
         {
@@ -20,7 +20,7 @@
         <span class="numstep-seg numstep-btn @(Disabled || Current >= Max ? "disabled" : "")"
               title="增加"
               @onclick="@(() => ChangeAsync(Step))">
-            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Size="Size.Small"/>
+            <MudIcon Icon="@Icons.Material.Outlined.AddCircle" Size="Size.Small"/>
         </span>
     </span>
     @if (!string.IsNullOrEmpty(Suffix))

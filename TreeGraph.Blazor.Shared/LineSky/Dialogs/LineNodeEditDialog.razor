@@ -23,7 +23,7 @@
         <MudContainer Class="pt-0 pb-4">
             @* KeepPanelsAlive：非激活页也保持渲染，属性区组件引用（提交时保存属性）不因切页丢失 *@
             <MudTabs Elevation="0" Rounded="true" KeepPanelsAlive="true">
-                <MudTabPanel Text="基本信息" Icon="@Icons.Material.Filled.Info" IconSize="Size.Small">
+                <MudTabPanel Text="基本信息" Icon="@Icons.Material.Outlined.Info" IconSize="Size.Small">
                     <MudStack Spacing="2">
                         <MudTextField @bind-Value="_form.Name"
                                       Label="名称"
@@ -44,13 +44,13 @@
                                           Size="Size.Small"
                                           ReadOnly="true"
                                           Adornment="Adornment.End"
-                                          AdornmentIcon="@Icons.Material.Filled.Search"
+                                          AdornmentIcon="@Icons.Material.Outlined.Search"
                                           IconSize="Size.Small"
                                           OnAdornmentClick="OpenPickerAsync"
                                           Style="flex: 1;" />
                             @if (!string.IsNullOrEmpty(_form.PredecessorId))
                             {
-                                <MudIconButton Icon="@Icons.Material.Filled.Clear"
+                                <MudIconButton Icon="@Icons.Material.Outlined.Clear"
                                                Color="Color.Warning"
                                                Title="清除前驱（不改连接）"
                                                Size="Size.Small"
@@ -60,7 +60,7 @@
                     </MudStack>
                 </MudTabPanel>
 
-                <MudTabPanel Text="属性绑定" Icon="@Icons.Material.Filled.Link" IconSize="Size.Small">
+                <MudTabPanel Text="属性绑定" Icon="@Icons.Material.Outlined.Link" IconSize="Size.Small">
                     @* 属性区：线路节点是 iNode 宿主，可关注属性定义并填写属性 *@
                     @if (Node is not null)
                     {
@@ -71,7 +71,7 @@
                     }
                 </MudTabPanel>
 
-                <MudTabPanel Text="关系绑定" Icon="@Icons.Material.Filled.Share" IconSize="Size.Small">
+                <MudTabPanel Text="关系绑定" Icon="@Icons.Material.Outlined.Share" IconSize="Size.Small">
                     @* 关系绑定：线路节点是 iNode 宿主，可维护出/入边 *@
                     @if (Node is not null)
                     {
@@ -85,7 +85,7 @@
         @* 对齐 Tree 设置修改：删除按钮置于左侧动作区；「添加下一个」在其左侧 *@
         <MudButton Variant="Variant.Text"
                    Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.PlaylistAdd"
+                   StartIcon="@Icons.Material.Outlined.PlaylistAdd"
                    Size="Size.Small"
                    OnClick="@OnAddNext">
             添加下一个
@@ -137,7 +137,14 @@
             { x => x.ExcludeNodeId, Node?.Id }
         };
         var dialog = await DialogService.ShowExAsync<LineNodePickerDialog>(
-            "选择前驱节点", parameters);
+            "选择前驱节点", parameters,
+            new DialogOptionsEx
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                BackdropClick = false,
+                Position = DialogPosition.TopCenter
+            });
         var result = await dialog.Result;
         if (result is { Canceled: false, Data: LineNodeDto picked })
         {

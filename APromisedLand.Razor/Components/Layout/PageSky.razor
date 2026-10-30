@@ -12,7 +12,7 @@
         {
             <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
                            Edge="Edge.Start" Color="Color.Warning"
-                           OnClick=@(e => BackClick())/>
+                           OnClick="@(e => BackClick())" Size="Size.Small" />
         }
 
         @if (string.IsNullOrEmpty(Title) == false)
@@ -31,7 +31,7 @@
         {
             <MudIconButton Icon="@Icons.Material.Outlined.Menu"
                            Color="Color.Success"
-                           OnClick="@(e => OnStartClick.InvokeAsync())"/>
+                           OnClick="@(e => OnStartClick.InvokeAsync())" Size="Size.Small" />
         }
 
     </ChildContent>
@@ -58,7 +58,7 @@
                 <MudSpacer/>
                 <MudIconButton Icon="@Icons.Material.Outlined.Logout"
                                Color="Color.Error"
-                               OnClick="e => Logout()"/>
+                               OnClick="e => Logout()" Size="Size.Small" />
             }
         </ChildContent>
     </MudAppBar>

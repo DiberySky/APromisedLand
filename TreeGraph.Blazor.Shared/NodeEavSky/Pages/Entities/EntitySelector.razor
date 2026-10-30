@@ -18,20 +18,20 @@
         {
             <MudButton Variant="Variant.Outlined" Color="Color.Default"
                        Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       StartIcon="@Icons.Material.Outlined.ArrowBack"
                        OnClick="BackToTypes">
                 返回类型
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.List"
+                       StartIcon="@Icons.Material.Outlined.List"
                        OnClick="@(() => Nav.NavigateTo($"/entities/{_selectedEntityType}"))">
                 进入完整列表页
             </MudButton>
         }
         <MudButton Variant="Variant.Outlined" Color="Color.Default"
                    Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Refresh"
+                   StartIcon="@Icons.Material.Outlined.Refresh"
                    OnClick="ReloadAsync" Disabled="@_loading">
             刷新
         </MudButton>
@@ -53,7 +53,7 @@
     }
     else if (_entityTypes is null || _entityTypes.Count == 0)
     {
-        <EmptyStateSky Icon="@Icons.Material.Filled.Inbox" Title="暂无属性定义">
+        <EmptyStateSky Icon="@Icons.Material.Outlined.Inbox" Title="暂无属性定义">
             <Description>
                 <text>请先在「属性定义管理」中创建属性定义，再通过「属性定义管理」添加属性</text>
             </Description>
@@ -72,7 +72,7 @@
                              Elevation="1">
                         <MudCardContent>
                             <div class="d-flex align-center mb-2" style="min-width:0; overflow:hidden;">
-                                <MudIcon Icon="@Icons.Material.Filled.Storage"
+                                <MudIcon Icon="@Icons.Material.Outlined.Storage"
                                          Color="Color.Primary" Size="Size.Medium" />
                                 <MudText Typo="Typo.h6" Class="ml-2"
                                          Style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
@@ -105,7 +105,7 @@
                             <MudButton Size="Size.Medium"
                                        Variant="Variant.Text"
                                        Color="Color.Primary"
-                                       EndIcon="@Icons.Material.Filled.ChevronRight">
+                                       EndIcon="@Icons.Material.Outlined.ChevronRight">
                                 浏览
                             </MudButton>
                         </MudCardActions>
@@ -147,7 +147,7 @@ else
     }
     else if (_entities is null)
     {
-        <EmptyStateSky Icon="@Icons.Material.Filled.CloudOff" Title="属性数据加载失败">
+        <EmptyStateSky Icon="@Icons.Material.Outlined.CloudOff" Title="属性数据加载失败">
             <Description>
                 <text>请检查后端服务是否正常</text>
             </Description>
@@ -155,12 +155,12 @@ else
     }
     else if (_entities.Items.Count == 0)
     {
-        <EmptyStateSky Icon="@Icons.Material.Filled.Inbox"
+        <EmptyStateSky Icon="@Icons.Material.Outlined.Inbox"
                        Title="@($"{_selectedEntityType} 下暂无属性数据")">
             <Action>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary"
                            Href="@($"/entities/{_selectedEntityType}")"
-                           StartIcon="@Icons.Material.Filled.Add">
+                           StartIcon="@Icons.Material.Outlined.Add">
                     前往列表页新建
                 </MudButton>
             </Action>
@@ -211,12 +211,12 @@ else
                         }
                     </MudTd>
                     <MudTd DataLabel="操作">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                        Size="Size.Medium"
                                        Color="Color.Primary"
                                        OnClick="@(() => EditEntity(context.EntityId))"
                                        title="编辑" />
-                        <MudIconButton Icon="@Icons.Material.Filled.History"
+                        <MudIconButton Icon="@Icons.Material.Outlined.History"
                                        Size="Size.Medium"
                                        Color="Color.Info"
                                        OnClick="@(() => ViewHistory(context.EntityId))"
@@ -224,7 +224,7 @@ else
                     </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
-                    <EmptyStateSky Icon="@Icons.Material.Filled.Inbox" Title="无属性数据" />
+                    <EmptyStateSky Icon="@Icons.Material.Outlined.Inbox" Title="无属性数据" />
                 </NoRecordsContent>
                 <PagerContent>
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
@@ -240,12 +240,12 @@ else
                             <MudSelectItem T="int" Value="100">100</MudSelectItem>
                         </MudSelect>
                         <MudSpacer />
-                        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                        <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft"
                                        Size="Size.Small"
                                        Disabled="@(_page <= 1)"
                                        OnClick="@(() => GoToPageAsync(_page - 1))" />
                         <MudText Typo="Typo.body2">@_page / @TotalPages</MudText>
-                        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                        <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight"
                                        Size="Size.Small"
                                        Disabled="@(_page >= TotalPages)"
                                        OnClick="@(() => GoToPageAsync(_page + 1))" />
@@ -273,7 +273,7 @@ else
     // MudBlazor 9：MudBreadcrumbs 只接受 Items + ItemTemplate，首项可点击返回第 1 步
     private List<BreadcrumbItem> Step2Crumbs =>
     [
-        new BreadcrumbItem("属性定义", null, false, Icons.Material.Filled.Storage),
+        new BreadcrumbItem("属性定义", null, false, Icons.Material.Outlined.Storage),
         new BreadcrumbItem(EntityTypeDisplay.GetDisplayName(_selectedEntityType), null, true, null),
     ];
 

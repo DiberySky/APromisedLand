@@ -27,7 +27,7 @@ else
             <MudTh>描述</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">同步刷新</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
-                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="OpenCreateAsync"
@@ -39,13 +39,13 @@ else
             <MudTd>@SpaceName(context.SpaceId)</MudTd>
             <MudTd Style="white-space: nowrap; text-align: center;">
                 @* 线路节点设置：打开该线路的 LineNode 维护对话框 *@
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenLineNodesAsync(context))"
                                title="线路节点设置" />
                 @* 线路结构：有序节点 → 自动建边（线路型边类型） *@
-                <MudIconButton Icon="@Icons.Material.Filled.Timeline"
+                <MudIconButton Icon="@Icons.Material.Outlined.Timeline"
                                Color="Color.Primary"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenStructureAsync(context))"
@@ -54,19 +54,19 @@ else
             <MudTd>@context.Description</MudTd>
             <MudTd Style="white-space: nowrap; text-align: center;">
                 @* 向量刷新：按该线路自身 + 其下线路节点范围对账（补缺 + 删孤） *@
-                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
                                Color="Color.Info"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenVectorRefreshAsync(context))"
                                title="向量刷新" />
             </MudTd>
             <MudTd Style="white-space: nowrap; text-align: right;">
-                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                Color="Color.Error"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenDeleteAsync(context))"
                                title="删除线路" />
-                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                Color="Color.Primary"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenEditAsync(context))"
@@ -74,7 +74,7 @@ else
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <EmptyStateSky Icon="@Icons.Material.Filled.Timeline"
+            <EmptyStateSky Icon="@Icons.Material.Outlined.Timeline"
                            Title="暂无线路">
                 <Description>
                     <text>点击右上角 + 创建第一条</text>

@@ -12,7 +12,7 @@
                 {
                     <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
                                    Edge="Edge.Start" Color="Color.Warning"
-                                   OnClick="@CancelAsync"/>
+                                   OnClick="@CancelAsync" Size="Size.Small" />
                 }
 
                 <MudSpacer/>
@@ -30,7 +30,7 @@
                 {
                     <MudIconButton Icon="@Icons.Material.Outlined.Menu"
                                    Color="Color.Success"
-                                   OnClick="@StartAsync"/>
+                                   OnClick="@StartAsync" Size="Size.Small" />
                 }
             </MudToolBar>
         }
@@ -57,7 +57,7 @@
                 @if (CancelButtonVisible)
                 {
                     <MudButton Variant="Variant.Text"
-                               StartIcon="@(IconsVisible ? Icons.Material.Filled.Close : null)"
+                               StartIcon="@(IconsVisible ? Icons.Material.Outlined.Close : null)"
                                Color="Color.Default"
                                OnClick="@CancelAsync">
                         @CancelButtonText
@@ -69,7 +69,7 @@
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
                                Disabled="@SubmitButtonDisabled"
-                               StartIcon="@(IconsVisible ? Icons.Material.Filled.SaveAs : null)"
+                               StartIcon="@(IconsVisible ? Icons.Material.Outlined.SaveAs : null)"
                                OnClick="@SubmitAsync">
                         @SubmitButtonText
                     </MudButton>

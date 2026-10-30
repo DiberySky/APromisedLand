@@ -29,12 +29,12 @@ else
             <MudTh Style="width: 1%; white-space: nowrap; text-align: center;">同步刷新</MudTh>
             <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                 @* 同步刷新：分步列出 space/tree/line/edge 同步到 向量/图 的过程进度 *@
-                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
                                Color="Color.Info"
                                Size="Size.Small"
                                OnClick="OpenSyncRefreshAsync"
                                title="同步刷新" />
-                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="OpenCreateAsync"
@@ -46,7 +46,7 @@ else
             <MudTd>@SpaceTypeLabel(context.Type)</MudTd>
             <MudTd DataLabel="关系设置" Style="white-space: nowrap; text-align: center;">
                 @* 关系图标：打开该空间的边类型维护对话框（EdgeType 为图空间级资源） *@
-                <MudIconButton Icon="@Icons.Material.Filled.Hub"
+                <MudIconButton Icon="@Icons.Material.Outlined.Hub"
                                Color="Color.Warning"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenEdgeTypesAsync(context))"
@@ -63,19 +63,19 @@ else
             <MudTd>@context.Description</MudTd>
             <MudTd Style="white-space: nowrap; text-align: center;">
                 @* 向量刷新：打开对话框可视化该空间范围的向量对账进度（补缺 + 删孤） *@
-                <MudIconButton Icon="@Icons.Material.Filled.Sync"
+                <MudIconButton Icon="@Icons.Material.Outlined.Sync"
                                Color="Color.Info"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenVectorRefreshAsync(context))"
                                title="向量刷新" />
             </MudTd>
             <MudTd Style="white-space: nowrap; text-align: right;">
-                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                Color="Color.Error"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenDeleteAsync(context))"
                                title="删除空间" />
-                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                Color="Color.Primary"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenEditAsync(context))"
@@ -83,7 +83,7 @@ else
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <EmptyStateSky Icon="@Icons.Material.Filled.Workspaces"
+            <EmptyStateSky Icon="@Icons.Material.Outlined.Workspaces"
                            Title="暂无空间">
                 <Description>
                     <text>点击右上角 + 创建第一个</text>

@@ -19,7 +19,7 @@
                OnArrowBackClick="BackToList">
     <SecondaryInfo>
         @EntityId
-        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
                        Size="Size.Small"
                        OnClick="CopyEntityId"
                        title="复制 EntityId" />
@@ -77,7 +77,7 @@ else
 
     <MudToolBar Class="mud-theme-dark mt-4">
         <MudButton Variant="Variant.Text" Color="Color.Default"
-                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   StartIcon="@Icons.Material.Outlined.ArrowBack"
                    OnClick="BackToList">
             返回列表
         </MudButton>
@@ -85,24 +85,24 @@ else
         <MudButton Variant="Variant.Filled"
                    Color="@(TotalErrorCount > 0 ? Color.Default : Color.Primary)"
                    OnClick="SaveAsync" Disabled="@_saving"
-                   StartIcon="@Icons.Material.Filled.Save">
+                   StartIcon="@Icons.Material.Outlined.Save">
             @(_saving ? "保存中..." : "保存")
         </MudButton>
 
         @if (Platform.IsCompact)
         {
-            <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+            <MudMenu Icon="@Icons.Material.Outlined.MoreVert"
                      Color="Color.Default"
                      AriaLabel="更多操作">
-                <MudMenuItem Icon="@Icons.Material.Filled.Refresh"
+                <MudMenuItem Icon="@Icons.Material.Outlined.Refresh"
                              OnClick="ReloadAsync">
                     重新加载
                 </MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Filled.Delete"
+                <MudMenuItem Icon="@Icons.Material.Outlined.Delete"
                              OnClick="ClearAllAsync">
                     清空所有属性
                 </MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Filled.DeleteForever"
+                <MudMenuItem Icon="@Icons.Material.Outlined.DeleteForever"
                              OnClick="DeleteEntityAsync"
                              Disabled="@_saving">
                     删除属性数据
@@ -113,17 +113,17 @@ else
         {
             <MudButton Variant="Variant.Outlined" Color="Color.Default"
                        OnClick="ReloadAsync"
-                       StartIcon="@Icons.Material.Filled.Refresh">
+                       StartIcon="@Icons.Material.Outlined.Refresh">
                 重新加载
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Error"
                        OnClick="ClearAllAsync"
-                       StartIcon="@Icons.Material.Filled.Delete">
+                       StartIcon="@Icons.Material.Outlined.Delete">
                 清空所有属性
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Error"
                        OnClick="DeleteEntityAsync"
-                       StartIcon="@Icons.Material.Filled.DeleteForever"
+                       StartIcon="@Icons.Material.Outlined.DeleteForever"
                        Disabled="@_saving">
                 删除属性数据
             </MudButton>

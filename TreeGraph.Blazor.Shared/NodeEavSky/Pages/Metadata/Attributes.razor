@@ -53,7 +53,7 @@
         <MudTh>属性名</MudTh>
         <MudTh Style="text-align: center;">类型</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
-            <MudIconButton Icon="@Icons.Material.Filled.Add"
+            <MudIconButton Icon="@Icons.Material.Outlined.Add"
                            Size="Size.Small"
                            Color="Color.Success"
                            OnClick="OpenCreateAsync"
@@ -64,12 +64,12 @@
     <RowTemplate>
         <MudTd DataLabel="排序" Style="text-align: right;">
             <div class="d-flex flex-nowrap justify-end gap-2 align-center">
-                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                                Size="Size.Small"
                                OnClick="@(async () => await MoveAsync(context, -1))"
                                Disabled="@(_moving || !CanMove(context, -1))"
                                title="上移" />
-                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                                Size="Size.Small"
                                OnClick="@(async () => await MoveAsync(context, 1))"
                                Disabled="@(_moving || !CanMove(context, 1))"
@@ -88,12 +88,12 @@
         </MudTd>
         <MudTd DataLabel="操作" Style="text-align: right;">
             <div class="d-flex flex-nowrap justify-end">
-                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                Size="Size.Small"
                                Color="Color.Error"
                                OnClick="@(async () => await DeleteAsync(context))"
                                title="删除" />
-                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                Size="Size.Small"
                                Color="Color.Primary"
                                OnClick="@(async () => await OpenEditAsync(context))"
@@ -102,7 +102,7 @@
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
-        <EmptyStateSky Icon="@Icons.Material.Filled.ListAlt"
+        <EmptyStateSky Icon="@Icons.Material.Outlined.ListAlt"
                        Title="暂无属性定义">
             <Description>
                 @if (string.IsNullOrEmpty(_entityType))

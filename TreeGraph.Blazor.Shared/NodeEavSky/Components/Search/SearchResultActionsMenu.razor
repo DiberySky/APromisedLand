@@ -21,18 +21,18 @@
 @inject LineNodeManageApiClient LineNodeApi
 
 @* 维护：直开对应 Node 类型的宿主操作对话框 *@
-<MudIconButton Icon="@Icons.Material.Filled.MoreVert"
+<MudIconButton Icon="@Icons.Material.Outlined.MoreVert"
                Size="Size.Small"
                title="节点操作"
                OnClick="OpenMaintenanceAsync" />
 @if (HasTreeLocate)
 {
-    <MudIconButton Icon="@Icons.Material.Filled.Forest"
+    <MudIconButton Icon="@Icons.Material.Outlined.Forest"
                    Size="Size.Small"
                    title="树定位"
                    OnClick="OpenTreeAsync" />
 }
-<MudIconButton Icon="@Icons.Material.Filled.AutoAwesome"
+<MudIconButton Icon="@Icons.Material.Outlined.AutoAwesome"
                Size="Size.Small"
                title="AI 综合"
                OnClick="AiExpandAsync" />

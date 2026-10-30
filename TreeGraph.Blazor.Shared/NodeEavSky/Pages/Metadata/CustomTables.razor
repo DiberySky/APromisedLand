@@ -14,13 +14,13 @@
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Small"
                        OnClick="LoadAsync" Disabled="_loading"
-                       StartIcon="@Icons.Material.Filled.Refresh">
+                       StartIcon="@Icons.Material.Outlined.Refresh">
                 刷新
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Success"
                        Size="Size.Small"
                        OnClick="OpenCreateTableAsync"
-                       StartIcon="@Icons.Material.Filled.Add"
+                       StartIcon="@Icons.Material.Outlined.Add"
                        Class="ml-2">
                 新建自定义表
             </MudButton>
@@ -40,7 +40,7 @@
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             @if (IsDialogMode)
             {
-                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="OpenCreateTableAsync"
@@ -56,12 +56,12 @@
         <MudTd DataLabel="排序" Style="text-align: right;">
             @* 排序：与相邻行交换 DisplayOrder 并持久化 *@
             <div class="d-flex flex-nowrap justify-end gap-2 align-center">
-                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                                Size="Size.Small"
                                Disabled="@(_moving || !CanMove(context, -1))"
                                OnClick="@(async () => await MoveAsync(context, -1))"
                                title="上移" />
-                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                                Size="Size.Small"
                                Disabled="@(_moving || !CanMove(context, 1))"
                                OnClick="@(async () => await MoveAsync(context, 1))"
@@ -75,7 +75,7 @@
                 @if (context.IsRecordTable)
                 {
                     <MudChip T="string" Size="Size.Small" Color="Color.Tertiary"
-                             Class="ml-2" Icon="@Icons.Material.Filled.Lock">
+                             Class="ml-2" Icon="@Icons.Material.Outlined.Lock">
                         时序
                     </MudChip>
                 }
@@ -86,7 +86,7 @@
                列数量以徽标叠加在图标右上角 *@
             <MudBadge Content="@context.Columns.Count(c => !c.IsDeleted)" Color="Color.Info"
                       Overlap="true" Bordered="true" Max="99">
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenColumnsAsync(context))"
@@ -94,17 +94,17 @@
             </MudBadge>
         </MudTd>
         <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                            Size="Size.Small"
                            Color="Color.Error"
                            OnClick="@(async () => await DeleteTableAsync(context))"
                            title="删除" />
-            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                            Size="Size.Small"
                            Color="Color.Primary"
                            OnClick="@(() => OpenEditTableAsync(context))"
                            title="编辑" />
-            <MudIconButton Icon="@(IsExpanded(context.TableDefinitionId) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+            <MudIconButton Icon="@(IsExpanded(context.TableDefinitionId) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"
                            Size="Size.Small"
                            Color="Color.Info"
                            OnClick="@(() => ToggleExpand(context.TableDefinitionId))"
@@ -151,7 +151,7 @@
                                                 <code>@c.ColumnName</code>
                                                 @if (locked)
                                                 {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Lock"
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Lock"
                                                              Size="Size.Small" Color="Color.Tertiary"
                                                              Class="ml-1" />
                                                 }
@@ -175,19 +175,19 @@
                                             <td>
                                                 @if (c.IsRequired)
                                                 {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Check" Color="Color.Success" Size="Size.Small" />
                                                 }
                                             </td>
                                             <td>
                                                 @if (c.IsSearchable)
                                                 {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Check" Color="Color.Success" Size="Size.Small" />
                                                 }
                                             </td>
                                             <td>
                                                 @if (c.IsUnique)
                                                 {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Check" Color="Color.Success" Size="Size.Small" />
                                                 }
                                             </td>
                                         </tr>
@@ -201,7 +201,7 @@
         }
     </ChildRowContent>
     <NoRecordsContent>
-        <EmptyStateSky Icon="@Icons.Material.Filled.TableChart"
+        <EmptyStateSky Icon="@Icons.Material.Outlined.TableChart"
                        Title="暂无自定义表">
             <Description>
                 <text>点击右上角 + 创建第一个</text>

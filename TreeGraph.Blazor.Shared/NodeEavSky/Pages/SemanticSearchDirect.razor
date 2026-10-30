@@ -26,7 +26,7 @@
                               Placeholder="输入关键词进行语义搜索..."
                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentIcon="@Icons.Material.Outlined.Search"
                               OnKeyDown="HandleKeyDown"
                               Immediate="true"
                               Disabled="_searching"/>
@@ -56,7 +56,7 @@
 
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.PersonSearch"
+                               StartIcon="@Icons.Material.Outlined.PersonSearch"
                                OnClick="PickNodeAsync"
                                Disabled="_searching">
                         选节点
@@ -64,7 +64,7 @@
 
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Search"
+                               StartIcon="@Icons.Material.Outlined.Search"
                                OnClick="DoSearchAsync"
                                Disabled="_searching || string.IsNullOrWhiteSpace(_query)">
                         @if (_searching)
@@ -82,7 +82,7 @@
         {
             <MudPaper Elevation="0" Class="pa-3 mt-3">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small"/>
+                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Color="Color.Success" Size="Size.Small"/>
                     <MudText Typo="Typo.body2">
                         已选节点：<strong>@(_picked.NodeName ?? _picked.InodeId)</strong>
                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-2">
@@ -90,15 +90,15 @@
                         </MudChip>
                     </MudText>
                     <MudSpacer/>
-                    <MudIconButton Icon="@Icons.Material.Filled.AccountTree"
+                    <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
                                    Size="Size.Small"
                                    Title="树定位"
                                    OnClick="@(() => OpenTreeDialogAsync(_picked))"/>
-                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                    <MudIconButton Icon="@Icons.Material.Outlined.OpenInNew"
                                    Size="Size.Small"
                                    Title="打开详情"
                                    OnClick="@(() => Nav.NavigateTo($"/inodes/{_picked.InodeId}"))"/>
-                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
                                    Size="Size.Small"
                                    Title="清除"
                                    OnClick="ClearPicked"/>

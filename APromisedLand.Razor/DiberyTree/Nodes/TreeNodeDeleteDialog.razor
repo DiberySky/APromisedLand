@@ -59,7 +59,7 @@
     private bool _isDeleting = false;
 
     private bool CanDelete => _confirmText.Trim() == Node.Text().Trim();
-    private string _confirmIcon => CanDelete ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error;
+    private string _confirmIcon => CanDelete ? Icons.Material.Outlined.CheckCircle : Icons.Material.Outlined.Error;
     private Color _confirmColor => CanDelete ? Color.Success : Color.Error;
 
     private void ConfirmDelete()

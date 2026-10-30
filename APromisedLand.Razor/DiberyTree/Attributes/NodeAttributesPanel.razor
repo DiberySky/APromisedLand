@@ -11,7 +11,7 @@
         </CardHeaderContent>
         <CardHeaderActions>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" 
-                       StartIcon="@Icons.Material.Filled.Add"
+                       StartIcon="@Icons.Material.Outlined.Add"
                        OnClick="@OpenAddDialog">
                 添加属性
             </MudButton>
@@ -70,10 +70,10 @@
                             }
                         </MudItem>
                         <MudItem xs="12" sm="3" Class="d-flex justify-end">
-                            <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Success"
-                                           OnClick="@(() => SaveValue(attr))" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                           OnClick="@(() => DeleteValue(attr))" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Save" Color="Color.Success"
+                                           OnClick="@(() => SaveValue(attr))" Size="Size.Small" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error"
+                                           OnClick="@(() => DeleteValue(attr))" Size="Size.Small" />
                         </MudItem>
                     </MudGrid>
                 }

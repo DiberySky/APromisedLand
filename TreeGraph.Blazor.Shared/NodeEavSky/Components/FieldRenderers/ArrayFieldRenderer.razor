@@ -16,7 +16,7 @@
             @if (!ReadOnly)
             {
                 <MudSpacer />
-                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                Size="Size.Medium" Color="Color.Error"
                                OnClick="@(() => RemoveAt(idx))" />
             }
@@ -46,7 +46,7 @@
 {
     <MudButton Size="Size.Medium" Variant="Variant.Outlined"
                Color="Color.Primary"
-               StartIcon="@Icons.Material.Filled.Add"
+               StartIcon="@Icons.Material.Outlined.Add"
                OnClick="AddNew">
         添加一项
     </MudButton>

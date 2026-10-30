@@ -35,14 +35,14 @@
                               Style="flex: 1;" />
                 <MudButton Variant="Variant.Outlined"
                            Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.Search"
+                           StartIcon="@Icons.Material.Outlined.Search"
                            Size="Size.Small"
                            OnClick="OpenPickerAsync">
                     选择
                 </MudButton>
                 @if (!string.IsNullOrEmpty(_form.PredecessorId))
                 {
-                    <MudIconButton Icon="@Icons.Material.Filled.Clear"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Clear"
                                    Title="清除"
                                    Size="Size.Small"
                                    OnClick="ClearPredecessor" />
@@ -85,7 +85,14 @@
             { x => x.LineId, LineId }
         };
         var dialog = await DialogService.ShowExAsync<LineNodePickerDialog>(
-            "选择前驱节点", parameters);
+            "选择前驱节点", parameters,
+            new DialogOptionsEx
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                BackdropClick = false,
+                Position = DialogPosition.TopCenter
+            });
         var result = await dialog.Result;
         if (result is { Canceled: false, Data: LineNodeDto picked })
         {

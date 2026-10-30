@@ -6,7 +6,7 @@
 
 <MudPaper Class="pa-3" Elevation="1" Outlined="true">
     <div class="d-flex align-center mb-2">
-        <MudIcon Icon="@Icons.Material.Filled.DataObject"
+        <MudIcon Icon="@Icons.Material.Outlined.DataObject"
                  Size="Size.Small" Color="Color.Primary" Class="mr-1" />
         <MudText Typo="Typo.subtitle2">@Attr.DisplayName</MudText>
         @if (Attr.IsRequired)
@@ -15,11 +15,11 @@
         }
         @if (!ReadOnly && HasValue)
         {
-            <MudIconButton Icon="@Icons.Material.Filled.FormatAlignLeft"
+            <MudIconButton Icon="@Icons.Material.Outlined.FormatAlignLeft"
                            Size="Size.Small" Color="Color.Default"
                            Title="格式化 JSON"
                            OnClick="FormatJson" Class="ml-auto" />
-            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+            <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
                            Size="Size.Small" Color="Color.Default"
                            Title="复制"
                            OnClick="CopyToClipboard" />

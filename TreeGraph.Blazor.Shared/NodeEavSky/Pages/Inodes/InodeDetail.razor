@@ -19,25 +19,25 @@
     <Actions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Add"
+                   StartIcon="@Icons.Material.Outlined.Add"
                    OnClick="OpenAttachDialog">
             声明新类型
         </MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                    Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.AddCircleOutline"
+                   StartIcon="@Icons.Material.Outlined.AddCircleOutline"
                    OnClick="OpenCreateBindingAsync">
             新建绑定
         </MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Info"
                    Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.DataObject"
+                   StartIcon="@Icons.Material.Outlined.DataObject"
                    OnClick="OpenJsonDrawer">
             JSON 预览
         </MudButton>
         <MudButton Variant="Variant.Outlined" Color="Color.Default"
                    Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Refresh"
+                   StartIcon="@Icons.Material.Outlined.Refresh"
                    OnClick="ReloadAsync" Disabled="@_loading">
             刷新
         </MudButton>
@@ -48,7 +48,7 @@
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
         <MudText Typo="Typo.caption" Color="Color.Secondary">iNode ID</MudText>
         <code>@InodeId</code>
-        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+        <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
                        Size="Size.Small" OnClick="CopyId" title="复制" />
     </MudStack>
 </MudPaper>
@@ -59,19 +59,19 @@
 }
 else if (_cards is null || _cards.Count == 0)
 {
-    <EmptyStateSky Icon="@Icons.Material.Filled.Inbox"
+    <EmptyStateSky Icon="@Icons.Material.Outlined.Inbox"
                    Title="该 iNode 尚未声明任何类型">
         <Description>
             <text>点击下方按钮，为该 iNode 声明它会使用的属性定义</text>
         </Description>
         <Action>
             <MudButton Variant="Variant.Filled" Color="Color.Success"
-                       StartIcon="@Icons.Material.Filled.Add"
+                       StartIcon="@Icons.Material.Outlined.Add"
                        OnClick="OpenAttachDialog">
                 声明新类型
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.AddCircleOutline"
+                       StartIcon="@Icons.Material.Outlined.AddCircleOutline"
                        OnClick="OpenCreateBindingAsync">
                 新建绑定
             </MudButton>
@@ -92,7 +92,7 @@ else
                 <MudCard Elevation="1" Class="h-100">
                     <MudCardContent>
                         <div class="d-flex align-center flex-wrap mb-2">
-                            <MudIcon Icon="@Icons.Material.Filled.Category"
+                            <MudIcon Icon="@Icons.Material.Outlined.Category"
                                      Color="@(captured.HasEntity ? Color.Success : Color.Default)"
                                      Size="Size.Medium" />
                             <MudText Typo="Typo.h6" Class="ml-2" Style="min-width: 0; overflow-wrap: anywhere;">
@@ -139,8 +139,8 @@ else
                                    Variant="Variant.Filled"
                                    Color="Color.Primary"
                                    StartIcon="@(captured.HasEntity
-                                       ? Icons.Material.Filled.Edit
-                                       : Icons.Material.Filled.Add)"
+                                       ? Icons.Material.Outlined.Edit
+                                       : Icons.Material.Outlined.Add)"
                                    OnClick="@(() => GoToEdit(captured))">
                             @(captured.BindingCount > 1
                                 ? "绑定"
@@ -149,13 +149,13 @@ else
                         <MudButton Size="Size.Medium"
                                    Variant="Variant.Text"
                                    Color="Color.Default"
-                                   StartIcon="@Icons.Material.Filled.History"
+                                   StartIcon="@Icons.Material.Outlined.History"
                                    OnClick="@(() => GoToHistory(captured))"
                                    Disabled="@(!captured.HasEntity)">
                             历史
                         </MudButton>
                         <MudSpacer />
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                        Size="Size.Medium"
                                        Color="Color.Error"
                                        OnClick="@(async () => await DetachAsync(captured))"
@@ -179,11 +179,11 @@ else
 
         @* 标题区 *@
         <div class="d-flex align-center mb-3">
-            <MudIcon Icon="@Icons.Material.Filled.DataObject"
-                     Color="Color.Info" Class="mr-2" />
+            <MudIcon Icon="@Icons.Material.Outlined.DataObject"
+                     Color="Color.Info" Class="mr-2" Size="Size.Small" />
             <MudText Typo="Typo.h6">原始 JSON 预览</MudText>
             <MudSpacer />
-            <MudIconButton Icon="@Icons.Material.Filled.Close"
+            <MudIconButton Icon="@Icons.Material.Outlined.Close"
                            Size="Size.Medium"
                            OnClick="@(() => _jsonDrawerOpen = false)"
                            title="关闭" />
@@ -212,14 +212,14 @@ else
         <div class="d-flex align-center flex-wrap mb-3" style="gap: 8px;">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Medium"
-                       StartIcon="@Icons.Material.Filled.Refresh"
+                       StartIcon="@Icons.Material.Outlined.Refresh"
                        OnClick="LoadJsonAsync"
                        Disabled="_jsonLoading">
                 刷新
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Default"
                        Size="Size.Medium"
-                       StartIcon="@Icons.Material.Filled.ContentCopy"
+                       StartIcon="@Icons.Material.Outlined.ContentCopy"
                        OnClick="CopyJsonToClipboard"
                        Disabled="@(string.IsNullOrEmpty(_jsonText))">
                 复制
@@ -240,7 +240,7 @@ else
         }
         else if (string.IsNullOrEmpty(_jsonText))
         {
-            <EmptyStateSky Icon="@Icons.Material.Filled.DataObject"
+            <EmptyStateSky Icon="@Icons.Material.Outlined.DataObject"
                            Title="暂无数据">
                 <Description>
                     <text>可能 iNode 下没有任何属性数据。</text>

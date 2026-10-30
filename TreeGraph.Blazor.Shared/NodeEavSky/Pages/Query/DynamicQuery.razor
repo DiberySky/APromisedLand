@@ -27,7 +27,7 @@
         <MudItem xs="12" md="4" Class="d-flex align-center">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        OnClick="LoadSchemaAsync"
-                       StartIcon="@Icons.Material.Filled.Refresh">
+                       StartIcon="@Icons.Material.Outlined.Refresh">
                 加载 Schema
             </MudButton>
         </MudItem>
@@ -63,7 +63,7 @@
     <MudDivider Class="my-4" />
     <MudButton Variant="Variant.Filled" Color="Color.Primary"
                OnClick="QueryAsync" Disabled="@_loading"
-               StartIcon="@Icons.Material.Filled.Search">
+               StartIcon="@Icons.Material.Outlined.Search">
         @(_loading ? "查询中..." : "执行查询")
     </MudButton>
 </MudPaper>
@@ -76,7 +76,7 @@
         </MudText>
         @if (_ids.Count == 0)
         {
-            <EmptyStateSky Icon="@Icons.Material.Filled.SearchOff" Title="无结果" />
+            <EmptyStateSky Icon="@Icons.Material.Outlined.SearchOff" Title="无结果" />
         }
         else
         {
@@ -118,7 +118,7 @@ else if (_entities is not null)
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
-                <EmptyStateSky Icon="@Icons.Material.Filled.SearchOff" Title="无匹配结果" />
+                <EmptyStateSky Icon="@Icons.Material.Outlined.SearchOff" Title="无匹配结果" />
             </NoRecordsContent>
         </MudTable>
     </MudPaper>

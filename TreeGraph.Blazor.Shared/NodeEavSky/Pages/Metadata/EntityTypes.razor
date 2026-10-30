@@ -18,13 +18,13 @@
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Small"
                        OnClick="LoadAsync" Disabled="@_loading"
-                       StartIcon="@Icons.Material.Filled.Refresh">
+                       StartIcon="@Icons.Material.Outlined.Refresh">
                 刷新
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Success"
                        Size="Size.Small"
                        OnClick="OpenCreateAsync"
-                       StartIcon="@Icons.Material.Filled.Add"
+                       StartIcon="@Icons.Material.Outlined.Add"
                        Class="ml-2">
                 新建属性定义
             </MudButton>
@@ -50,7 +50,7 @@ else
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             @if (IsDialogMode)
             {
-                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="OpenCreateAsync"
@@ -66,12 +66,12 @@ else
         <MudTd DataLabel="排序" Style="text-align: right;">
             @* 排序：与相邻行交换 DisplayOrder 并持久化 *@
             <div class="d-flex flex-nowrap justify-end gap-2 align-center">
-                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                                Size="Size.Small"
                                Disabled="@(_moving || !CanMove(context, -1))"
                                OnClick="@(async () => await MoveAsync(context, -1))"
                                title="上移" />
-                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                                Size="Size.Small"
                                Disabled="@(_moving || !CanMove(context, 1))"
                                OnClick="@(async () => await MoveAsync(context, 1))"
@@ -87,7 +87,7 @@ else
                属性数量以徽标叠加在图标右上角 *@
             <MudBadge Content="@context.AttributeCount" Color="Color.Info"
                       Overlap="true" Bordered="true" Max="99">
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenAttributesAsync(context))"
@@ -100,17 +100,17 @@ else
             </MudText>
         </MudTd>
         <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                            Size="Size.Small"
                            Color="Color.Error"
                            OnClick="@(async () => await DeleteAsync(context))"
                            title="删除" />
-            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                            Size="Size.Small"
                            Color="Color.Primary"
                            OnClick="@(async () => await OpenEditAsync(context))"
                            title="编辑" />
-            <MudIconButton Icon="@(IsExpanded(context.EntityTypeId) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+            <MudIconButton Icon="@(IsExpanded(context.EntityTypeId) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"
                            Size="Size.Small"
                            Color="Color.Info"
                            OnClick="@(async () => await ToggleExpandAsync(context))"
@@ -188,7 +188,7 @@ else
         }
     </ChildRowContent>
     <NoRecordsContent>
-        <EmptyStateSky Icon="@Icons.Material.Filled.Category"
+        <EmptyStateSky Icon="@Icons.Material.Outlined.Category"
                        Title="暂无属性定义">
             <Description>
                 <text>点击右上角 + 创建第一个</text>

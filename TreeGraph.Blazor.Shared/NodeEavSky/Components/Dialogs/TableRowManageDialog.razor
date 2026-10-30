@@ -19,7 +19,7 @@
                 <MudButton Size="Size.Small"
                            Variant="Variant.Filled"
                            Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.Add"
+                           StartIcon="@Icons.Material.Outlined.Add"
                            OnClick="@(() => OpenEditDialogAsync(null))"
                            Disabled="@(_tableDef is null || _activeColumns.Count == 0)">
                     添加行
@@ -80,11 +80,11 @@
                     @if (!ReadOnly)
                     {
                         <MudTd DataLabel="操作" Style="text-align:right">
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                            Size="Size.Small"
                                            Color="Color.Primary"
                                            OnClick="@(() => OpenEditDialogAsync(context))" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                            Size="Size.Small"
                                            Color="Color.Error"
                                            OnClick="@(() => DeleteRowAsync(context))" />

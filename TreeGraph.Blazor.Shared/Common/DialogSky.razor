@@ -55,7 +55,7 @@
                     <MudButton Variant="Variant.Text"
                                Color="@SubmitButtonColor"
                                Disabled="@SubmitButtonDisabled"
-                               StartIcon="@(IconsVisible ? Icons.Material.Filled.SaveAs : null)"
+                               StartIcon="@(IconsVisible ? Icons.Material.Outlined.SaveAs : null)"
                                Size="Size.Small"
                                OnClick="@SubmitAsync">
                         @SubmitButtonText
@@ -65,7 +65,7 @@
                 @if (CancelButtonVisible)
                 {
                     <MudButton Variant="Variant.Text"
-                               StartIcon="@(IconsVisible ? Icons.Material.Filled.Close : null)"
+                               StartIcon="@(IconsVisible ? Icons.Material.Outlined.Close : null)"
                                Color="Color.Default"
                                Size="Size.Small"
                                OnClick="@CancelAsync">

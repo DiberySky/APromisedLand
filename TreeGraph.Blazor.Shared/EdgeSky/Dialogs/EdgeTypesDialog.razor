@@ -15,7 +15,7 @@
         <MudText Typo="Typo.subtitle2" Color="Color.Inherit">@(SpaceName ?? SpaceId)</MudText>
         <MudSpacer />
         @* 创建预置关系：从预置种子目录多选批量创建 *@
-        <MudIconButton Icon="@Icons.Material.Filled.PlaylistAdd"
+        <MudIconButton Icon="@Icons.Material.Outlined.PlaylistAdd"
                        Size="Size.Small" Color="Color.Info"
                        OnClick="OpenSeedDialogAsync"
                        title="创建预置关系" />
@@ -29,11 +29,11 @@
                     <th>名称</th>
                     <th>属性</th>
                     <th style="width: 1%; white-space: nowrap; text-align: right;">
-                        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
                                        Size="Size.Small" Color="Color.Default"
                                        OnClick="LoadAsync" Disabled="@_loading"
                                        title="刷新" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                        Size="Size.Small" Color="Color.Success"
                                        OnClick="OpenCreateAsync"
                                        title="新建关系类型" />
@@ -66,12 +66,12 @@
                         <tr>
                             <td style="white-space: nowrap; text-align: center;">
                                 @* 排序：与相邻行交换 DisplayOrder 并持久化（同 EntityTypes 模式） *@
-                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                                                Size="Size.Small"
                                                Disabled="@(_moving || !CanMove(t, -1))"
                                                OnClick="@(async () => await MoveAsync(t, -1))"
                                                title="上移" />
-                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                                                Size="Size.Small"
                                                Disabled="@(_moving || !CanMove(t, 1))"
                                                OnClick="@(async () => await MoveAsync(t, 1))"
@@ -92,23 +92,23 @@
                             <td>
                                 <MudBadge Content="@t.Props.Count" Color="Color.Info"
                                           Overlap="true" Bordered="true" Max="99">
-                                    <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                                    Size="Size.Small" Color="Color.Primary"
                                                    OnClick="@(async () => await OpenPropsAsync(t))"
                                                    title="管理属性 Schema" />
                                 </MudBadge>
                             </td>
                             <td style="white-space: nowrap; text-align: right;">
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                                Size="Size.Small" Color="Color.Error"
                                                OnClick="@(async () => await DeleteAsync(t))"
                                                title="删除" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                                Size="Size.Small" Color="Color.Primary"
                                                OnClick="@(async () => await OpenEditDisplayNameAsync(t))"
                                                title="编辑中文显示名" />
                                 @* 查看：行下方通栏展开/折叠属性详情（只读） *@
-                                <MudIconButton Icon="@(_expanded.Contains(t.Name) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                <MudIconButton Icon="@(_expanded.Contains(t.Name) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"
                                                Size="Size.Small" Color="Color.Info"
                                                OnClick="@(() => ToggleExpand(t.Name))"
                                                title="@(_expanded.Contains(t.Name) ? "折叠属性详情" : "查看属性详情")" />

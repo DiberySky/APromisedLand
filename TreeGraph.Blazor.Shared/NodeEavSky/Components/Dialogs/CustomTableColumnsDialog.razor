@@ -32,7 +32,7 @@
                     <MudTh>类型</MudTh>
                     <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                         @* 添加列入口：置于操作列表头（与组合类型字段定义一致） *@
-                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                        Color="Color.Success"
                                        Size="Size.Small"
                                        OnClick="@OpenAddColumnAsync"
@@ -51,12 +51,12 @@
                         var canMoveDown = !locked && idx >= 0 && idx < _columns.Count - 1;
                     }
                     <MudTd DataLabel="排序" Style="white-space: nowrap; text-align: center;">
-                        <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                        <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                                        Size="Size.Small"
                                        Disabled="@(!canMoveUp)"
                                        OnClick="@(async () => await MoveUpAsync(context))"
                                        title="@(locked ? "时间维度列已锁定，不可排序" : canMoveUp ? "上移" : "已在首位")" />
-                        <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                        <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                                        Size="Size.Small"
                                        Disabled="@(!canMoveDown)"
                                        OnClick="@(async () => await MoveDownAsync(context))"
@@ -70,20 +70,20 @@
                         </MudChip>
                         @if (locked)
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.Lock"
+                            <MudIcon Icon="@Icons.Material.Outlined.Lock"
                                      Color="Color.Tertiary" Size="Size.Small"
                                      Class="ml-1"
                                      title="时间维度列已锁定（创建时定死）" />
                         }
                     </MudTd>
                     <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                        Size="Size.Small"
                                        Color="Color.Error"
                                        Disabled="@locked"
                                        title="@(locked ? "时间维度列已锁定，不可删除" : "删除")"
                                        OnClick="@(async () => await DeleteColumnAsync(context))" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                        Size="Size.Small"
                                        Color="Color.Primary"
                                        OnClick="@(() => OpenEditColumnAsync(context))"

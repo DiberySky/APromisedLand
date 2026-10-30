@@ -38,14 +38,14 @@
 <PageSky Title="空间管理" ArrowBackVisible="false">
     <PageContent>
         <MudTabs Elevation="0" ApplyEffectsToContainer="true" Class="spaces-tabs">
-            <MudTabPanel Text="空间" Icon="@Icons.Material.Filled.Workspaces">
+            <MudTabPanel Text="空间" Icon="@Icons.Material.Outlined.Workspaces">
                 @if (_loading)
                 {
                     <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
                 }
                 else if (_spaces is null || _spaces.Count == 0)
                 {
-                    <EmptyStateSky Icon="@Icons.Material.Filled.Workspaces"
+                    <EmptyStateSky Icon="@Icons.Material.Outlined.Workspaces"
                                    Title="暂无空间">
                         <Description>
                             <text>切换到"空间维护"创建第一个</text>
@@ -67,7 +67,7 @@
                             <MudTd>@context.Description</MudTd>
                             <MudTd>
                                 @* 打开该空间对应的空间树（TreeDialogPageSky，RootId = Space.Id） *@
-                                <MudIconButton Icon="@Icons.Material.Filled.AccountTree"
+                                <MudIconButton Icon="@Icons.Material.Outlined.AccountTree"
                                                Color="Color.Info"
                                                Size="Size.Small"
                                                OnClick="@(async () => await OpenTreeAsync(context))"
@@ -77,23 +77,23 @@
                     </MudTable>
                 }
             </MudTabPanel>
-            <MudTabPanel Text="空间维护" Icon="@Icons.Material.Filled.Settings">
+            <MudTabPanel Text="空间维护" Icon="@Icons.Material.Outlined.Settings">
                 <SpaceManagePanel OnChanged="LoadAsync" />
             </MudTabPanel>
             @* 节点属性：内嵌属性定义管理（IsDialogMode 隐藏页头，工具栏置于内容顶部）。
                线路/关系已改为 per-space 入口（空间维护 → 线路设置/关系设置），不再保留全局 tab *@
-            <MudTabPanel Text="节点属性" Icon="@Icons.Material.Filled.Category">
+            <MudTabPanel Text="节点属性" Icon="@Icons.Material.Outlined.Category">
                 <MudTabs Elevation="0" ApplyEffectsToContainer="true" Class="spaces-tabs mt-2">
-                    <MudTabPanel Text="属性定义" Icon="@Icons.Material.Filled.Category">
+                    <MudTabPanel Text="属性定义" Icon="@Icons.Material.Outlined.Category">
                         <EntityTypes IsDialogMode="true" />
                     </MudTabPanel>
-                    <MudTabPanel Text="组合定义" Icon="@Icons.Material.Filled.AccountTree">
+                    <MudTabPanel Text="组合定义" Icon="@Icons.Material.Outlined.AccountTree">
                         <CompositeTypes IsDialogMode="true" />
                     </MudTabPanel>
-                    <MudTabPanel Text="表格定义" Icon="@Icons.Material.Filled.TableChart">
+                    <MudTabPanel Text="表格定义" Icon="@Icons.Material.Outlined.TableChart">
                         <CustomTables IsDialogMode="true" />
                     </MudTabPanel>
-                    <MudTabPanel Text="选项集定义" Icon="@Icons.Material.Filled.Checklist">
+                    <MudTabPanel Text="选项集定义" Icon="@Icons.Material.Outlined.Checklist">
                         <OptionSets IsDialogMode="true" />
                     </MudTabPanel>
                 </MudTabs>

@@ -14,13 +14,13 @@
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Small"
                        OnClick="LoadAsync" Disabled="_loading"
-                       StartIcon="@Icons.Material.Filled.Refresh">
+                       StartIcon="@Icons.Material.Outlined.Refresh">
                 刷新
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Success"
                        Size="Size.Small"
                        OnClick="OpenCreateTypeAsync"
-                       StartIcon="@Icons.Material.Filled.Add"
+                       StartIcon="@Icons.Material.Outlined.Add"
                        Class="ml-2">
                 新建组合类型
             </MudButton>
@@ -40,7 +40,7 @@
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             @if (IsDialogMode)
             {
-                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="OpenCreateTypeAsync"
@@ -60,12 +60,12 @@
             var canMoveDown = idx >= 0 && idx < total - 1;
         }
         <MudTd DataLabel="排序" Style="white-space: nowrap; text-align: center;">
-            <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+            <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                            Size="Size.Small"
                            Disabled="@(!canMoveUp)"
                            OnClick="@(async () => await MoveUpAsync(context))"
                            title="@(canMoveUp ? "上移" : "已在首位")" />
-            <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+            <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                            Size="Size.Small"
                            Disabled="@(!canMoveDown)"
                            OnClick="@(async () => await MoveDownAsync(context))"
@@ -79,7 +79,7 @@
                字段数量以徽标叠加在图标右上角 *@
             <MudBadge Content="@context.Fields.Count(f => !f.IsDeleted)" Color="Color.Info"
                       Overlap="true" Bordered="true" Max="99">
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenFieldsAsync(context))"
@@ -87,17 +87,17 @@
             </MudBadge>
         </MudTd>
         <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                            Size="Size.Small"
                            Color="Color.Error"
                            OnClick="@(async () => await DeleteTypeAsync(context))"
                            title="删除" />
-            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                            Size="Size.Small"
                            Color="Color.Primary"
                            OnClick="@(() => OpenEditTypeAsync(context))"
                            title="编辑" />
-            <MudIconButton Icon="@(IsExpanded(context.CompositeTypeId) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+            <MudIconButton Icon="@(IsExpanded(context.CompositeTypeId) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"
                            Size="Size.Small"
                            Color="Color.Info"
                            OnClick="@(() => ToggleExpand(context.CompositeTypeId))"
@@ -164,25 +164,25 @@
                                             <td>
                                                 @if (f.IsArray)
                                                 {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Check" Color="Color.Success" Size="Size.Small" />
                                                 }
                                             </td>
                                             <td>
                                                 @if (f.IsRequired)
                                                 {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Check" Color="Color.Success" Size="Size.Small" />
                                                 }
                                             </td>
                                             <td>
                                                 @if (f.IsSearchable)
                                                 {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Check" Color="Color.Success" Size="Size.Small" />
                                                 }
                                             </td>
                                             <td>
                                                 @if (f.IsSortable)
                                                 {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Check" Color="Color.Success" Size="Size.Small" />
                                                 }
                                             </td>
                                             <td style="text-align: right;">@f.DisplayOrder</td>
@@ -197,7 +197,7 @@
         }
     </ChildRowContent>
     <NoRecordsContent>
-        <EmptyStateSky Icon="@Icons.Material.Filled.AccountTree"
+        <EmptyStateSky Icon="@Icons.Material.Outlined.AccountTree"
                        Title="暂无组合类型">
             <Description>
                 <text>点击右上角 + 创建第一个</text>

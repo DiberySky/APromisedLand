@@ -27,17 +27,17 @@ else if (!_loading && _space is not null)
     @if (AllowManage)
     {
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2 flex-wrap">
-            <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Workspaces">
+            <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Outlined.Workspaces">
                 @_space.SpaceName
             </MudChip>
-            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
                            Size="Size.Small" Color="Color.Default"
                            Disabled="@_loading"
                            OnClick="@(async () => await ReloadAsync())"
                            title="刷新" />
             <MudSpacer />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.AddLink"
+                       StartIcon="@Icons.Material.Outlined.AddLink"
                        Disabled="@(_loading || _types.Count == 0)"
                        OnClick="OpenCreateAsync">
                 新建关系
@@ -56,7 +56,7 @@ else if (!_loading && _space is not null)
         <MudTabPanel>
             <TabContent>
                 <span class="d-inline-flex align-items-center gap-1">
-                    出向<MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" />
+                    出向<MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" />
                 </span>
             </TabContent>
             <ChildContent>
@@ -66,7 +66,7 @@ else if (!_loading && _space is not null)
         <MudTabPanel>
             <TabContent>
                 <span class="d-inline-flex align-items-center gap-1">
-                    <MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" />入向
+                    <MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" />入向
                 </span>
             </TabContent>
             <ChildContent>
@@ -223,7 +223,7 @@ else if (!_loading && _space is not null)
             <MudTd DataLabel="起止">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="flex-wrap">
                     <MudText Typo="Typo.body2">@NameOf(context.SrcVid, context.SrcName)</MudText>
-                    <MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" />
+                    <MudIcon Icon="@Icons.Material.Outlined.ArrowRightAlt" Size="Size.Small" />
                     <MudText Typo="Typo.body2">@NameOf(context.DstVid, context.DstName)</MudText>
                 </MudStack>
             </MudTd>
@@ -238,7 +238,7 @@ else if (!_loading && _space is not null)
             <MudTd DataLabel="操作" Style="text-align: right;">
                 @if (AllowManage)
                 {
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                    Size="Size.Small" Color="Color.Error"
                                    Disabled="@_loading"
                                    OnClick="@(async () => await DeleteAsync(context))"

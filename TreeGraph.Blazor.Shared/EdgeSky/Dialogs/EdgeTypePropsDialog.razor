@@ -25,7 +25,7 @@
                     <th style="text-align: center;">可空</th>
                     <th>默认值</th>
                     <th style="text-align: right;">
-                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                        Color="Color.Success" Size="Size.Small"
                                        OnClick="OpenAddPropAsync"
                                        title="添加属性" />
@@ -87,19 +87,19 @@
                         <td style="text-align: right; white-space: nowrap;">
                             @if (row.Dropped)
                             {
-                                <MudIconButton Icon="@Icons.Material.Filled.Undo"
+                                <MudIconButton Icon="@Icons.Material.Outlined.Undo"
                                                Color="Color.Default" Size="Size.Small"
                                                OnClick="@(() => row.Dropped = false)"
                                                title="撤销删除" />
                             }
                             else
                             {
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                                Color="Color.Error" Size="Size.Small"
                                                Disabled="@IsTtlCol(row.Src.PropName)"
                                                OnClick="@(() => row.Dropped = true)"
                                                title="@(IsTtlCol(row.Src.PropName) ? "TTL 列不可删除" : "删除属性")" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                                Color="Color.Primary" Size="Size.Small"
                                                OnClick="@(async () => await OpenEditPropAsync(row))"
                                                title="编辑属性（显示名 / 可空 / 默认值）" />
@@ -125,7 +125,7 @@
                         <td style="text-align: center;">@(p.Nullable ? "是" : "否")</td>
                         <td>@(p.DefaultValue is { } dv2 ? dv2.ToString() : "—")</td>
                         <td style="text-align: right;">
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                            Color="Color.Error" Size="Size.Small"
                                            OnClick="@(() => _adds.Remove(p))"
                                            title="移除" />

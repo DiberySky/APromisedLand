@@ -32,7 +32,7 @@
                     <MudTh>类型</MudTh>
                     <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                         @* 添加字段入口：置于操作列表头（与组合定义管理页一致） *@
-                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                        Color="Color.Success"
                                        Size="Size.Small"
                                        OnClick="@OpenAddFieldAsync"
@@ -49,12 +49,12 @@
                         var canMoveDown = idx >= 0 && idx < _fields.Count - 1;
                     }
                     <MudTd DataLabel="排序" Style="white-space: nowrap; text-align: center;">
-                        <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                        <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
                                        Size="Size.Small"
                                        Disabled="@(!canMoveUp)"
                                        OnClick="@(async () => await MoveUpAsync(context))"
                                        title="@(canMoveUp ? "上移" : "已在首位")" />
-                        <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                        <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
                                        Size="Size.Small"
                                        Disabled="@(!canMoveDown)"
                                        OnClick="@(async () => await MoveDownAsync(context))"
@@ -68,12 +68,12 @@
                         </MudChip>
                     </MudTd>
                     <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                                        Size="Size.Small"
                                        Color="Color.Error"
                                        OnClick="@(async () => await DeleteFieldAsync(context))"
                                        title="删除" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                        Size="Size.Small"
                                        Color="Color.Primary"
                                        OnClick="@(() => OpenEditFieldAsync(context))"

@@ -10,7 +10,7 @@
         <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
                        Edge="Edge.Start"
                        Color="Color.Warning"
-                       OnClick="OnArrowBackClick" />
+                       OnClick="OnArrowBackClick" Size="Size.Small" />
     }
 
     <MudText Typo="@(Platform.IsCompact ? Typo.h6 : Typo.h5)">@Title</MudText>
@@ -27,7 +27,7 @@
     @if (Platform.IsCompact && Actions != null)
     {
         @* compact：右侧 Actions 收纳为 MoreVert 菜单 *@
-        <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+        <MudMenu Icon="@Icons.Material.Outlined.MoreVert"
                  Color="Color.Default"
                  AriaLabel="更多操作">
             @Actions

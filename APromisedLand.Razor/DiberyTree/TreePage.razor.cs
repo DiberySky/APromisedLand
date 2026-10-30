@@ -130,7 +130,7 @@ public partial class TreePage : ComponentBase
 
         // 添加子节点
         builder.OpenComponent<MudIconButton>(11);
-        builder.AddAttribute(12, "Icon", Icons.Material.Filled.Add);
+        builder.AddAttribute(12, "Icon", Icons.Material.Outlined.Add);
         builder.AddAttribute(13, "Size", Size.Small);
         builder.AddAttribute(14, "Color", Color.Success);
         builder.AddAttribute(15, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, () => AddChildNode(node)));
@@ -138,7 +138,7 @@ public partial class TreePage : ComponentBase
 
         // 删除
         builder.OpenComponent<MudIconButton>(16);
-        builder.AddAttribute(17, "Icon", Icons.Material.Filled.Delete);
+        builder.AddAttribute(17, "Icon", Icons.Material.Outlined.Delete);
         builder.AddAttribute(18, "Size", Size.Small);
         builder.AddAttribute(19, "Color", Color.Error);
         builder.AddAttribute(20, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, () => DeleteNode(node)));

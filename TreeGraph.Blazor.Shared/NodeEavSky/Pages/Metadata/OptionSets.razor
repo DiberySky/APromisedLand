@@ -14,13 +14,13 @@
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Small"
                        OnClick="LoadAsync" Disabled="_loading"
-                       StartIcon="@Icons.Material.Filled.Refresh">
+                       StartIcon="@Icons.Material.Outlined.Refresh">
                 刷新
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Success"
                        Size="Size.Small"
                        OnClick="OpenCreateSetAsync"
-                       StartIcon="@Icons.Material.Filled.Add"
+                       StartIcon="@Icons.Material.Outlined.Add"
                        Class="ml-2">
                 新建选项集
             </MudButton>
@@ -39,7 +39,7 @@
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
             @if (IsDialogMode)
             {
-                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="OpenCreateSetAsync"
@@ -71,7 +71,7 @@
                选项数量以徽标叠加在图标右上角 *@
             <MudBadge Content="@ItemCount(context.OptionSetId)" Color="Color.Info"
                       Overlap="true" Bordered="true" Max="99">
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                Color="Color.Success"
                                Size="Size.Small"
                                OnClick="@(async () => await OpenItemsAsync(context))"
@@ -79,17 +79,17 @@
             </MudBadge>
         </MudTd>
         <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                            Size="Size.Small"
                            Color="Color.Error"
                            OnClick="@(async () => await DeleteSetAsync(context))"
                            title="删除" />
-            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                            Size="Size.Small"
                            Color="Color.Primary"
                            OnClick="@(() => OpenEditSetAsync(context))"
                            title="编辑" />
-            <MudIconButton Icon="@(IsExpanded(context.OptionSetId) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+            <MudIconButton Icon="@(IsExpanded(context.OptionSetId) ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.ExpandMore)"
                            Size="Size.Small"
                            Color="Color.Info"
                            OnClick="@(() => ToggleExpand(context.OptionSetId))"
@@ -129,7 +129,7 @@
                                             <td style="text-align: center;">
                                                 @if (item.IsDefault)
                                                 {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Star"
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Star"
                                                              Color="Color.Warning" Size="Size.Small" />
                                                 }
                                             </td>
@@ -144,7 +144,7 @@
         }
     </ChildRowContent>
     <NoRecordsContent>
-        <EmptyStateSky Icon="@Icons.Material.Filled.Checklist"
+        <EmptyStateSky Icon="@Icons.Material.Outlined.Checklist"
                        Title="暂无选项集">
             <Description>
                 <text>点击右上角 + 创建第一个</text>

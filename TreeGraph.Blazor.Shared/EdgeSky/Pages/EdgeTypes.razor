@@ -47,11 +47,11 @@
         <MudTh>注释</MudTh>
         <MudTh>属性</MudTh>
         <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
-            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh"
                            Size="Size.Small" Color="Color.Default"
                            OnClick="LoadAsync" Disabled="@(_loading || _spaceId is null)"
                            title="刷新" />
-            <MudIconButton Icon="@Icons.Material.Filled.Add"
+            <MudIconButton Icon="@Icons.Material.Outlined.Add"
                            Size="Size.Small" Color="Color.Success"
                            OnClick="OpenCreateAsync" Disabled="@(_spaceId is null)"
                            title="新建关系类型" />
@@ -78,18 +78,18 @@
         <MudTd DataLabel="属性">
             <MudBadge Content="@context.Props.Count" Color="Color.Info"
                       Overlap="true" Bordered="true" Max="99">
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                Size="Size.Small" Color="Color.Primary"
                                OnClick="@(async () => await OpenPropsAsync(context))"
                                title="管理属性 Schema" />
             </MudBadge>
         </MudTd>
         <MudTd DataLabel="操作" Style="white-space: nowrap; text-align: right;">
-            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
                            Size="Size.Small" Color="Color.Error"
                            OnClick="@(async () => await DeleteAsync(context))"
                            title="删除" />
-            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                            Size="Size.Small" Color="Color.Primary"
                            OnClick="@(async () => await OpenEditDisplayNameAsync(context))"
                            title="编辑中文显示名" />

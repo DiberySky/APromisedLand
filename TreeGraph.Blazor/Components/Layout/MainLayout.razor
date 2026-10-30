@@ -14,9 +14,9 @@
 
 <MudLayout>
     <MudAppBar Elevation="1" Color="Color.Primary">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+        <MudIconButton Icon="@Icons.Material.Outlined.Menu"
                        Color="Color.Inherit" Edge="Edge.Start"
-                       OnClick="@(() => _drawerOpen = !_drawerOpen)" />
+                       OnClick="@(() => _drawerOpen = !_drawerOpen)" Size="Size.Small" />
         <MudText Typo="Typo.h6" Class="ml-2">TreeGraph 管理台</MudText>
         <MudSpacer />
         <MudChip T="string" Size="Size.Small" Color="Color.Default">

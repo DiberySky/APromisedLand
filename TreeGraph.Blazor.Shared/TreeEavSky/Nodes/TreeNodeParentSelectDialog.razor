@@ -23,7 +23,7 @@
                           Label="搜索节点"
                           Variant="Variant.Outlined"
                           Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          AdornmentIcon="@Icons.Material.Outlined.Search"
                           Class="mb-2"
                           Clearable="true"
                           DebounceInterval="300"
@@ -169,9 +169,9 @@
 
     private string GetNodeIcon(TItem node, bool isSelected)
     {
-        if (isSelected) return Icons.Material.Filled.CheckCircle;
-        if (GetChildren(node).Any() || node.HasChildren) return Icons.Material.Filled.Folder;
-        return Icons.Material.Filled.InsertDriveFile;
+        if (isSelected) return Icons.Material.Outlined.CheckCircle;
+        if (GetChildren(node).Any() || node.HasChildren) return Icons.Material.Outlined.Folder;
+        return Icons.Material.Outlined.InsertDriveFile;
     }
 
     private Color GetNodeColor(TItem node, bool isSelected)

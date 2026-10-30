@@ -30,7 +30,7 @@
                               DebounceInterval="300"
                               OnDebounceIntervalElapsed="OnSearchAsync"
                               Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentIcon="@Icons.Material.Outlined.Search"
                               IconSize="Size.Small"
                               Clearable="true"
                               Style="width: 240px;" />
@@ -42,17 +42,16 @@
                   @ref="_table"
                   ServerData="LoadPageAsync"
                   Hover="true"
-                  Bordered="true"
-                  Dense="true"
                   Elevation="0"
-                  RowsPerPage="20"
-                  LoadingProgressColor="Color.Primary">
+                  RowsPerPage="10"
+                  LoadingProgressColor="Color.Primary"
+                  Style="max-height: 56vh; overflow-y: auto; background-color: #000000;">
             <HeaderContent>
                 <MudTh>名称</MudTh>
                 <MudTh>描述</MudTh>
                 <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                     @* 操作列表头用 + 图标，点击即新建节点 *@
-                    <MudIconButton Icon="@Icons.Material.Filled.Add"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Add"
                                    Size="Size.Small"
                                    Color="Color.Success"
                                    title="新建节点"
@@ -64,7 +63,7 @@
                 <MudTd>@context.Description</MudTd>
                 <MudTd Style="white-space: nowrap; text-align: right;">
                     @* 宿主操作模式：点击打开 LineNodeActionsDialog（基本信息内嵌 + 编辑/删除，连续操作循环） *@
-                    <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Settings"
                                    Size="Size.Small"
                                    Color="Color.Info"
                                    title="节点操作"
@@ -72,7 +71,7 @@
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
-                <EmptyStateSky Icon="@Icons.Material.Filled.AccountTree"
+                <EmptyStateSky Icon="@Icons.Material.Outlined.AccountTree"
                                Title="暂无线路节点">
                     <Description>
                         <text>点击操作列 + 图标添加第一个</text>
@@ -80,8 +79,7 @@
                 </EmptyStateSky>
             </NoRecordsContent>
             <PagerContent>
-                <MudTablePager HidePageNumber="true"
-                               RowsPerPageString="每页："
+                <MudTablePager RowsPerPageString="每页：" HidePageNumber="true"
                                HorizontalAlignment="HorizontalAlignment.Center" />
             </PagerContent>
         </MudTable>

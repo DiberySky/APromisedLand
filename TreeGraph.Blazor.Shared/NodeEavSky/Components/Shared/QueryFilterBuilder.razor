@@ -9,8 +9,8 @@
 <MudExpansionPanel Text="动态查询" Class="mb-3">
     <TitleContent>
         <div class="d-flex align-center" style="width: 100%;">
-            <MudIcon Icon="@Icons.Material.Filled.FilterAlt"
-                     Color="Color.Primary" Class="mr-2" />
+            <MudIcon Icon="@Icons.Material.Outlined.FilterAlt"
+                     Color="Color.Primary" Class="mr-2" Size="Size.Small" />
             <MudText Typo="Typo.subtitle1">动态查询</MudText>
             @if (Filters.Count > 0)
             {
@@ -43,7 +43,7 @@
                 <MudButton Variant="Variant.Outlined"
                            Color="Color.Primary"
                            Size="Size.Medium"
-                           StartIcon="@Icons.Material.Filled.Add"
+                           StartIcon="@Icons.Material.Outlined.Add"
                            OnClick="AddFilter">
                     添加条件
                 </MudButton>
@@ -52,14 +52,14 @@
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Default"
                                Size="Size.Medium"
-                               StartIcon="@Icons.Material.Filled.Clear"
+                               StartIcon="@Icons.Material.Outlined.Clear"
                                OnClick="ClearAllAsync">
                         清空条件
                     </MudButton>
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Success"
                                Size="Size.Medium"
-                               StartIcon="@Icons.Material.Filled.Search"
+                               StartIcon="@Icons.Material.Outlined.Search"
                                OnClick="@(async () => await OnApply.InvokeAsync())">
                         应用查询
                     </MudButton>

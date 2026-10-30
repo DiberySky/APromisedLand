@@ -1,6 +1,6 @@
 @* LineNodePickerDialog.razor — 线路节点选择器（名称模糊搜索 + 服务端分页，单选）
    打开方式：IDialogService.ShowExAsync<LineNodePickerDialog>；
-   确认返回 DialogResult.Ok(LineNodeDto)，取消返回 null。
+   单击结果行即选中并确认，返回 DialogResult.Ok(LineNodeDto)；取消返回 null。
    LineId 非空时仅搜索该线路节点（前驱选择场景）；为空时跨线路搜索。 *@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Services
@@ -11,11 +11,7 @@
 @inject ISnackbar Snackbar
 
 <DialogSky Title="@Title"
-           CancelButtonVisible="true"
-           SubmitButtonVisible="true"
-           SubmitButtonText="确认选择"
-           SubmitButtonDisabled="@(_selected is null)"
-           OnSubmitClick="Confirm">
+           CancelButtonVisible="true">
     <DialogContent>
         <MudStack Spacing="2">
             @* 搜索栏 *@
@@ -27,40 +23,30 @@
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
                               Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentIcon="@Icons.Material.Outlined.Search"
                               Immediate="true"
                               OnKeyDown="OnKeyDown"
                               Style="flex: 1;" />
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.Search"
+                           StartIcon="@Icons.Material.Outlined.Search"
                            Size="Size.Small"
                            OnClick="@(() => _table?.ReloadServerData())">
                     搜索
                 </MudButton>
             </MudStack>
 
-            @if (_selected is not null)
-            {
-                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
-                    已选：<strong>@_selected.Name</strong>
-                    @if (LineId is null && TryGetLineName(_selected.LineId, out var ln))
-                    {
-                        <span class="mud-text-secondary">（@ln）</span>
-                    }
-                </MudAlert>
-            }
-
-            @* 结果表（服务端分页） *@
+            @* 结果表（服务端分页）：单击行即确认选择并关闭 *@
             <MudTable T="LineNodeDto"
                       @ref="_table"
                       ServerData="LoadPageAsync"
+                      OnRowClick="@(args => Confirm(args.Item))"
+                      RowStyle="cursor: pointer;"
                       Hover="true"
-                      Dense="true"
                       Elevation="0"
                       RowsPerPage="10"
                       LoadingProgressColor="Color.Primary"
-                      Style="max-height: 56vh; overflow-y: auto;">
+                      Style="max-height: 56vh; overflow-y: auto; background-color: #000000;">
                 <HeaderContent>
                     <MudTh>名称</MudTh>
                     @if (LineId is null)
@@ -69,17 +55,10 @@
                     }
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd OnClick="@(() => Select(context))"
-                           Style="cursor: pointer;">
-                        @context.Name
-                    </MudTd>
+                    <MudTd>@context.Name</MudTd>
                     @if (LineId is null)
                     {
-                        <MudTd OnClick="@(() => Select(context))"
-                               Style="cursor: pointer;"
-                               Class="mud-text-secondary">
-                            @LineLabel(context.LineId)
-                        </MudTd>
+                        <MudTd Class="mud-text-secondary">@LineLabel(context.LineId)</MudTd>
                     }
                 </RowTemplate>
                 <NoRecordsContent>
@@ -88,7 +67,8 @@
                     </MudText>
                 </NoRecordsContent>
                 <PagerContent>
-                    <MudTablePager />
+                    <MudTablePager RowsPerPageString="每页：" HidePageNumber="true"
+                                    HorizontalAlignment="HorizontalAlignment.Center" />
                 </PagerContent>
             </MudTable>
         </MudStack>
@@ -109,7 +89,6 @@
 
     private MudTable<LineNodeDto>? _table;
     private string _query = string.Empty;
-    private LineNodeDto? _selected;
     private Dictionary<string, string> _lineNames = new();
 
     protected override async Task OnInitializedAsync()
@@ -162,17 +141,13 @@
             await _table!.ReloadServerData();
     }
 
-    private void Select(LineNodeDto node) => _selected = node;
+    /// <summary>点击结果行即选中并确认，直接关闭对话框返回该节点。</summary>
+    private void Confirm(LineNodeDto node)
+        => MudDialog?.Close(DialogResult.Ok(node));
 
     private bool TryGetLineName(string? lineId, out string name)
         => _lineNames.TryGetValue(lineId ?? string.Empty, out name!);
 
     private string LineLabel(string? lineId)
         => TryGetLineName(lineId, out var ln) ? ln : (lineId ?? "");
-
-    private void Confirm()
-    {
-        if (_selected is null) return;
-        MudDialog?.Close(DialogResult.Ok(_selected));
-    }
 }

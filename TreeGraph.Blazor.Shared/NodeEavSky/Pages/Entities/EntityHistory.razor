@@ -15,7 +15,7 @@
     <Actions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Search"
+                   StartIcon="@Icons.Material.Outlined.Search"
                    OnClick="LoadAsync" Disabled="@_loading">
             查询
         </MudButton>
@@ -65,7 +65,7 @@ else if (_history is not null && _history.Count > 0)
 }
 else if (_history is not null)
 {
-    <EmptyStateSky Icon="@Icons.Material.Filled.History"
+    <EmptyStateSky Icon="@Icons.Material.Outlined.History"
                    Title="暂无历史记录">
         <Description>
             <text>该属性数据尚无属性变更记录</text>
