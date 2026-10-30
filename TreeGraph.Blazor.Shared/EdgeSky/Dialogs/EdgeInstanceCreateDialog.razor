@@ -12,7 +12,6 @@
 @using TreeGraph.Blazor.Shared.EdgeSky.Services
 @using TreeGraph.Shared.EdgeSky
 @using TreeGraph.Shared.EdgeSky.Dtos
-@using TreeGraph.Shared.NodeSky.Entities
 
 @inject ISnackbar Snackbar
 @inject EdgeApiClient Api
@@ -194,10 +193,10 @@
     private EdgeTypeDto? _edgeType;
     private string _direction = "out";
     private long _rank;
-    private Node? _peer;
+    private NodeLookupDto? _peer;
 
     private string _peerQuery = string.Empty;
-    private List<Node> _candidates = [];
+    private List<NodeLookupDto> _candidates = [];
     private bool _searching;
     private bool _searched;
 

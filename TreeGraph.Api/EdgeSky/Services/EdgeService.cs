@@ -90,7 +90,7 @@ public sealed class EdgeService
         UpsertEdgeRequest req, CancellationToken ct)
     {
         var schema = await LoadSchemaAsync(spaceId, edgeType, ct);
-        await EnsureNodesExistAsync(srcVid, dstVid, ct);
+        await EnsureNodesExistAsync(spaceId, srcVid, dstVid, ct);
 
         var finalProps = ApplyUpsert(schema, req.Props);
 
@@ -182,17 +182,20 @@ public sealed class EdgeService
             .ToListAsync(ct);
     }
 
-    /// <summary>两端必须都是 nodes 注册表中的真实节点。</summary>
-    private async Task EnsureNodesExistAsync(string srcVid, string dstVid, CancellationToken ct)
+    /// <summary>两端必须都是 nodes 注册表中的真实节点，且归属同一图空间。</summary>
+    private async Task EnsureNodesExistAsync(string spaceId, string srcVid, string dstVid, CancellationToken ct)
     {
-        var existing = await _db.Nodes.AsNoTracking()
-            .Where(n => n.Id == srcVid || n.Id == dstVid)
-            .Select(n => n.Id)
-            .ToListAsync(ct);
-        if (!existing.Contains(srcVid))
+        var srcSpace = await ResolveNodeSpaceIdAsync(srcVid, ct);
+        if (srcSpace is null)
             throw new ArgumentException($"起点节点 '{srcVid}' 不存在于 nodes 注册表");
-        if (!existing.Contains(dstVid))
+        if (srcSpace != spaceId)
+            throw new ArgumentException($"起点节点 '{srcVid}' 所属空间 '{srcSpace}' 与边空间 '{spaceId}' 不一致");
+
+        var dstSpace = await ResolveNodeSpaceIdAsync(dstVid, ct);
+        if (dstSpace is null)
             throw new ArgumentException($"终点节点 '{dstVid}' 不存在于 nodes 注册表");
+        if (dstSpace != spaceId)
+            throw new ArgumentException($"终点节点 '{dstVid}' 所属空间 '{dstSpace}' 与边空间 '{spaceId}' 不一致");
     }
 
     /// <summary>覆盖语义组装最终属性包：请求值 + Schema 默认值补齐；未知键/类型不符 → 400。</summary>
@@ -255,44 +258,7 @@ public sealed class EdgeService
     /// </summary>
     public async Task<NodeSpaceDto?> GetNodeSpaceAsync(string nodeId, CancellationToken ct)
     {
-        var row = await _db.Nodes.AsNoTracking()
-            .Where(n => n.Id == nodeId)
-            .Select(n => new { n.HostType, n.LineId })
-            .FirstOrDefaultAsync(ct);
-        if (row is null) return null;
-
-        string? spaceId;
-        switch (row.HostType)
-        {
-            case "UnitTree":
-                spaceId = SeedSpaceIds.Unit;
-                break;
-            case "CategoryTree":
-                spaceId = SeedSpaceIds.Type;
-                break;
-            case "KnowledgeTree":
-                spaceId = SeedSpaceIds.Knowledge;
-                break;
-            case "SpaceTree":
-                spaceId = await ResolveSpaceTreeRootAsync(nodeId, ct);
-                break;
-            case "Line":
-            case "LineNode":
-            {
-                var lineId = row.HostType == "Line" ? nodeId : row.LineId;
-                spaceId = lineId is null
-                    ? null
-                    : await _db.Lines.AsNoTracking()
-                        .Where(l => l.Id == lineId)
-                        .Select(l => l.SpaceId)
-                        .FirstOrDefaultAsync(ct);
-                break;
-            }
-            default:
-                spaceId = null;
-                break;
-        }
-
+        var spaceId = await ResolveNodeSpaceIdAsync(nodeId, ct);
         if (spaceId is null) return null;
 
         var space = await _db.Spaces.AsNoTracking()
@@ -309,8 +275,8 @@ public sealed class EdgeService
         };
     }
 
-    /// <summary>按名称关键字搜索节点（对端节点选择用）；空关键字返回前 200 条。</summary>
-    public async Task<List<Node>> SearchNodesAsync(string? search, CancellationToken ct)
+    /// <summary>按名称关键字搜索节点（对端节点选择用）；空关键字返回前 200 条。仅投影 Id/Name/HostType。</summary>
+    public async Task<List<NodeLookupDto>> SearchNodesAsync(string? search, CancellationToken ct)
     {
         var q = _db.Nodes.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(search))
@@ -318,23 +284,59 @@ public sealed class EdgeService
             var kw = search.Trim();
             q = q.Where(n => n.Name != null && n.Name.Contains(kw));
         }
-        return await q.OrderBy(n => n.Name).Take(200).ToListAsync(ct);
+        return await q.OrderBy(n => n.Name).Take(200)
+            .Select(n => new NodeLookupDto { Id = n.Id, Name = n.Name, HostType = n.HostType })
+            .ToListAsync(ct);
     }
 
-    /// <summary>空间树根祖先解析（根节点 Id 即 Space.Id）；带深度上限防环。</summary>
+    /// <summary>
+    /// 解析节点所属图空间 Id（按宿主类型路由）；节点不存在或无归属返回 null。
+    /// 供 GetNodeSpaceAsync 与 EnsureNodesExistAsync 共用，避免逻辑重复。
+    /// </summary>
+    private async Task<string?> ResolveNodeSpaceIdAsync(string nodeId, CancellationToken ct)
+    {
+        var row = await _db.Nodes.AsNoTracking()
+            .Where(n => n.Id == nodeId)
+            .Select(n => new { n.HostType, n.LineId })
+            .FirstOrDefaultAsync(ct);
+        if (row is null) return null;
+
+        return row.HostType switch
+        {
+            "UnitTree" => SeedSpaceIds.Unit,
+            "CategoryTree" => SeedSpaceIds.Type,
+            "KnowledgeTree" => SeedSpaceIds.Knowledge,
+            "SpaceTree" => await ResolveSpaceTreeRootAsync(nodeId, ct),
+            "Line" => await _db.Lines.AsNoTracking()
+                .Where(l => l.Id == nodeId)
+                .Select(l => l.SpaceId)
+                .FirstOrDefaultAsync(ct),
+            "LineNode" => row.LineId is null
+                ? null
+                : await _db.Lines.AsNoTracking()
+                    .Where(l => l.Id == row.LineId)
+                    .Select(l => l.SpaceId)
+                    .FirstOrDefaultAsync(ct),
+            _ => null
+        };
+    }
+
+    /// <summary>空间树根祖先解析（根节点 Id 即 Space.Id）；递归 CTE 单次查询替代 N+1 上溯。</summary>
     private async Task<string> ResolveSpaceTreeRootAsync(string nodeId, CancellationToken ct)
     {
-        var current = nodeId;
-        for (var depth = 0; depth < 64; depth++)
-        {
-            var parent = await _db.SpaceTrees.AsNoTracking()
-                .Where(n => n.Id == current)
-                .Select(n => n.ParentId)
-                .FirstOrDefaultAsync(ct);
-            if (parent is null) return current;
-            current = parent;
-        }
-        return current;
+        var root = await _db.SpaceTrees
+            .FromSqlRaw(@"
+                WITH RECURSIVE tree AS (
+                    SELECT id, parent_id FROM space_trees WHERE id = {0}
+                    UNION ALL
+                    SELECT st.id, st.parent_id FROM space_trees st
+                    INNER JOIN tree t ON st.id = t.parent_id
+                )
+                SELECT id, parent_id FROM tree WHERE parent_id IS NULL
+                LIMIT 1", nodeId)
+            .Select(st => st.Id)
+            .FirstOrDefaultAsync(ct);
+        return root ?? nodeId;
     }
 
     private static EdgeDto ToDto(Edge e, IReadOnlyDictionary<string, string?>? names = null) => new()

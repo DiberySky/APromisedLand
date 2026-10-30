@@ -1,3 +1,5 @@
+using System.IO;
+using System.Net.Http;
 using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.GraphSyncSky;
 
@@ -69,7 +71,10 @@ public sealed class NebulaEdgeSchemaGateway : IEdgeSchemaGateway
     // 重试与生效确认（DDL 生成见 EdgeNgqlDdlBuilder）
     // ------------------------------------------------------------
 
-    /// <summary>DDL 幂等重试（IF NOT EXISTS / IF EXISTS 语义；space 刚重建时 metad 可能瞬时失败）。</summary>
+    /// <summary>
+    /// DDL 幂等重试（IF NOT EXISTS / IF EXISTS 语义；space 刚重建时 metad 可能瞬时失败）。
+    /// 仅对瞬态异常（网络/IO/超时）重试；语义/校验异常立即抛出，避免无效重试。
+    /// </summary>
     private async Task ExecuteWithRetryAsync(string space, string ngql, CancellationToken ct)
     {
         const int maxAttempts = 5;
@@ -80,13 +85,17 @@ public sealed class NebulaEdgeSchemaGateway : IEdgeSchemaGateway
                 await _client.QueryAsync(space, ngql, ct);
                 return;
             }
-            catch (Exception ex) when (attempt < maxAttempts && !ct.IsCancellationRequested)
+            catch (Exception ex) when (attempt < maxAttempts && !ct.IsCancellationRequested && IsTransient(ex))
             {
                 _logger.LogWarning("nGQL 第 {Attempt}/{Max} 次失败：{Msg} | {Ngql}", attempt, maxAttempts, ex.Message, ngql);
                 await Task.Delay(TimeSpan.FromSeconds(2), ct);
             }
         }
     }
+
+    /// <summary>瞬态异常判定：网络/IO 故障与非用户取消的超时；语义异常（InvalidOperationException/ArgumentException）不重试。</summary>
+    private static bool IsTransient(Exception ex) => ex is HttpRequestException or IOException
+        || (ex is TaskCanceledException tce && !tce.CancellationToken.IsCancellationRequested);
 
     /// <summary>轮询确认 DDL 已生效（2s × 15 ≈ 覆盖 30s 传播窗口），超时抛 InvalidOperationException。</summary>
     private async Task WaitUntilAsync(Func<Task<bool>> verify, string what, CancellationToken ct)
@@ -113,7 +122,7 @@ public sealed class NebulaEdgeSchemaGateway : IEdgeSchemaGateway
         return types?.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
-    /// <summary>DESCRIBE EDGE 取列名 → 类型映射；边类型不存在（含传播窗口内）返回 null。</summary>
+    /// <summary>DESCRIBE EDGE 取列名 → 类型映射；边类型不存在（含传播窗口内）或查询异常均返回 null。</summary>
     private async Task<Dictionary<string, string>?> DescribeColumnTypesAsync(string space, string edgeType, CancellationToken ct)
     {
         try
@@ -132,8 +141,10 @@ public sealed class NebulaEdgeSchemaGateway : IEdgeSchemaGateway
             }
             return map;
         }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // 传播窗口内 DESCRIBE 可能抛多种异常（不存在/未就绪），统一视为"尚未可见"交由 WaitUntil 轮询
+            _logger.LogDebug(ex, "DESCRIBE EDGE {EdgeType} 暂不可用（可能不存在或传播中）", edgeType);
             return null;
         }
     }

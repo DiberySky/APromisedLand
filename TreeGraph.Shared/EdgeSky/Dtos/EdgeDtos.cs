@@ -53,3 +53,13 @@ public class PatchEdgeRequest
 {
     public Dictionary<string, JsonElement?> Props { get; set; } = [];
 }
+
+/// <summary>节点搜索轻量结果（对端节点选择用；仅暴露 Id/Name/HostType，避免泄露 Node 全字段）。</summary>
+public class NodeLookupDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string? Name { get; set; }
+
+    /// <summary>宿主类型（UnitTree/CategoryTree/KnowledgeTree/SpaceTree/Line/LineNode 等），UI 按空间类型过滤候选。</summary>
+    public string? HostType { get; set; }
+}

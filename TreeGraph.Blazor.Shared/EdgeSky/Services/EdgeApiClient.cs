@@ -3,7 +3,6 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using TreeGraph.Shared.EdgeSky.Dtos;
 using TreeGraph.Shared.NodeEavSky.Dtos;
-using TreeGraph.Shared.NodeSky.Entities;
 
 namespace TreeGraph.Blazor.Shared.EdgeSky.Services;
 
@@ -156,6 +155,8 @@ public class EdgeApiClient
     public async Task<List<EdgeDto>?> QueryEdgesAsync(
         string spaceId,
         string? edgeType = null,
+        string? srcVid = null,
+        string? dstVid = null,
         string? nodeId = null,
         string? direction = null,
         int? limit = null,
@@ -164,6 +165,8 @@ public class EdgeApiClient
     {
         var query = new List<string>();
         if (!string.IsNullOrEmpty(edgeType)) query.Add($"edgeType={Uri.EscapeDataString(edgeType)}");
+        if (!string.IsNullOrEmpty(srcVid)) query.Add($"srcVid={Uri.EscapeDataString(srcVid)}");
+        if (!string.IsNullOrEmpty(dstVid)) query.Add($"dstVid={Uri.EscapeDataString(dstVid)}");
         if (!string.IsNullOrEmpty(nodeId)) query.Add($"nodeId={Uri.EscapeDataString(nodeId)}");
         if (!string.IsNullOrEmpty(direction)) query.Add($"direction={Uri.EscapeDataString(direction)}");
         if (limit is > 0) query.Add($"limit={limit}");
@@ -242,11 +245,11 @@ public class EdgeApiClient
         => await GetAsync<NodeSpaceDto>($"api/edge/node-space/{Uri.EscapeDataString(nodeId)}", ct);
 
     /// <summary>按名称搜索节点（api/edge/nodes?search=），用于选择对端节点。</summary>
-    public async Task<List<Node>> SearchNodesAsync(string? search, CancellationToken ct = default)
+    public async Task<List<NodeLookupDto>> SearchNodesAsync(string? search, CancellationToken ct = default)
     {
         var url = "api/edge/nodes";
         if (!string.IsNullOrWhiteSpace(search)) url += $"?search={Uri.EscapeDataString(search)}";
-        return await GetAsync<List<Node>>(url, ct) ?? [];
+        return await GetAsync<List<NodeLookupDto>>(url, ct) ?? [];
     }
 
     private static string EdgeUrl(string spaceId, string edgeType, string srcVid, long rank, string dstVid)

@@ -96,7 +96,7 @@ public class EdgeTypePropUpdate
     public bool DefaultValueSet { get; set; }
 
     /// <summary>新默认值（配合 <see cref="DefaultValueSet"/>）。</summary>
-    public System.Text.Json.JsonElement? DefaultValue { get; set; }
+    public JsonElement? DefaultValue { get; set; }
 }
 
 /// <summary>更新边类型中文显示名请求（非 Nebula 概念，仅 UI 展示）。</summary>

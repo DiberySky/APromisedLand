@@ -9,7 +9,6 @@ using TreeGraph.Blazor.Shared.EdgeSky.Dialogs;
 using TreeGraph.Blazor.Shared.EdgeSky.Services;
 using TreeGraph.Shared.EdgeSky;
 using TreeGraph.Shared.EdgeSky.Dtos;
-using TreeGraph.Shared.NodeSky.Entities;
 using Xunit;
 
 namespace TreeGraph.Blazor.Shared.Tests.EdgeSky;
@@ -90,7 +89,7 @@ public class EdgeInstanceCreateDialogTests : BunitTestBase
     }
 
     /// <summary>反射注入已选对端节点（正常流程经搜索表「选择」按钮）。</summary>
-    private static void SetPeer(IRenderedComponent<MudDialogProvider> provider, Node peer)
+    private static void SetPeer(IRenderedComponent<MudDialogProvider> provider, NodeLookupDto peer)
     {
         var dialog = provider.FindComponent<EdgeInstanceCreateDialog>().Instance;
         typeof(EdgeInstanceCreateDialog)
@@ -130,7 +129,7 @@ public class EdgeInstanceCreateDialogTests : BunitTestBase
     public async Task Submit_OutEdge_PrefillsDefaultAndSkipsNullableEmpty()
     {
         var (provider, reference) = await OpenAsync();
-        SetPeer(provider, new Node { Id = "node-peer", Name = "对端", HostType = "UnitTree" });
+        SetPeer(provider, new NodeLookupDto { Id = "node-peer", Name = "对端", HostType = "UnitTree" });
 
         ClickSubmit(provider);
 
@@ -150,7 +149,7 @@ public class EdgeInstanceCreateDialogTests : BunitTestBase
     public async Task Submit_InEdge_SwapsEndpoints()
     {
         var (provider, reference) = await OpenAsync();
-        SetPeer(provider, new Node { Id = "node-peer", Name = "对端", HostType = "UnitTree" });
+        SetPeer(provider, new NodeLookupDto { Id = "node-peer", Name = "对端", HostType = "UnitTree" });
         SetDirection(provider, "in");
 
         ClickSubmit(provider);
