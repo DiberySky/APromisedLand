@@ -773,22 +773,32 @@ public sealed class InodeChangedConsumer
         _dedupCache.Set(dedupKey, true,
             TimeSpan.FromSeconds(_syncOptions.DedupWindowSeconds));
 
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var initializer = scope.ServiceProvider
-            .GetRequiredService<QdrantInitializer>();
-        var synchronizer = scope.ServiceProvider
-            .GetRequiredService<VectorSynchronizer>();
+        // 向量同步是旁路：与图同步共享同一消息（Wolverine 级联消费、串行执行、
+        // 失败整链重放），此处失败绝不能连坐图同步 —— 吞异常仅记日志，
+        // 向量漂移由全量/分类重建兜底。
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var initializer = scope.ServiceProvider
+                .GetRequiredService<QdrantInitializer>();
+            var synchronizer = scope.ServiceProvider
+                .GetRequiredService<VectorSynchronizer>();
 
-        await initializer.EnsureReadyAsync(ct);
-        await synchronizer.SyncInodeAsync(inodeId, ct);
+            await initializer.EnsureReadyAsync(ct);
+            await synchronizer.SyncInodeAsync(inodeId, ct);
 
-        // 改名/移动（PathAffected）：自身文本已随上面刷新；全部后代的路径型文本
-        // 同步失效，级联重建（后代的幂等由先删后写保证）
-        if (!msg.PathAffected) return;
-        var descendants = await synchronizer.CollectDescendantIdsAsync(inodeId, ct);
-        _logger.LogInformation("路径级联刷新：{InodeId} 后代 {Count} 个", inodeId, descendants.Count);
-        foreach (var descendantId in descendants)
-            await synchronizer.SyncInodeAsync(descendantId, ct);
+            // 改名/移动（PathAffected）：自身文本已随上面刷新；全部后代的路径型文本
+            // 同步失效，级联重建（后代的幂等由先删后写保证）
+            if (!msg.PathAffected) return;
+            var descendants = await synchronizer.CollectDescendantIdsAsync(inodeId, ct);
+            _logger.LogInformation("路径级联刷新：{InodeId} 后代 {Count} 个", inodeId, descendants.Count);
+            foreach (var descendantId in descendants)
+                await synchronizer.SyncInodeAsync(descendantId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "向量同步失败（已旁路，不影响图同步）：{InodeId}", inodeId);
+        }
     }
 }
 

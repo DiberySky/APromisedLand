@@ -20,6 +20,13 @@ public sealed class SemanticSearchOptions
 
     public string EmbeddingModel { get; set; } = "bge-m3";
 
+    /// <summary>
+    /// Embedding 服务失败后的短路冷却（秒）：失败后该窗口内所有向量化请求直接失败、不再发起 HTTP，
+    /// 避免每次向量同步都在 60s 超时上等待、进而连坐同消息的图同步 handler。
+    /// 0 = 禁用短路（每次都真实请求）。
+    /// </summary>
+    public int EmbeddingFailureCooldownSeconds { get; set; } = 60;
+
     public int DefaultTopK { get; set; } = 10;
     public int MaxTopK { get; set; } = 50;
 

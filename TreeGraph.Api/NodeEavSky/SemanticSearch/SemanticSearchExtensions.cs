@@ -55,7 +55,8 @@ public static class SemanticSearchExtensions
         services.AddHttpClient<EmbeddingClient>(client =>
         {
             client.BaseAddress = new Uri(embeddingEndpoint);
-            client.Timeout = TimeSpan.FromSeconds(60);
+            // 向量化调用应很快；超时过长会在服务不可用时连坐同消息的图同步 handler。
+            client.Timeout = TimeSpan.FromSeconds(15);
         });
 
         services.AddSingleton<QdrantVectorStore>();

@@ -33,16 +33,16 @@ void TreeGraph()
     builder.AddRabbitMq(context);
     builder.AddQdrant(context);
 
+    // ★ vLLM Chat/Embedding 容器（MAF 依赖；语义搜索向量化依赖 vllm-embed:5719）
+    //   必须在 AddTreeGraphEavApi 之前声明，以便注入 Embedding__Endpoint 并 WaitFor。
+    builder.AddVllm(context);
+
     // ★ EAV 动态类型 API(复用 TreeGraphDb,固定端口 5773)
     builder.AddTreeGraphEavApi(context);
 
     // ★ TreeGraph 文件存储 API(独立微服务,固定端口 5326,
     //   复用 FileMetadataDb + SeaweedS3,与 EavApi 平级)
     builder.AddTreeGraphFileStorageApi(context);
-
-    // ★ vLLM Chat/Embedding 容器（MAF 依赖；语义搜索向量化依赖 vllm-embed:5719）
-    //   研发期暂不需要 vLLM，暂停编排以节省内存（依赖方均有 null 保护）
-    // builder.AddVllm(context);
 
     // ★ TreeGraph.MafWfApi:MAF + Workflow 服务 API(vLLM 版,固定端口 5323,
     //   替代已停用的旧 MAFWorkFlowApi)
