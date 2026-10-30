@@ -13,7 +13,18 @@
 @inject EavApiClient EavApi
 @inject MessageService Message
 
-<MudExpansionPanel Elevation="0" Outlined="true" Class="mb-2"
+<style>
+    /* 属性绑定折叠面板：内容区及内部表单组件底色均设为纯黑 */
+    .nbs-expansion .mud-collapse-container,
+    .nbs-expansion .mud-expand-panel-content,
+    .nbs-expansion .mud-input-control,
+    .nbs-expansion .mud-input,
+    .nbs-expansion .mud-field {
+        background-color: #000;
+    }
+</style>
+
+<MudExpansionPanel Elevation="0" Outlined="true" Class="nbs-expansion mb-2"
                    Expanded="false"
                    ExpandIcon="@Icons.Material.Filled.ExpandMore"
                    CollapseIcon="@Icons.Material.Filled.ExpandLess"

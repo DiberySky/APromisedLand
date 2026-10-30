@@ -23,11 +23,12 @@
     <DialogContent>
         <MudStack Spacing="2">
             <MudTextField Value="@SpaceName" Label="所属空间" Variant="Variant.Outlined"
-                          Margin="Margin.Dense" ReadOnly="true" />
+                          Margin="Margin.Dense" ReadOnly="true" Size="Size.Small" />
 
             <MudSelect T="EdgeTypeDto" Value="_edgeType"
                        ValueChanged="OnEdgeTypeChanged"
                        Label="关系类型" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Size="Size.Small"
                        ToStringFunc="@(t => t is null ? string.Empty : TypeLabel(t))"
                        HelperText="属性区按该关系类型的 Schema 动态生成">
                 @foreach (var t in Types)
@@ -38,9 +39,14 @@
 
             <MudSelect T="string" @bind-Value="_direction"
                        Label="方向" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Size="Size.Small"
                        HelperText="出向：本节点 → 对端；入向：对端 → 本节点">
-                <MudSelectItem T="string" Value="@("out")">出向（本节点为起点）</MudSelectItem>
-                <MudSelectItem T="string" Value="@("in")">入向（本节点为终点）</MudSelectItem>
+                <MudSelectItem T="string" Value="@("out")">
+                    出向（本节点为起点）<MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" Class="ms-2" />
+                </MudSelectItem>
+                <MudSelectItem T="string" Value="@("in")">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" Class="me-2" />入向（本节点为终点）
+                </MudSelectItem>
             </MudSelect>
 
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-nowrap">
@@ -49,9 +55,11 @@
                               Placeholder="按名称搜索（留空列出前 50 个）"
                               Adornment="Adornment.End"
                               AdornmentIcon="@Icons.Material.Filled.Search"
+                              Size="Size.Small"
                               OnKeyDown="OnPeerKeyDown"
                               Class="flex-grow" />
                 <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           Size="Size.Small"
                            OnClick="SearchPeersAsync" Disabled="_searching">
                     搜索
                 </MudButton>

@@ -30,7 +30,7 @@
         <MudContainer Class="pt-0 pb-4">
             @* KeepPanelsAlive：非激活页也保持渲染，属性区组件引用（提交时保存属性）不因切页丢失 *@
             <MudTabs Elevation="0" Rounded="true" KeepPanelsAlive="true">
-                <MudTabPanel Text="基本信息" Icon="@Icons.Material.Filled.Info">
+                <MudTabPanel Text="基本信息" Icon="@Icons.Material.Filled.Info" IconSize="Size.Small">
                     <MudForm @ref="_form" Model="@_node">
                         @if (NodeTemplate.EditTemplate is null)
                         {
@@ -45,7 +45,7 @@
                     </MudForm>
                 </MudTabPanel>
 
-                <MudTabPanel Text="属性绑定" Icon="@Icons.Material.Filled.Link">
+                <MudTabPanel Text="属性绑定" Icon="@Icons.Material.Filled.Link" IconSize="Size.Small">
                     @* 编辑阶段必有 nodeId，直接渲染属性区（EAV 模块挂入点） *@
                     <NodeAttributeItemsSky @ref="_attrItems"
                                            NodeId="@_node.Id"
@@ -53,7 +53,7 @@
                                            AllowManage="true" />
                 </MudTabPanel>
 
-                <MudTabPanel Text="关系绑定" Icon="@Icons.Material.Filled.Share">
+                <MudTabPanel Text="关系绑定" Icon="@Icons.Material.Filled.Share" IconSize="Size.Small">
                     @* 编辑阶段必有 nodeId：节点所属图空间由后端按宿主类型解析，组件自行拉取出/入边 *@
                     @if (string.IsNullOrEmpty(_node.Id))
                     {
@@ -76,6 +76,7 @@
             <MudButton Variant="Variant.Text"
                        StartIcon="@Icons.Material.Outlined.Add"
                        Color="Color.Success"
+                       Size="Size.Small"
                        OnClick="@OnAddChild">
                 创建子项
             </MudButton>
@@ -86,6 +87,7 @@
             <MudButton Variant="Variant.Text"
                        StartIcon="@Icons.Material.Outlined.ImportExport"
                        Color="Color.Default"
+                       Size="Size.Small"
                        OnClick="@OnSort">
                 子项排序
             </MudButton>
@@ -96,6 +98,7 @@
             <MudButton Variant="Variant.Text"
                        Color="Color.Error"
                        StartIcon="@Icons.Material.Outlined.Delete"
+                       Size="Size.Small"
                        OnClick="@OnDelete">
                 删除
             </MudButton>
@@ -106,12 +109,14 @@
         <MudButton Variant="Variant.Text"
                    Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.SaveAs"
+                   Size="Size.Small"
                    OnClick="@SubmitAsync">
             提交
         </MudButton>
         <MudButton Variant="Variant.Text"
                    Color="Color.Default"
                    StartIcon="@Icons.Material.Filled.Close"
+                   Size="Size.Small"
                    OnClick="@Close">
             取消
         </MudButton>

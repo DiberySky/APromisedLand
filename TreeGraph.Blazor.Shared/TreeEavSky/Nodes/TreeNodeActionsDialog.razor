@@ -1,5 +1,6 @@
 @* TreeNodeActionsDialog.razor *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@using TreeGraph.Blazor.Shared.EdgeSky.Components
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @implements IDisposable
@@ -10,6 +11,18 @@
         width: 12px;
         height: 12px;
         font-size: 12px;
+    }
+
+    /* 关系绑定折叠面板：内容区及内部 Tabs/Table 组件底色均设为纯黑 */
+    .tna-expansion .mud-collapse-container,
+    .tna-expansion .mud-expand-panel-content,
+    .tna-expansion .mud-tabs,
+    .tna-expansion .mud-tabs-panels,
+    .tna-expansion .mud-table-container,
+    .tna-expansion .mud-table-root,
+    .tna-expansion .mud-table-row,
+    .tna-expansion .mud-table-cell {
+        background-color: #000;
     }
 </style>
 
@@ -63,6 +76,22 @@
                 </MudTabPanel>
 
             </MudTabs>
+
+            @* ===== 关系绑定（可展开） ===== *@
+            @* MudExpansionPanel.Icon 是展开/折叠箭头（默认 ExpandMore），不能用作标题前导图标；
+               用 TitleContent 渲染 [Share] 关系绑定，保持折叠图标为默认。
+               置于 MudContainer 内，宽度与「性别」等属性面板对齐。 *@
+            <MudExpansionPanel Class="tna-expansion">
+                <TitleContent>
+                    <MudStack Row AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Share" Size="Size.Small" />
+                        <MudText Typo="Typo.subtitle2">关系绑定</MudText>
+                    </MudStack>
+                </TitleContent>
+                <ChildContent>
+                    <NodeRelationBindingsSky NodeId="@NodeTemplate.Node.Value!.Id" AllowManage="false" />
+                </ChildContent>
+            </MudExpansionPanel>
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>

@@ -24,23 +24,26 @@
 }
 else if (!_loading && _space is not null)
 {
-    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2 flex-wrap">
-        <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Workspaces">
-            @_space.SpaceName
-        </MudChip>
-        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
-                       Size="Size.Small" Color="Color.Default"
-                       Disabled="@_loading"
-                       OnClick="@(async () => await ReloadAsync())"
-                       title="刷新" />
-        <MudSpacer />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.AddLink"
-                   Disabled="@(_loading || _types.Count == 0)"
-                   OnClick="OpenCreateAsync">
-            新建关系
-        </MudButton>
-    </MudStack>
+    @if (AllowManage)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2 flex-wrap">
+            <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Workspaces">
+                @_space.SpaceName
+            </MudChip>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Size="Size.Small" Color="Color.Default"
+                           Disabled="@_loading"
+                           OnClick="@(async () => await ReloadAsync())"
+                           title="刷新" />
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.AddLink"
+                       Disabled="@(_loading || _types.Count == 0)"
+                       OnClick="OpenCreateAsync">
+                新建关系
+            </MudButton>
+        </MudStack>
+    }
 
     @if (_types.Count == 0)
     {
@@ -50,11 +53,25 @@ else if (!_loading && _space is not null)
     }
 
     <MudTabs Elevation="0" Rounded="true" PanelClass="pt-2">
-        <MudTabPanel Text="@($"出向 {_out.Count}")" Icon="@Icons.Material.Filled.CallMade">
-            @EdgeTable(_out, true)
+        <MudTabPanel>
+            <TabContent>
+                <span class="d-inline-flex align-items-center gap-1">
+                    出向<MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" />
+                </span>
+            </TabContent>
+            <ChildContent>
+                @EdgeTable(_out, true)
+            </ChildContent>
         </MudTabPanel>
-        <MudTabPanel Text="@($"入向 {_in.Count}")" Icon="@Icons.Material.Filled.CallReceived">
-            @EdgeTable(_in, false)
+        <MudTabPanel>
+            <TabContent>
+                <span class="d-inline-flex align-items-center gap-1">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowRightAlt" Size="Size.Small" />入向
+                </span>
+            </TabContent>
+            <ChildContent>
+                @EdgeTable(_in, false)
+            </ChildContent>
         </MudTabPanel>
     </MudTabs>
 }
@@ -62,6 +79,9 @@ else if (!_loading && _space is not null)
 @code {
     /// <summary>宿主节点 Id（= nodes.id）。</summary>
     [Parameter, EditorRequired] public string NodeId { get; set; } = default!;
+
+    /// <summary>是否允许管理（新建/删除关系、显示空间名与刷新）。只读视图传 false。</summary>
+    [Parameter] public bool AllowManage { get; set; } = true;
 
     private NodeSpaceDto? _space;
     private List<EdgeTypeDto> _types = [];
@@ -210,11 +230,14 @@ else if (!_loading && _space is not null)
                 </MudText>
             </MudTd>
             <MudTd DataLabel="操作" Style="text-align: right;">
-                <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                               Size="Size.Small" Color="Color.Error"
-                               Disabled="@_loading"
-                               OnClick="@(async () => await DeleteAsync(context))"
-                               title="删除该关系" />
+                @if (AllowManage)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small" Color="Color.Error"
+                                   Disabled="@_loading"
+                                   OnClick="@(async () => await DeleteAsync(context))"
+                                   title="删除该关系" />
+                }
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>

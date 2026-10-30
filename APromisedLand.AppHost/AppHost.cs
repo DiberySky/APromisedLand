@@ -35,7 +35,7 @@ void TreeGraph()
 
     // ★ vLLM Chat/Embedding 容器（MAF 依赖；语义搜索向量化依赖 vllm-embed:5719）
     //   必须在 AddTreeGraphEavApi 之前声明，以便注入 Embedding__Endpoint 并 WaitFor。
-    builder.AddVllm(context);
+    // builder.AddVllm(context);
 
     // ★ TreeGraph 文件存储 API(独立微服务,固定端口 5326,
     //   复用 FileMetadataDb + SeaweedS3,与 EavApi 平级)
