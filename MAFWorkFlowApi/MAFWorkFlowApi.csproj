@@ -13,7 +13,7 @@
         <PackageReference Include="LiteGraph.Sdk" Version="10.2.0" />
         <PackageReference Include="Microsoft.Agents.AI" Version="1.26.0" />
         <PackageReference Include="Microsoft.Agents.AI.Abstractions" Version="1.26.0" />
-        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.25.0-preview.261014.1" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.26.0-preview.261023.1" />
         <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.26.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

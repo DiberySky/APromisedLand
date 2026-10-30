@@ -152,6 +152,26 @@ public sealed class FilesController(IFileMetadataService files) : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
         => await files.DeleteAsync(id, ct) ? NoContent() : NotFound();
 
+    /// <summary>
+    /// 按 docId + 可选 version 删除。version 为空时删该 docId 最新版本。
+    /// 供 EAV file 属性级联删除调用——EAV 的 value_file_meta 里直接带 docId/version。
+    /// </summary>
+    [HttpDelete("by-doc/{docId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteByDocId(
+        string docId, [FromQuery] int? version = null, CancellationToken ct = default)
+        => await files.DeleteByDocIdAsync(docId, version, ct) ? NoContent() : NotFound();
+
+    /// <summary>
+    /// 列出所有去重后的 docId（跨租户）。
+    /// 供 TreeGraph.Api 的 OrphanedFileCleanupService 做差集对比。
+    /// </summary>
+    [HttpGet("all-doc-ids")]
+    [ProducesResponseType(typeof(IReadOnlyList<string>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllDocIds(CancellationToken ct)
+        => Ok(await files.GetAllDocIdsAsync(ct));
+
     [DebuggerDisableUserUnhandledExceptions]                    // ★
     private async Task<IActionResult> FullDownloadAsync(Guid id, CancellationToken ct)
     {

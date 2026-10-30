@@ -97,6 +97,24 @@ public static class TreeGraphEavApiExtension
             Console.WriteLine("[TreeGraphEavApi] ⚠️ context.TreeGraphNebulaFastApiEndpoint 为 null，图同步将连接 localhost:9393");
         }
 
+        // TreeGraph.FileStorageApi（文件存储；OrphanedFileCleanupService + EAV 级联删除调用）
+        if (context.TreeGraphFileStorageApi is not null)
+        {
+            var fsaEndpoint = context.TreeGraphFileStorageApi.GetEndpoint("http");
+
+            context.TreeGraphEavApi
+                .WithReference(context.TreeGraphFileStorageApi)
+                .WaitFor(context.TreeGraphFileStorageApi)
+                .WithEnvironment("FileStorageApi__BaseAddress",
+                    ReferenceExpression.Create($"{fsaEndpoint}/"));
+
+            Console.WriteLine($"[TreeGraphEavApi] FileStorageApi 端点 → {fsaEndpoint}/");
+        }
+        else
+        {
+            Console.WriteLine("[TreeGraphEavApi] ⚠️ context.TreeGraphFileStorageApi 为 null，文件存储将连接 localhost:5060");
+        }
+
         context.TreeGraphEavApi.WithOtlpExporter();
 
         return builder;

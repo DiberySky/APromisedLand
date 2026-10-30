@@ -24,3 +24,6 @@ Notes/GitHub.md
 __pycache__/
 *.pyc
 .venv/
+
+# Aspire 运行日志
+aspire-run.log

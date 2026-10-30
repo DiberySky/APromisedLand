@@ -37,6 +37,14 @@ public class FileStorageDeleter : IFileStorageDeleter
                 "级联删除文件失败：docId={DocId}, version={Version}", docId, version);
             return false;
         }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // HttpClient 超时抛出 TaskCanceledException（非 HttpRequestException），
+            // 单文件删除失败返回 false，由调用方决定是否重试。
+            _logger.LogWarning(
+                "级联删除文件超时：docId={DocId}, version={Version}", docId, version);
+            return false;
+        }
     }
 
     public async Task DeleteBatchAsync(
