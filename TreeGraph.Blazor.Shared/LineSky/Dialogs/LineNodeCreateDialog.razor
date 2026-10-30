@@ -58,11 +58,24 @@
     /// <summary>所属线路 ID（由一级弹窗传入）。</summary>
     [Parameter] public string LineId { get; set; } = string.Empty;
 
+    /// <summary>前驱预置（可选）：从「设置修改」点击「添加下一个」时传入当前节点。</summary>
+    [Parameter] public string? PredecessorId { get; set; }
+
+    /// <summary>前驱预置的展示名。</summary>
+    [Parameter] public string? PredecessorName { get; set; }
+
     private readonly LineNodeDto _form = new();
     private bool _submitting;
 
     /// <summary>前驱节点展示名（只读文本框）。</summary>
     private string _predecessorLabel = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrEmpty(PredecessorId)) return;
+        _form.PredecessorId = PredecessorId;
+        _predecessorLabel = PredecessorName ?? string.Empty;
+    }
 
     /// <summary>打开线路节点搜索选择器（限定同线路），确认后写入前驱。</summary>
     private async Task OpenPickerAsync()

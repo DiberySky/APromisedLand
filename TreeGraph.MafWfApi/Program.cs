@@ -137,3 +137,6 @@ static string ResolveVllmEndpoint(IConfiguration config)
 
     return "http://localhost:8000";
 }
+
+// ★ 供 WebApplicationFactory<Program> 引用（集成测试需要 public）
+public partial class Program;

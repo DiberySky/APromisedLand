@@ -34,28 +34,27 @@
                                       Variant="Variant.Outlined"
                                       Lines="3"
                                       Size="Size.Small" />
-                        @* 前驱节点：线路节点可能很多，改用搜索对话框选择 *@
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        @* 前驱节点：线路节点可能很多，改用搜索对话框选择。
+                           尾部放大镜打开选择器；清除按钮在只读态下 Clearable 不显示，改为行尾显式图标。 *@
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                             <MudTextField T="string"
                                           Value="@_predecessorLabel"
                                           Label="前驱节点（改接段边）"
                                           Variant="Variant.Outlined"
                                           Size="Size.Small"
                                           ReadOnly="true"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@Icons.Material.Filled.Search"
+                                          IconSize="Size.Small"
+                                          OnAdornmentClick="OpenPickerAsync"
                                           Style="flex: 1;" />
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.Search"
-                                       Size="Size.Small"
-                                       OnClick="OpenPickerAsync">
-                                选择
-                            </MudButton>
                             @if (!string.IsNullOrEmpty(_form.PredecessorId))
                             {
                                 <MudIconButton Icon="@Icons.Material.Filled.Clear"
-                                               Title="清除（不改连接）"
+                                               Color="Color.Warning"
+                                               Title="清除前驱（不改连接）"
                                                Size="Size.Small"
-                                               OnClick="ClearPredecessor" />
+                                               OnClick="ConfirmClearPredecessor" />
                             }
                         </MudStack>
                     </MudStack>
@@ -83,7 +82,14 @@
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
-        @* 对齐 Tree 设置修改：删除按钮置于左侧动作区 *@
+        @* 对齐 Tree 设置修改：删除按钮置于左侧动作区；「添加下一个」在其左侧 *@
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PlaylistAdd"
+                   Size="Size.Small"
+                   OnClick="@OnAddNext">
+            添加下一个
+        </MudButton>
         <MudButton Variant="Variant.Text"
                    Color="Color.Error"
                    StartIcon="@Icons.Material.Outlined.Delete"
@@ -140,11 +146,18 @@
         }
     }
 
-    /// <summary>清除前驱选择（留空 = 不改连接）。</summary>
-    private void ClearPredecessor()
+    /// <summary>清除前驱选择前先确认（留空 = 不改连接，但仍需防误触）。</summary>
+    private async Task ConfirmClearPredecessor()
     {
-        _form.PredecessorId = null;
-        _predecessorLabel = string.Empty;
+        var confirm = await DialogService.ShowMessageBoxAsync(
+            "清除前驱",
+            $"确定要清除前驱节点“{_predecessorLabel}”吗？保存后该节点将不再接在该前驱之后。",
+            "清除", "取消");
+        if (confirm == true)
+        {
+            _form.PredecessorId = null;
+            _predecessorLabel = string.Empty;
+        }
     }
 
     private async Task UpdateAsync()
@@ -186,4 +199,8 @@
     /// <summary>删除：关闭并返回 Delete 动作，由编排器打开 LineNodeDeleteDialog 执行。</summary>
     private void OnDelete()
         => MudDialog?.Close(DialogResult.Ok(LineNodeHostAction.Delete));
+
+    /// <summary>添加下一个：关闭并返回 AddNext 动作，由编排器打开新建对话框（前驱 = 当前节点）。</summary>
+    private void OnAddNext()
+        => MudDialog?.Close(DialogResult.Ok(LineNodeHostAction.AddNext));
 }

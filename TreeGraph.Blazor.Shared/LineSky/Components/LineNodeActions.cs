@@ -16,6 +16,8 @@ public enum LineNodeHostAction
     Attribute,
     /// <summary>删除节点。</summary>
     Delete,
+    /// <summary>在当前节点之后添加一个新节点（前驱 = 当前节点）。</summary>
+    AddNext,
     /// <summary>跳转到所属线路的节点维护对话框。</summary>
     LineManage
 }
@@ -89,11 +91,16 @@ public static class LineNodeActions
             switch (action)
             {
                 case LineNodeHostAction.Edit:
-                    var editOutcome = await EditAsync(dialogService, node, lineName);
+                    var (editOutcome, addNextCreated) = await EditAsync(dialogService, node, lineName);
                     if (editOutcome is LineNodeHostOutcome.Deleted)
                         return LineNodeHostOutcome.Deleted;
                     if (editOutcome is LineNodeHostOutcome.Changed)
                         changed = true;
+
+                    // 「添加下一个」创建成功：线路结构已变，直接退出宿主循环，
+                    // 由调用方刷新「线路节点」列表（对齐 Tree 创建子项后退出）。
+                    if (addNextCreated)
+                        return LineNodeHostOutcome.Changed;
                     break;
 
                 case LineNodeHostAction.Attribute:
@@ -119,8 +126,11 @@ public static class LineNodeActions
     /// <summary>
     /// 编辑（名称/描述/连接 + 属性区 + 关系绑定）。
     /// 若用户在「设置修改」内点击删除，转交 DeleteAsync 并返回 Deleted。
+    /// 返回值中的 AddNextCreated 表示用户在编辑页点击了「添加下一个」并创建成功，
+    /// 此时线路结构已变化，调用方应直接退出宿主循环、回到列表刷新。
     /// </summary>
-    public static async Task<LineNodeHostOutcome> EditAsync(IDialogService dialogService, LineNodeDto node, string? lineName)
+    public static async Task<(LineNodeHostOutcome Outcome, bool AddNextCreated)> EditAsync(
+        IDialogService dialogService, LineNodeDto node, string? lineName)
     {
         var parameters = new DialogParameters<LineNodeEditDialog>
         {
@@ -137,11 +147,39 @@ public static class LineNodeActions
             if (result.Data is LineNodeHostAction.Delete)
             {
                 var deleted = await DeleteAsync(dialogService, node);
-                return deleted ? LineNodeHostOutcome.Deleted : LineNodeHostOutcome.Canceled;
+                return (deleted ? LineNodeHostOutcome.Deleted : LineNodeHostOutcome.Canceled, false);
             }
-            return LineNodeHostOutcome.Changed;
+
+            // 用户在「设置修改」内点击「添加下一个」：新建节点，前驱预置为当前节点；
+            // 创建成功即退出宿主循环，回到「线路节点」列表。
+            if (result.Data is LineNodeHostAction.AddNext)
+            {
+                var created = await AddNextAsync(dialogService, node);
+                return created
+                    ? (LineNodeHostOutcome.Changed, true)
+                    : (LineNodeHostOutcome.Canceled, false);
+            }
+            return (LineNodeHostOutcome.Changed, false);
         }
-        return LineNodeHostOutcome.Canceled;
+        return (LineNodeHostOutcome.Canceled, false);
+    }
+
+    /// <summary>
+    /// 在当前节点之后新建一个线路节点：打开新建对话框，前驱预置为当前节点，
+    /// 创建成功即形成 当前节点 → 新节点 的段边。返回 true = 已创建。
+    /// </summary>
+    private static async Task<bool> AddNextAsync(IDialogService dialogService, LineNodeDto node)
+    {
+        var parameters = new DialogParameters<LineNodeCreateDialog>
+        {
+            { x => x.LineId, node.LineId },
+            { x => x.PredecessorId, node.Id },
+            { x => x.PredecessorName, node.Name }
+        };
+        var dialog = await dialogService.ShowExAsync<LineNodeCreateDialog>(
+            "添加下一个节点", parameters, NestedOptions);
+        var result = await dialog.Result;
+        return result is { Canceled: false };
     }
 
     /// <summary>删除（守卫链：段边/端子/属性/属性数据引用 → 409 透出）。</summary>
