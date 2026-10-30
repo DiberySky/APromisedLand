@@ -1,10 +1,32 @@
 @* LineNodeActionsDialog.razor — 线路节点宿主操作对话框（对齐 TreeNodeActionsDialog 模式）：
-   基本信息内嵌只读 + 操作按钮平铺（编辑/属性/删除/线路节点维护）。
+   基本信息 Tab（只读）+ 关系绑定折叠面板；操作按钮平铺（编辑/属性/删除/线路节点维护）。
    按钮不直接执行，仅携带 LineNodeHostAction 关窗，由 LineNodeActions.OperateAsync 编排执行并循环重开。 *@
 @namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Components
 @using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@using TreeGraph.Blazor.Shared.EdgeSky.Components
+
+<style>
+    /* 选项卡图标小号（对齐 TreeNodeActionsDialog） */
+    .lna-tabs .mud-tab .mud-icon-root {
+        width: 12px;
+        height: 12px;
+        font-size: 12px;
+    }
+
+    /* 关系绑定折叠面板：内容区及内部 Tabs/Table 组件底色均设为纯黑 */
+    .lna-expansion .mud-collapse-container,
+    .lna-expansion .mud-expand-panel-content,
+    .lna-expansion .mud-tabs,
+    .lna-expansion .mud-tabs-panels,
+    .lna-expansion .mud-table-container,
+    .lna-expansion .mud-table-root,
+    .lna-expansion .mud-table-row,
+    .lna-expansion .mud-table-cell {
+        background-color: #000;
+    }
+</style>
 
 <DialogSky Title="节点操作"
            SubmitButtonVisible="false"
@@ -13,52 +35,66 @@
     <ToolBarContent>
         @* 静态内容：所属线路名（ToolBarContent 不支持动态更新） *@
         <MudText Color="Color.Info">@LineName</MudText>
+        <MudSpacer/>
     </ToolBarContent>
     <DialogContent>
-        <MudContainer Class="py-4" MaxWidth="MaxWidth.Medium">
-            <MudStack Spacing="2">
-                <MudTextField T="string" Value="Node.Name"
-                              Label="名称" Variant="Variant.Outlined" ReadOnly="true" />
-                <MudTextField T="string" Value="Node.Description"
-                              Label="描述" Variant="Variant.Outlined" ReadOnly="true" Lines="3" />
-                <MudTextField T="string"
-                              Value="@(string.IsNullOrEmpty(Node.PredecessorName) ? "无（首节点）" : Node.PredecessorName)"
-                              Label="前驱节点" Variant="Variant.Outlined" ReadOnly="true" />
-                <MudTextField T="string"
-                              Value="@(Node.CreatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")"
-                              Label="创建时间" Variant="Variant.Outlined" ReadOnly="true" />
+        <MudContainer Class="pt-0 pb-4" MaxWidth="MaxWidth.Medium">
+            <MudTabs Elevation="0" Rounded="true" Class="lna-tabs">
+                <MudTabPanel Text="基本信息"
+                             Icon="@Icons.Material.Filled.Info">
+                    <MudStack Spacing="2">
+                        <MudTextField T="string" Value="Node.Name"
+                                      Label="名称" Variant="Variant.Outlined" ReadOnly="true" />
+                        <MudTextField T="string" Value="Node.Description"
+                                      Label="描述" Variant="Variant.Outlined" ReadOnly="true" Lines="3" />
+                        <MudTextField T="string"
+                                      Value="@(string.IsNullOrEmpty(Node.PredecessorName) ? "无（首节点）" : Node.PredecessorName)"
+                                      Label="前驱节点" Variant="Variant.Outlined" ReadOnly="true" />
+                        <MudTextField T="string"
+                                      Value="@(Node.CreatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")"
+                                      Label="创建时间" Variant="Variant.Outlined" ReadOnly="true" />
 
-                @* 属性区：仅展示本节点已关注属性定义的属性（只读） *@
-                <NodeAttributeItemsSky NodeId="@Node.Id" ReadOnly="true" />
-            </MudStack>
+                        @* 属性区：仅展示本节点已关注属性定义的属性（只读） *@
+                        <NodeAttributeItemsSky NodeId="@Node.Id" ReadOnly="true" />
+                    </MudStack>
+                </MudTabPanel>
+            </MudTabs>
+
+            @* ===== 关系绑定（可展开，只读；无关系时隐藏） ===== *@
+            @if (_hasRelations)
+            {
+                <MudExpansionPanel Class="lna-expansion">
+                    <TitleContent>
+                        <MudStack Row AlignItems="AlignItems.Center">
+                            <MudIcon Icon="@Icons.Material.Filled.Share" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2">关系绑定</MudText>
+                        </MudStack>
+                    </TitleContent>
+                    <ChildContent>
+                        <NodeRelationBindingsSky NodeId="@Node.Id" AllowManage="false"
+                                                 OnHasRelationsChanged="@(v => _hasRelations = v)" />
+                    </ChildContent>
+                </MudExpansionPanel>
+            }
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
-        <MudButton OnClick="OnDelete"
-                   Variant="Variant.Text"
-                   Color="Color.Error"
-                   StartIcon="@Icons.Material.Outlined.Delete">
-            删除
-        </MudButton>
-    </DialogLeftActions>
-    <DialogRightActions>
-        <MudButton OnClick="OnAttribute"
-                   Variant="Variant.Text"
-                   Color="Color.Info"
-                   StartIcon="@Icons.Material.Outlined.EditAttributes">
-            属性
-        </MudButton>
+        @* 对齐 Tree 节点操作（只读宿主）：删除已迁入「设置修改」 *@
         <MudButton OnClick="OnEdit"
                    Variant="Variant.Text"
                    Color="Color.Primary"
+                   Size="Size.Small"
                    StartIcon="@Icons.Material.Outlined.Edit">
-            编辑
+            设置修改
         </MudButton>
+    </DialogLeftActions>
+    <DialogRightActions>
         @if (ShowLineManage && !string.IsNullOrEmpty(Node.LineId))
         {
             <MudButton OnClick="OnLineManage"
                        Variant="Variant.Text"
                        Color="Color.Default"
+                       Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.AccountTree">
                 线路节点维护
             </MudButton>
@@ -78,9 +114,10 @@
     /// <summary>是否显示「线路节点维护」跳转项（在线路管理对话框内为 false）。</summary>
     [Parameter] public bool ShowLineManage { get; set; }
 
+    /// <summary>该节点是否存在关系（出/入边），由 NodeRelationBindingsSky 加载后回调；无关系则隐藏「关系绑定」面板。</summary>
+    private bool _hasRelations;
+
     private void OnEdit() => CloseWithAction(LineNodeHostAction.Edit);
-    private void OnAttribute() => CloseWithAction(LineNodeHostAction.Attribute);
-    private void OnDelete() => CloseWithAction(LineNodeHostAction.Delete);
     private void OnLineManage() => CloseWithAction(LineNodeHostAction.LineManage);
 
     private void CloseWithAction(LineNodeHostAction action)

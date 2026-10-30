@@ -1,0 +1,178 @@
+@* LineNodePickerDialog.razor — 线路节点选择器（名称模糊搜索 + 服务端分页，单选）
+   打开方式：IDialogService.ShowExAsync<LineNodePickerDialog>；
+   确认返回 DialogResult.Ok(LineNodeDto)，取消返回 null。
+   LineId 非空时仅搜索该线路节点（前驱选择场景）；为空时跨线路搜索。 *@
+@using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.Common
+@using TreeGraph.Shared.NodeEavSky.Dtos
+@inject LineNodeManageApiClient NodeApi
+@inject LineManageApiClient LineApi
+@inject ISnackbar Snackbar
+
+<DialogSky Title="@Title"
+           CancelButtonVisible="true"
+           SubmitButtonVisible="true"
+           SubmitButtonText="确认选择"
+           SubmitButtonDisabled="@(_selected is null)"
+           OnSubmitClick="Confirm">
+    <DialogContent>
+        <MudStack Spacing="2">
+            @* 搜索栏 *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudTextField T="string"
+                              @bind-Value="_query"
+                              Label="搜索名称"
+                              Placeholder="输入关键词搜索..."
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true"
+                              OnKeyDown="OnKeyDown"
+                              Style="flex: 1;" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           Size="Size.Small"
+                           OnClick="@(() => _table?.ReloadServerData())">
+                    搜索
+                </MudButton>
+            </MudStack>
+
+            @if (_selected is not null)
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
+                    已选：<strong>@_selected.Name</strong>
+                    @if (LineId is null && TryGetLineName(_selected.LineId, out var ln))
+                    {
+                        <span class="mud-text-secondary">（@ln）</span>
+                    }
+                </MudAlert>
+            }
+
+            @* 结果表（服务端分页） *@
+            <MudTable T="LineNodeDto"
+                      @ref="_table"
+                      ServerData="LoadPageAsync"
+                      Hover="true"
+                      Dense="true"
+                      Elevation="0"
+                      RowsPerPage="10"
+                      LoadingProgressColor="Color.Primary"
+                      Style="max-height: 56vh; overflow-y: auto;">
+                <HeaderContent>
+                    <MudTh>名称</MudTh>
+                    @if (LineId is null)
+                    {
+                        <MudTh>线路</MudTh>
+                    }
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd OnClick="@(() => Select(context))"
+                           Style="cursor: pointer;">
+                        @context.Name
+                    </MudTd>
+                    @if (LineId is null)
+                    {
+                        <MudTd OnClick="@(() => Select(context))"
+                               Style="cursor: pointer;"
+                               Class="mud-text-secondary">
+                            @LineLabel(context.LineId)
+                        </MudTd>
+                    }
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
+                        未找到匹配的线路节点
+                    </MudText>
+                </NoRecordsContent>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        </MudStack>
+    </DialogContent>
+</DialogSky>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance? MudDialog { get; set; }
+
+    /// <summary>对话框标题。</summary>
+    [Parameter] public string Title { get; set; } = "选择线路节点";
+
+    /// <summary>限定线路 ID（前驱选择场景）；为空则跨线路搜索。</summary>
+    [Parameter] public string? LineId { get; set; }
+
+    /// <summary>需排除的节点 Id（如当前编辑节点自身，避免选自己作为前驱）。</summary>
+    [Parameter] public string? ExcludeNodeId { get; set; }
+
+    private MudTable<LineNodeDto>? _table;
+    private string _query = string.Empty;
+    private LineNodeDto? _selected;
+    private Dictionary<string, string> _lineNames = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 跨线路模式下预加载线路名称，用于结果行展示
+        if (LineId is null)
+        {
+            try
+            {
+                var lines = await LineApi.GetAllAsync();
+                _lineNames = lines.ToDictionary(l => l.Id, l => l.Name);
+            }
+            catch
+            {
+                _lineNames = new();
+            }
+        }
+    }
+
+    /// <summary>MudTable 服务端数据回调。</summary>
+    private async Task<TableData<LineNodeDto>> LoadPageAsync(TableState state, CancellationToken ct)
+    {
+        try
+        {
+            var page = state.Page + 1; // MudTable 页码从 0 开始，后端从 1 开始
+            var pageSize = state.PageSize;
+            var result = await NodeApi.SearchPagedAsync(LineId, _query, page, pageSize, ct);
+
+            // 排除指定节点（如自身）—— 客户端过滤
+            IEnumerable<LineNodeDto> items = result.Items;
+            if (!string.IsNullOrEmpty(ExcludeNodeId))
+                items = items.Where(n => n.Id != ExcludeNodeId);
+
+            return new TableData<LineNodeDto>
+            {
+                Items = items.ToList(),
+                TotalItems = result.Total
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
+            return new TableData<LineNodeDto> { Items = [], TotalItems = 0 };
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await _table!.ReloadServerData();
+    }
+
+    private void Select(LineNodeDto node) => _selected = node;
+
+    private bool TryGetLineName(string? lineId, out string name)
+        => _lineNames.TryGetValue(lineId ?? string.Empty, out name!);
+
+    private string LineLabel(string? lineId)
+        => TryGetLineName(lineId, out var ln) ? ln : (lineId ?? "");
+
+    private void Confirm()
+    {
+        if (_selected is null) return;
+        MudDialog?.Close(DialogResult.Ok(_selected));
+    }
+}

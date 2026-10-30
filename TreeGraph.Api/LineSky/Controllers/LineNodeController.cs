@@ -4,6 +4,7 @@ using TreeGraph.Api.Data;
 using TreeGraph.Api.EdgeSky.Entities;
 using TreeGraph.Api.MessagingSky;
 using TreeGraph.Shared.Messaging;
+using TreeGraph.Shared.NodeEavSky.Dtos;
 using TreeGraph.Shared.NodeSky.Entities;
 
 namespace TreeGraph.Api.LineSky.Controllers;
@@ -37,11 +38,17 @@ public class LineNodeController : ControllerBase
         _publishEndpoint = publishEndpoint;
     }
 
-    /// <summary>查询 LineNode；可按所属线路（lineId）与名称（search）过滤。</summary>
+    /// <summary>
+    /// 查询 LineNode；可按所属线路（lineId）与名称（search）过滤。
+    /// 分页：pageSize > 0 时返回 PagedResult{Items,Total,Page,PageSize}；
+    ///       pageSize = 0（默认）时返回全量 List（向后兼容既有调用方）。
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? lineId = null,
         [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 0,
         CancellationToken ct = default)
     {
         var query = _db.Nodes.Where(n => n.HostType == "LineNode");
@@ -49,13 +56,40 @@ public class LineNodeController : ControllerBase
             query = query.Where(n => n.LineId == lineId);
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(n => n.Name != null && n.Name.Contains(search));
-        var items = await query.OrderBy(n => n.Name).AsNoTracking().ToListAsync(ct);
-        var predMap = await GetPredecessorMapAsync(items.Select(n => n.Id).ToList(), ct);
-        var nameMap = items.ToDictionary(n => n.Id, n => n.Name ?? "");
+
+        var ordered = query.OrderBy(n => n.Name);
+
+        if (pageSize > 0)
+        {
+            var total = await ordered.CountAsync(ct);
+            var pageItems = await ordered
+                .Skip(Math.Max(0, page - 1) * pageSize)
+                .Take(pageSize)
+                .AsNoTracking()
+                .ToListAsync(ct);
+            var predMap = await GetPredecessorMapAsync(pageItems.Select(n => n.Id).ToList(), ct);
+            var nameMap = pageItems.ToDictionary(n => n.Id, n => n.Name ?? "");
+            var dtos = pageItems.Select(n =>
+            {
+                var hasPred = predMap.TryGetValue(n.Id, out var predId);
+                return ToDto(n, hasPred ? predId : null, hasPred ? nameMap.GetValueOrDefault(predId!) : null);
+            }).ToList();
+            return Ok(new PagedResult<object>
+            {
+                Items = dtos.Cast<object>().ToList(),
+                Total = total,
+                Page = page,
+                PageSize = pageSize
+            });
+        }
+
+        var items = await ordered.AsNoTracking().ToListAsync(ct);
+        var pMap = await GetPredecessorMapAsync(items.Select(n => n.Id).ToList(), ct);
+        var nMap = items.ToDictionary(n => n.Id, n => n.Name ?? "");
         return Ok(items.Select(n =>
         {
-            var hasPred = predMap.TryGetValue(n.Id, out var predId);
-            return ToDto(n, hasPred ? predId : null, hasPred ? nameMap.GetValueOrDefault(predId!) : null);
+            var hasPred = pMap.TryGetValue(n.Id, out var predId);
+            return ToDto(n, hasPred ? predId : null, hasPred ? nMap.GetValueOrDefault(predId!) : null);
         }).ToList());
     }
 

@@ -1,10 +1,12 @@
 @* LineNodeCreateDialog.razor — 新建线路节点（二级弹窗，隶属某条线路）
    R7：创建时可选择「前驱」节点（同线已有节点），选后自动建立 前驱 → 新节点 的结构段边；
-       不选（无）= 首节点/独立节点，不建边。 *@
+       不选（无）= 首节点/独立节点，不建边。
+   前驱选择：线路节点可能成百上千，改用搜索对话框（同线路过滤 + 服务端分页）。 *@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @inject LineNodeManageApiClient Api
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <DialogSky Title="新建线路节点"
            SubmitButtonVisible="true"
@@ -12,28 +14,41 @@
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="CreateAsync">
     <DialogContent>
-        <MudTextField @bind-Value="_form.Name"
-                      Label="名称"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
-        <MudTextField @bind-Value="_form.Description"
-                      Label="描述"
-                      Variant="Variant.Outlined"
-                      Lines="3"
-                      Class="mb-3" />
-        <MudSelect T="string"
-                   @bind-Value="_form.PredecessorId"
-                   Label="前驱（可选，选后接在该节点之后）"
-                   Variant="Variant.Outlined"
-                   Dense="true"
-                   Clearable="true"
-                   Disabled="@_loadingNodes">
-            <MudSelectItem T="string" Value="@((string?)null)">无（首节点）</MudSelectItem>
-            @foreach (var n in _existingNodes)
-            {
-                <MudSelectItem T="string" Value="@((string?)n.Id)">@n.Name</MudSelectItem>
-            }
-        </MudSelect>
+        <MudStack Spacing="2">
+            <MudTextField @bind-Value="_form.Name"
+                          Label="名称"
+                          Variant="Variant.Outlined"
+                          Size="Size.Small" />
+            <MudTextField @bind-Value="_form.Description"
+                          Label="描述"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Size="Size.Small" />
+            @* 前驱节点：改用搜索对话框选择（同线路过滤 + 分页） *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudTextField T="string"
+                              Value="@_predecessorLabel"
+                              Label="前驱（可选，选后接在该节点之后）"
+                              Variant="Variant.Outlined"
+                              Size="Size.Small"
+                              ReadOnly="true"
+                              Style="flex: 1;" />
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           Size="Size.Small"
+                           OnClick="OpenPickerAsync">
+                    选择
+                </MudButton>
+                @if (!string.IsNullOrEmpty(_form.PredecessorId))
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Clear"
+                                   Title="清除"
+                                   Size="Size.Small"
+                                   OnClick="ClearPredecessor" />
+                }
+            </MudStack>
+        </MudStack>
     </DialogContent>
 </DialogSky>
 
@@ -44,25 +59,33 @@
     [Parameter] public string LineId { get; set; } = string.Empty;
 
     private readonly LineNodeDto _form = new();
-    private IReadOnlyList<LineNodeDto> _existingNodes = [];
-    private bool _loadingNodes = true;
     private bool _submitting;
 
-    protected override async Task OnInitializedAsync()
+    /// <summary>前驱节点展示名（只读文本框）。</summary>
+    private string _predecessorLabel = string.Empty;
+
+    /// <summary>打开线路节点搜索选择器（限定同线路），确认后写入前驱。</summary>
+    private async Task OpenPickerAsync()
     {
-        try
+        var parameters = new DialogParameters<LineNodePickerDialog>
         {
-            _existingNodes = await Api.GetByLineAsync(LineId);
-        }
-        catch
+            { x => x.LineId, LineId }
+        };
+        var dialog = await DialogService.ShowExAsync<LineNodePickerDialog>(
+            "选择前驱节点", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: LineNodeDto picked })
         {
-            // 前驱候选加载失败不阻塞创建（按首节点处理）
-            _existingNodes = [];
+            _form.PredecessorId = picked.Id;
+            _predecessorLabel = picked.Name;
         }
-        finally
-        {
-            _loadingNodes = false;
-        }
+    }
+
+    /// <summary>清除前驱选择（留空 = 首节点）。</summary>
+    private void ClearPredecessor()
+    {
+        _form.PredecessorId = null;
+        _predecessorLabel = string.Empty;
     }
 
     private async Task CreateAsync()

@@ -83,6 +83,9 @@ else if (!_loading && _space is not null)
     /// <summary>是否允许管理（新建/删除关系、显示空间名与刷新）。只读视图传 false。</summary>
     [Parameter] public bool AllowManage { get; set; } = true;
 
+    /// <summary>关系加载完成后回调：true = 存在出/入边，false = 无关系（含无空间）。父级据此决定是否展示「关系绑定」面板。</summary>
+    [Parameter] public EventCallback<bool> OnHasRelationsChanged { get; set; }
+
     private NodeSpaceDto? _space;
     private List<EdgeTypeDto> _types = [];
     private List<EdgeDto> _out = [];
@@ -131,6 +134,9 @@ else if (!_loading && _space is not null)
         finally
         {
             _loading = false;
+            // 通知父级是否存在关系（无空间或出/入边均为空 → false）
+            var hasRelations = _space is not null && (_out.Count > 0 || _in.Count > 0);
+            await OnHasRelationsChanged.InvokeAsync(hasRelations);
         }
     }
 

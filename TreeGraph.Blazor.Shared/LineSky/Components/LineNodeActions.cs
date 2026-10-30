@@ -89,7 +89,10 @@ public static class LineNodeActions
             switch (action)
             {
                 case LineNodeHostAction.Edit:
-                    if (await EditAsync(dialogService, node))
+                    var editOutcome = await EditAsync(dialogService, node, lineName);
+                    if (editOutcome is LineNodeHostOutcome.Deleted)
+                        return LineNodeHostOutcome.Deleted;
+                    if (editOutcome is LineNodeHostOutcome.Changed)
                         changed = true;
                     break;
 
@@ -113,17 +116,32 @@ public static class LineNodeActions
         }
     }
 
-    /// <summary>编辑（名称/描述/连接 + 属性区）。</summary>
-    public static async Task<bool> EditAsync(IDialogService dialogService, LineNodeDto node)
+    /// <summary>
+    /// 编辑（名称/描述/连接 + 属性区 + 关系绑定）。
+    /// 若用户在「设置修改」内点击删除，转交 DeleteAsync 并返回 Deleted。
+    /// </summary>
+    public static async Task<LineNodeHostOutcome> EditAsync(IDialogService dialogService, LineNodeDto node, string? lineName)
     {
         var parameters = new DialogParameters<LineNodeEditDialog>
         {
-            { x => x.Node, node }
+            { x => x.Node, node },
+            { x => x.LineName, lineName ?? "" }
         };
         var dialog = await dialogService.ShowExAsync<LineNodeEditDialog>(
-            "编辑线路节点", parameters, NestedOptions);
+            "设置修改", parameters, NestedOptions);
         var result = await dialog.Result;
-        return result is { Canceled: false };
+
+        if (result is { Canceled: false })
+        {
+            // 用户在「设置修改」内点击删除：转交删除确认对话框
+            if (result.Data is LineNodeHostAction.Delete)
+            {
+                var deleted = await DeleteAsync(dialogService, node);
+                return deleted ? LineNodeHostOutcome.Deleted : LineNodeHostOutcome.Canceled;
+            }
+            return LineNodeHostOutcome.Changed;
+        }
+        return LineNodeHostOutcome.Canceled;
     }
 
     /// <summary>删除（守卫链：段边/端子/属性/属性数据引用 → 409 透出）。</summary>
@@ -180,7 +198,7 @@ public static class LineNodeActions
         };
         var options = new DialogOptionsEx
         {
-            MaxWidth = MaxWidth.Medium,
+            MaxWidth = MaxWidth.Small,
             FullWidth = true,
             MaximizeButton = true
         };

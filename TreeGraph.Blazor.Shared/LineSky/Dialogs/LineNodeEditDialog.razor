@@ -1,36 +1,97 @@
-@* LineNodeEditDialog.razor — 编辑线路节点（二级弹窗） *@
+@* LineNodeEditDialog.razor — 编辑线路节点（二级弹窗，对齐 TreeNodeEditDialog「设置修改」模式）
+   基本信息（名称/描述）+ 属性绑定（EAV）+ 关系绑定（EdgeSky）三个 Tab。 *@
 @using TreeGraph.Blazor.Shared.LineSky
+@using TreeGraph.Blazor.Shared.LineSky.Components
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@using TreeGraph.Blazor.Shared.EdgeSky.Components
 @inject LineNodeManageApiClient Api
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
-<DialogSky Title="编辑线路节点"
+<DialogSky Title="设置修改"
            SubmitButtonVisible="true"
            SubmitButtonText="@(_submitting ? "保存中..." : "保存")"
            SubmitButtonDisabled="@_submitting"
            OnSubmitClick="UpdateAsync">
+    <ToolBarContent>
+        @* 显示所属线路名（与只读宿主「节点操作」一致） *@
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@LineName</MudText>
+        <MudSpacer/>
+    </ToolBarContent>
     <DialogContent>
-        <MudTextField @bind-Value="_form.Name"
-                      Label="名称"
-                      Variant="Variant.Outlined"
-                      Class="mb-3" />
-        <MudTextField @bind-Value="_form.Description"
-                      Label="描述"
-                      Variant="Variant.Outlined"
-                      Lines="3"
-                      Class="mb-3" />
+        <MudContainer Class="pt-0 pb-4">
+            @* KeepPanelsAlive：非激活页也保持渲染，属性区组件引用（提交时保存属性）不因切页丢失 *@
+            <MudTabs Elevation="0" Rounded="true" KeepPanelsAlive="true">
+                <MudTabPanel Text="基本信息" Icon="@Icons.Material.Filled.Info" IconSize="Size.Small">
+                    <MudStack Spacing="2">
+                        <MudTextField @bind-Value="_form.Name"
+                                      Label="名称"
+                                      Variant="Variant.Outlined"
+                                      Size="Size.Small" />
+                        <MudTextField @bind-Value="_form.Description"
+                                      Label="描述"
+                                      Variant="Variant.Outlined"
+                                      Lines="3"
+                                      Size="Size.Small" />
+                        @* 前驱节点：线路节点可能很多，改用搜索对话框选择 *@
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudTextField T="string"
+                                          Value="@_predecessorLabel"
+                                          Label="前驱节点（改接段边）"
+                                          Variant="Variant.Outlined"
+                                          Size="Size.Small"
+                                          ReadOnly="true"
+                                          Style="flex: 1;" />
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Search"
+                                       Size="Size.Small"
+                                       OnClick="OpenPickerAsync">
+                                选择
+                            </MudButton>
+                            @if (!string.IsNullOrEmpty(_form.PredecessorId))
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Clear"
+                                               Title="清除（不改连接）"
+                                               Size="Size.Small"
+                                               OnClick="ClearPredecessor" />
+                            }
+                        </MudStack>
+                    </MudStack>
+                </MudTabPanel>
 
-        @* 属性区：线路节点是 iNode 宿主，可关注属性定义并填写属性 *@
-        @if (Node is not null)
-        {
-            <MudText Typo="Typo.subtitle2" Class="mb-2">属性</MudText>
-            <NodeAttributeItemsSky @ref="_attrItems"
-                                   NodeId="@Node.Id"
-                                   ReadOnly="false"
-                                   AllowManage="true" />
-        }
+                <MudTabPanel Text="属性绑定" Icon="@Icons.Material.Filled.Link" IconSize="Size.Small">
+                    @* 属性区：线路节点是 iNode 宿主，可关注属性定义并填写属性 *@
+                    @if (Node is not null)
+                    {
+                        <NodeAttributeItemsSky @ref="_attrItems"
+                                               NodeId="@Node.Id"
+                                               ReadOnly="false"
+                                               AllowManage="true" />
+                    }
+                </MudTabPanel>
+
+                <MudTabPanel Text="关系绑定" Icon="@Icons.Material.Filled.Share" IconSize="Size.Small">
+                    @* 关系绑定：线路节点是 iNode 宿主，可维护出/入边 *@
+                    @if (Node is not null)
+                    {
+                        <NodeRelationBindingsSky NodeId="@Node.Id" />
+                    }
+                </MudTabPanel>
+            </MudTabs>
+        </MudContainer>
     </DialogContent>
+    <DialogLeftActions>
+        @* 对齐 Tree 设置修改：删除按钮置于左侧动作区 *@
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Error"
+                   StartIcon="@Icons.Material.Outlined.Delete"
+                   Size="Size.Small"
+                   OnClick="@OnDelete">
+            删除
+        </MudButton>
+    </DialogLeftActions>
 </DialogSky>
 
 @code {
@@ -38,9 +99,15 @@
 
     [Parameter] public LineNodeDto? Node { get; set; }
 
+    /// <summary>所属线路名称（仅用于工具栏展示）。</summary>
+    [Parameter] public string LineName { get; set; } = "";
+
     private readonly LineNodeDto _form = new();
     private NodeAttributeItemsSky? _attrItems;
     private bool _submitting;
+
+    /// <summary>前驱节点展示名（只读文本框）。</summary>
+    private string _predecessorLabel = string.Empty;
 
     protected override void OnParametersSet()
     {
@@ -49,7 +116,35 @@
             _form.LineId = Node.LineId;
             _form.Name = Node.Name;
             _form.Description = Node.Description;
+            // 前驱初始值：留空表示「不改连接」
+            _form.PredecessorId = Node.PredecessorId;
+            _predecessorLabel = Node.PredecessorName ?? string.Empty;
         }
+    }
+
+    /// <summary>打开线路节点搜索选择器，确认后写入 _form.PredecessorId 与展示名。</summary>
+    private async Task OpenPickerAsync()
+    {
+        var parameters = new DialogParameters<LineNodePickerDialog>
+        {
+            { x => x.LineId, Node?.LineId },
+            { x => x.ExcludeNodeId, Node?.Id }
+        };
+        var dialog = await DialogService.ShowExAsync<LineNodePickerDialog>(
+            "选择前驱节点", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: LineNodeDto picked })
+        {
+            _form.PredecessorId = picked.Id;
+            _predecessorLabel = picked.Name;
+        }
+    }
+
+    /// <summary>清除前驱选择（留空 = 不改连接）。</summary>
+    private void ClearPredecessor()
+    {
+        _form.PredecessorId = null;
+        _predecessorLabel = string.Empty;
     }
 
     private async Task UpdateAsync()
@@ -87,4 +182,8 @@
             _submitting = false;
         }
     }
+
+    /// <summary>删除：关闭并返回 Delete 动作，由编排器打开 LineNodeDeleteDialog 执行。</summary>
+    private void OnDelete()
+        => MudDialog?.Close(DialogResult.Ok(LineNodeHostAction.Delete));
 }

@@ -25,6 +25,39 @@ public class LineNodeManageApiClient(HttpClient httpClient)
         return apiResponse?.Success != true || apiResponse.Data == null ? [] : apiResponse.Data;
     }
 
+    // GET api/LineNode?search={search}（跨线路，按名称模糊匹配；不传 search 返回全部）
+    public async Task<IReadOnlyList<LineNodeDto>> SearchAsync(
+        string? search, CancellationToken cancellationToken = default)
+    {
+        var url = string.IsNullOrWhiteSpace(search)
+            ? BasePath
+            : $"{BasePath}?search={Uri.EscapeDataString(search)}";
+        var response = await httpClient.GetAsync(url, cancellationToken);
+        await EnsureSuccessWithApiResponseAsync(response);
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<List<LineNodeDto>>>(cancellationToken);
+        return apiResponse?.Success != true || apiResponse.Data == null ? [] : apiResponse.Data;
+    }
+
+    // GET api/LineNode?lineId=...&search=...&page=...&pageSize=...（分页查询）
+    public async Task<PagedResult<LineNodeDto>> SearchPagedAsync(
+        string? lineId, string? search, int page, int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var qs = new List<string> { $"page={page}", $"pageSize={pageSize}" };
+        if (!string.IsNullOrWhiteSpace(lineId))
+            qs.Add($"lineId={Uri.EscapeDataString(lineId)}");
+        if (!string.IsNullOrWhiteSpace(search))
+            qs.Add($"search={Uri.EscapeDataString(search)}");
+        var url = $"{BasePath}?{string.Join('&', qs)}";
+
+        var response = await httpClient.GetAsync(url, cancellationToken);
+        await EnsureSuccessWithApiResponseAsync(response);
+        var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<LineNodeDto>>>(cancellationToken);
+        return apiResponse?.Success == true && apiResponse.Data != null
+            ? apiResponse.Data
+            : new PagedResult<LineNodeDto> { Items = [], Total = 0, Page = page, PageSize = pageSize };
+    }
+
     // GET api/LineNode/{id}；不存在返回 null
     public async Task<LineNodeDto?> GetByIdAsync(
         string id, CancellationToken cancellationToken = default)

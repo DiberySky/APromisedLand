@@ -77,21 +77,22 @@
 
             </MudTabs>
 
-            @* ===== 关系绑定（可展开） ===== *@
-            @* MudExpansionPanel.Icon 是展开/折叠箭头（默认 ExpandMore），不能用作标题前导图标；
-               用 TitleContent 渲染 [Share] 关系绑定，保持折叠图标为默认。
-               置于 MudContainer 内，宽度与「性别」等属性面板对齐。 *@
-            <MudExpansionPanel Class="tna-expansion">
-                <TitleContent>
-                    <MudStack Row AlignItems="AlignItems.Center">
-                        <MudIcon Icon="@Icons.Material.Filled.Share" Size="Size.Small" />
-                        <MudText Typo="Typo.subtitle2">关系绑定</MudText>
-                    </MudStack>
-                </TitleContent>
-                <ChildContent>
-                    <NodeRelationBindingsSky NodeId="@NodeTemplate.Node.Value!.Id" AllowManage="false" />
-                </ChildContent>
-            </MudExpansionPanel>
+            @* ===== 关系绑定（可展开；无关系时隐藏） ===== *@
+            @if (_hasRelations)
+            {
+                <MudExpansionPanel Class="tna-expansion">
+                    <TitleContent>
+                        <MudStack Row AlignItems="AlignItems.Center">
+                            <MudIcon Icon="@Icons.Material.Filled.Share" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2">关系绑定</MudText>
+                        </MudStack>
+                    </TitleContent>
+                    <ChildContent>
+                        <NodeRelationBindingsSky NodeId="@NodeTemplate.Node.Value!.Id" AllowManage="false"
+                                                 OnHasRelationsChanged="@(v => _hasRelations = v)" />
+                    </ChildContent>
+                </MudExpansionPanel>
+            }
         </MudContainer>
     </DialogContent>
     <DialogLeftActions>
@@ -134,6 +135,9 @@
     [Parameter] public required NodeTemplate<TItem> NodeTemplate { get; set; }
     [Parameter] public TItem? ParentNode { get; set; }
     [Parameter] public bool IsBoot { get; set; }
+
+    /// <summary>该节点是否存在关系（出/入边），由 NodeRelationBindingsSky 加载后回调；无关系则隐藏「关系绑定」面板。</summary>
+    private bool _hasRelations;
 
     private void OnEdit() => CloseWithAction(NodeAction.Edit);
     private void OnAddChild() => CloseWithAction(NodeAction.AddChild);

@@ -1,9 +1,25 @@
-@* LineNodeViewDialog.razor — 线路节点只读详情：名称/描述/所属线路/前驱节点/创建时间。
+@* LineNodeViewDialog.razor — 线路节点只读详情：基本信息 + 属性 + 关系绑定。
    数据源：GET api/LineNode/{id}（LineNodeManageApiClient.GetByIdAsync）。 *@
 @namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Services
+@using TreeGraph.Blazor.Shared.TreeEavSky.Nodes
+@using TreeGraph.Blazor.Shared.EdgeSky.Components
 @inject LineNodeManageApiClient Api
+
+<style>
+    /* 关系绑定折叠面板：内容区及内部 Tabs/Table 组件底色均设为纯黑 */
+    .lnv-expansion .mud-collapse-container,
+    .lnv-expansion .mud-expand-panel-content,
+    .lnv-expansion .mud-tabs,
+    .lnv-expansion .mud-tabs-panels,
+    .lnv-expansion .mud-table-container,
+    .lnv-expansion .mud-table-root,
+    .lnv-expansion .mud-table-row,
+    .lnv-expansion .mud-table-cell {
+        background-color: #000;
+    }
+</style>
 
 <DialogSky Title="线路节点详情"
            SubmitButtonVisible="false"
@@ -22,20 +38,51 @@
         }
         else
         {
-            <MudStack Spacing="2">
-                <MudTextField T="string" Value="_node.Name"
-                              Label="名称" Variant="Variant.Outlined" ReadOnly="true" />
-                <MudTextField T="string" Value="_node.Description"
-                              Label="描述" Variant="Variant.Outlined" ReadOnly="true" Lines="3" />
-                <MudTextField T="string" Value="@LineDisplay"
-                              Label="所属线路" Variant="Variant.Outlined" ReadOnly="true" />
-                <MudTextField T="string"
-                              Value="@(string.IsNullOrEmpty(_node.PredecessorName) ? "无（首节点）" : _node.PredecessorName)"
-                              Label="前驱节点" Variant="Variant.Outlined" ReadOnly="true" />
-                <MudTextField T="string"
-                              Value="@(_node.CreatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")"
-                              Label="创建时间" Variant="Variant.Outlined" ReadOnly="true" />
-            </MudStack>
+            <MudContainer Class="pt-0 pb-4" MaxWidth="MaxWidth.Medium">
+                <MudTabs Elevation="0" Rounded="true">
+                    <MudTabPanel Text="基本信息" Icon="@Icons.Material.Filled.Info">
+                        <MudStack Spacing="2">
+                            <MudTextField T="string" Value="_node.Name"
+                                          Label="名称" Variant="Variant.Outlined" ReadOnly="true"
+                                          Size="Size.Small" />
+                            <MudTextField T="string" Value="_node.Description"
+                                          Label="描述" Variant="Variant.Outlined" ReadOnly="true" Lines="3"
+                                          Size="Size.Small" />
+                            <MudTextField T="string" Value="@LineDisplay"
+                                          Label="所属线路" Variant="Variant.Outlined" ReadOnly="true"
+                                          Size="Size.Small" />
+                            <MudTextField T="string"
+                                          Value="@(string.IsNullOrEmpty(_node.PredecessorName) ? "无（首节点）" : _node.PredecessorName)"
+                                          Label="前驱节点" Variant="Variant.Outlined" ReadOnly="true"
+                                          Size="Size.Small" />
+                            <MudTextField T="string"
+                                          Value="@(_node.CreatedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")"
+                                          Label="创建时间" Variant="Variant.Outlined" ReadOnly="true"
+                                          Size="Size.Small" />
+
+                            @* 属性区：只读展示 *@
+                            <NodeAttributeItemsSky NodeId="@_node.Id" ReadOnly="true" />
+                        </MudStack>
+                    </MudTabPanel>
+                </MudTabs>
+
+                @* ===== 关系绑定（可展开，只读；无关系时隐藏） ===== *@
+                @if (_hasRelations)
+                {
+                    <MudExpansionPanel Class="lnv-expansion">
+                        <TitleContent>
+                            <MudStack Row AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.Share" Size="Size.Small" />
+                                <MudText Typo="Typo.subtitle2">关系绑定</MudText>
+                            </MudStack>
+                        </TitleContent>
+                        <ChildContent>
+                            <NodeRelationBindingsSky NodeId="@_node.Id" AllowManage="false"
+                                                     OnHasRelationsChanged="@(v => _hasRelations = v)" />
+                        </ChildContent>
+                    </MudExpansionPanel>
+                }
+            </MudContainer>
         }
     </DialogContent>
 </DialogSky>
@@ -49,6 +96,9 @@
 
     private LineNodeDto? _node;
     private bool _loading = true;
+
+    /// <summary>该节点是否存在关系（出/入边），由 NodeRelationBindingsSky 加载后回调；无关系则隐藏「关系绑定」面板。</summary>
+    private bool _hasRelations;
     private string? _error;
 
     private string LineDisplay => !string.IsNullOrEmpty(LineName)

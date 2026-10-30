@@ -1,5 +1,6 @@
 @* LineNodeManageDialog.razor — 线路节点管理（一级弹窗）：列表 + 新建/编辑/删除（二级弹窗）
-   入口：「空间管理」页 →「线路」选项卡 → 行内「设置」图标。 *@
+   入口：「空间管理」页 →「线路」选项卡 → 行内「设置」图标。
+   列表使用服务端分页（线路节点可能成百上千）。 *@
 @namespace TreeGraph.Blazor.Shared.LineSky.Dialogs
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Components
@@ -9,56 +10,81 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<DialogSky Title="@($"线路节点：{LineName}")"
+<DialogSky Title="线路节点"
            SubmitButtonVisible="false"
            CancelButtonVisible="true"
            CancelButtonText="关闭">
-    <DialogContent>
-        <div class="d-flex align-center mb-3">
-            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">线路节点</MudText>
-            <MudSpacer />
-            <MudButton Size="Size.Small"
-                       Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenCreateAsync">
-                新建节点
-            </MudButton>
+    <ToolBarContent>
+        @* 工具栏默认不撑满，这里用显式 flex 容器 + margin-left:auto 保证搜索框贴右 *@
+        <div style="display: flex; align-items: center; width: 100%;">
+            <MudText Typo="Typo.body2" Color="Color.Info">@LineName</MudText>
+            @* 仅当前线路的名称模糊搜索；防抖后回到第一页并刷新下方列表 *@
+            <div style="margin-left: auto;">
+                <MudTextField T="string"
+                              @bind-Value="_query"
+                              Placeholder="搜索节点名称"
+                              Variant="Variant.Filled"
+                              Margin="Margin.Dense"
+                              Typo="Typo.body2"
+                              Immediate="true"
+                              DebounceInterval="300"
+                              OnDebounceIntervalElapsed="OnSearchAsync"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Small"
+                              Clearable="true"
+                              Style="width: 240px;" />
+            </div>
         </div>
-
-        @if (_loading)
-        {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-        }
-        else
-        {
-            <MudTable Items="_nodes ?? (IReadOnlyList<LineNodeDto>)[]" Hover="true" Bordered="true" Dense="true">
-                <HeaderContent>
-                    <MudTh>名称</MudTh>
-                    <MudTh>描述</MudTh>
-                    <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">操作</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd>@context.Name</MudTd>
-                    <MudTd>@context.Description</MudTd>
-                    <MudTd Style="white-space: nowrap; text-align: right;">
-                        @* 宿主操作模式：点击打开 LineNodeActionsDialog（基本信息内嵌 + 编辑/属性/删除，连续操作循环） *@
-                        <MudIconButton Icon="@Icons.Material.Filled.Settings"
-                                       Size="Size.Small"
-                                       title="节点操作"
-                                       OnClick="@(() => OpenActionsAsync(context))" />
-                    </MudTd>
-                </RowTemplate>
-                <NoRecordsContent>
-                    <EmptyStateSky Icon="@Icons.Material.Filled.AccountTree"
-                                   Title="暂无线路节点">
-                        <Description>
-                            <text>点击左上角"新建节点"添加第一个</text>
-                        </Description>
-                    </EmptyStateSky>
-                </NoRecordsContent>
-            </MudTable>
-        }
+    </ToolBarContent>
+    <DialogContent>
+        <MudTable T="LineNodeDto"
+                  @ref="_table"
+                  ServerData="LoadPageAsync"
+                  Hover="true"
+                  Bordered="true"
+                  Dense="true"
+                  Elevation="0"
+                  RowsPerPage="20"
+                  LoadingProgressColor="Color.Primary">
+            <HeaderContent>
+                <MudTh>名称</MudTh>
+                <MudTh>描述</MudTh>
+                <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
+                    @* 操作列表头用 + 图标，点击即新建节点 *@
+                    <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                   Size="Size.Small"
+                                   Color="Color.Success"
+                                   title="新建节点"
+                                   OnClick="OpenCreateAsync" />
+                </MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Description</MudTd>
+                <MudTd Style="white-space: nowrap; text-align: right;">
+                    @* 宿主操作模式：点击打开 LineNodeActionsDialog（基本信息内嵌 + 编辑/删除，连续操作循环） *@
+                    <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                                   Size="Size.Small"
+                                   Color="Color.Info"
+                                   title="节点操作"
+                                   OnClick="@(() => OpenActionsAsync(context))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <EmptyStateSky Icon="@Icons.Material.Filled.AccountTree"
+                               Title="暂无线路节点">
+                    <Description>
+                        <text>点击操作列 + 图标添加第一个</text>
+                    </Description>
+                </EmptyStateSky>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager HidePageNumber="true"
+                               RowsPerPageString="每页："
+                               HorizontalAlignment="HorizontalAlignment.Center" />
+            </PagerContent>
+        </MudTable>
     </DialogContent>
 </DialogSky>
 
@@ -69,8 +95,10 @@
     /// <summary>所属线路名称（仅用于标题展示）。</summary>
     [Parameter] public string LineName { get; set; } = string.Empty;
 
-    private IReadOnlyList<LineNodeDto>? _nodes;
-    private bool _loading;
+    private MudTable<LineNodeDto>? _table;
+
+    /// <summary>搜索关键字（仅按当前线路的节点名称模糊匹配）。</summary>
+    private string? _query;
 
     /// <summary>二级弹窗选项（与 TableRowManageDialog 一致）。</summary>
     private static readonly DialogOptionsEx NestedOptions = new()
@@ -80,24 +108,40 @@
         MaximizeButton = true
     };
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
-
-    private async Task LoadAsync()
+    /// <summary>MudTable 服务端数据回调（按 LineId 过滤 + 分页）。</summary>
+    private async Task<TableData<LineNodeDto>> LoadPageAsync(TableState state, CancellationToken ct)
     {
-        _loading = true;
         try
         {
-            _nodes = await Api.GetByLineAsync(LineId);
+            var page = state.Page + 1; // MudTable 页码从 0 开始，后端从 1 开始
+            var pageSize = state.PageSize;
+            var result = await Api.SearchPagedAsync(LineId, _query, page, pageSize, ct);
+            return new TableData<LineNodeDto>
+            {
+                Items = result.Items,
+                TotalItems = result.Total
+            };
         }
         catch (Exception ex)
         {
             Snackbar.Add($"加载失败：{ex.Message}", Severity.Error);
-            _nodes = [];
+            return new TableData<LineNodeDto> { Items = [], TotalItems = 0 };
         }
-        finally
-        {
-            _loading = false;
-        }
+    }
+
+    /// <summary>刷新表格（新建/编辑/删除后调用）。</summary>
+    private Task ReloadAsync() => _table?.ReloadServerData() ?? Task.CompletedTask;
+
+    /// <summary>搜索防抖结束后回到第一页并刷新列表。</summary>
+    private async Task OnSearchAsync()
+    {
+        if (_table is null)
+            return;
+
+        if (_table.CurrentPage > 0)
+            _table.NavigateTo(Page.First);
+
+        await _table.ReloadServerData();
     }
 
     private async Task OpenActionsAsync(LineNodeDto node)
@@ -106,7 +150,7 @@
         var outcome = await LineNodeActions.OperateAsync(
             DialogService, Api, node.Id, LineName, showLineManage: false, snackbar: Snackbar);
         if (outcome is LineNodeHostOutcome.Changed or LineNodeHostOutcome.Deleted)
-            await LoadAsync();
+            await ReloadAsync();
     }
 
     private async Task OpenCreateAsync()
@@ -121,6 +165,6 @@
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
-            await LoadAsync();
+            await ReloadAsync();
     }
 }
