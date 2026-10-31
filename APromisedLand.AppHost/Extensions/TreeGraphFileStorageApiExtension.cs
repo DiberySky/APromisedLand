@@ -133,7 +133,9 @@ public static class TreeGraphFileStorageApiExtension
     private static void ConfigureObservability(
         IResourceBuilder<ProjectResource> api)
     {
-        api.WithHttpHealthCheck("/health", 200, "http");
+        // 探针用 /alive（仅存活，不查 DB）：冷启动 Postgres 未就绪时不会反复超时取消。
+        // DB 就绪性由 /health 单独暴露给监控。
+        api.WithHttpHealthCheck("/alive", 200, "http");
 
         if (ShouldEnableOtlp())
         {

@@ -4,6 +4,7 @@ using FileStorageApi.Files;
 using FileStorageApi.Security;
 using FileStorageApi.Storage;
 using FileStorageApi.Uploads;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -139,6 +140,18 @@ else
 app.UseCors("Frontend");
 app.UseRouting();
 app.MapControllers();
-app.MapDefaultEndpoints();
+
+// ══════════════════════════════════════════════════════════
+// ★ 健康检查端点拆分（替代 MapDefaultEndpoints）
+//   /health：全部检查（含 FileStorageContext 的 DB 连接），供监控/就绪判断
+//   /alive：仅表示进程可响应，跳过所有检查（不碰 DB），供 AppHost 存活探针
+//   目的：冷启动时 Postgres 未就绪不会让探针反复超时取消，
+//   避免 OperationCanceledException 噪声与资源被误判 Unhealthy。
+// ══════════════════════════════════════════════════════════
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/alive", new HealthCheckOptions
+{
+    Predicate = _ => false
+});
 
 app.Run();
