@@ -17,9 +17,15 @@
 }
 else
 {
+    @* 名称模糊搜索（客户端过滤，防抖后重渲染列表） *@
+    <MudToolBar Dense>
+        <MudSpacer />
+        <LineSearchField Placeholder="搜索线路名称" Width="230px" @bind-Value="_query" OnSearch="OnSearchAsync" />
+    </MudToolBar>
+
     @* 表格始终渲染：空态走 NoRecordsContent（EmptyStateSky，与 SpaceManagePanel 对齐），
        表头操作列的新建 + 按钮在空态时同样可用 *@
-    <MudTable Items="_lines ?? (IReadOnlyList<LineDto>)[]" Hover="true" Bordered="true" Dense="true">
+    <MudTable Items="FilteredLines" Hover="true" Bordered="true" Dense="true">
         <HeaderContent>
             <MudTh>名称</MudTh>
             <MudTh>空间</MudTh>
@@ -89,6 +95,22 @@ else
     private IReadOnlyList<SpaceDto>? _spaces;
     private bool _loading;
     private bool _initialized;
+
+    /// <summary>搜索关键字（按线路名称模糊匹配，客户端过滤）。</summary>
+    private string? _query;
+
+    /// <summary>按名称模糊过滤后的线路列表。</summary>
+    private IReadOnlyList<LineDto> FilteredLines =>
+        _lines is null ? [] :
+        string.IsNullOrWhiteSpace(_query) ? _lines :
+        _lines.Where(l => l.Name.Contains(_query, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    /// <summary>搜索防抖结束：客户端过滤只需触发重渲染。</summary>
+    private Task OnSearchAsync()
+    {
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
 
     /// <summary>CRUD 子对话框选项（与 SpaceManagePanel 一致：小宽度全宽）。</summary>
     private static readonly DialogOptions DialogOptions = new()
@@ -185,7 +207,10 @@ else
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
             Position = DialogPosition.TopCenter,
-            MaximizeButton = true
+            MaximizeButton = true,
+            // Extensions 的遮罩点击在打开时按初始 options 注册，
+            // DialogSky 运行时 SetOptionsAsync 对其无效，必须在打开点显式关闭。
+            BackdropClick = false
         };
 
         await DialogService.ShowExAsync<LineNodeManageDialog>(
@@ -207,7 +232,10 @@ else
             MaxWidth = MaxWidth.Medium,
             FullWidth = true,
             Position = DialogPosition.TopCenter,
-            MaximizeButton = true
+            MaximizeButton = true,
+            // Extensions 的遮罩点击在打开时按初始 options 注册，
+            // DialogSky 运行时 SetOptionsAsync 对其无效，必须在打开点显式关闭。
+            BackdropClick = false
         };
 
         await DialogService.ShowExAsync<LineStructureDialog>(
@@ -228,7 +256,10 @@ else
             Position = DialogPosition.TopCenter,
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            // Extensions 的遮罩点击在打开时按初始 options 注册，
+            // DialogSky 运行时 SetOptionsAsync 对其无效，必须在打开点显式关闭。
+            BackdropClick = false
         };
         await DialogService.ShowExAsync<LineVectorRefreshDialog>(
             "向量刷新", parameters, options);

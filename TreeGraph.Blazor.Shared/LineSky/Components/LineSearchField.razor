@@ -1,0 +1,48 @@
+@* LineSearchField.razor — LineSky 通用名称搜索框：Filled 输入 + 防抖 + 框内搜索图标。
+   用于线路面板 / 线路节点弹窗的名称模糊搜索，区别于 NodeEavSky 的树搜索组件。 *@
+@namespace TreeGraph.Blazor.Shared.LineSky.Components
+
+@* 宽度由 Width 参数控制（如 "230px"）；不传则自适应内容宽度 *@
+<MudItem Style="@ItemStyle">
+    <MudTextField T="string"
+                  Value="Value"
+                  ValueChanged="OnValueChangedAsync"
+                  Placeholder="@Placeholder"
+                  Variant="Variant.Filled"
+                  Margin="Margin.Dense"
+                  Typo="Typo.body2"
+                  Immediate="true"
+                  DebounceInterval="300"
+                  OnDebounceIntervalElapsed="OnSearch"
+                  Clearable="true"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Outlined.Search"
+                  IconSize="Size.Small"
+                  Class="ma-0" />
+</MudItem>
+
+@code {
+    /// <summary>当前搜索关键字（支持 @bind-Value，Immediate 每次输入即更新）。</summary>
+    [Parameter] public string? Value { get; set; }
+
+    /// <summary>关键字变更回调。</summary>
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    /// <summary>占位文字，如「搜索线路名称」。</summary>
+    [Parameter] public string Placeholder { get; set; } = "搜索";
+
+    /// <summary>外层容器宽度（如 "230px"）；默认 null = 自适应内容宽度。</summary>
+    [Parameter] public string? Width { get; set; }
+
+    /// <summary>防抖 300ms 结束后触发（重渲染 / 回第一页等服务端或客户端刷新动作）。</summary>
+    [Parameter] public EventCallback OnSearch { get; set; }
+
+    private string? ItemStyle =>
+        string.IsNullOrWhiteSpace(Width) ? null : $"width: {Width};";
+
+    private async Task OnValueChangedAsync(string value)
+    {
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+}

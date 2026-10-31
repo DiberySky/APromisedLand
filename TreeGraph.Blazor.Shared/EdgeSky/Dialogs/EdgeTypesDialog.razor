@@ -12,7 +12,7 @@
 <DialogSky Title="关系类型管理"
            SubmitButtonVisible="false">
     <ToolBarContent>
-        <MudText Typo="Typo.subtitle2" Color="Color.Inherit">@(SpaceName ?? SpaceId)</MudText>
+        <MudText Typo="Typo.subtitle1" Color="Color.Inherit">@(SpaceName ?? SpaceId)</MudText>
         <MudSpacer />
         @* 创建预置关系：从预置种子目录多选批量创建 *@
         <MudIconButton Icon="@Icons.Material.Outlined.PlaylistAdd"
@@ -271,7 +271,8 @@
             {
                 MaxWidth = MaxWidth.Small, FullWidth = true,
                 Position = DialogPosition.TopCenter,
-                MaximizeButton = true
+                MaximizeButton = true,
+                BackdropClick = false
             });
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not AlterEdgeTypeRequest req)
@@ -298,7 +299,7 @@
         };
         var dialog = await DialogService.ShowExAsync<EdgeTypeCreateDialog>(
             string.Empty, parameters,
-            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true, BackdropClick = false });
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not CreateEdgeTypeRequest req)
             return;
@@ -323,7 +324,7 @@
         };
         var dialog = await DialogService.ShowExAsync<EdgeTypeSeedDialog>(
             string.Empty, parameters,
-            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true, BackdropClick = false });
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not List<CreateEdgeTypeRequest> reqs || reqs.Count == 0)
             return;
@@ -351,7 +352,7 @@
         };
         var dialog = await DialogService.ShowExAsync<EdgeTypeDisplayNameDialog>(
             string.Empty, parameters,
-            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true, BackdropClick = false });
         var result = await dialog.Result;
         if (result?.Canceled != false)
             return;

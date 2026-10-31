@@ -15,24 +15,11 @@
            CancelButtonVisible="true"
            CancelButtonText="关闭">
     <ToolBarContent>
-        <MudText Typo="Typo.body2" Color="Color.Info">@LineName</MudText>
+        <MudText Typo="Typo.subtitle1" Color="Color.Info">@LineName</MudText>
     </ToolBarContent>
     <ToolBarRightContent>
         @* 仅当前线路的名称模糊搜索；防抖后回到第一页并刷新下方列表 *@
-        <MudTextField T="string"
-                      @bind-Value="_query"
-                      Placeholder="搜索节点名称"
-                      Variant="Variant.Filled"
-                      Margin="Margin.Dense"
-                      Typo="Typo.body2"
-                      Immediate="true"
-                      DebounceInterval="300"
-                      OnDebounceIntervalElapsed="OnSearchAsync"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Outlined.Search"
-                      IconSize="Size.Small"
-                      Clearable="true"
-                      Style="width: 240px;" />
+        <LineSearchField Placeholder="搜索节点名称" Width="230px" @bind-Value="_query" OnSearch="OnSearchAsync" />
     </ToolBarRightContent>
     <DialogContent>
         <MudTable T="LineNodeDto"
@@ -100,7 +87,8 @@
     {
         MaxWidth = MaxWidth.Small,
         FullWidth = true,
-        MaximizeButton = true
+        MaximizeButton = true,
+        BackdropClick = false
     };
 
     /// <summary>MudTable 服务端数据回调（按 LineId 过滤 + 分页）。</summary>
