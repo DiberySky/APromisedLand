@@ -153,7 +153,8 @@
             {
                 MaxWidth = MaxWidth.Small, FullWidth = true,
                 Position = DialogPosition.TopCenter,
-                MaximizeButton = true
+                MaximizeButton = true,
+                BackdropClick = false
             });
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not AlterEdgeTypeRequest req)
@@ -181,7 +182,7 @@
         };
         var dialog = await DialogService.ShowExAsync<EdgeTypeCreateDialog>(
             string.Empty, parameters,
-            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true, BackdropClick = false });
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not CreateEdgeTypeRequest req)
             return;
@@ -206,7 +207,7 @@
         };
         var dialog = await DialogService.ShowExAsync<EdgeTypeDisplayNameDialog>(
             string.Empty, parameters,
-            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true, BackdropClick = false });
         var result = await dialog.Result;
         if (result?.Canceled != false)
             return;

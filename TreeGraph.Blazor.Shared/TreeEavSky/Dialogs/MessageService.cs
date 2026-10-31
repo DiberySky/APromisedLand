@@ -34,7 +34,7 @@ public class MessageService(IDialogService dialogService, ISnackbar snackbar)
 
         var dialogOptions = new DialogOptions
         {
-            BackdropClick = true,
+            BackdropClick = false,
             MaxWidth = MaxWidth.ExtraSmall,
             FullWidth = true,
         };
@@ -75,7 +75,7 @@ public class MessageService(IDialogService dialogService, ISnackbar snackbar)
                     message, detail, yesText: "确定",
                     options: new DialogOptions
                     {
-                        BackdropClick = true,
+                        BackdropClick = false,
                         MaxWidth = MaxWidth.ExtraSmall,
                         FullWidth = true,
                         CloseButton = false,

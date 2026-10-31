@@ -134,7 +134,8 @@ else
             Position = DialogPosition.TopCenter,
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
         await DialogService.ShowExAsync<EdgeTypesDialog>(
             string.Empty, parameters, options);
@@ -153,7 +154,10 @@ else
             Position = DialogPosition.TopCenter,
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            // Extensions 的遮罩点击在打开时按初始 options 注册，
+            // DialogSky 运行时 SetOptionsAsync 对其无效，必须在打开点显式关闭。
+            BackdropClick = false
         };
         await DialogService.ShowExAsync<LinesDialog>(
             string.Empty, parameters, options);
@@ -201,7 +205,8 @@ else
             Position = DialogPosition.TopCenter,
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
         await DialogService.ShowExAsync<SpaceVectorRefreshDialog>(
             "向量刷新", parameters, options);
@@ -215,7 +220,8 @@ else
             Position = DialogPosition.TopCenter,
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
         await DialogService.ShowExAsync<SyncRefreshDialog>(
             "同步刷新", new DialogParameters<SyncRefreshDialog>(), options);

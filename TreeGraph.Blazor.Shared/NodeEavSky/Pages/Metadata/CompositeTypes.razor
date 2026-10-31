@@ -335,7 +335,8 @@
             Position = DialogPosition.TopCenter,
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
 
         var dialog = await DialogService.ShowExAsync<CompositeTypeFieldsDialog>(

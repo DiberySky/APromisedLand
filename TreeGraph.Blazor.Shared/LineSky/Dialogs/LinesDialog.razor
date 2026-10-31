@@ -180,7 +180,8 @@
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
             Position = DialogPosition.TopCenter,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
 
         await DialogService.ShowExAsync<LineNodeManageDialog>(
@@ -202,7 +203,8 @@
             MaxWidth = MaxWidth.Medium,
             FullWidth = true,
             Position = DialogPosition.TopCenter,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
 
         await DialogService.ShowExAsync<LineStructureDialog>(
@@ -223,7 +225,8 @@
             Position = DialogPosition.TopCenter,
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
         await DialogService.ShowExAsync<LineVectorRefreshDialog>(
             "向量刷新", parameters, options);

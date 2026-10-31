@@ -105,7 +105,8 @@
         {
             MaxWidth = MaxWidth.Large,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
 
         var dialog = await DialogService.ShowExAsync<TableRowManageDialog>(

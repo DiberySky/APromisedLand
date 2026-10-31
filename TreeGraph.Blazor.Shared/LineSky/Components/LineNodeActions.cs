@@ -45,7 +45,8 @@ public static class LineNodeActions
     {
         MaxWidth = MaxWidth.Small,
         FullWidth = true,
-        MaximizeButton = true
+        MaximizeButton = true,
+        BackdropClick = false
     };
 
     /// <summary>
@@ -219,7 +220,8 @@ public static class LineNodeActions
         {
             MaxWidth = MaxWidth.Medium,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
         var dialog = await dialogService.ShowExAsync<NodeAttributesDialog>(
             "节点属性", parameters, options);
@@ -238,7 +240,8 @@ public static class LineNodeActions
         {
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
         var dialog = await dialogService.ShowExAsync<LineNodeManageDialog>(
             "线路节点维护", parameters, options);

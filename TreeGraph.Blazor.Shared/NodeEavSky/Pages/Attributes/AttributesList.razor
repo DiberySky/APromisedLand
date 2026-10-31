@@ -349,7 +349,8 @@ else
             Position = DialogPosition.TopCenter,
             MaxWidth = MaxWidth.Large,
             FullWidth = true,
-            MaximizeButton = true
+            MaximizeButton = true,
+            BackdropClick = false
         };
 
         await DialogService.ShowExAsync<AttributesManageDialog>(

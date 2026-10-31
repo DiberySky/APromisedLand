@@ -160,7 +160,8 @@ else if (!_loading && _space is not null)
                 MaxWidth = MaxWidth.Small,
                 FullWidth = true,
                 MaximizeButton = true,
-                Position = DialogPosition.TopCenter
+                Position = DialogPosition.TopCenter,
+                BackdropClick = false
             });
         var result = await dialog.Result;
         if (result?.Canceled != false

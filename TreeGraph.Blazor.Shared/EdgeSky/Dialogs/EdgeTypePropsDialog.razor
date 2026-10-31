@@ -185,7 +185,7 @@
     {
         var dialog = await DialogService.ShowExAsync<EdgePropAddDialog>(
             string.Empty,
-            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true, BackdropClick = false });
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not EdgeTypePropDto prop)
             return;
@@ -215,7 +215,7 @@
         };
         var dialog = await DialogService.ShowExAsync<EdgePropEditDialog>(
             string.Empty, parameters,
-            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true });
+            new DialogOptionsEx { MaxWidth = MaxWidth.Small, FullWidth = true, MaximizeButton = true, BackdropClick = false });
         var result = await dialog.Result;
         if (result?.Canceled != false || result.Data is not EdgePropEditDialog.Result edit)
             return;
