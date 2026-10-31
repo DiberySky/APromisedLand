@@ -15,28 +15,25 @@
            CancelButtonVisible="true"
            CancelButtonText="关闭">
     <ToolBarContent>
-        @* 工具栏默认不撑满，这里用显式 flex 容器 + margin-left:auto 保证搜索框贴右 *@
-        <div style="display: flex; align-items: center; width: 100%;">
-            <MudText Typo="Typo.body2" Color="Color.Info">@LineName</MudText>
-            @* 仅当前线路的名称模糊搜索；防抖后回到第一页并刷新下方列表 *@
-            <div style="margin-left: auto;">
-                <MudTextField T="string"
-                              @bind-Value="_query"
-                              Placeholder="搜索节点名称"
-                              Variant="Variant.Filled"
-                              Margin="Margin.Dense"
-                              Typo="Typo.body2"
-                              Immediate="true"
-                              DebounceInterval="300"
-                              OnDebounceIntervalElapsed="OnSearchAsync"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Outlined.Search"
-                              IconSize="Size.Small"
-                              Clearable="true"
-                              Style="width: 240px;" />
-            </div>
-        </div>
+        <MudText Typo="Typo.body2" Color="Color.Info">@LineName</MudText>
     </ToolBarContent>
+    <ToolBarRightContent>
+        @* 仅当前线路的名称模糊搜索；防抖后回到第一页并刷新下方列表 *@
+        <MudTextField T="string"
+                      @bind-Value="_query"
+                      Placeholder="搜索节点名称"
+                      Variant="Variant.Filled"
+                      Margin="Margin.Dense"
+                      Typo="Typo.body2"
+                      Immediate="true"
+                      DebounceInterval="300"
+                      OnDebounceIntervalElapsed="OnSearchAsync"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Outlined.Search"
+                      IconSize="Size.Small"
+                      Clearable="true"
+                      Style="width: 240px;" />
+    </ToolBarRightContent>
     <DialogContent>
         <MudTable T="LineNodeDto"
                   @ref="_table"

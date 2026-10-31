@@ -18,11 +18,19 @@
             </MudToolBar>
         }
 
-        @if (ToolBarContent != null)
+        @if (ToolBarContent != null || ToolBarRightContent != null)
         {
             <MudPaper>
                 <MudToolBar Dense>
-                    @ToolBarContent
+                    @if (ToolBarContent != null)
+                    {
+                        @ToolBarContent
+                    }
+                    @if (ToolBarRightContent != null)
+                    {
+                        <MudSpacer/>
+                        @ToolBarRightContent
+                    }
                 </MudToolBar>
             </MudPaper>
         }
@@ -111,6 +119,7 @@
     /// 需要随状态更新的内容（状态文字、步进器绑定值等）放 DialogContent 顶部。
     /// </summary>
     [Parameter] public RenderFragment? ToolBarContent { get; set; }
+    [Parameter] public RenderFragment? ToolBarRightContent { get; set; }
     [Parameter] public RenderFragment? DialogContent { get; set; }
     [Parameter] public RenderFragment? DialogLeftActions { get; set; }
     [Parameter] public RenderFragment? DialogRightActions { get; set; }
