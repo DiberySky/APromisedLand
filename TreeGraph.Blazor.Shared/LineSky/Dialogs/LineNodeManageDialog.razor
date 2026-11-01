@@ -140,8 +140,7 @@
     {
         var parameters = new DialogParameters<LineNodeCreateDialog>
         {
-            { x => x.LineId, LineId },
-            { x => x.LineName, LineName }
+            { x => x.LineId, LineId }
         };
 
         var dialog = await DialogService.ShowExAsync<LineNodeCreateDialog>(

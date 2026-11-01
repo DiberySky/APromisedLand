@@ -155,7 +155,7 @@ public static class LineNodeActions
             // 创建成功即退出宿主循环，回到「线路节点」列表。
             if (result.Data is LineNodeHostAction.AddNext)
             {
-                var created = await AddNextAsync(dialogService, node, lineName);
+                var created = await AddNextAsync(dialogService, node);
                 return created
                     ? (LineNodeHostOutcome.Changed, true)
                     : (LineNodeHostOutcome.Canceled, false);
@@ -169,12 +169,11 @@ public static class LineNodeActions
     /// 在当前节点之后新建一个线路节点：打开新建对话框，前驱预置为当前节点，
     /// 创建成功即形成 当前节点 → 新节点 的段边。返回 true = 已创建。
     /// </summary>
-    private static async Task<bool> AddNextAsync(IDialogService dialogService, LineNodeDto node, string? lineName)
+    private static async Task<bool> AddNextAsync(IDialogService dialogService, LineNodeDto node)
     {
         var parameters = new DialogParameters<LineNodeCreateDialog>
         {
             { x => x.LineId, node.LineId },
-            { x => x.LineName, lineName },
             { x => x.PredecessorId, node.Id },
             { x => x.PredecessorName, node.Name }
         };

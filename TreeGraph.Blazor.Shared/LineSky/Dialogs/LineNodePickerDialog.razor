@@ -1,23 +1,35 @@
 @* LineNodePickerDialog.razor — 线路节点选择器（名称模糊搜索 + 服务端分页，单选）
    打开方式：IDialogService.ShowExAsync<LineNodePickerDialog>；
    单击结果行即选中并确认，返回 DialogResult.Ok(LineNodeDto)；取消返回 null。
-   LineId 非空时仅搜索该线路节点（前驱选择场景）；为空时跨线路搜索。 *@
+   工具栏线路下拉：列出全部线路，切换即重新过滤节点（始终定位到某条具体线路）。
+   注意：Lines（线路列表）必须由调用方预加载传入——MudDialog 标题栏内容在首渲后
+   不会随组件状态重渲，弹窗内异步加载的数据永远不会显示在工具栏。 *@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Components
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @using TreeGraph.Blazor.Shared.Common
 @using TreeGraph.Shared.NodeEavSky.Dtos
 @inject LineNodeManageApiClient NodeApi
-@inject LineManageApiClient LineApi
 @inject ISnackbar Snackbar
 
 <DialogSky Title="@Title"
            CancelButtonVisible="true">
     <ToolBarContent>
-        @if (!string.IsNullOrEmpty(LineName))
+        @* 线路下拉：列出全部线路，切换即重新过滤节点表 *@
+        @if (_lines.Count > 0)
         {
-            @* 限定线路模式：展示所属线路名（由调用方传入，对齐线路节点维护/设置修改等弹窗） *@
-            <MudText Typo="Typo.subtitle1" Color="Color.Info">@LineName</MudText>
+            <MudSelect T="string"
+                       Value="_selectedLineId"
+                       ValueChanged="OnLineChanged"
+                       Variant="Variant.Filled"
+                       Margin="Margin.Dense"
+                       Dense="true"
+                       Typo="Typo.body2">
+                @foreach (var line in _lines)
+                {
+                    <MudSelectItem Value="@line.Id">@line.Name</MudSelectItem>
+                }
+            </MudSelect>
         }
     </ToolBarContent>
     <ToolBarRightContent>
@@ -38,17 +50,11 @@
                   Style="max-height: 56vh; overflow-y: auto; background-color: #000000;">
             <HeaderContent>
                 <MudTh>名称</MudTh>
-                @if (LineId is null)
-                {
-                    <MudTh>线路</MudTh>
-                }
+                <MudTh>线路</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd>@context.Name</MudTd>
-                @if (LineId is null)
-                {
-                    <MudTd Class="mud-text-secondary">@LineLabel(context.LineId)</MudTd>
-                }
+                <MudTd Class="mud-text-secondary">@LineLabel(context.LineId)</MudTd>
             </RowTemplate>
             <NoRecordsContent>
                 <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
@@ -69,34 +75,31 @@
     /// <summary>对话框标题。</summary>
     [Parameter] public string Title { get; set; } = "选择线路节点";
 
-    /// <summary>限定线路 ID（前驱选择场景）；为空则跨线路搜索。</summary>
+    /// <summary>初始选中线路 ID（前驱选择场景）；为空则选中线路列表第一条。</summary>
     [Parameter] public string? LineId { get; set; }
-
-    /// <summary>所属线路名称（限定线路模式下展示于工具栏，由调用方传入）。</summary>
-    [Parameter] public string? LineName { get; set; }
 
     /// <summary>需排除的节点 Id（如当前编辑节点自身，避免选自己作为前驱）。</summary>
     [Parameter] public string? ExcludeNodeId { get; set; }
 
+    /// <summary>线路下拉数据源（调用方预加载传入——标题栏内容不会随弹窗内异步状态重渲）。</summary>
+    [Parameter] public IReadOnlyList<LineDto> Lines { get; set; } = [];
+
     private MudTable<LineNodeDto>? _table;
     private string? _query;
-    private Dictionary<string, string> _lineNames = new();
 
-    protected override async Task OnInitializedAsync()
+    /// <summary>线路下拉数据源。</summary>
+    private List<LineDto> _lines = [];
+
+    /// <summary>当前选中线路（始终为某条具体线路）。</summary>
+    private string _selectedLineId = string.Empty;
+
+    protected override void OnInitialized()
     {
-        if (LineId is null)
-        {
-            // 跨线路模式下预加载线路名称，用于结果行展示
-            try
-            {
-                var lines = await LineApi.GetAllAsync();
-                _lineNames = lines.ToDictionary(l => l.Id, l => l.Name);
-            }
-            catch
-            {
-                _lineNames = new();
-            }
-        }
+        _lines = Lines.ToList();
+        _selectedLineId = LineId ?? string.Empty;
+        // 缺省选中第一条线路
+        if (string.IsNullOrEmpty(_selectedLineId) && _lines.Count > 0)
+            _selectedLineId = _lines[0].Id ?? string.Empty;
     }
 
     /// <summary>MudTable 服务端数据回调。</summary>
@@ -106,7 +109,7 @@
         {
             var page = state.Page + 1; // MudTable 页码从 0 开始，后端从 1 开始
             var pageSize = state.PageSize;
-            var result = await NodeApi.SearchPagedAsync(LineId, _query, page, pageSize, ct);
+            var result = await NodeApi.SearchPagedAsync(_selectedLineId, _query, page, pageSize, ct);
 
             // 排除指定节点（如自身）—— 客户端过滤
             IEnumerable<LineNodeDto> items = result.Items;
@@ -126,15 +129,20 @@
         }
     }
 
+    /// <summary>切换线路：更新过滤条件并重新加载。</summary>
+    private async Task OnLineChanged(string value)
+    {
+        _selectedLineId = value;
+        if (_table is not null)
+            await _table.ReloadServerData();
+    }
+
     private Task OnSearchAsync() => _table?.ReloadServerData() ?? Task.CompletedTask;
 
     /// <summary>点击结果行即选中并确认，直接关闭对话框返回该节点。</summary>
     private void Confirm(LineNodeDto node)
         => MudDialog?.Close(DialogResult.Ok(node));
 
-    private bool TryGetLineName(string? lineId, out string name)
-        => _lineNames.TryGetValue(lineId ?? string.Empty, out name!);
-
     private string LineLabel(string? lineId)
-        => TryGetLineName(lineId, out var ln) ? ln : (lineId ?? "");
+        => _lines.FirstOrDefault(l => l.Id == lineId)?.Name ?? lineId ?? string.Empty;
 }

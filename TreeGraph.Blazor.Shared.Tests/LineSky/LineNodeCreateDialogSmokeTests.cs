@@ -32,6 +32,7 @@ public class LineNodeCreateDialogSmokeTests : BunitTestBase
             BaseAddress = new Uri("http://localhost/")
         });
         Services.AddSingleton<LineNodeManageApiClient>();
+        Services.AddSingleton<LineManageApiClient>();
     }
 
     // ============================================================

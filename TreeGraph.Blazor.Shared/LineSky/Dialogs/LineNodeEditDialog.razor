@@ -8,6 +8,7 @@
 @using TreeGraph.Blazor.Shared.EdgeSky.Services
 @using TreeGraph.Shared.EdgeSky.Dtos
 @inject LineNodeManageApiClient Api
+@inject LineManageApiClient LineApi
 @inject EdgeApiClient EdgeApi
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -170,10 +171,21 @@
     /// <summary>打开线路节点搜索选择器，确认后写入 _form.PredecessorId 与展示名。</summary>
     private async Task OpenPickerAsync()
     {
+        // 线路列表须在打开前预加载（弹窗标题栏不随异步状态重渲）
+        IReadOnlyList<LineDto> lines;
+        try
+        {
+            lines = await LineApi.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载线路失败：{ex.Message}", Severity.Error);
+            return;
+        }
         var parameters = new DialogParameters<LineNodePickerDialog>
         {
+            { x => x.Lines, lines },
             { x => x.LineId, Node?.LineId },
-            { x => x.LineName, LineName },
             { x => x.ExcludeNodeId, Node?.Id }
         };
         var dialog = await DialogService.ShowExAsync<LineNodePickerDialog>(

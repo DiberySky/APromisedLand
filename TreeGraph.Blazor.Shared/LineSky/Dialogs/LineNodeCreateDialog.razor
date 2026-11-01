@@ -5,6 +5,7 @@
 @using TreeGraph.Blazor.Shared.LineSky
 @using TreeGraph.Blazor.Shared.LineSky.Services
 @inject LineNodeManageApiClient Api
+@inject LineManageApiClient LineApi
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
@@ -56,9 +57,6 @@
     /// <summary>所属线路 ID（由一级弹窗传入）。</summary>
     [Parameter] public string LineId { get; set; } = string.Empty;
 
-    /// <summary>所属线路名称（透传给前驱选择器工具栏展示）。</summary>
-    [Parameter] public string? LineName { get; set; }
-
     /// <summary>前驱预置（可选）：从「设置修改」点击「添加下一个」时传入当前节点。</summary>
     [Parameter] public string? PredecessorId { get; set; }
 
@@ -81,10 +79,21 @@
     /// <summary>打开线路节点搜索选择器（限定同线路），确认后写入前驱。</summary>
     private async Task OpenPickerAsync()
     {
+        // 线路列表须在打开前预加载（弹窗标题栏不随异步状态重渲）
+        IReadOnlyList<LineDto> lines;
+        try
+        {
+            lines = await LineApi.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"加载线路失败：{ex.Message}", Severity.Error);
+            return;
+        }
         var parameters = new DialogParameters<LineNodePickerDialog>
         {
-            { x => x.LineId, LineId },
-            { x => x.LineName, LineName }
+            { x => x.Lines, lines },
+            { x => x.LineId, LineId }
         };
         var dialog = await DialogService.ShowExAsync<LineNodePickerDialog>(
             "选择前驱节点", parameters,
