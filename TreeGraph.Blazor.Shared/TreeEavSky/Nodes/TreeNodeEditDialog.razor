@@ -30,41 +30,64 @@
         <MudContainer Class="pt-0 pb-4">
             @* KeepPanelsAlive：非激活页也保持渲染，属性区组件引用（提交时保存属性）不因切页丢失 *@
             <MudTabs Elevation="0" Rounded="true" KeepPanelsAlive="true">
-                <MudTabPanel Text="基本信息" Icon="@Icons.Material.Outlined.Info" IconSize="Size.Small">
-                    <MudForm @ref="_form" Model="@_node">
-                        @if (NodeTemplate.EditTemplate is null)
+                @* MudTabPanel 没有 IconSize 参数（MudTabs 内固定以默认尺寸渲染 Icon），
+                   改用 TabContent 自绘图标，才能让图标取 Small *@
+                <MudTabPanel>
+                    <TabContent>
+                        <span class="d-inline-flex align-items-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" />基本信息
+                        </span>
+                    </TabContent>
+                    <ChildContent>
+                        <MudForm @ref="_form" Model="@_node">
+                            @if (NodeTemplate.EditTemplate is null)
+                            {
+                                <MudStack Spacing="3">
+                                    <MudText Color="Color.Secondary">未提供编辑模板（EditTemplate）。</MudText>
+                                </MudStack>
+                            }
+                            else
+                            {
+                                @NodeTemplate.EditTemplate(_node)
+                            }
+                        </MudForm>
+                    </ChildContent>
+                </MudTabPanel>
+
+                <MudTabPanel>
+                    <TabContent>
+                        <span class="d-inline-flex align-items-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" />属性绑定
+                        </span>
+                    </TabContent>
+                    <ChildContent>
+                        @* 编辑阶段必有 nodeId，直接渲染属性区（EAV 模块挂入点） *@
+                        <NodeAttributeItemsSky @ref="_attrItems"
+                                               NodeId="@_node.Id"
+                                               ReadOnly="false"
+                                               AllowManage="true" />
+                    </ChildContent>
+                </MudTabPanel>
+
+                <MudTabPanel>
+                    <TabContent>
+                        <span class="d-inline-flex align-items-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Outlined.Share" Size="Size.Small" />关系绑定
+                        </span>
+                    </TabContent>
+                    <ChildContent>
+                        @* 编辑阶段必有 nodeId：节点所属图空间由后端按宿主类型解析，组件自行拉取出/入边 *@
+                        @if (string.IsNullOrEmpty(_node.Id))
                         {
-                            <MudStack Spacing="3">
-                                <MudText Color="Color.Secondary">未提供编辑模板（EditTemplate）。</MudText>
-                            </MudStack>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                新建节点保存后方可维护关系。
+                            </MudText>
                         }
                         else
                         {
-                            @NodeTemplate.EditTemplate(_node)
+                            <NodeRelationBindingsSky NodeId="@_node.Id" />
                         }
-                    </MudForm>
-                </MudTabPanel>
-
-                <MudTabPanel Text="属性绑定" Icon="@Icons.Material.Outlined.Link" IconSize="Size.Small">
-                    @* 编辑阶段必有 nodeId，直接渲染属性区（EAV 模块挂入点） *@
-                    <NodeAttributeItemsSky @ref="_attrItems"
-                                           NodeId="@_node.Id"
-                                           ReadOnly="false"
-                                           AllowManage="true" />
-                </MudTabPanel>
-
-                <MudTabPanel Text="关系绑定" Icon="@Icons.Material.Outlined.Share" IconSize="Size.Small">
-                    @* 编辑阶段必有 nodeId：节点所属图空间由后端按宿主类型解析，组件自行拉取出/入边 *@
-                    @if (string.IsNullOrEmpty(_node.Id))
-                    {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">
-                            新建节点保存后方可维护关系。
-                        </MudText>
-                    }
-                    else
-                    {
-                        <NodeRelationBindingsSky NodeId="@_node.Id" />
-                    }
+                    </ChildContent>
                 </MudTabPanel>
             </MudTabs>
         </MudContainer>
