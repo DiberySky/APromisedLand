@@ -28,8 +28,11 @@ public partial class TreeEavSky<TItem> : IDisposable
         {
             _items = await LoadInitialDataAsync(_cts.Token);
 
-            // 恢复选中（深层节点会沿祖先路径懒加载展开）
+            // 恢复选中并沿祖先路径展开（必须在树首帧挂载前完成：
+            // 真实浏览器首帧是 loading 占位，OnAfterRender(firstRender) 会在异步加载完成前就消费掉；
+            // 提前在模型上置 Expanded，树挂载时即带展开状态，不依赖 MudTreeViewItem 的事后响应）
             await SetSelectedAsync(_cts.Token);
+            await ExpandPendingAsync(_cts.Token);
 
             if (ShowDialogFunc == null)
             {
@@ -69,20 +72,22 @@ public partial class TreeEavSky<TItem> : IDisposable
         if (RootId == null && _items != null) RootId = _items!.FirstOrDefault()?.Value?.Id;
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    /// <summary>
+    /// 处理由 <see cref="SetSelectedAsync"/> 登记的初始定位目标：沿祖先路径展开并选中。
+    /// 在树首帧挂载前于模型层完成，避免依赖 Mounted 后的渲染时序。
+    /// </summary>
+    private async Task ExpandPendingAsync(CancellationToken ct = default)
     {
-        // 深层书签/刷新直达：等 MudTreeView 挂载完成后再沿路径展开并选中
-        if (firstRender && _pendingDeepClickNodeId is { } targetId)
+        if (_pendingDeepClickNodeId is not { } targetId) return;
+
+        _pendingDeepClickNodeId = null;
+        try
         {
-            _pendingDeepClickNodeId = null;
-            try
-            {
-                await ExpandToNodeAsync(targetId, clearSelection: false, ct: _cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                // 组件已卸载，静默忽略
-            }
+            await ExpandToNodeAsync(targetId, clearSelection: false, ct: ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // 组件已卸载，静默忽略
         }
     }
 

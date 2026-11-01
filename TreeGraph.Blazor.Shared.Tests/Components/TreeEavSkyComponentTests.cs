@@ -186,6 +186,63 @@ public class TreeEavSkyComponentTests : BunitTestBase {
     }
 
     // ============================================================
+    // 首屏预载但祖先未展开：目标已在 _items 中，仍需展开祖先路径
+    // （回归：搜索定位时后端首屏已带孙级节点，旧逻辑“找到即返回”导致父节点未展开）
+    // ============================================================
+
+    [Fact]
+    public void DeepLink_TargetPreloadedUnderCollapsedParent_ExpandsAncestors()
+    {
+        var target = new TreeNodeDto<UnitTree>
+        {
+            Id = "bbb-1",
+            Text = "bbb-1",
+            Value = new UnitTree { Id = "bbb-1", Name = "bbb-1" },
+        };
+        var parent = new TreeNodeDto<UnitTree>
+        {
+            Id = "bbb",
+            Text = "bbb",
+            Value = new UnitTree { Id = "bbb", Name = "bbb", HasChildren = true },
+            HasChildren = true,
+            Expanded = false,
+            Children = [target],
+        };
+        var root = new TreeNodeDto<UnitTree>
+        {
+            Id = "root",
+            Text = "root",
+            Value = new UnitTree { Id = "root", Name = "root", HasChildren = true },
+            HasChildren = true,
+            Expanded = true,
+            Children = [parent],
+        };
+
+        // 模拟真实异步加载：首屏先渲染 loading 占位（消耗首个 firstRender），
+        // 数据到达后才登记定位目标——旧逻辑只在 firstRender 处理 pending，此处会漏展开。
+        var tcs = new TaskCompletionSource<IReadOnlyList<TreeNodeDto<UnitTree>>>();
+        _clientService
+            .Setup(s => s.LoadInitialDataAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(tcs.Task);
+
+        var cut = Render<TreeEavSky<UnitTree>>(
+            p => p.Add(x => x.ClickNodeId, "bbb-1"));
+
+        Assert.Contains("mud-progress-circular", cut.Markup, StringComparison.Ordinal);
+
+        tcs.SetResult([root]);
+
+        cut.WaitForAssertion(
+            () => Assert.Contains("bbb-1", cut.Markup, StringComparison.Ordinal),
+            TimeSpan.FromSeconds(2));
+
+        // 路径已在首屏模型中 → 不应再走 API 祖先查询
+        _clientService.Verify(
+            s => s.GetAncestorPathFromApiAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    // ============================================================
     // GetAllLoadedNodes 只读不触发懒加载；EnsureAllNodesLoadedAsync 显式加载
     // ============================================================
 

@@ -90,9 +90,8 @@ public partial class TreeEavSky<TItem>
 
     /// <summary>
     /// 从 ClickNodeId 恢复选中状态（首屏阶段）。
-    /// 目标已在首屏节点中时直接选中；深层节点登记到 <see cref="_pendingDeepClickNodeId"/>，
-    /// 等首帧渲染（MudTreeView 挂载）完成后再沿祖先路径懒加载展开，
-    /// 避免在树视图挂载边界内设置选中值被其初始化流程重置。
+    /// 目标已在首屏节点中时直接选中，但**仍需**登记到 <see cref="_pendingDeepClickNodeId"/>：
+    /// 后端首屏会预载孙级节点而父级 Expanded=false，视觉上仍隐藏，须沿祖先路径展开。
     /// </summary>
     private Task SetSelectedAsync(CancellationToken ct = default)
     {
@@ -106,11 +105,9 @@ public partial class TreeEavSky<TItem>
         {
             SelectedValue = found;
             _ = SelectedValueChanged.InvokeAsync(found);
-            _lastClickNodeId = ClickNodeId;
-            return Task.CompletedTask;
         }
 
-        // 深层节点：延后到首帧渲染后处理；同时阻止 OnParametersSetAsync 重复展开
+        // 无论是否已在首屏模型中，统一登记并阻止 OnParametersSetAsync 重复展开
         _pendingDeepClickNodeId = ClickNodeId;
         _lastClickNodeId = ClickNodeId;
         return Task.CompletedTask;

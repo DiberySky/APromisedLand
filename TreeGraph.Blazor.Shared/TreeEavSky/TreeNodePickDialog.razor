@@ -1,11 +1,16 @@
 @* TreeNodePickDialog.razor — 纯节点选择（单选）：点击节点文本即返回该节点（TreeNodeItem 的 Value）。
    由原 TreeSelectDialogSky 拆分而来（其 OriginalNode == null 分支），只做"选一个节点"，不含任何移动/改父语义。
    叶子守卫：ClientService.SelectLeaf 为 true 时仅叶子节点可选（保持拆分前行为）。
+   搜索栏：样式与位置对齐 LineNode（LineNodePickerDialog 工具栏右侧 Filled/Dense/body2 输入框 + 搜索按钮）；
+   有关键词时切换为服务端查询结果平铺列表，点击某结果即回到树视图并展开定位到该节点（不直接选中/关窗）。
+   后端 query 仅支持按父级精确过滤，无法按子树过滤，故搜索范围为整棵树（不叠加 RootId 限定）。
    已废弃能力：移至顶层（把节点置为无父根）—— 单根树模型下会产生 UI 不可见的幽灵节点，禁止。 *@
 @namespace TreeGraph.Blazor.Shared.TreeEavSky
 @typeparam TItem where TItem : class, ITreeNodeBase<TItem>, new()
 
 @inject ITreeClientService<TItem> ClientService
+@inject TreeApiClient<TItem> Api
+@inject ISnackbar Snackbar
 
 <DialogSky Title="@Title"
            CancelButtonVisible="true"
@@ -25,13 +30,69 @@
             @ToolBarRightContent
         }
     </ToolBarContent>
+    <ToolBarRightContent>
+        @* 搜索栏：Enter 或点击按钮执行服务端查询；清空后回到树视图 *@
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Style="width: 230px;">
+            <MudTextField T="string"
+                          @bind-Value="_query"
+                          Placeholder="搜索名称"
+                          Variant="Variant.Filled"
+                          Margin="Margin.Dense"
+                          Typo="Typo.body2"
+                          Immediate="true"
+                          Clearable="true"
+                          OnClearButtonClick="ClearSearchAsync"
+                          OnKeyDown="OnKeyDownAsync"
+                          Style="flex: 1;"/>
+            <MudIconButton Icon="@Icons.Material.Outlined.Search"
+                           Color="Color.Primary"
+                           Size="Size.Small"
+                           OnClick="SearchAsync"
+                           title="搜索"/>
+        </MudStack>
+    </ToolBarRightContent>
     <DialogContent>
         <MudContainer MaxWidth="@MaxWidth">
-            <TreeEavSky TItem="@TItem"
-                        IsSelectDialog="true"
-                        RootId="@RootId"
-                        ClickNodeId="@ClickNodeId"
-                        OnClickItemText="Pick"/>
+            @if (ShowResults)
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary mb-1">
+                    @if (_searching)
+                    {
+                        <span>搜索中…</span>
+                    }
+                    else
+                    {
+                        <span>「@_activeTerm」的搜索结果：@_results.Count 条</span>
+                    }
+                </MudText>
+                <MudTable T="TreeNodeDto<TItem>"
+                          Items="@_results"
+                          OnRowClick="@(args => Locate(args.Item))"
+                          Loading="@_searching"
+                          LoadingProgressColor="Color.Primary"
+                          RowStyle="cursor: pointer;"
+                          Hover="true"
+                          Dense="true"
+                          Elevation="0"
+                          Style="max-height: 56vh; overflow-y: auto;">
+                    <RowTemplate>
+                        <MudTd>@context.Text</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Align="Align.Center" Color="Color.Secondary" Class="my-4">
+                            未找到匹配的节点
+                        </MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            }
+            else
+            {
+                <TreeEavSky TItem="@TItem"
+                            IsSelectDialog="true"
+                            RootId="@RootId"
+                            ClickNodeId="@_clickNodeId"
+                            OnClickItemText="Pick"/>
+            }
         </MudContainer>
     </DialogContent>
 </DialogSky>
@@ -50,17 +111,101 @@
 
     [Parameter] public MaxWidth MaxWidth { get; set; } = MaxWidth.Small;
 
+    /// <summary>是否仅叶子节点可选；不传则沿用 ClientService.SelectLeaf（如边关系选对端等场景需放开为任意节点）。</summary>
+    [Parameter] public bool? SelectLeaf { get; set; }
+
     [Parameter] public RenderFragment? ToolBarLeftContent { get; set; }
     [Parameter] public RenderFragment? ToolBarRightContent { get; set; }
 
     private bool _selectLeaf;
 
+    /// <summary>输入框当前文本（Enter/按钮才真正查询）。</summary>
+    private string? _query;
+
+    /// <summary>生效中的搜索关键词；非空时展示结果列表，清空后回到树视图。</summary>
+    private string? _activeTerm;
+
+    private List<TreeNodeDto<TItem>> _results = [];
+
+    private bool _searching;
+
+    /// <summary>树组件当前定位目标（初始取参数，点击搜索结果时更新并触发展开）。</summary>
+    private string? _clickNodeId;
+
+    /// <summary>后端 query 不返回总数，单页取回（超出时提示细化关键词）。</summary>
+    private const int SearchPageSize = 100;
+
+    private bool ShowResults => !string.IsNullOrWhiteSpace(_activeTerm);
+
     protected override void OnInitialized()
     {
         Title = string.IsNullOrEmpty(Title) ? ClientService.Title : Title;
-        _selectLeaf = ClientService.SelectLeaf;
+        _selectLeaf = SelectLeaf ?? ClientService.SelectLeaf;
+        _clickNodeId = ClickNodeId;
 
         base.OnInitialized();
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SearchAsync();
+    }
+
+    /// <summary>执行搜索：查整棵树（ParentId 空串 = 不限父级）。</summary>
+    private async Task SearchAsync()
+    {
+        var term = string.IsNullOrWhiteSpace(_query) ? null : _query.Trim();
+        if (term is null)
+        {
+            await ClearSearchAsync();
+            return;
+        }
+
+        _activeTerm = term;
+        _searching = true;
+        try
+        {
+            var items = await Api.QueryNodesAsync(new TreeQueryParams
+            {
+                ParentId = string.Empty,
+                SearchTerm = term,
+                Page = 1,
+                PageSize = SearchPageSize
+            });
+            _results = [.. items];
+            if (_results.Count == SearchPageSize)
+                Snackbar.Add($"结果超过 {SearchPageSize} 条，请细化关键词", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            _results = [];
+            Snackbar.Add($"搜索失败：{ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    /// <summary>清空搜索，回到树视图。</summary>
+    private Task ClearSearchAsync()
+    {
+        _query = null;
+        _activeTerm = null;
+        _results = [];
+        _searching = false;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>点击搜索结果：回到树视图，并把树展开定位到该节点（不直接选中/关窗）。</summary>
+    private void Locate(TreeNodeDto<TItem>? dto)
+    {
+        if (dto?.Value is null) return;
+
+        _clickNodeId = dto.Id;
+        _activeTerm = null;
+        _results = [];
     }
 
     private void Pick(TreeNodeItem<TItem>? node)
