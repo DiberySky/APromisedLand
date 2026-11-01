@@ -32,7 +32,7 @@
                   Style="max-height: 56vh; overflow-y: auto; background-color: #000000;">
             <HeaderContent>
                 <MudTh>名称</MudTh>
-                <MudTh>描述</MudTh>
+                <MudTh>线路名</MudTh>
                 <MudTh Style="width: 1%; white-space: nowrap; text-align: right;">
                     @* 操作列表头用 + 图标，点击即新建节点 *@
                     <MudIconButton Icon="@Icons.Material.Outlined.Add"
@@ -44,7 +44,7 @@
             </HeaderContent>
             <RowTemplate>
                 <MudTd>@context.Name</MudTd>
-                <MudTd>@context.Description</MudTd>
+                <MudTd Class="mud-text-secondary">@LineName</MudTd>
                 <MudTd Style="white-space: nowrap; text-align: right;">
                     @* 宿主操作模式：点击打开 LineNodeActionsDialog（基本信息内嵌 + 编辑/删除，连续操作循环） *@
                     <MudIconButton Icon="@Icons.Material.Outlined.Settings"
